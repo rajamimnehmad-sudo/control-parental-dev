@@ -1,0 +1,45 @@
+name: Android CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  quality:
+    name: Build, tests, lint, detekt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build dev debug
+        run: ./gradlew assembleDevDebug
+
+      - name: Unit tests
+        run: ./gradlew testDevDebugUnitTest test
+
+      - name: Ktlint
+        run: ./gradlew ktlintCheck
+
+      - name: Android lint
+        run: ./gradlew lintDevDebug
+
+      - name: Detekt
+        run: ./gradlew detekt

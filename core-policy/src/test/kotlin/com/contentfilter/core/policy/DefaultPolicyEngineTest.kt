@@ -1,0 +1,310 @@
+package com.contentfilter.core.policy
+
+import com.contentfilter.core.domain.model.AppPolicyContext
+import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.DailyLimit
+import com.contentfilter.core.domain.model.DevicePolicyContext
+import com.contentfilter.core.domain.model.DomainPolicyContext
+import com.contentfilter.core.domain.model.ExtraTimeGrant
+import com.contentfilter.core.domain.model.LicenseState
+import com.contentfilter.core.domain.model.PolicyDecision
+import com.contentfilter.core.domain.model.PolicyLevel
+import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicySnapshot
+import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.RuleAction
+import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SystemHealthSnapshot
+import com.contentfilter.core.domain.model.TimePolicyContext
+import com.contentfilter.core.domain.model.UpdateState
+import kotlin.test.Test
+import kotlin.test.assertIs
+
+class DefaultPolicyEngineTest {
+    private val engine = DefaultPolicyEngine()
+
+    @Test
+    fun `specific rule wins over general rule`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(
+                rules = listOf(
+                    rule(id = "global-block", level = PolicyLevel.Global, scope = RuleScope.Global, action = RuleAction.Block),
+                    rule(id = "device-allow", level = PolicyLevel.Device, target = BlockedPackage, action = RuleAction.Allow),
+                ),
+            ),
+            context = appContext(packageName = BlockedPackage),
+        )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `approved app exception wins over account block`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(
+                rules = listOf(
+                    rule(id = "account-block", target = BlockedPackage, action = RuleAction.Block, priority = 0),
+                    rule(id = "approved-allow", target = BlockedPackage, action = RuleAction.Allow, priority = 1_000),
+                ),
+            ),
+            context = appContext(packageName = BlockedPackage),
+        )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `blocks app by package rule`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(rules = listOf(rule(target = BlockedPackage, action = RuleAction.Block))),
+            context = appContext(packageName = BlockedPackage),
+        )
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `allows app while daily limit is still available`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(limits = listOf(limit(target = AllowedPackage, minutes = 60))),
+            context = appContext(packageName = AllowedPackage, usedMinutesToday = 30),
+        )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `blocks app when daily limit is exceeded`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(limits = listOf(limit(target = BlockedPackage, minutes = 60))),
+            context = appContext(packageName = BlockedPackage, usedMinutesToday = 60),
+        )
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `allows exact domain`() {
+        val decision = engine.evaluateDomain(
+            snapshot = policy(rules = listOf(domainRule(target = "example.com", action = RuleAction.Allow))),
+            context = domainContext(domain = "example.com"),
+        )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `allows subdomain`() {
+        val decision = engine.evaluateDomain(
+            snapshot = policy(rules = listOf(domainRule(target = "example.com", action = RuleAction.Allow))),
+            context = domainContext(domain = "kids.example.com"),
+        )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `blocks domain`() {
+        val decision = engine.evaluateDomain(
+            snapshot = policy(rules = listOf(domainRule(target = "blocked.test", action = RuleAction.Block))),
+            context = domainContext(domain = "blocked.test"),
+        )
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `approved domain exception wins over account block`() {
+        val decision = engine.evaluateDomain(
+            snapshot = policy(
+                rules = listOf(
+                    domainRule(id = "domain-block", target = "blocked.test", action = RuleAction.Block, priority = 0),
+                    domainRule(id = "approved-domain", target = "blocked.test", action = RuleAction.Allow, priority = 1_000),
+                ),
+            ),
+            context = domainContext(domain = "blocked.test"),
+        )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `uses active temporary approval`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(
+                limits = listOf(limit(target = BlockedPackage, minutes = 1)),
+                grants = listOf(grant(target = BlockedPackage, validUntil = Now + 1_000)),
+            ),
+            context = appContext(packageName = BlockedPackage, usedMinutesToday = 100),
+        )
+
+        assertIs<PolicyDecision.GrantExtraTime>(decision)
+    }
+
+    @Test
+    fun `ignores expired temporary approval`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(
+                limits = listOf(limit(target = BlockedPackage, minutes = 1)),
+                grants = listOf(grant(target = BlockedPackage, validUntil = Now - 1_000)),
+            ),
+            context = appContext(packageName = BlockedPackage, usedMinutesToday = 100),
+        )
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `uses active global extra time for domain`() {
+        val decision = engine.evaluateDomain(
+            snapshot = policy(
+                rules = listOf(domainRule(target = "blocked.test", action = RuleAction.Block)),
+                grants = listOf(grant(targetType = PolicyTargetType.Global, target = "extra_time", validUntil = Now + 1_000)),
+            ),
+            context = domainContext(domain = "blocked.test"),
+        )
+
+        assertIs<PolicyDecision.GrantExtraTime>(decision)
+    }
+
+    @Test
+    fun `requires activation when device is not activated`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(),
+            context = appContext(isActivated = false),
+        )
+
+        assertIs<PolicyDecision.RequireActivation>(decision)
+    }
+
+    @Test
+    fun `requests authorization when rule requires it`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(rules = listOf(rule(target = BlockedPackage, action = RuleAction.RequestAuthorization))),
+            context = appContext(packageName = BlockedPackage),
+        )
+
+        assertIs<PolicyDecision.RequestAuthorization>(decision)
+    }
+
+    @Test
+    fun `returns health warning when local health is degraded`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(),
+            context = appContext(syncState = ComponentState.Warning),
+        )
+
+        assertIs<PolicyDecision.HealthWarning>(decision)
+    }
+
+    private fun policy(
+        rules: List<PolicyRule> = emptyList(),
+        limits: List<DailyLimit> = emptyList(),
+        grants: List<ExtraTimeGrant> = emptyList(),
+    ): PolicySnapshot =
+        PolicySnapshot(
+            id = "policy",
+            version = 1,
+            rules = rules,
+            dailyLimits = limits,
+            extraTimeGrants = grants,
+        )
+
+    private fun rule(
+        id: String = "rule",
+        level: PolicyLevel = PolicyLevel.Account,
+        scope: RuleScope = RuleScope.App,
+        target: String = BlockedPackage,
+        action: RuleAction,
+        priority: Int = 0,
+    ): PolicyRule =
+        PolicyRule(
+            id = id,
+            level = level,
+            scope = scope,
+            target = target,
+            action = action,
+            priority = priority,
+            enabled = true,
+        )
+
+    private fun domainRule(
+        id: String = "rule",
+        target: String,
+        action: RuleAction,
+        priority: Int = 0,
+    ): PolicyRule =
+        rule(id = id, scope = RuleScope.Domain, target = target, action = action, priority = priority)
+
+    private fun limit(
+        target: String,
+        minutes: Int,
+    ): DailyLimit =
+        DailyLimit(
+            id = "limit-$target",
+            targetType = PolicyTargetType.App,
+            target = target,
+            limitMinutes = minutes,
+            enabled = true,
+        )
+
+    private fun grant(
+        targetType: PolicyTargetType = PolicyTargetType.App,
+        target: String,
+        validUntil: Long,
+    ): ExtraTimeGrant =
+        ExtraTimeGrant(
+            id = "grant-$target",
+            requestId = null,
+            targetType = targetType,
+            target = target,
+            grantedMinutes = 15,
+            validUntilEpochMillis = validUntil,
+        )
+
+    private fun appContext(
+        packageName: String = AllowedPackage,
+        usedMinutesToday: Int = 0,
+        isActivated: Boolean = true,
+        syncState: ComponentState = ComponentState.Enabled,
+    ): AppPolicyContext =
+        AppPolicyContext(
+            packageName = packageName,
+            category = null,
+            usedMinutesToday = usedMinutesToday,
+            time = TimePolicyContext(evaluatedAtEpochMillis = Now, minuteOfDay = 720),
+            device = deviceContext(isActivated = isActivated, syncState = syncState),
+        )
+
+    private fun domainContext(domain: String): DomainPolicyContext =
+        DomainPolicyContext(
+            domain = domain,
+            category = null,
+            time = TimePolicyContext(evaluatedAtEpochMillis = Now, minuteOfDay = 720),
+            device = deviceContext(isActivated = true),
+        )
+
+    private fun deviceContext(
+        isActivated: Boolean,
+        syncState: ComponentState = ComponentState.Enabled,
+    ): DevicePolicyContext =
+        DevicePolicyContext(
+            isActivated = isActivated,
+            healthSnapshot = SystemHealthSnapshot(
+                vpnState = ComponentState.Enabled,
+                accessibilityState = ComponentState.Enabled,
+                syncState = syncState,
+                integrityState = ComponentState.Enabled,
+                databaseState = ComponentState.Enabled,
+                licenseState = LicenseState.Active,
+                updateState = UpdateState.Current,
+                checkedAtEpochMillis = Now,
+            ),
+        )
+
+    private companion object {
+        const val AllowedPackage = "com.example.allowed"
+        const val BlockedPackage = "com.example.blocked"
+        const val Now = 1_000_000L
+    }
+}

@@ -1,0 +1,10 @@
+complexity:
+  LongMethod:
+    threshold: 60
+  LongParameterList:
+    functionThreshold: 7
+style:
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    maxLineLength: 120

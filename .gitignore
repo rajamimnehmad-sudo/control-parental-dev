@@ -1,0 +1,11 @@
+.gradle/
+.gradle-home/
+.kotlin/
+build/
+*/build/
+local.properties
+.env
+supabase/.temp/
+.DS_Store
+*.apk
+*.aab

@@ -1,0 +1,23 @@
+-- Optional seed for local manual testing.
+-- Replace the placeholder UUID with an existing auth.users.id from Supabase Auth.
+-- Do not run this in production unless you understand the sample data.
+
+-- insert into public.accounts (owner_user_id, name)
+-- values ('00000000-0000-0000-0000-000000000000', 'Demo account');
+
+-- Example activation code for manual testing after creating an account.
+-- Replace the account id and code. Store only the hash in Supabase.
+--
+-- insert into public.activation_codes (account_id, code_hash, expires_at)
+-- values (
+--     '00000000-0000-0000-0000-000000000000',
+--     crypt('DEMO-USER-CODE', gen_salt('bf')),
+--     now() + interval '7 days'
+-- );
+--
+-- insert into public.activation_codes (account_id, code_hash, expires_at)
+-- values (
+--     '00000000-0000-0000-0000-000000000000',
+--     crypt('DEMO-ADMIN-CODE', gen_salt('bf')),
+--     now() + interval '7 days'
+-- );

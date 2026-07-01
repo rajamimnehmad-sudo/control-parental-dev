@@ -1,0 +1,70 @@
+name: Publicar APKs DEV
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish-dev:
+    name: Build, test y publicar DEV
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Crear .env DEV desde secrets
+        shell: bash
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          UPDATE_MANIFEST_URL_USER: ${{ secrets.UPDATE_MANIFEST_URL_USER }}
+          UPDATE_MANIFEST_URL_ADMIN: ${{ secrets.UPDATE_MANIFEST_URL_ADMIN }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${SUPABASE_URL:-}" ]]; then
+            echo "Falta secret SUPABASE_URL" >&2
+            exit 1
+          fi
+          if [[ -z "${SUPABASE_ANON_KEY:-}" ]]; then
+            echo "Falta secret SUPABASE_ANON_KEY" >&2
+            exit 1
+          fi
+          {
+            echo "SUPABASE_URL=$SUPABASE_URL"
+            echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
+            echo "UPDATE_MANIFEST_URL_USER=${UPDATE_MANIFEST_URL_USER:-}"
+            echo "UPDATE_MANIFEST_URL_ADMIN=${UPDATE_MANIFEST_URL_ADMIN:-}"
+            echo "UPDATE_MANIFEST_URL="
+          } > .env
+
+      - name: Autenticar Supabase CLI
+        shell: bash
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+            supabase login --token "$SUPABASE_ACCESS_TOKEN" --name github-actions-dev
+          else
+            echo "SUPABASE_ACCESS_TOKEN no configurado; se usara el login local del runner si existe."
+          fi
+
+      - name: Permisos de scripts
+        shell: bash
+        run: chmod +x ./gradlew scripts/*.sh
+
+      - name: Publicar DEV
+        shell: bash
+        env:
+          SUPABASE_PROJECT_REF: syeycayasyufedwoprea
+        run: scripts/publicar_dev.sh
