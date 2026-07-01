@@ -15,6 +15,21 @@ data class SystemStatusUiState(
     val appVersion: String,
     val isVpnActive: Boolean,
 ) {
+    fun withVpnRunning(isRunning: Boolean): SystemStatusUiState =
+        if (isRunning) {
+            copy(
+                summary = "VPN Activa, Accesibilidad $accessibilityState",
+                vpnState = "Activa",
+                isVpnActive = true,
+            )
+        } else {
+            copy(
+                summary = "VPN Inactiva, Accesibilidad $accessibilityState",
+                vpnState = "Inactiva",
+                isVpnActive = false,
+            )
+        }
+
     companion object {
         fun from(snapshot: SystemHealthSnapshot): SystemStatusUiState =
             SystemStatusUiState(

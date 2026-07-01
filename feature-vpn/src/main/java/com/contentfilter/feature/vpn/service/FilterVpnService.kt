@@ -54,7 +54,7 @@ class FilterVpnService : VpnService() {
         startId: Int,
     ): Int {
         when (intent?.action ?: ActionStart) {
-            ActionStop -> stopVpn()
+            ActionStop -> stopVpn(StopReasonApp)
             ActionReconnect -> reconnectVpn()
             else -> startVpn()
         }
@@ -62,19 +62,22 @@ class FilterVpnService : VpnService() {
     }
 
     override fun onRevoke() {
-        stopVpn()
+        stopVpn(StopReasonRevoked)
         super.onRevoke()
     }
 
     override fun onDestroy() {
-        stopVpn()
+        if (VpnController.isRunning(this)) {
+            stopVpn(StopReasonAndroid)
+        }
         super.onDestroy()
     }
 
     private fun startVpn() {
         if (readerJob?.isActive == true) return
         if (DevProtectionMode.isProtectionDisabled(this)) {
-            serviceScope?.launch { systemStatusRepository.updateVpnState(ComponentState.Disabled) }
+            updateVpnState(ComponentState.Disabled)
+            VpnController.markStopped(this, StopReasonDevRescue)
             stopSelf()
             return
         }
@@ -90,11 +93,13 @@ class FilterVpnService : VpnService() {
                 snapshotProvider.start(scope)
                 upstreamDnsServers = currentDnsServers()
                 vpnInterface = establishVpn()
+                VpnController.markStarted(this@FilterVpnService)
                 systemStatusRepository.updateVpnState(ComponentState.Enabled)
                 telemetryReporter.recordServiceState("VPN started.")
                 readPackets(requireNotNull(vpnInterface))
             }.onFailure {
-                systemStatusRepository.updateVpnState(ComponentState.Warning)
+                VpnController.markStopped(this@FilterVpnService, StopReasonFailed)
+                updateVpnState(ComponentState.Warning)
                 telemetryReporter.recordError("VPN failed: ${it.javaClass.simpleName}")
                 cleanup()
             }
@@ -106,14 +111,25 @@ class FilterVpnService : VpnService() {
         startVpn()
     }
 
-    private fun stopVpn() {
-        serviceScope?.launch {
-            systemStatusRepository.updateVpnState(ComponentState.Disabled)
-            telemetryReporter.recordServiceState("VPN stopped.")
-        }
+    private fun stopVpn(reason: String) {
+        VpnController.markStopped(this, reason)
+        updateVpnState(ComponentState.Disabled)
+        recordServiceState("VPN stopped: $reason")
         cleanup()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
+    }
+
+    private fun updateVpnState(state: ComponentState) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            systemStatusRepository.updateVpnState(state)
+        }
+    }
+
+    private fun recordServiceState(message: String) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            telemetryReporter.recordServiceState(message)
+        }
     }
 
     private fun establishVpn(): ParcelFileDescriptor? =
@@ -248,6 +264,11 @@ class FilterVpnService : VpnService() {
         private const val NoBytesRead = -1
         private const val PacketBufferSize = 32 * 1024
         private const val SingleIpv4HostPrefixLength = 32
+        private const val StopReasonAndroid = "android_stopped_vpn"
+        private const val StopReasonApp = "app_stopped_vpn"
+        private const val StopReasonDevRescue = "dev_protection_disabled"
+        private const val StopReasonFailed = "vpn_failed"
+        private const val StopReasonRevoked = "system_revoked_vpn"
         private val AdminPackageNames = listOf(
             "com.android.contacts",
             "com.android.dialer",

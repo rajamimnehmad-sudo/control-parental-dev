@@ -30,6 +30,9 @@ fun SystemStatusRoute(
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
+    val isVpnRunning = VpnController
+        .observeRunning(context)
+        .collectAsStateWithLifecycle(initialValue = VpnController.isRunning(context))
     val isDevProtectionAvailable = VpnController.isDevProtectionAvailable(context)
     var isDevProtectionDisabled by remember {
         mutableStateOf(VpnController.isDevProtectionDisabled(context))
@@ -43,7 +46,7 @@ fun SystemStatusRoute(
         }
     }
     SystemStatusScreen(
-        state = state.value,
+        state = state.value.withVpnRunning(isVpnRunning.value),
         onStartVpn = {
             val prepareIntent = VpnController.prepareIntent(context)
             if (prepareIntent != null) {
