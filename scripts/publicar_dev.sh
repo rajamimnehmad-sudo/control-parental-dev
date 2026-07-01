@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
 if [[ ! -f ".env" ]]; then
     printf 'Falta .env en %s\n' "$ROOT_DIR" >&2
     exit 1
