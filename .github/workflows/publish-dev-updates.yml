@@ -53,11 +53,12 @@ jobs:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
           set -euo pipefail
-          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
-            supabase login --token "$SUPABASE_ACCESS_TOKEN" --name github-actions-dev
-          else
-            echo "SUPABASE_ACCESS_TOKEN no configurado; se usara el login local del runner si existe."
+          if [[ -z "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+            echo "Falta secret SUPABASE_ACCESS_TOKEN." >&2
+            echo "Crealo en Supabase Account Access Tokens y guardalo en GitHub Actions Secrets." >&2
+            exit 1
           fi
+          supabase login --token "$SUPABASE_ACCESS_TOKEN" --name github-actions-dev
 
       - name: Permisos de scripts
         shell: bash
