@@ -1,12 +1,19 @@
 name: Publicar APKs DEV
 
 on:
+  push:
+    branches:
+      - main
   workflow_dispatch:
+
+concurrency:
+  group: publish-dev-updates-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   publish-dev:
     name: Build, test y publicar DEV
-    runs-on: [self-hosted, macOS]
+    runs-on: [self-hosted, macOS, mac-dev-runner]
     timeout-minutes: 60
 
     steps:
