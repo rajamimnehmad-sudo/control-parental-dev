@@ -1,5 +1,6 @@
 package com.contentfilter.feature.accessibility.policy
 
+import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
@@ -12,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
@@ -44,12 +46,13 @@ class AccessibilityPolicySnapshotProvider
                             localDate = day.localDate,
                             dayStartEpochMillis = day.startEpochMillis,
                             dayEndEpochMillis = day.endEpochMillis,
-                        )
+                        ).map { dailyUsage -> activation to dailyUsage }
                     },
-                ) { snapshot, health, dailyUsage ->
+                ) { snapshot, health, activationAndDailyUsage ->
+                    val (activation, dailyUsage) = activationAndDailyUsage
                     AccessibilityPolicyState(
                         snapshot = snapshot.copy(dailyUsage = dailyUsage),
-                        health = health,
+                        health = health.withActiveLicenseIfActivated(activation != null),
                     )
                 }.collect { state.value = it }
             }
@@ -57,11 +60,12 @@ class AccessibilityPolicySnapshotProvider
 
         suspend fun refresh() {
             val day = localDayProvider.currentDay()
+            val activation = deviceActivationRepository.currentActivation()
             state.value = AccessibilityPolicyState(
                 snapshot = policyRepository.getActivePolicy().copy(
                     dailyUsage = emptyList(),
                 ),
-                health = systemStatusRepository.currentHealth(),
+                health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
             )
             observedDay = day
         }
@@ -79,4 +83,9 @@ class AccessibilityPolicySnapshotProvider
             observationJob = null
             observedDay = null
         }
+
+        private fun com.contentfilter.core.domain.model.SystemHealthSnapshot.withActiveLicenseIfActivated(
+            isActivated: Boolean,
+        ): com.contentfilter.core.domain.model.SystemHealthSnapshot =
+            if (isActivated) copy(licenseState = LicenseState.Active) else this
     }

@@ -20,6 +20,7 @@ dependencies {
     implementation(project(":core-domain"))
     implementation(project(":core-ui"))
     implementation(project(":core-telemetry"))
+    implementation(project(":feature-accessibility"))
     implementation(project(":feature-vpn"))
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.activity.compose)

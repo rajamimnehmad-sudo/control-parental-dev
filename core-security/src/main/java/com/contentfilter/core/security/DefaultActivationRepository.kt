@@ -5,9 +5,11 @@ import com.contentfilter.core.domain.model.ActivationCredentials
 import com.contentfilter.core.domain.model.ActivationResult
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.DeviceActivation
+import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.repository.ActivationRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
+import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseActivationClient
 import com.contentfilter.core.network.remote.SupabaseAuthClient
@@ -23,9 +25,11 @@ class DefaultActivationRepository
         private val sessionStore: AuthSessionStore,
         private val activationRepository: DeviceActivationRepository,
         private val deviceRepository: DeviceRepository,
+        private val systemStatusRepository: SystemStatusRepository,
     ) : ActivationRepository {
         override suspend fun activate(credentials: ActivationCredentials): ActivationResult = withContext(Dispatchers.IO) {
             activationRepository.currentActivation()?.let { activation ->
+                systemStatusRepository.updateLicenseState(LicenseState.Active)
                 Log.i(LogTag, "Activation skipped; local device is already activated deviceId=${activation.deviceId}")
                 return@withContext ActivationResult.Activated(activation)
             }
@@ -65,6 +69,7 @@ class DefaultActivationRepository
                     displayName = credentials.deviceDisplayName,
                 ),
             )
+            systemStatusRepository.updateLicenseState(LicenseState.Active)
             return@withContext ActivationResult.Activated(domain)
         }
 

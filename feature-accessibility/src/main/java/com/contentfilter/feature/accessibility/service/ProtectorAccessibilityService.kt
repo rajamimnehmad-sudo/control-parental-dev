@@ -56,12 +56,13 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (event == null || event.eventType !in HandledEventTypes) return
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
         if (DevProtectionMode.isProtectionDisabled(this) || packageName.isAlwaysAllowedPackage()) return
         val elapsed = clock.elapsedRealtimeMillis()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
 
+        serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
         serviceScope?.let { snapshotProvider.ensureCurrentDay(it) }
         val now = clock.nowEpochMillis()
         val transition = usageTracker.onForegroundApp(packageName, elapsed, now)
@@ -191,6 +192,11 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     private companion object {
         const val CheckpointIntervalMillis = 5 * 60 * 1_000L
+        val HandledEventTypes = setOf(
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED,
+            AccessibilityEvent.TYPE_VIEW_FOCUSED,
+        )
         val ExactAllowedPackageNames = setOf(
             "android",
             "com.android.contacts",

@@ -1,6 +1,7 @@
 package com.contentfilter.feature.status
 
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.ProtectionLevel
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 
@@ -39,7 +40,7 @@ data class SystemStatusUiState(
                 vpnState = snapshot.vpnState.displayName(),
                 accessibilityState = snapshot.accessibilityState.displayName(),
                 syncState = snapshot.syncState.displayName(),
-                activationState = snapshot.licenseState.name,
+                activationState = snapshot.licenseState.displayName(),
                 appVersion = "1.0.0",
                 isVpnActive = snapshot.vpnState == ComponentState.Enabled,
             )
@@ -50,6 +51,16 @@ data class SystemStatusUiState(
                 ComponentState.Disabled -> "Inactiva"
                 ComponentState.Warning -> "Con advertencias"
                 ComponentState.Unknown -> "Desconocida"
+            }
+
+        private fun LicenseState.displayName(): String =
+            when (this) {
+                LicenseState.Active -> "Activada"
+                LicenseState.ExpiringSoon -> "Por vencer"
+                LicenseState.PendingActivation -> "Pendiente"
+                LicenseState.Expired -> "Expirada"
+                LicenseState.GracePeriod -> "Periodo de gracia"
+                LicenseState.Suspended -> "Suspendida"
             }
     }
 }

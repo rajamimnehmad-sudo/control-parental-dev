@@ -2,6 +2,7 @@ package com.contentfilter.core.data
 
 import com.contentfilter.core.database.dao.SystemHealthDao
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import kotlinx.coroutines.flow.Flow
@@ -31,6 +32,10 @@ class RoomSystemStatusRepository
 
         override suspend fun updateSyncState(state: ComponentState) {
             updateHealth { it.copy(syncState = state) }
+        }
+
+        override suspend fun updateLicenseState(state: LicenseState) {
+            updateHealth { it.copy(licenseState = state) }
         }
 
         private suspend fun updateHealth(transform: (SystemHealthSnapshot) -> SystemHealthSnapshot) {

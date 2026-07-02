@@ -1,6 +1,7 @@
 package com.contentfilter.core.domain.repository
 
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import kotlinx.coroutines.flow.Flow
 
@@ -17,4 +18,6 @@ interface SystemStatusRepository {
     suspend fun updateAccessibilityState(state: ComponentState)
 
     suspend fun updateSyncState(state: ComponentState)
+
+    suspend fun updateLicenseState(state: LicenseState)
 }
