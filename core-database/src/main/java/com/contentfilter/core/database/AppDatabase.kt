@@ -9,8 +9,8 @@ import com.contentfilter.core.database.dao.DeviceDao
 import com.contentfilter.core.database.dao.ExtraTimeGrantDao
 import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.dao.PolicyDao
-import com.contentfilter.core.database.dao.SystemHealthDao
 import com.contentfilter.core.database.dao.SyncCursorDao
+import com.contentfilter.core.database.dao.SystemHealthDao
 import com.contentfilter.core.database.dao.TechnicalDiagnosticDao
 import com.contentfilter.core.database.dao.UsageSessionDao
 import com.contentfilter.core.database.entity.AccessRequestEntity
@@ -22,8 +22,8 @@ import com.contentfilter.core.database.entity.ExtraTimeGrantEntity
 import com.contentfilter.core.database.entity.OutboxOperationEntity
 import com.contentfilter.core.database.entity.PolicyEntity
 import com.contentfilter.core.database.entity.PolicyRuleEntity
-import com.contentfilter.core.database.entity.SystemHealthEntity
 import com.contentfilter.core.database.entity.SyncCursorEntity
+import com.contentfilter.core.database.entity.SystemHealthEntity
 import com.contentfilter.core.database.entity.TechnicalDiagnosticEntity
 import com.contentfilter.core.database.entity.UsageSessionEntity
 

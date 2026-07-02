@@ -23,13 +23,13 @@ class GrantExtraTimeUseCase(
                 targetType = request.targetType,
                 target = request.target,
                 grantedMinutes = minutes,
-                validUntilEpochMillis = nowEpochMillis + minutes * MillisPerMinute,
+                validUntilEpochMillis = nowEpochMillis + minutes * MILLIS_PER_MINUTE,
             ),
         )
         requestRepository.updateStatus(request.id, RequestStatus.Approved)
     }
 
     private companion object {
-        const val MillisPerMinute = 60_000L
+        const val MILLIS_PER_MINUTE = 60_000L
     }
 }

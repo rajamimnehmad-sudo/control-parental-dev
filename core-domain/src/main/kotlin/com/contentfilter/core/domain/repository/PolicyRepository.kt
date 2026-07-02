@@ -1,7 +1,7 @@
 package com.contentfilter.core.domain.repository
 
-import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicySnapshot
 import kotlinx.coroutines.flow.Flow
 
 /**

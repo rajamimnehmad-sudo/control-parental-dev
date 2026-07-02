@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "system_health")
 data class SystemHealthEntity(
-    @PrimaryKey val id: String = CurrentHealthId,
+    @PrimaryKey val id: String = CURRENT_HEALTH_ID,
     val vpnState: String,
     val accessibilityState: String,
     val syncState: String,
@@ -16,6 +16,6 @@ data class SystemHealthEntity(
     val checkedAtEpochMillis: Long,
 ) {
     companion object {
-        const val CurrentHealthId = "current"
+        const val CURRENT_HEALTH_ID = "current"
     }
 }

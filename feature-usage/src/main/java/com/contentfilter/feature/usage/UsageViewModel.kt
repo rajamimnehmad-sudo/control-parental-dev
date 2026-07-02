@@ -27,7 +27,7 @@ class UsageViewModel
             .observeActivation()
             .flatMapLatest { activation ->
                 usageSessionRepository.observeDailyUsage(
-                    deviceId = activation?.deviceId ?: UsageSession.LocalDeviceId,
+                    deviceId = activation?.deviceId ?: UsageSession.LOCAL_DEVICE_ID,
                     localDate = day.localDate,
                     dayStartEpochMillis = day.startEpochMillis,
                     dayEndEpochMillis = day.endEpochMillis,

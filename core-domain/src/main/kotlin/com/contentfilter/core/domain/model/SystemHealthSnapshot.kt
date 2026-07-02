@@ -14,13 +14,14 @@ data class SystemHealthSnapshot(
     val checkedAtEpochMillis: Long,
 ) {
     val protectionLevel: ProtectionLevel
-        get() = when {
-            vpnState == ComponentState.Disabled ||
-                accessibilityState == ComponentState.Disabled ||
-                databaseState == ComponentState.Disabled -> ProtectionLevel.Unprotected
-            hasWarningState() -> ProtectionLevel.Warning
-            else -> ProtectionLevel.Protected
-        }
+        get() =
+            when {
+                vpnState == ComponentState.Disabled ||
+                    accessibilityState == ComponentState.Disabled ||
+                    databaseState == ComponentState.Disabled -> ProtectionLevel.Unprotected
+                hasWarningState() -> ProtectionLevel.Warning
+                else -> ProtectionLevel.Protected
+            }
 
     private fun hasWarningState(): Boolean =
         vpnState != ComponentState.Enabled ||

@@ -32,7 +32,7 @@ internal fun dailyAppUsage(
         packageName = packageName,
         deviceId = deviceId,
         localDate = localDate,
-        usedMinutes = (usedMillis / MillisPerMinute).toInt(),
+        usedMinutes = (usedMillis / MILLIS_PER_MINUTE).toInt(),
     )
 
-private const val MillisPerMinute = 60_000L
+private const val MILLIS_PER_MINUTE = 60_000L

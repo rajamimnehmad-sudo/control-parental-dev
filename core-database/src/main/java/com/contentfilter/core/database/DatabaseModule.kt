@@ -9,8 +9,8 @@ import com.contentfilter.core.database.dao.DeviceDao
 import com.contentfilter.core.database.dao.ExtraTimeGrantDao
 import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.dao.PolicyDao
-import com.contentfilter.core.database.dao.SystemHealthDao
 import com.contentfilter.core.database.dao.SyncCursorDao
+import com.contentfilter.core.database.dao.SystemHealthDao
 import com.contentfilter.core.database.dao.TechnicalDiagnosticDao
 import com.contentfilter.core.database.dao.UsageSessionDao
 import dagger.Module
@@ -39,8 +39,7 @@ object DatabaseModule {
     fun provideSystemHealthDao(database: AppDatabase): SystemHealthDao = database.systemHealthDao()
 
     @Provides
-    fun provideTechnicalDiagnosticDao(database: AppDatabase): TechnicalDiagnosticDao =
-        database.technicalDiagnosticDao()
+    fun provideTechnicalDiagnosticDao(database: AppDatabase): TechnicalDiagnosticDao = database.technicalDiagnosticDao()
 
     @Provides
     fun provideDailyLimitDao(database: AppDatabase): DailyLimitDao = database.dailyLimitDao()

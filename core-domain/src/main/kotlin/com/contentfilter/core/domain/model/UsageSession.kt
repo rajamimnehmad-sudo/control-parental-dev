@@ -11,6 +11,6 @@ data class UsageSession(
     val endedAtEpochMillis: Long?,
 ) {
     companion object {
-        const val LocalDeviceId = "local-device"
+        const val LOCAL_DEVICE_ID = "local-device"
     }
 }

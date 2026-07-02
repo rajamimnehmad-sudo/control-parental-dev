@@ -14,5 +14,8 @@ interface AccessRequestRepository {
 
     suspend fun saveRequest(request: AccessRequest)
 
-    suspend fun updateStatus(requestId: String, status: RequestStatus)
+    suspend fun updateStatus(
+        requestId: String,
+        status: RequestStatus,
+    )
 }

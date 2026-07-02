@@ -4,9 +4,9 @@ import com.contentfilter.core.database.dao.UsageSessionDao
 import com.contentfilter.core.domain.model.DailyAppUsage
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.repository.UsageSessionRepository
-import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
 
 class RoomUsageSessionRepository
     @Inject
@@ -44,12 +44,13 @@ class RoomUsageSessionRepository
             dayStartEpochMillis: Long,
             dayEndEpochMillis: Long,
         ): DailyAppUsage {
-            val projection = usageSessionDao.dailyUsageForPackage(
-                deviceId = deviceId,
-                packageName = packageName,
-                dayStartEpochMillis = dayStartEpochMillis,
-                dayEndEpochMillis = dayEndEpochMillis,
-            )
+            val projection =
+                usageSessionDao.dailyUsageForPackage(
+                    deviceId = deviceId,
+                    packageName = packageName,
+                    dayStartEpochMillis = dayStartEpochMillis,
+                    dayEndEpochMillis = dayEndEpochMillis,
+                )
             return dailyAppUsage(
                 packageName = packageName,
                 deviceId = deviceId,

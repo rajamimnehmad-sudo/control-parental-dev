@@ -10,10 +10,10 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface SystemHealthDao {
     @Query("SELECT * FROM system_health WHERE id = :id")
-    fun observeCurrent(id: String = SystemHealthEntity.CurrentHealthId): Flow<SystemHealthEntity?>
+    fun observeCurrent(id: String = SystemHealthEntity.CURRENT_HEALTH_ID): Flow<SystemHealthEntity?>
 
     @Query("SELECT * FROM system_health WHERE id = :id")
-    suspend fun current(id: String = SystemHealthEntity.CurrentHealthId): SystemHealthEntity?
+    suspend fun current(id: String = SystemHealthEntity.CURRENT_HEALTH_ID): SystemHealthEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(entity: SystemHealthEntity)

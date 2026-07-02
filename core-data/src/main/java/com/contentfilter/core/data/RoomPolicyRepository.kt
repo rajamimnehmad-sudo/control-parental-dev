@@ -1,23 +1,22 @@
 package com.contentfilter.core.data
 
-import com.contentfilter.core.database.dao.PolicyDao
-import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.ExtraTimeGrantDao
+import com.contentfilter.core.database.dao.OutboxOperationDao
+import com.contentfilter.core.database.dao.PolicyDao
 import com.contentfilter.core.database.entity.OutboxOperationEntity
 import com.contentfilter.core.database.entity.PolicyEntity
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.repository.PolicyRepository
-import java.time.Instant
-import java.util.UUID
-import javax.inject.Inject
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+import java.time.Instant
+import java.util.UUID
+import javax.inject.Inject
 
 class RoomPolicyRepository
     @Inject
@@ -72,9 +71,10 @@ class RoomPolicyRepository
             if (currentPolicy != null && !currentPolicy.id.isRemoteCompatibleId()) {
                 policyDao.deactivatePolicy(currentPolicy.id)
             }
-            val policy = currentPolicy
-                ?.takeIf { it.id.isRemoteCompatibleId() }
-                ?: createDefaultPolicy()
+            val policy =
+                currentPolicy
+                    ?.takeIf { it.id.isRemoteCompatibleId() }
+                    ?: createDefaultPolicy()
             policyDao.upsertRule(rule.toEntity(policy.id))
             val accountId = deviceActivationDao.latest()?.accountId
             outboxDao.upsert(policy.toOutboxOperation(accountId))
@@ -82,29 +82,30 @@ class RoomPolicyRepository
         }
 
         private suspend fun createDefaultPolicy(): PolicyEntity {
-            val policy = PolicyEntity(
-                id = UUID.randomUUID().toString(),
-                version = System.currentTimeMillis(),
-                active = true,
-                updatedAtEpochMillis = System.currentTimeMillis(),
-            )
+            val policy =
+                PolicyEntity(
+                    id = UUID.randomUUID().toString(),
+                    version = System.currentTimeMillis(),
+                    active = true,
+                    updatedAtEpochMillis = System.currentTimeMillis(),
+                )
             policyDao.upsertPolicy(policy)
             return policy
         }
 
-        private fun String.isRemoteCompatibleId(): Boolean =
-            runCatching { UUID.fromString(this) }.isSuccess
+        private fun String.isRemoteCompatibleId(): Boolean = runCatching { UUID.fromString(this) }.isSuccess
 
         private fun PolicyEntity.toOutboxOperation(accountId: String?): OutboxOperationEntity {
             val now = System.currentTimeMillis()
-            val payload = org.json.JSONObject()
-                .put("id", id)
-                .put("account_id", accountId)
-                .put("version", version)
-                .put("active", active)
-                .put("updated_at", Instant.ofEpochMilli(updatedAtEpochMillis).toString())
-                .toString()
-            return outboxOperation(PoliciesTable, payload, now)
+            val payload =
+                org.json.JSONObject()
+                    .put("id", id)
+                    .put("account_id", accountId)
+                    .put("version", version)
+                    .put("active", active)
+                    .put("updated_at", Instant.ofEpochMilli(updatedAtEpochMillis).toString())
+                    .toString()
+            return outboxOperation(POLICIES_TABLE, payload, now)
         }
 
         private fun PolicyRule.toOutboxOperation(
@@ -112,18 +113,19 @@ class RoomPolicyRepository
             accountId: String?,
         ): OutboxOperationEntity {
             val now = System.currentTimeMillis()
-            val payload = org.json.JSONObject()
-                .put("id", id)
-                .put("account_id", accountId)
-                .put("policy_id", policyId)
-                .put("scope", scope.name)
-                .put("target", target)
-                .put("action", action.name)
-                .put("priority", priority)
-                .put("enabled", enabled)
-                .put("updated_at", Instant.ofEpochMilli(now).toString())
-                .toString()
-            return outboxOperation(PolicyRulesTable, payload, now)
+            val payload =
+                org.json.JSONObject()
+                    .put("id", id)
+                    .put("account_id", accountId)
+                    .put("policy_id", policyId)
+                    .put("scope", scope.name)
+                    .put("target", target)
+                    .put("action", action.name)
+                    .put("priority", priority)
+                    .put("enabled", enabled)
+                    .put("updated_at", Instant.ofEpochMilli(now).toString())
+                    .toString()
+            return outboxOperation(POLICY_RULES_TABLE, payload, now)
         }
 
         private fun outboxOperation(
@@ -134,18 +136,18 @@ class RoomPolicyRepository
             OutboxOperationEntity(
                 id = UUID.randomUUID().toString(),
                 tableName = tableName,
-                operation = UpsertOperation,
+                operation = UPSERT_OPERATION,
                 payload = payload,
-                status = PendingStatus,
+                status = PENDING_STATUS,
                 attemptCount = 0,
                 createdAtEpochMillis = now,
                 updatedAtEpochMillis = now,
             )
 
         private companion object {
-            const val PoliciesTable = "policies"
-            const val PolicyRulesTable = "policy_rules"
-            const val UpsertOperation = "Upsert"
-            const val PendingStatus = "Pending"
+            const val POLICIES_TABLE = "policies"
+            const val POLICY_RULES_TABLE = "policy_rules"
+            const val UPSERT_OPERATION = "Upsert"
+            const val PENDING_STATUS = "Pending"
         }
     }

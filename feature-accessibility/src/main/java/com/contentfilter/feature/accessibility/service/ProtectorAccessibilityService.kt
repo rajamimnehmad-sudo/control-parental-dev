@@ -180,7 +180,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             usageSessionRepository.saveSession(
                 UsageSession(
                     id = UUID.randomUUID().toString(),
-                    deviceId = deviceActivationRepository.currentActivation()?.deviceId ?: UsageSession.LocalDeviceId,
+                    deviceId = deviceActivationRepository.currentActivation()?.deviceId ?: UsageSession.LOCAL_DEVICE_ID,
                     packageName = transition.packageName,
                     startedAtEpochMillis = transition.startedAtEpochMillis,
                     endedAtEpochMillis = transition.endedAtEpochMillis,

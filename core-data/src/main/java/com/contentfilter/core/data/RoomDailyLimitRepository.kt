@@ -3,9 +3,9 @@ package com.contentfilter.core.data
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.repository.DailyLimitRepository
-import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
+import javax.inject.Inject
 
 class RoomDailyLimitRepository
     @Inject

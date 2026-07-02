@@ -24,16 +24,18 @@ class ApproveAccessRequestUseCase(
     }
 
     private fun AccessRequest.toAllowRule(): PolicyRule? {
-        val scope = when (requestType) {
-            AccessRequestType.APP_ACCESS -> RuleScope.App
-            AccessRequestType.DOMAIN_ACCESS -> RuleScope.Domain
-            else -> return null
-        }
-        val allowTarget = when (scope) {
-            RuleScope.App -> targetPackageName ?: target.takeIf { targetType == PolicyTargetType.App }
-            RuleScope.Domain -> targetDomain ?: target.takeIf { targetType == PolicyTargetType.Domain }
-            else -> null
-        }?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val scope =
+            when (requestType) {
+                AccessRequestType.APP_ACCESS -> RuleScope.App
+                AccessRequestType.DOMAIN_ACCESS -> RuleScope.Domain
+                else -> return null
+            }
+        val allowTarget =
+            when (scope) {
+                RuleScope.App -> targetPackageName ?: target.takeIf { targetType == PolicyTargetType.App }
+                RuleScope.Domain -> targetDomain ?: target.takeIf { targetType == PolicyTargetType.Domain }
+                else -> null
+            }?.trim()?.takeIf { it.isNotEmpty() } ?: return null
 
         return PolicyRule(
             id = UUID.randomUUID().toString(),
@@ -41,12 +43,12 @@ class ApproveAccessRequestUseCase(
             scope = scope,
             target = allowTarget,
             action = RuleAction.Allow,
-            priority = ApprovedRequestPriority,
+            priority = APPROVED_REQUEST_PRIORITY,
             enabled = true,
         )
     }
 
     private companion object {
-        const val ApprovedRequestPriority = 1_000
+        const val APPROVED_REQUEST_PRIORITY = 1_000
     }
 }
