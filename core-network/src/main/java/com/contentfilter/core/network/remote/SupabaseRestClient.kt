@@ -67,7 +67,7 @@ class SupabaseRestClient
             }
         }
 
-        private fun executeArray(
+        private suspend fun executeArray(
             path: String,
             source: String,
         ): RemoteResult<JSONArray> {
@@ -87,7 +87,7 @@ class SupabaseRestClient
             }
         }
 
-        private fun requestBuilder(path: String): Request.Builder? {
+        private suspend fun requestBuilder(path: String): Request.Builder? {
             val config = configProvider.current()
             val token = authTokenProvider.currentToken()
             val baseUrl = config.normalizedUrlOrNull()

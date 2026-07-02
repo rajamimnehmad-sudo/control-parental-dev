@@ -6,14 +6,18 @@ import com.contentfilter.admin.BuildConfig
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
+import com.contentfilter.core.sync.SyncScheduler
+import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 
 @HiltViewModel
 class DevicesViewModel
@@ -22,6 +26,8 @@ class DevicesViewModel
         observeDevices: ObserveDevicesUseCase,
         activationRepository: DeviceActivationRepository,
         systemStatusRepository: SystemStatusRepository,
+        private val syncScheduler: SyncScheduler,
+        private val syncEngine: SyncEngine,
     ) : ViewModel() {
         val uiState = combine(
             observeDevices(),
@@ -50,6 +56,13 @@ class DevicesViewModel
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = DevicesUiState(offlineMode = false),
         )
+
+        init {
+            syncScheduler.requestSync()
+            viewModelScope.launch(Dispatchers.IO) {
+                syncEngine.syncOnce()
+            }
+        }
 
         private fun Long.toDisplayDate(): String =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")

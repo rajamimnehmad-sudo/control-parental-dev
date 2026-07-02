@@ -5,9 +5,12 @@ import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.network.remote.SupabaseTable
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import okhttp3.Response
@@ -23,22 +26,26 @@ class SupabaseRealtimeSubscription
         private val httpClient: OkHttpClient,
     ) : RealtimeSubscription {
         private val changes = MutableSharedFlow<RealtimeChange>(extraBufferCapacity = 32)
+        private val scope = CoroutineScope(Dispatchers.IO)
         private var webSocket: WebSocket? = null
 
         override fun observeChanges(): Flow<RealtimeChange> = changes.asSharedFlow()
 
         override fun connect() {
-            val config = configProvider.current()
-            val baseUrl = config.normalizedUrlOrNull()
-            val token = authTokenProvider.currentToken()
-            if (baseUrl == null || token == null || webSocket != null) return
-            val realtimeUrl = baseUrl
-                .replace("https://", "wss://")
-                .replace("http://", "ws://")
-            val request = Request.Builder()
-                .url("$realtimeUrl/realtime/v1/websocket?apikey=${config.anonKey}&access_token=$token&vsn=1.0.0")
-                .build()
-            webSocket = httpClient.newWebSocket(request, listener())
+            if (webSocket != null) return
+            scope.launch {
+                val config = configProvider.current()
+                val baseUrl = config.normalizedUrlOrNull()
+                val token = authTokenProvider.currentToken()
+                if (baseUrl == null || token == null || webSocket != null) return@launch
+                val realtimeUrl = baseUrl
+                    .replace("https://", "wss://")
+                    .replace("http://", "ws://")
+                val request = Request.Builder()
+                    .url("$realtimeUrl/realtime/v1/websocket?apikey=${config.anonKey}&access_token=$token&vsn=1.0.0")
+                    .build()
+                webSocket = httpClient.newWebSocket(request, listener())
+            }
         }
 
         override fun disconnect() {

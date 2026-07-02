@@ -9,9 +9,11 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.usecase.admin.ObservePolicyRulesUseCase
 import com.contentfilter.core.domain.usecase.admin.SavePolicyRuleUseCase
 import com.contentfilter.core.sync.SyncScheduler
+import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
@@ -26,6 +28,7 @@ class RulesViewModel
         observePolicyRules: ObservePolicyRulesUseCase,
         private val saveRule: SavePolicyRuleUseCase,
         private val syncScheduler: SyncScheduler,
+        private val syncEngine: SyncEngine,
     ) : ViewModel() {
         private val form = MutableStateFlow(
             RulesUiState(),
@@ -58,7 +61,13 @@ class RulesViewModel
             viewModelScope.launch {
                 saveRule(rule.copy(enabled = !rule.enabled))
                 syncScheduler.requestSync()
+                syncNow()
             }
+        }
+
+        init {
+            syncScheduler.requestSync()
+            syncNow()
         }
 
         private fun createRule(scope: RuleScope) {
@@ -89,7 +98,14 @@ class RulesViewModel
                     ),
                 )
                 syncScheduler.requestSync()
+                syncNow()
                 form.update { it.copy(target = "", message = "Regla guardada.") }
+            }
+        }
+
+        private fun syncNow() {
+            viewModelScope.launch(Dispatchers.IO) {
+                syncEngine.syncOnce()
             }
         }
 

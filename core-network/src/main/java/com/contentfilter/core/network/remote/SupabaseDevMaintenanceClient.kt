@@ -105,7 +105,7 @@ class SupabaseDevMaintenanceClient
             }
         }
 
-        private fun requestBuilder(path: String): Request.Builder? {
+        private suspend fun requestBuilder(path: String): Request.Builder? {
             val config = configProvider.current()
             val baseUrl = config.normalizedUrlOrNull()
             val token = authTokenProvider.currentToken()
