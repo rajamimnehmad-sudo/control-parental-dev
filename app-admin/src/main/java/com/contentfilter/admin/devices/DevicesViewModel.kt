@@ -6,7 +6,6 @@ import com.contentfilter.admin.BuildConfig
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
-import com.contentfilter.core.network.config.SupabaseConfigProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.ZoneId
@@ -23,7 +22,6 @@ class DevicesViewModel
         observeDevices: ObserveDevicesUseCase,
         activationRepository: DeviceActivationRepository,
         systemStatusRepository: SystemStatusRepository,
-        configProvider: SupabaseConfigProvider,
     ) : ViewModel() {
         val uiState = combine(
             observeDevices(),
@@ -45,12 +43,12 @@ class DevicesViewModel
             }
             DevicesUiState(
                 devices = items,
-                offlineMode = !configProvider.current().isConfigured,
+                offlineMode = false,
             )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = DevicesUiState(offlineMode = !configProvider.current().isConfigured),
+            initialValue = DevicesUiState(offlineMode = false),
         )
 
         private fun Long.toDisplayDate(): String =

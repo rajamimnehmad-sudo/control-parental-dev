@@ -8,7 +8,6 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.usecase.admin.ObservePolicyRulesUseCase
 import com.contentfilter.core.domain.usecase.admin.SavePolicyRuleUseCase
-import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.sync.SyncScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
@@ -27,16 +26,15 @@ class RulesViewModel
         observePolicyRules: ObservePolicyRulesUseCase,
         private val saveRule: SavePolicyRuleUseCase,
         private val syncScheduler: SyncScheduler,
-        configProvider: SupabaseConfigProvider,
     ) : ViewModel() {
         private val form = MutableStateFlow(
-            RulesUiState(offlineMode = !configProvider.current().isConfigured),
+            RulesUiState(),
         )
 
         val uiState = combine(observePolicyRules(), form) { rules, formState ->
             formState.copy(
                 rules = rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
-                offlineMode = !configProvider.current().isConfigured,
+                offlineMode = false,
             )
         }.stateIn(
             scope = viewModelScope,

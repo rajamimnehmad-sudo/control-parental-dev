@@ -9,7 +9,6 @@ import com.contentfilter.core.domain.usecase.admin.ApproveAccessRequestUseCase
 import com.contentfilter.core.domain.usecase.admin.GrantExtraTimeUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
 import com.contentfilter.core.domain.usecase.admin.SetRequestStatusUseCase
-import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -34,7 +33,6 @@ class AdminRequestsViewModel
         private val grantExtraTime: GrantExtraTimeUseCase,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
-        configProvider: SupabaseConfigProvider,
     ) : ViewModel() {
         private val syncMessage = MutableStateFlow("")
 
@@ -51,14 +49,14 @@ class AdminRequestsViewModel
             .combine(syncMessage) { requests, message ->
                 AdminRequestsUiState(
                     requests = requests,
-                    offlineMode = !configProvider.current().isConfigured,
+                    offlineMode = false,
                     lastSyncMessage = message,
                 )
             }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = AdminRequestsUiState(offlineMode = !configProvider.current().isConfigured),
+                initialValue = AdminRequestsUiState(offlineMode = false),
             )
 
         init {

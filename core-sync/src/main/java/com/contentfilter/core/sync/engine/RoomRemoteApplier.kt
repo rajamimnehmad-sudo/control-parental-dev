@@ -38,7 +38,13 @@ class RoomRemoteApplier
         }
 
         suspend fun applyPolicyRules(values: List<RemotePolicyRuleDto>) {
-            policyDao.upsertRules(values.map { it.toEntity() })
+            values.forEach { rule ->
+                if (rule.deletedAt == null) {
+                    policyDao.upsertRule(rule.toEntity())
+                } else {
+                    policyDao.deleteRuleById(rule.id)
+                }
+            }
         }
 
         suspend fun applyDailyLimits(values: List<RemoteDailyLimitDto>) {

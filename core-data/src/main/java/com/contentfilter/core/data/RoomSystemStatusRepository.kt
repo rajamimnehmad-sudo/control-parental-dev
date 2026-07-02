@@ -29,6 +29,10 @@ class RoomSystemStatusRepository
             updateHealth { it.copy(accessibilityState = state) }
         }
 
+        override suspend fun updateSyncState(state: ComponentState) {
+            updateHealth { it.copy(syncState = state) }
+        }
+
         private suspend fun updateHealth(transform: (SystemHealthSnapshot) -> SystemHealthSnapshot) {
             val now = System.currentTimeMillis()
             val current = systemHealthDao.current()?.toDomain() ?: defaultHealthSnapshot(now)

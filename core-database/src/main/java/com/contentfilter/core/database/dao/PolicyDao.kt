@@ -34,6 +34,9 @@ interface PolicyDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertRules(rules: List<PolicyRuleEntity>)
 
+    @Query("DELETE FROM policy_rules WHERE id = :ruleId")
+    suspend fun deleteRuleById(ruleId: String)
+
     @Query("DELETE FROM policy_rules")
     suspend fun deleteAllRules()
 }

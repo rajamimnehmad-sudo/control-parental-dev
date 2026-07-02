@@ -101,7 +101,7 @@ class DefaultPolicyEngine : PolicyEngine {
         if (health.updateState == UpdateState.RequiredUpdateAvailable) {
             return PolicyDecision.RequireUpdate("A required update is available.")
         }
-        if (health.databaseState == ComponentState.Warning || health.syncState == ComponentState.Warning) {
+        if (health.databaseState == ComponentState.Warning) {
             return PolicyDecision.HealthWarning("Protection is running with warnings.")
         }
         return null

@@ -209,7 +209,8 @@ class FilterVpnService : VpnService() {
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)
             }
-            is PolicyDecision.Block -> {
+            is PolicyDecision.Block,
+            is PolicyDecision.RequestAuthorization -> {
                 telemetryReporter.recordDnsDecision(decision)
                 output.write(responseFactory.nxdomainPacket(question))
             }
@@ -219,7 +220,6 @@ class FilterVpnService : VpnService() {
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)
             }
-            is PolicyDecision.RequestAuthorization,
             is PolicyDecision.Warn -> {
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)

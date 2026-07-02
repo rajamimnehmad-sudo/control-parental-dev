@@ -15,4 +15,6 @@ interface SystemStatusRepository {
     suspend fun updateVpnState(state: ComponentState)
 
     suspend fun updateAccessibilityState(state: ComponentState)
+
+    suspend fun updateSyncState(state: ComponentState)
 }

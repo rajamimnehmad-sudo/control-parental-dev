@@ -30,6 +30,7 @@ fun DashboardRoute(
         state = state,
         onClearLocalRequests = viewModel::clearLocalRequests,
         onClearRemoteRequests = viewModel::clearRemoteRequests,
+        onClearAllRequests = viewModel::clearAllRequests,
         onClearRules = viewModel::clearRules,
         onClearExtraTimeGrants = viewModel::clearExtraTimeGrants,
         onClearDuplicateDevices = viewModel::clearDuplicateDevices,
@@ -42,6 +43,7 @@ private fun DashboardScreen(
     state: DashboardUiState,
     onClearLocalRequests: () -> Unit,
     onClearRemoteRequests: () -> Unit,
+    onClearAllRequests: () -> Unit,
     onClearRules: () -> Unit,
     onClearExtraTimeGrants: () -> Unit,
     onClearDuplicateDevices: () -> Unit,
@@ -77,6 +79,12 @@ private fun DashboardScreen(
                 enabled = !state.devToolsBusy,
             ) {
                 Text("Borrar solicitudes remotas")
+            }
+            Button(
+                onClick = { pendingAction = DevAction.ClearAllRequests },
+                enabled = !state.devToolsBusy,
+            ) {
+                Text("Borrar todas las solicitudes")
             }
             Button(
                 onClick = { pendingAction = DevAction.ClearRules },
@@ -119,6 +127,7 @@ private fun DashboardScreen(
                         when (action) {
                             DevAction.ClearLocalRequests -> onClearLocalRequests()
                             DevAction.ClearRemoteRequests -> onClearRemoteRequests()
+                            DevAction.ClearAllRequests -> onClearAllRequests()
                             DevAction.ClearRules -> onClearRules()
                             DevAction.ClearExtraTimeGrants -> onClearExtraTimeGrants()
                             DevAction.ClearDuplicateDevices -> onClearDuplicateDevices()
@@ -141,6 +150,7 @@ private fun DashboardScreen(
 private enum class DevAction(val confirmationText: String) {
     ClearLocalRequests("Esto borra solicitudes locales, Outbox y cursores de sync."),
     ClearRemoteRequests("Esto marca como borradas las solicitudes remotas DEV del account actual."),
+    ClearAllRequests("Esto borra solicitudes del Usuario y Admin, Room, Outbox y Supabase DEV."),
     ClearRules("Esto borra reglas locales y marca como borradas las reglas remotas DEV del account actual."),
     ClearExtraTimeGrants("Esto borra tiempos extra locales y remotos DEV del account actual."),
     ClearDuplicateDevices("Esto borra dispositivos duplicados y conserva el dispositivo actual."),

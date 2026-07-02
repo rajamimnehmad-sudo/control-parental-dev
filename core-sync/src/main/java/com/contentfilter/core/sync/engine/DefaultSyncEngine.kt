@@ -3,6 +3,8 @@ package com.contentfilter.core.sync.engine
 import android.util.Log
 import com.contentfilter.core.database.dao.SyncCursorDao
 import com.contentfilter.core.database.entity.SyncCursorEntity
+import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
@@ -22,21 +24,28 @@ class DefaultSyncEngine
         private val requestRepository: RemoteRequestRepository,
         private val syncCursorDao: SyncCursorDao,
         private val applier: RoomRemoteApplier,
+        private val systemStatusRepository: SystemStatusRepository,
     ) : SyncEngine {
         override suspend fun syncOnce(): SyncResult {
             runCatching {
                 outboxProcessor.processPending()
             }.onFailure { exception ->
                 Log.e(LogTag, "Outbox processing crashed: ${exception.message}", exception)
+                systemStatusRepository.updateSyncState(ComponentState.Warning)
                 return SyncResult(success = false, message = "Sync deferred; outbox failed.")
             }
-            return pullRemoteChanges()
+            return pullRemoteChanges().also { result ->
+                systemStatusRepository.updateSyncState(
+                    if (result.success) ComponentState.Enabled else ComponentState.Warning,
+                )
+            }
         }
 
         override suspend fun syncAccessRequestsFull(): SyncResult =
             when (val result = requestRepository.pullAccessRequests(updatedAfterIso = null)) {
                 is RemoteResult.Failure -> {
                     Log.w(LogTag, "Full access_requests pull failed: ${result.reason}")
+                    systemStatusRepository.updateSyncState(ComponentState.Warning)
                     SyncResult(success = false, message = result.reason)
                 }
                 is RemoteResult.Success -> {
@@ -54,6 +63,7 @@ class DefaultSyncEngine
                     }.fold(
                         onSuccess = {
                             Log.i(LogTag, "Full access_requests pull applied count=${result.value.size}")
+                            systemStatusRepository.updateSyncState(ComponentState.Enabled)
                             SyncResult(
                                 success = true,
                                 message = "Access requests synced: ${result.value.size}",
@@ -61,6 +71,7 @@ class DefaultSyncEngine
                         },
                         onFailure = { exception ->
                             Log.e(LogTag, "Full access_requests apply crashed: ${exception.message}", exception)
+                            systemStatusRepository.updateSyncState(ComponentState.Warning)
                             SyncResult(success = false, message = "Access requests could not be saved locally.")
                         },
                     )
@@ -72,6 +83,7 @@ class DefaultSyncEngine
             val grants = when (val result = requestRepository.pullExtraTimeGrants(updatedAfterIso = null)) {
                 is RemoteResult.Failure -> {
                     Log.w(LogTag, "Full extra_time_grants pull failed: ${result.reason}")
+                    systemStatusRepository.updateSyncState(ComponentState.Warning)
                     SyncResult(success = false, message = result.reason)
                 }
                 is RemoteResult.Success -> {
@@ -89,6 +101,7 @@ class DefaultSyncEngine
                     }.fold(
                         onSuccess = {
                             Log.i(LogTag, "Full extra_time_grants pull applied count=${result.value.size}")
+                            systemStatusRepository.updateSyncState(ComponentState.Enabled)
                             SyncResult(
                                 success = true,
                                 message = "Extra time grants synced: ${result.value.size}",
@@ -96,6 +109,7 @@ class DefaultSyncEngine
                         },
                         onFailure = { exception ->
                             Log.e(LogTag, "Full extra_time_grants apply crashed: ${exception.message}", exception)
+                            systemStatusRepository.updateSyncState(ComponentState.Warning)
                             SyncResult(success = false, message = "Extra time grants could not be saved locally.")
                         },
                     )

@@ -9,7 +9,6 @@ import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
-import com.contentfilter.core.network.config.SupabaseConfigProvider
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.time.Instant
 import java.time.ZoneId
@@ -29,7 +28,6 @@ class DashboardViewModel
         observeDevices: ObserveDevicesUseCase,
         observeRequests: ObserveRequestsUseCase,
         systemStatusRepository: SystemStatusRepository,
-        configProvider: SupabaseConfigProvider,
         private val devTools: AdminDevTools,
     ) : ViewModel() {
         private val devToolsState = MutableStateFlow(DevToolsState())
@@ -48,7 +46,7 @@ class DashboardViewModel
                 syncState = health.syncState.name,
                 systemState = health.protectionLevel.name,
                 lastSync = health.checkedAtEpochMillis.toDisplayDate(),
-                offlineMode = !configProvider.current().isConfigured,
+                offlineMode = false,
                 showDevTools = BuildConfig.FLAVOR == "dev",
                 devToolsBusy = devState.busy,
                 devToolsMessage = devState.message,
@@ -57,7 +55,7 @@ class DashboardViewModel
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = DashboardUiState(
-                offlineMode = !configProvider.current().isConfigured,
+                offlineMode = false,
                 showDevTools = BuildConfig.FLAVOR == "dev",
             ),
         )
@@ -68,6 +66,10 @@ class DashboardViewModel
 
         fun clearRemoteRequests() = runDevTool("clear_remote_requests") {
             devTools.clearRemoteRequests()
+        }
+
+        fun clearAllRequests() = runDevTool("clear_all_requests") {
+            devTools.clearAllRequests()
         }
 
         fun clearRules() = runDevTool("clear_rules") {

@@ -126,12 +126,12 @@ class ProtectorAccessibilityService : AccessibilityService() {
         serviceScope?.launch { telemetryReporter.recordDecision(decision) }
         when (decision) {
             is PolicyDecision.Allow -> clearExtraTimeExpiry()
-            is PolicyDecision.Block -> {
+            is PolicyDecision.Block,
+            is PolicyDecision.RequestAuthorization -> {
                 clearExtraTimeExpiry()
                 performGlobalAction(GLOBAL_ACTION_HOME)
             }
             is PolicyDecision.Warn,
-            is PolicyDecision.RequestAuthorization,
             is PolicyDecision.RequireActivation,
             is PolicyDecision.RequireUpdate,
             is PolicyDecision.HealthWarning -> clearExtraTimeExpiry()

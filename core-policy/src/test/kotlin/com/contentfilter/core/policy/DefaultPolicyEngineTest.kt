@@ -188,13 +188,13 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `returns health warning when local health is degraded`() {
+    fun `uses cached rules when sync has warnings`() {
         val decision = engine.evaluateApp(
-            snapshot = policy(),
-            context = appContext(syncState = ComponentState.Warning),
+            snapshot = policy(rules = listOf(rule(target = BlockedPackage, action = RuleAction.Block))),
+            context = appContext(packageName = BlockedPackage, syncState = ComponentState.Warning),
         )
 
-        assertIs<PolicyDecision.HealthWarning>(decision)
+        assertIs<PolicyDecision.Block>(decision)
     }
 
     private fun policy(
