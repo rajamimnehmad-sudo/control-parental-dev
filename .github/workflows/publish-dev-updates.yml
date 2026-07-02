@@ -13,7 +13,7 @@ concurrency:
 jobs:
   publish-dev:
     name: Build, test y publicar DEV
-    runs-on: [self-hosted, macOS, mac-dev-runner]
+    runs-on: [self-hosted, macOS, dev]
     timeout-minutes: 60
 
     steps:

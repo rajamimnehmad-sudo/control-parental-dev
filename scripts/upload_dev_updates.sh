@@ -5,6 +5,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PROJECT_REF="${SUPABASE_PROJECT_REF:-syeycayasyufedwoprea}"
 OUT_DIR="$ROOT_DIR/build/dev-updates"
 ARCHIVE_SUFFIX="bak-$(date +%Y%m%d-%H%M%S)"
+STAGING_PREFIX=".staging-$ARCHIVE_SUFFIX"
 
 require_file() {
     local file="$1"
@@ -33,16 +34,23 @@ if [[ ! -f "$ROOT_DIR/supabase/.temp/project-ref" ]]; then
 fi
 
 printf 'Subiendo manifiestos y APKs al bucket publico dev-updates...\n'
+printf 'Subiendo artefactos nuevos a staging...\n'
+supabase storage cp --experimental --linked --content-type application/json build/dev-updates/app-user-dev-manifest.json "ss:///dev-updates/$STAGING_PREFIX/app-user-dev-manifest.json"
+supabase storage cp --experimental --linked --content-type application/json build/dev-updates/app-admin-dev-manifest.json "ss:///dev-updates/$STAGING_PREFIX/app-admin-dev-manifest.json"
+supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/app-user-dev-debug.apk "ss:///dev-updates/$STAGING_PREFIX/app-user-dev-debug.apk"
+supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/app-admin-dev-debug.apk "ss:///dev-updates/$STAGING_PREFIX/app-admin-dev-debug.apk"
+
 printf 'Archivando artefactos dev anteriores si existen...\n'
 supabase storage mv --experimental --linked ss:///dev-updates/app-user-dev-manifest.json "ss:///dev-updates/app-user-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 supabase storage mv --experimental --linked ss:///dev-updates/app-admin-dev-manifest.json "ss:///dev-updates/app-admin-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 supabase storage mv --experimental --linked ss:///dev-updates/app-user-dev-debug.apk "ss:///dev-updates/app-user-dev-debug.apk.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 supabase storage mv --experimental --linked ss:///dev-updates/app-admin-dev-debug.apk "ss:///dev-updates/app-admin-dev-debug.apk.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 
-supabase storage cp --experimental --linked --content-type application/json build/dev-updates/app-user-dev-manifest.json ss:///dev-updates/app-user-dev-manifest.json
-supabase storage cp --experimental --linked --content-type application/json build/dev-updates/app-admin-dev-manifest.json ss:///dev-updates/app-admin-dev-manifest.json
-supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/app-user-dev-debug.apk ss:///dev-updates/app-user-dev-debug.apk
-supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/app-admin-dev-debug.apk ss:///dev-updates/app-admin-dev-debug.apk
+printf 'Publicando artefactos staged...\n'
+supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/app-user-dev-manifest.json" ss:///dev-updates/app-user-dev-manifest.json
+supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/app-admin-dev-manifest.json" ss:///dev-updates/app-admin-dev-manifest.json
+supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/app-user-dev-debug.apk" ss:///dev-updates/app-user-dev-debug.apk
+supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/app-admin-dev-debug.apk" ss:///dev-updates/app-admin-dev-debug.apk
 
 cat <<EOF
 Listo.
