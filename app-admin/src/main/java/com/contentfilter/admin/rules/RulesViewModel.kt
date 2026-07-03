@@ -1,7 +1,9 @@
 package com.contentfilter.admin.rules
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.contentfilter.admin.BuildConfig
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.PolicyLevel
@@ -25,10 +27,12 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -53,10 +57,11 @@ class RulesViewModel
                 RulesUiState(),
             )
         private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
+        private val policyRules = observePolicyRules()
 
         val uiState =
             combine(
-                observePolicyRules(),
+                policyRules,
                 observeDailyLimits(),
                 observeDevices(),
                 installedApps,
@@ -67,13 +72,7 @@ class RulesViewModel
                     formState.selectedDeviceId?.takeIf { selected ->
                         userDevices.any { it.id == selected }
                     }
-                val savedInternetBlocked =
-                    rules.any {
-                        it.enabled &&
-                            it.scope == RuleScope.Domain &&
-                            it.target == DomainWildcard &&
-                            it.action == RuleAction.Block
-                    }
+                val savedInternetBlocked = rules.internetBlocked()
                 formState.copy(
                     rules = rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
                     limits = limits.sortedWith(compareBy({ it.targetType.name }, { it.target })),
@@ -215,42 +214,95 @@ class RulesViewModel
         }
 
         fun setInternetBlocked(blocked: Boolean) {
+            val currentState = uiState.value
             val existing =
-                uiState.value.rules.firstOrNull {
+                currentState.rules.firstOrNull {
                     it.scope == RuleScope.Domain &&
                         it.target == DomainWildcard &&
                         it.action == RuleAction.Block
                 }
+            val previousRoom = currentState.rules.internetBlocked()
+            logInternetSwitch(
+                stage = "tap",
+                touched = blocked,
+                pending = form.value.pendingInternetBlocked,
+                room = previousRoom,
+                ui = currentState.internetBlocked,
+            )
             form.update {
                 it.copy(
                     pendingInternetBlocked = blocked,
                     message = if (blocked) "Activando lista blanca..." else "Activando lista negra...",
                 )
             }
+            logInternetSwitch(
+                stage = "pending",
+                touched = blocked,
+                pending = blocked,
+                room = previousRoom,
+                ui = blocked,
+            )
             viewModelScope.launch {
-                saveRule(
-                    existing?.copy(enabled = blocked)
-                        ?: PolicyRule(
-                            id = UUID.randomUUID().toString(),
-                            level = PolicyLevel.Account,
-                            scope = RuleScope.Domain,
-                            target = DomainWildcard,
-                            action = RuleAction.Block,
-                            priority = InternetBlockPriority,
-                            enabled = blocked,
-                        ),
-                )
-                syncScheduler.requestSync()
-                syncNow()
-                form.update {
-                    it.copy(
-                        pendingInternetBlocked = null,
-                        message =
-                            if (blocked) {
-                                "Modo web: bloquear todo excepto permitidos."
-                            } else {
-                                "Modo web: permitir todo excepto bloqueados."
-                            },
+                val saved =
+                    runCatching {
+                        saveRule(
+                            existing?.copy(enabled = blocked)
+                                ?: PolicyRule(
+                                    id = UUID.randomUUID().toString(),
+                                    level = PolicyLevel.Account,
+                                    scope = RuleScope.Domain,
+                                    target = DomainWildcard,
+                                    action = RuleAction.Block,
+                                    priority = InternetBlockPriority,
+                                    enabled = blocked,
+                                ),
+                        )
+                        withTimeoutOrNull(RoomConfirmTimeoutMillis) {
+                            policyRules.first { it.internetBlocked() == blocked }
+                        } ?: error("Room no confirmó el nuevo estado de Internet.")
+                    }
+                val roomAfterSave = saved.getOrNull()?.internetBlocked() ?: previousRoom
+                if (saved.isSuccess) {
+                    logInternetSwitch(
+                        stage = "room-confirmed",
+                        touched = blocked,
+                        pending = form.value.pendingInternetBlocked,
+                        room = roomAfterSave,
+                        ui = uiState.value.internetBlocked,
+                    )
+                    syncScheduler.requestSync()
+                    syncNow()
+                    form.update {
+                        it.copy(
+                            pendingInternetBlocked = null,
+                            message =
+                                if (blocked) {
+                                    "Modo web: bloquear todo excepto permitidos."
+                                } else {
+                                    "Modo web: permitir todo excepto bloqueados."
+                                },
+                        )
+                    }
+                    logInternetSwitch(
+                        stage = "ui-final",
+                        touched = blocked,
+                        pending = null,
+                        room = roomAfterSave,
+                        ui = blocked,
+                    )
+                } else {
+                    form.update {
+                        it.copy(
+                            pendingInternetBlocked = null,
+                            message = "No se pudo cambiar el modo web. Intentá otra vez.",
+                        )
+                    }
+                    logInternetSwitch(
+                        stage = "save-failed",
+                        touched = blocked,
+                        pending = null,
+                        room = previousRoom,
+                        ui = previousRoom,
                     )
                 }
             }
@@ -609,6 +661,29 @@ class RulesViewModel
                 )
                 .firstOrNull()
 
+        private fun List<PolicyRule>.internetBlocked(): Boolean =
+            any {
+                it.enabled &&
+                    it.scope == RuleScope.Domain &&
+                    it.target == DomainWildcard &&
+                    it.action == RuleAction.Block
+            }
+
+        private fun logInternetSwitch(
+            stage: String,
+            touched: Boolean,
+            pending: Boolean?,
+            room: Boolean,
+            ui: Boolean,
+        ) {
+            if (BuildConfig.DEBUG) {
+                Log.d(
+                    LogTag,
+                    "internetSwitch stage=$stage touched=$touched pending=$pending room=$room uiFinal=$ui",
+                )
+            }
+        }
+
         private fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List<UserDeviceUiState> {
             val appDeviceIds = apps.mapTo(mutableSetOf()) { it.deviceId }
             val appsByDevice = apps.groupBy { it.deviceId }
@@ -679,10 +754,12 @@ class RulesViewModel
             val DomainRegex = Regex("^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$")
             const val ActiveDeviceWindowMillis = 15 * 60 * 1000L
             const val SwitchHoldMillis = 2_500L
+            const val RoomConfirmTimeoutMillis = 5_000L
             const val DomainWildcard = "*"
             const val InternetBlockPriority = 10
             const val BlockDomainPriority = 2_000
             const val AllowDomainPriority = 1_000
+            const val LogTag = "RulesViewModel"
             val GoogleSearchDomains =
                 listOf(
                     "google.com",
