@@ -13,4 +13,6 @@ interface PolicyRepository {
     suspend fun getActivePolicy(): PolicySnapshot
 
     suspend fun saveRule(rule: PolicyRule)
+
+    suspend fun deleteRule(rule: PolicyRule)
 }

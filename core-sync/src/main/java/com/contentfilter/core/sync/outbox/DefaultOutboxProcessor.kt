@@ -5,9 +5,11 @@ import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.entity.OutboxOperationEntity
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
+import com.contentfilter.core.network.dto.RemoteDailyLimitDto
 import com.contentfilter.core.network.dto.RemoteExtraTimeGrantDto
 import com.contentfilter.core.network.dto.RemotePolicyDto
 import com.contentfilter.core.network.dto.RemotePolicyRuleDto
+import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.RemoteResult
@@ -21,6 +23,7 @@ class DefaultOutboxProcessor
         private val deviceActivationDao: DeviceActivationDao,
         private val requestRepository: RemoteRequestRepository,
         private val policyRepository: RemotePolicyRepository,
+        private val limitRepository: RemoteLimitRepository,
     ) : OutboxProcessor {
         override suspend fun processPending() {
             val operations = outboxDao.pending()
@@ -65,6 +68,7 @@ class DefaultOutboxProcessor
             when (operation.tableName) {
                 PoliciesTable -> policyRepository.upsertPolicy(operation.toPolicyDto())
                 PolicyRulesTable -> policyRepository.upsertPolicyRule(operation.toPolicyRuleDto())
+                DailyLimitsTable -> limitRepository.upsertDailyLimit(operation.toDailyLimitDto())
                 AccessRequestsTable -> requestRepository.upsertAccessRequest(operation.toAccessRequestDto())
                 ExtraTimeGrantsTable -> requestRepository.upsertExtraTimeGrant(operation.toExtraTimeGrantDto())
                 else -> RemoteResult.Failure("Unsupported outbox table ${operation.tableName}.", retryable = false)
@@ -75,6 +79,9 @@ class DefaultOutboxProcessor
 
         private suspend fun OutboxOperationEntity.toPolicyRuleDto(): RemotePolicyRuleDto =
             RemotePolicyRuleDto.fromJson(payloadJsonWithAccount())
+
+        private suspend fun OutboxOperationEntity.toDailyLimitDto(): RemoteDailyLimitDto =
+            RemoteDailyLimitDto.fromJson(payloadJsonWithAccount())
 
         private suspend fun OutboxOperationEntity.toAccessRequestDto(): RemoteAccessRequestDto =
             RemoteAccessRequestDto.fromJson(payloadJsonWithAccountAndDevice())
@@ -103,6 +110,7 @@ class DefaultOutboxProcessor
         private companion object {
             const val PoliciesTable = "policies"
             const val PolicyRulesTable = "policy_rules"
+            const val DailyLimitsTable = "daily_limits"
             const val AccessRequestsTable = "access_requests"
             const val ExtraTimeGrantsTable = "extra_time_grants"
             const val LogTag = "OutboxProcessor"

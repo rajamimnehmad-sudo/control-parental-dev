@@ -1,13 +1,17 @@
 package com.contentfilter.feature.accessibility.service
 
 import android.accessibilityservice.AccessibilityService
+import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.PolicyDecision
+import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
+import com.contentfilter.core.sync.SyncScheduler
+import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.feature.accessibility.policy.AccessibilityAppPolicyEvaluator
 import com.contentfilter.feature.accessibility.policy.AccessibilityClock
 import com.contentfilter.feature.accessibility.policy.AccessibilityPolicySnapshotProvider
@@ -35,6 +39,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     @Inject lateinit var systemStatusRepository: SystemStatusRepository
     @Inject lateinit var telemetryReporter: AccessibilityTelemetryReporter
     @Inject lateinit var usageSessionRepository: UsageSessionRepository
+    @Inject lateinit var syncScheduler: SyncScheduler
+    @Inject lateinit var syncEngine: SyncEngine
 
     private val usageTracker = AppUsageTracker()
     private val settingsProtectionPolicy = SettingsProtectionPolicy()
@@ -42,12 +48,20 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var extraTimeExpiryJob: Job? = null
     private var extraTimeExpiryPackageName: String? = null
     private var extraTimeExpiryAtEpochMillis: Long? = null
+    private var policyRefreshJob: Job? = null
+    private var foregroundWatchJob: Job? = null
+    private var foregroundWatchPackageName: String? = null
+    private var appLimitDeadlineJob: Job? = null
+    private var appLimitDeadlinePackageName: String? = null
+    private var lastPolicyRefreshAtElapsedMillis: Long = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
         serviceScope = scope
         scope.launch {
+            syncScheduler.requestSync()
+            refreshPolicies()
             snapshotProvider.refresh()
             snapshotProvider.start(scope)
             systemStatusRepository.updateAccessibilityState(ComponentState.Enabled)
@@ -63,13 +77,22 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
-        serviceScope?.let { snapshotProvider.ensureCurrentDay(it) }
         val now = clock.nowEpochMillis()
+        serviceScope?.let { scope ->
+            if (snapshotProvider.ensureCurrentDay(scope)) {
+                usageTracker.finishCurrent(elapsed, now)?.let { transition ->
+                    scope.launch { saveTransition(transition) }
+                }
+                usageTracker.reset()
+            }
+        }
+        maybeRefreshPolicies(elapsed)
         val transition = usageTracker.onForegroundApp(packageName, elapsed, now)
         if (transition != null) {
             serviceScope?.launch { saveTransition(transition) }
         }
         evaluateForegroundApp(packageName, elapsed)
+        startForegroundWatch(packageName)
         if (transition == null) {
             usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
                 serviceScope?.launch { saveTransition(checkpoint) }
@@ -93,11 +116,14 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 telemetryReporter.recordServiceState("Accessibility service destroyed.")
                 snapshotProvider.stop()
                 clearExtraTimeExpiry()
+                clearAppLimitDeadline()
+                clearForegroundWatch()
                 cancel()
             }
         } else {
             snapshotProvider.stop()
             clearExtraTimeExpiry()
+            clearForegroundWatch()
         }
         serviceScope = null
         super.onDestroy()
@@ -122,15 +148,29 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val persistedMinutes = state.snapshot.dailyUsage
             .firstOrNull { it.packageName == packageName }
             ?.usedMinutes ?: 0
-        val usedMinutes = persistedMinutes + usageTracker.activeMinutes(packageName, elapsedRealtimeMillis)
+        val activeMillis = usageTracker.activeMillisForPackage(packageName, elapsedRealtimeMillis)
+        val usedMinutes = persistedMinutes + activeMillis.toObservedMinutes()
+        scheduleAppLimitDeadline(
+            packageName = packageName,
+            persistedMinutes = persistedMinutes,
+            activeMillis = activeMillis,
+            limitMinutes = state.snapshot.dailyLimits
+                .filter { it.enabled && it.targetType == PolicyTargetType.App && it.target == packageName }
+                .minOfOrNull { it.limitMinutes },
+        )
         val decision = policyEvaluator.evaluate(packageName, usedMinutes, state.snapshot, state.health)
-        serviceScope?.launch { telemetryReporter.recordDecision(decision) }
+        Log.i(
+            LogTag,
+            "Evaluated app package=$packageName persistedMin=$persistedMinutes activeMs=$activeMillis usedMin=$usedMinutes limits=${state.snapshot.dailyLimits.size} rules=${state.snapshot.rules.size} decision=${decision.label()}",
+        )
+        serviceScope?.launch { telemetryReporter.recordDecision(packageName, decision) }
         when (decision) {
             is PolicyDecision.Allow -> clearExtraTimeExpiry()
             is PolicyDecision.Block,
             is PolicyDecision.RequestAuthorization -> {
                 clearExtraTimeExpiry()
-                performGlobalAction(GLOBAL_ACTION_HOME)
+                clearAppLimitDeadline()
+                leaveBlockedApp(packageName)
             }
             is PolicyDecision.Warn,
             is PolicyDecision.RequireActivation,
@@ -138,6 +178,121 @@ class ProtectorAccessibilityService : AccessibilityService() {
             is PolicyDecision.HealthWarning -> clearExtraTimeExpiry()
             is PolicyDecision.GrantExtraTime -> scheduleExtraTimeExpiry(packageName, decision.validUntilEpochMillis)
         }
+    }
+
+    private fun maybeRefreshPolicies(elapsedRealtimeMillis: Long) {
+        if (elapsedRealtimeMillis - lastPolicyRefreshAtElapsedMillis < BackgroundPolicyRefreshMillis) return
+        if (policyRefreshJob?.isActive == true) return
+        val scope = serviceScope ?: return
+        policyRefreshJob = scope.launch {
+            refreshPolicies()
+            snapshotProvider.refresh()
+        }
+    }
+
+    private suspend fun refreshPolicies() {
+        runCatching {
+            syncEngine.syncCoreDataFull()
+            syncEngine.syncRequestResultsFull()
+        }
+            .onSuccess { lastPolicyRefreshAtElapsedMillis = clock.elapsedRealtimeMillis() }
+            .onFailure {
+                Log.w(LogTag, "Policy refresh failed: ${it.javaClass.simpleName}")
+                telemetryReporter.recordError("Policy refresh failed: ${it.javaClass.simpleName}")
+            }
+    }
+
+    private fun leaveBlockedApp(packageName: String) {
+        Log.i(LogTag, "Blocking foreground app pending confirmation package=$packageName")
+        val scope = serviceScope ?: return
+        scope.launch {
+            delay(BlockRecheckDelayMillis)
+            if (usageTracker.currentPackageName() == packageName && packageName.isStillBlocked()) {
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                delay(BlockRecheckDelayMillis)
+                if (usageTracker.currentPackageName() == packageName && packageName.isStillBlocked()) {
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                }
+            }
+        }
+    }
+
+    private fun String.isStillBlocked(): Boolean {
+        val elapsed = clock.elapsedRealtimeMillis()
+        val state = snapshotProvider.current()
+        val persistedMinutes = state.snapshot.dailyUsage
+            .firstOrNull { it.packageName == this }
+            ?.usedMinutes ?: 0
+        val activeMillis = usageTracker.activeMillisForPackage(this, elapsed)
+        val usedMinutes = persistedMinutes + activeMillis.toObservedMinutes()
+        return when (policyEvaluator.evaluate(this, usedMinutes, state.snapshot, state.health)) {
+            is PolicyDecision.Block,
+            is PolicyDecision.RequestAuthorization,
+            -> true
+            else -> false
+        }
+    }
+
+    private fun startForegroundWatch(packageName: String) {
+        if (foregroundWatchJob?.isActive == true && foregroundWatchPackageName == packageName) return
+        clearForegroundWatch()
+        val scope = serviceScope ?: return
+        foregroundWatchPackageName = packageName
+        foregroundWatchJob = scope.launch {
+            while (usageTracker.currentPackageName() == packageName) {
+                delay(ForegroundRecheckMillis)
+                val elapsed = clock.elapsedRealtimeMillis()
+                val now = clock.nowEpochMillis()
+                usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
+                    saveTransition(checkpoint)
+                    snapshotProvider.refresh()
+                }
+                evaluateForegroundApp(packageName, elapsed)
+            }
+        }
+    }
+
+    private fun clearForegroundWatch() {
+        foregroundWatchJob?.cancel()
+        foregroundWatchJob = null
+        foregroundWatchPackageName = null
+    }
+
+    private fun scheduleAppLimitDeadline(
+        packageName: String,
+        persistedMinutes: Int,
+        activeMillis: Long,
+        limitMinutes: Int?,
+    ) {
+        if (limitMinutes == null) {
+            clearAppLimitDeadline()
+            return
+        }
+        if (appLimitDeadlineJob?.isActive == true && appLimitDeadlinePackageName == packageName) return
+        clearAppLimitDeadline()
+        val remainingMillis = (limitMinutes * MillisPerMinute - persistedMinutes * MillisPerMinute - activeMillis)
+            .coerceAtMost(MaxDeadlineDelayMillis)
+            .coerceAtLeast(0L)
+        val scope = serviceScope ?: return
+        appLimitDeadlinePackageName = packageName
+        appLimitDeadlineJob = scope.launch {
+            delay(remainingMillis)
+            if (usageTracker.currentPackageName() == packageName) {
+                usageTracker.checkpointCurrent(
+                    elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
+                    epochMillis = clock.nowEpochMillis(),
+                    minimumDurationMillis = 0L,
+                )?.let { saveTransition(it) }
+                snapshotProvider.refresh()
+                evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())
+            }
+        }
+    }
+
+    private fun clearAppLimitDeadline() {
+        appLimitDeadlineJob?.cancel()
+        appLimitDeadlineJob = null
+        appLimitDeadlinePackageName = null
     }
 
     private fun scheduleExtraTimeExpiry(
@@ -178,6 +333,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     private suspend fun saveTransition(transition: UsageTransition) {
         runCatching {
+            val durationMs = transition.endedAtEpochMillis - transition.startedAtEpochMillis
             usageSessionRepository.saveSession(
                 UsageSession(
                     id = UUID.randomUUID().toString(),
@@ -187,11 +343,18 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     endedAtEpochMillis = transition.endedAtEpochMillis,
                 ),
             )
+            Log.i(LogTag, "Saved usage package=${transition.packageName} durationMs=$durationMs")
         }.onFailure { telemetryReporter.recordError("Usage session save failed: ${it.javaClass.simpleName}") }
     }
 
     private companion object {
-        const val CheckpointIntervalMillis = 5 * 60 * 1_000L
+        const val CheckpointIntervalMillis = 15_000L
+        const val ForegroundRecheckMillis = 5_000L
+        const val MillisPerMinute = 60_000L
+        const val MaxDeadlineDelayMillis = 60_000L
+        const val BlockRecheckDelayMillis = 250L
+        const val BackgroundPolicyRefreshMillis = 1_000L
+        const val LogTag = "ProtectorAccessibility"
         val HandledEventTypes = setOf(
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOWS_CHANGED,
@@ -232,5 +395,24 @@ class ProtectorAccessibilityService : AccessibilityService() {
             this in ExactAllowedPackageNames ||
                 AllowedPackagePrefixes.any { startsWith(it) } ||
                 endsWith(".launcher")
+
+        fun Long.toObservedMinutes(): Int =
+            if (this <= 0L) {
+                0
+            } else {
+                ((this + MillisPerMinute - 1) / MillisPerMinute).toInt()
+            }
+
+        fun PolicyDecision.label(): String =
+            when (this) {
+                is PolicyDecision.Allow -> "Allow"
+                is PolicyDecision.Block -> "Block"
+                is PolicyDecision.GrantExtraTime -> "GrantExtraTime"
+                is PolicyDecision.HealthWarning -> "HealthWarning"
+                is PolicyDecision.RequestAuthorization -> "RequestAuthorization"
+                is PolicyDecision.RequireActivation -> "RequireActivation"
+                is PolicyDecision.RequireUpdate -> "RequireUpdate"
+                is PolicyDecision.Warn -> "Warn"
+            }
     }
 }

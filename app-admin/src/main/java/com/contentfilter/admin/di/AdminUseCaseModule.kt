@@ -1,14 +1,18 @@
 package com.contentfilter.admin.di
 
 import com.contentfilter.core.domain.repository.AccessRequestRepository
+import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.usecase.admin.ApproveAccessRequestUseCase
+import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
 import com.contentfilter.core.domain.usecase.admin.GrantExtraTimeUseCase
+import com.contentfilter.core.domain.usecase.admin.ObserveDailyLimitsUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObservePolicyRulesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
+import com.contentfilter.core.domain.usecase.admin.SaveDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.SavePolicyRuleUseCase
 import com.contentfilter.core.domain.usecase.admin.SetRequestStatusUseCase
 import dagger.Module
@@ -52,4 +56,16 @@ object AdminUseCaseModule {
     @Provides
     fun provideSavePolicyRuleUseCase(repository: PolicyRepository): SavePolicyRuleUseCase =
         SavePolicyRuleUseCase(repository)
+
+    @Provides
+    fun provideDeletePolicyRuleUseCase(repository: PolicyRepository): DeletePolicyRuleUseCase =
+        DeletePolicyRuleUseCase(repository)
+
+    @Provides
+    fun provideObserveDailyLimitsUseCase(repository: DailyLimitRepository): ObserveDailyLimitsUseCase =
+        ObserveDailyLimitsUseCase(repository)
+
+    @Provides
+    fun provideSaveDailyLimitUseCase(repository: DailyLimitRepository): SaveDailyLimitUseCase =
+        SaveDailyLimitUseCase(repository)
 }

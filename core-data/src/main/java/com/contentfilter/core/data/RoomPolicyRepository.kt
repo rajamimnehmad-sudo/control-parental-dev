@@ -28,8 +28,9 @@ class RoomPolicyRepository
     ) : PolicyRepository {
         @OptIn(ExperimentalCoroutinesApi::class)
         override fun observeActivePolicy(): Flow<PolicySnapshot> =
-            policyDao.observeActivePolicy().flatMapLatest { policy ->
+            policyDao.observeActivePolicies().flatMapLatest { policies ->
                 val activeGrants = extraTimeGrantDao.observeActive(System.currentTimeMillis())
+                val policy = policies.firstOrNull()
                 if (policy == null) {
                     activeGrants.map { grants ->
                         PolicySnapshot(
@@ -40,7 +41,7 @@ class RoomPolicyRepository
                         )
                     }
                 } else {
-                    combine(policyDao.observeRulesForPolicy(policy.id), activeGrants) { rules, grants ->
+                    combine(policyDao.observeRulesForActivePolicies(), activeGrants) { rules, grants ->
                         PolicySnapshot(
                             id = policy.id,
                             version = policy.version,
@@ -53,6 +54,7 @@ class RoomPolicyRepository
 
         override suspend fun getActivePolicy(): PolicySnapshot {
             val policy = policyDao.activePolicy()
+            val rules = policyDao.rulesForActivePolicies()
             val grants = extraTimeGrantDao.active(System.currentTimeMillis()).map { it.toDomain() }
             return if (policy == null) {
                 PolicySnapshot(id = "local-default", version = 1L, rules = emptyList(), extraTimeGrants = grants)
@@ -60,7 +62,7 @@ class RoomPolicyRepository
                 PolicySnapshot(
                     id = policy.id,
                     version = policy.version,
-                    rules = policyDao.rulesForPolicy(policy.id).map { it.toDomain() },
+                    rules = rules.map { it.toDomain() },
                     extraTimeGrants = grants,
                 )
             }
@@ -79,6 +81,13 @@ class RoomPolicyRepository
             val accountId = deviceActivationDao.latest()?.accountId
             outboxDao.upsert(policy.toOutboxOperation(accountId))
             outboxDao.upsert(rule.toOutboxOperation(policy.id, accountId))
+        }
+
+        override suspend fun deleteRule(rule: PolicyRule) {
+            val policy = policyDao.activePolicy() ?: return
+            policyDao.deleteRuleById(rule.id)
+            val accountId = deviceActivationDao.latest()?.accountId
+            outboxDao.upsert(rule.toDeletedOutboxOperation(policy.id, accountId))
         }
 
         private suspend fun createDefaultPolicy(): PolicyEntity {
@@ -124,6 +133,28 @@ class RoomPolicyRepository
                     .put("priority", priority)
                     .put("enabled", enabled)
                     .put("updated_at", Instant.ofEpochMilli(now).toString())
+                    .toString()
+            return outboxOperation(POLICY_RULES_TABLE, payload, now)
+        }
+
+        private fun PolicyRule.toDeletedOutboxOperation(
+            policyId: String,
+            accountId: String?,
+        ): OutboxOperationEntity {
+            val now = System.currentTimeMillis()
+            val deletedAt = Instant.ofEpochMilli(now).toString()
+            val payload =
+                org.json.JSONObject()
+                    .put("id", id)
+                    .put("account_id", accountId)
+                    .put("policy_id", policyId)
+                    .put("scope", scope.name)
+                    .put("target", target)
+                    .put("action", action.name)
+                    .put("priority", priority)
+                    .put("enabled", false)
+                    .put("updated_at", deletedAt)
+                    .put("deleted_at", deletedAt)
                     .toString()
             return outboxOperation(POLICY_RULES_TABLE, payload, now)
         }

@@ -65,6 +65,3 @@ data class RemoteAccessRequestDto(
             }
     }
 }
-
-private fun JSONObject.optNullableString(name: String): String? =
-    if (isNull(name)) null else optString(name).ifBlank { null }

@@ -22,8 +22,8 @@ class DefaultRealtimeSyncCoordinator
         private var job: Job? = null
 
         override fun start() {
-            if (job != null) return
             realtimeSubscription.connect()
+            if (job?.isActive == true) return
             job = scope.launch {
                 realtimeSubscription.observeChanges().collectLatest {
                     syncEngine.syncOnce()

@@ -15,8 +15,14 @@ class AccessibilityTelemetryReporter
             record(type = "accessibility-state", message = state)
         }
 
-        suspend fun recordDecision(decision: PolicyDecision) {
-            record(type = "accessibility-decision", message = "App decision: ${decision.label()}")
+        suspend fun recordDecision(
+            packageName: String,
+            decision: PolicyDecision,
+        ) {
+            record(
+                type = "accessibility-decision",
+                message = "App decision: ${decision.label()} package=$packageName",
+            )
         }
 
         suspend fun recordSettingsProtection() {

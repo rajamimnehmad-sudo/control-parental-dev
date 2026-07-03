@@ -41,7 +41,7 @@ class RequestsViewModel
                     grantRepository.observeGrants(),
                 ) { requests, grants -> requests to grants }
                     .collect { (requests, grants) ->
-                    val pendingCount = requests.count {
+                    val pendingRequests = requests.filter {
                         it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote
                     }
                     val latestResult = requests
@@ -49,8 +49,8 @@ class RequestsViewModel
                         .maxByOrNull { it.createdAtEpochMillis }
                     mutableState.update {
                         it.copy(
-                            pendingCount = pendingCount,
-                            requests = requests,
+                            pendingCount = pendingRequests.size,
+                            requests = pendingRequests,
                             extraTimeGrants = grants,
                             message = latestResult?.let { request ->
                                 "Última solicitud: ${request.status.displayName()}"

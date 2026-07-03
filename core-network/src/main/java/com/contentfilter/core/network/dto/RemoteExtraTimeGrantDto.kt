@@ -28,14 +28,14 @@ data class RemoteExtraTimeGrantDto(
         fun fromJson(json: JSONObject): RemoteExtraTimeGrantDto =
             RemoteExtraTimeGrantDto(
                 id = json.getString("id"),
-                accountId = json.optString("account_id").ifBlank { null },
-                requestId = json.optString("request_id").ifBlank { null },
+                accountId = json.optNullableString("account_id"),
+                requestId = json.optNullableString("request_id"),
                 targetType = json.getString("target_type"),
                 target = json.getString("target"),
                 grantedMinutes = json.getInt("granted_minutes"),
                 validUntil = json.getString("valid_until"),
                 updatedAt = json.getString("updated_at"),
-                deletedAt = json.optString("deleted_at").ifBlank { null },
+                deletedAt = json.optNullableString("deleted_at"),
             )
     }
 }

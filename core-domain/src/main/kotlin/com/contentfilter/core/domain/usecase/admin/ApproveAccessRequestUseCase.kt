@@ -17,6 +17,16 @@ class ApproveAccessRequestUseCase(
     private val policyRepository: PolicyRepository,
 ) {
     suspend operator fun invoke(request: AccessRequest) {
+        request.allowTarget()?.let { target ->
+            policyRepository.getActivePolicy().rules
+                .filter {
+                    it.enabled &&
+                        it.scope == RuleScope.App &&
+                        it.target == target &&
+                        it.action == RuleAction.Block
+                }
+                .forEach { policyRepository.saveRule(it.copy(enabled = false)) }
+        }
         request.toAllowRule()?.let { rule ->
             policyRepository.saveRule(rule)
         }
@@ -30,12 +40,7 @@ class ApproveAccessRequestUseCase(
                 AccessRequestType.DOMAIN_ACCESS -> RuleScope.Domain
                 else -> return null
             }
-        val allowTarget =
-            when (scope) {
-                RuleScope.App -> targetPackageName ?: target.takeIf { targetType == PolicyTargetType.App }
-                RuleScope.Domain -> targetDomain ?: target.takeIf { targetType == PolicyTargetType.Domain }
-                else -> null
-            }?.trim()?.takeIf { it.isNotEmpty() } ?: return null
+        val allowTarget = allowTarget(scope) ?: return null
 
         return PolicyRule(
             id = UUID.randomUUID().toString(),
@@ -47,6 +52,13 @@ class ApproveAccessRequestUseCase(
             enabled = true,
         )
     }
+
+    private fun AccessRequest.allowTarget(scope: RuleScope = RuleScope.App): String? =
+        when (scope) {
+            RuleScope.App -> targetPackageName ?: target.takeIf { targetType == PolicyTargetType.App }
+            RuleScope.Domain -> targetDomain ?: target.takeIf { targetType == PolicyTargetType.Domain }
+            else -> null
+        }?.trim()?.takeIf { it.isNotEmpty() }
 
     private companion object {
         const val APPROVED_REQUEST_PRIORITY = 1_000

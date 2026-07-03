@@ -20,6 +20,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.admin.BuildConfig
 
 @Composable
 fun AdminUpdatesRoute(
@@ -61,9 +62,13 @@ private fun AdminUpdatesScreen(
             text = state.status.message(),
             style = MaterialTheme.typography.bodyLarge,
         )
+        Text(
+            text = "Version instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+            style = MaterialTheme.typography.titleMedium,
+        )
         state.manifest?.let { manifest ->
             Text(
-                text = "Version disponible: ${manifest.versionName} (${manifest.versionCode})",
+                text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
@@ -127,4 +132,12 @@ private fun AdminUpdatesStatus.message(): String =
         AdminUpdatesStatus.NeedsInstallPermission -> "Android requiere permiso para instalar APKs desde esta app."
         AdminUpdatesStatus.ChecksumFailed -> "La descarga no paso la verificacion SHA-256."
         AdminUpdatesStatus.DownloadFailed -> "No se pudo descargar la actualizacion."
+    }
+
+private fun AdminUpdatesStatus.versionLabel(): String =
+    when (this) {
+        AdminUpdatesStatus.ReadyToInstall,
+        AdminUpdatesStatus.NeedsInstallPermission,
+        -> "Ultima version descargada"
+        else -> "Version disponible"
     }

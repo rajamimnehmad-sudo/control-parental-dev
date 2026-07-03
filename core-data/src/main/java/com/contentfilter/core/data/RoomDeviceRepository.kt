@@ -18,4 +18,8 @@ class RoomDeviceRepository
         override suspend fun saveDevice(device: Device) {
             deviceDao.upsert(device.toEntity())
         }
+
+        override suspend fun deleteDevice(deviceId: String) {
+            deviceDao.deleteById(deviceId)
+        }
     }

@@ -37,5 +37,13 @@ object DatabaseMigrations {
             }
         }
 
-    val All: Array<Migration> = arrayOf(Migration1To2, Migration2To3)
+    val Migration3To4: Migration =
+        object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE devices ADD COLUMN appRole TEXT NOT NULL DEFAULT 'user'")
+                db.execSQL("ALTER TABLE devices ADD COLUMN lastSeenAtEpochMillis INTEGER")
+            }
+        }
+
+    val All: Array<Migration> = arrayOf(Migration1To2, Migration2To3, Migration3To4)
 }

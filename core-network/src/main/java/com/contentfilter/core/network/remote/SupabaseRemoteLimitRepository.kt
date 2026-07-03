@@ -10,4 +10,7 @@ class SupabaseRemoteLimitRepository
     ) : RemoteLimitRepository {
         override suspend fun pullDailyLimits(updatedAfterIso: String?): RemoteResult<List<RemoteDailyLimitDto>> =
             client.selectUpdatedSince(SupabaseTable.DailyLimits, updatedAfterIso).mapArray(RemoteDailyLimitDto::fromJson)
+
+        override suspend fun upsertDailyLimit(limit: RemoteDailyLimitDto): RemoteResult<Unit> =
+            client.upsert(SupabaseTable.DailyLimits, limit.toJson())
     }

@@ -24,10 +24,21 @@ class RoomRemoteApplier
         private val extraTimeGrantDao: ExtraTimeGrantDao,
     ) {
         suspend fun applyPolicies(values: List<RemotePolicyDto>) {
-            values.forEach { policyDao.upsertPolicy(it.toEntity()) }
+            values.forEach { policy ->
+                if (policy.active && policy.deletedAt == null) {
+                    policyDao.deactivateOtherPolicies(policy.id)
+                }
+                policyDao.upsertPolicy(policy.toEntity())
+            }
         }
 
         suspend fun applyDevices(values: List<RemoteDeviceDto>) {
+            if (values.isNotEmpty()) {
+                Log.i(
+                    LogTag,
+                    "Applying remote devices count=${values.size} active=${values.count { it.deletedAt == null }}",
+                )
+            }
             values.forEach { device ->
                 if (device.deletedAt == null) {
                     deviceDao.upsert(device.toEntity())

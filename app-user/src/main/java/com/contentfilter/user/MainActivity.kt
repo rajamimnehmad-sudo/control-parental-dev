@@ -1,46 +1,90 @@
 package com.contentfilter.user
 
+import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import com.contentfilter.core.ui.ContentFilterTheme
-import com.contentfilter.feature.activation.ActivationRoute
-import com.contentfilter.feature.block.BlockScreen
-import com.contentfilter.feature.onboarding.OnboardingScreen
+import com.contentfilter.feature.accessibility.service.AccessibilityController
 import com.contentfilter.feature.requests.RequestsRoute
 import com.contentfilter.feature.status.SystemStatusRoute
-import com.contentfilter.feature.usage.UsageRoute
+import com.contentfilter.user.apps.MyAppsRoute
+import com.contentfilter.user.internet.InternetRoute
+import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesRoute
+import com.contentfilter.user.updates.UpdatesViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val blockedDomainIntent = MutableStateFlow<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        blockedDomainIntent.value = intent.blockedDomainExtra()
         setContent {
             ContentFilterTheme {
-                UserAppRoot(modifier = Modifier.fillMaxSize())
+                val blockedDomain by blockedDomainIntent.collectAsStateWithLifecycle()
+                UserAppRoot(
+                    modifier = Modifier.fillMaxSize(),
+                    blockedDomain = blockedDomain,
+                    onBlockedDomainConsumed = { blockedDomainIntent.value = null },
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        blockedDomainIntent.value = intent.blockedDomainExtra()
     }
 }
 
 @Composable
-private fun UserAppRoot(modifier: Modifier = Modifier) {
-    var destination by rememberSaveable { mutableStateOf(UserDestination.Onboarding) }
+private fun UserAppRoot(
+    modifier: Modifier = Modifier,
+    blockedDomain: String? = null,
+    onBlockedDomainConsumed: () -> Unit = {},
+) {
+    var destination by rememberSaveable { mutableStateOf(UserDestination.MyApps) }
+    var showAccessibilityDialog by rememberSaveable { mutableStateOf(false) }
+    val context = LocalContext.current
+    val updatesViewModel: UpdatesViewModel = hiltViewModel()
+    val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) {
+        updatesViewModel.autoCheckAndDownload()
+    }
+    LaunchedEffect(destination) {
+        showAccessibilityDialog = !AccessibilityController.isEnabled(context)
+    }
+    LaunchedEffect(blockedDomain) {
+        if (!blockedDomain.isNullOrBlank()) {
+            destination = UserDestination.Internet
+        }
+    }
     Scaffold(
         modifier = modifier,
         bottomBar = {
@@ -58,24 +102,84 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             when (destination) {
-                UserDestination.Onboarding -> OnboardingScreen()
-                UserDestination.Activation -> ActivationRoute()
                 UserDestination.Status -> SystemStatusRoute()
+                UserDestination.MyApps -> MyAppsRoute()
                 UserDestination.Requests -> RequestsRoute()
-                UserDestination.Usage -> UsageRoute()
+                UserDestination.Internet -> InternetRoute(
+                    initialDomain = blockedDomain,
+                    onInitialDomainConsumed = onBlockedDomainConsumed,
+                )
                 UserDestination.Updates -> UpdatesRoute()
-                UserDestination.Block -> BlockScreen(onRequestAccess = { destination = UserDestination.Requests })
             }
         }
+    }
+    if (updateState.status == UpdatesStatus.NeedsInstallPermission) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Actualización lista") },
+            text = { Text("Android necesita permiso para instalar APKs desde esta app.") },
+            confirmButton = {
+                Button(onClick = updatesViewModel::openInstallPermissionSettings) {
+                    Text("Dar permiso")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { destination = UserDestination.Updates }) {
+                    Text("Ver")
+                }
+            },
+        )
+    } else if (updateState.status == UpdatesStatus.ReadyToInstall) {
+        AlertDialog(
+            onDismissRequest = {},
+            title = { Text("Actualización descargada") },
+            text = { Text("Confirma la instalación en Android para completar la actualización.") },
+            confirmButton = {
+                Button(onClick = updatesViewModel::installDownloadedUpdate) {
+                    Text("Instalar")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { destination = UserDestination.Updates }) {
+                    Text("Ver")
+                }
+            },
+        )
+    } else if (showAccessibilityDialog) {
+        AlertDialog(
+            onDismissRequest = { showAccessibilityDialog = false },
+            title = { Text("Accesibilidad apagada") },
+            text = { Text("El bloqueo de apps necesita el servicio de accesibilidad activo. Android puede desactivarlo después de una actualización.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showAccessibilityDialog = false
+                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    },
+                ) {
+                    Text("Activar")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showAccessibilityDialog = false }) {
+                    Text("Luego")
+                }
+            },
+        )
     }
 }
 
 private enum class UserDestination(val label: String) {
-    Onboarding("Inicio"),
-    Activation("Activar"),
     Status("Estado"),
-    Requests("Solicitudes"),
-    Usage("Uso"),
+    MyApps("Mis apps"),
+    Requests("Mis solicitudes"),
+    Internet("Internet"),
     Updates("Actualizaciones"),
-    Block("Bloqueo"),
 }
+
+private fun Intent.blockedDomainExtra(): String? =
+    takeIf { action == OpenInternetAction }
+        ?.getStringExtra(ExtraBlockedDomain)
+
+const val OpenInternetAction = "com.contentfilter.user.OPEN_INTERNET"
+const val ExtraBlockedDomain = "blocked_domain"

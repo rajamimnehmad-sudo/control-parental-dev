@@ -8,9 +8,11 @@ import com.contentfilter.core.domain.model.ActivationResult
 import com.contentfilter.core.domain.repository.ActivationRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.SyncScheduler
+import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -24,6 +26,7 @@ class ActivationViewModel
         private val activationRepository: ActivationRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
         private val syncScheduler: SyncScheduler,
+        private val syncEngine: SyncEngine,
         private val realtimeSyncCoordinator: RealtimeSyncCoordinator,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ActivationUiState())
@@ -45,10 +48,6 @@ class ActivationViewModel
             }
         }
 
-        fun onEmailChanged(value: String) = update { copy(email = value) }
-
-        fun onPasswordChanged(value: String) = update { copy(password = value) }
-
         fun onActivationCodeChanged(value: String) = update { copy(activationCode = value) }
 
         fun onDeviceNameChanged(value: String) = update { copy(deviceName = value) }
@@ -56,22 +55,22 @@ class ActivationViewModel
         fun activate() {
             val state = mutableState.value
             if (state.activated) {
-                mutableState.update { it.copy(message = "Dispositivo activado. No hace falta volver a iniciar sesión.") }
+                mutableState.update { it.copy(message = "Dispositivo enlazado. No hace falta volver a enlazar.") }
                 return
             }
-            if (state.email.isBlank() || state.password.isBlank() || state.activationCode.isBlank()) {
-                val reason = "Local validation failed: email, password or activation code is blank."
+            if (state.deviceName.isBlank() || state.activationCode.isBlank()) {
+                val reason = "Local validation failed: device name or activation code is blank."
                 Log.w(LogTag, reason)
-                mutableState.update { it.copy(message = activationFailureMessage("Completá email, password y código.")) }
+                mutableState.update { it.copy(message = "Completá nombre y código.") }
                 return
             }
             viewModelScope.launch {
-                mutableState.update { it.copy(isLoading = true, message = "Activando dispositivo...") }
+                mutableState.update { it.copy(isLoading = true, message = "Enlazando dispositivo...") }
                 val result = runCatching {
                     activationRepository.activate(
                         ActivationCredentials(
-                            email = state.email.trim(),
-                            password = state.password,
+                            email = "",
+                            password = "",
                             activationCode = state.activationCode.trim(),
                             deviceDisplayName = state.deviceName.ifBlank { "Android" },
                             appVersionCode = 1,
@@ -86,6 +85,9 @@ class ActivationViewModel
                     realtimeSyncCoordinator.stop()
                     realtimeSyncCoordinator.start()
                     syncScheduler.requestSync()
+                    viewModelScope.launch(Dispatchers.IO) {
+                        syncEngine.syncCoreDataFull()
+                    }
                 } else if (result is ActivationResult.Failed) {
                     Log.e(LogTag, "Activation failed. Reason: ${result.reason.ifBlank { "<blank reason>" }}")
                 }
@@ -93,7 +95,7 @@ class ActivationViewModel
                     it.copy(
                         isLoading = false,
                         message = when (result) {
-                            is ActivationResult.Activated -> "Dispositivo activado."
+                            is ActivationResult.Activated -> "Dispositivo enlazado."
                             is ActivationResult.Failed -> activationFailureMessage(result.reason)
                         },
                     )
@@ -108,7 +110,7 @@ class ActivationViewModel
         private fun activationFailureMessage(reason: String): String {
             val detail = reason.ifBlank { "No se recibió detalle técnico del error." }
             if (detail == OfflineMessage) return OfflineMessage
-            return "No se pudo activar. Revisá email, password y código."
+            return "No se pudo enlazar. Revisá el código o pedí uno nuevo al administrador."
         }
 
         private companion object {

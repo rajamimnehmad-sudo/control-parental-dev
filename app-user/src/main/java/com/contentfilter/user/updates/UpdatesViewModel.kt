@@ -9,6 +9,7 @@ import com.contentfilter.core.update.model.UpdateDownloadResult
 import com.contentfilter.core.update.repository.ApkUpdateRepository
 import com.contentfilter.user.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,6 +26,32 @@ class UpdatesViewModel
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(UpdatesUiState())
         val uiState: StateFlow<UpdatesUiState> = _uiState.asStateFlow()
+        private var downloadedApk: File? = null
+        private var autoCheckStarted = false
+
+        fun autoCheckAndDownload() {
+            if (autoCheckStarted) return
+            autoCheckStarted = true
+            viewModelScope.launch {
+                runCatching {
+                    when (val result = updateRepository.checkForUpdate(BuildConfig.VERSION_CODE)) {
+                        is UpdateCheckResult.Available -> {
+                            _uiState.value = UpdatesUiState(
+                                status = UpdatesStatus.Downloading,
+                                manifest = result.manifest,
+                            )
+                            downloadAndMaybeInstall(result.manifest, openInstaller = true)
+                        }
+                        UpdateCheckResult.NetworkError,
+                        UpdateCheckResult.NotConfigured,
+                        UpdateCheckResult.UpToDate,
+                        -> Unit
+                    }
+                }.onFailure { exception ->
+                    Log.e(LogTag, "Auto update failed: ${exception.message}", exception)
+                }
+            }
+        }
 
         fun checkForUpdates() {
             viewModelScope.launch {
@@ -59,26 +86,20 @@ class UpdatesViewModel
             viewModelScope.launch {
                 _uiState.update { it.copy(status = UpdatesStatus.Downloading) }
                 runCatching {
-                    when (val result = updateRepository.download(manifest)) {
-                        UpdateDownloadResult.DownloadError -> {
-                            _uiState.update { it.copy(status = UpdatesStatus.DownloadFailed) }
-                        }
-                        UpdateDownloadResult.InvalidChecksum -> {
-                            _uiState.update { it.copy(status = UpdatesStatus.ChecksumFailed) }
-                        }
-                        is UpdateDownloadResult.Success -> {
-                            if (apkInstaller.canRequestPackageInstalls()) {
-                                _uiState.update { it.copy(status = UpdatesStatus.ReadyToInstall) }
-                                apkInstaller.openPackageInstaller(result.apk)
-                            } else {
-                                _uiState.update { it.copy(status = UpdatesStatus.NeedsInstallPermission) }
-                            }
-                        }
-                    }
+                    downloadAndMaybeInstall(manifest, openInstaller = true)
                 }.onFailure { exception ->
                     Log.e(LogTag, "Update download failed: ${exception.message}", exception)
                     _uiState.update { it.copy(status = UpdatesStatus.DownloadFailed) }
                 }
+            }
+        }
+
+        fun installDownloadedUpdate() {
+            val apk = downloadedApk ?: return
+            if (apkInstaller.canRequestPackageInstalls()) {
+                apkInstaller.openPackageInstaller(apk)
+            } else {
+                _uiState.update { it.copy(status = UpdatesStatus.NeedsInstallPermission) }
             }
         }
 
@@ -87,6 +108,29 @@ class UpdatesViewModel
                 apkInstaller.openInstallPermissionSettings()
             }.onFailure { exception ->
                 Log.e(LogTag, "Open install permission settings failed: ${exception.message}", exception)
+            }
+        }
+
+        private suspend fun downloadAndMaybeInstall(
+            manifest: com.contentfilter.core.update.model.UpdateManifest,
+            openInstaller: Boolean,
+        ) {
+            when (val result = updateRepository.download(manifest)) {
+                UpdateDownloadResult.DownloadError -> {
+                    _uiState.update { it.copy(status = UpdatesStatus.DownloadFailed) }
+                }
+                UpdateDownloadResult.InvalidChecksum -> {
+                    _uiState.update { it.copy(status = UpdatesStatus.ChecksumFailed) }
+                }
+                is UpdateDownloadResult.Success -> {
+                    downloadedApk = result.apk
+                    if (apkInstaller.canRequestPackageInstalls()) {
+                        _uiState.update { it.copy(status = UpdatesStatus.ReadyToInstall) }
+                        if (openInstaller) apkInstaller.openPackageInstaller(result.apk)
+                    } else {
+                        _uiState.update { it.copy(status = UpdatesStatus.NeedsInstallPermission) }
+                    }
+                }
             }
         }
 

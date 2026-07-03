@@ -25,12 +25,17 @@ data class RemotePolicyRuleDto(
             .put("priority", priority)
             .put("enabled", enabled)
             .put("updated_at", updatedAt)
+            .apply {
+                if (deletedAt != null) {
+                    put("deleted_at", deletedAt)
+                }
+            }
 
     companion object {
         fun fromJson(json: JSONObject): RemotePolicyRuleDto =
             RemotePolicyRuleDto(
                 id = json.getString("id"),
-                accountId = json.optString("account_id").ifBlank { null },
+                accountId = json.optNullableString("account_id"),
                 policyId = json.getString("policy_id"),
                 scope = json.getString("scope"),
                 target = json.getString("target"),
@@ -38,7 +43,7 @@ data class RemotePolicyRuleDto(
                 priority = json.getInt("priority"),
                 enabled = json.getBoolean("enabled"),
                 updatedAt = json.getString("updated_at"),
-                deletedAt = json.optString("deleted_at").ifBlank { null },
+                deletedAt = json.optNullableString("deleted_at"),
             )
     }
 }

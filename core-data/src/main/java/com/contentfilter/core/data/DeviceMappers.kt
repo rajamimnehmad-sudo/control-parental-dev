@@ -8,6 +8,8 @@ internal fun DeviceEntity.toDomain(): Device =
         id = id,
         accountId = accountId,
         displayName = displayName,
+        appRole = appRole,
+        lastSeenAtEpochMillis = lastSeenAtEpochMillis,
     )
 
 internal fun Device.toEntity(): DeviceEntity =
@@ -15,4 +17,6 @@ internal fun Device.toEntity(): DeviceEntity =
         id = id,
         accountId = accountId,
         displayName = displayName,
+        appRole = appRole,
+        lastSeenAtEpochMillis = lastSeenAtEpochMillis,
     )

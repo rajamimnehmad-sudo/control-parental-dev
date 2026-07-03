@@ -4,6 +4,7 @@ import android.util.Log
 import com.contentfilter.core.database.dao.SyncCursorDao
 import com.contentfilter.core.database.entity.SyncCursorEntity
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
@@ -25,8 +26,10 @@ class DefaultSyncEngine
         private val syncCursorDao: SyncCursorDao,
         private val applier: RoomRemoteApplier,
         private val systemStatusRepository: SystemStatusRepository,
+        private val deviceActivationRepository: DeviceActivationRepository,
     ) : SyncEngine {
         override suspend fun syncOnce(): SyncResult {
+            markCurrentDeviceSeen()
             runCatching {
                 outboxProcessor.processPending()
             }.onFailure { exception ->
@@ -78,6 +81,69 @@ class DefaultSyncEngine
                 }
             }
 
+        override suspend fun syncCoreDataFull(): SyncResult {
+            markCurrentDeviceSeen()
+            runCatching {
+                outboxProcessor.processPending()
+            }.onFailure { exception ->
+                Log.e(LogTag, "Full core sync outbox crashed: ${exception.message}", exception)
+                systemStatusRepository.updateSyncState(ComponentState.Warning)
+                return SyncResult(success = false, message = "Sync deferred; outbox failed.")
+            }
+            val result = pullCoreData(forceFull = true)
+            systemStatusRepository.updateSyncState(
+                if (result.success) ComponentState.Enabled else ComponentState.Warning,
+            )
+            return result
+        }
+
+        override suspend fun syncDevicesFull(): SyncResult =
+            run {
+                markCurrentDeviceSeen()
+                syncDevicesFullInternal()
+            }
+
+        private suspend fun syncDevicesFullInternal(): SyncResult =
+            when (val result = deviceRepository.pullDevices(updatedAfterIso = null)) {
+                is RemoteResult.Failure -> {
+                    Log.w(LogTag, "Full devices pull failed: ${result.reason}")
+                    systemStatusRepository.updateSyncState(ComponentState.Warning)
+                    SyncResult(success = false, message = result.reason)
+                }
+                is RemoteResult.Success -> {
+                    runCatching {
+                        applier.applyDevices(result.value)
+                        result.value.maxOfOrNull { it.updatedAt }?.let { cursor ->
+                            syncCursorDao.upsert(
+                                SyncCursorEntity(
+                                    tableName = SupabaseTable.Devices.tableName,
+                                    updatedAfterIso = cursor,
+                                    syncedAtEpochMillis = System.currentTimeMillis(),
+                                ),
+                            )
+                        }
+                    }.fold(
+                        onSuccess = {
+                            val activeCount = result.value.count { it.deletedAt == null }
+                            Log.i(
+                                LogTag,
+                                "Full devices pull applied remote=${result.value.size} active=$activeCount",
+                            )
+                            systemStatusRepository.updateSyncState(ComponentState.Enabled)
+                            SyncResult(
+                                success = true,
+                                message = "Dispositivos sincronizados: $activeCount",
+                            )
+                        },
+                        onFailure = { exception ->
+                            Log.e(LogTag, "Full devices apply crashed: ${exception.message}", exception)
+                            systemStatusRepository.updateSyncState(ComponentState.Warning)
+                            SyncResult(success = false, message = "No se pudieron guardar dispositivos.")
+                        },
+                    )
+                }
+            }
+
         override suspend fun syncRequestResultsFull(): SyncResult {
             val requests = syncAccessRequestsFull()
             val grants = when (val result = requestRepository.pullExtraTimeGrants(updatedAfterIso = null)) {
@@ -119,47 +185,32 @@ class DefaultSyncEngine
                 success = requests.success && grants.success,
                 message = "Requests: ${requests.message}; grants: ${grants.message}",
             )
+            }
+
+        private suspend fun markCurrentDeviceSeen() {
+            val activation = deviceActivationRepository.currentActivation() ?: return
+            when (val result = deviceRepository.markDeviceSeen(activation.deviceId)) {
+                is RemoteResult.Success -> Unit
+                is RemoteResult.Failure -> Log.w(LogTag, "Device heartbeat failed: ${result.reason}")
+            }
         }
 
         private suspend fun pullRemoteChanges(): SyncResult {
-            val results = listOf(
-                pull(
-                    table = SupabaseTable.Devices,
-                    request = { deviceRepository.pullDevices(cursorFor(SupabaseTable.Devices)) },
-                    apply = applier::applyDevices,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.Policies,
-                    request = { policyRepository.pullPolicies(cursorFor(SupabaseTable.Policies)) },
-                    apply = applier::applyPolicies,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.PolicyRules,
-                    request = { policyRepository.pullPolicyRules(cursorFor(SupabaseTable.PolicyRules)) },
-                    apply = applier::applyPolicyRules,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.DailyLimits,
-                    request = { limitRepository.pullDailyLimits(cursorFor(SupabaseTable.DailyLimits)) },
-                    apply = applier::applyDailyLimits,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.AccessRequests,
-                    request = { requestRepository.pullAccessRequests(cursorFor(SupabaseTable.AccessRequests)) },
-                    apply = applier::applyAccessRequests,
-                    updatedAt = { it.updatedAt },
-                ),
-                pull(
-                    table = SupabaseTable.ExtraTimeGrants,
-                    request = { requestRepository.pullExtraTimeGrants(cursorFor(SupabaseTable.ExtraTimeGrants)) },
-                    apply = applier::applyExtraTimeGrants,
-                    updatedAt = { it.updatedAt },
-                ),
-            )
+            val results = pullCoreDataResults(forceFull = false) +
+                listOf(
+                    pull(
+                        table = SupabaseTable.AccessRequests,
+                        request = { requestRepository.pullAccessRequests(cursorFor(SupabaseTable.AccessRequests)) },
+                        apply = applier::applyAccessRequests,
+                        updatedAt = { it.updatedAt },
+                    ),
+                    pull(
+                        table = SupabaseTable.ExtraTimeGrants,
+                        request = { requestRepository.pullExtraTimeGrants(cursorFor(SupabaseTable.ExtraTimeGrants)) },
+                        apply = applier::applyExtraTimeGrants,
+                        updatedAt = { it.updatedAt },
+                    ),
+                )
             val success = results.all { it }
             return SyncResult(
                 success = success,
@@ -167,8 +218,49 @@ class DefaultSyncEngine
             )
         }
 
+        private suspend fun pullCoreData(forceFull: Boolean): SyncResult {
+            val success = pullCoreDataResults(forceFull).all { it }
+            return SyncResult(
+                success = success,
+                message = if (success) "Core data synced." else "Core data sync deferred; remote is unavailable.",
+            )
+        }
+
+        private suspend fun pullCoreDataResults(forceFull: Boolean): List<Boolean> =
+            listOf(
+                pull(
+                    table = SupabaseTable.Devices,
+                    request = { deviceRepository.pullDevices(cursorFor(SupabaseTable.Devices, forceFull)) },
+                    apply = applier::applyDevices,
+                    updatedAt = { it.updatedAt },
+                ),
+                pull(
+                    table = SupabaseTable.Policies,
+                    request = { policyRepository.pullPolicies(cursorFor(SupabaseTable.Policies, forceFull)) },
+                    apply = applier::applyPolicies,
+                    updatedAt = { it.updatedAt },
+                ),
+                pull(
+                    table = SupabaseTable.PolicyRules,
+                    request = { policyRepository.pullPolicyRules(cursorFor(SupabaseTable.PolicyRules, forceFull)) },
+                    apply = applier::applyPolicyRules,
+                    updatedAt = { it.updatedAt },
+                ),
+                pull(
+                    table = SupabaseTable.DailyLimits,
+                    request = { limitRepository.pullDailyLimits(cursorFor(SupabaseTable.DailyLimits, forceFull)) },
+                    apply = applier::applyDailyLimits,
+                    updatedAt = { it.updatedAt },
+                ),
+            )
+
         private suspend fun cursorFor(table: SupabaseTable): String? =
             syncCursorDao.cursorFor(table.tableName)?.updatedAfterIso
+
+        private suspend fun cursorFor(
+            table: SupabaseTable,
+            forceFull: Boolean,
+        ): String? = if (forceFull) null else cursorFor(table)
 
         private suspend fun <T> pull(
             table: SupabaseTable,

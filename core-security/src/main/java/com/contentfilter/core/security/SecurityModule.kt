@@ -2,6 +2,7 @@ package com.contentfilter.core.security
 
 import com.contentfilter.core.domain.repository.ActivationRepository
 import com.contentfilter.core.network.config.AuthTokenProvider
+import com.contentfilter.core.network.config.DeviceTokenProvider
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -15,6 +16,9 @@ abstract class SecurityModule {
 
     @Binds
     abstract fun bindAuthTokenProvider(provider: StoredAuthTokenProvider): AuthTokenProvider
+
+    @Binds
+    abstract fun bindDeviceTokenProvider(provider: SharedPreferencesDeviceTokenProvider): DeviceTokenProvider
 
     @Binds
     abstract fun bindActivationRepository(repository: DefaultActivationRepository): ActivationRepository

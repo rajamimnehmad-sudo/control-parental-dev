@@ -35,6 +35,11 @@ class AppUsageTracker {
         elapsedRealtimeMillis: Long,
     ): Int = (activeMillis(packageName, elapsedRealtimeMillis) / MillisPerMinute).toInt()
 
+    fun activeMillisForPackage(
+        packageName: String,
+        elapsedRealtimeMillis: Long,
+    ): Long = activeMillis(packageName, elapsedRealtimeMillis)
+
     private fun activeMillis(
         packageName: String,
         elapsedRealtimeMillis: Long,
@@ -81,6 +86,13 @@ class AppUsageTracker {
     }
 
     fun currentPackageName(): String? = currentPackageName
+
+    fun reset() {
+        accumulatedMillisByPackage.clear()
+        currentPackageName = null
+        currentStartedAtElapsedMillis = 0L
+        currentStartedAtEpochMillis = 0L
+    }
 
     companion object {
         private const val MillisPerMinute = 60_000L

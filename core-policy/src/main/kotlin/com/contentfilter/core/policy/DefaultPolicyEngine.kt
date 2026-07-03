@@ -38,7 +38,7 @@ class DefaultPolicyEngine : PolicyEngine {
         val limit = snapshot.dailyLimits
             .filter { it.enabled && it.targetType == PolicyTargetType.App && it.target == context.packageName }
             .minByOrNull { it.limitMinutes }
-        if (limit != null && usedMinutesToday >= limit.limitMinutes) {
+        if (limit != null && usedMinutesToday > limit.limitMinutes) {
             return PolicyDecision.Block("Daily limit exceeded for ${context.packageName}.")
         }
         val rule = snapshot.rules.bestMatchingRule(context)
@@ -49,12 +49,16 @@ class DefaultPolicyEngine : PolicyEngine {
         snapshot: PolicySnapshot,
         context: DomainPolicyContext,
     ): PolicyDecision {
+        val normalizedContext = context.copy(domain = context.domain.normalizedDomain())
         deviceDecision(context.device)?.let { return it }
-        activeGrant(snapshot.extraTimeGrants, PolicyTargetType.Global, GlobalExtraTimeTarget, context.time)?.let {
+        if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
+            return PolicyDecision.Allow()
+        }
+        activeGrant(snapshot.extraTimeGrants, PolicyTargetType.Global, GlobalExtraTimeTarget, normalizedContext.time)?.let {
             return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
         }
-        val rule = snapshot.rules.bestMatchingRule(context)
-        return rule?.toDecision(context.domain) ?: PolicyDecision.Allow()
+        val rule = snapshot.rules.bestMatchingRule(normalizedContext)
+        return rule?.toDecision(normalizedContext.domain) ?: PolicyDecision.Allow()
     }
 
     override fun evaluate(
@@ -133,7 +137,10 @@ class DefaultPolicyEngine : PolicyEngine {
 
     private fun PolicyRule.matchesDomain(context: DomainPolicyContext): Boolean =
         when (scope) {
-            RuleScope.Domain -> context.domain == target || context.domain.endsWith(".$target")
+            RuleScope.Domain -> {
+                val normalizedTarget = target.normalizedDomain()
+                normalizedTarget == DomainWildcard || context.domain.matchesDomainTarget(normalizedTarget)
+            }
             RuleScope.Category -> target == context.category
             RuleScope.Global -> true
             RuleScope.App -> false
@@ -164,6 +171,13 @@ class DefaultPolicyEngine : PolicyEngine {
 
     private companion object {
         const val GlobalExtraTimeTarget = "extra_time"
+        const val DomainWildcard = "*"
+        val CriticalAllowedDomains = setOf(
+            "supabase.co",
+            "syeycayasyufedwoprea.supabase.co",
+            "android.clients.google.com",
+            "connectivitycheck.gstatic.com",
+        )
 
         val ruleComparator: Comparator<PolicyRule> =
             compareByDescending<PolicyRule> { it.level.specificity }
@@ -177,5 +191,17 @@ class DefaultPolicyEngine : PolicyEngine {
                 RuleScope.Category -> 1
                 RuleScope.Global -> 0
             }
+
+        fun String.normalizedDomain(): String =
+            trim()
+                .lowercase()
+                .removeSuffix(".")
+                .removePrefix("www.")
+
+        fun String.matchesDomainTarget(target: String): Boolean =
+            this == target || endsWith(".$target")
+
+        fun String.matchesAny(targets: Set<String>): Boolean =
+            targets.any { matchesDomainTarget(it) }
     }
 }

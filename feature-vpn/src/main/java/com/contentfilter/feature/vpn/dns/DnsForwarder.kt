@@ -14,21 +14,30 @@ class DnsForwarder(
         payload: ByteArray,
         upstreamServers: List<InetAddress>,
     ): ByteArray? {
-        val upstream = upstreamServers.firstOrNull() ?: return null
-        DatagramSocket().use { socket ->
-            if (!protectSocket(socket)) return null
-            socket.soTimeout = TimeoutMillis
-            socket.send(DatagramPacket(payload, payload.size, upstream, DnsPort))
-            val buffer = ByteArray(MaxDnsPayloadSize)
-            val response = DatagramPacket(buffer, buffer.size)
-            socket.receive(response)
-            return response.data.copyOf(response.length)
+        upstreamServers.withFallbacks().forEach { upstream ->
+            runCatching {
+                DatagramSocket().use { socket ->
+                    if (!protectSocket(socket)) return@runCatching null
+                    socket.soTimeout = TimeoutMillis
+                    socket.send(DatagramPacket(payload, payload.size, upstream, DnsPort))
+                    val buffer = ByteArray(MaxDnsPayloadSize)
+                    val response = DatagramPacket(buffer, buffer.size)
+                    socket.receive(response)
+                    response.data.copyOf(response.length)
+                }
+            }.getOrNull()?.let { return it }
         }
+        return null
     }
+
+    private fun List<InetAddress>.withFallbacks(): List<InetAddress> =
+        (this + FallbackDnsServers.mapNotNull { runCatching { InetAddress.getByName(it) }.getOrNull() })
+            .distinctBy { it.hostAddress }
 
     private companion object {
         const val DnsPort = 53
         const val MaxDnsPayloadSize = 4096
-        const val TimeoutMillis = 1_500
+        const val TimeoutMillis = 900
+        val FallbackDnsServers = listOf("1.1.1.1", "8.8.8.8")
     }
 }

@@ -7,4 +7,5 @@ data class AdminRequestsUiState(
     val offlineMode: Boolean = true,
     val message: String = "",
     val lastSyncMessage: String = "",
+    val isLoading: Boolean = false,
 )

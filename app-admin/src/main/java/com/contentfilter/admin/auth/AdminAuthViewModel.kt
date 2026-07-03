@@ -10,9 +10,11 @@ import com.contentfilter.core.domain.repository.ActivationRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.sync.SyncScheduler
+import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,6 +28,7 @@ class AdminAuthViewModel
         private val activationRepository: ActivationRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
         private val syncScheduler: SyncScheduler,
+        private val syncEngine: SyncEngine,
         private val realtimeSyncCoordinator: RealtimeSyncCoordinator,
         configProvider: SupabaseConfigProvider,
     ) : ViewModel() {
@@ -96,6 +99,9 @@ class AdminAuthViewModel
                     realtimeSyncCoordinator.stop()
                     realtimeSyncCoordinator.start()
                     syncScheduler.requestSync()
+                    viewModelScope.launch(Dispatchers.IO) {
+                        syncEngine.syncCoreDataFull()
+                    }
                 } else if (result is ActivationResult.Failed) {
                     Log.e(LogTag, "Admin activation failed. Reason: ${result.reason.ifBlank { "<blank reason>" }}")
                 }

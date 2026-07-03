@@ -11,7 +11,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,8 +23,6 @@ fun ActivationRoute(
     val state = viewModel.uiState.collectAsStateWithLifecycle()
     ActivationScreen(
         state = state.value,
-        onEmailChanged = viewModel::onEmailChanged,
-        onPasswordChanged = viewModel::onPasswordChanged,
         onActivationCodeChanged = viewModel::onActivationCodeChanged,
         onDeviceNameChanged = viewModel::onDeviceNameChanged,
         onActivate = viewModel::activate,
@@ -36,8 +33,6 @@ fun ActivationRoute(
 @Composable
 fun ActivationScreen(
     state: ActivationUiState,
-    onEmailChanged: (String) -> Unit,
-    onPasswordChanged: (String) -> Unit,
     onActivationCodeChanged: (String) -> Unit,
     onDeviceNameChanged: (String) -> Unit,
     onActivate: () -> Unit,
@@ -49,23 +44,27 @@ fun ActivationScreen(
             .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(text = "Activación", style = MaterialTheme.typography.headlineSmall)
+        Text(text = "Enlazar dispositivo", style = MaterialTheme.typography.headlineSmall)
         if (state.activated) {
             Text(text = state.message, style = MaterialTheme.typography.bodyMedium)
             return@Column
         }
-        OutlinedTextField(state.email, onEmailChanged, Modifier.fillMaxWidth(), label = { Text("Email") })
         OutlinedTextField(
-            value = state.password,
-            onValueChange = onPasswordChanged,
+            value = state.deviceName,
+            onValueChange = onDeviceNameChanged,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
+            label = { Text("Nombre") },
+            singleLine = true,
         )
-        OutlinedTextField(state.activationCode, onActivationCodeChanged, Modifier.fillMaxWidth(), label = { Text("Código") })
-        OutlinedTextField(state.deviceName, onDeviceNameChanged, Modifier.fillMaxWidth(), label = { Text("Nombre del dispositivo") })
+        OutlinedTextField(
+            value = state.activationCode,
+            onValueChange = onActivationCodeChanged,
+            modifier = Modifier.fillMaxWidth(),
+            label = { Text("Código del administrador") },
+            singleLine = true,
+        )
         Button(onClick = onActivate, enabled = !state.isLoading) {
-            Text(if (state.isLoading) "Activando" else "Activar")
+            Text(if (state.isLoading) "Enlazando" else "Enlazar")
         }
         Text(text = state.message, style = MaterialTheme.typography.bodyMedium)
     }

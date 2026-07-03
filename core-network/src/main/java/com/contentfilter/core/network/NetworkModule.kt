@@ -3,9 +3,11 @@ package com.contentfilter.core.network
 import com.contentfilter.core.network.config.BuildConfigSupabaseConfigProvider
 import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.network.remote.RemoteLimitRepository
+import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteLimitRepository
+import com.contentfilter.core.network.remote.SupabaseRemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.SupabaseRemotePolicyRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteRequestRepository
@@ -34,6 +36,9 @@ abstract class NetworkModule {
 
     @Binds
     abstract fun bindRemoteDeviceRepository(repository: SupabaseRemoteDeviceRepository): RemoteDeviceRepository
+
+    @Binds
+    abstract fun bindRemoteInstalledAppRepository(repository: SupabaseRemoteInstalledAppRepository): RemoteInstalledAppRepository
 
     @Binds
     abstract fun bindRemoteRequestRepository(repository: SupabaseRemoteRequestRepository): RemoteRequestRepository

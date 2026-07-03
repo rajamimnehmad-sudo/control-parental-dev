@@ -10,4 +10,7 @@ class SupabaseRemoteDeviceRepository
     ) : RemoteDeviceRepository {
         override suspend fun pullDevices(updatedAfterIso: String?): RemoteResult<List<RemoteDeviceDto>> =
             client.selectUpdatedSince(SupabaseTable.Devices, updatedAfterIso).mapArray(RemoteDeviceDto::fromJson)
+
+        override suspend fun markDeviceSeen(deviceId: String): RemoteResult<Unit> =
+            client.patchById(SupabaseTable.Devices, deviceId, client.deviceSeenJson())
     }

@@ -11,7 +11,7 @@ data class AuthSessionDto(
         fun fromJson(json: JSONObject): AuthSessionDto =
             AuthSessionDto(
                 accessToken = json.getString("access_token"),
-                refreshToken = json.optString("refresh_token").ifBlank { null },
+                refreshToken = json.optNullableString("refresh_token"),
                 expiresInSeconds = json.optLong("expires_in", 0L),
             )
     }

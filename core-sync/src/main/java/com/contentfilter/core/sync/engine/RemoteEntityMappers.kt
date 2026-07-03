@@ -26,6 +26,8 @@ internal fun RemoteDeviceDto.toEntity(): DeviceEntity =
         id = id,
         accountId = accountId,
         displayName = if (deletedAt == null) displayName else "$displayName (inactivo)",
+        appRole = appRole,
+        lastSeenAtEpochMillis = lastSeenAt?.toEpochMillis(),
     )
 
 internal fun RemotePolicyRuleDto.toEntity(): PolicyRuleEntity =

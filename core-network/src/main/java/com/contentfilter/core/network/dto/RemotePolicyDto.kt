@@ -22,11 +22,11 @@ data class RemotePolicyDto(
         fun fromJson(json: JSONObject): RemotePolicyDto =
             RemotePolicyDto(
                 id = json.getString("id"),
-                accountId = json.optString("account_id").ifBlank { null },
+                accountId = json.optNullableString("account_id"),
                 version = json.getLong("version"),
                 active = json.getBoolean("active"),
                 updatedAt = json.getString("updated_at"),
-                deletedAt = json.optString("deleted_at").ifBlank { null },
+                deletedAt = json.optNullableString("deleted_at"),
             )
     }
 }

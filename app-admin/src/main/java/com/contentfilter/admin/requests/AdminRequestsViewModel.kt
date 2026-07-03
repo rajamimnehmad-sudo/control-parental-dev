@@ -22,6 +22,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @HiltViewModel
 class AdminRequestsViewModel
@@ -35,6 +36,7 @@ class AdminRequestsViewModel
         private val syncEngine: SyncEngine,
     ) : ViewModel() {
         private val syncMessage = MutableStateFlow("")
+        private val isLoading = MutableStateFlow(false)
 
         val uiState = observeRequests()
             .map { requests ->
@@ -46,11 +48,14 @@ class AdminRequestsViewModel
                 syncMessage.update { "No se pudieron cargar las solicitudes." }
                 emit(emptyList())
             }
-            .combine(syncMessage) { requests, message ->
+            .combine(syncMessage) { requests, message -> requests to message }
+            .combine(isLoading) { (requests, message), loading ->
+                val pendingRequests = requests.filter { it.status.isPending() }
                 AdminRequestsUiState(
-                    requests = requests,
+                    requests = pendingRequests,
                     offlineMode = false,
                     lastSyncMessage = message,
+                    isLoading = loading,
                 )
             }
             .stateIn(
@@ -61,6 +66,10 @@ class AdminRequestsViewModel
 
         init {
             Log.i(LogTag, "Admin requests opened; requesting immediate sync.")
+            refresh()
+        }
+
+        fun refresh() {
             syncScheduler.requestSync()
             syncNow()
         }
@@ -76,7 +85,7 @@ class AdminRequestsViewModel
                         approveAccessRequest(request)
                     }
                     syncScheduler.requestSync()
-                    syncNow()
+                    syncNowBlocking()
                     syncMessage.update { "Solicitud aprobada." }
                 }.onFailure { exception ->
                     Log.e(LogTag, "Approve failed requestId=$requestId: ${exception.message}", exception)
@@ -92,7 +101,7 @@ class AdminRequestsViewModel
                     if (request?.status?.isPending() == false) return@runCatching
                     setRequestStatus(requestId, RequestStatus.Rejected)
                     syncScheduler.requestSync()
-                    syncNow()
+                    syncNowBlocking()
                     syncMessage.update { "Solicitud rechazada." }
                 }.onFailure { exception ->
                     Log.e(LogTag, "Reject failed requestId=$requestId: ${exception.message}", exception)
@@ -101,17 +110,23 @@ class AdminRequestsViewModel
             }
         }
 
-        fun grantTime(request: AccessRequest) {
+        fun grantTime(
+            request: AccessRequest,
+            rawMinutes: String,
+        ) {
             viewModelScope.launch {
                 runCatching {
                     if (!request.status.isPending()) return@runCatching
+                    val minutes = rawMinutes.filter(Char::isDigit).toIntOrNull()
+                        ?: request.requestedMinutes
+                        ?: DefaultGrantMinutes
                     grantExtraTime(
                         request = request,
-                        minutes = request.requestedMinutes ?: DefaultGrantMinutes,
+                        minutes = minutes.coerceAtLeast(1),
                         nowEpochMillis = System.currentTimeMillis(),
                     )
                     syncScheduler.requestSync()
-                    syncNow()
+                    syncNowBlocking()
                     syncMessage.update { "Tiempo extra concedido." }
                 }.onFailure { exception ->
                     Log.e(LogTag, "Grant time failed requestId=${request.id}: ${exception.message}", exception)
@@ -122,22 +137,9 @@ class AdminRequestsViewModel
 
         private fun syncNow() {
             viewModelScope.launch(Dispatchers.IO) {
+                isLoading.update { true }
                 runCatching {
-                    val outboxResult = syncEngine.syncOnce()
-                    val result = syncEngine.syncRequestResultsFull()
-                    Log.i(
-                        LogTag,
-                        "Immediate admin requests sync outboxSuccess=${outboxResult.success} resultsSuccess=${result.success} message=${result.message}",
-                    )
-                    syncMessage.update {
-                        if (outboxResult.success && result.success) {
-                            "Sync solicitudes OK: ${result.message}"
-                        } else if (outboxResult.message.contains(OfflineMessage) || result.message.contains(OfflineMessage)) {
-                            OfflineMessage
-                        } else {
-                            "Sync solicitudes falló: ${outboxResult.message}; ${result.message}"
-                        }
-                    }
+                    updateSyncMessage(syncNowBlocking())
                 }.onFailure { exception ->
                     Log.e(LogTag, "Immediate admin requests sync failed: ${exception.message}", exception)
                     syncMessage.update {
@@ -147,6 +149,30 @@ class AdminRequestsViewModel
                             "Sync solicitudes falló: ${exception.message.orEmpty()}"
                         }
                     }
+                }.also {
+                    isLoading.update { false }
+                }
+            }
+        }
+
+        private suspend fun syncNowBlocking(): Boolean =
+            withContext(Dispatchers.IO) {
+                val outboxResult = syncEngine.syncOnce()
+                val result = syncEngine.syncAccessRequestsFull()
+                Log.i(
+                    LogTag,
+                    "Immediate admin requests sync outboxSuccess=${outboxResult.success} resultsSuccess=${result.success} message=${result.message}",
+                )
+                updateSyncMessage(outboxResult.success && result.success)
+                outboxResult.success && result.success
+            }
+
+        private fun updateSyncMessage(success: Boolean) {
+            syncMessage.update {
+                if (success) {
+                    "Solicitudes sincronizadas."
+                } else {
+                    "Cambio guardado localmente. Se sincronizará cuando haya conexión."
                 }
             }
         }

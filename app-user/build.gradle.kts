@@ -16,7 +16,7 @@ android {
         minSdk = 29
         targetSdk = 36
         versionCode = 1
-        versionName = "1.0.0"
+        versionName = "1.0.1"
     }
 
     flavorDimensions += "distribution"
@@ -24,7 +24,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 16
+            versionCode = 45
             versionNameSuffix = "-dev"
         }
         create("beta") {
@@ -43,6 +43,7 @@ android {
 }
 
 dependencies {
+    implementation(project(":core-domain"))
     implementation(project(":core-data"))
     implementation(project(":core-database"))
     implementation(project(":core-license"))

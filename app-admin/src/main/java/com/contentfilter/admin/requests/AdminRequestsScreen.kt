@@ -12,10 +12,16 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -28,36 +34,54 @@ import java.time.format.DateTimeFormatter
 
 @Composable
 fun AdminRequestsRoute(
+    refreshKey: Int = 0,
     viewModel: AdminRequestsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(refreshKey) {
+        viewModel.refresh()
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
             .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Solicitudes", style = MaterialTheme.typography.headlineSmall)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text("Solicitudes", style = MaterialTheme.typography.headlineSmall)
+            OutlinedButton(
+                onClick = viewModel::refresh,
+                enabled = !state.isLoading,
+            ) {
+                Text(if (state.isLoading) "Cargando..." else "Actualizar")
+            }
+        }
         if (state.offlineMode) {
             Text("Modo Offline / Desarrollo", color = MaterialTheme.colorScheme.error)
         }
         if (state.message.isNotBlank()) {
             Text(state.message, color = MaterialTheme.colorScheme.error)
         }
-        Text("Solicitudes locales: ${state.requests.size}", style = MaterialTheme.typography.bodyMedium)
+        Text("Pendientes: ${state.requests.size}", style = MaterialTheme.typography.bodyMedium)
+        if (state.isLoading) {
+            Text("Cargando solicitudes...", style = MaterialTheme.typography.bodySmall)
+        }
         if (state.lastSyncMessage.isNotBlank()) {
             Text(state.lastSyncMessage, style = MaterialTheme.typography.bodySmall)
         }
         if (state.requests.isEmpty()) {
             Text("No hay solicitudes para revisar.")
         }
-        LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             items(state.requests, key = { it.id }) { request ->
                 RequestCard(
                     request = request,
                     onApprove = { viewModel.approve(request.id) },
                     onReject = { viewModel.reject(request.id) },
-                    onGrant = { viewModel.grantTime(request) },
+                    onGrant = { minutes -> viewModel.grantTime(request, minutes) },
                 )
             }
         }
@@ -69,27 +93,39 @@ private fun RequestCard(
     request: AccessRequest,
     onApprove: () -> Unit,
     onReject: () -> Unit,
-    onGrant: () -> Unit,
+    onGrant: (String) -> Unit,
 ) {
+    var grantMinutes by remember(request.id, request.requestedMinutes) {
+        mutableStateOf((request.requestedMinutes ?: 15).toString())
+    }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(request.requestType.displayName(), style = MaterialTheme.typography.titleMedium)
             Text("Objetivo: ${request.displayTarget()}")
-            Text("Estado: ${request.status.displayName()}")
-            Text("Fecha: ${request.createdAtEpochMillis.toDisplayDate()}")
             if (request.reason.isNotBlank()) {
                 Text("Motivo: ${request.reason}")
             }
             request.requestedMinutes?.let { minutes ->
                 Text("Minutos pedidos: $minutes")
             }
+            Text("Fecha: ${request.createdAtEpochMillis.toDisplayDate()}", style = MaterialTheme.typography.bodySmall)
             if (request.status.isPending()) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     if (request.requestType == AccessRequestType.EXTRA_TIME) {
-                        Button(onClick = onGrant) { Text("Conceder tiempo") }
+                        OutlinedTextField(
+                            modifier = Modifier.weight(1f),
+                            value = grantMinutes,
+                            onValueChange = { grantMinutes = it.filter(Char::isDigit) },
+                            label = { Text("Min") },
+                            singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = KeyboardType.Number,
+                            ),
+                        )
+                        Button(onClick = { onGrant(grantMinutes) }) { Text("Conceder") }
                     } else {
                         Button(onClick = onApprove) { Text("Aprobar") }
                     }

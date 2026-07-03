@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.repository.ActivationRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.network.config.DeviceTokenProvider
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseActivationClient
 import com.contentfilter.core.network.remote.SupabaseAuthClient
@@ -23,6 +24,7 @@ class DefaultActivationRepository
         private val authClient: SupabaseAuthClient,
         private val activationClient: SupabaseActivationClient,
         private val sessionStore: AuthSessionStore,
+        private val deviceTokenProvider: DeviceTokenProvider,
         private val activationRepository: DeviceActivationRepository,
         private val deviceRepository: DeviceRepository,
         private val systemStatusRepository: SystemStatusRepository,
@@ -33,27 +35,43 @@ class DefaultActivationRepository
                 Log.i(LogTag, "Activation skipped; local device is already activated deviceId=${activation.deviceId}")
                 return@withContext ActivationResult.Activated(activation)
             }
-            val session = when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
-                is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
-                is RemoteResult.Success -> result.value
-            }
-            sessionStore.save(
-                AuthSession(
-                    accessToken = session.accessToken,
-                    refreshToken = session.refreshToken,
-                    expiresAtEpochMillis = System.currentTimeMillis() + session.expiresInSeconds * 1000,
-                ),
-            )
-            val activation = when (
-                val result = activationClient.activateDevice(
-                    activationCode = credentials.activationCode,
-                    displayName = credentials.deviceDisplayName,
-                    appVersionCode = credentials.appVersionCode,
-                    appRole = credentials.appRole,
+            val activation = if (credentials.email.isBlank() && credentials.password.isBlank()) {
+                when (
+                    val result = activationClient.pairDeviceWithCode(
+                        pairingCode = credentials.activationCode,
+                        displayName = credentials.deviceDisplayName,
+                        appVersionCode = credentials.appVersionCode,
+                        appRole = credentials.appRole,
+                    )
+                ) {
+                    is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
+                    is RemoteResult.Success -> result.value.also { dto ->
+                        dto.deviceToken?.let(deviceTokenProvider::saveDeviceToken)
+                    }
+                }
+            } else {
+                val session = when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
+                    is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
+                    is RemoteResult.Success -> result.value
+                }
+                sessionStore.save(
+                    AuthSession(
+                        accessToken = session.accessToken,
+                        refreshToken = session.refreshToken,
+                        expiresAtEpochMillis = System.currentTimeMillis() + session.expiresInSeconds * 1000,
+                    ),
                 )
-            ) {
-                is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
-                is RemoteResult.Success -> result.value
+                when (
+                    val result = activationClient.activateDevice(
+                        activationCode = credentials.activationCode,
+                        displayName = credentials.deviceDisplayName,
+                        appVersionCode = credentials.appVersionCode,
+                        appRole = credentials.appRole,
+                    )
+                ) {
+                    is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
+                    is RemoteResult.Success -> result.value
+                }
             }
             val domain = DeviceActivation(
                 id = activation.activationId,

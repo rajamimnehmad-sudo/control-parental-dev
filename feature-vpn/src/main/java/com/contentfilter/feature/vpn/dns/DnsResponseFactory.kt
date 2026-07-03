@@ -9,6 +9,11 @@ class DnsResponseFactory {
         return responsePacket(question, payload)
     }
 
+    fun servfailPacket(question: DnsQuestion): ByteArray {
+        val payload = failurePayload(question, SERVFAIL_FLAGS_LOW)
+        return responsePacket(question, payload)
+    }
+
     fun responsePacket(
         question: DnsQuestion,
         payload: ByteArray,
@@ -35,13 +40,29 @@ class DnsResponseFactory {
         if (response.size < DNS_HEADER_SIZE) return response
         response[FLAGS_OFFSET] = RESPONSE_FLAGS_HIGH.toByte()
         response[FLAGS_OFFSET + 1] = NXDOMAIN_FLAGS_LOW.toByte()
+        clearCounts(response)
+        return response
+    }
+
+    private fun failurePayload(
+        question: DnsQuestion,
+        lowFlags: Int,
+    ): ByteArray {
+        val response = question.queryPayload.copyOf()
+        if (response.size < DNS_HEADER_SIZE) return response
+        response[FLAGS_OFFSET] = RESPONSE_FLAGS_HIGH.toByte()
+        response[FLAGS_OFFSET + 1] = lowFlags.toByte()
+        clearCounts(response)
+        return response
+    }
+
+    private fun clearCounts(response: ByteArray) {
         response[ANSWER_COUNT_OFFSET] = 0
         response[ANSWER_COUNT_OFFSET + 1] = 0
         response[AUTHORITY_COUNT_OFFSET] = 0
         response[AUTHORITY_COUNT_OFFSET + 1] = 0
         response[ADDITIONAL_COUNT_OFFSET] = 0
         response[ADDITIONAL_COUNT_OFFSET + 1] = 0
-        return response
     }
 
     private fun writeUInt16(
@@ -82,6 +103,7 @@ class DnsResponseFactory {
         const val IPV4_HEADER_SIZE = 20
         const val IPV4_VERSION_AND_HEADER_LENGTH = 0x45
         const val NXDOMAIN_FLAGS_LOW = 0x83
+        const val SERVFAIL_FLAGS_LOW = 0x82
         const val PORT_FIELD_SIZE = 2
         const val RESPONSE_FLAGS_HIGH = 0x81
         const val SHORT_MASK = 0xFFFF

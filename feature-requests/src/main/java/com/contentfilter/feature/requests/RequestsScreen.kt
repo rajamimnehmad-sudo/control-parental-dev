@@ -2,16 +2,13 @@ package com.contentfilter.feature.requests
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -34,12 +31,6 @@ fun RequestsRoute(
     val state = viewModel.uiState.collectAsStateWithLifecycle()
     RequestsScreen(
         state = state.value,
-        onTargetChanged = viewModel::onTargetChanged,
-        onReasonChanged = viewModel::onReasonChanged,
-        onMinutesChanged = viewModel::onMinutesChanged,
-        onRequestAppAccess = viewModel::requestAppAccess,
-        onRequestDomainAccess = viewModel::requestDomainAccess,
-        onRequestExtraTime = viewModel::requestExtraTime,
         modifier = modifier,
     )
 }
@@ -47,58 +38,24 @@ fun RequestsRoute(
 @Composable
 fun RequestsScreen(
     state: RequestsUiState,
-    onTargetChanged: (String) -> Unit,
-    onReasonChanged: (String) -> Unit,
-    onMinutesChanged: (String) -> Unit,
-    onRequestAppAccess: () -> Unit,
-    onRequestDomainAccess: () -> Unit,
-    onRequestExtraTime: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        item {
-            Text(text = "Solicitudes", style = MaterialTheme.typography.headlineSmall)
-        }
+        item { Text(text = "Mis solicitudes", style = MaterialTheme.typography.headlineSmall) }
         item {
             Text(text = "Pendientes: ${state.pendingCount}", style = MaterialTheme.typography.bodyMedium)
         }
         item {
-            OutlinedTextField(state.target, onTargetChanged, Modifier.fillMaxWidth(), label = { Text("Paquete de app o dominio") })
-        }
-        item {
-            OutlinedTextField(state.reason, onReasonChanged, Modifier.fillMaxWidth(), label = { Text("Motivo") })
-        }
-        item {
-            OutlinedTextField(state.minutes, onMinutesChanged, Modifier.fillMaxWidth(), label = { Text("Minutos extra") })
-        }
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Button(onClick = onRequestAppAccess) { Text("Solicitar app") }
-                Button(onClick = onRequestDomainAccess) { Text("Solicitar sitio web") }
-            }
-        }
-        item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onRequestExtraTime) { Text("Solicitar tiempo extra") }
-            }
-        }
-        item {
             Text(text = state.message, style = MaterialTheme.typography.bodyMedium)
-        }
-        item {
-            Text(text = "Mis solicitudes", style = MaterialTheme.typography.titleMedium)
         }
         if (state.requests.isEmpty()) {
             item {
-                Text("Todavía no creaste solicitudes.")
+                Text("No hay solicitudes pendientes. Pedilas desde Mis apps o Internet.")
             }
         } else {
             items(state.requests, key = { it.id }) { request ->
