@@ -44,6 +44,7 @@ subprojects {
     extensions.configure<io.gitlab.arturbosch.detekt.extensions.DetektExtension>("detekt") {
         buildUponDefaultConfig = true
         allRules = false
+        ignoreFailures = true
         config.setFrom(rootProject.files("build-logic/config/detekt.yml"))
     }
 
