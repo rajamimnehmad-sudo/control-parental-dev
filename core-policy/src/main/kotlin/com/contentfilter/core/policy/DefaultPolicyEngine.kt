@@ -31,13 +31,15 @@ class DefaultPolicyEngine : PolicyEngine {
         activeGrant(snapshot.extraTimeGrants, PolicyTargetType.Global, GlobalExtraTimeTarget, context.time)?.let {
             return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
         }
-        val usedMinutesToday = maxOf(
-            context.usedMinutesToday,
-            snapshot.dailyUsage.firstOrNull { it.packageName == context.packageName }?.usedMinutes ?: 0,
-        )
-        val limit = snapshot.dailyLimits
-            .filter { it.enabled && it.targetType == PolicyTargetType.App && it.target == context.packageName }
-            .minByOrNull { it.limitMinutes }
+        val usedMinutesToday =
+            maxOf(
+                context.usedMinutesToday,
+                snapshot.dailyUsage.firstOrNull { it.packageName == context.packageName }?.usedMinutes ?: 0,
+            )
+        val limit =
+            snapshot.dailyLimits
+                .filter { it.enabled && it.targetType == PolicyTargetType.App && it.target == context.packageName }
+                .minByOrNull { it.limitMinutes }
         if (limit != null && usedMinutesToday > limit.limitMinutes) {
             return PolicyDecision.Block("Daily limit exceeded for ${context.packageName}.")
         }
@@ -54,7 +56,12 @@ class DefaultPolicyEngine : PolicyEngine {
         if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
             return PolicyDecision.Allow()
         }
-        activeGrant(snapshot.extraTimeGrants, PolicyTargetType.Global, GlobalExtraTimeTarget, normalizedContext.time)?.let {
+        activeGrant(
+            snapshot.extraTimeGrants,
+            PolicyTargetType.Global,
+            GlobalExtraTimeTarget,
+            normalizedContext.time,
+        )?.let {
             return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
         }
         val rule = snapshot.rules.bestMatchingRule(normalizedContext)
@@ -65,34 +72,38 @@ class DefaultPolicyEngine : PolicyEngine {
         snapshot: PolicySnapshot,
         context: PolicyContext,
     ): PolicyDecision {
-        val device = DevicePolicyContext(
-            isActivated = context.healthSnapshot.licenseState != LicenseState.PendingActivation,
-            healthSnapshot = context.healthSnapshot,
-        )
-        val time = TimePolicyContext(
-            evaluatedAtEpochMillis = context.evaluatedAtEpochMillis,
-            minuteOfDay = 0,
-        )
+        val device =
+            DevicePolicyContext(
+                isActivated = context.healthSnapshot.licenseState != LicenseState.PendingActivation,
+                healthSnapshot = context.healthSnapshot,
+            )
+        val time =
+            TimePolicyContext(
+                evaluatedAtEpochMillis = context.evaluatedAtEpochMillis,
+                minuteOfDay = 0,
+            )
         return when {
-            context.packageName != null -> evaluateApp(
-                snapshot,
-                AppPolicyContext(
-                    packageName = context.packageName.orEmpty(),
-                    category = null,
-                    usedMinutesToday = 0,
-                    time = time,
-                    device = device,
-                ),
-            )
-            context.domain != null -> evaluateDomain(
-                snapshot,
-                DomainPolicyContext(
-                    domain = context.domain.orEmpty(),
-                    category = null,
-                    time = time,
-                    device = device,
-                ),
-            )
+            context.packageName != null ->
+                evaluateApp(
+                    snapshot,
+                    AppPolicyContext(
+                        packageName = context.packageName.orEmpty(),
+                        category = null,
+                        usedMinutesToday = 0,
+                        time = time,
+                        device = device,
+                    ),
+                )
+            context.domain != null ->
+                evaluateDomain(
+                    snapshot,
+                    DomainPolicyContext(
+                        domain = context.domain.orEmpty(),
+                        category = null,
+                        time = time,
+                        device = device,
+                    ),
+                )
             else -> deviceDecision(device) ?: PolicyDecision.Allow()
         }
     }
@@ -172,12 +183,13 @@ class DefaultPolicyEngine : PolicyEngine {
     private companion object {
         const val GlobalExtraTimeTarget = "extra_time"
         const val DomainWildcard = "*"
-        val CriticalAllowedDomains = setOf(
-            "supabase.co",
-            "syeycayasyufedwoprea.supabase.co",
-            "android.clients.google.com",
-            "connectivitycheck.gstatic.com",
-        )
+        val CriticalAllowedDomains =
+            setOf(
+                "supabase.co",
+                "syeycayasyufedwoprea.supabase.co",
+                "android.clients.google.com",
+                "connectivitycheck.gstatic.com",
+            )
 
         val ruleComparator: Comparator<PolicyRule> =
             compareByDescending<PolicyRule> { it.level.specificity }
@@ -187,7 +199,8 @@ class DefaultPolicyEngine : PolicyEngine {
         fun exactnessScore(rule: PolicyRule): Int =
             when (rule.scope) {
                 RuleScope.App,
-                RuleScope.Domain -> 2
+                RuleScope.Domain,
+                -> 2
                 RuleScope.Category -> 1
                 RuleScope.Global -> 0
             }
@@ -198,10 +211,8 @@ class DefaultPolicyEngine : PolicyEngine {
                 .removeSuffix(".")
                 .removePrefix("www.")
 
-        fun String.matchesDomainTarget(target: String): Boolean =
-            this == target || endsWith(".$target")
+        fun String.matchesDomainTarget(target: String): Boolean = this == target || endsWith(".$target")
 
-        fun String.matchesAny(targets: Set<String>): Boolean =
-            targets.any { matchesDomainTarget(it) }
+        fun String.matchesAny(targets: Set<String>): Boolean = targets.any { matchesDomainTarget(it) }
     }
 }

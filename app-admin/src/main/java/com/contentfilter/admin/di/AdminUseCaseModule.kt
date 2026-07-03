@@ -39,15 +39,13 @@ object AdminUseCaseModule {
     fun provideApproveAccessRequestUseCase(
         requestRepository: AccessRequestRepository,
         policyRepository: PolicyRepository,
-    ): ApproveAccessRequestUseCase =
-        ApproveAccessRequestUseCase(requestRepository, policyRepository)
+    ): ApproveAccessRequestUseCase = ApproveAccessRequestUseCase(requestRepository, policyRepository)
 
     @Provides
     fun provideGrantExtraTimeUseCase(
         requestRepository: AccessRequestRepository,
         grantRepository: ExtraTimeGrantRepository,
-    ): GrantExtraTimeUseCase =
-        GrantExtraTimeUseCase(requestRepository, grantRepository)
+    ): GrantExtraTimeUseCase = GrantExtraTimeUseCase(requestRepository, grantRepository)
 
     @Provides
     fun provideObservePolicyRulesUseCase(repository: PolicyRepository): ObservePolicyRulesUseCase =

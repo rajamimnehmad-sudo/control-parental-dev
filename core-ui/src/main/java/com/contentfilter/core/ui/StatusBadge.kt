@@ -16,15 +16,17 @@ fun StatusBadge(
     level: ProtectionLevel,
     modifier: Modifier = Modifier,
 ) {
-    val color = when (level) {
-        ProtectionLevel.Protected -> Color(0xFF2F7D32)
-        ProtectionLevel.Warning -> Color(0xFF8A6500)
-        ProtectionLevel.Unprotected -> Color(0xFFB3261E)
-    }
+    val color =
+        when (level) {
+            ProtectionLevel.Protected -> Color(0xFF2F7D32)
+            ProtectionLevel.Warning -> Color(0xFF8A6500)
+            ProtectionLevel.Unprotected -> Color(0xFFB3261E)
+        }
     Box(
-        modifier = modifier
-            .background(color = color, shape = MaterialTheme.shapes.small)
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+        modifier =
+            modifier
+                .background(color = color, shape = MaterialTheme.shapes.small)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
     ) {
         Text(
             text = level.name,

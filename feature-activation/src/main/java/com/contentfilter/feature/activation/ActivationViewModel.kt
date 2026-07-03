@@ -11,13 +11,13 @@ import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @HiltViewModel
 class ActivationViewModel
@@ -66,21 +66,28 @@ class ActivationViewModel
             }
             viewModelScope.launch {
                 mutableState.update { it.copy(isLoading = true, message = "Enlazando dispositivo...") }
-                val result = runCatching {
-                    activationRepository.activate(
-                        ActivationCredentials(
-                            email = "",
-                            password = "",
-                            activationCode = state.activationCode.trim(),
-                            deviceDisplayName = state.deviceName.ifBlank { "Android" },
-                            appVersionCode = 1,
-                        ),
-                    )
-                }.getOrElse { exception ->
-                    val message = exception.message?.takeIf { it.isNotBlank() } ?: exception.toString()
-                    Log.e(LogTag, "Unexpected activation exception: ${exception.javaClass.name}: $message", exception)
-                    ActivationResult.Failed("Unexpected activation exception: ${exception.javaClass.simpleName}: $message")
-                }
+                val result =
+                    runCatching {
+                        activationRepository.activate(
+                            ActivationCredentials(
+                                email = "",
+                                password = "",
+                                activationCode = state.activationCode.trim(),
+                                deviceDisplayName = state.deviceName.ifBlank { "Android" },
+                                appVersionCode = 1,
+                            ),
+                        )
+                    }.getOrElse { exception ->
+                        val message = exception.message?.takeIf { it.isNotBlank() } ?: exception.toString()
+                        Log.e(
+                            LogTag,
+                            "Unexpected activation exception: ${exception.javaClass.name}: $message",
+                            exception,
+                        )
+                        ActivationResult.Failed(
+                            "Unexpected activation exception: ${exception.javaClass.simpleName}: $message",
+                        )
+                    }
                 if (result is ActivationResult.Activated) {
                     realtimeSyncCoordinator.stop()
                     realtimeSyncCoordinator.start()
@@ -94,10 +101,11 @@ class ActivationViewModel
                 mutableState.update {
                     it.copy(
                         isLoading = false,
-                        message = when (result) {
-                            is ActivationResult.Activated -> "Dispositivo enlazado."
-                            is ActivationResult.Failed -> activationFailureMessage(result.reason)
-                        },
+                        message =
+                            when (result) {
+                                is ActivationResult.Activated -> "Dispositivo enlazado."
+                                is ActivationResult.Failed -> activationFailureMessage(result.reason)
+                            },
                     )
                 }
             }

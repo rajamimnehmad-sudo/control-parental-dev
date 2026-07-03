@@ -1,21 +1,21 @@
 package com.contentfilter.user.updates
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import android.util.Log
 import com.contentfilter.core.update.install.ApkInstaller
 import com.contentfilter.core.update.model.UpdateCheckResult
 import com.contentfilter.core.update.model.UpdateDownloadResult
 import com.contentfilter.core.update.repository.ApkUpdateRepository
 import com.contentfilter.user.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.File
-import javax.inject.Inject
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.io.File
+import javax.inject.Inject
 
 @HiltViewModel
 class UpdatesViewModel
@@ -36,10 +36,11 @@ class UpdatesViewModel
                 runCatching {
                     when (val result = updateRepository.checkForUpdate(BuildConfig.VERSION_CODE)) {
                         is UpdateCheckResult.Available -> {
-                            _uiState.value = UpdatesUiState(
-                                status = UpdatesStatus.Downloading,
-                                manifest = result.manifest,
-                            )
+                            _uiState.value =
+                                UpdatesUiState(
+                                    status = UpdatesStatus.Downloading,
+                                    manifest = result.manifest,
+                                )
                             downloadAndMaybeInstall(result.manifest, openInstaller = true)
                         }
                         UpdateCheckResult.NetworkError,
@@ -59,10 +60,11 @@ class UpdatesViewModel
                 runCatching {
                     when (val result = updateRepository.checkForUpdate(BuildConfig.VERSION_CODE)) {
                         is UpdateCheckResult.Available -> {
-                            _uiState.value = UpdatesUiState(
-                                status = UpdatesStatus.Available,
-                                manifest = result.manifest,
-                            )
+                            _uiState.value =
+                                UpdatesUiState(
+                                    status = UpdatesStatus.Available,
+                                    manifest = result.manifest,
+                                )
                         }
                         UpdateCheckResult.NetworkError -> {
                             _uiState.value = UpdatesUiState(status = UpdatesStatus.SearchFailed)

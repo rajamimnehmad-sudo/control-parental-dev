@@ -13,9 +13,10 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun OnboardingScreen(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(text = "Community Content Filter", style = MaterialTheme.typography.headlineMedium)

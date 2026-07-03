@@ -1,12 +1,12 @@
 package com.contentfilter.core.network.remote
 
 import android.util.Log
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.IOException
 import java.net.ConnectException
 import java.net.SocketTimeoutException
 import java.net.UnknownHostException
-import org.json.JSONArray
-import org.json.JSONObject
 
 private const val LogTag = "SupabaseRemote"
 internal const val OfflineUserMessage = "Sin conexión. Mostrando datos guardados."
@@ -16,11 +16,12 @@ internal fun httpFailure(
     code: Int,
     responseBody: String,
 ): RemoteResult.Failure {
-    val reason = if (code >= 500) {
-        OfflineUserMessage
-    } else {
-        "No se pudo completar la operación."
-    }
+    val reason =
+        if (code >= 500) {
+            OfflineUserMessage
+        } else {
+            "No se pudo completar la operación."
+        }
     Log.w(LogTag, "$source failed. HTTP $code. Body: ${responseBody.ifBlank { "<empty>" }}")
     return RemoteResult.Failure(reason = reason, retryable = code >= 500)
 }
@@ -32,11 +33,12 @@ internal fun exceptionFailure(
     val message = exception.message?.takeIf { it.isNotBlank() } ?: exception.toString()
     Log.e(LogTag, "$source failed with ${exception.javaClass.name}: $message", exception)
     return RemoteResult.Failure(
-        reason = if (exception.isConnectivityFailure()) {
-            OfflineUserMessage
-        } else {
-            "$source failed: ${exception.javaClass.simpleName}: $message"
-        },
+        reason =
+            if (exception.isConnectivityFailure()) {
+                OfflineUserMessage
+            } else {
+                "$source failed: ${exception.javaClass.simpleName}: $message"
+            },
         retryable = true,
     )
 }

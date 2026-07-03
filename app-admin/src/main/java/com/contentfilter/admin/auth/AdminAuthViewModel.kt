@@ -13,13 +13,13 @@ import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @HiltViewModel
 class AdminAuthViewModel
@@ -32,9 +32,10 @@ class AdminAuthViewModel
         private val realtimeSyncCoordinator: RealtimeSyncCoordinator,
         configProvider: SupabaseConfigProvider,
     ) : ViewModel() {
-        private val _uiState = MutableStateFlow(
-            AdminAuthUiState(offlineMode = !configProvider.current().isConfigured),
-        )
+        private val _uiState =
+            MutableStateFlow(
+                AdminAuthUiState(offlineMode = !configProvider.current().isConfigured),
+            )
         val uiState: StateFlow<AdminAuthUiState> = _uiState.asStateFlow()
 
         init {
@@ -79,22 +80,29 @@ class AdminAuthViewModel
             }
             viewModelScope.launch {
                 _uiState.update { it.copy(loading = true, message = "Activando") }
-                val result = runCatching {
-                    activationRepository.activate(
-                        ActivationCredentials(
-                            email = state.email.trim(),
-                            password = state.password,
-                            activationCode = state.activationCode.trim(),
-                            deviceDisplayName = state.deviceName.ifBlank { "Admin Android" },
-                            appVersionCode = BuildConfig.VERSION_CODE,
-                            appRole = AdminRole,
-                        ),
-                    )
-                }.getOrElse { exception ->
-                    val message = exception.message?.takeIf { it.isNotBlank() } ?: exception.toString()
-                    Log.e(LogTag, "Unexpected admin activation exception: ${exception.javaClass.name}: $message", exception)
-                    ActivationResult.Failed("Unexpected admin activation exception: ${exception.javaClass.simpleName}: $message")
-                }
+                val result =
+                    runCatching {
+                        activationRepository.activate(
+                            ActivationCredentials(
+                                email = state.email.trim(),
+                                password = state.password,
+                                activationCode = state.activationCode.trim(),
+                                deviceDisplayName = state.deviceName.ifBlank { "Admin Android" },
+                                appVersionCode = BuildConfig.VERSION_CODE,
+                                appRole = AdminRole,
+                            ),
+                        )
+                    }.getOrElse { exception ->
+                        val message = exception.message?.takeIf { it.isNotBlank() } ?: exception.toString()
+                        Log.e(
+                            LogTag,
+                            "Unexpected admin activation exception: ${exception.javaClass.name}: $message",
+                            exception,
+                        )
+                        ActivationResult.Failed(
+                            "Unexpected admin activation exception: ${exception.javaClass.simpleName}: $message",
+                        )
+                    }
                 if (result is ActivationResult.Activated) {
                     realtimeSyncCoordinator.stop()
                     realtimeSyncCoordinator.start()
@@ -108,10 +116,11 @@ class AdminAuthViewModel
                 _uiState.update {
                     it.copy(
                         loading = false,
-                        message = when (result) {
-                            is ActivationResult.Activated -> "Administrador activado"
-                            is ActivationResult.Failed -> activationFailureMessage(result.reason)
-                        },
+                        message =
+                            when (result) {
+                                is ActivationResult.Activated -> "Administrador activado"
+                                is ActivationResult.Failed -> activationFailureMessage(result.reason)
+                            },
                     )
                 }
             }

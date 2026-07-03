@@ -12,8 +12,6 @@ import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.util.UUID
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -21,6 +19,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.util.UUID
+import javax.inject.Inject
 
 @HiltViewModel
 class RequestsViewModel
@@ -41,23 +41,26 @@ class RequestsViewModel
                     grantRepository.observeGrants(),
                 ) { requests, grants -> requests to grants }
                     .collect { (requests, grants) ->
-                    val pendingRequests = requests.filter {
-                        it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote
+                        val pendingRequests =
+                            requests.filter {
+                                it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote
+                            }
+                        val latestResult =
+                            requests
+                                .filter { it.status == RequestStatus.Approved || it.status == RequestStatus.Rejected }
+                                .maxByOrNull { it.createdAtEpochMillis }
+                        mutableState.update {
+                            it.copy(
+                                pendingCount = pendingRequests.size,
+                                requests = pendingRequests,
+                                extraTimeGrants = grants,
+                                message =
+                                    latestResult?.let { request ->
+                                        "Última solicitud: ${request.status.displayName()}"
+                                    } ?: it.message,
+                            )
+                        }
                     }
-                    val latestResult = requests
-                        .filter { it.status == RequestStatus.Approved || it.status == RequestStatus.Rejected }
-                        .maxByOrNull { it.createdAtEpochMillis }
-                    mutableState.update {
-                        it.copy(
-                            pendingCount = pendingRequests.size,
-                            requests = pendingRequests,
-                            extraTimeGrants = grants,
-                            message = latestResult?.let { request ->
-                                "Última solicitud: ${request.status.displayName()}"
-                            } ?: it.message,
-                        )
-                    }
-                }
             }
             syncResultsNow()
         }
@@ -101,21 +104,25 @@ class RequestsViewModel
             }
             val target = state.target.trim()
             viewModelScope.launch {
-                val request = AccessRequest(
-                    id = UUID.randomUUID().toString(),
-                    requestType = requestType,
-                    targetType = targetType,
-                    target = target.ifBlank { "extra_time" },
-                    targetPackageName = if (targetType == PolicyTargetType.App) target.ifBlank { null } else null,
-                    targetDomain = if (targetType == PolicyTargetType.Domain) target.ifBlank { null } else null,
-                    reason = state.reason.trim(),
-                    requestedMinutes = requestedMinutes,
-                    status = RequestStatus.PendingLocal,
-                    createdAtEpochMillis = System.currentTimeMillis(),
-                    expiresAtEpochMillis = null,
-                )
+                val request =
+                    AccessRequest(
+                        id = UUID.randomUUID().toString(),
+                        requestType = requestType,
+                        targetType = targetType,
+                        target = target.ifBlank { "extra_time" },
+                        targetPackageName = if (targetType == PolicyTargetType.App) target.ifBlank { null } else null,
+                        targetDomain = if (targetType == PolicyTargetType.Domain) target.ifBlank { null } else null,
+                        reason = state.reason.trim(),
+                        requestedMinutes = requestedMinutes,
+                        status = RequestStatus.PendingLocal,
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                        expiresAtEpochMillis = null,
+                    )
                 repository.saveRequest(request)
-                Log.i(LogTag, "Queued access request id=${request.id} requestType=${request.requestType} targetType=${request.targetType}")
+                Log.i(
+                    LogTag,
+                    "Queued access request id=${request.id} requestType=${request.requestType} targetType=${request.targetType}",
+                )
                 syncScheduler.requestSync()
                 syncNow(request.id)
                 mutableState.update { it.copy(message = "Solicitud pendiente creada.", target = "", reason = "") }
@@ -127,7 +134,10 @@ class RequestsViewModel
                 runCatching {
                     val result = syncEngine.syncOnce()
                     val resultSync = syncEngine.syncRequestResultsFull()
-                    Log.i(LogTag, "Immediate request sync id=$requestId success=${result.success} message=${result.message}")
+                    Log.i(
+                        LogTag,
+                        "Immediate request sync id=$requestId success=${result.success} message=${result.message}",
+                    )
                     Log.i(
                         LogTag,
                         "Immediate request results sync id=$requestId success=${resultSync.success} message=${resultSync.message}",

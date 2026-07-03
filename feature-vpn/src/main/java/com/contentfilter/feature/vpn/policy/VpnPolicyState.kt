@@ -13,21 +13,23 @@ data class VpnPolicyState(
     companion object {
         fun initial(): VpnPolicyState =
             VpnPolicyState(
-                snapshot = PolicySnapshot(
-                    id = "empty",
-                    version = 0L,
-                    rules = emptyList(),
-                ),
-                health = SystemHealthSnapshot(
-                    vpnState = ComponentState.Unknown,
-                    accessibilityState = ComponentState.Unknown,
-                    syncState = ComponentState.Unknown,
-                    integrityState = ComponentState.Unknown,
-                    databaseState = ComponentState.Unknown,
-                    licenseState = LicenseState.PendingActivation,
-                    updateState = UpdateState.Unknown,
-                    checkedAtEpochMillis = 0L,
-                ),
+                snapshot =
+                    PolicySnapshot(
+                        id = "empty",
+                        version = 0L,
+                        rules = emptyList(),
+                    ),
+                health =
+                    SystemHealthSnapshot(
+                        vpnState = ComponentState.Unknown,
+                        accessibilityState = ComponentState.Unknown,
+                        syncState = ComponentState.Unknown,
+                        integrityState = ComponentState.Unknown,
+                        databaseState = ComponentState.Unknown,
+                        licenseState = LicenseState.PendingActivation,
+                        updateState = UpdateState.Unknown,
+                        checkedAtEpochMillis = 0L,
+                    ),
             )
     }
 }

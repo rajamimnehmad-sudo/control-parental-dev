@@ -13,7 +13,10 @@ class SupabaseRemotePolicyRepository
             client.selectUpdatedSince(SupabaseTable.Policies, updatedAfterIso).mapArray(RemotePolicyDto::fromJson)
 
         override suspend fun pullPolicyRules(updatedAfterIso: String?): RemoteResult<List<RemotePolicyRuleDto>> =
-            client.selectUpdatedSince(SupabaseTable.PolicyRules, updatedAfterIso).mapArray(RemotePolicyRuleDto::fromJson)
+            client.selectUpdatedSince(
+                SupabaseTable.PolicyRules,
+                updatedAfterIso,
+            ).mapArray(RemotePolicyRuleDto::fromJson)
 
         override suspend fun upsertPolicy(policy: RemotePolicyDto): RemoteResult<Unit> =
             client.upsert(SupabaseTable.Policies, policy.toJson())

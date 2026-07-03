@@ -20,9 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
-fun AdminAuthRoute(
-    viewModel: AdminAuthViewModel = hiltViewModel(),
-) {
+fun AdminAuthRoute(viewModel: AdminAuthViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     AdminAuthScreen(
         state = state,
@@ -44,10 +42,11 @@ private fun AdminAuthScreen(
     onActivate: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Login / Activacion", style = MaterialTheme.typography.headlineSmall)

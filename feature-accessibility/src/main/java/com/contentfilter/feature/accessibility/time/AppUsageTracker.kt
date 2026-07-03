@@ -44,11 +44,12 @@ class AppUsageTracker {
         packageName: String,
         elapsedRealtimeMillis: Long,
     ): Long {
-        val active = if (packageName == currentPackageName) {
-            (elapsedRealtimeMillis - currentStartedAtElapsedMillis).coerceAtLeast(0L)
-        } else {
-            0L
-        }
+        val active =
+            if (packageName == currentPackageName) {
+                (elapsedRealtimeMillis - currentStartedAtElapsedMillis).coerceAtLeast(0L)
+            } else {
+                0L
+            }
         return active
     }
 
@@ -75,11 +76,12 @@ class AppUsageTracker {
         val packageName = currentPackageName ?: return null
         val duration = (elapsedRealtimeMillis - currentStartedAtElapsedMillis).coerceAtLeast(0L)
         if (duration < minimumDurationMillis) return null
-        val transition = UsageTransition(
-            packageName = packageName,
-            startedAtEpochMillis = currentStartedAtEpochMillis,
-            endedAtEpochMillis = epochMillis,
-        )
+        val transition =
+            UsageTransition(
+                packageName = packageName,
+                startedAtEpochMillis = currentStartedAtEpochMillis,
+                endedAtEpochMillis = epochMillis,
+            )
         currentStartedAtElapsedMillis = elapsedRealtimeMillis
         currentStartedAtEpochMillis = epochMillis
         return transition

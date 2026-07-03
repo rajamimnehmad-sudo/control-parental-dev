@@ -13,7 +13,9 @@ class SupabaseRemoteRequestRepository
             client.selectUpdatedSince(SupabaseTable.AccessRequests, updatedAfterIso)
                 .mapArray(RemoteAccessRequestDto::fromJson)
 
-        override suspend fun pullExtraTimeGrants(updatedAfterIso: String?): RemoteResult<List<RemoteExtraTimeGrantDto>> =
+        override suspend fun pullExtraTimeGrants(
+            updatedAfterIso: String?,
+        ): RemoteResult<List<RemoteExtraTimeGrantDto>> =
             client.selectUpdatedSince(SupabaseTable.ExtraTimeGrants, updatedAfterIso)
                 .mapArray(RemoteExtraTimeGrantDto::fromJson)
 

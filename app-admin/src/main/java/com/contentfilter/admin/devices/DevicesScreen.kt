@@ -20,9 +20,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
-fun DevicesRoute(
-    viewModel: DevicesViewModel = hiltViewModel(),
-) {
+fun DevicesRoute(viewModel: DevicesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     DevicesScreen(
         state = state,
@@ -38,9 +36,10 @@ private fun DevicesScreen(
     onRevokeDevice: (String) -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Dispositivos", style = MaterialTheme.typography.headlineSmall)
@@ -100,7 +99,10 @@ private fun DeviceCard(
             Text(device.name, style = MaterialTheme.typography.titleMedium)
             Text("Usuario: ${device.user}", style = MaterialTheme.typography.bodySmall)
             Text("Version: ${device.version}", style = MaterialTheme.typography.bodySmall)
-            Text("VPN: ${device.vpnState} | Accesibilidad: ${device.accessibilityState}", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "VPN: ${device.vpnState} | Accesibilidad: ${device.accessibilityState}",
+                style = MaterialTheme.typography.bodySmall,
+            )
             Text("Ultima sincronizacion: ${device.lastSync}", style = MaterialTheme.typography.bodySmall)
             Text("Estado: ${device.systemState}", style = MaterialTheme.typography.bodySmall)
             OutlinedButton(

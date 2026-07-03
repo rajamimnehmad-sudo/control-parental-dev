@@ -15,17 +15,11 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 abstract class UpdateModule {
     @Binds
-    abstract fun bindUpdateConfigProvider(
-        provider: BuildConfigUpdateConfigProvider,
-    ): UpdateConfigProvider
+    abstract fun bindUpdateConfigProvider(provider: BuildConfigUpdateConfigProvider): UpdateConfigProvider
 
     @Binds
-    abstract fun bindApkUpdateRepository(
-        repository: DevApkUpdateRepository,
-    ): ApkUpdateRepository
+    abstract fun bindApkUpdateRepository(repository: DevApkUpdateRepository): ApkUpdateRepository
 
     @Binds
-    abstract fun bindApkInstaller(
-        installer: AndroidApkInstaller,
-    ): ApkInstaller
+    abstract fun bindApkInstaller(installer: AndroidApkInstaller): ApkInstaller
 }

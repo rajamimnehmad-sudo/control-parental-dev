@@ -23,9 +23,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.user.BuildConfig
 
 @Composable
-fun UpdatesRoute(
-    viewModel: UpdatesViewModel = hiltViewModel(),
-) {
+fun UpdatesRoute(viewModel: UpdatesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         if (state.status == UpdatesStatus.Idle) {
@@ -48,10 +46,11 @@ private fun UpdatesScreen(
     onInstallPermission: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
@@ -110,8 +109,9 @@ private fun UpdatesScreen(
         }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
-            enabled = state.status != UpdatesStatus.Checking &&
-                state.status != UpdatesStatus.Downloading,
+            enabled =
+                state.status != UpdatesStatus.Checking &&
+                    state.status != UpdatesStatus.Downloading,
             onClick = onCheck,
         ) {
             Text("Buscar actualizacion")

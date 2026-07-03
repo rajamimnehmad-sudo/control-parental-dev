@@ -42,9 +42,10 @@ fun AdminRequestsRoute(
         viewModel.refresh()
     }
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
@@ -121,9 +122,10 @@ private fun RequestCard(
                             onValueChange = { grantMinutes = it.filter(Char::isDigit) },
                             label = { Text("Min") },
                             singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
-                            ),
+                            keyboardOptions =
+                                androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                ),
                         )
                         Button(onClick = { onGrant(grantMinutes) }) { Text("Conceder") }
                     } else {

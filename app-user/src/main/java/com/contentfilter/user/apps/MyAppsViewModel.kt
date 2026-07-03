@@ -7,8 +7,8 @@ import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.DailyAppUsage
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.ExtraTimeGrant
-import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicySnapshot
+import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
@@ -24,11 +24,6 @@ import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.Instant
-import java.time.LocalDate
-import java.time.ZoneId
-import java.util.UUID
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -39,6 +34,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
+import javax.inject.Inject
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
@@ -61,106 +61,118 @@ class MyAppsViewModel
         private val searchQuery = MutableStateFlow("")
         private val pendingRequestPackages = MutableStateFlow<Set<String>>(emptySet())
         private val day = currentDay()
-        private val appUiOptions = combine(searchQuery, pendingRequestPackages) { query, pendingPackages ->
-            AppUiOptions(query, pendingPackages)
-        }
-        private val policyAndLimits = combine(
-            policyRepository.observeActivePolicy(),
-            dailyLimitRepository.observeLimits(),
-            grantRepository.observeGrants(),
-            accessRequestRepository.observePendingRequests(),
-        ) { policy, limits, grants, requests ->
-            PolicyAndLimits(policy, limits, grants, requests)
-        }
-        private val appPolicyState = combine(
-            policyAndLimits,
-            activationRepository.observeActivation().flatMapLatest { activation ->
-                if (activation == null) {
-                    flowOf(emptyList())
-                } else {
-                    usageSessionRepository.observeDailyUsage(
-                        deviceId = activation.deviceId,
-                        localDate = day.localDate,
-                        dayStartEpochMillis = day.startEpochMillis,
-                        dayEndEpochMillis = day.endEpochMillis,
-                    )
-                }
-            },
-        ) { policyAndLimits, usage ->
-            AppPolicyState(
-                policyAndLimits.policy,
-                policyAndLimits.limits,
-                policyAndLimits.grants,
-                policyAndLimits.requests,
-                usage,
-            )
-        }
-
-        val uiState = combine(
-            detectedApps,
-            appPolicyState,
-            message,
-            appUiOptions,
-        ) { apps, policyState, currentMessage, options ->
-            val usageByPackage = policyState.usage.associateBy { it.packageName }
-            val appLimits = policyState.limits
-                .filter { it.enabled && it.targetType == PolicyTargetType.App }
-                .associateBy { it.target }
-            val now = System.currentTimeMillis()
-            MyAppsUiState(
-                apps = apps
-                    .filterBySearch(options.searchQuery)
-                    .map { app ->
-                        val hasActiveExtraTime = policyState.grants.any {
-                            it.targetType == PolicyTargetType.App &&
-                                it.target == app.packageName &&
-                                it.validUntilEpochMillis > now
-                        }
-                        val pendingRequests = policyState.requests.filter {
-                            it.targetType == PolicyTargetType.App &&
-                                (it.target == app.packageName || it.targetPackageName == app.packageName)
-                        }
-                        val hasPendingExtraTime = pendingRequests.any {
-                            it.requestType == AccessRequestType.EXTRA_TIME
-                        }
-                        val hasPendingAppAccess = pendingRequests.any {
-                            it.requestType == AccessRequestType.APP_ACCESS
-                        }
-                        val matchingRules = policyState.policy.rules.filter {
-                            it.enabled && it.scope == RuleScope.App && it.target == app.packageName
-                        }
-                        val dailyLimit = appLimits[app.packageName]
-                        val usedMinutes = usageByPackage[app.packageName]?.usedMinutes ?: 0
-                        val limitReached = dailyLimit != null && usedMinutes >= dailyLimit.limitMinutes
-                        val status = when {
-                            hasPendingExtraTime -> AppAccessStatus.WaitingExtraTime
-                            hasPendingAppAccess -> AppAccessStatus.WaitingAuthorization
-                            hasActiveExtraTime -> AppAccessStatus.ExtraTime
-                            limitReached -> AppAccessStatus.LimitReached
-                            matchingRules.any { it.action == RuleAction.Block } -> AppAccessStatus.Blocked
-                            matchingRules.any { it.action == RuleAction.RequestAuthorization } -> AppAccessStatus.RequiresAuthorization
-                            dailyLimit != null -> AppAccessStatus.Limited
-                            else -> AppAccessStatus.Allowed
-                        }
-                        MyAppItemUiState(
-                            name = app.name,
-                            packageName = app.packageName,
-                            iconBase64 = app.iconBase64,
-                            status = status,
-                            dailyLimitMinutes = dailyLimit?.limitMinutes,
-                            usedMinutes = usedMinutes,
-                            isRequesting = options.pendingRequestPackages.contains(app.packageName),
+        private val appUiOptions =
+            combine(searchQuery, pendingRequestPackages) { query, pendingPackages ->
+                AppUiOptions(query, pendingPackages)
+            }
+        private val policyAndLimits =
+            combine(
+                policyRepository.observeActivePolicy(),
+                dailyLimitRepository.observeLimits(),
+                grantRepository.observeGrants(),
+                accessRequestRepository.observePendingRequests(),
+            ) { policy, limits, grants, requests ->
+                PolicyAndLimits(policy, limits, grants, requests)
+            }
+        private val appPolicyState =
+            combine(
+                policyAndLimits,
+                activationRepository.observeActivation().flatMapLatest { activation ->
+                    if (activation == null) {
+                        flowOf(emptyList())
+                    } else {
+                        usageSessionRepository.observeDailyUsage(
+                            deviceId = activation.deviceId,
+                            localDate = day.localDate,
+                            dayStartEpochMillis = day.startEpochMillis,
+                            dayEndEpochMillis = day.endEpochMillis,
                         )
                     }
-                    .sortedWith(compareBy({ it.name.lowercase() }, { it.packageName })),
-                searchQuery = options.searchQuery,
-                message = currentMessage,
+                },
+            ) { policyAndLimits, usage ->
+                AppPolicyState(
+                    policyAndLimits.policy,
+                    policyAndLimits.limits,
+                    policyAndLimits.grants,
+                    policyAndLimits.requests,
+                    usage,
+                )
+            }
+
+        val uiState =
+            combine(
+                detectedApps,
+                appPolicyState,
+                message,
+                appUiOptions,
+            ) { apps, policyState, currentMessage, options ->
+                val usageByPackage = policyState.usage.associateBy { it.packageName }
+                val appLimits =
+                    policyState.limits
+                        .filter { it.enabled && it.targetType == PolicyTargetType.App }
+                        .associateBy { it.target }
+                val now = System.currentTimeMillis()
+                MyAppsUiState(
+                    apps =
+                        apps
+                            .filterBySearch(options.searchQuery)
+                            .map { app ->
+                                val hasActiveExtraTime =
+                                    policyState.grants.any {
+                                        it.targetType == PolicyTargetType.App &&
+                                            it.target == app.packageName &&
+                                            it.validUntilEpochMillis > now
+                                    }
+                                val pendingRequests =
+                                    policyState.requests.filter {
+                                        it.targetType == PolicyTargetType.App &&
+                                            (it.target == app.packageName || it.targetPackageName == app.packageName)
+                                    }
+                                val hasPendingExtraTime =
+                                    pendingRequests.any {
+                                        it.requestType == AccessRequestType.EXTRA_TIME
+                                    }
+                                val hasPendingAppAccess =
+                                    pendingRequests.any {
+                                        it.requestType == AccessRequestType.APP_ACCESS
+                                    }
+                                val matchingRules =
+                                    policyState.policy.rules.filter {
+                                        it.enabled && it.scope == RuleScope.App && it.target == app.packageName
+                                    }
+                                val dailyLimit = appLimits[app.packageName]
+                                val usedMinutes = usageByPackage[app.packageName]?.usedMinutes ?: 0
+                                val limitReached = dailyLimit != null && usedMinutes >= dailyLimit.limitMinutes
+                                val status =
+                                    when {
+                                        hasPendingExtraTime -> AppAccessStatus.WaitingExtraTime
+                                        hasPendingAppAccess -> AppAccessStatus.WaitingAuthorization
+                                        hasActiveExtraTime -> AppAccessStatus.ExtraTime
+                                        limitReached -> AppAccessStatus.LimitReached
+                                        matchingRules.any { it.action == RuleAction.Block } -> AppAccessStatus.Blocked
+                                        matchingRules.any { it.action == RuleAction.RequestAuthorization } -> AppAccessStatus.RequiresAuthorization
+                                        dailyLimit != null -> AppAccessStatus.Limited
+                                        else -> AppAccessStatus.Allowed
+                                    }
+                                MyAppItemUiState(
+                                    name = app.name,
+                                    packageName = app.packageName,
+                                    iconBase64 = app.iconBase64,
+                                    status = status,
+                                    dailyLimitMinutes = dailyLimit?.limitMinutes,
+                                    usedMinutes = usedMinutes,
+                                    isRequesting = options.pendingRequestPackages.contains(app.packageName),
+                                )
+                            }
+                            .sortedWith(compareBy({ it.name.lowercase() }, { it.packageName })),
+                    searchQuery = options.searchQuery,
+                    message = currentMessage,
+                )
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = MyAppsUiState(),
             )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = MyAppsUiState(),
-        )
 
         init {
             refreshApps()
@@ -203,44 +215,51 @@ class MyAppsViewModel
             pendingRequestPackages.update { it + packageName }
             message.value = "Enviando solicitud..."
             viewModelScope.launch {
-                val request = AccessRequest(
-                    id = UUID.randomUUID().toString(),
-                    requestType = requestType,
-                    targetType = PolicyTargetType.App,
-                    target = packageName,
-                    targetPackageName = packageName,
-                    targetDomain = null,
-                    reason = "Solicitud desde Mis aplicaciones",
-                    requestedMinutes = requestedMinutes,
-                    status = RequestStatus.PendingLocal,
-                    createdAtEpochMillis = System.currentTimeMillis(),
-                    expiresAtEpochMillis = null,
-                )
+                val request =
+                    AccessRequest(
+                        id = UUID.randomUUID().toString(),
+                        requestType = requestType,
+                        targetType = PolicyTargetType.App,
+                        target = packageName,
+                        targetPackageName = packageName,
+                        targetDomain = null,
+                        reason = "Solicitud desde Mis aplicaciones",
+                        requestedMinutes = requestedMinutes,
+                        status = RequestStatus.PendingLocal,
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                        expiresAtEpochMillis = null,
+                    )
                 val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
-                val pushedDirectly = withContext(Dispatchers.IO) {
-                    runCatching {
-                        activation?.let {
-                            remoteRequestRepository.upsertAccessRequest(
-                                request.toRemoteDto(
-                                    accountId = it.accountId,
-                                    deviceId = it.deviceId,
-                                ),
-                            )
-                        }
-                    }.getOrNull() is RemoteResult.Success
-                }
+                val pushedDirectly =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            activation?.let {
+                                remoteRequestRepository.upsertAccessRequest(
+                                    request.toRemoteDto(
+                                        accountId = it.accountId,
+                                        deviceId = it.deviceId,
+                                    ),
+                                )
+                            }
+                        }.getOrNull() is RemoteResult.Success
+                    }
                 accessRequestRepository.saveRequest(
-                    request.copy(status = if (pushedDirectly) RequestStatus.PendingRemote else RequestStatus.PendingLocal),
+                    request.copy(
+                        status = if (pushedDirectly) RequestStatus.PendingRemote else RequestStatus.PendingLocal,
+                    ),
                 )
                 syncScheduler.requestSync()
-                val synced = withContext(Dispatchers.IO) {
-                    pushedDirectly || runCatching {
-                        val syncOk = syncEngine.syncOnce().success &&
-                            syncEngine.syncAccessRequestsFull().success &&
-                            syncEngine.syncRequestResultsFull().success
-                        syncOk
-                    }.getOrDefault(false)
-                }
+                val synced =
+                    withContext(Dispatchers.IO) {
+                        pushedDirectly ||
+                            runCatching {
+                                val syncOk =
+                                    syncEngine.syncOnce().success &&
+                                        syncEngine.syncAccessRequestsFull().success &&
+                                        syncEngine.syncRequestResultsFull().success
+                                syncOk
+                            }.getOrDefault(false)
+                    }
                 pendingRequestPackages.update { it - packageName }
                 message.update {
                     when {

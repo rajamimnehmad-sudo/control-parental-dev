@@ -4,22 +4,22 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
-import android.os.Build
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.Drawable
+import android.os.Build
 import android.util.Base64
 import com.contentfilter.core.domain.model.DeviceActivation
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.nio.charset.StandardCharsets
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
+import java.nio.charset.StandardCharsets
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 class InstalledAppPublisher
     @Inject
@@ -27,24 +27,25 @@ class InstalledAppPublisher
         @ApplicationContext private val context: Context,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
     ) {
-        suspend fun publish(activation: DeviceActivation) = withContext(Dispatchers.IO) {
-            val now = Instant.now().toString()
-            installedApps().forEach { app ->
-                remoteInstalledAppRepository.upsertInstalledApp(
-                    RemoteInstalledAppDto(
-                        id = stableId(activation.deviceId, app.packageName),
-                        accountId = activation.accountId,
-                        deviceId = activation.deviceId,
-                        appName = app.name,
-                        packageName = app.packageName,
-                        versionName = app.versionName,
-                        isSystemApp = app.isSystemApp,
-                        iconBase64 = app.iconBase64,
-                        updatedAt = now,
-                    ),
-                )
+        suspend fun publish(activation: DeviceActivation) =
+            withContext(Dispatchers.IO) {
+                val now = Instant.now().toString()
+                installedApps().forEach { app ->
+                    remoteInstalledAppRepository.upsertInstalledApp(
+                        RemoteInstalledAppDto(
+                            id = stableId(activation.deviceId, app.packageName),
+                            accountId = activation.accountId,
+                            deviceId = activation.deviceId,
+                            appName = app.name,
+                            packageName = app.packageName,
+                            versionName = app.versionName,
+                            isSystemApp = app.isSystemApp,
+                            iconBase64 = app.iconBase64,
+                            updatedAt = now,
+                        ),
+                    )
+                }
             }
-        }
 
         fun installedApps(): List<DetectedApp> {
             val packageManager = context.packageManager
@@ -70,8 +71,7 @@ class InstalledAppPublisher
         private fun stableId(
             deviceId: String,
             packageName: String,
-        ): String =
-            UUID.nameUUIDFromBytes("$deviceId:$packageName".toByteArray(StandardCharsets.UTF_8)).toString()
+        ): String = UUID.nameUUIDFromBytes("$deviceId:$packageName".toByteArray(StandardCharsets.UTF_8)).toString()
 
         data class DetectedApp(
             val name: String,
@@ -105,36 +105,38 @@ class InstalledAppPublisher
         private companion object {
             const val IconSizePx = 96
             const val IconPngQuality = 90
-            val ExactAllowedPackageNames = setOf(
-                "android",
-                "com.android.contacts",
-                "com.android.dialer",
-                "com.android.packageinstaller",
-                "com.android.permissioncontroller",
-                "com.android.phone",
-                "com.android.providers.downloads",
-                "com.android.settings",
-                "com.contentfilter.admin",
-                "com.contentfilter.admin.dev",
-                "com.contentfilter.admin.beta",
-                "com.contentfilter.user",
-                "com.contentfilter.user.dev",
-                "com.contentfilter.user.beta",
-                "com.google.android.contacts",
-                "com.google.android.dialer",
-                "com.google.android.gms",
-                "com.google.android.gsf",
-                "com.google.android.packageinstaller",
-                "com.google.android.permissioncontroller",
-                "com.google.android.setupwizard",
-                "com.android.vending",
-            )
-            val AllowedPackagePrefixes = listOf(
-                "com.android.launcher",
-                "com.google.android.apps.nexuslauncher",
-                "com.google.android.inputmethod",
-                "com.google.android.webview",
-            )
+            val ExactAllowedPackageNames =
+                setOf(
+                    "android",
+                    "com.android.contacts",
+                    "com.android.dialer",
+                    "com.android.packageinstaller",
+                    "com.android.permissioncontroller",
+                    "com.android.phone",
+                    "com.android.providers.downloads",
+                    "com.android.settings",
+                    "com.contentfilter.admin",
+                    "com.contentfilter.admin.dev",
+                    "com.contentfilter.admin.beta",
+                    "com.contentfilter.user",
+                    "com.contentfilter.user.dev",
+                    "com.contentfilter.user.beta",
+                    "com.google.android.contacts",
+                    "com.google.android.dialer",
+                    "com.google.android.gms",
+                    "com.google.android.gsf",
+                    "com.google.android.packageinstaller",
+                    "com.google.android.permissioncontroller",
+                    "com.google.android.setupwizard",
+                    "com.android.vending",
+                )
+            val AllowedPackagePrefixes =
+                listOf(
+                    "com.android.launcher",
+                    "com.google.android.apps.nexuslauncher",
+                    "com.google.android.inputmethod",
+                    "com.google.android.webview",
+                )
 
             fun String.isAlwaysAllowedPackage(): Boolean =
                 this in ExactAllowedPackageNames ||

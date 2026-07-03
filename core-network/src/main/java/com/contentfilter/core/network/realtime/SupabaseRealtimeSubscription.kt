@@ -3,8 +3,6 @@ package com.contentfilter.core.network.realtime
 import com.contentfilter.core.network.config.AuthTokenProvider
 import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.network.remote.SupabaseTable
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -16,6 +14,8 @@ import okhttp3.Request
 import okhttp3.Response
 import okhttp3.WebSocket
 import okhttp3.WebSocketListener
+import javax.inject.Inject
+import javax.inject.Singleton
 
 @Singleton
 class SupabaseRealtimeSubscription
@@ -38,12 +38,16 @@ class SupabaseRealtimeSubscription
                 val baseUrl = config.normalizedUrlOrNull()
                 val token = authTokenProvider.currentToken()
                 if (baseUrl == null || token == null || webSocket != null) return@launch
-                val realtimeUrl = baseUrl
-                    .replace("https://", "wss://")
-                    .replace("http://", "ws://")
-                val request = Request.Builder()
-                    .url("$realtimeUrl/realtime/v1/websocket?apikey=${config.anonKey}&access_token=$token&vsn=1.0.0")
-                    .build()
+                val realtimeUrl =
+                    baseUrl
+                        .replace("https://", "wss://")
+                        .replace("http://", "ws://")
+                val request =
+                    Request.Builder()
+                        .url(
+                            "$realtimeUrl/realtime/v1/websocket?apikey=${config.anonKey}&access_token=$token&vsn=1.0.0",
+                        )
+                        .build()
                 webSocket = httpClient.newWebSocket(request, listener())
             }
         }
@@ -55,18 +59,28 @@ class SupabaseRealtimeSubscription
 
         private fun listener(): WebSocketListener =
             object : WebSocketListener() {
-                override fun onOpen(webSocket: WebSocket, response: Response) {
+                override fun onOpen(
+                    webSocket: WebSocket,
+                    response: Response,
+                ) {
                     RealtimeTables.forEach { table ->
                         webSocket.send(subscriptionMessage(table))
                     }
                 }
 
-                override fun onMessage(webSocket: WebSocket, text: String) {
+                override fun onMessage(
+                    webSocket: WebSocket,
+                    text: String,
+                ) {
                     val table = RealtimeTables.firstOrNull { text.contains(it.tableName) } ?: return
                     changes.tryEmit(RealtimeChange(table = table, payload = text))
                 }
 
-                override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
+                override fun onClosed(
+                    webSocket: WebSocket,
+                    code: Int,
+                    reason: String,
+                ) {
                     this@SupabaseRealtimeSubscription.webSocket = null
                 }
             }
@@ -86,13 +100,14 @@ class SupabaseRealtimeSubscription
             """.trimIndent()
 
         private companion object {
-            val RealtimeTables = listOf(
-                SupabaseTable.Devices,
-                SupabaseTable.Policies,
-                SupabaseTable.PolicyRules,
-                SupabaseTable.DailyLimits,
-                SupabaseTable.AccessRequests,
-                SupabaseTable.ExtraTimeGrants,
-            )
+            val RealtimeTables =
+                listOf(
+                    SupabaseTable.Devices,
+                    SupabaseTable.Policies,
+                    SupabaseTable.PolicyRules,
+                    SupabaseTable.DailyLimits,
+                    SupabaseTable.AccessRequests,
+                    SupabaseTable.ExtraTimeGrants,
+                )
         }
     }

@@ -2,9 +2,9 @@ package com.contentfilter.feature.vpn.policy
 
 import com.contentfilter.core.domain.model.DevicePolicyContext
 import com.contentfilter.core.domain.model.DomainPolicyContext
-import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicySnapshot
+import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.policy.PolicyEngine
@@ -29,28 +29,33 @@ class VpnDomainPolicyEvaluator
             val now = clock.nowEpochMillis()
             val minuteOfDay = clock.minuteOfDay(now)
             val normalizedDomain = domain.normalizedDomain()
-            val policyDecision = policyEngine.evaluateDomain(
-                snapshot = snapshot,
-                context = DomainPolicyContext(
-                    domain = normalizedDomain,
-                    category = null,
-                    time = TimePolicyContext(
-                        evaluatedAtEpochMillis = now,
-                        minuteOfDay = minuteOfDay,
-                    ),
-                    device = DevicePolicyContext(
-                        isActivated = health.licenseState.isActivated(),
-                        healthSnapshot = health,
-                    ),
-                ),
-            )
-            val limit = snapshot.dailyLimits
-                .filter {
-                    it.enabled &&
-                        it.targetType == PolicyTargetType.Domain &&
-                        normalizedDomain.matchesLimitTarget(it.target.normalizedDomain())
-                }
-                .minByOrNull { it.limitMinutes }
+            val policyDecision =
+                policyEngine.evaluateDomain(
+                    snapshot = snapshot,
+                    context =
+                        DomainPolicyContext(
+                            domain = normalizedDomain,
+                            category = null,
+                            time =
+                                TimePolicyContext(
+                                    evaluatedAtEpochMillis = now,
+                                    minuteOfDay = minuteOfDay,
+                                ),
+                            device =
+                                DevicePolicyContext(
+                                    isActivated = health.licenseState.isActivated(),
+                                    healthSnapshot = health,
+                                ),
+                        ),
+                )
+            val limit =
+                snapshot.dailyLimits
+                    .filter {
+                        it.enabled &&
+                            it.targetType == PolicyTargetType.Domain &&
+                            normalizedDomain.matchesLimitTarget(it.target.normalizedDomain())
+                    }
+                    .minByOrNull { it.limitMinutes }
             if (limit != null && policyDecision is PolicyDecision.Allow) {
                 val observedMinutes = dnsUsageTracker.recordMinute(limit.target, now, minuteOfDay)
                 if (observedMinutes > limit.limitMinutes) {
@@ -60,8 +65,7 @@ class VpnDomainPolicyEvaluator
             return policyDecision
         }
 
-        private fun String.matchesLimitTarget(target: String): Boolean =
-            this == target || endsWith(".$target")
+        private fun String.matchesLimitTarget(target: String): Boolean = this == target || endsWith(".$target")
 
         private fun String.normalizedDomain(): String =
             trim()

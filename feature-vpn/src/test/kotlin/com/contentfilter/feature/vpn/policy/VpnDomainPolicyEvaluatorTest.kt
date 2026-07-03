@@ -16,10 +16,11 @@ import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class VpnDomainPolicyEvaluatorTest {
-    private val evaluator = VpnDomainPolicyEvaluator(
-        policyEngine = DefaultPolicyEngine(),
-        clock = FixedVpnClock,
-    )
+    private val evaluator =
+        VpnDomainPolicyEvaluator(
+            policyEngine = DefaultPolicyEngine(),
+            clock = FixedVpnClock,
+        )
 
     @Test
     fun `returns allow when no domain rule matches`() {
@@ -30,39 +31,45 @@ class VpnDomainPolicyEvaluatorTest {
 
     @Test
     fun `returns block for blocked domain`() {
-        val decision = evaluator.evaluate(
-            domain = "blocked.example",
-            snapshot = snapshot(
-                rule("blocked.example", RuleAction.Block),
-            ),
-            health = activeHealth(),
-        )
+        val decision =
+            evaluator.evaluate(
+                domain = "blocked.example",
+                snapshot =
+                    snapshot(
+                        rule("blocked.example", RuleAction.Block),
+                    ),
+                health = activeHealth(),
+            )
 
         assertIs<PolicyDecision.Block>(decision)
     }
 
     @Test
     fun `matches subdomain rule`() {
-        val decision = evaluator.evaluate(
-            domain = "child.example.com",
-            snapshot = snapshot(
-                rule("example.com", RuleAction.Block),
-            ),
-            health = activeHealth(),
-        )
+        val decision =
+            evaluator.evaluate(
+                domain = "child.example.com",
+                snapshot =
+                    snapshot(
+                        rule("example.com", RuleAction.Block),
+                    ),
+                health = activeHealth(),
+            )
 
         assertIs<PolicyDecision.Block>(decision)
     }
 
     @Test
     fun `preserves safesearch extension flag`() {
-        val decision = evaluator.evaluate(
-            domain = "search.example",
-            snapshot = snapshot(
-                rule("search.example", RuleAction.Allow, safeSearchRequired = true),
-            ),
-            health = activeHealth(),
-        )
+        val decision =
+            evaluator.evaluate(
+                domain = "search.example",
+                snapshot =
+                    snapshot(
+                        rule("search.example", RuleAction.Allow, safeSearchRequired = true),
+                    ),
+                health = activeHealth(),
+            )
 
         val allow = assertIs<PolicyDecision.Allow>(decision)
         assertTrue(allow.safeSearchRequired)

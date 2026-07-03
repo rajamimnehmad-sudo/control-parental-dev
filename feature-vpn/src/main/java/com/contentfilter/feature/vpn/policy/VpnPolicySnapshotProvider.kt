@@ -5,14 +5,14 @@ import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
 
 /**
  * Keeps a fast in-memory snapshot for packet-time evaluation.
@@ -31,29 +31,32 @@ class VpnPolicySnapshotProvider
 
         fun start(scope: CoroutineScope) {
             if (observationJob?.isActive == true) return
-            observationJob = scope.launch {
-                combine(
-                    policyRepository.observeActivePolicy(),
-                    dailyLimitRepository.observeLimits(),
-                    systemStatusRepository.observeHealth(),
-                    deviceActivationRepository.observeActivation(),
-                ) { snapshot, dailyLimits, health, activation ->
-                    VpnPolicyState(
-                        snapshot = snapshot.copy(dailyLimits = dailyLimits),
-                        health = health.withActiveLicenseIfActivated(activation != null),
-                    )
-                }.collect { state.value = it }
-            }
+            observationJob =
+                scope.launch {
+                    combine(
+                        policyRepository.observeActivePolicy(),
+                        dailyLimitRepository.observeLimits(),
+                        systemStatusRepository.observeHealth(),
+                        deviceActivationRepository.observeActivation(),
+                    ) { snapshot, dailyLimits, health, activation ->
+                        VpnPolicyState(
+                            snapshot = snapshot.copy(dailyLimits = dailyLimits),
+                            health = health.withActiveLicenseIfActivated(activation != null),
+                        )
+                    }.collect { state.value = it }
+                }
         }
 
         suspend fun refresh() {
             val activation = deviceActivationRepository.currentActivation()
-            state.value = VpnPolicyState(
-                snapshot = policyRepository.getActivePolicy().copy(
-                    dailyLimits = dailyLimitRepository.observeLimits().first(),
-                ),
-                health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
-            )
+            state.value =
+                VpnPolicyState(
+                    snapshot =
+                        policyRepository.getActivePolicy().copy(
+                            dailyLimits = dailyLimitRepository.observeLimits().first(),
+                        ),
+                    health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
+                )
         }
 
         fun current(): VpnPolicyState = state.value

@@ -2,14 +2,14 @@ package com.contentfilter.core.sync.realtime
 
 import com.contentfilter.core.network.realtime.RealtimeSubscription
 import com.contentfilter.core.sync.engine.SyncEngine
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
 
 @Singleton
 class DefaultRealtimeSyncCoordinator
@@ -24,11 +24,12 @@ class DefaultRealtimeSyncCoordinator
         override fun start() {
             realtimeSubscription.connect()
             if (job?.isActive == true) return
-            job = scope.launch {
-                realtimeSubscription.observeChanges().collectLatest {
-                    syncEngine.syncOnce()
+            job =
+                scope.launch {
+                    realtimeSubscription.observeChanges().collectLatest {
+                        syncEngine.syncOnce()
+                    }
                 }
-            }
         }
 
         override fun stop() {

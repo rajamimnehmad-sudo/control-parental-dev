@@ -5,8 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.PolicyLevel
-import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
@@ -21,10 +21,6 @@ import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.Duration
-import java.time.Instant
-import java.util.UUID
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -33,6 +29,10 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.time.Duration
+import java.time.Instant
+import java.util.UUID
+import javax.inject.Inject
 
 @HiltViewModel
 class RulesViewModel
@@ -48,57 +48,63 @@ class RulesViewModel
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
     ) : ViewModel() {
-        private val form = MutableStateFlow(
-            RulesUiState(),
-        )
+        private val form =
+            MutableStateFlow(
+                RulesUiState(),
+            )
         private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
 
-        val uiState = combine(
-            observePolicyRules(),
-            observeDailyLimits(),
-            observeDevices(),
-            installedApps,
-            form,
-        ) { rules, limits, devices, apps, formState ->
-            val userDevices = devices.toUserDevices(apps)
-            val selectedDeviceId = formState.selectedDeviceId?.takeIf { selected ->
-                userDevices.any { it.id == selected }
-            }
-            val savedInternetBlocked = rules.any {
-                it.enabled &&
-                    it.scope == RuleScope.Domain &&
-                    it.target == DomainWildcard &&
-                    it.action == RuleAction.Block
-            }
-            formState.copy(
-                rules = rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
-                limits = limits.sortedWith(compareBy({ it.targetType.name }, { it.target })),
-                userDevices = userDevices,
-                selectedDeviceId = selectedDeviceId,
-                internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
-                googleSearchAllowed = GoogleSearchDomains.all { domain ->
+        val uiState =
+            combine(
+                observePolicyRules(),
+                observeDailyLimits(),
+                observeDevices(),
+                installedApps,
+                form,
+            ) { rules, limits, devices, apps, formState ->
+                val userDevices = devices.toUserDevices(apps)
+                val selectedDeviceId =
+                    formState.selectedDeviceId?.takeIf { selected ->
+                        userDevices.any { it.id == selected }
+                    }
+                val savedInternetBlocked =
                     rules.any {
                         it.enabled &&
                             it.scope == RuleScope.Domain &&
-                            it.target == domain &&
-                            it.action == RuleAction.Allow
+                            it.target == DomainWildcard &&
+                            it.action == RuleAction.Block
                     }
-                },
-                appControls = if (selectedDeviceId == null) {
-                    emptyList()
-                } else {
-                    apps
-                        .filter { it.deviceId == selectedDeviceId }
-                        .toAppControls(rules, limits, devices, formState.pendingAppAllowed)
-                }
-                    .filterBySearch(formState.appSearchQuery),
-                offlineMode = false,
+                formState.copy(
+                    rules = rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
+                    limits = limits.sortedWith(compareBy({ it.targetType.name }, { it.target })),
+                    userDevices = userDevices,
+                    selectedDeviceId = selectedDeviceId,
+                    internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
+                    googleSearchAllowed =
+                        GoogleSearchDomains.all { domain ->
+                            rules.any {
+                                it.enabled &&
+                                    it.scope == RuleScope.Domain &&
+                                    it.target == domain &&
+                                    it.action == RuleAction.Allow
+                            }
+                        },
+                    appControls =
+                        if (selectedDeviceId == null) {
+                            emptyList()
+                        } else {
+                            apps
+                                .filter { it.deviceId == selectedDeviceId }
+                                .toAppControls(rules, limits, devices, formState.pendingAppAllowed)
+                        }
+                            .filterBySearch(formState.appSearchQuery),
+                    offlineMode = false,
+                )
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = form.value,
             )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = form.value,
-        )
 
         fun onAppPackageChanged(value: String) {
             form.update { it.copy(appPackageName = value, message = "") }
@@ -168,7 +174,9 @@ class RulesViewModel
                 syncScheduler.requestSync()
                 syncNow()
                 form.update {
-                    it.copy(message = if (allowed) "Google permitido para buscar." else "Google vuelve a estar bloqueado.")
+                    it.copy(
+                        message = if (allowed) "Google permitido para buscar." else "Google vuelve a estar bloqueado.",
+                    )
                 }
             }
         }
@@ -184,9 +192,10 @@ class RulesViewModel
                 saveAllowedDomain(target)
                 saveDailyLimit(
                     DailyLimit(
-                        id = uiState.value.limits.firstOrNull {
-                            it.targetType == PolicyTargetType.Domain && it.target == target
-                        }?.id ?: UUID.randomUUID().toString(),
+                        id =
+                            uiState.value.limits.firstOrNull {
+                                it.targetType == PolicyTargetType.Domain && it.target == target
+                            }?.id ?: UUID.randomUUID().toString(),
                         targetType = PolicyTargetType.Domain,
                         target = target,
                         limitMinutes = minutes,
@@ -206,11 +215,12 @@ class RulesViewModel
         }
 
         fun setInternetBlocked(blocked: Boolean) {
-            val existing = uiState.value.rules.firstOrNull {
-                it.scope == RuleScope.Domain &&
-                    it.target == DomainWildcard &&
-                    it.action == RuleAction.Block
-            }
+            val existing =
+                uiState.value.rules.firstOrNull {
+                    it.scope == RuleScope.Domain &&
+                        it.target == DomainWildcard &&
+                        it.action == RuleAction.Block
+                }
             form.update {
                 it.copy(
                     pendingInternetBlocked = blocked,
@@ -235,11 +245,12 @@ class RulesViewModel
                 form.update {
                     it.copy(
                         pendingInternetBlocked = null,
-                        message = if (blocked) {
-                            "Modo web: bloquear todo excepto permitidos."
-                        } else {
-                            "Modo web: permitir todo excepto bloqueados."
-                        },
+                        message =
+                            if (blocked) {
+                                "Modo web: bloquear todo excepto permitidos."
+                            } else {
+                                "Modo web: permitir todo excepto bloqueados."
+                            },
                     )
                 }
             }
@@ -266,9 +277,10 @@ class RulesViewModel
             packageName: String,
             allowed: Boolean,
         ) {
-            val matchingRules = uiState.value.rules.filter {
-                it.scope == RuleScope.App && it.target == packageName
-            }
+            val matchingRules =
+                uiState.value.rules.filter {
+                    it.scope == RuleScope.App && it.target == packageName
+                }
             val blockRules = matchingRules.filter { it.action == RuleAction.Block }
             val allowRules = matchingRules.filter { it.action == RuleAction.Allow }
             form.update {
@@ -278,38 +290,40 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch {
-                val synced = runCatching {
-                    if (allowed) {
-                        blockRules.filter { it.enabled }.forEach {
-                            saveRule(it.copy(enabled = false))
+                val synced =
+                    runCatching {
+                        if (allowed) {
+                            blockRules.filter { it.enabled }.forEach {
+                                saveRule(it.copy(enabled = false))
+                            }
+                        } else {
+                            allowRules.filter { it.enabled }.forEach {
+                                saveRule(it.copy(enabled = false))
+                            }
+                            saveRule(
+                                blockRules.firstOrNull()?.copy(enabled = true)
+                                    ?: PolicyRule(
+                                        id = UUID.randomUUID().toString(),
+                                        level = PolicyLevel.Account,
+                                        scope = RuleScope.App,
+                                        target = packageName,
+                                        action = RuleAction.Block,
+                                        priority = 100,
+                                        enabled = true,
+                                    ),
+                            )
                         }
-                    } else {
-                        allowRules.filter { it.enabled }.forEach {
-                            saveRule(it.copy(enabled = false))
-                        }
-                        saveRule(
-                            blockRules.firstOrNull()?.copy(enabled = true)
-                                ?: PolicyRule(
-                                    id = UUID.randomUUID().toString(),
-                                    level = PolicyLevel.Account,
-                                    scope = RuleScope.App,
-                                    target = packageName,
-                                    action = RuleAction.Block,
-                                    priority = 100,
-                                    enabled = true,
-                                ),
-                        )
-                    }
-                    syncScheduler.requestSync()
-                    withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull().success }
-                }.getOrDefault(false)
+                        syncScheduler.requestSync()
+                        withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull().success }
+                    }.getOrDefault(false)
                 form.update {
                     it.copy(
-                        message = when {
-                            synced && allowed -> "App permitida."
-                            synced -> "App bloqueada."
-                            else -> "Cambio guardado localmente. Se sincronizará cuando haya conexión."
-                        },
+                        message =
+                            when {
+                                synced && allowed -> "App permitida."
+                                synced -> "App bloqueada."
+                                else -> "Cambio guardado localmente. Se sincronizará cuando haya conexión."
+                            },
                     )
                 }
                 kotlinx.coroutines.delay(SwitchHoldMillis)
@@ -322,9 +336,10 @@ class RulesViewModel
             rawMinutes: String,
         ) {
             val minutes = rawMinutes.filter(Char::isDigit).toIntOrNull()
-            val existing = uiState.value.limits.firstOrNull {
-                it.targetType == PolicyTargetType.App && it.target == packageName
-            }
+            val existing =
+                uiState.value.limits.firstOrNull {
+                    it.targetType == PolicyTargetType.App && it.target == packageName
+                }
             viewModelScope.launch {
                 if (minutes == null || minutes <= 0) {
                     if (existing != null) {
@@ -359,20 +374,22 @@ class RulesViewModel
             action: RuleAction,
         ) {
             val state = form.value
-            val rawTarget = when (scope) {
-                RuleScope.App -> state.appPackageName
-                RuleScope.Domain -> if (action == RuleAction.Allow) state.allowDomain else state.domain
-                else -> ""
-            }
+            val rawTarget =
+                when (scope) {
+                    RuleScope.App -> state.appPackageName
+                    RuleScope.Domain -> if (action == RuleAction.Allow) state.allowDomain else state.domain
+                    else -> ""
+                }
             val target = normalizeTarget(scope, rawTarget)
             if (target == null) {
                 form.update {
                     it.copy(
-                        message = when (scope) {
-                            RuleScope.App -> "Ingresá un paquete válido, por ejemplo com.android.chrome."
-                            RuleScope.Domain -> "Ingresá solo un dominio, por ejemplo example.com. No pegues URL completa."
-                            else -> "Objetivo inválido."
-                        },
+                        message =
+                            when (scope) {
+                                RuleScope.App -> "Ingresá un paquete válido, por ejemplo com.android.chrome."
+                                RuleScope.Domain -> "Ingresá solo un dominio, por ejemplo example.com. No pegues URL completa."
+                                else -> "Objetivo inválido."
+                            },
                     )
                 }
                 return
@@ -412,11 +429,12 @@ class RulesViewModel
                 form.update {
                     when (scope) {
                         RuleScope.App -> it.copy(appPackageName = "", message = "App bloqueada.")
-                        RuleScope.Domain -> if (action == RuleAction.Allow) {
-                            it.copy(allowDomain = "", message = "Sitio permitido.")
-                        } else {
-                            it.copy(domain = "", message = "Dominio/familia bloqueada.")
-                        }
+                        RuleScope.Domain ->
+                            if (action == RuleAction.Allow) {
+                                it.copy(allowDomain = "", message = "Sitio permitido.")
+                            } else {
+                                it.copy(domain = "", message = "Dominio/familia bloqueada.")
+                            }
                         else -> it.copy(message = "Regla guardada.")
                     }
                 }
@@ -425,25 +443,28 @@ class RulesViewModel
 
         private fun createLimit(targetType: PolicyTargetType) {
             val state = form.value
-            val rawTarget = when (targetType) {
-                PolicyTargetType.App -> state.limitPackageName
-                PolicyTargetType.Domain -> state.domainLimitDomain
-                else -> ""
-            }
-            val rawMinutes = when (targetType) {
-                PolicyTargetType.App -> state.limitMinutes
-                PolicyTargetType.Domain -> state.domainLimitMinutes
-                else -> ""
-            }
+            val rawTarget =
+                when (targetType) {
+                    PolicyTargetType.App -> state.limitPackageName
+                    PolicyTargetType.Domain -> state.domainLimitDomain
+                    else -> ""
+                }
+            val rawMinutes =
+                when (targetType) {
+                    PolicyTargetType.App -> state.limitMinutes
+                    PolicyTargetType.Domain -> state.domainLimitMinutes
+                    else -> ""
+                }
             val target = normalizeLimitTarget(targetType, rawTarget)
             val minutes = rawMinutes.toIntOrNull()
             if (target == null || minutes == null || minutes <= 0) {
                 form.update {
                     it.copy(
-                        message = when (targetType) {
-                            PolicyTargetType.Domain -> "Ingresá dominio y minutos válidos."
-                            else -> "Ingresá paquete de app y minutos válidos."
-                        },
+                        message =
+                            when (targetType) {
+                                PolicyTargetType.Domain -> "Ingresá dominio y minutos válidos."
+                                else -> "Ingresá paquete de app y minutos válidos."
+                            },
                     )
                 }
                 return
@@ -463,11 +484,12 @@ class RulesViewModel
                 syncNow()
                 form.update {
                     when (targetType) {
-                        PolicyTargetType.Domain -> it.copy(
-                            domainLimitDomain = "",
-                            domainLimitMinutes = "",
-                            message = "Límite de dominio guardado.",
-                        )
+                        PolicyTargetType.Domain ->
+                            it.copy(
+                                domainLimitDomain = "",
+                                domainLimitMinutes = "",
+                                message = "Límite de dominio guardado.",
+                            )
                         else -> it.copy(limitPackageName = "", limitMinutes = "", message = "Límite de app guardado.")
                     }
                 }
@@ -483,9 +505,10 @@ class RulesViewModel
                             state.copy(message = state.message.takeUnless { it == "Cargando apps..." }.orEmpty())
                         }
                     }
-                    is RemoteResult.Failure -> form.update {
-                        it.copy(message = "No se pudo cargar la lista de apps: ${result.reason}")
-                    }
+                    is RemoteResult.Failure ->
+                        form.update {
+                            it.copy(message = "No se pudo cargar la lista de apps: ${result.reason}")
+                        }
                 }
             }
         }
@@ -498,11 +521,12 @@ class RulesViewModel
             target: String,
             enabled: Boolean,
         ) {
-            val existing = uiState.value.rules.firstOrNull {
-                it.scope == RuleScope.Domain &&
-                    it.target == target &&
-                    it.action == RuleAction.Allow
-            }
+            val existing =
+                uiState.value.rules.firstOrNull {
+                    it.scope == RuleScope.Domain &&
+                        it.target == target &&
+                        it.action == RuleAction.Allow
+                }
             saveRule(
                 existing?.copy(enabled = enabled, priority = AllowDomainPriority)
                     ?: PolicyRule(
@@ -555,11 +579,12 @@ class RulesViewModel
             return distinctBy { it.deviceId to it.packageName }
                 .map { app ->
                     val effectiveRule = rules.effectiveAppRule(app.packageName)
-                    val limit = limits.firstOrNull {
-                        it.enabled &&
-                            it.targetType == PolicyTargetType.App &&
-                            it.target == app.packageName
-                    }
+                    val limit =
+                        limits.firstOrNull {
+                            it.enabled &&
+                                it.targetType == PolicyTargetType.App &&
+                                it.target == app.packageName
+                        }
                     AppControlUiState(
                         appName = app.appName,
                         packageName = app.packageName,
@@ -590,9 +615,10 @@ class RulesViewModel
             return filter { device ->
                 device.appRole != "admin" && (device.appRole == "user" || device.id in appDeviceIds)
             }.map { device ->
-                val newestAppSeen = appsByDevice[device.id]
-                    ?.mapNotNull { it.updatedAt.toEpochMillisOrNull() }
-                    ?.maxOrNull()
+                val newestAppSeen =
+                    appsByDevice[device.id]
+                        ?.mapNotNull { it.updatedAt.toEpochMillisOrNull() }
+                        ?.maxOrNull()
                 val lastSeen = device.lastSeenAtEpochMillis ?: newestAppSeen
                 UserDeviceUiState(
                     id = device.id,
@@ -614,19 +640,19 @@ class RulesViewModel
             }
         }
 
-        private fun String.toEpochMillisOrNull(): Long? =
-            runCatching { Instant.parse(this).toEpochMilli() }.getOrNull()
+        private fun String.toEpochMillisOrNull(): Long? = runCatching { Instant.parse(this).toEpochMilli() }.getOrNull()
 
         private fun String.toDomainOrNull(): String? {
-            val withoutScheme = trim()
-                .lowercase()
-                .substringAfter("://", missingDelimiterValue = trim().lowercase())
-                .substringBefore("/")
-                .substringBefore("?")
-                .substringBefore("#")
-                .substringBefore(":")
-                .removeSuffix(".")
-                .removePrefix("www.")
+            val withoutScheme =
+                trim()
+                    .lowercase()
+                    .substringAfter("://", missingDelimiterValue = trim().lowercase())
+                    .substringBefore("/")
+                    .substringBefore("?")
+                    .substringBefore("#")
+                    .substringBefore(":")
+                    .removeSuffix(".")
+                    .removePrefix("www.")
             return withoutScheme.takeIf { DomainRegex.matches(it) }
         }
 
@@ -657,19 +683,21 @@ class RulesViewModel
             const val InternetBlockPriority = 10
             const val BlockDomainPriority = 2_000
             const val AllowDomainPriority = 1_000
-            val GoogleSearchDomains = listOf(
-                "google.com",
-                "gstatic.com",
-                "googleapis.com",
-                "googleusercontent.com",
-                "bing.com",
-                "duckduckgo.com",
-            )
-            val YouTubeWebDomains = listOf(
-                "youtube.com",
-                "youtubei.googleapis.com",
-                "googlevideo.com",
-                "ytimg.com",
-            )
+            val GoogleSearchDomains =
+                listOf(
+                    "google.com",
+                    "gstatic.com",
+                    "googleapis.com",
+                    "googleusercontent.com",
+                    "bing.com",
+                    "duckduckgo.com",
+                )
+            val YouTubeWebDomains =
+                listOf(
+                    "youtube.com",
+                    "youtubei.googleapis.com",
+                    "googlevideo.com",
+                    "ytimg.com",
+                )
         }
     }

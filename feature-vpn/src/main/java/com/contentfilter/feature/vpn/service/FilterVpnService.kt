@@ -23,11 +23,6 @@ import com.contentfilter.feature.vpn.policy.VpnDomainPolicyEvaluator
 import com.contentfilter.feature.vpn.policy.VpnPolicySnapshotProvider
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import dagger.hilt.android.AndroidEntryPoint
-import java.io.FileInputStream
-import java.io.FileOutputStream
-import java.net.Inet4Address
-import java.net.InetAddress
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -36,6 +31,11 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.FileInputStream
+import java.io.FileOutputStream
+import java.net.Inet4Address
+import java.net.InetAddress
+import javax.inject.Inject
 
 /**
  * Local VPN entry point. Business decisions are delegated to PolicyEngine.
@@ -43,8 +43,11 @@ import kotlinx.coroutines.withContext
 @AndroidEntryPoint
 class FilterVpnService : VpnService() {
     @Inject lateinit var snapshotProvider: VpnPolicySnapshotProvider
+
     @Inject lateinit var policyEvaluator: VpnDomainPolicyEvaluator
+
     @Inject lateinit var systemStatusRepository: SystemStatusRepository
+
     @Inject lateinit var telemetryReporter: VpnTelemetryReporter
 
     private val parser = DnsPacketParser()
@@ -95,24 +98,25 @@ class FilterVpnService : VpnService() {
         )
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         serviceScope = scope
-        readerJob = scope.launch {
-            runCatching {
-                snapshotProvider.refresh()
-                snapshotProvider.start(scope)
-                upstreamDnsServers = currentDnsServers()
-                Log.i(LogTag, "VPN active upstream=${upstreamDnsServers.safeAddresses()} rules=${snapshotProvider.current().snapshot.rules.size}")
-                vpnInterface = establishVpn()
-                VpnController.markStarted(this@FilterVpnService)
-                systemStatusRepository.updateVpnState(ComponentState.Enabled)
-                telemetryReporter.recordServiceState("VPN started.")
-                readPackets(requireNotNull(vpnInterface))
-            }.onFailure {
-                VpnController.markStopped(this@FilterVpnService, StopReasonFailed)
-                updateVpnState(ComponentState.Warning)
-                telemetryReporter.recordError("VPN failed: ${it.javaClass.simpleName}")
-                cleanup()
+        readerJob =
+            scope.launch {
+                runCatching {
+                    snapshotProvider.refresh()
+                    snapshotProvider.start(scope)
+                    upstreamDnsServers = currentDnsServers()
+                    Log.i(LogTag, "VPN active upstream=${upstreamDnsServers.safeAddresses()} rules=${snapshotProvider.current().snapshot.rules.size}")
+                    vpnInterface = establishVpn()
+                    VpnController.markStarted(this@FilterVpnService)
+                    systemStatusRepository.updateVpnState(ComponentState.Enabled)
+                    telemetryReporter.recordServiceState("VPN started.")
+                    readPackets(requireNotNull(vpnInterface))
+                }.onFailure {
+                    VpnController.markStopped(this@FilterVpnService, StopReasonFailed)
+                    updateVpnState(ComponentState.Warning)
+                    telemetryReporter.recordError("VPN failed: ${it.javaClass.simpleName}")
+                    cleanup()
+                }
             }
-        }
     }
 
     private fun reconnectVpn() {
@@ -216,7 +220,10 @@ class FilterVpnService : VpnService() {
         val state = snapshotProvider.current()
         when (val decision = policyEvaluator.evaluate(domain, state.snapshot, state.health)) {
             is PolicyDecision.Allow -> {
-                Log.i(LogTag, "DNS decision=allow domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} upstream=${upstreamDnsServers.safeAddresses()}")
+                Log.i(
+                    LogTag,
+                    "DNS decision=allow domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} upstream=${upstreamDnsServers.safeAddresses()}",
+                )
                 telemetryReporter.recordDnsDecision(decision)
                 if (decision.safeSearchRequired) {
                     reportSafeSearchExtensionPoint()
@@ -224,20 +231,28 @@ class FilterVpnService : VpnService() {
                 forwardDns(question, output)
             }
             is PolicyDecision.GrantExtraTime -> {
-                Log.i(LogTag, "DNS decision=grant domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}")
+                Log.i(
+                    LogTag,
+                    "DNS decision=grant domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}",
+                )
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)
             }
             is PolicyDecision.Block,
-            is PolicyDecision.RequestAuthorization -> {
-                Log.i(LogTag, "DNS decision=block domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}")
+            is PolicyDecision.RequestAuthorization,
+            -> {
+                Log.i(
+                    LogTag,
+                    "DNS decision=block domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}",
+                )
                 telemetryReporter.recordDnsDecision(decision)
                 notifyBlockedDomain(domain)
                 output.write(responseFactory.nxdomainPacket(question))
             }
             is PolicyDecision.HealthWarning,
             is PolicyDecision.RequireActivation,
-            is PolicyDecision.RequireUpdate -> {
+            is PolicyDecision.RequireUpdate,
+            -> {
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)
             }
@@ -257,7 +272,10 @@ class FilterVpnService : VpnService() {
             if (responsePayload != null) {
                 output.write(responseFactory.responsePacket(question, responsePayload))
             } else {
-                Log.w(LogTag, "DNS forward failed domain=${question.domain.normalizedDomain()} upstream=${upstreamDnsServers.safeAddresses()}")
+                Log.w(
+                    LogTag,
+                    "DNS forward failed domain=${question.domain.normalizedDomain()} upstream=${upstreamDnsServers.safeAddresses()}",
+                )
                 output.write(responseFactory.servfailPacket(question))
             }
         }.onFailure { telemetryReporter.recordError("DNS forward failed: ${it.javaClass.simpleName}") }
@@ -274,33 +292,37 @@ class FilterVpnService : VpnService() {
         if (now - (lastBlockedNotificationAt[normalized] ?: 0L) < BlockNotificationCooldownMillis) return
         lastBlockedNotificationAt[normalized] = now
         ensureBlockedNotificationChannel()
-        val intent = Intent().apply {
-            setClassName(packageName, UserMainActivityClassName)
-            action = OpenInternetAction
-            putExtra(ExtraBlockedDomain, normalized)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        val pendingIntent = PendingIntent.getActivity(
-            this,
-            normalized.hashCode(),
-            intent,
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(this, BlockedChannelId)
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(this)
-        }
-        val notification = builder
-            .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setContentTitle("Sitio bloqueado")
-            .setContentText("$normalized - tocar para pedir permiso")
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
-            .setCategory(Notification.CATEGORY_STATUS)
-            .build()
+        val intent =
+            Intent().apply {
+                setClassName(packageName, UserMainActivityClassName)
+                action = OpenInternetAction
+                putExtra(ExtraBlockedDomain, normalized)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            }
+        val pendingIntent =
+            PendingIntent.getActivity(
+                this,
+                normalized.hashCode(),
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        val builder =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(this, BlockedChannelId)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(this)
+            }
+        val notification =
+            builder
+                .setSmallIcon(android.R.drawable.stat_sys_warning)
+                .setContentTitle("Sitio bloqueado")
+                .setContentText("$normalized - tocar para pedir permiso")
+                .setContentIntent(pendingIntent)
+                .setAutoCancel(true)
+                .setOnlyAlertOnce(true)
+                .setCategory(Notification.CATEGORY_STATUS)
+                .build()
         getSystemService(NotificationManager::class.java)
             ?.notify(BlockedNotificationId, notification)
     }
@@ -317,11 +339,12 @@ class FilterVpnService : VpnService() {
     private fun rememberBlockedDomain(domain: String) {
         val prefs = getSharedPreferences(BlockedPrefsName, Context.MODE_PRIVATE)
         val now = System.currentTimeMillis()
-        val current = prefs.getString(BlockedDomainsKey, "")
-            .orEmpty()
-            .split("|")
-            .mapNotNull { it.toBlockedDomainEntryOrNull() }
-            .filter { it.domain != domain }
+        val current =
+            prefs.getString(BlockedDomainsKey, "")
+                .orEmpty()
+                .split("|")
+                .mapNotNull { it.toBlockedDomainEntryOrNull() }
+                .filter { it.domain != domain }
         prefs.edit()
             .putString(
                 BlockedDomainsKey,
@@ -335,20 +358,22 @@ class FilterVpnService : VpnService() {
     private fun String.toBlockedDomainEntryOrNull(): BlockedDomainEntry? {
         if (isBlank()) return null
         val domain = substringBefore(",").normalizedDomain()
-        val timestamp = substringAfter(",", missingDelimiterValue = "")
-            .toLongOrNull()
-            ?: System.currentTimeMillis()
+        val timestamp =
+            substringAfter(",", missingDelimiterValue = "")
+                .toLongOrNull()
+                ?: System.currentTimeMillis()
         return domain.takeIf { it.isNotBlank() }?.let { BlockedDomainEntry(it, timestamp) }
     }
 
     private fun ensureBlockedNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
-        val channel = NotificationChannel(
-            BlockedChannelId,
-            "Sitios bloqueados",
-            NotificationManager.IMPORTANCE_DEFAULT,
-        )
+        val channel =
+            NotificationChannel(
+                BlockedChannelId,
+                "Sitios bloqueados",
+                NotificationManager.IMPORTANCE_DEFAULT,
+            )
         manager.createNotificationChannel(channel)
     }
 
@@ -383,79 +408,85 @@ class FilterVpnService : VpnService() {
         private const val BlockedPrefsName = "blocked_domains"
         private const val BlockedDomainsKey = "domains"
         private const val MaxRecentBlockedDomains = 20
-        private val NoisyDomainLabels = setOf(
-            "api",
-            "apis",
-            "auth",
-            "collect",
-            "crash",
-            "discover",
-            "events",
-            "firebase",
-            "gms",
-            "graph",
-            "logs",
-            "metrics",
-            "optimizationguide-pa",
-            "telemetry",
-            "us-auth2",
-            "vas",
-        )
-        private val NoisyBaseDomains = setOf(
-            "googleapis.com",
-            "gstatic.com",
-            "samsungapps.com",
-            "samsungosp.com",
-            "ureca-lab.com",
-        )
+        private val NoisyDomainLabels =
+            setOf(
+                "api",
+                "apis",
+                "auth",
+                "collect",
+                "crash",
+                "discover",
+                "events",
+                "firebase",
+                "gms",
+                "graph",
+                "logs",
+                "metrics",
+                "optimizationguide-pa",
+                "telemetry",
+                "us-auth2",
+                "vas",
+            )
+        private val NoisyBaseDomains =
+            setOf(
+                "googleapis.com",
+                "gstatic.com",
+                "samsungapps.com",
+                "samsungosp.com",
+                "ureca-lab.com",
+            )
         private const val StopReasonAndroid = "android_stopped_vpn"
         private const val StopReasonApp = "app_stopped_vpn"
         private const val StopReasonDevRescue = "dev_protection_disabled"
         private const val StopReasonFailed = "vpn_failed"
         private const val StopReasonRevoked = "system_revoked_vpn"
         private const val LogTag = "FilterVpnService"
+
         private data class BlockedDomainEntry(
             val domain: String,
             val blockedAtEpochMillis: Long,
         )
-        private val BrowserPackageNames = listOf(
-            "com.android.chrome",
-            "com.sec.android.app.sbrowser",
-            "org.mozilla.firefox",
-            "org.mozilla.firefox_beta",
-            "com.microsoft.emmx",
-            "com.brave.browser",
-            "com.opera.browser",
-            "com.opera.mini.native",
-            "com.duckduckgo.mobile.android",
-            "com.vivaldi.browser",
-            "com.kiwibrowser.browser",
-            "com.UCMobile.intl",
-            "mark.via.gp",
-        )
-        private val AdminPackageNames = listOf(
-            "com.android.contacts",
-            "com.android.dialer",
-            "com.android.packageinstaller",
-            "com.android.permissioncontroller",
-            "com.android.phone",
-            "com.android.providers.downloads",
-            "com.android.settings",
-            "com.contentfilter.admin",
-            "com.contentfilter.admin.dev",
-            "com.contentfilter.admin.beta",
-            "com.contentfilter.user",
-            "com.contentfilter.user.dev",
-            "com.contentfilter.user.beta",
-            "com.google.android.contacts",
-            "com.google.android.dialer",
-            "com.google.android.gms",
-            "com.google.android.gsf",
-            "com.google.android.packageinstaller",
-            "com.google.android.permissioncontroller",
-            "com.google.android.setupwizard",
-            "com.android.vending",
-        )
+
+        private val BrowserPackageNames =
+            listOf(
+                "com.android.chrome",
+                "com.sec.android.app.sbrowser",
+                "org.mozilla.firefox",
+                "org.mozilla.firefox_beta",
+                "com.microsoft.emmx",
+                "com.brave.browser",
+                "com.opera.browser",
+                "com.opera.mini.native",
+                "com.duckduckgo.mobile.android",
+                "com.vivaldi.browser",
+                "com.kiwibrowser.browser",
+                "com.UCMobile.intl",
+                "mark.via.gp",
+            )
+        private val AdminPackageNames =
+            listOf(
+                "com.android.contacts",
+                "com.android.dialer",
+                "com.android.packageinstaller",
+                "com.android.permissioncontroller",
+                "com.android.phone",
+                "com.android.providers.downloads",
+                "com.android.settings",
+                "com.contentfilter.admin",
+                "com.contentfilter.admin.dev",
+                "com.contentfilter.admin.beta",
+                "com.contentfilter.user",
+                "com.contentfilter.user.dev",
+                "com.contentfilter.user.beta",
+                "com.google.android.contacts",
+                "com.google.android.dialer",
+                "com.google.android.gms",
+                "com.google.android.gsf",
+                "com.google.android.packageinstaller",
+                "com.google.android.permissioncontroller",
+                "com.google.android.setupwizard",
+                "com.android.vending",
+            )
 
         private fun String.normalizedDomain(): String =
             trim()

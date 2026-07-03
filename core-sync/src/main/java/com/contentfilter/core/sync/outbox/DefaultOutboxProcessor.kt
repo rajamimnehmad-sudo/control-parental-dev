@@ -13,8 +13,8 @@ import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.RemoteResult
-import javax.inject.Inject
 import org.json.JSONObject
+import javax.inject.Inject
 
 class DefaultOutboxProcessor
     @Inject
@@ -31,29 +31,33 @@ class DefaultOutboxProcessor
                 Log.i(LogTag, "Processing pending outbox operations count=${operations.size}")
             }
             operations.forEach { operation ->
-                val result = runCatching {
-                    push(operation)
-                }.getOrElse { exception ->
-                    Log.e(
-                        LogTag,
-                        "Outbox push crashed id=${operation.id} table=${operation.tableName}: ${exception.message}",
-                        exception,
-                    )
-                    RemoteResult.Failure("Outbox payload could not be pushed.", retryable = false)
-                }
-                val nextStatus = when (result) {
-                    is RemoteResult.Success -> OutboxStatus.Synced
-                    is RemoteResult.Failure -> if (result.retryable) OutboxStatus.Pending else OutboxStatus.Failed
-                }
+                val result =
+                    runCatching {
+                        push(operation)
+                    }.getOrElse { exception ->
+                        Log.e(
+                            LogTag,
+                            "Outbox push crashed id=${operation.id} table=${operation.tableName}: ${exception.message}",
+                            exception,
+                        )
+                        RemoteResult.Failure("Outbox payload could not be pushed.", retryable = false)
+                    }
+                val nextStatus =
+                    when (result) {
+                        is RemoteResult.Success -> OutboxStatus.Synced
+                        is RemoteResult.Failure -> if (result.retryable) OutboxStatus.Pending else OutboxStatus.Failed
+                    }
                 when (result) {
-                    is RemoteResult.Success -> Log.i(
-                        LogTag,
-                        "Outbox push succeeded id=${operation.id} table=${operation.tableName}",
-                    )
-                    is RemoteResult.Failure -> Log.w(
-                        LogTag,
-                        "Outbox push failed id=${operation.id} table=${operation.tableName} retryable=${result.retryable}: ${result.reason}",
-                    )
+                    is RemoteResult.Success ->
+                        Log.i(
+                            LogTag,
+                            "Outbox push succeeded id=${operation.id} table=${operation.tableName}",
+                        )
+                    is RemoteResult.Failure ->
+                        Log.w(
+                            LogTag,
+                            "Outbox push failed id=${operation.id} table=${operation.tableName} retryable=${result.retryable}: ${result.reason}",
+                        )
                 }
                 outboxDao.updateStatus(
                     id = operation.id,

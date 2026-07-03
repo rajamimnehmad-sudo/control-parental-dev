@@ -41,9 +41,10 @@ fun RequestsScreen(
     modifier: Modifier = Modifier,
 ) {
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         item { Text(text = "Mis solicitudes", style = MaterialTheme.typography.headlineSmall) }
@@ -86,7 +87,9 @@ private fun UserRequestCard(
             Text("Fecha: ${request.createdAtEpochMillis.toDisplayDate()}")
             Text("Estado: ${request.status.displayName()}")
             grant?.let {
-                Text("Tiempo extra concedido: ${it.grantedMinutes} min hasta ${it.validUntilEpochMillis.toDisplayDate()}")
+                Text(
+                    "Tiempo extra concedido: ${it.grantedMinutes} min hasta ${it.validUntilEpochMillis.toDisplayDate()}",
+                )
             }
             if (request.status == RequestStatus.Approved) {
                 Text("Respuesta del administrador: aprobada.")

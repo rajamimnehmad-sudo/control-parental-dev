@@ -23,18 +23,18 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ContentFilterTheme
 import com.contentfilter.feature.accessibility.service.AccessibilityController
 import com.contentfilter.feature.requests.RequestsRoute
 import com.contentfilter.feature.status.SystemStatusRoute
 import com.contentfilter.user.apps.MyAppsRoute
 import com.contentfilter.user.internet.InternetRoute
-import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesRoute
+import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
@@ -105,10 +105,11 @@ private fun UserAppRoot(
                 UserDestination.Status -> SystemStatusRoute()
                 UserDestination.MyApps -> MyAppsRoute()
                 UserDestination.Requests -> RequestsRoute()
-                UserDestination.Internet -> InternetRoute(
-                    initialDomain = blockedDomain,
-                    onInitialDomainConsumed = onBlockedDomainConsumed,
-                )
+                UserDestination.Internet ->
+                    InternetRoute(
+                        initialDomain = blockedDomain,
+                        onInitialDomainConsumed = onBlockedDomainConsumed,
+                    )
                 UserDestination.Updates -> UpdatesRoute()
             }
         }
@@ -149,7 +150,11 @@ private fun UserAppRoot(
         AlertDialog(
             onDismissRequest = { showAccessibilityDialog = false },
             title = { Text("Accesibilidad apagada") },
-            text = { Text("El bloqueo de apps necesita el servicio de accesibilidad activo. Android puede desactivarlo después de una actualización.") },
+            text = {
+                Text(
+                    "El bloqueo de apps necesita el servicio de accesibilidad activo. Android puede desactivarlo después de una actualización.",
+                )
+            },
             confirmButton = {
                 Button(
                     onClick = {

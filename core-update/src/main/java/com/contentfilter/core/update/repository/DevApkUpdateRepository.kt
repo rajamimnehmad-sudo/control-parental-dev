@@ -6,14 +6,14 @@ import com.contentfilter.core.update.model.UpdateCheckResult
 import com.contentfilter.core.update.model.UpdateDownloadResult
 import com.contentfilter.core.update.model.UpdateManifest
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.io.File
-import java.security.MessageDigest
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
+import java.io.File
+import java.security.MessageDigest
+import javax.inject.Inject
 
 class DevApkUpdateRepository
     @Inject
@@ -92,8 +92,7 @@ class DevApkUpdateRepository
         }
 
         private companion object {
-            fun UpdateManifest.apkFileName(): String =
-                apkUrl.substringAfterLast('/').ifBlank { DefaultUpdateApkName }
+            fun UpdateManifest.apkFileName(): String = apkUrl.substringAfterLast('/').ifBlank { DefaultUpdateApkName }
 
             const val UpdateCacheDir = "updates"
             const val DefaultUpdateApkName = "dev-update.apk"

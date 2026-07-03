@@ -146,46 +146,47 @@ class DefaultSyncEngine
 
         override suspend fun syncRequestResultsFull(): SyncResult {
             val requests = syncAccessRequestsFull()
-            val grants = when (val result = requestRepository.pullExtraTimeGrants(updatedAfterIso = null)) {
-                is RemoteResult.Failure -> {
-                    Log.w(LogTag, "Full extra_time_grants pull failed: ${result.reason}")
-                    systemStatusRepository.updateSyncState(ComponentState.Warning)
-                    SyncResult(success = false, message = result.reason)
+            val grants =
+                when (val result = requestRepository.pullExtraTimeGrants(updatedAfterIso = null)) {
+                    is RemoteResult.Failure -> {
+                        Log.w(LogTag, "Full extra_time_grants pull failed: ${result.reason}")
+                        systemStatusRepository.updateSyncState(ComponentState.Warning)
+                        SyncResult(success = false, message = result.reason)
+                    }
+                    is RemoteResult.Success -> {
+                        runCatching {
+                            applier.applyExtraTimeGrants(result.value)
+                            result.value.maxOfOrNull { it.updatedAt }?.let { cursor ->
+                                syncCursorDao.upsert(
+                                    SyncCursorEntity(
+                                        tableName = SupabaseTable.ExtraTimeGrants.tableName,
+                                        updatedAfterIso = cursor,
+                                        syncedAtEpochMillis = System.currentTimeMillis(),
+                                    ),
+                                )
+                            }
+                        }.fold(
+                            onSuccess = {
+                                Log.i(LogTag, "Full extra_time_grants pull applied count=${result.value.size}")
+                                systemStatusRepository.updateSyncState(ComponentState.Enabled)
+                                SyncResult(
+                                    success = true,
+                                    message = "Extra time grants synced: ${result.value.size}",
+                                )
+                            },
+                            onFailure = { exception ->
+                                Log.e(LogTag, "Full extra_time_grants apply crashed: ${exception.message}", exception)
+                                systemStatusRepository.updateSyncState(ComponentState.Warning)
+                                SyncResult(success = false, message = "Extra time grants could not be saved locally.")
+                            },
+                        )
+                    }
                 }
-                is RemoteResult.Success -> {
-                    runCatching {
-                        applier.applyExtraTimeGrants(result.value)
-                        result.value.maxOfOrNull { it.updatedAt }?.let { cursor ->
-                            syncCursorDao.upsert(
-                                SyncCursorEntity(
-                                    tableName = SupabaseTable.ExtraTimeGrants.tableName,
-                                    updatedAfterIso = cursor,
-                                    syncedAtEpochMillis = System.currentTimeMillis(),
-                                ),
-                            )
-                        }
-                    }.fold(
-                        onSuccess = {
-                            Log.i(LogTag, "Full extra_time_grants pull applied count=${result.value.size}")
-                            systemStatusRepository.updateSyncState(ComponentState.Enabled)
-                            SyncResult(
-                                success = true,
-                                message = "Extra time grants synced: ${result.value.size}",
-                            )
-                        },
-                        onFailure = { exception ->
-                            Log.e(LogTag, "Full extra_time_grants apply crashed: ${exception.message}", exception)
-                            systemStatusRepository.updateSyncState(ComponentState.Warning)
-                            SyncResult(success = false, message = "Extra time grants could not be saved locally.")
-                        },
-                    )
-                }
-            }
             return SyncResult(
                 success = requests.success && grants.success,
                 message = "Requests: ${requests.message}; grants: ${grants.message}",
             )
-            }
+        }
 
         private suspend fun markCurrentDeviceSeen() {
             val activation = deviceActivationRepository.currentActivation() ?: return
@@ -196,21 +197,22 @@ class DefaultSyncEngine
         }
 
         private suspend fun pullRemoteChanges(): SyncResult {
-            val results = pullCoreDataResults(forceFull = false) +
-                listOf(
-                    pull(
-                        table = SupabaseTable.AccessRequests,
-                        request = { requestRepository.pullAccessRequests(cursorFor(SupabaseTable.AccessRequests)) },
-                        apply = applier::applyAccessRequests,
-                        updatedAt = { it.updatedAt },
-                    ),
-                    pull(
-                        table = SupabaseTable.ExtraTimeGrants,
-                        request = { requestRepository.pullExtraTimeGrants(cursorFor(SupabaseTable.ExtraTimeGrants)) },
-                        apply = applier::applyExtraTimeGrants,
-                        updatedAt = { it.updatedAt },
-                    ),
-                )
+            val results =
+                pullCoreDataResults(forceFull = false) +
+                    listOf(
+                        pull(
+                            table = SupabaseTable.AccessRequests,
+                            request = { requestRepository.pullAccessRequests(cursorFor(SupabaseTable.AccessRequests)) },
+                            apply = applier::applyAccessRequests,
+                            updatedAt = { it.updatedAt },
+                        ),
+                        pull(
+                            table = SupabaseTable.ExtraTimeGrants,
+                            request = { requestRepository.pullExtraTimeGrants(cursorFor(SupabaseTable.ExtraTimeGrants)) },
+                            apply = applier::applyExtraTimeGrants,
+                            updatedAt = { it.updatedAt },
+                        ),
+                    )
             val success = results.all { it }
             return SyncResult(
                 success = success,

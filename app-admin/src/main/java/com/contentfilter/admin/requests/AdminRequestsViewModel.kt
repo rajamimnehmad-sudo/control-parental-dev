@@ -12,17 +12,17 @@ import com.contentfilter.core.domain.usecase.admin.SetRequestStatusUseCase
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import javax.inject.Inject
 
 @HiltViewModel
 class AdminRequestsViewModel
@@ -38,31 +38,32 @@ class AdminRequestsViewModel
         private val syncMessage = MutableStateFlow("")
         private val isLoading = MutableStateFlow(false)
 
-        val uiState = observeRequests()
-            .map { requests ->
-                Log.i(LogTag, "Loaded local access requests count=${requests.size}")
-                requests
-            }
-            .catch { exception ->
-                Log.e(LogTag, "Requests flow failed: ${exception.message}", exception)
-                syncMessage.update { "No se pudieron cargar las solicitudes." }
-                emit(emptyList())
-            }
-            .combine(syncMessage) { requests, message -> requests to message }
-            .combine(isLoading) { (requests, message), loading ->
-                val pendingRequests = requests.filter { it.status.isPending() }
-                AdminRequestsUiState(
-                    requests = pendingRequests,
-                    offlineMode = false,
-                    lastSyncMessage = message,
-                    isLoading = loading,
+        val uiState =
+            observeRequests()
+                .map { requests ->
+                    Log.i(LogTag, "Loaded local access requests count=${requests.size}")
+                    requests
+                }
+                .catch { exception ->
+                    Log.e(LogTag, "Requests flow failed: ${exception.message}", exception)
+                    syncMessage.update { "No se pudieron cargar las solicitudes." }
+                    emit(emptyList())
+                }
+                .combine(syncMessage) { requests, message -> requests to message }
+                .combine(isLoading) { (requests, message), loading ->
+                    val pendingRequests = requests.filter { it.status.isPending() }
+                    AdminRequestsUiState(
+                        requests = pendingRequests,
+                        offlineMode = false,
+                        lastSyncMessage = message,
+                        isLoading = loading,
+                    )
+                }
+                .stateIn(
+                    scope = viewModelScope,
+                    started = SharingStarted.WhileSubscribed(5_000),
+                    initialValue = AdminRequestsUiState(offlineMode = false),
                 )
-            }
-            .stateIn(
-                scope = viewModelScope,
-                started = SharingStarted.WhileSubscribed(5_000),
-                initialValue = AdminRequestsUiState(offlineMode = false),
-            )
 
         init {
             Log.i(LogTag, "Admin requests opened; requesting immediate sync.")
@@ -117,9 +118,10 @@ class AdminRequestsViewModel
             viewModelScope.launch {
                 runCatching {
                     if (!request.status.isPending()) return@runCatching
-                    val minutes = rawMinutes.filter(Char::isDigit).toIntOrNull()
-                        ?: request.requestedMinutes
-                        ?: DefaultGrantMinutes
+                    val minutes =
+                        rawMinutes.filter(Char::isDigit).toIntOrNull()
+                            ?: request.requestedMinutes
+                            ?: DefaultGrantMinutes
                     grantExtraTime(
                         request = request,
                         minutes = minutes.coerceAtLeast(1),

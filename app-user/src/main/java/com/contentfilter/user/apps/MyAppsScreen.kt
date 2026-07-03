@@ -2,8 +2,8 @@ package com.contentfilter.user.apps
 
 import android.graphics.BitmapFactory
 import android.util.Base64
-import androidx.compose.foundation.background
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +23,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,7 +31,6 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.runtime.remember
 
 @Composable
 fun MyAppsRoute(
@@ -56,9 +56,10 @@ private fun MyAppsScreen(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         Text("Mis aplicaciones", style = MaterialTheme.typography.headlineSmall)
@@ -78,7 +79,7 @@ private fun MyAppsScreen(
         ) {
             if (state.apps.isEmpty()) {
                 item {
-                Text("No hay apps detectadas todavía.")
+                    Text("No hay apps detectadas todavía.")
                 }
             }
             items(state.apps, key = { it.packageName }) { app ->
@@ -99,16 +100,19 @@ private fun MyAppRow(
     onRequestAccess: () -> Unit,
     onRequestMoreTime: () -> Unit,
 ) {
-    val canRequestAccess = app.status == AppAccessStatus.Blocked ||
-        app.status == AppAccessStatus.RequiresAuthorization ||
-        app.status == AppAccessStatus.Limited ||
-        app.status == AppAccessStatus.LimitReached
-    val canRequestMoreTime = app.status == AppAccessStatus.LimitReached ||
-        app.status == AppAccessStatus.Blocked
+    val canRequestAccess =
+        app.status == AppAccessStatus.Blocked ||
+            app.status == AppAccessStatus.RequiresAuthorization ||
+            app.status == AppAccessStatus.Limited ||
+            app.status == AppAccessStatus.LimitReached
+    val canRequestMoreTime =
+        app.status == AppAccessStatus.LimitReached ||
+            app.status == AppAccessStatus.Blocked
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 6.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 6.dp),
         verticalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         Row(
@@ -156,10 +160,11 @@ private fun MyAppRow(
 @Composable
 private fun StatusLabel(status: AppAccessStatus) {
     Box(
-        modifier = Modifier
-            .clip(RoundedCornerShape(6.dp))
-            .background(MaterialTheme.colorScheme.secondaryContainer)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+        modifier =
+            Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(MaterialTheme.colorScheme.secondaryContainer)
+                .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(
             text = status.displayName(),
@@ -174,21 +179,23 @@ private fun AppIcon(
     name: String,
     iconBase64: String?,
 ) {
-    val bitmap = remember(iconBase64) {
-        iconBase64?.let {
-            runCatching {
-                val bytes = Base64.decode(it, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            }.getOrNull()
+    val bitmap =
+        remember(iconBase64) {
+            iconBase64?.let {
+                runCatching {
+                    val bytes = Base64.decode(it, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                }.getOrNull()
+            }
         }
-    }
     if (bitmap != null) {
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = null,
-            modifier = Modifier
-                .size(40.dp)
-                .clip(CircleShape),
+            modifier =
+                Modifier
+                    .size(40.dp)
+                    .clip(CircleShape),
         )
     } else {
         FallbackIcon(name)
@@ -198,10 +205,11 @@ private fun AppIcon(
 @Composable
 private fun FallbackIcon(name: String) {
     Box(
-        modifier = Modifier
-            .size(40.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+        modifier =
+            Modifier
+                .size(40.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center,
     ) {
         Text(

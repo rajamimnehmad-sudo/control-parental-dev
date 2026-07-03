@@ -11,12 +11,13 @@ class VpnNotificationFactory(
 ) {
     fun create(): Notification {
         ensureChannel()
-        val builder = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            Notification.Builder(context, ChannelId)
-        } else {
-            @Suppress("DEPRECATION")
-            Notification.Builder(context)
-        }
+        val builder =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                Notification.Builder(context, ChannelId)
+            } else {
+                @Suppress("DEPRECATION")
+                Notification.Builder(context)
+            }
         return builder
             .setSmallIcon(android.R.drawable.stat_sys_warning)
             .setContentTitle("Content Filter")
@@ -29,11 +30,12 @@ class VpnNotificationFactory(
     private fun ensureChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
-        val channel = NotificationChannel(
-            ChannelId,
-            "Proteccion local",
-            NotificationManager.IMPORTANCE_LOW,
-        )
+        val channel =
+            NotificationChannel(
+                ChannelId,
+                "Proteccion local",
+                NotificationManager.IMPORTANCE_LOW,
+            )
         manager.createNotificationChannel(channel)
     }
 

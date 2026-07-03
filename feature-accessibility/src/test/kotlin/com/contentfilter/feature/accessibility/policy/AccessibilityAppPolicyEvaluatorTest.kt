@@ -13,11 +13,12 @@ class AccessibilityAppPolicyEvaluatorTest {
 
     @Test
     fun `builds app policy context without android framework state`() {
-        val context = evaluator.buildContext(
-            packageName = "com.example.app",
-            usedMinutesToday = 12,
-            health = activeHealth(),
-        )
+        val context =
+            evaluator.buildContext(
+                packageName = "com.example.app",
+                usedMinutesToday = 12,
+                health = activeHealth(),
+            )
 
         assertEquals("com.example.app", context.packageName)
         assertEquals(12, context.usedMinutesToday)

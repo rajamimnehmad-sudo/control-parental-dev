@@ -1,12 +1,12 @@
 package com.contentfilter.feature.status
 
 import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -15,8 +15,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -30,21 +30,23 @@ fun SystemStatusRoute(
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle()
     val context = LocalContext.current
-    val isVpnRunning = VpnController
-        .observeRunning(context)
-        .collectAsStateWithLifecycle(initialValue = VpnController.isRunning(context))
+    val isVpnRunning =
+        VpnController
+            .observeRunning(context)
+            .collectAsStateWithLifecycle(initialValue = VpnController.isRunning(context))
     val isDevProtectionAvailable = VpnController.isDevProtectionAvailable(context)
     var isDevProtectionDisabled by remember {
         mutableStateOf(VpnController.isDevProtectionDisabled(context))
     }
-    val vpnPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult(),
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            VpnController.start(context)
-            isDevProtectionDisabled = false
+    val vpnPermissionLauncher =
+        rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.StartActivityForResult(),
+        ) { result ->
+            if (result.resultCode == Activity.RESULT_OK) {
+                VpnController.start(context)
+                isDevProtectionDisabled = false
+            }
         }
-    }
     SystemStatusScreen(
         state = state.value.withVpnRunning(isVpnRunning.value),
         onStartVpn = {
@@ -83,9 +85,10 @@ fun SystemStatusScreen(
     modifier: Modifier = Modifier,
 ) {
     Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(24.dp),
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(text = state.title, style = MaterialTheme.typography.headlineMedium)

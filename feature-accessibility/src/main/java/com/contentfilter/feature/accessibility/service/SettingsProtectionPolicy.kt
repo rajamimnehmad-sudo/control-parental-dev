@@ -20,11 +20,12 @@ class SettingsProtectionPolicy {
     private companion object {
         const val AndroidSettingsPackage = "com.android.settings"
         const val MinActionIntervalMillis = 2_000L
-        val ProtectedSettingsClassHints = listOf(
-            "Accessibility",
-            "Vpn",
-            "DeviceAdmin",
-            "SpecialAccess",
-        )
+        val ProtectedSettingsClassHints =
+            listOf(
+                "Accessibility",
+                "Vpn",
+                "DeviceAdmin",
+                "SpecialAccess",
+            )
     }
 }

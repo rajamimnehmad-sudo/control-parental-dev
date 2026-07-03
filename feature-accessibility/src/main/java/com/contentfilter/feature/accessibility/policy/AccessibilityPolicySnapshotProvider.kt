@@ -7,16 +7,16 @@ import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
-import javax.inject.Inject
-import javax.inject.Singleton
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import javax.inject.Inject
+import javax.inject.Singleton
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @Singleton
@@ -39,46 +39,50 @@ class AccessibilityPolicySnapshotProvider
             if (observationJob?.isActive == true && observedDay?.localDate == day.localDate) return
             observationJob?.cancel()
             observedDay = day
-            observationJob = scope.launch {
-                combine(
-                    policyRepository.observeActivePolicy(),
-                    dailyLimitRepository.observeLimits(),
-                    systemStatusRepository.observeHealth(),
-                    deviceActivationRepository.observeActivation().flatMapLatest { activation ->
-                        usageSessionRepository.observeDailyUsage(
-                            deviceId = activation?.deviceId ?: UsageSession.LOCAL_DEVICE_ID,
-                            localDate = day.localDate,
-                            dayStartEpochMillis = day.startEpochMillis,
-                            dayEndEpochMillis = day.endEpochMillis,
-                        ).map { dailyUsage -> activation to dailyUsage }
-                    },
-                ) { snapshot, dailyLimits, health, activationAndDailyUsage ->
-                    val (activation, dailyUsage) = activationAndDailyUsage
-                    AccessibilityPolicyState(
-                        snapshot = snapshot.copy(dailyLimits = dailyLimits, dailyUsage = dailyUsage),
-                        health = health.withActiveLicenseIfActivated(activation != null),
-                    )
-                }.collect { state.value = it }
-            }
+            observationJob =
+                scope.launch {
+                    combine(
+                        policyRepository.observeActivePolicy(),
+                        dailyLimitRepository.observeLimits(),
+                        systemStatusRepository.observeHealth(),
+                        deviceActivationRepository.observeActivation().flatMapLatest { activation ->
+                            usageSessionRepository.observeDailyUsage(
+                                deviceId = activation?.deviceId ?: UsageSession.LOCAL_DEVICE_ID,
+                                localDate = day.localDate,
+                                dayStartEpochMillis = day.startEpochMillis,
+                                dayEndEpochMillis = day.endEpochMillis,
+                            ).map { dailyUsage -> activation to dailyUsage }
+                        },
+                    ) { snapshot, dailyLimits, health, activationAndDailyUsage ->
+                        val (activation, dailyUsage) = activationAndDailyUsage
+                        AccessibilityPolicyState(
+                            snapshot = snapshot.copy(dailyLimits = dailyLimits, dailyUsage = dailyUsage),
+                            health = health.withActiveLicenseIfActivated(activation != null),
+                        )
+                    }.collect { state.value = it }
+                }
         }
 
         suspend fun refresh() {
             val day = localDayProvider.currentDay()
             val activation = deviceActivationRepository.currentActivation()
-            val dailyUsage = usageSessionRepository.observeDailyUsage(
-                deviceId = activation?.deviceId ?: UsageSession.LOCAL_DEVICE_ID,
-                localDate = day.localDate,
-                dayStartEpochMillis = day.startEpochMillis,
-                dayEndEpochMillis = day.endEpochMillis,
-            ).first()
+            val dailyUsage =
+                usageSessionRepository.observeDailyUsage(
+                    deviceId = activation?.deviceId ?: UsageSession.LOCAL_DEVICE_ID,
+                    localDate = day.localDate,
+                    dayStartEpochMillis = day.startEpochMillis,
+                    dayEndEpochMillis = day.endEpochMillis,
+                ).first()
             val dailyLimits = dailyLimitRepository.observeLimits().first()
-            state.value = AccessibilityPolicyState(
-                snapshot = policyRepository.getActivePolicy().copy(
-                    dailyLimits = dailyLimits,
-                    dailyUsage = dailyUsage,
-                ),
-                health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
-            )
+            state.value =
+                AccessibilityPolicyState(
+                    snapshot =
+                        policyRepository.getActivePolicy().copy(
+                            dailyLimits = dailyLimits,
+                            dailyUsage = dailyUsage,
+                        ),
+                    health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
+                )
             observedDay = day
         }
 

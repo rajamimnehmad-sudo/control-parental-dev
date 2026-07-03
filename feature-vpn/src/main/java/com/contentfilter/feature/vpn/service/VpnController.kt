@@ -44,16 +44,17 @@ object VpnController {
         callbackFlow {
             val appContext = context.applicationContext
             trySend(isRunning(appContext))
-            val receiver = object : BroadcastReceiver() {
-                override fun onReceive(
-                    context: Context?,
-                    intent: Intent?,
-                ) {
-                    if (intent?.action == ActionStateChanged) {
-                        trySend(isRunning(appContext))
+            val receiver =
+                object : BroadcastReceiver() {
+                    override fun onReceive(
+                        context: Context?,
+                        intent: Intent?,
+                    ) {
+                        if (intent?.action == ActionStateChanged) {
+                            trySend(isRunning(appContext))
+                        }
                     }
                 }
-            }
             ContextCompat.registerReceiver(
                 appContext,
                 receiver,

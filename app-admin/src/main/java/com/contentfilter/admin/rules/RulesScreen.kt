@@ -1,5 +1,8 @@
 package com.contentfilter.admin.rules
 
+import android.graphics.BitmapFactory
+import android.util.Base64
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -12,9 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.Image
-import android.graphics.BitmapFactory
-import android.util.Base64
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -44,9 +44,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 
 @Composable
-fun RulesRoute(
-    viewModel: RulesViewModel = hiltViewModel(),
-) {
+fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     RulesScreen(
         state = state,
@@ -95,21 +93,23 @@ private fun RulesScreen(
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
-    val visibleDomainRules = state.rules.filter {
-        it.scope == RuleScope.Domain &&
-            it.target != "*" &&
-            it.target !in GoogleSearchDomainsForUi &&
-            it.action == if (state.internetBlocked) RuleAction.Allow else RuleAction.Block
-    }
+    val visibleDomainRules =
+        state.rules.filter {
+            it.scope == RuleScope.Domain &&
+                it.target != "*" &&
+                it.target !in GoogleSearchDomainsForUi &&
+                it.action == if (state.internetBlocked) RuleAction.Allow else RuleAction.Block
+        }
     val otherRules = state.rules.filter { it.scope != RuleScope.App && it.scope != RuleScope.Domain }
     val selectedDevice = state.userDevices.firstOrNull { it.id == state.selectedDeviceId }
     var selectedPanel by rememberSaveable(state.selectedDeviceId) { mutableStateOf(DevicePanel.Apps) }
 
     if (selectedDevice != null && selectedPanel == DevicePanel.Apps) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(20.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Text("Reglas", style = MaterialTheme.typography.headlineSmall)
@@ -160,9 +160,10 @@ private fun RulesScreen(
     }
 
     LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(20.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
@@ -369,11 +370,12 @@ private fun UserDeviceCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
-    val indicatorColor = if (device.active) {
-        MaterialTheme.colorScheme.primary
-    } else {
-        MaterialTheme.colorScheme.error
-    }
+    val indicatorColor =
+        if (device.active) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.error
+        }
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -384,10 +386,11 @@ private fun UserDeviceCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .size(12.dp)
-                    .clip(CircleShape)
-                    .background(indicatorColor),
+                modifier =
+                    Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(indicatorColor),
             )
             Column(
                 modifier = Modifier.weight(1f),
@@ -413,9 +416,10 @@ private fun SectionHeader(
     count: Int,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
@@ -438,9 +442,10 @@ private fun SectionActionHeader(
     onAction: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 8.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Row(
@@ -513,11 +518,12 @@ private fun AppControlCard(
                 )
             }
             Text(
-                text = when {
-                    app.isUpdating -> "Estado: guardando..."
-                    app.allowed -> "Estado: Permitida"
-                    else -> "Estado: Bloqueada"
-                },
+                text =
+                    when {
+                        app.isUpdating -> "Estado: guardando..."
+                        app.allowed -> "Estado: Permitida"
+                        else -> "Estado: Bloqueada"
+                    },
                 style = MaterialTheme.typography.bodySmall,
             )
             Text(
@@ -535,7 +541,10 @@ private fun AppControlCard(
                     onValueChange = { minutes = it.filter(Char::isDigit) },
                     label = { Text("Minutos diarios") },
                     singleLine = true,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions =
+                        androidx.compose.foundation.text.KeyboardOptions(
+                            keyboardType = KeyboardType.Number,
+                        ),
                 )
                 OutlinedButton(onClick = { onLimitSaved(minutes) }) {
                     Text("Guardar")
@@ -550,21 +559,23 @@ private fun AppIcon(
     name: String,
     iconBase64: String?,
 ) {
-    val bitmap = remember(iconBase64) {
-        iconBase64?.let {
-            runCatching {
-                val bytes = Base64.decode(it, Base64.DEFAULT)
-                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-            }.getOrNull()
+    val bitmap =
+        remember(iconBase64) {
+            iconBase64?.let {
+                runCatching {
+                    val bytes = Base64.decode(it, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                }.getOrNull()
+            }
         }
-    }
     if (bitmap != null) {
         Image(
             bitmap = bitmap.asImageBitmap(),
             contentDescription = null,
-            modifier = Modifier
-                .size(42.dp)
-                .clip(CircleShape),
+            modifier =
+                Modifier
+                    .size(42.dp)
+                    .clip(CircleShape),
         )
     } else {
         FallbackAppIcon(name)
@@ -574,10 +585,11 @@ private fun AppIcon(
 @Composable
 private fun FallbackAppIcon(name: String) {
     Box(
-        modifier = Modifier
-            .size(42.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.primaryContainer),
+        modifier =
+            Modifier
+                .size(42.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.primaryContainer),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -639,11 +651,12 @@ private fun InternetModeCard(
                 ) {
                     Text("Modo web", style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = if (blocked) {
-                            "Bloquear todo excepto lista blanca."
-                        } else {
-                            "Permitir todo excepto dominios bloqueados."
-                        },
+                        text =
+                            if (blocked) {
+                                "Bloquear todo excepto lista blanca."
+                            } else {
+                                "Permitir todo excepto dominios bloqueados."
+                            },
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
@@ -822,11 +835,12 @@ private fun RuleScope.displayName(): String =
         RuleScope.Global -> "Global"
     }
 
-private val GoogleSearchDomainsForUi = setOf(
-    "google.com",
-    "gstatic.com",
-    "googleapis.com",
-    "googleusercontent.com",
-    "bing.com",
-    "duckduckgo.com",
-)
+private val GoogleSearchDomainsForUi =
+    setOf(
+        "google.com",
+        "gstatic.com",
+        "googleapis.com",
+        "googleusercontent.com",
+        "bing.com",
+        "duckduckgo.com",
+    )

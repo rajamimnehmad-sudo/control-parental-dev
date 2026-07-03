@@ -92,8 +92,9 @@ class DnsPacketParser {
     private fun readUInt16(
         data: ByteArray,
         offset: Int,
-    ): Int = ((data[offset].toInt() and BYTE_MASK) shl BYTE_SIZE_BITS) or
-        (data[offset + 1].toInt() and BYTE_MASK)
+    ): Int =
+        ((data[offset].toInt() and BYTE_MASK) shl BYTE_SIZE_BITS) or
+            (data[offset + 1].toInt() and BYTE_MASK)
 
     private companion object {
         const val BYTE_MASK = 0xFF

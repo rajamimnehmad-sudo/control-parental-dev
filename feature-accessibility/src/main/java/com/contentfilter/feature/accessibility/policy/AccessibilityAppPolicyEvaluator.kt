@@ -38,14 +38,16 @@ class AccessibilityAppPolicyEvaluator
                 packageName = packageName,
                 category = null,
                 usedMinutesToday = usedMinutesToday,
-                time = TimePolicyContext(
-                    evaluatedAtEpochMillis = now,
-                    minuteOfDay = clock.minuteOfDay(now),
-                ),
-                device = DevicePolicyContext(
-                    isActivated = health.licenseState != LicenseState.PendingActivation,
-                    healthSnapshot = health,
-                ),
+                time =
+                    TimePolicyContext(
+                        evaluatedAtEpochMillis = now,
+                        minuteOfDay = clock.minuteOfDay(now),
+                    ),
+                device =
+                    DevicePolicyContext(
+                        isActivated = health.licenseState != LicenseState.PendingActivation,
+                        healthSnapshot = health,
+                    ),
             )
         }
     }

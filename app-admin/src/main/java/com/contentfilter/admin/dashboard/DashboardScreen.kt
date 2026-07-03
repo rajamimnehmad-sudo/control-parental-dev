@@ -22,9 +22,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 
 @Composable
-fun DashboardRoute(
-    viewModel: DashboardViewModel = hiltViewModel(),
-) {
+fun DashboardRoute(viewModel: DashboardViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     DashboardScreen(
         state = state,
@@ -51,10 +49,11 @@ private fun DashboardScreen(
 ) {
     var pendingAction by remember { mutableStateOf<DevAction?>(null) }
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(20.dp),
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text("Panel administrador", style = MaterialTheme.typography.headlineSmall)

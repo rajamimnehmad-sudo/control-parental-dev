@@ -10,16 +10,16 @@ import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.update
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.stateIn
 
 @HiltViewModel
 class DashboardViewModel
@@ -32,61 +32,71 @@ class DashboardViewModel
     ) : ViewModel() {
         private val devToolsState = MutableStateFlow(DevToolsState())
 
-        val uiState = combine(
-            observeDevices(),
-            observeRequests(),
-            systemStatusRepository.observeHealth(),
-            devToolsState,
-        ) { devices, requests, health, devState ->
-            DashboardUiState(
-                deviceCount = devices.size,
-                pendingRequests = requests.count {
-                    it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote
-                },
-                syncState = health.syncState.name,
-                systemState = health.protectionLevel.name,
-                lastSync = health.checkedAtEpochMillis.toDisplayDate(),
-                offlineMode = false,
-                showDevTools = BuildConfig.FLAVOR == "dev",
-                devToolsBusy = devState.busy,
-                devToolsMessage = devState.message,
+        val uiState =
+            combine(
+                observeDevices(),
+                observeRequests(),
+                systemStatusRepository.observeHealth(),
+                devToolsState,
+            ) { devices, requests, health, devState ->
+                DashboardUiState(
+                    deviceCount = devices.size,
+                    pendingRequests =
+                        requests.count {
+                            it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote
+                        },
+                    syncState = health.syncState.name,
+                    systemState = health.protectionLevel.name,
+                    lastSync = health.checkedAtEpochMillis.toDisplayDate(),
+                    offlineMode = false,
+                    showDevTools = BuildConfig.FLAVOR == "dev",
+                    devToolsBusy = devState.busy,
+                    devToolsMessage = devState.message,
+                )
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue =
+                    DashboardUiState(
+                        offlineMode = false,
+                        showDevTools = BuildConfig.FLAVOR == "dev",
+                    ),
             )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = DashboardUiState(
-                offlineMode = false,
-                showDevTools = BuildConfig.FLAVOR == "dev",
-            ),
-        )
 
-        fun clearLocalRequests() = runDevTool("clear_local_requests") {
-            devTools.clearLocalRequests()
-        }
+        fun clearLocalRequests() =
+            runDevTool("clear_local_requests") {
+                devTools.clearLocalRequests()
+            }
 
-        fun clearRemoteRequests() = runDevTool("clear_remote_requests") {
-            devTools.clearRemoteRequests()
-        }
+        fun clearRemoteRequests() =
+            runDevTool("clear_remote_requests") {
+                devTools.clearRemoteRequests()
+            }
 
-        fun clearAllRequests() = runDevTool("clear_all_requests") {
-            devTools.clearAllRequests()
-        }
+        fun clearAllRequests() =
+            runDevTool("clear_all_requests") {
+                devTools.clearAllRequests()
+            }
 
-        fun clearRules() = runDevTool("clear_rules") {
-            devTools.clearRules()
-        }
+        fun clearRules() =
+            runDevTool("clear_rules") {
+                devTools.clearRules()
+            }
 
-        fun clearExtraTimeGrants() = runDevTool("clear_extra_time_grants") {
-            devTools.clearExtraTimeGrants()
-        }
+        fun clearExtraTimeGrants() =
+            runDevTool("clear_extra_time_grants") {
+                devTools.clearExtraTimeGrants()
+            }
 
-        fun clearDuplicateDevices() = runDevTool("clear_duplicate_devices") {
-            devTools.clearDuplicateDevices()
-        }
+        fun clearDuplicateDevices() =
+            runDevTool("clear_duplicate_devices") {
+                devTools.clearDuplicateDevices()
+            }
 
-        fun resetDev() = runDevTool("reset_dev") {
-            devTools.resetDev()
-        }
+        fun resetDev() =
+            runDevTool("reset_dev") {
+                devTools.resetDev()
+            }
 
         private fun runDevTool(
             name: String,
@@ -104,8 +114,9 @@ class DashboardViewModel
                         devToolsState.update {
                             it.copy(
                                 busy = false,
-                                message = exception.message?.takeIf { value -> value.isNotBlank() }
-                                    ?: "No se pudo ejecutar herramienta DEV.",
+                                message =
+                                    exception.message?.takeIf { value -> value.isNotBlank() }
+                                        ?: "No se pudo ejecutar herramienta DEV.",
                             )
                         }
                     }

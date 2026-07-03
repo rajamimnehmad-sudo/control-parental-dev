@@ -15,10 +15,6 @@ import com.contentfilter.core.network.remote.SupabaseActivationClient
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -26,6 +22,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import javax.inject.Inject
 
 @HiltViewModel
 class DevicesViewModel
@@ -43,52 +43,56 @@ class DevicesViewModel
         private val pairingCode = MutableStateFlow("")
         private val pairingExpiresAt = MutableStateFlow("")
         private val loading = MutableStateFlow(false)
-        private val deviceState = combine(
-            observeDevices(),
-            activationRepository.observeActivation(),
-            systemStatusRepository.observeHealth(),
-        ) { devices, activation, health ->
-            DeviceState(devices, activation, health)
-        }
-        private val localState = combine(
-            syncMessage,
-            pairingCode,
-            pairingExpiresAt,
-            loading,
-        ) { message, code, expiresAt, isLoading ->
-            LocalState(message, code, expiresAt, isLoading)
-        }
-
-        val uiState = combine(
-            deviceState,
-            localState,
-        ) { deviceState, local ->
-            val items = deviceState.devices.filter { it.appRole != "admin" }.map { device ->
-                val isCurrent = deviceState.activation?.deviceId == device.id
-                AdminDeviceItem(
-                    id = device.id,
-                    name = device.displayName,
-                    user = "Usuario",
-                    version = if (isCurrent) BuildConfig.VERSION_NAME else "Sin datos",
-                    vpnState = if (isCurrent) deviceState.health.vpnState.name else "Sin datos",
-                    accessibilityState = if (isCurrent) deviceState.health.accessibilityState.name else "Sin datos",
-                    lastSync = if (isCurrent) deviceState.health.checkedAtEpochMillis.toDisplayDate() else "Sin datos",
-                    systemState = if (isCurrent) deviceState.health.protectionLevel.name else "Sin datos",
-                )
+        private val deviceState =
+            combine(
+                observeDevices(),
+                activationRepository.observeActivation(),
+                systemStatusRepository.observeHealth(),
+            ) { devices, activation, health ->
+                DeviceState(devices, activation, health)
             }
-            DevicesUiState(
-                devices = items,
-                pairingCode = local.pairingCode,
-                pairingExpiresAt = local.pairingExpiresAt,
-                loading = local.loading,
-                offlineMode = false,
-                message = local.message,
+        private val localState =
+            combine(
+                syncMessage,
+                pairingCode,
+                pairingExpiresAt,
+                loading,
+            ) { message, code, expiresAt, isLoading ->
+                LocalState(message, code, expiresAt, isLoading)
+            }
+
+        val uiState =
+            combine(
+                deviceState,
+                localState,
+            ) { deviceState, local ->
+                val items =
+                    deviceState.devices.filter { it.appRole != "admin" }.map { device ->
+                        val isCurrent = deviceState.activation?.deviceId == device.id
+                        AdminDeviceItem(
+                            id = device.id,
+                            name = device.displayName,
+                            user = "Usuario",
+                            version = if (isCurrent) BuildConfig.VERSION_NAME else "Sin datos",
+                            vpnState = if (isCurrent) deviceState.health.vpnState.name else "Sin datos",
+                            accessibilityState = if (isCurrent) deviceState.health.accessibilityState.name else "Sin datos",
+                            lastSync = if (isCurrent) deviceState.health.checkedAtEpochMillis.toDisplayDate() else "Sin datos",
+                            systemState = if (isCurrent) deviceState.health.protectionLevel.name else "Sin datos",
+                        )
+                    }
+                DevicesUiState(
+                    devices = items,
+                    pairingCode = local.pairingCode,
+                    pairingExpiresAt = local.pairingExpiresAt,
+                    loading = local.loading,
+                    offlineMode = false,
+                    message = local.message,
+                )
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = DevicesUiState(offlineMode = false, message = "Sincronizando dispositivos..."),
             )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = DevicesUiState(offlineMode = false, message = "Sincronizando dispositivos..."),
-        )
 
         init {
             syncScheduler.requestSync()

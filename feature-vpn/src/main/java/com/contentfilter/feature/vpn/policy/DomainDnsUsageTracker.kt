@@ -12,10 +12,11 @@ class DomainDnsUsageTracker {
         epochMillis: Long,
         minuteOfDay: Int,
     ): Int {
-        val date = Instant.ofEpochMilli(epochMillis)
-            .atZone(ZoneId.systemDefault())
-            .toLocalDate()
-            .toString()
+        val date =
+            Instant.ofEpochMilli(epochMillis)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+                .toString()
         if (localDate != date) {
             minutesByTarget.clear()
             localDate = date

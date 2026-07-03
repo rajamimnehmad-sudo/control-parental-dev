@@ -16,18 +16,17 @@ import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
-import java.net.URI
-import java.time.Instant
-import java.util.UUID
-import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.net.URI
+import java.time.Instant
+import java.util.UUID
+import javax.inject.Inject
 
 @HiltViewModel
 class InternetViewModel
@@ -45,30 +44,33 @@ class InternetViewModel
         private val message = MutableStateFlow("")
         private val isSending = MutableStateFlow(false)
 
-        val uiState = combine(
-            domainInput,
-            recentDomains,
-            accessRequestRepository.observePendingRequests(),
-            message,
-            isSending,
-        ) { input, recent, requests, currentMessage, sending ->
-            val pendingDomains = requests
-                .filter { it.targetType == PolicyTargetType.Domain }
-                .mapTo(mutableSetOf()) { it.targetDomain ?: it.target }
-            InternetUiState(
-                domainInput = input,
-                recentBlockedDomains = recent.map { entry ->
-                    BlockedDomainUiState(domain = entry.domain, pending = entry.domain in pendingDomains)
-                },
-                pendingDomains = pendingDomains,
-                message = currentMessage,
-                isSending = sending,
+        val uiState =
+            combine(
+                domainInput,
+                recentDomains,
+                accessRequestRepository.observePendingRequests(),
+                message,
+                isSending,
+            ) { input, recent, requests, currentMessage, sending ->
+                val pendingDomains =
+                    requests
+                        .filter { it.targetType == PolicyTargetType.Domain }
+                        .mapTo(mutableSetOf()) { it.targetDomain ?: it.target }
+                InternetUiState(
+                    domainInput = input,
+                    recentBlockedDomains =
+                        recent.map { entry ->
+                            BlockedDomainUiState(domain = entry.domain, pending = entry.domain in pendingDomains)
+                        },
+                    pendingDomains = pendingDomains,
+                    message = currentMessage,
+                    isSending = sending,
+                )
+            }.stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = InternetUiState(),
             )
-        }.stateIn(
-            scope = viewModelScope,
-            started = SharingStarted.WhileSubscribed(5_000),
-            initialValue = InternetUiState(),
-        )
 
         fun onDomainChanged(value: String) {
             domainInput.value = value
@@ -116,50 +118,58 @@ class InternetViewModel
             isSending.value = true
             message.value = "Enviando solicitud..."
             viewModelScope.launch {
-                val request = AccessRequest(
-                    id = UUID.randomUUID().toString(),
-                    requestType = requestType,
-                    targetType = PolicyTargetType.Domain,
-                    target = domain,
-                    targetPackageName = null,
-                    targetDomain = domain,
-                    reason = "Solicitud desde Internet",
-                    requestedMinutes = requestedMinutes,
-                    status = RequestStatus.PendingLocal,
-                    createdAtEpochMillis = System.currentTimeMillis(),
-                    expiresAtEpochMillis = null,
-                )
+                val request =
+                    AccessRequest(
+                        id = UUID.randomUUID().toString(),
+                        requestType = requestType,
+                        targetType = PolicyTargetType.Domain,
+                        target = domain,
+                        targetPackageName = null,
+                        targetDomain = domain,
+                        reason = "Solicitud desde Internet",
+                        requestedMinutes = requestedMinutes,
+                        status = RequestStatus.PendingLocal,
+                        createdAtEpochMillis = System.currentTimeMillis(),
+                        expiresAtEpochMillis = null,
+                    )
                 val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
-                val pushedDirectly = withContext(Dispatchers.IO) {
-                    runCatching {
-                        activation?.let {
-                            remoteRequestRepository.upsertAccessRequest(
-                                request.toRemoteDto(
-                                    accountId = it.accountId,
-                                    deviceId = it.deviceId,
-                                ),
-                            )
-                        }
-                    }.getOrNull() is RemoteResult.Success
-                }
+                val pushedDirectly =
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            activation?.let {
+                                remoteRequestRepository.upsertAccessRequest(
+                                    request.toRemoteDto(
+                                        accountId = it.accountId,
+                                        deviceId = it.deviceId,
+                                    ),
+                                )
+                            }
+                        }.getOrNull() is RemoteResult.Success
+                    }
                 accessRequestRepository.saveRequest(
-                    request.copy(status = if (pushedDirectly) RequestStatus.PendingRemote else RequestStatus.PendingLocal),
+                    request.copy(
+                        status = if (pushedDirectly) RequestStatus.PendingRemote else RequestStatus.PendingLocal,
+                    ),
                 )
                 syncScheduler.requestSync()
-                val synced = withContext(Dispatchers.IO) {
-                    pushedDirectly || runCatching {
-                        val syncOk = syncEngine.syncOnce().success &&
-                            syncEngine.syncAccessRequestsFull().success &&
-                            syncEngine.syncRequestResultsFull().success
-                        syncOk
-                    }.getOrDefault(false)
-                }
+                val synced =
+                    withContext(Dispatchers.IO) {
+                        pushedDirectly ||
+                            runCatching {
+                                val syncOk =
+                                    syncEngine.syncOnce().success &&
+                                        syncEngine.syncAccessRequestsFull().success &&
+                                        syncEngine.syncRequestResultsFull().success
+                                syncOk
+                            }.getOrDefault(false)
+                    }
                 isSending.value = false
-                message.value = when {
-                    activation == null -> "Solicitud guardada, pero este celular no está enlazado."
-                    synced -> successMessage
-                    else -> "Solicitud guardada. Se enviará cuando haya conexión."
-                }
+                message.value =
+                    when {
+                        activation == null -> "Solicitud guardada, pero este celular no está enlazado."
+                        synced -> successMessage
+                        else -> "Solicitud guardada. Se enviará cuando haya conexión."
+                    }
             }
         }
 
@@ -180,9 +190,10 @@ class InternetViewModel
         private fun String.toBlockedDomainEntryOrNull(): BlockedDomainEntry? {
             if (isBlank()) return null
             val domain = normalizeDomain(substringBefore(",")) ?: return null
-            val timestamp = substringAfter(",", missingDelimiterValue = "")
-                .toLongOrNull()
-                ?: System.currentTimeMillis()
+            val timestamp =
+                substringAfter(",", missingDelimiterValue = "")
+                    .toLongOrNull()
+                    ?: System.currentTimeMillis()
             return BlockedDomainEntry(domain, timestamp)
         }
 
@@ -200,10 +211,11 @@ class InternetViewModel
         private fun normalizeDomain(value: String): String? {
             val trimmed = value.trim().lowercase()
             if (trimmed.isBlank()) return null
-            val host = runCatching {
-                val withScheme = if ("://" in trimmed) trimmed else "https://$trimmed"
-                URI(withScheme).host
-            }.getOrNull() ?: trimmed.substringBefore("/").substringBefore("?")
+            val host =
+                runCatching {
+                    val withScheme = if ("://" in trimmed) trimmed else "https://$trimmed"
+                    URI(withScheme).host
+                }.getOrNull() ?: trimmed.substringBefore("/").substringBefore("?")
             return host
                 .removePrefix("www.")
                 .takeIf { DomainRegex.matches(it) }
@@ -240,30 +252,32 @@ class InternetViewModel
             const val MaxRecentDomains = 20
             const val RecentBlockedWindowMillis = 60 * 60 * 1000L
             val DomainRegex = Regex("^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$")
-            val NoisyDomainLabels = setOf(
-                "api",
-                "apis",
-                "auth",
-                "collect",
-                "crash",
-                "discover",
-                "events",
-                "firebase",
-                "gms",
-                "graph",
-                "logs",
-                "metrics",
-                "optimizationguide-pa",
-                "telemetry",
-                "us-auth2",
-                "vas",
-            )
-            val NoisyBaseDomains = setOf(
-                "googleapis.com",
-                "gstatic.com",
-                "samsungapps.com",
-                "samsungosp.com",
-                "ureca-lab.com",
-            )
+            val NoisyDomainLabels =
+                setOf(
+                    "api",
+                    "apis",
+                    "auth",
+                    "collect",
+                    "crash",
+                    "discover",
+                    "events",
+                    "firebase",
+                    "gms",
+                    "graph",
+                    "logs",
+                    "metrics",
+                    "optimizationguide-pa",
+                    "telemetry",
+                    "us-auth2",
+                    "vas",
+                )
+            val NoisyBaseDomains =
+                setOf(
+                    "googleapis.com",
+                    "gstatic.com",
+                    "samsungapps.com",
+                    "samsungosp.com",
+                    "ureca-lab.com",
+                )
         }
     }

@@ -10,8 +10,7 @@ class BuildConfigUpdateConfigProvider
     constructor(
         @ApplicationContext private val context: Context,
     ) : UpdateConfigProvider {
-        override fun manifestUrl(): String =
-            appSpecificManifestUrl().ifBlank { BuildConfig.UPDATE_MANIFEST_URL }
+        override fun manifestUrl(): String = appSpecificManifestUrl().ifBlank { BuildConfig.UPDATE_MANIFEST_URL }
 
         private fun appSpecificManifestUrl(): String =
             if (context.packageName.contains(AdminPackageMarker)) {

@@ -3,9 +3,9 @@ package com.contentfilter.core.security
 import com.contentfilter.core.network.config.AuthTokenProvider
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseAuthClient
-import javax.inject.Inject
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import javax.inject.Inject
 
 class StoredAuthTokenProvider
     @Inject
@@ -25,11 +25,12 @@ class StoredAuthTokenProvider
                 val refreshToken = latest.refreshToken?.takeIf { it.isNotBlank() } ?: return@withLock null
                 when (val refreshed = authClient.refreshSession(refreshToken)) {
                     is RemoteResult.Success -> {
-                        val refreshedSession = AuthSession(
-                            accessToken = refreshed.value.accessToken,
-                            refreshToken = refreshed.value.refreshToken ?: refreshToken,
-                            expiresAtEpochMillis = System.currentTimeMillis() + refreshed.value.expiresInSeconds * 1000,
-                        )
+                        val refreshedSession =
+                            AuthSession(
+                                accessToken = refreshed.value.accessToken,
+                                refreshToken = refreshed.value.refreshToken ?: refreshToken,
+                                expiresAtEpochMillis = System.currentTimeMillis() + refreshed.value.expiresInSeconds * 1000,
+                            )
                         store.save(refreshedSession)
                         refreshedSession.accessToken
                     }

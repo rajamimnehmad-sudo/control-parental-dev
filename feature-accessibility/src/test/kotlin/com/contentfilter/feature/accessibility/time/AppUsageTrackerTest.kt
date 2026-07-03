@@ -20,7 +20,12 @@ class AppUsageTrackerTest {
     fun `same foreground app does not close a session`() {
         tracker.onForegroundApp("com.example.app", elapsedRealtimeMillis = 1_000L, epochMillis = 10_000L)
 
-        val transition = tracker.onForegroundApp("com.example.app", elapsedRealtimeMillis = 5_000L, epochMillis = 14_000L)
+        val transition =
+            tracker.onForegroundApp(
+                "com.example.app",
+                elapsedRealtimeMillis = 5_000L,
+                epochMillis = 14_000L,
+            )
 
         assertNull(transition)
     }
@@ -29,7 +34,12 @@ class AppUsageTrackerTest {
     fun `switching app closes previous session`() {
         tracker.onForegroundApp("com.example.first", elapsedRealtimeMillis = 1_000L, epochMillis = 10_000L)
 
-        val transition = tracker.onForegroundApp("com.example.second", elapsedRealtimeMillis = 61_000L, epochMillis = 70_000L)
+        val transition =
+            tracker.onForegroundApp(
+                "com.example.second",
+                elapsedRealtimeMillis = 61_000L,
+                epochMillis = 70_000L,
+            )
 
         assertEquals("com.example.first", transition?.packageName)
         assertEquals(10_000L, transition?.startedAtEpochMillis)
@@ -51,11 +61,12 @@ class AppUsageTrackerTest {
     fun `checkpoint closes active session without changing app`() {
         tracker.onForegroundApp("com.example.app", elapsedRealtimeMillis = 0L, epochMillis = 10_000L)
 
-        val checkpoint = tracker.checkpointCurrent(
-            elapsedRealtimeMillis = 300_000L,
-            epochMillis = 310_000L,
-            minimumDurationMillis = 300_000L,
-        )
+        val checkpoint =
+            tracker.checkpointCurrent(
+                elapsedRealtimeMillis = 300_000L,
+                epochMillis = 310_000L,
+                minimumDurationMillis = 300_000L,
+            )
 
         assertEquals("com.example.app", checkpoint?.packageName)
         assertEquals(10_000L, checkpoint?.startedAtEpochMillis)

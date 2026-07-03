@@ -20,8 +20,6 @@ import com.contentfilter.feature.accessibility.time.AppUsageTracker
 import com.contentfilter.feature.accessibility.time.UsageTransition
 import com.contentfilter.feature.vpn.service.DevProtectionMode
 import dagger.hilt.android.AndroidEntryPoint
-import java.util.UUID
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -29,17 +27,27 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.util.UUID
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class ProtectorAccessibilityService : AccessibilityService() {
     @Inject lateinit var clock: AccessibilityClock
+
     @Inject lateinit var policyEvaluator: AccessibilityAppPolicyEvaluator
+
     @Inject lateinit var snapshotProvider: AccessibilityPolicySnapshotProvider
+
     @Inject lateinit var deviceActivationRepository: DeviceActivationRepository
+
     @Inject lateinit var systemStatusRepository: SystemStatusRepository
+
     @Inject lateinit var telemetryReporter: AccessibilityTelemetryReporter
+
     @Inject lateinit var usageSessionRepository: UsageSessionRepository
+
     @Inject lateinit var syncScheduler: SyncScheduler
+
     @Inject lateinit var syncEngine: SyncEngine
 
     private val usageTracker = AppUsageTracker()
@@ -145,18 +153,20 @@ class ProtectorAccessibilityService : AccessibilityService() {
         elapsedRealtimeMillis: Long,
     ) {
         val state = snapshotProvider.current()
-        val persistedMinutes = state.snapshot.dailyUsage
-            .firstOrNull { it.packageName == packageName }
-            ?.usedMinutes ?: 0
+        val persistedMinutes =
+            state.snapshot.dailyUsage
+                .firstOrNull { it.packageName == packageName }
+                ?.usedMinutes ?: 0
         val activeMillis = usageTracker.activeMillisForPackage(packageName, elapsedRealtimeMillis)
         val usedMinutes = persistedMinutes + activeMillis.toObservedMinutes()
         scheduleAppLimitDeadline(
             packageName = packageName,
             persistedMinutes = persistedMinutes,
             activeMillis = activeMillis,
-            limitMinutes = state.snapshot.dailyLimits
-                .filter { it.enabled && it.targetType == PolicyTargetType.App && it.target == packageName }
-                .minOfOrNull { it.limitMinutes },
+            limitMinutes =
+                state.snapshot.dailyLimits
+                    .filter { it.enabled && it.targetType == PolicyTargetType.App && it.target == packageName }
+                    .minOfOrNull { it.limitMinutes },
         )
         val decision = policyEvaluator.evaluate(packageName, usedMinutes, state.snapshot, state.health)
         Log.i(
@@ -167,7 +177,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         when (decision) {
             is PolicyDecision.Allow -> clearExtraTimeExpiry()
             is PolicyDecision.Block,
-            is PolicyDecision.RequestAuthorization -> {
+            is PolicyDecision.RequestAuthorization,
+            -> {
                 clearExtraTimeExpiry()
                 clearAppLimitDeadline()
                 leaveBlockedApp(packageName)
@@ -175,7 +186,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
             is PolicyDecision.Warn,
             is PolicyDecision.RequireActivation,
             is PolicyDecision.RequireUpdate,
-            is PolicyDecision.HealthWarning -> clearExtraTimeExpiry()
+            is PolicyDecision.HealthWarning,
+            -> clearExtraTimeExpiry()
             is PolicyDecision.GrantExtraTime -> scheduleExtraTimeExpiry(packageName, decision.validUntilEpochMillis)
         }
     }
@@ -184,10 +196,11 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (elapsedRealtimeMillis - lastPolicyRefreshAtElapsedMillis < BackgroundPolicyRefreshMillis) return
         if (policyRefreshJob?.isActive == true) return
         val scope = serviceScope ?: return
-        policyRefreshJob = scope.launch {
-            refreshPolicies()
-            snapshotProvider.refresh()
-        }
+        policyRefreshJob =
+            scope.launch {
+                refreshPolicies()
+                snapshotProvider.refresh()
+            }
     }
 
     private suspend fun refreshPolicies() {
@@ -220,9 +233,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private fun String.isStillBlocked(): Boolean {
         val elapsed = clock.elapsedRealtimeMillis()
         val state = snapshotProvider.current()
-        val persistedMinutes = state.snapshot.dailyUsage
-            .firstOrNull { it.packageName == this }
-            ?.usedMinutes ?: 0
+        val persistedMinutes =
+            state.snapshot.dailyUsage
+                .firstOrNull { it.packageName == this }
+                ?.usedMinutes ?: 0
         val activeMillis = usageTracker.activeMillisForPackage(this, elapsed)
         val usedMinutes = persistedMinutes + activeMillis.toObservedMinutes()
         return when (policyEvaluator.evaluate(this, usedMinutes, state.snapshot, state.health)) {
@@ -238,18 +252,19 @@ class ProtectorAccessibilityService : AccessibilityService() {
         clearForegroundWatch()
         val scope = serviceScope ?: return
         foregroundWatchPackageName = packageName
-        foregroundWatchJob = scope.launch {
-            while (usageTracker.currentPackageName() == packageName) {
-                delay(ForegroundRecheckMillis)
-                val elapsed = clock.elapsedRealtimeMillis()
-                val now = clock.nowEpochMillis()
-                usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
-                    saveTransition(checkpoint)
-                    snapshotProvider.refresh()
+        foregroundWatchJob =
+            scope.launch {
+                while (usageTracker.currentPackageName() == packageName) {
+                    delay(ForegroundRecheckMillis)
+                    val elapsed = clock.elapsedRealtimeMillis()
+                    val now = clock.nowEpochMillis()
+                    usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
+                        saveTransition(checkpoint)
+                        snapshotProvider.refresh()
+                    }
+                    evaluateForegroundApp(packageName, elapsed)
                 }
-                evaluateForegroundApp(packageName, elapsed)
             }
-        }
     }
 
     private fun clearForegroundWatch() {
@@ -270,23 +285,25 @@ class ProtectorAccessibilityService : AccessibilityService() {
         }
         if (appLimitDeadlineJob?.isActive == true && appLimitDeadlinePackageName == packageName) return
         clearAppLimitDeadline()
-        val remainingMillis = (limitMinutes * MillisPerMinute - persistedMinutes * MillisPerMinute - activeMillis)
-            .coerceAtMost(MaxDeadlineDelayMillis)
-            .coerceAtLeast(0L)
+        val remainingMillis =
+            (limitMinutes * MillisPerMinute - persistedMinutes * MillisPerMinute - activeMillis)
+                .coerceAtMost(MaxDeadlineDelayMillis)
+                .coerceAtLeast(0L)
         val scope = serviceScope ?: return
         appLimitDeadlinePackageName = packageName
-        appLimitDeadlineJob = scope.launch {
-            delay(remainingMillis)
-            if (usageTracker.currentPackageName() == packageName) {
-                usageTracker.checkpointCurrent(
-                    elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
-                    epochMillis = clock.nowEpochMillis(),
-                    minimumDurationMillis = 0L,
-                )?.let { saveTransition(it) }
-                snapshotProvider.refresh()
-                evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())
+        appLimitDeadlineJob =
+            scope.launch {
+                delay(remainingMillis)
+                if (usageTracker.currentPackageName() == packageName) {
+                    usageTracker.checkpointCurrent(
+                        elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
+                        epochMillis = clock.nowEpochMillis(),
+                        minimumDurationMillis = 0L,
+                    )?.let { saveTransition(it) }
+                    snapshotProvider.refresh()
+                    evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())
+                }
             }
-        }
     }
 
     private fun clearAppLimitDeadline() {
@@ -312,16 +329,17 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val delayMillis = (validUntilEpochMillis - clock.nowEpochMillis()).coerceAtLeast(0L)
         extraTimeExpiryPackageName = packageName
         extraTimeExpiryAtEpochMillis = validUntilEpochMillis
-        extraTimeExpiryJob = scope.launch {
-            delay(delayMillis)
-            val trackedPackageName = extraTimeExpiryPackageName
-            extraTimeExpiryJob = null
-            extraTimeExpiryPackageName = null
-            extraTimeExpiryAtEpochMillis = null
-            if (trackedPackageName == packageName && usageTracker.currentPackageName() == packageName) {
-                evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())
+        extraTimeExpiryJob =
+            scope.launch {
+                delay(delayMillis)
+                val trackedPackageName = extraTimeExpiryPackageName
+                extraTimeExpiryJob = null
+                extraTimeExpiryPackageName = null
+                extraTimeExpiryAtEpochMillis = null
+                if (trackedPackageName == packageName && usageTracker.currentPackageName() == packageName) {
+                    evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())
+                }
             }
-        }
     }
 
     private fun clearExtraTimeExpiry() {
@@ -355,41 +373,44 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val BlockRecheckDelayMillis = 250L
         const val BackgroundPolicyRefreshMillis = 1_000L
         const val LogTag = "ProtectorAccessibility"
-        val HandledEventTypes = setOf(
-            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-            AccessibilityEvent.TYPE_WINDOWS_CHANGED,
-            AccessibilityEvent.TYPE_VIEW_FOCUSED,
-        )
-        val ExactAllowedPackageNames = setOf(
-            "android",
-            "com.android.contacts",
-            "com.android.dialer",
-            "com.android.packageinstaller",
-            "com.android.permissioncontroller",
-            "com.android.phone",
-            "com.android.providers.downloads",
-            "com.android.settings",
-            "com.contentfilter.admin",
-            "com.contentfilter.admin.dev",
-            "com.contentfilter.admin.beta",
-            "com.contentfilter.user",
-            "com.contentfilter.user.dev",
-            "com.contentfilter.user.beta",
-            "com.google.android.contacts",
-            "com.google.android.dialer",
-            "com.google.android.gms",
-            "com.google.android.gsf",
-            "com.google.android.packageinstaller",
-            "com.google.android.permissioncontroller",
-            "com.google.android.setupwizard",
-            "com.android.vending",
-        )
-        val AllowedPackagePrefixes = listOf(
-            "com.android.launcher",
-            "com.google.android.apps.nexuslauncher",
-            "com.google.android.inputmethod",
-            "com.google.android.webview",
-        )
+        val HandledEventTypes =
+            setOf(
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+                AccessibilityEvent.TYPE_WINDOWS_CHANGED,
+                AccessibilityEvent.TYPE_VIEW_FOCUSED,
+            )
+        val ExactAllowedPackageNames =
+            setOf(
+                "android",
+                "com.android.contacts",
+                "com.android.dialer",
+                "com.android.packageinstaller",
+                "com.android.permissioncontroller",
+                "com.android.phone",
+                "com.android.providers.downloads",
+                "com.android.settings",
+                "com.contentfilter.admin",
+                "com.contentfilter.admin.dev",
+                "com.contentfilter.admin.beta",
+                "com.contentfilter.user",
+                "com.contentfilter.user.dev",
+                "com.contentfilter.user.beta",
+                "com.google.android.contacts",
+                "com.google.android.dialer",
+                "com.google.android.gms",
+                "com.google.android.gsf",
+                "com.google.android.packageinstaller",
+                "com.google.android.permissioncontroller",
+                "com.google.android.setupwizard",
+                "com.android.vending",
+            )
+        val AllowedPackagePrefixes =
+            listOf(
+                "com.android.launcher",
+                "com.google.android.apps.nexuslauncher",
+                "com.google.android.inputmethod",
+                "com.google.android.webview",
+            )
 
         fun String.isAlwaysAllowedPackage(): Boolean =
             this in ExactAllowedPackageNames ||

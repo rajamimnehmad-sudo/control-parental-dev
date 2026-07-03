@@ -66,9 +66,10 @@ class DnsPacketParserTest {
     }
 
     private fun dnsPayload(domain: String): ByteArray {
-        val question = domain.split(".").flatMap { label ->
-            listOf(label.length.toByte()) + label.encodeToByteArray().toList()
-        } + listOf(0, 0, 1, 0, 1).map { it.toByte() }
+        val question =
+            domain.split(".").flatMap { label ->
+                listOf(label.length.toByte()) + label.encodeToByteArray().toList()
+            } + listOf(0, 0, 1, 0, 1).map { it.toByte() }
         val payload = ByteArray(DnsHeaderSize + question.size)
         writeUInt16(payload, 0, 0x1234)
         writeUInt16(payload, 4, 1)
