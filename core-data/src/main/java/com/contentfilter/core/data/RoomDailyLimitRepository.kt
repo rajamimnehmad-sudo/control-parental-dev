@@ -11,9 +11,9 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import java.time.Instant
 import java.util.UUID
+import javax.inject.Inject
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import javax.inject.Inject
 
 class RoomDailyLimitRepository
     @Inject
