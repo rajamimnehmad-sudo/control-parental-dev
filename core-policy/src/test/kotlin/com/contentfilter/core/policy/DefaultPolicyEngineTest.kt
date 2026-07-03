@@ -77,10 +77,20 @@ class DefaultPolicyEngineTest {
     fun `blocks app when daily limit is exceeded`() {
         val decision = engine.evaluateApp(
             snapshot = policy(limits = listOf(limit(target = BlockedPackage, minutes = 60))),
-            context = appContext(packageName = BlockedPackage, usedMinutesToday = 60),
+            context = appContext(packageName = BlockedPackage, usedMinutesToday = 61),
         )
 
         assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `allows app when daily limit is exactly reached`() {
+        val decision = engine.evaluateApp(
+            snapshot = policy(limits = listOf(limit(target = AllowedPackage, minutes = 60))),
+            context = appContext(packageName = AllowedPackage, usedMinutesToday = 60),
+        )
+
+        assertIs<PolicyDecision.Allow>(decision)
     }
 
     @Test
