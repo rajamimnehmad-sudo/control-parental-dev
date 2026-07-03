@@ -30,7 +30,7 @@ jobs:
         run: chmod +x ./gradlew
 
       - name: Build dev debug
-        run: ./gradlew assembleDevDebug
+        run: ./gradlew :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
 
       - name: Unit tests
         run: ./gradlew testDevDebugUnitTest test
