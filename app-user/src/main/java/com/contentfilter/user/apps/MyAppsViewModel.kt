@@ -181,6 +181,9 @@ class MyAppsViewModel
         fun refreshApps() {
             viewModelScope.launch(Dispatchers.IO) {
                 detectedApps.value = installedAppPublisher.installedApps()
+                activationRepository.currentActivation()?.let { activation ->
+                    runCatching { installedAppPublisher.publish(activation) }
+                }
             }
         }
 
