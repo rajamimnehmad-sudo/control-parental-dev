@@ -91,7 +91,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 73
+versionCode 74
 versionName 1.0.1-dev
 ```
 
@@ -113,6 +113,8 @@ Actualizar este README cuando cambie:
 - Buscadores bloqueados tambien bloquea DNS seguro conocido y fuerza reconexion del VPN ante cambios de reglas de dominio.
 - Accessibility saca al usuario de pantallas de buscador detectadas en navegadores cuando buscadores esta bloqueado.
 - Admin muestra el estado de buscadores en verde/rojo y mantiene la logica como lista blanca.
+- Diagnostico interno por capas para buscadores: VPN/DNS y Accessibility registran motivo tecnico en Logcat.
+- Accessibility tambien revisa cambios de contenido de ventana para detectar resultados que cargan sin cambiar de pantalla.
 - Con modo web abierto, buscadores quedan abiertos.
 - Las reglas de internet bloquean dominios por VPN/DNS sin cerrar el navegador; Chrome/Samsung Internet solo se cierra por reglas o limites de app.
 - Las apps se actualizan manualmente desde la pantalla `Actualizaciones`.

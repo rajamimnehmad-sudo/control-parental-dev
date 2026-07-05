@@ -10,14 +10,48 @@ class SearchEngineScreenDetector {
         packageName: String,
         snapshot: PolicySnapshot,
         visibleText: String,
-    ): Boolean {
-        if (packageName !in BrowserPackageNames) return false
-        if (!snapshot.searchEnginesBlocked()) return false
-        return visibleText.indicatesSearchEngineScreen()
+    ): Boolean = diagnose(packageName, snapshot, visibleText).shouldLeave
+
+    fun diagnose(
+        packageName: String,
+        snapshot: PolicySnapshot,
+        visibleText: String,
+    ): SearchEngineScreenDiagnosis {
+        if (packageName !in BrowserPackageNames) {
+            return SearchEngineScreenDiagnosis(
+                shouldLeave = false,
+                reason = "non-browser",
+                searchBlockRules = 0,
+                visibleTextLength = visibleText.length,
+            )
+        }
+        val blockRuleCount = snapshot.searchEngineBlockRuleCount()
+        if (blockRuleCount == 0) {
+            return SearchEngineScreenDiagnosis(
+                shouldLeave = false,
+                reason = "search-rules-not-blocked",
+                searchBlockRules = 0,
+                visibleTextLength = visibleText.length,
+            )
+        }
+        if (!visibleText.indicatesSearchEngineScreen()) {
+            return SearchEngineScreenDiagnosis(
+                shouldLeave = false,
+                reason = "no-search-signal",
+                searchBlockRules = blockRuleCount,
+                visibleTextLength = visibleText.length,
+            )
+        }
+        return SearchEngineScreenDiagnosis(
+            shouldLeave = true,
+            reason = "blocked-search-screen",
+            searchBlockRules = blockRuleCount,
+            visibleTextLength = visibleText.length,
+        )
     }
 
-    private fun PolicySnapshot.searchEnginesBlocked(): Boolean =
-        rules.any {
+    private fun PolicySnapshot.searchEngineBlockRuleCount(): Int =
+        rules.count {
             it.enabled &&
                 it.scope == RuleScope.Domain &&
                 it.action == RuleAction.Block &&
@@ -61,3 +95,10 @@ class SearchEngineScreenDetector {
             )
     }
 }
+
+data class SearchEngineScreenDiagnosis(
+    val shouldLeave: Boolean,
+    val reason: String,
+    val searchBlockRules: Int,
+    val visibleTextLength: Int,
+)

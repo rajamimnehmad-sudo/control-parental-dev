@@ -153,16 +153,24 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     private fun handleSearchEngineProtection(packageName: String): Boolean {
         val visibleText = rootInActiveWindow.visibleText()
-        val shouldLeave =
-            searchEngineScreenDetector.shouldLeaveSearchEngine(
+        val diagnosis =
+            searchEngineScreenDetector.diagnose(
                 packageName = packageName,
                 snapshot = snapshotProvider.current().snapshot,
                 visibleText = visibleText,
             )
-        if (!shouldLeave) return false
+        Log.i(
+            LogTag,
+            "Search protection layer=accessibility package=$packageName reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} visibleTextLength=${diagnosis.visibleTextLength}",
+        )
+        if (!diagnosis.shouldLeave) return false
         Log.i(LogTag, "Leaving blocked search engine screen package=$packageName")
         performGlobalAction(GLOBAL_ACTION_HOME)
-        serviceScope?.launch { telemetryReporter.recordServiceState("Blocked search engine screen.") }
+        serviceScope?.launch {
+            telemetryReporter.recordServiceState(
+                "Search protection accessibility action: ${diagnosis.reason}.",
+            )
+        }
         return true
     }
 
@@ -395,6 +403,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             setOf(
                 AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
                 AccessibilityEvent.TYPE_WINDOWS_CHANGED,
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
                 AccessibilityEvent.TYPE_VIEW_FOCUSED,
             )
         val ExactAllowedPackageNames =

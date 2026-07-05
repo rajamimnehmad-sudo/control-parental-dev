@@ -14,12 +14,16 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.PolicyDecision
+import com.contentfilter.core.domain.model.RuleAction
+import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.feature.vpn.dns.DnsForwarder
 import com.contentfilter.feature.vpn.dns.DnsPacketParser
 import com.contentfilter.feature.vpn.dns.DnsQuestion
 import com.contentfilter.feature.vpn.dns.DnsResponseFactory
 import com.contentfilter.feature.vpn.policy.VpnDomainPolicyEvaluator
+import com.contentfilter.feature.vpn.policy.VpnPolicyState
 import com.contentfilter.feature.vpn.policy.VpnPolicySnapshotProvider
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import dagger.hilt.android.AndroidEntryPoint
@@ -270,6 +274,7 @@ class FilterVpnService : VpnService() {
         val state = snapshotProvider.current()
         when (val decision = policyEvaluator.evaluate(domain, state.snapshot, state.health)) {
             is PolicyDecision.Allow -> {
+                logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
                     "DNS decision=allow domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} upstream=${upstreamDnsServers.safeAddresses()}",
@@ -281,6 +286,7 @@ class FilterVpnService : VpnService() {
                 forwardDns(question, output)
             }
             is PolicyDecision.GrantExtraTime -> {
+                logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
                     "DNS decision=grant domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}",
@@ -291,6 +297,7 @@ class FilterVpnService : VpnService() {
             is PolicyDecision.Block,
             is PolicyDecision.RequestAuthorization,
             -> {
+                logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
                     "DNS decision=block domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}",
@@ -303,14 +310,42 @@ class FilterVpnService : VpnService() {
             is PolicyDecision.RequireActivation,
             is PolicyDecision.RequireUpdate,
             -> {
+                logSearchProtectionDnsLayer(domain, decision, state)
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)
             }
             is PolicyDecision.Warn -> {
+                logSearchProtectionDnsLayer(domain, decision, state)
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)
             }
         }
+    }
+
+    private fun logSearchProtectionDnsLayer(
+        domain: String,
+        decision: PolicyDecision,
+        state: VpnPolicyState,
+    ) {
+        if (!domain.isSearchProtectionDomain()) return
+        val blockRules =
+            state.snapshot.rules.count {
+                it.enabled &&
+                    it.scope == RuleScope.Domain &&
+                    it.action == RuleAction.Block &&
+                    domain.matchesRuleTarget(it.target.normalizedDomain())
+            }
+        val allowRules =
+            state.snapshot.rules.count {
+                it.enabled &&
+                    it.scope == RuleScope.Domain &&
+                    it.action == RuleAction.Allow &&
+                    domain.matchesRuleTarget(it.target.normalizedDomain())
+            }
+        Log.i(
+            LogTag,
+            "Search protection layer=vpn-dns domain=$domain decision=${decision.searchProtectionLabel()} strict=${state.strictWebBlockEnabled} allowRules=$allowRules blockRules=$blockRules totalRules=${state.snapshot.rules.size}",
+        )
     }
 
     private suspend fun forwardDns(
@@ -508,6 +543,28 @@ class FilterVpnService : VpnService() {
                 .lowercase()
                 .removeSuffix(".")
                 .removePrefix("www.")
+
+        private fun String.matchesRuleTarget(target: String): Boolean =
+            target == "*" || this == target || endsWith(".$target")
+
+        private fun String.isSearchProtectionDomain(): Boolean {
+            val domain = normalizedDomain()
+            return SearchEngineCatalog.searchEngineDomains.any { domain.matchesRuleTarget(it) } ||
+                SearchEngineCatalog.searchSupportDomains.any { domain.matchesRuleTarget(it) } ||
+                SearchEngineCatalog.secureDnsDomains.any { domain.matchesRuleTarget(it) }
+        }
+
+        private fun PolicyDecision.searchProtectionLabel(): String =
+            when (this) {
+                is PolicyDecision.Allow -> if (safeSearchRequired) "AllowSafeSearch" else "Allow"
+                is PolicyDecision.Block -> "Block"
+                is PolicyDecision.GrantExtraTime -> "GrantExtraTime"
+                is PolicyDecision.HealthWarning -> "HealthWarning"
+                is PolicyDecision.RequestAuthorization -> "RequestAuthorization"
+                is PolicyDecision.RequireActivation -> "RequireActivation"
+                is PolicyDecision.RequireUpdate -> "RequireUpdate"
+                is PolicyDecision.Warn -> "Warn"
+            }
 
         private fun List<InetAddress>.safeAddresses(): String =
             joinToString(",") { it.hostAddress.orEmpty() }.ifBlank { "none" }

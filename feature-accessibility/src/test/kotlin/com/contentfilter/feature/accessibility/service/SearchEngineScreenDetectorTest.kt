@@ -6,6 +6,7 @@ import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -43,6 +44,34 @@ class SearchEngineScreenDetectorTest {
                 visibleText = "Google Search resultados de busqueda",
             ),
         )
+    }
+
+    @Test
+    fun `diagnoses blocked browser screen without visible search signal`() {
+        val diagnosis =
+            detector.diagnose(
+                packageName = "com.android.chrome",
+                snapshot = snapshot(rule("google.com", RuleAction.Block)),
+                visibleText = "Nueva pestaña",
+            )
+
+        assertFalse(diagnosis.shouldLeave)
+        assertEquals("no-search-signal", diagnosis.reason)
+        assertEquals(1, diagnosis.searchBlockRules)
+    }
+
+    @Test
+    fun `diagnoses blocked search screen`() {
+        val diagnosis =
+            detector.diagnose(
+                packageName = "com.android.chrome",
+                snapshot = snapshot(rule("google.com", RuleAction.Block)),
+                visibleText = "Google Search resultados de busqueda",
+            )
+
+        assertTrue(diagnosis.shouldLeave)
+        assertEquals("blocked-search-screen", diagnosis.reason)
+        assertEquals(1, diagnosis.searchBlockRules)
     }
 
     private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =
