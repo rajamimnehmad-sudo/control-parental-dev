@@ -17,6 +17,9 @@ class SearchEngineCatalogTest {
     fun `catalog includes regional Google and major search engines`() {
         assertTrue("google.com" in SearchEngineCatalog.searchEngineDomains)
         assertTrue("google.com.ar" in SearchEngineCatalog.searchEngineDomains)
+        assertTrue("search.google.com" in SearchEngineCatalog.searchEngineDomains)
+        assertTrue("clients4.google.com" in SearchEngineCatalog.searchEngineDomains)
+        assertTrue("clientservices.googleapis.com" in SearchEngineCatalog.searchEngineDomains)
         assertTrue("bing.com" in SearchEngineCatalog.searchEngineDomains)
         assertTrue("search.yahoo.com" in SearchEngineCatalog.searchEngineDomains)
         assertTrue("duckduckgo.com" in SearchEngineCatalog.searchEngineDomains)

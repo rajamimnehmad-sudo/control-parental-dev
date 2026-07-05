@@ -90,10 +90,12 @@ class VpnTelemetryReporter
 
         suspend fun recordUnsupportedPacket(diagnostic: VpnPacketDiagnostic) {
             val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
+            val encryptedDns = diagnostic.sourcePort == DnsOverTlsPort || diagnostic.destinationPort == DnsOverTlsPort
             record(
                 type = "vpn-unsupported-packet",
                 message =
-                    "layer=vpn-packet deviceId=$deviceId action=unsupported result=ignored " +
+                    "layer=vpn-packet deviceId=$deviceId action=${if (encryptedDns) "encrypted-dns" else "unsupported"} " +
+                        "result=${if (encryptedDns) "dropped" else "ignored"} " +
                         "ipVersion=${diagnostic.ipVersion} protocol=${diagnostic.protocol} " +
                         "srcPort=${diagnostic.sourcePort ?: "none"} dstPort=${diagnostic.destinationPort ?: "none"} " +
                         "looksLikeDns=${diagnostic.looksLikeDns} reason=${diagnostic.reason}",
@@ -159,6 +161,7 @@ class VpnTelemetryReporter
         }
 
         private companion object {
+            const val DnsOverTlsPort = 853
             const val MaxMessageLength = 120
         }
     }

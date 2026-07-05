@@ -61,6 +61,33 @@ class VpnDomainPolicyEvaluatorTest {
     }
 
     @Test
+    fun `base google rule blocks google subdomains`() {
+        val snapshot = snapshot(rule("google.com", RuleAction.Block, priority = 3_000))
+
+        assertIs<PolicyDecision.Block>(evaluator.evaluate("google.com", snapshot, activeHealth()))
+        assertIs<PolicyDecision.Block>(evaluator.evaluate("www.google.com", snapshot, activeHealth()))
+        assertIs<PolicyDecision.Block>(evaluator.evaluate("search.google.com", snapshot, activeHealth()))
+        assertIs<PolicyDecision.Block>(evaluator.evaluate("clients4.google.com", snapshot, activeHealth()))
+    }
+
+    @Test
+    fun `search protection fallback blocks clients4 when search block exists`() {
+        val snapshot = snapshot(rule("bing.com", RuleAction.Block, priority = 3_000))
+
+        val decision = evaluator.evaluate("clients4.google.com", snapshot, activeHealth())
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `search protection fallback blocks clientservices without blocking all googleapis`() {
+        val snapshot = snapshot(rule("google.com", RuleAction.Block, priority = 3_000))
+
+        assertIs<PolicyDecision.Block>(evaluator.evaluate("clientservices.googleapis.com", snapshot, activeHealth()))
+        assertIs<PolicyDecision.Allow>(evaluator.evaluate("maps.googleapis.com", snapshot, activeHealth()))
+    }
+
+    @Test
     fun `preserves safesearch extension flag`() {
         val decision =
             evaluator.evaluate(
