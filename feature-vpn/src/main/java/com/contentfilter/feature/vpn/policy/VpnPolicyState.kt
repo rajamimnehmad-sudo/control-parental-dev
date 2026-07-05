@@ -21,7 +21,14 @@ data class VpnPolicyState(
                         it.target == DomainWildcard &&
                         it.action == RuleAction.Block
                 }
-            return wildcardBlocked
+            val hasAllowedDomain =
+                snapshot.rules.any {
+                    it.enabled &&
+                        it.scope == RuleScope.Domain &&
+                        it.target != DomainWildcard &&
+                        it.action == RuleAction.Allow
+                }
+            return wildcardBlocked && !hasAllowedDomain
         }
 
     companion object {

@@ -54,7 +54,7 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `keeps strict mode when web is blocked and search engines are allowed`() {
+    fun `uses dns mode when web is blocked and search engines are allowed`() {
         val state =
             state(
                 rule(
@@ -79,7 +79,24 @@ class VpnPolicyStateTest {
                 ),
             )
 
-        assertTrue(state.strictWebBlockEnabled)
+        assertFalse(state.strictWebBlockEnabled)
+    }
+
+    @Test
+    fun `uses dns mode when web is blocked and whitelist has allowed domain`() {
+        val state =
+            state(
+                rule(
+                    target = "*",
+                    action = RuleAction.Block,
+                ),
+                rule(
+                    target = "example.com",
+                    action = RuleAction.Allow,
+                ),
+            )
+
+        assertFalse(state.strictWebBlockEnabled)
     }
 
     private fun state(vararg rules: PolicyRule): VpnPolicyState =
