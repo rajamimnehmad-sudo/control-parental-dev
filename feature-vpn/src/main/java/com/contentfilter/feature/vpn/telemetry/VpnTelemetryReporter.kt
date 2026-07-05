@@ -7,6 +7,7 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
+import com.contentfilter.feature.vpn.dns.VpnPacketDiagnostic
 import java.util.UUID
 import javax.inject.Inject
 
@@ -56,6 +57,16 @@ class VpnTelemetryReporter
             )
         }
 
+        suspend fun recordRecentDnsSearchBlock(host: String) {
+            val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
+            record(
+                type = "search-protection",
+                message =
+                    "layer=vpn-dns deviceId=$deviceId action=recentDnsSearchBlock " +
+                        "host=${host.sanitizeHost()} packageName=unknown result=recorded",
+            )
+        }
+
         suspend fun recordSnapshotReceived(
             snapshot: PolicySnapshot,
             strictWebBlock: Boolean,
@@ -75,6 +86,30 @@ class VpnTelemetryReporter
 
         suspend fun recordUnsupportedPacket() {
             record(type = "vpn-unsupported-packet", message = "Unsupported packet ignored by VPN parser.")
+        }
+
+        suspend fun recordUnsupportedPacket(diagnostic: VpnPacketDiagnostic) {
+            val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
+            record(
+                type = "vpn-unsupported-packet",
+                message =
+                    "layer=vpn-packet deviceId=$deviceId action=unsupported result=ignored " +
+                        "ipVersion=${diagnostic.ipVersion} protocol=${diagnostic.protocol} " +
+                        "srcPort=${diagnostic.sourcePort ?: "none"} dstPort=${diagnostic.destinationPort ?: "none"} " +
+                        "looksLikeDns=${diagnostic.looksLikeDns} reason=${diagnostic.reason}",
+            )
+        }
+
+        suspend fun recordParsedPacket(diagnostic: VpnPacketDiagnostic) {
+            val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
+            record(
+                type = "vpn-packet",
+                message =
+                    "layer=vpn-packet deviceId=$deviceId action=parsed result=ok " +
+                        "ipVersion=${diagnostic.ipVersion} protocol=${diagnostic.protocol} " +
+                        "srcPort=${diagnostic.sourcePort ?: "none"} dstPort=${diagnostic.destinationPort ?: "none"} " +
+                        "looksLikeDns=${diagnostic.looksLikeDns}",
+            )
         }
 
         suspend fun recordError(message: String) {

@@ -2,6 +2,7 @@ package com.contentfilter.feature.vpn.dns
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -43,6 +44,31 @@ class DnsPacketParserTest {
         assertTrue(response.size > question.queryPayload.size)
     }
 
+    @Test
+    fun `parses ipv6 dns query`() {
+        val packet = dnsQueryPacketIpv6("google.com")
+
+        val question = parser.parseQuery(packet, packet.size)
+
+        assertNotNull(question)
+        assertEquals(6, question.ipVersion)
+        assertEquals("google.com", question.domain)
+        assertEquals(53, question.destinationPort)
+    }
+
+    @Test
+    fun `diagnoses unsupported tcp packet with ports`() {
+        val packet = tcpPacket(destinationPort = 443)
+
+        val diagnostic = parser.inspect(packet, packet.size)
+
+        assertEquals(4, diagnostic.ipVersion)
+        assertEquals("tcp", diagnostic.protocol)
+        assertEquals(443, diagnostic.destinationPort)
+        assertFalse(diagnostic.looksLikeDns)
+        assertEquals("not-udp", diagnostic.reason)
+    }
+
     private fun dnsQueryPacket(domain: String): ByteArray {
         val dnsPayload = dnsPayload(domain)
         val packet = ByteArray(Ipv4HeaderSize + UdpHeaderSize + dnsPayload.size)
@@ -62,6 +88,33 @@ class DnsPacketParserTest {
         writeUInt16(packet, Ipv4HeaderSize + 2, 53)
         writeUInt16(packet, Ipv4HeaderSize + 4, UdpHeaderSize + dnsPayload.size)
         dnsPayload.copyInto(packet, Ipv4HeaderSize + UdpHeaderSize)
+        return packet
+    }
+
+    private fun dnsQueryPacketIpv6(domain: String): ByteArray {
+        val dnsPayload = dnsPayload(domain)
+        val packet = ByteArray(Ipv6HeaderSize + UdpHeaderSize + dnsPayload.size)
+        packet[0] = 0x60
+        writeUInt16(packet, 4, UdpHeaderSize + dnsPayload.size)
+        packet[6] = 17
+        packet[7] = 64
+        packet[23] = 1
+        packet[39] = 2
+        writeUInt16(packet, Ipv6HeaderSize, 43210)
+        writeUInt16(packet, Ipv6HeaderSize + 2, 53)
+        writeUInt16(packet, Ipv6HeaderSize + 4, UdpHeaderSize + dnsPayload.size)
+        dnsPayload.copyInto(packet, Ipv6HeaderSize + UdpHeaderSize)
+        return packet
+    }
+
+    private fun tcpPacket(destinationPort: Int): ByteArray {
+        val packet = ByteArray(Ipv4HeaderSize + 20)
+        packet[0] = 0x45
+        packet[8] = 64
+        packet[9] = 6
+        writeUInt16(packet, 2, packet.size)
+        writeUInt16(packet, Ipv4HeaderSize, 40000)
+        writeUInt16(packet, Ipv4HeaderSize + 2, destinationPort)
         return packet
     }
 
@@ -89,6 +142,7 @@ class DnsPacketParserTest {
     private companion object {
         const val DnsHeaderSize = 12
         const val Ipv4HeaderSize = 20
+        const val Ipv6HeaderSize = 40
         const val UdpHeaderSize = 8
     }
 }

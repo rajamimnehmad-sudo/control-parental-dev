@@ -10,17 +10,22 @@ class SearchEngineScreenDetector {
         packageName: String,
         snapshot: PolicySnapshot,
         visibleText: String,
-    ): Boolean = diagnose(packageName, snapshot, visibleText).shouldLeave
+        recentDnsBlockHost: String? = null,
+    ): Boolean = diagnose(packageName, snapshot, visibleText, recentDnsBlockHost).shouldLeave
 
     fun diagnose(
         packageName: String,
         snapshot: PolicySnapshot,
         visibleText: String,
+        recentDnsBlockHost: String? = null,
     ): SearchEngineScreenDiagnosis {
-        if (packageName !in BrowserPackageNames) {
+        val packageCategory = packageName.searchSurfaceCategory()
+        if (packageCategory == SearchSurfaceCategory.NonBrowser) {
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
                 reason = "non-browser",
+                packageCategory = packageCategory.label,
+                recentDnsBlockHost = null,
                 searchBlockRules = 0,
                 visibleTextLength = visibleText.length,
             )
@@ -30,14 +35,28 @@ class SearchEngineScreenDetector {
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
                 reason = "search-rules-not-blocked",
+                packageCategory = packageCategory.label,
+                recentDnsBlockHost = null,
                 searchBlockRules = 0,
                 visibleTextLength = visibleText.length,
             )
         }
         if (!visibleText.indicatesSearchEngineScreen()) {
+            if (recentDnsBlockHost != null) {
+                return SearchEngineScreenDiagnosis(
+                    shouldLeave = true,
+                    reason = "dueToRecentDnsBlock",
+                    packageCategory = packageCategory.label,
+                    recentDnsBlockHost = recentDnsBlockHost,
+                    searchBlockRules = blockRuleCount,
+                    visibleTextLength = visibleText.length,
+                )
+            }
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
                 reason = "no-search-signal",
+                packageCategory = packageCategory.label,
+                recentDnsBlockHost = null,
                 searchBlockRules = blockRuleCount,
                 visibleTextLength = visibleText.length,
             )
@@ -45,10 +64,19 @@ class SearchEngineScreenDetector {
         return SearchEngineScreenDiagnosis(
             shouldLeave = true,
             reason = "blocked-search-screen",
+            packageCategory = packageCategory.label,
+            recentDnsBlockHost = null,
             searchBlockRules = blockRuleCount,
             visibleTextLength = visibleText.length,
         )
     }
+
+    private fun String.searchSurfaceCategory(): SearchSurfaceCategory =
+        when (this) {
+            in BrowserPackageNames -> SearchSurfaceCategory.Browser
+            in SearchAppPackageNames -> SearchSurfaceCategory.SearchApp
+            else -> SearchSurfaceCategory.NonBrowser
+        }
 
     private fun PolicySnapshot.searchEngineBlockRuleCount(): Int =
         rules.count {
@@ -82,6 +110,11 @@ class SearchEngineScreenDetector {
                 "mark.via.gp",
             )
 
+        val SearchAppPackageNames =
+            setOf(
+                "com.google.android.googlequicksearchbox",
+            )
+
         val SearchEngineSignals =
             setOf(
                 "google search",
@@ -99,6 +132,14 @@ class SearchEngineScreenDetector {
 data class SearchEngineScreenDiagnosis(
     val shouldLeave: Boolean,
     val reason: String,
+    val packageCategory: String,
+    val recentDnsBlockHost: String?,
     val searchBlockRules: Int,
     val visibleTextLength: Int,
 )
+
+private enum class SearchSurfaceCategory(val label: String) {
+    Browser("browser"),
+    SearchApp("searchApp"),
+    NonBrowser("non-browser"),
+}

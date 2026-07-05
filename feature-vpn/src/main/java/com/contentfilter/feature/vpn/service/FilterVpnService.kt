@@ -20,11 +20,14 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.feature.vpn.dns.DnsForwarder
 import com.contentfilter.feature.vpn.dns.DnsPacketParser
+import com.contentfilter.feature.vpn.dns.DnsParseResult
 import com.contentfilter.feature.vpn.dns.DnsQuestion
 import com.contentfilter.feature.vpn.dns.DnsResponseFactory
+import com.contentfilter.feature.vpn.dns.VpnPacketDiagnostic
 import com.contentfilter.feature.vpn.policy.VpnDomainPolicyEvaluator
 import com.contentfilter.feature.vpn.policy.VpnPolicyState
 import com.contentfilter.feature.vpn.policy.VpnPolicySnapshotProvider
+import com.contentfilter.feature.vpn.search.SearchProtectionSignals
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CancellationException
@@ -66,6 +69,8 @@ class FilterVpnService : VpnService() {
     private var upstreamDnsServers: List<InetAddress> = emptyList()
     private var strictWebBlockMode = false
     private val lastBlockedNotificationAt = mutableMapOf<String, Long>()
+    private val lastUnsupportedPacketDiagnosticAt = mutableMapOf<String, Long>()
+    private var lastParsedDnsPacketDiagnosticAt: Long = 0L
 
     override fun onStartCommand(
         intent: Intent?,
@@ -264,13 +269,17 @@ class FilterVpnService : VpnService() {
         output: FileOutputStream,
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
-        val question = parser.parseQuery(packet, length)
-        if (question == null) {
-            if (!strictWebBlockMode) {
-                telemetryReporter.recordUnsupportedPacket()
+        val question =
+            when (val parsed = parser.parse(packet, length)) {
+                is DnsParseResult.Parsed -> {
+                    maybeRecordParsedPacket(parser.inspect(packet, length))
+                    parsed.question
+                }
+                is DnsParseResult.Unsupported -> {
+                    maybeRecordUnsupportedPacket(parsed.diagnostic)
+                    return
+                }
             }
-            return
-        }
         val domain = question.domain.normalizedDomain()
         val state = snapshotProvider.current()
         when (val decision = policyEvaluator.evaluate(domain, state.snapshot, state.health)) {
@@ -347,6 +356,10 @@ class FilterVpnService : VpnService() {
             LogTag,
             "Search protection layer=vpn-dns domain=$domain decision=${decision.searchProtectionLabel()} strict=${state.strictWebBlockEnabled} allowRules=$allowRules blockRules=$blockRules totalRules=${state.snapshot.rules.size}",
         )
+        if (decision is PolicyDecision.Block) {
+            SearchProtectionSignals.recordDnsBlock(domain)
+            telemetryReporter.recordRecentDnsSearchBlock(domain)
+        }
         telemetryReporter.recordSearchProtectionDnsDecision(
             domainHost = domain,
             decision = decision,
@@ -377,6 +390,23 @@ class FilterVpnService : VpnService() {
 
     private suspend fun reportSafeSearchExtensionPoint() {
         telemetryReporter.recordServiceState("SafeSearch extension point reached.")
+    }
+
+    private suspend fun maybeRecordParsedPacket(diagnostic: VpnPacketDiagnostic) {
+        val now = System.currentTimeMillis()
+        if (now - lastParsedDnsPacketDiagnosticAt < PacketDiagnosticCooldownMillis) return
+        lastParsedDnsPacketDiagnosticAt = now
+        telemetryReporter.recordParsedPacket(diagnostic)
+    }
+
+    private suspend fun maybeRecordUnsupportedPacket(diagnostic: VpnPacketDiagnostic) {
+        val key =
+            "${diagnostic.reason}:${diagnostic.ipVersion}:${diagnostic.protocol}:" +
+                "${diagnostic.sourcePort ?: "none"}:${diagnostic.destinationPort ?: "none"}"
+        val now = System.currentTimeMillis()
+        if (now - (lastUnsupportedPacketDiagnosticAt[key] ?: 0L) < PacketDiagnosticCooldownMillis) return
+        lastUnsupportedPacketDiagnosticAt[key] = now
+        telemetryReporter.recordUnsupportedPacket(diagnostic)
     }
 
     private fun notifyBlockedDomain(domain: String) {
@@ -470,6 +500,7 @@ class FilterVpnService : VpnService() {
         private const val AllTrafficPrefixLength = 0
         private const val SingleIpv4HostPrefixLength = 32
         private const val BlockNotificationCooldownMillis = 60_000L
+        private const val PacketDiagnosticCooldownMillis = 5_000L
         private const val BlockedChannelId = "content_filter_blocked_sites_v2"
         private const val BlockedNotificationId = 3_000
         private val NoisyDomainLabels =
@@ -509,6 +540,7 @@ class FilterVpnService : VpnService() {
         private val BrowserPackageNames =
             listOf(
                 "com.android.chrome",
+                "com.google.android.googlequicksearchbox",
                 "com.sec.android.app.sbrowser",
                 "org.mozilla.firefox",
                 "org.mozilla.firefox_beta",

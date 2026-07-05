@@ -34,8 +34,10 @@ class AccessibilityTelemetryReporter
         suspend fun recordSearchProtection(
             eventLabel: String,
             packageName: String,
+            packageCategory: String,
             reason: String,
             blockRules: Int,
+            recentDnsBlockHost: String?,
             result: String,
         ) {
             val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
@@ -43,8 +45,9 @@ class AccessibilityTelemetryReporter
                 type = "search-protection",
                 message =
                     "layer=accessibility deviceId=$deviceId action=search-screen event=$eventLabel " +
-                        "packageName=${packageName.take(MaxMessageLength)} result=$result " +
-                        "blockRules=$blockRules reason=${reason.take(MaxMessageLength)}",
+                        "packageName=${packageName.take(MaxMessageLength)} browserCheck=$packageCategory result=$result " +
+                        "blockRules=$blockRules reason=${reason.take(MaxMessageLength)} " +
+                        "recentDnsSearchBlock=${recentDnsBlockHost?.sanitizeHost() ?: "none"}",
             )
         }
 
@@ -79,6 +82,12 @@ class AccessibilityTelemetryReporter
             }
 
         private fun String.safeDeviceId(): String = take(8)
+
+        private fun String.sanitizeHost(): String =
+            lowercase()
+                .substringBefore("/")
+                .substringBefore("?")
+                .take(MaxMessageLength)
 
         private companion object {
             const val MaxMessageLength = 120

@@ -4,6 +4,7 @@ package com.contentfilter.feature.vpn.dns
  * DNS question extracted from a traditional UDP DNS packet.
  */
 data class DnsQuestion(
+    val ipVersion: Int = IPV4_VERSION,
     val transactionId: Int,
     val domain: String,
     val type: Int,
@@ -15,6 +16,7 @@ data class DnsQuestion(
 ) {
     override fun equals(other: Any?): Boolean =
         other is DnsQuestion &&
+            ipVersion == other.ipVersion &&
             transactionId == other.transactionId &&
             domain == other.domain &&
             type == other.type &&
@@ -25,7 +27,8 @@ data class DnsQuestion(
             queryPayload.contentEquals(other.queryPayload)
 
     override fun hashCode(): Int {
-        var result = transactionId
+        var result = ipVersion
+        result = 31 * result + transactionId
         result = 31 * result + domain.hashCode()
         result = 31 * result + type
         result = 31 * result + sourceAddress.contentHashCode()
@@ -34,5 +37,9 @@ data class DnsQuestion(
         result = 31 * result + destinationPort
         result = 31 * result + queryPayload.contentHashCode()
         return result
+    }
+
+    private companion object {
+        const val IPV4_VERSION = 4
     }
 }

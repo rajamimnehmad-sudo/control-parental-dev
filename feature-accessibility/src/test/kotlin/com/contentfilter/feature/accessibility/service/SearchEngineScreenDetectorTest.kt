@@ -47,6 +47,20 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
+    fun `leaves Google app search screen when search engines are blocked`() {
+        val diagnosis =
+            detector.diagnose(
+                packageName = "com.google.android.googlequicksearchbox",
+                snapshot = snapshot(rule("google.com", RuleAction.Block)),
+                visibleText = "Google Search resultados de busqueda",
+            )
+
+        assertTrue(diagnosis.shouldLeave)
+        assertEquals("searchApp", diagnosis.packageCategory)
+        assertEquals("blocked-search-screen", diagnosis.reason)
+    }
+
+    @Test
     fun `diagnoses blocked browser screen without visible search signal`() {
         val diagnosis =
             detector.diagnose(
@@ -59,6 +73,23 @@ class SearchEngineScreenDetectorTest {
         assertEquals("no-search-signal", diagnosis.reason)
         assertEquals(1, diagnosis.searchBlockRules)
     }
+
+    @Test
+    fun `leaves Chrome without visible signal after recent DNS search block`() {
+        val diagnosis =
+            detector.diagnose(
+                packageName = "com.android.chrome",
+                snapshot = snapshot(rule("google.com", RuleAction.Block)),
+                visibleText = "Nueva pestaña",
+                recentDnsBlockHost = "google.com",
+            )
+
+        assertTrue(diagnosis.shouldLeave)
+        assertEquals("browser", diagnosis.packageCategory)
+        assertEquals("dueToRecentDnsBlock", diagnosis.reason)
+        assertEquals("google.com", diagnosis.recentDnsBlockHost)
+    }
+
 
     @Test
     fun `diagnoses blocked search screen`() {

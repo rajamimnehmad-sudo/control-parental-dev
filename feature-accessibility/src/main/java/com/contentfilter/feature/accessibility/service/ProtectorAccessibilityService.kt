@@ -19,6 +19,7 @@ import com.contentfilter.feature.accessibility.policy.AccessibilityPolicySnapsho
 import com.contentfilter.feature.accessibility.telemetry.AccessibilityTelemetryReporter
 import com.contentfilter.feature.accessibility.time.AppUsageTracker
 import com.contentfilter.feature.accessibility.time.UsageTransition
+import com.contentfilter.feature.vpn.search.SearchProtectionSignals
 import com.contentfilter.feature.vpn.service.DevProtectionMode
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -161,6 +162,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 packageName = packageName,
                 snapshot = snapshotProvider.current().snapshot,
                 visibleText = visibleText,
+                recentDnsBlockHost = SearchProtectionSignals.recentDnsBlock()?.host,
             )
         Log.i(
             LogTag,
@@ -170,8 +172,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
             telemetryReporter.recordSearchProtection(
                 eventLabel = AccessibilityEventFilter.label(eventType),
                 packageName = packageName,
+                packageCategory = diagnosis.packageCategory,
                 reason = diagnosis.reason,
                 blockRules = diagnosis.searchBlockRules,
+                recentDnsBlockHost = diagnosis.recentDnsBlockHost,
                 result = if (diagnosis.shouldLeave) "blocked-search-screen" else "no-search-signal",
             )
         }
