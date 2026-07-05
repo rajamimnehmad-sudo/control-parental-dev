@@ -79,6 +79,11 @@ internal fun InternetModeCard(
                 ) {
                     Text("Permitir buscadores", style = MaterialTheme.typography.titleSmall)
                     Text(
+                        text = if (searchEnginesAllowed) "Estado: permitidos" else "Estado: bloqueados",
+                        color = if (searchEnginesAllowed) SearchAllowedColor else SearchBlockedColor,
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
                         "Permite ver resultados de Google, Bing, Yahoo y DuckDuckGo cuando el modo web bloquea todo.",
                         style = MaterialTheme.typography.bodySmall,
                     )

@@ -326,10 +326,10 @@ class RulesViewModel
                             saveRule(rule.copy(enabled = blocked), targetDeviceId)
                         }
                         if (blocked) {
-                            clearDomainBlacklistRules(targetDeviceId)
+                            clearLegacyDomainBlockRules(targetDeviceId)
                             setSearchEnginesAllowedRules(allowed = false)
                         } else {
-                            clearDomainBlacklistRules(targetDeviceId)
+                            clearLegacyDomainBlockRules(targetDeviceId)
                             clearSearchEngineRules(targetDeviceId)
                         }
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
@@ -771,7 +771,7 @@ class RulesViewModel
             }
         }
 
-        private suspend fun clearDomainBlacklistRules(deviceId: String) {
+        private suspend fun clearLegacyDomainBlockRules(deviceId: String) {
             uiState.value.rules
                 .filter {
                     it.enabled &&
