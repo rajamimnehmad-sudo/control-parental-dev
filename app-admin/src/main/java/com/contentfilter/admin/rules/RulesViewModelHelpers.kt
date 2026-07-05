@@ -187,13 +187,6 @@ internal fun String.toDomainOrNull(): String? {
     return withoutScheme.takeIf { DomainRegex.matches(it) }
 }
 
-internal fun String.expandBlockedDomainFamily(): List<String> =
-    if (this in YouTubeWebDomains) {
-        YouTubeWebDomains
-    } else {
-        listOf(this)
-    }
-
 private fun List<PolicyRule>.effectiveAppRule(packageName: String): PolicyRule? =
     asSequence()
         .filter { it.enabled && it.scope == RuleScope.App && it.target == packageName }
@@ -223,7 +216,6 @@ internal const val SwitchHoldMillis = 2_500L
 internal const val RoomConfirmTimeoutMillis = 5_000L
 internal const val DomainWildcard = "*"
 internal const val InternetBlockPriority = 10
-internal const val BlockDomainPriority = 2_000
 internal const val AllowDomainPriority = 1_000
 internal const val SearchEngineBlockPriority = 3_000
 internal const val LogTag = "RulesViewModel"

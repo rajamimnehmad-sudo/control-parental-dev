@@ -133,7 +133,7 @@ Indice tecnico por areas para que cada ticket pueda empezar con `Area: ...` y ev
 | --- | --- | --- |
 | Switch Internet rebota | `RulesViewModel`, `RulesUiState`, `PolicyDao` | `FilterVpnService` |
 | Cortar Internet no aplica | `RulesViewModel`, `RoomPolicyRepository`, `VpnPolicySnapshotProvider`, `VpnDomainPolicyEvaluator` | `DnsForwarder`, `DefaultSyncEngine` |
-| Lista blanca/lista negra desincronizada | `RulesScreen`, `RulesViewModel`, `PolicyDao` | VPN |
+| Lista blanca desincronizada | `RulesScreen`, `RulesViewModel`, `PolicyDao` | VPN |
 | Dominio bloqueado carga | `VpnDomainPolicyEvaluator`, `DnsForwarder`, reglas en `PolicyDao` | Sync remoto |
 | Dominio permitido no carga | `VpnDomainPolicyEvaluator`, allowlist en `RulesViewModel`, servicios criticos | DNS parser |
 | Solicitud web no llega | `InternetViewModel`, `RoomAccessRequestRepository`, `DefaultOutboxProcessor`, `AdminRequestsViewModel` | Realtime |
@@ -158,4 +158,3 @@ Indice tecnico por areas para que cada ticket pueda empezar con `Area: ...` y ev
 - `core-update`, workflows y scripts de publicacion si no hay cambio de release.
 - Supabase Auth/config/secrets salvo ticket de login/enlace.
 - Migrations Room salvo cambio real de schema.
-

@@ -118,10 +118,6 @@ class RulesViewModel
             form.update { it.copy(appPackageName = value, message = "") }
         }
 
-        fun onDomainChanged(value: String) {
-            form.update { it.copy(domain = value, message = "") }
-        }
-
         fun onDomainLimitDomainChanged(value: String) {
             form.update { it.copy(domainLimitDomain = value, message = "") }
         }
@@ -220,8 +216,6 @@ class RulesViewModel
 
         fun createBlockedAppRule() = createRule(RuleScope.App, RuleAction.Block)
 
-        fun createBlockedDomainRule() = createRule(RuleScope.Domain, RuleAction.Block)
-
         fun createAllowedDomainRule() = createRule(RuleScope.Domain, RuleAction.Allow)
 
         fun createAppLimit() = createLimit(PolicyTargetType.App)
@@ -301,7 +295,7 @@ class RulesViewModel
                 it.copy(
                     pendingInternetBlocked = blocked,
                     pendingGoogleSearchAllowed = if (blocked) false else it.pendingGoogleSearchAllowed,
-                    message = if (blocked) "Activando lista blanca..." else "Activando lista negra...",
+                    message = if (blocked) "Activando lista blanca..." else "Abriendo Internet...",
                 )
             }
             logInternetSwitch(
@@ -332,8 +326,10 @@ class RulesViewModel
                             saveRule(rule.copy(enabled = blocked), targetDeviceId)
                         }
                         if (blocked) {
+                            clearDomainBlacklistRules(targetDeviceId)
                             setGoogleSearchAllowedRules(allowed = false)
                         } else {
+                            clearDomainBlacklistRules(targetDeviceId)
                             clearSearchEngineRules(targetDeviceId)
                         }
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
@@ -367,7 +363,7 @@ class RulesViewModel
                                     if (blocked) {
                                         "Modo web: bloquear todo excepto permitidos. Buscadores bloqueados."
                                     } else {
-                                        "Modo web: permitir todo excepto bloqueados."
+                                        "Modo web: Internet abierto."
                                     },
                             )
                         }
@@ -557,7 +553,7 @@ class RulesViewModel
             val rawTarget =
                 when (scope) {
                     RuleScope.App -> state.appPackageName
-                    RuleScope.Domain -> if (action == RuleAction.Allow) state.allowDomain else state.domain
+                    RuleScope.Domain -> state.allowDomain
                     else -> ""
                 }
             val target = normalizeTarget(scope, rawTarget)
@@ -594,21 +590,6 @@ class RulesViewModel
                     if (allowDomainMinutes != null) {
                         saveDomainDailyLimit(target, allowDomainMinutes, targetDeviceId)
                     }
-                } else if (scope == RuleScope.Domain && action == RuleAction.Block) {
-                    target.expandBlockedDomainFamily().forEach { domain ->
-                        saveRule(
-                            PolicyRule(
-                                id = UUID.randomUUID().toString(),
-                                level = PolicyLevel.Account,
-                                scope = RuleScope.Domain,
-                                target = domain,
-                                action = action,
-                                priority = BlockDomainPriority,
-                                enabled = true,
-                            ),
-                            targetDeviceId,
-                        )
-                    }
                 } else {
                     saveRule(
                         PolicyRule(
@@ -641,7 +622,7 @@ class RulesViewModel
                                         },
                                 )
                             } else {
-                                it.copy(domain = "", message = "Dominio/familia bloqueada.")
+                                it.copy(message = "Regla guardada.")
                             }
                         else -> it.copy(message = "Regla guardada.")
                     }
@@ -785,6 +766,20 @@ class RulesViewModel
                     deviceId = deviceId,
                 )
             }
+        }
+
+        private suspend fun clearDomainBlacklistRules(deviceId: String) {
+            uiState.value.rules
+                .filter {
+                    it.enabled &&
+                        it.scope == RuleScope.Domain &&
+                        it.action == RuleAction.Block &&
+                        it.target != DomainWildcard &&
+                        it.target !in SearchEngineDomains
+                }
+                .forEach { rule ->
+                    saveRule(rule.copy(enabled = false), deviceId)
+                }
         }
 
         private suspend fun setSearchEngineDomain(

@@ -27,35 +27,6 @@ import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.PolicyRule
 
 @Composable
-internal fun RuleEditorCard(
-    title: String,
-    description: String,
-    value: String,
-    label: String,
-    buttonText: String,
-    onValueChange: (String) -> Unit,
-    onSubmit: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(description, style = MaterialTheme.typography.bodyMedium)
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = value,
-                onValueChange = onValueChange,
-                label = { Text(label) },
-                singleLine = true,
-            )
-            Button(onClick = onSubmit) { Text(buttonText) }
-        }
-    }
-}
-
-@Composable
 internal fun InternetModeCard(
     blocked: Boolean,
     googleAllowed: Boolean,
@@ -84,7 +55,7 @@ internal fun InternetModeCard(
                             if (blocked) {
                                 "Bloquear todo excepto lista blanca."
                             } else {
-                                "Permitir todo excepto dominios bloqueados."
+                                "Internet abierto."
                             },
                         style = MaterialTheme.typography.bodyMedium,
                     )

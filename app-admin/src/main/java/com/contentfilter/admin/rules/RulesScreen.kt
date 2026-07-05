@@ -50,7 +50,6 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     RulesScreen(
         state = state,
-        onDomainChanged = viewModel::onDomainChanged,
         onAllowDomainChanged = viewModel::onAllowDomainChanged,
         onAllowDomainMinutesChanged = viewModel::onAllowDomainMinutesChanged,
         onAppSearchChanged = viewModel::onAppSearchChanged,
@@ -59,7 +58,6 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
         onDeviceSelected = viewModel::onDeviceSelected,
         onDeviceCleared = viewModel::clearDeviceSelection,
         onDeviceDeleted = viewModel::deleteDevicePermanently,
-        onCreateDomainBlock = viewModel::createBlockedDomainRule,
         onCreateDomainAllow = viewModel::createAllowedDomainRule,
         onCreateAllowedDomainLimit = viewModel::saveAllowedDomainLimit,
         onInternetBlockedChanged = viewModel::setInternetBlocked,
@@ -75,7 +73,6 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
 @Composable
 private fun RulesScreen(
     state: RulesUiState,
-    onDomainChanged: (String) -> Unit,
     onAllowDomainChanged: (String) -> Unit,
     onAllowDomainMinutesChanged: (String) -> Unit,
     onAppSearchChanged: (String) -> Unit,
@@ -84,7 +81,6 @@ private fun RulesScreen(
     onDeviceSelected: (String) -> Unit,
     onDeviceCleared: () -> Unit,
     onDeviceDeleted: (String) -> Unit,
-    onCreateDomainBlock: () -> Unit,
     onCreateDomainAllow: () -> Unit,
     onCreateAllowedDomainLimit: () -> Unit,
     onInternetBlockedChanged: (Boolean) -> Unit,
@@ -99,8 +95,8 @@ private fun RulesScreen(
         state.rules.filter {
             it.scope == RuleScope.Domain &&
                 it.target != "*" &&
-            it.target !in SearchEngineDomainsForUi &&
-                it.action == if (state.internetBlocked) RuleAction.Allow else RuleAction.Block
+                it.target !in SearchEngineDomainsForUi &&
+                it.action == RuleAction.Allow
         }
     val visibleDomainLimits =
         state.limits.filter {
@@ -283,42 +279,24 @@ private fun RulesScreen(
                     )
                 }
                 item {
-                    if (state.internetBlocked) {
-                        AllowDomainEditorCard(
-                            domain = state.allowDomain,
-                            minutes = state.allowDomainMinutes,
-                            onDomainChanged = onAllowDomainChanged,
-                            onMinutesChanged = onAllowDomainMinutesChanged,
-                            onAllow = onCreateDomainAllow,
-                            onAllowWithLimit = onCreateAllowedDomainLimit,
-                        )
-                    } else {
-                        RuleEditorCard(
-                            title = "Lista negra",
-                            description = "Bloquea el dominio y sus subdominios.",
-                            value = state.domain,
-                            label = "Dominio",
-                            onValueChange = onDomainChanged,
-                            buttonText = "Bloquear dominio",
-                            onSubmit = onCreateDomainBlock,
-                        )
-                    }
+                    AllowDomainEditorCard(
+                        domain = state.allowDomain,
+                        minutes = state.allowDomainMinutes,
+                        onDomainChanged = onAllowDomainChanged,
+                        onMinutesChanged = onAllowDomainMinutesChanged,
+                        onAllow = onCreateDomainAllow,
+                        onAllowWithLimit = onCreateAllowedDomainLimit,
+                    )
                 }
                 item {
                     SectionHeader(
-                        title = if (state.internetBlocked) "Lista blanca" else "Lista negra",
+                        title = "Lista blanca",
                         count = visibleDomainRules.size,
                     )
                 }
                 if (visibleDomainRules.isEmpty()) {
                     item {
-                        EmptySectionText(
-                            if (state.internetBlocked) {
-                                "No hay sitios permitidos."
-                            } else {
-                                "No hay sitios bloqueados."
-                            },
-                        )
+                        EmptySectionText("No hay sitios permitidos.")
                     }
                 }
                 items(visibleDomainRules, key = { it.id }) { rule ->

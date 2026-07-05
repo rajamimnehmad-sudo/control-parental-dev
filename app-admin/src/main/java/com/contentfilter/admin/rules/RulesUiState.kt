@@ -11,7 +11,6 @@ data class RulesUiState(
     val selectedDeviceId: String? = null,
     val appControls: List<AppControlUiState> = emptyList(),
     val appPackageName: String = "",
-    val domain: String = "",
     val domainLimitDomain: String = "",
     val domainLimitMinutes: String = "",
     val allowDomain: String = "",

@@ -172,7 +172,7 @@ Proyecto Android multi-modulo, offline-first:
 5. `VpnPolicySnapshotProvider` construye `PolicySnapshot`.
 6. `FilterVpnService` recibe consulta DNS.
 7. `DnsForwarder` parsea/resuelve DNS.
-8. `VpnDomainPolicyEvaluator` decide allow/block/request segun reglas, lista blanca/negra y limites.
+8. `VpnDomainPolicyEvaluator` decide allow/block/request segun reglas, lista blanca y limites.
 9. `DomainDnsUsageTracker` mantiene uso aproximado DNS-based para dominio/familia.
 
 ## Flujo Apps
@@ -229,4 +229,3 @@ Proyecto Android multi-modulo, offline-first:
 - `scripts/publicar_dev.sh`
 - Supabase Auth/config/secrets.
 - Room migrations/schemas, salvo cambio de DB.
-
