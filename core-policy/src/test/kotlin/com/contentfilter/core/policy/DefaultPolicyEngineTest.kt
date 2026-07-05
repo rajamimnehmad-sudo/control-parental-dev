@@ -253,6 +253,15 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
+    fun `safe default snapshot blocks search and secure dns hosts`() {
+        val snapshot = SearchProtectionPolicyDefaults.safeDefaultSnapshot()
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("dns.google")))
+    }
+
+    @Test
     fun `approved domain exception wins over account block`() {
         val decision =
             engine.evaluateDomain(

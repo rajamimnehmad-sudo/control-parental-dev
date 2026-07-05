@@ -41,7 +41,12 @@ class UpdatesViewModel
             if (BuildConfig.FLAVOR == "dev") {
                 viewModelScope.launch {
                     telemetryRepository.observeDiagnostics().collect { diagnostics ->
-                        _uiState.update { it.copy(diagnosticsText = diagnostics.formatDiagnostics()) }
+                        _uiState.update {
+                            it.copy(
+                                diagnosticsText = diagnostics.formatDiagnostics(),
+                                diagnosticsSummaryText = diagnostics.formatInternetSummary(),
+                            )
+                        }
                     }
                 }
             }
@@ -194,6 +199,56 @@ private fun List<TechnicalDiagnostic>.formatDiagnostics(): String {
         "${diagnostic.occurredAtEpochMillis.toDisplayDate()} ${diagnostic.type} ${diagnostic.message}"
     }
 }
+
+private fun List<TechnicalDiagnostic>.formatInternetSummary(): String {
+    val messages = map { it.message }
+    val latestSnapshot = messages.lastOrNull { it.contains("action=snapshot-received") }
+    val latestDnsDecision = messages.lastOrNull { it.contains("layer=vpn-dns") && it.contains("action=dns-decision") }
+    val latestBlockedHost = messages.lastOrNull { it.contains("layer=vpn-dns") && it.contains("result=Block") }?.field("host")
+    val latestAllowedHost = messages.lastOrNull { it.contains("layer=vpn-dns") && it.contains("result=Allow") }?.field("host")
+    val latestBypass =
+        messages.lastOrNull {
+            it.contains("action=encrypted-dns") ||
+                it.contains("action=quic") ||
+                it.contains("reason=policy-not-loaded")
+        }
+    val vpnActive = messages.any { it.contains("VPN started") || it.contains("VPN active") }
+    val reconnectApplied = messages.any { it.contains("layer=reconnect") && it.contains("result=applied") }
+    val ruleCount = latestSnapshot?.field("ruleCount") ?: "desconocido"
+    val searchBlockRules = latestSnapshot?.field("searchBlockRules") ?: "desconocido"
+    val strict = latestSnapshot?.field("strict") ?: "desconocido"
+    val searchState =
+        when {
+            latestSnapshot == null -> "desconocidos"
+            searchBlockRules.toIntOrNull()?.let { it > 0 } == true -> "bloqueados"
+            else -> "permitidos"
+        }
+    val policyLoaded = latestSnapshot?.field("policyLoaded") ?: "no"
+    return listOf(
+        "Estado Internet",
+        "Politica cargada: $policyLoaded",
+        "WebMode strict: $strict",
+        "Buscadores: $searchState",
+        "Rule count: $ruleCount",
+        "Ultimo host bloqueado: ${latestBlockedHost ?: "ninguno"}",
+        "Ultimo host permitido: ${latestAllowedHost ?: "ninguno"}",
+        "Ultima decision DNS: ${latestDnsDecision?.field("result") ?: "ninguna"}",
+        "Ultimo bypass sospechoso: ${latestBypass?.summaryLine() ?: "ninguno"}",
+        "VPN activo: ${if (vpnActive) "si" else "no"}",
+        "Reconnect aplicado: ${if (reconnectApplied) "si" else "no"}",
+    ).joinToString("\n")
+}
+
+private fun String.field(name: String): String? =
+    split(" ")
+        .firstOrNull { it.startsWith("$name=") }
+        ?.substringAfter("=")
+        ?.takeIf { it.isNotBlank() }
+
+private fun String.summaryLine(): String =
+    listOfNotNull(field("action"), field("result"), field("protocol"), field("dstPort"), field("reason"))
+        .joinToString(" ")
+        .ifBlank { take(80) }
 
 private fun Long.toDisplayDate(): String =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")

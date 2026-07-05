@@ -7,6 +7,7 @@ data class UpdatesUiState(
     val manifest: UpdateManifest? = null,
     val devMessage: String = "",
     val diagnosticsText: String = "",
+    val diagnosticsSummaryText: String = "",
 )
 
 enum class UpdatesStatus {

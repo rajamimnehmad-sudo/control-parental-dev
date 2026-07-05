@@ -7,6 +7,7 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
+import com.contentfilter.core.policy.SearchProtectionPolicyDefaults
 import com.contentfilter.feature.vpn.dns.VpnPacketDiagnostic
 import java.util.UUID
 import javax.inject.Inject
@@ -80,6 +81,7 @@ class VpnTelemetryReporter
                 type = "search-protection",
                 message =
                     "layer=sync deviceId=$deviceId action=snapshot-received result=applied " +
+                        "policyLoaded=${snapshot.id != SearchProtectionPolicyDefaults.SafeDefaultPolicyId && snapshot.id != LocalDefaultPolicyId} " +
                         "ruleCount=${snapshot.rules.size} searchBlockRules=$searchBlockRules strict=$strictWebBlock",
             )
         }
@@ -91,11 +93,12 @@ class VpnTelemetryReporter
         suspend fun recordUnsupportedPacket(diagnostic: VpnPacketDiagnostic) {
             val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
             val encryptedDns = diagnostic.sourcePort == DnsOverTlsPort || diagnostic.destinationPort == DnsOverTlsPort
+            val quic = diagnostic.protocol == "udp" && (diagnostic.sourcePort == QuicPort || diagnostic.destinationPort == QuicPort)
             record(
                 type = "vpn-unsupported-packet",
                 message =
-                    "layer=vpn-packet deviceId=$deviceId action=${if (encryptedDns) "encrypted-dns" else "unsupported"} " +
-                        "result=${if (encryptedDns) "dropped" else "ignored"} " +
+                    "layer=vpn-packet deviceId=$deviceId action=${diagnostic.actionLabel(encryptedDns, quic)} " +
+                        "result=${if (encryptedDns || quic) "dropped" else "ignored"} " +
                         "ipVersion=${diagnostic.ipVersion} protocol=${diagnostic.protocol} " +
                         "srcPort=${diagnostic.sourcePort ?: "none"} dstPort=${diagnostic.destinationPort ?: "none"} " +
                         "looksLikeDns=${diagnostic.looksLikeDns} reason=${diagnostic.reason}",
@@ -162,6 +165,18 @@ class VpnTelemetryReporter
 
         private companion object {
             const val DnsOverTlsPort = 853
+            const val LocalDefaultPolicyId = "local-default"
+            const val QuicPort = 443
             const val MaxMessageLength = 120
         }
+    }
+
+private fun VpnPacketDiagnostic.actionLabel(
+    encryptedDns: Boolean,
+    quic: Boolean,
+): String =
+    when {
+        encryptedDns -> "encrypted-dns"
+        quic -> "quic"
+        else -> "unsupported"
     }

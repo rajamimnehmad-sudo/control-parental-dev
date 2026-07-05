@@ -86,18 +86,12 @@ internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
     }
 
 internal fun List<PolicyRule>.searchEnginesAllowed(): Boolean =
-    SearchEngineDomains.all { domain ->
-        none {
-            it.enabled &&
-                it.scope == RuleScope.Domain &&
-                it.target == domain &&
-                it.action == RuleAction.Block
-        } &&
+    SearchEngineDomains.none { domain ->
         any {
             it.enabled &&
                 it.scope == RuleScope.Domain &&
                 it.target == domain &&
-                it.action == RuleAction.Allow
+                it.action == RuleAction.Block
         }
     }
 

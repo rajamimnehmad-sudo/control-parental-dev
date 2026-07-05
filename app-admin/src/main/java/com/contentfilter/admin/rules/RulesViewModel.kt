@@ -292,6 +292,7 @@ class RulesViewModel
                     pending = form.value.pendingSearchEnginesAllowed,
                     roomAllowed = saved.getOrThrow().searchEnginesAllowed(),
                 )
+                val confirmedAllowed = saved.getOrThrow().searchEnginesAllowed()
                 syncScheduler.requestSync()
                 val synced = syncNowWithResult()
                 Log.i(
@@ -317,9 +318,9 @@ class RulesViewModel
                         pendingSearchEnginesAllowed = null,
                         message =
                             if (synced.success) {
-                                if (allowed) "Buscadores permitidos." else "Buscadores bloqueados."
+                                if (confirmedAllowed) "Buscadores permitidos." else "Buscadores bloqueados."
                             } else {
-                                if (allowed) {
+                                if (confirmedAllowed) {
                                     "Buscadores permitidos localmente. Se sincronizará cuando haya conexión."
                                 } else {
                                     "Buscadores bloqueados localmente. Se sincronizará cuando haya conexión."

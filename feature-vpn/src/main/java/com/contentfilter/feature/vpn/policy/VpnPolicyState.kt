@@ -7,6 +7,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
+import com.contentfilter.core.policy.SearchProtectionPolicyDefaults
 
 data class VpnPolicyState(
     val snapshot: PolicySnapshot,
@@ -43,16 +44,12 @@ data class VpnPolicyState(
         }
 
     companion object {
+        const val SafeDefaultPolicyId = SearchProtectionPolicyDefaults.SafeDefaultPolicyId
         private const val DomainWildcard = "*"
 
         fun initial(): VpnPolicyState =
             VpnPolicyState(
-                snapshot =
-                    PolicySnapshot(
-                        id = "empty",
-                        version = 0L,
-                        rules = emptyList(),
-                    ),
+                snapshot = safeDefaultSnapshot(),
                 health =
                     SystemHealthSnapshot(
                         vpnState = ComponentState.Unknown,
@@ -65,5 +62,23 @@ data class VpnPolicyState(
                         checkedAtEpochMillis = 0L,
                     ),
             )
+
+        fun safeDefaultSnapshot(): PolicySnapshot =
+            SearchProtectionPolicyDefaults.safeDefaultSnapshot()
+
+        fun resolveSnapshot(
+            current: PolicySnapshot,
+            candidate: PolicySnapshot,
+        ): PolicySnapshot =
+            when {
+                candidate.isEmptyLocalDefault() && current.rules.isNotEmpty() -> current
+                candidate.isEmptyLocalDefault() -> safeDefaultSnapshot()
+                else -> candidate
+            }
+
+        private fun PolicySnapshot.isEmptyLocalDefault(): Boolean =
+            id == LocalDefaultPolicyId && rules.isEmpty()
+
+        private const val LocalDefaultPolicyId = "local-default"
     }
 }

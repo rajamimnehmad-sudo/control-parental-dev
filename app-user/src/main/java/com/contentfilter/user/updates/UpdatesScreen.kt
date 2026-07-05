@@ -152,6 +152,12 @@ private fun UpdatesScreen(
             }
             OutlinedButton(
                 modifier = Modifier.fillMaxWidth(),
+                onClick = { clipboardManager.setText(AnnotatedString(state.diagnosticsSummaryText)) },
+            ) {
+                Text("Copiar resumen corto")
+            }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
                 onClick = onClearDiagnostics,
             ) {
                 Text("Limpiar diagnóstico")

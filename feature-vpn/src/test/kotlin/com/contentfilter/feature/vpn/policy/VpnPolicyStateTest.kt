@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
@@ -126,6 +127,46 @@ class VpnPolicyStateTest {
             )
 
         assertNotEquals(allowed.vpnReconnectKey, blocked.vpnReconnectKey)
+    }
+
+    @Test
+    fun `initial state uses safe default search blocking rules`() {
+        val state = VpnPolicyState.initial()
+
+        assertTrue(state.snapshot.rules.any { it.target == "google.com" && it.action == RuleAction.Block && it.enabled })
+        assertTrue(state.snapshot.rules.any { it.target == "clients4.google.com" && it.action == RuleAction.Block && it.enabled })
+        assertTrue(state.snapshot.rules.any { it.target == "dns.google" && it.action == RuleAction.Block && it.enabled })
+    }
+
+    @Test
+    fun `keeps last valid policy when empty local default arrives`() {
+        val current =
+            PolicySnapshot(
+                id = "remote-policy",
+                version = 2L,
+                rules = listOf(rule("google.com", RuleAction.Block)),
+            )
+        val emptyLocal =
+            PolicySnapshot(
+                id = "local-default",
+                version = 1L,
+                rules = emptyList(),
+            )
+
+        val resolved = VpnPolicyState.resolveSnapshot(current = current, candidate = emptyLocal)
+
+        assertEquals(current, resolved)
+    }
+
+    @Test
+    fun `uses safe default when startup only has empty local default`() {
+        val emptyCurrent = PolicySnapshot(id = "empty", version = 0L, rules = emptyList())
+        val emptyLocal = PolicySnapshot(id = "local-default", version = 1L, rules = emptyList())
+
+        val resolved = VpnPolicyState.resolveSnapshot(current = emptyCurrent, candidate = emptyLocal)
+
+        assertEquals(VpnPolicyState.SafeDefaultPolicyId, resolved.id)
+        assertTrue(resolved.rules.any { it.target == "google.com" && it.action == RuleAction.Block && it.enabled })
     }
 
     private fun state(vararg rules: PolicyRule): VpnPolicyState =

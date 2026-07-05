@@ -42,7 +42,7 @@ class VpnPolicySnapshotProvider
                         systemStatusRepository.observeHealth(),
                         deviceActivationRepository.observeActivation(),
                     ) { snapshot, dailyLimits, health, activation ->
-                        VpnPolicyState(
+                        resolvedState(
                             snapshot = snapshot.copy(dailyLimits = dailyLimits),
                             health = health.withActiveLicenseIfActivated(activation != null),
                         )
@@ -59,11 +59,10 @@ class VpnPolicySnapshotProvider
         suspend fun refresh() {
             val activation = deviceActivationRepository.currentActivation()
             state.value =
-                VpnPolicyState(
+                resolvedState(
                     snapshot =
-                        policyRepository.getActivePolicy().copy(
-                            dailyLimits = dailyLimitRepository.observeLimits().first(),
-                        ),
+                        policyRepository.getActivePolicy()
+                            .copy(dailyLimits = dailyLimitRepository.observeLimits().first()),
                     health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
                 )
             telemetryReporter.recordSnapshotReceived(
@@ -85,4 +84,17 @@ class VpnPolicySnapshotProvider
             isActivated: Boolean,
         ): com.contentfilter.core.domain.model.SystemHealthSnapshot =
             if (isActivated) copy(licenseState = LicenseState.Active) else this
+
+        private fun resolvedState(
+            snapshot: com.contentfilter.core.domain.model.PolicySnapshot,
+            health: com.contentfilter.core.domain.model.SystemHealthSnapshot,
+        ): VpnPolicyState {
+            val current = state.value
+            val resolvedSnapshot =
+                VpnPolicyState.resolveSnapshot(
+                    current = current.snapshot,
+                    candidate = snapshot,
+                )
+            return VpnPolicyState(snapshot = resolvedSnapshot, health = health)
+        }
     }
