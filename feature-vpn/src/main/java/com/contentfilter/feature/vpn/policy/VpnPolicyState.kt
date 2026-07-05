@@ -13,16 +13,27 @@ data class VpnPolicyState(
     val health: SystemHealthSnapshot,
 ) {
     val strictWebBlockEnabled: Boolean
-        get() =
-            snapshot.rules.any {
-                it.enabled &&
-                    it.scope == RuleScope.Domain &&
-                    it.target == DomainWildcard &&
-                    it.action == RuleAction.Block
-            }
+        get() {
+            val wildcardBlocked =
+                snapshot.rules.any {
+                    it.enabled &&
+                        it.scope == RuleScope.Domain &&
+                        it.target == DomainWildcard &&
+                        it.action == RuleAction.Block
+                }
+            val googleSearchAllowed =
+                snapshot.rules.any {
+                    it.enabled &&
+                        it.scope == RuleScope.Domain &&
+                        it.target == GoogleSearchDomain &&
+                        it.action == RuleAction.Allow
+                }
+            return wildcardBlocked && !googleSearchAllowed
+        }
 
     companion object {
         private const val DomainWildcard = "*"
+        private const val GoogleSearchDomain = "google.com"
 
         fun initial(): VpnPolicyState =
             VpnPolicyState(

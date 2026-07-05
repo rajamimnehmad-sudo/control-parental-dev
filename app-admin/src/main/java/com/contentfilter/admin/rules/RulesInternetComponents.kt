@@ -105,13 +105,13 @@ internal fun InternetModeCard(
                 ) {
                     Text("Permitir buscadores", style = MaterialTheme.typography.titleSmall)
                     Text(
-                        "Permite Google, Bing y DuckDuckGo aunque el modo web bloquee todo.",
+                        "Permite ver resultados de Google cuando el modo web bloquea todo.",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
                 Switch(
                     checked = googleAllowed,
-                    enabled = !blocked && !webModeUpdating && !googleUpdating,
+                    enabled = blocked && !webModeUpdating && !googleUpdating,
                     onCheckedChange = onGoogleAllowedChanged,
                 )
             }

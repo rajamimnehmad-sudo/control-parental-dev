@@ -187,11 +187,6 @@ internal const val LogTag = "RulesViewModel"
 internal val GoogleSearchDomains =
     listOf(
         "google.com",
-        "gstatic.com",
-        "googleapis.com",
-        "googleusercontent.com",
-        "bing.com",
-        "duckduckgo.com",
     )
 internal val YouTubeWebDomains =
     listOf(
