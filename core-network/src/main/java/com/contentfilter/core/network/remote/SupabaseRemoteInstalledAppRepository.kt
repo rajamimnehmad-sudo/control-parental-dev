@@ -12,5 +12,5 @@ class SupabaseRemoteInstalledAppRepository
             client.selectAll(SupabaseTable.DeviceApps).mapArray(RemoteInstalledAppDto::fromJson)
 
         override suspend fun upsertInstalledApp(app: RemoteInstalledAppDto): RemoteResult<Unit> =
-            client.upsert(SupabaseTable.DeviceApps, app.toJson())
+            client.upsert(SupabaseTable.DeviceApps, app.toRequiredJson())
     }

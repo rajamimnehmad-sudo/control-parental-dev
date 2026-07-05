@@ -25,6 +25,15 @@ data class RemoteInstalledAppDto(
             .put("icon_base64", iconBase64)
             .put("updated_at", updatedAt)
 
+    fun toRequiredJson(): JSONObject =
+        JSONObject()
+            .put("id", id)
+            .put("account_id", accountId)
+            .put("device_id", deviceId)
+            .put("app_name", appName)
+            .put("package_name", packageName)
+            .put("updated_at", updatedAt)
+
     companion object {
         fun fromJson(json: JSONObject): RemoteInstalledAppDto =
             RemoteInstalledAppDto(
