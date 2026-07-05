@@ -23,6 +23,7 @@ import com.contentfilter.feature.vpn.policy.VpnDomainPolicyEvaluator
 import com.contentfilter.feature.vpn.policy.VpnPolicySnapshotProvider
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -103,7 +104,7 @@ class FilterVpnService : VpnService() {
         serviceScope = scope
         readerJob =
             scope.launch {
-                runCatching {
+                try {
                     snapshotProvider.refresh()
                     snapshotProvider.start(scope)
                     strictWebBlockMode = snapshotProvider.current().strictWebBlockEnabled
@@ -118,10 +119,12 @@ class FilterVpnService : VpnService() {
                     systemStatusRepository.updateVpnState(ComponentState.Enabled)
                     telemetryReporter.recordServiceState("VPN started.")
                     readPackets(requireNotNull(vpnInterface))
-                }.onFailure {
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (exception: Throwable) {
                     VpnController.markStopped(this@FilterVpnService, StopReasonFailed)
                     updateVpnState(ComponentState.Warning)
-                    telemetryReporter.recordError("VPN failed: ${it.javaClass.simpleName}")
+                    telemetryReporter.recordError("VPN failed: ${exception.javaClass.simpleName}")
                     cleanup()
                 }
             }
@@ -197,11 +200,19 @@ class FilterVpnService : VpnService() {
                 .collect { nextMode ->
                     if (nextMode != currentMode) {
                         Log.i(LogTag, "VPN strict web block changed: $currentMode -> $nextMode")
-                        reconnectVpn()
+                        requestReconnectVpn()
                     }
                     currentMode = nextMode
                 }
         }
+    }
+
+    private fun requestReconnectVpn() {
+        startService(
+            Intent(this, FilterVpnService::class.java).apply {
+                action = ActionReconnect
+            },
+        )
     }
 
     private fun Builder.allowBrowserApps(): Builder =
