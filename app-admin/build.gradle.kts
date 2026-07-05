@@ -24,7 +24,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 57
+            versionCode = 58
             versionNameSuffix = "-dev"
         }
         create("beta") {

@@ -54,7 +54,7 @@ internal fun SelectedDeviceHeader(
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(device.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "${device.status.label} | ${device.userLabel} | ${device.lastSeenLabel}",
+                        text = "${device.status.label} | ${device.lastSeenLabel}",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -123,7 +123,7 @@ internal fun UserDeviceCard(
             ) {
                 Text(device.name, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = "${device.status.label} | ${device.userLabel} | ${device.lastSeenLabel} | ${device.appCount} apps",
+                    text = "${device.status.label} | ${device.lastSeenLabel} | ${device.appCount} apps",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }

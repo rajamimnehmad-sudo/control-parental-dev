@@ -85,13 +85,12 @@ internal fun List<PolicyRule>.googleSearchAllowed(): Boolean =
 
 internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List<UserDeviceUiState> {
     val devicesById = associateBy { it.id }
-    val appDeviceIds = apps.mapTo(linkedSetOf()) { it.deviceId }
     val appsByDevice = apps.groupBy { it.deviceId }
     val localUserDeviceIds =
         filter { device ->
-            device.appRole != "admin" && (device.appRole == "user" || device.id in appDeviceIds)
+            device.appRole != "admin"
         }.map { it.id }
-    return (localUserDeviceIds + appDeviceIds)
+    return localUserDeviceIds
         .distinct()
         .map { deviceId ->
             val device = devicesById[deviceId]
@@ -130,10 +129,7 @@ private val UserDeviceStatus.sortOrder: Int
         }
 
 internal fun List<UserDeviceUiState>.selectedDeviceId(requestedDeviceId: String?): String? {
-    val requested = firstOrNull { it.id == requestedDeviceId }
-    if (requested == null) return firstOrNull { it.appCount > 0 }?.id ?: firstOrNull()?.id
-    if (requested.appCount > 0 || none { it.appCount > 0 }) return requested.id
-    return firstOrNull { it.appCount > 0 }?.id
+    return firstOrNull { it.id == requestedDeviceId }?.id
 }
 
 internal fun List<AppControlUiState>.filterBySearch(query: String): List<AppControlUiState> {
