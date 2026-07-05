@@ -21,6 +21,12 @@ class SharedPreferencesDeviceTokenProvider
                 .apply()
         }
 
+        override fun clearDeviceToken() {
+            preferences.edit()
+                .remove(DeviceTokenKey)
+                .apply()
+        }
+
         private companion object {
             const val PreferencesName = "device-token"
             const val DeviceTokenKey = "device-token"

@@ -8,6 +8,7 @@ import com.contentfilter.core.update.model.UpdateCheckResult
 import com.contentfilter.core.update.model.UpdateDownloadResult
 import com.contentfilter.core.update.repository.ApkUpdateRepository
 import com.contentfilter.user.BuildConfig
+import com.contentfilter.user.repair.UserLocalDataRepair
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,7 @@ class UpdatesViewModel
     constructor(
         private val updateRepository: ApkUpdateRepository,
         private val apkInstaller: ApkInstaller,
+        private val localDataRepair: UserLocalDataRepair,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(UpdatesUiState())
         val uiState: StateFlow<UpdatesUiState> = _uiState.asStateFlow()
@@ -110,6 +112,22 @@ class UpdatesViewModel
                 apkInstaller.openInstallPermissionSettings()
             }.onFailure { exception ->
                 Log.e(LogTag, "Open install permission settings failed: ${exception.message}", exception)
+            }
+        }
+
+        fun resetLocalDataForRelink() {
+            viewModelScope.launch {
+                runCatching {
+                    localDataRepair.resetLocalDataForRelink()
+                    _uiState.update {
+                        it.copy(devMessage = "Datos locales limpiados. Volvé a enlazar con un código nuevo.")
+                    }
+                }.onFailure { exception ->
+                    Log.e(LogTag, "Local relink reset failed: ${exception.message}", exception)
+                    _uiState.update {
+                        it.copy(devMessage = "No se pudo limpiar datos locales.")
+                    }
+                }
             }
         }
 

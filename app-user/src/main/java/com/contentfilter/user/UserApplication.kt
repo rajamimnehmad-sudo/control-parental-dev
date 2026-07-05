@@ -8,6 +8,7 @@ import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import com.contentfilter.user.apps.InstalledAppPublisher
+import com.contentfilter.user.repair.UserLocalDataRepair
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -39,6 +40,9 @@ class UserApplication :
     @Inject
     lateinit var installedAppPublisher: InstalledAppPublisher
 
+    @Inject
+    lateinit var localDataRepair: UserLocalDataRepair
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -50,8 +54,14 @@ class UserApplication :
     override fun onCreate() {
         super.onCreate()
         runCatching { syncScheduler.schedulePeriodicSync() }
-        runCatching { syncScheduler.requestSync() }
-        appScope.launch { runCatching { syncEngine.syncCoreDataFull() } }
+        appScope.launch {
+            runCatching { localDataRepair.repairIfNeeded() }
+            if (deviceActivationRepository.currentActivation() != null) {
+                runCatching { syncScheduler.requestSync() }
+                runCatching { syncEngine.syncCoreDataFull() }
+                runCatching { realtimeSyncCoordinator.start() }
+            }
+        }
         appScope.launch {
             deviceActivationRepository.observeActivation()
                 .map { it?.deviceId }
@@ -63,6 +73,5 @@ class UserApplication :
                     }
                 }
         }
-        runCatching { realtimeSyncCoordinator.start() }
     }
 }

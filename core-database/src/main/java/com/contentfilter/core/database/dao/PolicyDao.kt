@@ -66,4 +66,7 @@ interface PolicyDao {
 
     @Query("DELETE FROM policy_rules")
     suspend fun deleteAllRules()
+
+    @Query("DELETE FROM policies")
+    suspend fun deleteAllPolicies()
 }

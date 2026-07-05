@@ -4,4 +4,6 @@ interface DeviceTokenProvider {
     fun currentDeviceToken(): String?
 
     fun saveDeviceToken(token: String)
+
+    fun clearDeviceToken()
 }
