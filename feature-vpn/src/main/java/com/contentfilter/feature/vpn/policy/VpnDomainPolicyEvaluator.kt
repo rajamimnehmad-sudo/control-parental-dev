@@ -5,9 +5,6 @@ import com.contentfilter.core.domain.model.DomainPolicyContext
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyTargetType
-import com.contentfilter.core.domain.model.RuleAction
-import com.contentfilter.core.domain.model.RuleScope
-import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.policy.PolicyEngine
@@ -51,15 +48,6 @@ class VpnDomainPolicyEvaluator
                                 ),
                         ),
                 )
-            val protectedDecision =
-                if (policyDecision is PolicyDecision.Allow &&
-                    normalizedDomain.isSearchProtectionDomain() &&
-                    snapshot.hasSearchEngineBlockRule()
-                ) {
-                    PolicyDecision.Block("Blocked by search protection fallback.")
-                } else {
-                    policyDecision
-                }
             val limit =
                 snapshot.dailyLimits
                     .filter {
@@ -68,34 +56,16 @@ class VpnDomainPolicyEvaluator
                             normalizedDomain.matchesLimitTarget(it.target.normalizedDomain())
                     }
                     .minByOrNull { it.limitMinutes }
-            if (limit != null && protectedDecision is PolicyDecision.Allow) {
+            if (limit != null && policyDecision is PolicyDecision.Allow) {
                 val observedMinutes = dnsUsageTracker.recordMinute(limit.target, now, minuteOfDay)
                 if (observedMinutes > limit.limitMinutes) {
                     return PolicyDecision.Block("Daily DNS event limit exceeded for ${limit.target}.")
                 }
             }
-            return protectedDecision
+            return policyDecision
         }
 
         private fun String.matchesLimitTarget(target: String): Boolean = this == target || endsWith(".$target")
-
-        private fun PolicySnapshot.hasSearchEngineBlockRule(): Boolean =
-            rules.any {
-                it.enabled &&
-                    it.scope == RuleScope.Domain &&
-                    it.action == RuleAction.Block &&
-                    it.target.normalizedDomain().isSearchProtectionRuleTarget()
-            }
-
-        private fun String.isSearchProtectionRuleTarget(): Boolean =
-            SearchEngineCatalog.searchEngineDomains.any { matchesDomainTarget(it) || it.matchesDomainTarget(this) } ||
-                SearchEngineCatalog.secureDnsDomains.any { matchesDomainTarget(it) || it.matchesDomainTarget(this) }
-
-        private fun String.isSearchProtectionDomain(): Boolean =
-            SearchEngineCatalog.searchEngineDomains.any { matchesDomainTarget(it) } ||
-                SearchEngineCatalog.secureDnsDomains.any { matchesDomainTarget(it) }
-
-        private fun String.matchesDomainTarget(target: String): Boolean = this == target || endsWith(".$target")
 
         private fun String.normalizedDomain(): String =
             trim()

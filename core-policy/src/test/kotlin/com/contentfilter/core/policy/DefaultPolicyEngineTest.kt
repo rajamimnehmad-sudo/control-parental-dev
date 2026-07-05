@@ -14,6 +14,7 @@ import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
@@ -152,6 +153,101 @@ class DefaultPolicyEngineTest {
                 snapshot = policy(rules = listOf(domainRule(target = "blocked.test", action = RuleAction.Block))),
                 context = domainContext(domain = "blocked.test"),
             )
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `base google rule blocks google subdomains`() {
+        val snapshot = policy(rules = listOf(domainRule(target = "google.com", action = RuleAction.Block)))
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("search.google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
+    }
+
+    @Test
+    fun `search protection policy blocks clients4 when search blocking is active`() {
+        val snapshot = policy(rules = listOf(domainRule(target = "bing.com", action = RuleAction.Block)))
+
+        val decision = engine.evaluateDomain(snapshot, domainContext("clients4.google.com"))
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `search protection policy blocks clientservices without blocking all googleapis`() {
+        val snapshot = policy(rules = listOf(domainRule(target = "google.com", action = RuleAction.Block)))
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("clientservices.googleapis.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("maps.googleapis.com")))
+    }
+
+    @Test
+    fun `blocks search engines when web is blocked and search engines are disabled`() {
+        val snapshot = policy(rules = listOf(domainRule(target = "*", action = RuleAction.Block)))
+
+        SearchEngineCatalog.searchEngineDomains.forEach { domain ->
+            val decision = engine.evaluateDomain(snapshot, domainContext(domain))
+
+            assertIs<PolicyDecision.Block>(decision, "Expected $domain to be blocked")
+        }
+    }
+
+    @Test
+    fun `allows search engines but blocks result domains when web is blocked`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(domainRule(target = "*", action = RuleAction.Block)) +
+                        SearchEngineCatalog.searchEngineDomains.map { domain ->
+                            domainRule(target = domain, action = RuleAction.Allow, priority = 1_000)
+                        },
+            )
+
+        SearchEngineCatalog.searchEngineDomains.forEach { domain ->
+            val decision = engine.evaluateDomain(snapshot, domainContext(domain))
+
+            assertIs<PolicyDecision.Allow>(decision, "Expected $domain to be allowed")
+        }
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.google.com.ar")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.bing.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("duckduckgo.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("app.com")))
+    }
+
+    @Test
+    fun `blocks search engine when explicit search block overrides stale allow`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(target = "*", action = RuleAction.Block, priority = 10),
+                        domainRule(target = "google.com", action = RuleAction.Allow, priority = 1_000),
+                        domainRule(target = "google.com", action = RuleAction.Block, priority = 3_000),
+                    ),
+            )
+
+        val decision = engine.evaluateDomain(snapshot, domainContext("www.google.com"))
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `blocks secure dns providers when explicit search protection block exists`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(target = "*", action = RuleAction.Block, priority = 10),
+                        domainRule(target = "dns.google", action = RuleAction.Allow, priority = 1_000),
+                        domainRule(target = "dns.google", action = RuleAction.Block, priority = 3_000),
+                    ),
+            )
+
+        val decision = engine.evaluateDomain(snapshot, domainContext("dns.google"))
 
         assertIs<PolicyDecision.Block>(decision)
     }

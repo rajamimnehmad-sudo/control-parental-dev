@@ -8,7 +8,6 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
-import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.policy.DefaultPolicyEngine
@@ -61,33 +60,6 @@ class VpnDomainPolicyEvaluatorTest {
     }
 
     @Test
-    fun `base google rule blocks google subdomains`() {
-        val snapshot = snapshot(rule("google.com", RuleAction.Block, priority = 3_000))
-
-        assertIs<PolicyDecision.Block>(evaluator.evaluate("google.com", snapshot, activeHealth()))
-        assertIs<PolicyDecision.Block>(evaluator.evaluate("www.google.com", snapshot, activeHealth()))
-        assertIs<PolicyDecision.Block>(evaluator.evaluate("search.google.com", snapshot, activeHealth()))
-        assertIs<PolicyDecision.Block>(evaluator.evaluate("clients4.google.com", snapshot, activeHealth()))
-    }
-
-    @Test
-    fun `search protection fallback blocks clients4 when search block exists`() {
-        val snapshot = snapshot(rule("bing.com", RuleAction.Block, priority = 3_000))
-
-        val decision = evaluator.evaluate("clients4.google.com", snapshot, activeHealth())
-
-        assertIs<PolicyDecision.Block>(decision)
-    }
-
-    @Test
-    fun `search protection fallback blocks clientservices without blocking all googleapis`() {
-        val snapshot = snapshot(rule("google.com", RuleAction.Block, priority = 3_000))
-
-        assertIs<PolicyDecision.Block>(evaluator.evaluate("clientservices.googleapis.com", snapshot, activeHealth()))
-        assertIs<PolicyDecision.Allow>(evaluator.evaluate("maps.googleapis.com", snapshot, activeHealth()))
-    }
-
-    @Test
     fun `preserves safesearch extension flag`() {
         val decision =
             evaluator.evaluate(
@@ -101,67 +73,6 @@ class VpnDomainPolicyEvaluatorTest {
 
         val allow = assertIs<PolicyDecision.Allow>(decision)
         assertTrue(allow.safeSearchRequired)
-    }
-
-    @Test
-    fun `blocks search engines when web is blocked and search engines are disabled`() {
-        val snapshot = snapshot(rule("*", RuleAction.Block, priority = 10))
-
-        SearchEngineDomains.forEach { domain ->
-            val decision = evaluator.evaluate(domain, snapshot, activeHealth())
-
-            assertIs<PolicyDecision.Block>(decision, "Expected $domain to be blocked")
-        }
-    }
-
-    @Test
-    fun `allows search engines but blocks result domains when web is blocked`() {
-        val snapshot =
-            snapshot(
-                rule("*", RuleAction.Block, priority = 10),
-                *SearchEngineDomains
-                    .map { domain -> rule(domain, RuleAction.Allow, priority = 1_000) }
-                    .toTypedArray(),
-            )
-
-        SearchEngineDomains.forEach { domain ->
-            val decision = evaluator.evaluate(domain, snapshot, activeHealth())
-
-            assertIs<PolicyDecision.Allow>(decision, "Expected $domain to be allowed")
-        }
-        assertIs<PolicyDecision.Allow>(evaluator.evaluate("www.google.com", snapshot, activeHealth()))
-        assertIs<PolicyDecision.Allow>(evaluator.evaluate("www.google.com.ar", snapshot, activeHealth()))
-        assertIs<PolicyDecision.Allow>(evaluator.evaluate("www.bing.com", snapshot, activeHealth()))
-        assertIs<PolicyDecision.Allow>(evaluator.evaluate("duckduckgo.com", snapshot, activeHealth()))
-        assertIs<PolicyDecision.Block>(evaluator.evaluate("app.com", snapshot, activeHealth()))
-    }
-
-    @Test
-    fun `blocks search engine when explicit search block overrides stale allow`() {
-        val snapshot =
-            snapshot(
-                rule("*", RuleAction.Block, priority = 10),
-                rule("google.com", RuleAction.Allow, priority = 1_000),
-                rule("google.com", RuleAction.Block, priority = 3_000),
-            )
-
-        val decision = evaluator.evaluate("www.google.com", snapshot, activeHealth())
-
-        assertIs<PolicyDecision.Block>(decision)
-    }
-
-    @Test
-    fun `blocks secure dns providers when explicit search protection block exists`() {
-        val snapshot =
-            snapshot(
-                rule("*", RuleAction.Block, priority = 10),
-                rule("dns.google", RuleAction.Allow, priority = 1_000),
-                rule("dns.google", RuleAction.Block, priority = 3_000),
-            )
-
-        val decision = evaluator.evaluate("dns.google", snapshot, activeHealth())
-
-        assertIs<PolicyDecision.Block>(decision)
     }
 
     private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =
@@ -208,6 +119,5 @@ class VpnDomainPolicyEvaluatorTest {
 
     private companion object {
         const val FixedTime = 1_735_689_600_000L
-        val SearchEngineDomains = SearchEngineCatalog.searchEngineDomains
     }
 }

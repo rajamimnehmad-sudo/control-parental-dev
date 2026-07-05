@@ -13,6 +13,7 @@ import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
 
@@ -65,7 +66,14 @@ class DefaultPolicyEngine : PolicyEngine {
             return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
         }
         val rule = snapshot.rules.bestMatchingRule(normalizedContext)
-        return rule?.toDecision(normalizedContext.domain) ?: PolicyDecision.Allow()
+        val decision = rule?.toDecision(normalizedContext.domain) ?: PolicyDecision.Allow()
+        if (decision is PolicyDecision.Allow &&
+            normalizedContext.domain.isSearchProtectionDomain() &&
+            snapshot.hasSearchEngineBlockRule()
+        ) {
+            return PolicyDecision.Block("Blocked by search protection policy.")
+        }
+        return decision
     }
 
     override fun evaluate(
@@ -214,5 +222,21 @@ class DefaultPolicyEngine : PolicyEngine {
         fun String.matchesDomainTarget(target: String): Boolean = this == target || endsWith(".$target")
 
         fun String.matchesAny(targets: Set<String>): Boolean = targets.any { matchesDomainTarget(it) }
+
+        fun PolicySnapshot.hasSearchEngineBlockRule(): Boolean =
+            rules.any {
+                it.enabled &&
+                    it.scope == RuleScope.Domain &&
+                    it.action == RuleAction.Block &&
+                    it.target.normalizedDomain().isSearchProtectionRuleTarget()
+            }
+
+        fun String.isSearchProtectionRuleTarget(): Boolean =
+            SearchEngineCatalog.searchEngineDomains.any { matchesDomainTarget(it) || it.matchesDomainTarget(this) } ||
+                SearchEngineCatalog.secureDnsDomains.any { matchesDomainTarget(it) || it.matchesDomainTarget(this) }
+
+        fun String.isSearchProtectionDomain(): Boolean =
+            SearchEngineCatalog.searchEngineDomains.any { matchesDomainTarget(it) } ||
+                SearchEngineCatalog.secureDnsDomains.any { matchesDomainTarget(it) }
     }
 }
