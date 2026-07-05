@@ -8,11 +8,13 @@ import androidx.room.PrimaryKey
     tableName = "policies",
     indices = [
         Index(value = ["active"]),
+        Index(value = ["deviceId"]),
         Index(value = ["updatedAtEpochMillis"]),
     ],
 )
 data class PolicyEntity(
     @PrimaryKey val id: String,
+    val deviceId: String?,
     val version: Long,
     val active: Boolean,
     val updatedAtEpochMillis: Long,

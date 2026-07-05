@@ -5,5 +5,5 @@ import com.contentfilter.core.domain.repository.DailyLimitRepository
 class ObserveDailyLimitsUseCase(
     private val repository: DailyLimitRepository,
 ) {
-    operator fun invoke() = repository.observeLimits()
+    operator fun invoke(deviceId: String? = null) = repository.observeLimits(deviceId)
 }

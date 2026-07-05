@@ -249,6 +249,7 @@ class MyAppsViewModel
                 accessRequestRepository.saveRequest(
                     request.copy(
                         status = if (pushedDirectly) RequestStatus.PendingRemote else RequestStatus.PendingLocal,
+                        deviceId = activation?.deviceId,
                     ),
                 )
                 syncScheduler.requestSync()

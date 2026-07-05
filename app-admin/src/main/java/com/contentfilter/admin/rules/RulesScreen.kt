@@ -39,7 +39,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 
@@ -69,6 +71,7 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onToggle = viewModel::toggle,
         onDelete = viewModel::delete,
+        onDeleteDomainLimit = viewModel::deleteDomainLimit,
     )
 }
 
@@ -96,6 +99,7 @@ private fun RulesScreen(
     onAppLimitSaved: (String, String) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
+    onDeleteDomainLimit: (DailyLimit) -> Unit,
 ) {
     val visibleDomainRules =
         state.rules.filter {
@@ -104,6 +108,14 @@ private fun RulesScreen(
             it.target !in SearchEngineDomainsForUi &&
                 it.action == if (state.internetBlocked) RuleAction.Allow else RuleAction.Block
         }
+    val visibleDomainLimits =
+        state.limits.filter {
+            it.enabled &&
+                it.targetType == PolicyTargetType.Domain &&
+                it.target !in SearchEngineDomainsForUi
+        }
+    val visibleDomainRuleTargets = visibleDomainRules.map { it.target }.toSet()
+    val orphanDomainLimits = visibleDomainLimits.filter { it.target !in visibleDomainRuleTargets }
     val otherRules = state.rules.filter { it.scope != RuleScope.App && it.scope != RuleScope.Domain }
     val selectedDevice = state.userDevices.firstOrNull { it.id == state.selectedDeviceId }
     var selectedPanel by rememberSaveable(state.selectedDeviceId) { mutableStateOf(DevicePanel.Apps) }
@@ -325,7 +337,20 @@ private fun RulesScreen(
                     }
                 }
                 items(visibleDomainRules, key = { it.id }) { rule ->
-                    RuleCard(rule = rule, onToggle = { onToggle(rule) }, onDelete = { onDelete(rule) })
+                    RuleCard(
+                        rule = rule,
+                        dailyLimitMinutes = visibleDomainLimits.firstOrNull { it.target == rule.target }?.limitMinutes,
+                        onToggle = { onToggle(rule) },
+                        onDelete = { onDelete(rule) },
+                    )
+                }
+                if (orphanDomainLimits.isNotEmpty()) {
+                    item {
+                        SectionHeader(title = "Límites sin regla visible", count = orphanDomainLimits.size)
+                    }
+                    items(orphanDomainLimits, key = { it.id }) { limit ->
+                        DomainLimitCard(limit = limit, onDelete = { onDeleteDomainLimit(limit) })
+                    }
                 }
             }
             if (otherRules.isNotEmpty()) {

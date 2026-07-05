@@ -26,7 +26,12 @@ class RoomRemoteApplier
         suspend fun applyPolicies(values: List<RemotePolicyDto>) {
             values.forEach { policy ->
                 if (policy.active && policy.deletedAt == null) {
-                    policyDao.deactivateOtherPolicies(policy.id)
+                    val deviceId = policy.deviceId
+                    if (deviceId != null) {
+                        policyDao.deactivateOtherPoliciesForDevice(policy.id, deviceId)
+                    } else {
+                        policyDao.deactivateOtherPoliciesWithoutDevice(policy.id)
+                    }
                 }
                 policyDao.upsertPolicy(policy.toEntity())
             }
@@ -59,7 +64,13 @@ class RoomRemoteApplier
         }
 
         suspend fun applyDailyLimits(values: List<RemoteDailyLimitDto>) {
-            values.forEach { dailyLimitDao.upsert(it.toEntity()) }
+            values.forEach { limit ->
+                if (limit.deletedAt == null) {
+                    dailyLimitDao.upsert(limit.toEntity())
+                } else {
+                    dailyLimitDao.deleteById(limit.id)
+                }
+            }
         }
 
         suspend fun applyAccessRequests(values: List<RemoteAccessRequestDto>) {

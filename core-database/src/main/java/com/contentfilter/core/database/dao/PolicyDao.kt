@@ -16,11 +16,37 @@ interface PolicyDao {
     @Query("SELECT * FROM policies WHERE active = 1 ORDER BY updatedAtEpochMillis DESC LIMIT 1")
     suspend fun activePolicy(): PolicyEntity?
 
+    @Query(
+        """
+        SELECT * FROM policies
+        WHERE active = 1 AND deviceId = :deviceId
+        ORDER BY updatedAtEpochMillis DESC
+        LIMIT 1
+        """,
+    )
+    fun observeActivePolicyForDevice(deviceId: String): Flow<PolicyEntity?>
+
+    @Query(
+        """
+        SELECT * FROM policies
+        WHERE active = 1 AND deviceId = :deviceId
+        ORDER BY updatedAtEpochMillis DESC
+        LIMIT 1
+        """,
+    )
+    suspend fun activePolicyForDevice(deviceId: String): PolicyEntity?
+
     @Query("SELECT * FROM policies WHERE active = 1 ORDER BY updatedAtEpochMillis DESC")
     fun observeActivePolicies(): Flow<List<PolicyEntity>>
 
     @Query("SELECT * FROM policies WHERE active = 1 ORDER BY updatedAtEpochMillis DESC")
     suspend fun activePolicies(): List<PolicyEntity>
+
+    @Query("SELECT policyId FROM policy_rules WHERE id = :ruleId LIMIT 1")
+    suspend fun policyIdForRule(ruleId: String): String?
+
+    @Query("SELECT * FROM policies WHERE id = :policyId LIMIT 1")
+    suspend fun policyById(policyId: String): PolicyEntity?
 
     @Query("SELECT * FROM policy_rules WHERE policyId = :policyId")
     suspend fun rulesForPolicy(policyId: String): List<PolicyRuleEntity>
@@ -54,6 +80,15 @@ interface PolicyDao {
 
     @Query("UPDATE policies SET active = 0 WHERE id != :policyId")
     suspend fun deactivateOtherPolicies(policyId: String)
+
+    @Query("UPDATE policies SET active = 0 WHERE id != :policyId AND deviceId = :deviceId")
+    suspend fun deactivateOtherPoliciesForDevice(
+        policyId: String,
+        deviceId: String,
+    )
+
+    @Query("UPDATE policies SET active = 0 WHERE id != :policyId AND deviceId IS NULL")
+    suspend fun deactivateOtherPoliciesWithoutDevice(policyId: String)
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertRule(rule: PolicyRuleEntity)

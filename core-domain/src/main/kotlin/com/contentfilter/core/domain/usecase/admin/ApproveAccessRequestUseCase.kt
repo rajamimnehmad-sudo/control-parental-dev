@@ -18,17 +18,17 @@ class ApproveAccessRequestUseCase(
 ) {
     suspend operator fun invoke(request: AccessRequest) {
         request.allowTarget()?.let { target ->
-            policyRepository.getActivePolicy().rules
+            policyRepository.getActivePolicy(request.deviceId).rules
                 .filter {
                     it.enabled &&
                         it.scope == RuleScope.App &&
                         it.target == target &&
                         it.action == RuleAction.Block
                 }
-                .forEach { policyRepository.saveRule(it.copy(enabled = false)) }
+                .forEach { policyRepository.saveRule(it.copy(enabled = false), request.deviceId) }
         }
         request.toAllowRule()?.let { rule ->
-            policyRepository.saveRule(rule)
+            policyRepository.saveRule(rule, request.deviceId)
         }
         requestRepository.updateStatus(request.id, RequestStatus.Approved)
     }

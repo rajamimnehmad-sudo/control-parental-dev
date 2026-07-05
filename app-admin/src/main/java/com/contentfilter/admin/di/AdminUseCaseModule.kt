@@ -6,6 +6,7 @@ import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.usecase.admin.ApproveAccessRequestUseCase
+import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
 import com.contentfilter.core.domain.usecase.admin.GrantExtraTimeUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDailyLimitsUseCase
@@ -66,4 +67,8 @@ object AdminUseCaseModule {
     @Provides
     fun provideSaveDailyLimitUseCase(repository: DailyLimitRepository): SaveDailyLimitUseCase =
         SaveDailyLimitUseCase(repository)
+
+    @Provides
+    fun provideDeleteDailyLimitUseCase(repository: DailyLimitRepository): DeleteDailyLimitUseCase =
+        DeleteDailyLimitUseCase(repository)
 }

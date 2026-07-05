@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.PolicyRule
 
 @Composable
@@ -198,6 +199,7 @@ internal fun DomainLimitEditorCard(
 @Composable
 internal fun RuleCard(
     rule: PolicyRule,
+    dailyLimitMinutes: Int? = null,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -225,6 +227,9 @@ internal fun RuleCard(
                 )
             }
             Text("Acción: ${rule.action.displayName()}")
+            if (dailyLimitMinutes != null) {
+                Text("Límite diario: $dailyLimitMinutes min")
+            }
             Text("Estado: ${if (rule.enabled) "Activada" else "Desactivada"}")
             OutlinedButton(onClick = { confirmDelete = true }) {
                 Text("Eliminar")
@@ -236,6 +241,49 @@ internal fun RuleCard(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Eliminar regla") },
             text = { Text("Esta regla se eliminará de este entorno DEV.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        confirmDelete = false
+                        onDelete()
+                    },
+                ) {
+                    Text("Eliminar")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { confirmDelete = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+internal fun DomainLimitCard(
+    limit: DailyLimit,
+    onDelete: () -> Unit,
+) {
+    var confirmDelete by remember { mutableStateOf(false) }
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text(limit.target, style = MaterialTheme.typography.titleMedium)
+            Text("Límite diario: ${limit.limitMinutes} min")
+            Text("Estado: ${if (limit.enabled) "Activado" else "Desactivado"}")
+            OutlinedButton(onClick = { confirmDelete = true }) {
+                Text("Eliminar límite")
+            }
+        }
+    }
+    if (confirmDelete) {
+        AlertDialog(
+            onDismissRequest = { confirmDelete = false },
+            title = { Text("Eliminar límite") },
+            text = { Text("Este límite de dominio se eliminará de este entorno DEV.") },
             confirmButton = {
                 Button(
                     onClick = {

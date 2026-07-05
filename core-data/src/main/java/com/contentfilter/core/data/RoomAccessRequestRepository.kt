@@ -4,6 +4,7 @@ import android.util.Log
 import com.contentfilter.core.database.dao.AccessRequestDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.OutboxOperationDao
+import com.contentfilter.core.database.entity.DeviceActivationEntity
 import com.contentfilter.core.database.entity.OutboxOperationEntity
 import com.contentfilter.core.domain.model.AccessRequest
 import com.contentfilter.core.domain.model.RequestStatus
@@ -31,12 +32,14 @@ class RoomAccessRequestRepository
             accessRequestDao.observeAll().map { requests -> requests.map { it.toDomain() } }
 
         override suspend fun saveRequest(request: AccessRequest) {
-            accessRequestDao.upsert(request.toEntity())
-            val operation = request.toOutboxOperation()
+            val activation = deviceActivationDao.latest()
+            val requestWithDevice = request.copy(deviceId = request.deviceId ?: activation?.deviceId)
+            accessRequestDao.upsert(requestWithDevice.toEntity())
+            val operation = requestWithDevice.toOutboxOperation(activation)
             outboxDao.upsert(operation)
             Log.i(
                 LOG_TAG,
-                "Saved access request id=${request.id} status=${request.status} outboxId=${operation.id}",
+                "Saved access request id=${requestWithDevice.id} status=${requestWithDevice.status} outboxId=${operation.id}",
             )
         }
 
@@ -47,18 +50,20 @@ class RoomAccessRequestRepository
             val current = accessRequestDao.requestById(requestId) ?: return
             val updated = current.toDomain().copy(status = status)
             accessRequestDao.upsert(updated.toEntity())
-            val operation = updated.toOutboxOperation()
+            val operation = updated.toOutboxOperation(deviceActivationDao.latest())
             outboxDao.upsert(operation)
             Log.i(LOG_TAG, "Updated access request id=$requestId status=$status outboxId=${operation.id}")
         }
 
-        private suspend fun AccessRequest.toOutboxOperation(): OutboxOperationEntity {
+        private fun AccessRequest.toOutboxOperation(
+            activation: DeviceActivationEntity?,
+        ): OutboxOperationEntity {
             val now = System.currentTimeMillis()
             return OutboxOperationEntity(
                 id = UUID.randomUUID().toString(),
                 tableName = ACCESS_REQUESTS_TABLE,
                 operation = UPSERT_OPERATION,
-                payload = toRemoteJson().toString(),
+                payload = toRemoteJson(activation).toString(),
                 status = PENDING_STATUS,
                 attemptCount = 0,
                 createdAtEpochMillis = now,
@@ -66,15 +71,17 @@ class RoomAccessRequestRepository
             )
         }
 
-        private suspend fun AccessRequest.toRemoteJson(): JSONObject =
-            deviceActivationDao.latest().let { activation ->
+        private fun AccessRequest.toRemoteJson(
+            activation: DeviceActivationEntity?,
+        ): JSONObject =
+            activation.let {
                 if (activation == null) {
                     Log.w(LOG_TAG, "Access request id=$id enqueued without local activation.")
                 }
                 JSONObject()
                     .put("id", id)
                     .put("account_id", activation?.accountId)
-                    .put("device_id", activation?.deviceId)
+                    .put("device_id", deviceId)
                     .put("request_type", requestType.name)
                     .put("target_type", targetType.name)
                     .put("target", target)

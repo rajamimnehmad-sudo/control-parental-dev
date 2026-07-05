@@ -6,5 +6,5 @@ import kotlinx.coroutines.flow.map
 class ObservePolicyRulesUseCase(
     private val repository: PolicyRepository,
 ) {
-    operator fun invoke() = repository.observeActivePolicy().map { it.rules }
+    operator fun invoke(deviceId: String? = null) = repository.observeActivePolicy(deviceId).map { it.rules }
 }

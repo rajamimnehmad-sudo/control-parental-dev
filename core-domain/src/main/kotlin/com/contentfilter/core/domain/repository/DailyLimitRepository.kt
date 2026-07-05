@@ -7,7 +7,12 @@ import kotlinx.coroutines.flow.Flow
  * Stores local daily limits used by the PolicyEngine.
  */
 interface DailyLimitRepository {
-    fun observeLimits(): Flow<List<DailyLimit>>
+    fun observeLimits(deviceId: String? = null): Flow<List<DailyLimit>>
 
-    suspend fun saveLimit(limit: DailyLimit)
+    suspend fun saveLimit(
+        limit: DailyLimit,
+        deviceId: String? = null,
+    )
+
+    suspend fun deleteLimit(limit: DailyLimit)
 }

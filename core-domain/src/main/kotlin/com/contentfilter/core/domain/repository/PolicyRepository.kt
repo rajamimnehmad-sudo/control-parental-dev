@@ -8,11 +8,14 @@ import kotlinx.coroutines.flow.Flow
  * Source of the active local policy.
  */
 interface PolicyRepository {
-    fun observeActivePolicy(): Flow<PolicySnapshot>
+    fun observeActivePolicy(deviceId: String? = null): Flow<PolicySnapshot>
 
-    suspend fun getActivePolicy(): PolicySnapshot
+    suspend fun getActivePolicy(deviceId: String? = null): PolicySnapshot
 
-    suspend fun saveRule(rule: PolicyRule)
+    suspend fun saveRule(
+        rule: PolicyRule,
+        deviceId: String? = null,
+    )
 
     suspend fun deleteRule(rule: PolicyRule)
 }

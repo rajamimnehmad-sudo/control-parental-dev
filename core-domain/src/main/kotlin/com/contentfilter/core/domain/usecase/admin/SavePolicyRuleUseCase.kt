@@ -6,7 +6,10 @@ import com.contentfilter.core.domain.repository.PolicyRepository
 class SavePolicyRuleUseCase(
     private val repository: PolicyRepository,
 ) {
-    suspend operator fun invoke(rule: PolicyRule) {
-        repository.saveRule(rule)
+    suspend operator fun invoke(
+        rule: PolicyRule,
+        deviceId: String? = null,
+    ) {
+        repository.saveRule(rule, deviceId)
     }
 }

@@ -5,6 +5,7 @@ package com.contentfilter.core.domain.model
  */
 data class PolicySnapshot(
     val id: String,
+    val deviceId: String? = null,
     val version: Long,
     val rules: List<PolicyRule>,
     val dailyLimits: List<DailyLimit> = emptyList(),

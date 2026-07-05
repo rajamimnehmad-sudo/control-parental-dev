@@ -16,6 +16,7 @@ import com.contentfilter.core.network.dto.RemotePolicyRuleDto
 internal fun RemotePolicyDto.toEntity(): PolicyEntity =
     PolicyEntity(
         id = id,
+        deviceId = deviceId,
         version = version,
         active = active && deletedAt == null,
         updatedAtEpochMillis = updatedAt.toEpochMillis(),
@@ -44,6 +45,7 @@ internal fun RemotePolicyRuleDto.toEntity(): PolicyRuleEntity =
 internal fun RemoteDailyLimitDto.toEntity(): DailyLimitEntity =
     DailyLimitEntity(
         id = id,
+        policyId = policyId,
         targetType = targetType,
         target = target,
         limitMinutes = limitMinutes,
@@ -53,6 +55,7 @@ internal fun RemoteDailyLimitDto.toEntity(): DailyLimitEntity =
 internal fun RemoteAccessRequestDto.toEntity(): AccessRequestEntity =
     AccessRequestEntity(
         id = id,
+        deviceId = deviceId,
         requestType = requestType,
         targetType = targetType,
         target = target,

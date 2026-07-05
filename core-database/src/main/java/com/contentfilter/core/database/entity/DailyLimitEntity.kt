@@ -8,11 +8,13 @@ import androidx.room.PrimaryKey
     tableName = "daily_limits",
     indices = [
         Index(value = ["enabled"]),
-        Index(value = ["targetType", "target"], unique = true),
+        Index(value = ["policyId"]),
+        Index(value = ["policyId", "targetType", "target"], unique = true),
     ],
 )
 data class DailyLimitEntity(
     @PrimaryKey val id: String,
+    val policyId: String?,
     val targetType: String,
     val target: String,
     val limitMinutes: Int,

@@ -45,5 +45,24 @@ object DatabaseMigrations {
             }
         }
 
-    val All: Array<Migration> = arrayOf(Migration1To2, Migration2To3, Migration3To4)
+    val Migration4To5: Migration =
+        object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE policies ADD COLUMN deviceId TEXT")
+                db.execSQL("ALTER TABLE daily_limits ADD COLUMN policyId TEXT")
+                db.execSQL("ALTER TABLE access_requests ADD COLUMN deviceId TEXT")
+                db.execSQL("DROP INDEX IF EXISTS index_daily_limits_targetType_target")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_policies_deviceId ON policies(deviceId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_daily_limits_policyId ON daily_limits(policyId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_access_requests_deviceId ON access_requests(deviceId)")
+                db.execSQL(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS index_daily_limits_policyId_targetType_target
+                    ON daily_limits(policyId, targetType, target)
+                    """.trimIndent(),
+                )
+            }
+        }
+
+    val All: Array<Migration> = arrayOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5)
 }

@@ -16,6 +16,7 @@ internal fun DailyLimitEntity.toDomain(): DailyLimit =
 internal fun DailyLimit.toEntity(): DailyLimitEntity =
     DailyLimitEntity(
         id = id,
+        policyId = null,
         targetType = targetType.name,
         target = target,
         limitMinutes = limitMinutes,

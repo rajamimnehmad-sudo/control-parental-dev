@@ -9,6 +9,7 @@ import com.contentfilter.core.domain.model.RequestStatus
 internal fun AccessRequestEntity.toDomain(): AccessRequest =
     AccessRequest(
         id = id,
+        deviceId = deviceId,
         requestType = enumValueOrDefault(requestType, AccessRequestType.APP_ACCESS),
         targetType = enumValueOrDefault(targetType, PolicyTargetType.Global),
         target = target,
@@ -24,6 +25,7 @@ internal fun AccessRequestEntity.toDomain(): AccessRequest =
 internal fun AccessRequest.toEntity(): AccessRequestEntity =
     AccessRequestEntity(
         id = id,
+        deviceId = deviceId,
         requestType = requestType.name,
         targetType = targetType.name,
         target = target,

@@ -9,7 +9,10 @@ import com.contentfilter.core.database.entity.PolicyEntity
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.repository.DailyLimitRepository
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import java.time.Instant
 import java.util.UUID
@@ -23,23 +26,58 @@ class RoomDailyLimitRepository
         private val outboxDao: OutboxOperationDao,
         private val deviceActivationDao: DeviceActivationDao,
     ) : DailyLimitRepository {
-        override fun observeLimits(): Flow<List<DailyLimit>> =
-            dailyLimitDao.observeEnabled().map { limits ->
+        @OptIn(ExperimentalCoroutinesApi::class)
+        override fun observeLimits(deviceId: String?): Flow<List<DailyLimit>> =
+            activeDeviceIdFlow(deviceId).flatMapLatest { activeDeviceId ->
+                if (activeDeviceId != null) {
+                    dailyLimitDao.observeEnabledForDevice(activeDeviceId)
+                } else {
+                    dailyLimitDao.observeEnabled()
+                }
+            }.map { limits ->
                 limits
                     .map { it.toDomain() }
                     .filter { it.targetType == PolicyTargetType.App || it.targetType == PolicyTargetType.Domain }
             }
 
-        override suspend fun saveLimit(limit: DailyLimit) {
-            val policy = policyDao.activePolicy() ?: createDefaultPolicy()
-            dailyLimitDao.upsert(limit.toEntity())
+        override suspend fun saveLimit(
+            limit: DailyLimit,
+            deviceId: String?,
+        ) {
+            val targetDeviceId = deviceId ?: deviceActivationDao.latest()?.deviceId
+            val policy = activePolicy(targetDeviceId) ?: createDefaultPolicy(targetDeviceId)
+            dailyLimitDao.upsert(limit.toEntity().copy(policyId = policy.id))
             outboxDao.upsert(limit.toOutboxOperation(policy.id, deviceActivationDao.latest()?.accountId))
         }
 
-        private suspend fun createDefaultPolicy(): PolicyEntity {
+        override suspend fun deleteLimit(limit: DailyLimit) {
+            val policyId =
+                dailyLimitDao.byId(limit.id)?.policyId
+                    ?: policyDao.activePolicy()?.id
+                    ?: return
+            dailyLimitDao.deleteById(limit.id)
+            outboxDao.upsert(limit.toDeletedOutboxOperation(policyId, deviceActivationDao.latest()?.accountId))
+        }
+
+        private fun activeDeviceIdFlow(deviceId: String?): Flow<String?> =
+            if (deviceId != null) {
+                flowOf(deviceId)
+            } else {
+                deviceActivationDao.observeLatest().map { it?.deviceId }
+            }
+
+        private suspend fun activePolicy(deviceId: String?): PolicyEntity? =
+            if (deviceId != null) {
+                policyDao.activePolicyForDevice(deviceId)
+            } else {
+                policyDao.activePolicy()
+            }
+
+        private suspend fun createDefaultPolicy(deviceId: String?): PolicyEntity {
             val policy =
                 PolicyEntity(
                     id = UUID.randomUUID().toString(),
+                    deviceId = deviceId,
                     version = System.currentTimeMillis(),
                     active = true,
                     updatedAtEpochMillis = System.currentTimeMillis(),
@@ -64,7 +102,41 @@ class RoomDailyLimitRepository
                     .put("enabled", enabled)
                     .put("updated_at", Instant.ofEpochMilli(now).toString())
                     .toString()
-            return OutboxOperationEntity(
+            return outboxOperation(
+                payload = payload,
+                now = now,
+            )
+        }
+
+        private fun DailyLimit.toDeletedOutboxOperation(
+            policyId: String,
+            accountId: String?,
+        ): OutboxOperationEntity {
+            val now = System.currentTimeMillis()
+            val deletedAt = Instant.ofEpochMilli(now).toString()
+            val payload =
+                org.json.JSONObject()
+                    .put("id", id)
+                    .put("account_id", accountId)
+                    .put("policy_id", policyId)
+                    .put("target_type", targetType.name)
+                    .put("target", target)
+                    .put("limit_minutes", limitMinutes)
+                    .put("enabled", false)
+                    .put("updated_at", deletedAt)
+                    .put("deleted_at", deletedAt)
+                    .toString()
+            return outboxOperation(
+                payload = payload,
+                now = now,
+            )
+        }
+
+        private fun outboxOperation(
+            payload: String,
+            now: Long,
+        ): OutboxOperationEntity =
+            OutboxOperationEntity(
                 id = UUID.randomUUID().toString(),
                 tableName = DAILY_LIMITS_TABLE,
                 operation = UPSERT_OPERATION,
@@ -74,7 +146,6 @@ class RoomDailyLimitRepository
                 createdAtEpochMillis = now,
                 updatedAtEpochMillis = now,
             )
-        }
 
         private companion object {
             const val DAILY_LIMITS_TABLE = "daily_limits"

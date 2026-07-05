@@ -15,4 +15,5 @@ data class AccessRequest(
     val status: RequestStatus,
     val createdAtEpochMillis: Long,
     val expiresAtEpochMillis: Long?,
+    val deviceId: String? = null,
 )

@@ -9,10 +9,12 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["status", "createdAtEpochMillis"]),
         Index(value = ["targetType", "target"]),
+        Index(value = ["deviceId"]),
     ],
 )
 data class AccessRequestEntity(
     @PrimaryKey val id: String,
+    val deviceId: String?,
     val requestType: String,
     val targetType: String,
     val target: String,

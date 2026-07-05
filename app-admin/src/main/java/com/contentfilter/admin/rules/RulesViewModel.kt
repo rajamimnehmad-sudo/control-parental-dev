@@ -12,6 +12,7 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.repository.DeviceRepository
+import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDailyLimitsUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
@@ -26,11 +27,15 @@ import com.contentfilter.core.network.remote.SupabaseDevMaintenanceClient
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -42,6 +47,7 @@ import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class RulesViewModel
     @Inject
     constructor(
@@ -51,6 +57,7 @@ class RulesViewModel
         private val saveRule: SavePolicyRuleUseCase,
         private val deleteRule: DeletePolicyRuleUseCase,
         private val saveDailyLimit: SaveDailyLimitUseCase,
+        private val deleteDailyLimitUseCase: DeleteDailyLimitUseCase,
         private val deviceRepository: DeviceRepository,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
         private val activationClient: SupabaseActivationClient,
@@ -63,12 +70,14 @@ class RulesViewModel
                 RulesUiState(),
             )
         private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
-        private val policyRules = observePolicyRules()
+        private val selectedPolicyDeviceId = form.map { it.selectedDeviceId }.distinctUntilChanged()
+        private val policyRules = selectedPolicyDeviceId.flatMapLatest { observePolicyRules(it) }
+        private val dailyLimits = selectedPolicyDeviceId.flatMapLatest { observeDailyLimits(it) }
 
         val uiState =
             combine(
                 policyRules,
-                observeDailyLimits(),
+                dailyLimits,
                 observeDevices(),
                 installedApps,
                 form,
@@ -247,6 +256,7 @@ class RulesViewModel
         }
 
         fun saveAllowedDomainLimit() {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
             val target = normalizeLimitTarget(PolicyTargetType.Domain, form.value.allowDomain)
             val minutes = form.value.allowDomainMinutes.toIntOrNull()
             if (target == null || minutes == null || minutes <= 0) {
@@ -254,19 +264,8 @@ class RulesViewModel
                 return
             }
             viewModelScope.launch {
-                saveAllowedDomain(target)
-                saveDailyLimit(
-                    DailyLimit(
-                        id =
-                            uiState.value.limits.firstOrNull {
-                                it.targetType == PolicyTargetType.Domain && it.target == target
-                            }?.id ?: UUID.randomUUID().toString(),
-                        targetType = PolicyTargetType.Domain,
-                        target = target,
-                        limitMinutes = minutes,
-                        enabled = true,
-                    ),
-                )
+                saveAllowedDomain(target, targetDeviceId)
+                saveDomainDailyLimit(target, minutes, targetDeviceId)
                 syncScheduler.requestSync()
                 syncNow()
                 form.update {
@@ -280,6 +279,11 @@ class RulesViewModel
         }
 
         fun setInternetBlocked(blocked: Boolean) {
+            val targetDeviceId = uiState.value.selectedDeviceId
+            if (targetDeviceId == null) {
+                form.update { it.copy(message = "Seleccioná un dispositivo.") }
+                return
+            }
             val currentState = uiState.value
             val existingRules = currentState.rules.internetBlockRules()
             val previousRoom = currentState.rules.internetBlocked()
@@ -320,9 +324,9 @@ class RulesViewModel
                                         enabled = blocked,
                                     ),
                                 )
-                            }
+	                            }
                         rulesToSave.forEach { rule ->
-                            saveRule(rule.copy(enabled = blocked))
+                            saveRule(rule.copy(enabled = blocked), targetDeviceId)
                         }
                         if (blocked) {
                             setGoogleSearchAllowedRules(allowed = false)
@@ -394,8 +398,9 @@ class RulesViewModel
         }
 
         fun toggle(rule: PolicyRule) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
             viewModelScope.launch {
-                saveRule(rule.copy(enabled = !rule.enabled))
+                saveRule(rule.copy(enabled = !rule.enabled), targetDeviceId)
                 syncScheduler.requestSync()
                 syncNow()
             }
@@ -403,10 +408,32 @@ class RulesViewModel
 
         fun delete(rule: PolicyRule) {
             viewModelScope.launch {
+                val associatedLimit = rule.associatedDomainLimit()
                 deleteRule(rule)
+                if (associatedLimit != null) {
+                    deleteDailyLimitUseCase(associatedLimit)
+                }
                 syncScheduler.requestSync()
                 syncNow()
-                form.update { it.copy(message = "Regla eliminada.") }
+                form.update {
+                    it.copy(
+                        message =
+                            if (associatedLimit != null) {
+                                "Regla y límite asociado eliminados."
+                            } else {
+                                "Regla eliminada."
+                            },
+                    )
+                }
+            }
+        }
+
+        fun deleteDomainLimit(limit: DailyLimit) {
+            viewModelScope.launch {
+                deleteDailyLimitUseCase(limit)
+                syncScheduler.requestSync()
+                syncNow()
+                form.update { it.copy(message = "Límite de dominio eliminado.") }
             }
         }
 
@@ -414,6 +441,7 @@ class RulesViewModel
             packageName: String,
             allowed: Boolean,
         ) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
             val matchingRules =
                 uiState.value.rules.filter {
                     it.scope == RuleScope.App && it.target == packageName
@@ -431,11 +459,11 @@ class RulesViewModel
                     runCatching {
                         if (allowed) {
                             blockRules.filter { it.enabled }.forEach {
-                                saveRule(it.copy(enabled = false))
+                                saveRule(it.copy(enabled = false), targetDeviceId)
                             }
                         } else {
                             allowRules.filter { it.enabled }.forEach {
-                                saveRule(it.copy(enabled = false))
+                                saveRule(it.copy(enabled = false), targetDeviceId)
                             }
                             saveRule(
                                 blockRules.firstOrNull()?.copy(enabled = true)
@@ -448,6 +476,7 @@ class RulesViewModel
                                         priority = 100,
                                         enabled = true,
                                     ),
+                                targetDeviceId,
                             )
                         }
                         syncScheduler.requestSync()
@@ -472,6 +501,7 @@ class RulesViewModel
             packageName: String,
             rawMinutes: String,
         ) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
             val minutes = rawMinutes.filter(Char::isDigit).toIntOrNull()
             val existing =
                 uiState.value.limits.firstOrNull {
@@ -480,7 +510,7 @@ class RulesViewModel
             viewModelScope.launch {
                 if (minutes == null || minutes <= 0) {
                     if (existing != null) {
-                        saveDailyLimit(existing.copy(enabled = false))
+                        saveDailyLimit(existing.copy(enabled = false), targetDeviceId)
                     }
                     form.update { it.copy(message = "Límite de app desactivado.") }
                 } else {
@@ -492,6 +522,7 @@ class RulesViewModel
                             limitMinutes = minutes,
                             enabled = true,
                         ),
+                        targetDeviceId,
                     )
                     form.update { it.copy(message = "Límite de app guardado.") }
                 }
@@ -512,6 +543,7 @@ class RulesViewModel
             scope: RuleScope,
             action: RuleAction,
         ) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
             val state = form.value
             val rawTarget =
                 when (scope) {
@@ -520,6 +552,12 @@ class RulesViewModel
                     else -> ""
                 }
             val target = normalizeTarget(scope, rawTarget)
+            val allowDomainMinutes =
+                if (scope == RuleScope.Domain && action == RuleAction.Allow && state.allowDomainMinutes.isNotBlank()) {
+                    state.allowDomainMinutes.toIntOrNull()
+                } else {
+                    null
+                }
             if (target == null) {
                 form.update {
                     it.copy(
@@ -533,9 +571,20 @@ class RulesViewModel
                 }
                 return
             }
+            if (scope == RuleScope.Domain &&
+                action == RuleAction.Allow &&
+                state.allowDomainMinutes.isNotBlank() &&
+                (allowDomainMinutes == null || allowDomainMinutes <= 0)
+            ) {
+                form.update { it.copy(message = "Ingresá minutos válidos o dejá el campo vacío.") }
+                return
+            }
             viewModelScope.launch {
                 if (scope == RuleScope.Domain && action == RuleAction.Allow) {
-                    saveAllowedDomain(target)
+                    saveAllowedDomain(target, targetDeviceId)
+                    if (allowDomainMinutes != null) {
+                        saveDomainDailyLimit(target, allowDomainMinutes, targetDeviceId)
+                    }
                 } else if (scope == RuleScope.Domain && action == RuleAction.Block) {
                     target.expandBlockedDomainFamily().forEach { domain ->
                         saveRule(
@@ -548,6 +597,7 @@ class RulesViewModel
                                 priority = BlockDomainPriority,
                                 enabled = true,
                             ),
+                            targetDeviceId,
                         )
                     }
                 } else {
@@ -561,6 +611,7 @@ class RulesViewModel
                             priority = 100,
                             enabled = true,
                         ),
+                        targetDeviceId,
                     )
                 }
                 syncScheduler.requestSync()
@@ -570,7 +621,16 @@ class RulesViewModel
                         RuleScope.App -> it.copy(appPackageName = "", message = "App bloqueada.")
                         RuleScope.Domain ->
                             if (action == RuleAction.Allow) {
-                                it.copy(allowDomain = "", message = "Sitio permitido.")
+                                it.copy(
+                                    allowDomain = "",
+                                    allowDomainMinutes = "",
+                                    message =
+                                        if (allowDomainMinutes != null) {
+                                            "Sitio permitido con límite guardado."
+                                        } else {
+                                            "Sitio permitido."
+                                        },
+                                )
                             } else {
                                 it.copy(domain = "", message = "Dominio/familia bloqueada.")
                             }
@@ -581,6 +641,7 @@ class RulesViewModel
         }
 
         private fun createLimit(targetType: PolicyTargetType) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
             val state = form.value
             val rawTarget =
                 when (targetType) {
@@ -618,6 +679,7 @@ class RulesViewModel
                         limitMinutes = minutes,
                         enabled = true,
                     ),
+                    targetDeviceId,
                 )
                 syncScheduler.requestSync()
                 syncNow()
@@ -652,19 +714,55 @@ class RulesViewModel
             }
         }
 
-        private suspend fun saveAllowedDomain(target: String) {
-            setAllowedDomain(target, true)
+        private suspend fun saveAllowedDomain(
+            target: String,
+            deviceId: String,
+        ) {
+            setAllowedDomain(target, true, deviceId)
         }
 
+        private suspend fun saveDomainDailyLimit(
+            target: String,
+            minutes: Int,
+            deviceId: String,
+        ) {
+            saveDailyLimit(
+                DailyLimit(
+                    id =
+                        uiState.value.limits.firstOrNull {
+                            it.targetType == PolicyTargetType.Domain && it.target == target
+                        }?.id ?: UUID.randomUUID().toString(),
+                    targetType = PolicyTargetType.Domain,
+                    target = target,
+                    limitMinutes = minutes,
+                    enabled = true,
+                ),
+                deviceId,
+            )
+        }
+
+        private fun PolicyRule.associatedDomainLimit(): DailyLimit? =
+            if (scope == RuleScope.Domain) {
+                uiState.value.limits.firstOrNull {
+                    it.enabled &&
+                        it.targetType == PolicyTargetType.Domain &&
+                        it.target == target
+                }
+            } else {
+                null
+            }
+
         private suspend fun setGoogleSearchAllowedRules(allowed: Boolean) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
             SearchEngineDomains.forEach { domain ->
-                setAllowedDomain(domain, allowed)
+                setAllowedDomain(domain, allowed, targetDeviceId)
             }
         }
 
         private suspend fun setAllowedDomain(
             target: String,
             enabled: Boolean,
+            deviceId: String,
         ) {
             val existingRules =
                 uiState.value.rules.filter {
@@ -687,8 +785,16 @@ class RulesViewModel
                     )
                 }
             rulesToSave.forEach { rule ->
-                saveRule(rule.copy(enabled = enabled, priority = AllowDomainPriority))
+                saveRule(rule.copy(enabled = enabled, priority = AllowDomainPriority), deviceId)
             }
+        }
+
+        private fun selectedDeviceIdForRules(): String? {
+            val selectedDeviceId = uiState.value.selectedDeviceId
+            if (selectedDeviceId == null) {
+                form.update { it.copy(message = "Seleccioná un dispositivo.") }
+            }
+            return selectedDeviceId
         }
 
         private suspend fun syncNow(): Boolean = withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull().success }
