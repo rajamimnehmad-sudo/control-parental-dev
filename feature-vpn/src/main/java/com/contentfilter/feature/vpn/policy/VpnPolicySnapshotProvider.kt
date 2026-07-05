@@ -7,6 +7,7 @@ import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
@@ -60,6 +61,8 @@ class VpnPolicySnapshotProvider
         }
 
         fun current(): VpnPolicyState = state.value
+
+        fun observe(): StateFlow<VpnPolicyState> = state
 
         fun stop() {
             observationJob?.cancel()

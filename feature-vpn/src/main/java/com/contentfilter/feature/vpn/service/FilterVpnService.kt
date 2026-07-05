@@ -28,6 +28,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -57,6 +59,7 @@ class FilterVpnService : VpnService() {
     private var vpnInterface: ParcelFileDescriptor? = null
     private var readerJob: Job? = null
     private var upstreamDnsServers: List<InetAddress> = emptyList()
+    private var strictWebBlockMode = false
     private val lastBlockedNotificationAt = mutableMapOf<String, Long>()
 
     override fun onStartCommand(
@@ -103,9 +106,14 @@ class FilterVpnService : VpnService() {
                 runCatching {
                     snapshotProvider.refresh()
                     snapshotProvider.start(scope)
+                    strictWebBlockMode = snapshotProvider.current().strictWebBlockEnabled
                     upstreamDnsServers = currentDnsServers()
-                    Log.i(LogTag, "VPN active upstream=${upstreamDnsServers.safeAddresses()} rules=${snapshotProvider.current().snapshot.rules.size}")
+                    Log.i(
+                        LogTag,
+                        "VPN active upstream=${upstreamDnsServers.safeAddresses()} rules=${snapshotProvider.current().snapshot.rules.size} strictWebBlock=$strictWebBlockMode",
+                    )
                     vpnInterface = establishVpn()
+                    observeStrictWebBlockMode(scope, strictWebBlockMode)
                     VpnController.markStarted(this@FilterVpnService)
                     systemStatusRepository.updateVpnState(ComponentState.Enabled)
                     telemetryReporter.recordServiceState("VPN started.")
@@ -149,23 +157,51 @@ class FilterVpnService : VpnService() {
         Builder()
             .setSession("Content Filter VPN")
             .addAddress(LocalVpnAddress, LocalVpnPrefixLength)
-            .applyDnsRoutes(upstreamDnsServers)
+            .applyTrafficRoutes(upstreamDnsServers, strictWebBlockMode)
             .allowBrowserApps()
             .setMtu(DefaultMtu)
             .setBlocking(true)
             .establish()
 
-    private fun Builder.applyDnsRoutes(upstreamServers: List<InetAddress>): Builder =
+    private fun Builder.applyTrafficRoutes(
+        upstreamServers: List<InetAddress>,
+        strictWebBlock: Boolean,
+    ): Builder =
         apply {
-            upstreamServers
-                .filterIsInstance<Inet4Address>()
-                .forEach { server ->
-                    addDnsServer(server)
-                    server.hostAddress?.let { address ->
-                        addRoute(address, SingleIpv4HostPrefixLength)
+            upstreamServers.forEach { server -> addDnsServer(server) }
+            if (strictWebBlock) {
+                addRoute(AllIpv4Route, AllTrafficPrefixLength)
+                runCatching { addRoute(AllIpv6Route, AllTrafficPrefixLength) }
+            } else {
+                upstreamServers
+                    .filterIsInstance<Inet4Address>()
+                    .forEach { server ->
+                        server.hostAddress?.let { address ->
+                            addRoute(address, SingleIpv4HostPrefixLength)
+                        }
                     }
+            }
+        }
+
+    private fun observeStrictWebBlockMode(
+        scope: CoroutineScope,
+        initialMode: Boolean,
+    ) {
+        scope.launch {
+            var currentMode = initialMode
+            snapshotProvider
+                .observe()
+                .map { it.strictWebBlockEnabled }
+                .distinctUntilChanged()
+                .collect { nextMode ->
+                    if (nextMode != currentMode) {
+                        Log.i(LogTag, "VPN strict web block changed: $currentMode -> $nextMode")
+                        reconnectVpn()
+                    }
+                    currentMode = nextMode
                 }
         }
+    }
 
     private fun Builder.allowBrowserApps(): Builder =
         apply {
@@ -213,7 +249,9 @@ class FilterVpnService : VpnService() {
         if (DevProtectionMode.isProtectionDisabled(this)) return
         val question = parser.parseQuery(packet, length)
         if (question == null) {
-            telemetryReporter.recordUnsupportedPacket()
+            if (!strictWebBlockMode) {
+                telemetryReporter.recordUnsupportedPacket()
+            }
             return
         }
         val domain = question.domain.normalizedDomain()
@@ -401,6 +439,9 @@ class FilterVpnService : VpnService() {
         private const val LocalVpnPrefixLength = 32
         private const val NoBytesRead = -1
         private const val PacketBufferSize = 32 * 1024
+        private const val AllIpv4Route = "0.0.0.0"
+        private const val AllIpv6Route = "::"
+        private const val AllTrafficPrefixLength = 0
         private const val SingleIpv4HostPrefixLength = 32
         private const val BlockNotificationCooldownMillis = 60_000L
         private const val BlockedChannelId = "content_filter_blocked_sites_v2"

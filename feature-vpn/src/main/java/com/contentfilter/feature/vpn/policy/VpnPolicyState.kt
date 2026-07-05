@@ -3,6 +3,8 @@ package com.contentfilter.feature.vpn.policy
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicySnapshot
+import com.contentfilter.core.domain.model.RuleAction
+import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 
@@ -10,7 +12,18 @@ data class VpnPolicyState(
     val snapshot: PolicySnapshot,
     val health: SystemHealthSnapshot,
 ) {
+    val strictWebBlockEnabled: Boolean
+        get() =
+            snapshot.rules.any {
+                it.enabled &&
+                    it.scope == RuleScope.Domain &&
+                    it.target == DomainWildcard &&
+                    it.action == RuleAction.Block
+            }
+
     companion object {
+        private const val DomainWildcard = "*"
+
         fun initial(): VpnPolicyState =
             VpnPolicyState(
                 snapshot =
