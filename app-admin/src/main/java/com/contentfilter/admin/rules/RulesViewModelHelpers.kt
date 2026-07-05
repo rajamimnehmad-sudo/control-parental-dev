@@ -84,24 +84,41 @@ internal fun List<PolicyRule>.googleSearchAllowed(): Boolean =
     }
 
 internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List<UserDeviceUiState> {
-    val appDeviceIds = apps.mapTo(mutableSetOf()) { it.deviceId }
+    val devicesById = associateBy { it.id }
+    val appDeviceIds = apps.mapTo(linkedSetOf()) { it.deviceId }
     val appsByDevice = apps.groupBy { it.deviceId }
-    return filter { device ->
-        device.appRole != "admin" && (device.appRole == "user" || device.id in appDeviceIds)
-    }.map { device ->
-        val newestAppSeen =
-            appsByDevice[device.id]
-                ?.mapNotNull { it.updatedAt.toEpochMillisOrNull() }
-                ?.maxOrNull()
-        val lastSeen = device.lastSeenAtEpochMillis ?: newestAppSeen
-        UserDeviceUiState(
-            id = device.id,
-            name = device.displayName,
-            active = lastSeen?.let { System.currentTimeMillis() - it <= ActiveDeviceWindowMillis } ?: false,
-            lastSeenLabel = lastSeen.toLastSeenLabel(),
-            appCount = appsByDevice[device.id]?.distinctBy { it.packageName }?.size ?: 0,
+    val localUserDeviceIds =
+        filter { device ->
+            device.appRole != "admin" && (device.appRole == "user" || device.id in appDeviceIds)
+        }.map { it.id }
+    return (localUserDeviceIds + appDeviceIds)
+        .distinct()
+        .map { deviceId ->
+            val device = devicesById[deviceId]
+            val newestAppSeen =
+                appsByDevice[deviceId]
+                    ?.mapNotNull { it.updatedAt.toEpochMillisOrNull() }
+                    ?.maxOrNull()
+            val lastSeen = device?.lastSeenAtEpochMillis ?: newestAppSeen
+            UserDeviceUiState(
+                id = deviceId,
+                name = device?.displayName ?: "Usuario",
+                active = lastSeen?.let { System.currentTimeMillis() - it <= ActiveDeviceWindowMillis } ?: false,
+                lastSeenLabel = lastSeen.toLastSeenLabel(),
+                appCount = appsByDevice[deviceId]?.distinctBy { it.packageName }?.size ?: 0,
+            )
+        }.sortedWith(
+            compareByDescending<UserDeviceUiState> { it.appCount > 0 }
+                .thenByDescending { it.active }
+                .thenBy { it.name.lowercase() },
         )
-    }.sortedWith(compareByDescending<UserDeviceUiState> { it.active }.thenBy { it.name.lowercase() })
+}
+
+internal fun List<UserDeviceUiState>.selectedDeviceId(requestedDeviceId: String?): String? {
+    val requested = firstOrNull { it.id == requestedDeviceId }
+    if (requested == null) return firstOrNull { it.appCount > 0 }?.id ?: firstOrNull()?.id
+    if (requested.appCount > 0 || none { it.appCount > 0 }) return requested.id
+    return firstOrNull { it.appCount > 0 }?.id
 }
 
 internal fun List<AppControlUiState>.filterBySearch(query: String): List<AppControlUiState> {

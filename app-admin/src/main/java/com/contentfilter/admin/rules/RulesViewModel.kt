@@ -68,10 +68,7 @@ class RulesViewModel
                 form,
             ) { rules, limits, devices, apps, formState ->
                 val userDevices = devices.toUserDevices(apps)
-                val selectedDeviceId =
-                    formState.selectedDeviceId?.takeIf { selected ->
-                        userDevices.any { it.id == selected }
-                    }
+                val selectedDeviceId = userDevices.selectedDeviceId(formState.selectedDeviceId)
                 val savedInternetBlocked = rules.internetBlocked()
                 formState.copy(
                     rules = rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
