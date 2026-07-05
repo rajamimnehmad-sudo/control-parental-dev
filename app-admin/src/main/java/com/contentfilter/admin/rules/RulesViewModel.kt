@@ -91,9 +91,9 @@ class RulesViewModel
                     userDevices = userDevices,
                     selectedDeviceId = selectedDeviceId,
                     internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
-                    googleSearchAllowed =
+                    searchEnginesAllowed =
                         if (formState.pendingInternetBlocked ?: savedInternetBlocked) {
-                            formState.pendingGoogleSearchAllowed ?: rules.googleSearchAllowed()
+                            formState.pendingSearchEnginesAllowed ?: rules.searchEnginesAllowed()
                         } else {
                             true
                         },
@@ -222,29 +222,29 @@ class RulesViewModel
 
         fun createDomainLimit() = createLimit(PolicyTargetType.Domain)
 
-        fun setGoogleSearchAllowed(allowed: Boolean) {
+        fun setSearchEnginesAllowed(allowed: Boolean) {
             form.update {
                 it.copy(
-                    pendingGoogleSearchAllowed = allowed,
+                    pendingSearchEnginesAllowed = allowed,
                     message = if (allowed) "Permitiendo buscadores..." else "Bloqueando buscadores...",
                 )
             }
             viewModelScope.launch {
                 runCatching {
-                    setGoogleSearchAllowedRules(allowed)
+                    setSearchEnginesAllowedRules(allowed)
                     syncScheduler.requestSync()
                     check(syncNow()) { "No se pudo sincronizar buscadores." }
                 }.onSuccess {
                     form.update {
                         it.copy(
-                            pendingGoogleSearchAllowed = null,
+                            pendingSearchEnginesAllowed = null,
                             message = if (allowed) "Buscadores permitidos." else "Buscadores bloqueados.",
                         )
                     }
                 }.onFailure {
                     form.update {
                         it.copy(
-                            pendingGoogleSearchAllowed = null,
+                            pendingSearchEnginesAllowed = null,
                             message = "No se pudo cambiar buscadores. Intentá otra vez.",
                         )
                     }
@@ -294,7 +294,7 @@ class RulesViewModel
             form.update {
                 it.copy(
                     pendingInternetBlocked = blocked,
-                    pendingGoogleSearchAllowed = if (blocked) false else it.pendingGoogleSearchAllowed,
+                    pendingSearchEnginesAllowed = if (blocked) false else it.pendingSearchEnginesAllowed,
                     message = if (blocked) "Activando lista blanca..." else "Abriendo Internet...",
                 )
             }
@@ -327,7 +327,7 @@ class RulesViewModel
                         }
                         if (blocked) {
                             clearDomainBlacklistRules(targetDeviceId)
-                            setGoogleSearchAllowedRules(allowed = false)
+                            setSearchEnginesAllowedRules(allowed = false)
                         } else {
                             clearDomainBlacklistRules(targetDeviceId)
                             clearSearchEngineRules(targetDeviceId)
@@ -336,7 +336,7 @@ class RulesViewModel
                             policyRules.first {
                                 it.internetBlocked() == blocked &&
                                     if (blocked) {
-                                        !it.googleSearchAllowed()
+                                        !it.searchEnginesAllowed()
                                     } else {
                                         it.searchEngineBlockRules().none { rule -> rule.enabled }
                                     }
@@ -358,7 +358,7 @@ class RulesViewModel
                         form.update {
                             it.copy(
                                 pendingInternetBlocked = null,
-                                pendingGoogleSearchAllowed = if (blocked) null else it.pendingGoogleSearchAllowed,
+                                pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
                                 message =
                                     if (blocked) {
                                         "Modo web: bloquear todo excepto permitidos. Buscadores bloqueados."
@@ -378,7 +378,7 @@ class RulesViewModel
                         form.update {
                             it.copy(
                                 pendingInternetBlocked = null,
-                                pendingGoogleSearchAllowed = if (blocked) null else it.pendingGoogleSearchAllowed,
+                                pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
                                 message = "Cambio guardado localmente. Se sincronizará cuando haya conexión.",
                             )
                         }
@@ -387,7 +387,7 @@ class RulesViewModel
                     form.update {
                         it.copy(
                             pendingInternetBlocked = null,
-                            pendingGoogleSearchAllowed = if (blocked) null else it.pendingGoogleSearchAllowed,
+                            pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
                             message = "No se pudo cambiar el modo web. Intentá otra vez.",
                         )
                     }
@@ -742,7 +742,7 @@ class RulesViewModel
                 null
             }
 
-        private suspend fun setGoogleSearchAllowedRules(allowed: Boolean) {
+        private suspend fun setSearchEnginesAllowedRules(allowed: Boolean) {
             val targetDeviceId = selectedDeviceIdForRules() ?: return
             SearchEngineDomains.forEach { domain ->
                 setSearchEngineDomain(domain, allowed, targetDeviceId)

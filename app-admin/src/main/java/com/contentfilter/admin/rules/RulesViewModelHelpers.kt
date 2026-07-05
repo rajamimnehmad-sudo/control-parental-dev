@@ -84,7 +84,7 @@ internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
             it.action == RuleAction.Block
     }
 
-internal fun List<PolicyRule>.googleSearchAllowed(): Boolean =
+internal fun List<PolicyRule>.searchEnginesAllowed(): Boolean =
     SearchEngineDomains.all { domain ->
         none {
             it.enabled &&

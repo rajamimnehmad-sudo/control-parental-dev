@@ -61,7 +61,7 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
         onCreateDomainAllow = viewModel::createAllowedDomainRule,
         onCreateAllowedDomainLimit = viewModel::saveAllowedDomainLimit,
         onInternetBlockedChanged = viewModel::setInternetBlocked,
-        onGoogleSearchAllowedChanged = viewModel::setGoogleSearchAllowed,
+        onSearchEnginesAllowedChanged = viewModel::setSearchEnginesAllowed,
         onAppAllowedChanged = viewModel::setAppAllowed,
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onToggle = viewModel::toggle,
@@ -84,7 +84,7 @@ private fun RulesScreen(
     onCreateDomainAllow: () -> Unit,
     onCreateAllowedDomainLimit: () -> Unit,
     onInternetBlockedChanged: (Boolean) -> Unit,
-    onGoogleSearchAllowedChanged: (Boolean) -> Unit,
+    onSearchEnginesAllowedChanged: (Boolean) -> Unit,
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
     onToggle: (PolicyRule) -> Unit,
@@ -271,11 +271,11 @@ private fun RulesScreen(
                 item {
                     InternetModeCard(
                         blocked = state.internetBlocked,
-                        googleAllowed = state.googleSearchAllowed,
+                        searchEnginesAllowed = state.searchEnginesAllowed,
                         webModeUpdating = state.pendingInternetBlocked != null,
-                        googleUpdating = state.pendingGoogleSearchAllowed != null,
+                        searchEnginesUpdating = state.pendingSearchEnginesAllowed != null,
                         onBlockedChanged = onInternetBlockedChanged,
-                        onGoogleAllowedChanged = onGoogleSearchAllowedChanged,
+                        onSearchEnginesAllowedChanged = onSearchEnginesAllowedChanged,
                     )
                 }
                 item {

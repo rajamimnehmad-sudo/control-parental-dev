@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -21,6 +22,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.DailyLimit
@@ -29,11 +31,11 @@ import com.contentfilter.core.domain.model.PolicyRule
 @Composable
 internal fun InternetModeCard(
     blocked: Boolean,
-    googleAllowed: Boolean,
+    searchEnginesAllowed: Boolean,
     webModeUpdating: Boolean,
-    googleUpdating: Boolean,
+    searchEnginesUpdating: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
-    onGoogleAllowedChanged: (Boolean) -> Unit,
+    onSearchEnginesAllowedChanged: (Boolean) -> Unit,
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -82,14 +84,26 @@ internal fun InternetModeCard(
                     )
                 }
                 Switch(
-                    checked = googleAllowed,
-                    enabled = blocked && !webModeUpdating && !googleUpdating,
-                    onCheckedChange = onGoogleAllowedChanged,
+                    checked = searchEnginesAllowed,
+                    enabled = blocked && !webModeUpdating && !searchEnginesUpdating,
+                    onCheckedChange = onSearchEnginesAllowedChanged,
+                    colors =
+                        SwitchDefaults.colors(
+                            checkedThumbColor = SearchAllowedColor,
+                            checkedTrackColor = SearchAllowedTrackColor,
+                            uncheckedThumbColor = SearchBlockedColor,
+                            uncheckedTrackColor = SearchBlockedTrackColor,
+                        ),
                 )
             }
         }
     }
 }
+
+private val SearchAllowedColor = Color(0xFF2E7D32)
+private val SearchAllowedTrackColor = Color(0xFFA5D6A7)
+private val SearchBlockedColor = Color(0xFFC62828)
+private val SearchBlockedTrackColor = Color(0xFFFFCDD2)
 
 @Composable
 internal fun AllowDomainEditorCard(
