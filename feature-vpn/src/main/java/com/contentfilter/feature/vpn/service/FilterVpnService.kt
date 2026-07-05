@@ -387,32 +387,7 @@ class FilterVpnService : VpnService() {
     }
 
     private fun rememberBlockedDomain(domain: String) {
-        val prefs = getSharedPreferences(BlockedPrefsName, Context.MODE_PRIVATE)
-        val now = System.currentTimeMillis()
-        val current =
-            prefs.getString(BlockedDomainsKey, "")
-                .orEmpty()
-                .split("|")
-                .mapNotNull { it.toBlockedDomainEntryOrNull() }
-                .filter { it.domain != domain }
-        prefs.edit()
-            .putString(
-                BlockedDomainsKey,
-                (listOf(BlockedDomainEntry(domain, now)) + current)
-                    .take(MaxRecentBlockedDomains)
-                    .joinToString("|") { "${it.domain},${it.blockedAtEpochMillis}" },
-            )
-            .apply()
-    }
-
-    private fun String.toBlockedDomainEntryOrNull(): BlockedDomainEntry? {
-        if (isBlank()) return null
-        val domain = substringBefore(",").normalizedDomain()
-        val timestamp =
-            substringAfter(",", missingDelimiterValue = "")
-                .toLongOrNull()
-                ?: System.currentTimeMillis()
-        return domain.takeIf { it.isNotBlank() }?.let { BlockedDomainEntry(it, timestamp) }
+        BlockedDomainSignal.remember(this, domain)
     }
 
     private fun ensureBlockedNotificationChannel() {
@@ -458,9 +433,6 @@ class FilterVpnService : VpnService() {
         private const val BlockNotificationCooldownMillis = 60_000L
         private const val BlockedChannelId = "content_filter_blocked_sites_v2"
         private const val BlockedNotificationId = 3_000
-        private const val BlockedPrefsName = "blocked_domains"
-        private const val BlockedDomainsKey = "domains"
-        private const val MaxRecentBlockedDomains = 20
         private val NoisyDomainLabels =
             setOf(
                 "api",
@@ -494,11 +466,6 @@ class FilterVpnService : VpnService() {
         private const val StopReasonFailed = "vpn_failed"
         private const val StopReasonRevoked = "system_revoked_vpn"
         private const val LogTag = "FilterVpnService"
-
-        private data class BlockedDomainEntry(
-            val domain: String,
-            val blockedAtEpochMillis: Long,
-        )
 
         private val BrowserPackageNames =
             listOf(
