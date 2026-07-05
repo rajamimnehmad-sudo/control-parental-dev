@@ -80,14 +80,8 @@ class RulesViewModel
                     selectedDeviceId = selectedDeviceId,
                     internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
                     googleSearchAllowed =
-                        GoogleSearchDomains.all { domain ->
-                            rules.any {
-                                it.enabled &&
-                                    it.scope == RuleScope.Domain &&
-                                    it.target == domain &&
-                                    it.action == RuleAction.Allow
-                            }
-                        },
+                        formState.pendingGoogleSearchAllowed
+                            ?: rules.googleSearchAllowed(),
                     appControls =
                         if (selectedDeviceId == null) {
                             emptyList()
@@ -166,16 +160,31 @@ class RulesViewModel
         fun createDomainLimit() = createLimit(PolicyTargetType.Domain)
 
         fun setGoogleSearchAllowed(allowed: Boolean) {
+            form.update {
+                it.copy(
+                    pendingGoogleSearchAllowed = allowed,
+                    message = if (allowed) "Permitiendo buscadores..." else "Bloqueando buscadores...",
+                )
+            }
             viewModelScope.launch {
-                GoogleSearchDomains.forEach { domain ->
-                    setAllowedDomain(domain, allowed)
-                }
-                syncScheduler.requestSync()
-                syncNow()
-                form.update {
-                    it.copy(
-                        message = if (allowed) "Google permitido para buscar." else "Google vuelve a estar bloqueado.",
-                    )
+                runCatching {
+                    setGoogleSearchAllowedRules(allowed)
+                    syncScheduler.requestSync()
+                    syncNow()
+                }.onSuccess {
+                    form.update {
+                        it.copy(
+                            pendingGoogleSearchAllowed = null,
+                            message = if (allowed) "Buscadores permitidos." else "Buscadores bloqueados.",
+                        )
+                    }
+                }.onFailure {
+                    form.update {
+                        it.copy(
+                            pendingGoogleSearchAllowed = null,
+                            message = "No se pudo cambiar buscadores. Intentá otra vez.",
+                        )
+                    }
                 }
             }
         }
@@ -227,6 +236,7 @@ class RulesViewModel
             form.update {
                 it.copy(
                     pendingInternetBlocked = blocked,
+                    pendingGoogleSearchAllowed = if (blocked) false else it.pendingGoogleSearchAllowed,
                     message = if (blocked) "Activando lista blanca..." else "Activando lista negra...",
                 )
             }
@@ -257,8 +267,14 @@ class RulesViewModel
                         rulesToSave.forEach { rule ->
                             saveRule(rule.copy(enabled = blocked))
                         }
+                        if (blocked) {
+                            setGoogleSearchAllowedRules(allowed = false)
+                        }
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                            policyRules.first { it.internetBlocked() == blocked }
+                            policyRules.first {
+                                it.internetBlocked() == blocked &&
+                                    (!blocked || !it.googleSearchAllowed())
+                            }
                         } ?: error("Room no confirmó el nuevo estado de Internet.")
                     }
                 val roomAfterSave = saved.getOrNull()?.internetBlocked() ?: previousRoom
@@ -275,9 +291,10 @@ class RulesViewModel
                     form.update {
                         it.copy(
                             pendingInternetBlocked = null,
+                            pendingGoogleSearchAllowed = if (blocked) null else it.pendingGoogleSearchAllowed,
                             message =
                                 if (blocked) {
-                                    "Modo web: bloquear todo excepto permitidos."
+                                    "Modo web: bloquear todo excepto permitidos. Buscadores bloqueados."
                                 } else {
                                     "Modo web: permitir todo excepto bloqueados."
                                 },
@@ -294,6 +311,7 @@ class RulesViewModel
                     form.update {
                         it.copy(
                             pendingInternetBlocked = null,
+                            pendingGoogleSearchAllowed = if (blocked) null else it.pendingGoogleSearchAllowed,
                             message = "No se pudo cambiar el modo web. Intentá otra vez.",
                         )
                     }
@@ -569,28 +587,39 @@ class RulesViewModel
             setAllowedDomain(target, true)
         }
 
+        private suspend fun setGoogleSearchAllowedRules(allowed: Boolean) {
+            GoogleSearchDomains.forEach { domain ->
+                setAllowedDomain(domain, allowed)
+            }
+        }
+
         private suspend fun setAllowedDomain(
             target: String,
             enabled: Boolean,
         ) {
-            val existing =
-                uiState.value.rules.firstOrNull {
+            val existingRules =
+                uiState.value.rules.filter {
                     it.scope == RuleScope.Domain &&
                         it.target == target &&
                         it.action == RuleAction.Allow
                 }
-            saveRule(
-                existing?.copy(enabled = enabled, priority = AllowDomainPriority)
-                    ?: PolicyRule(
-                        id = UUID.randomUUID().toString(),
-                        level = PolicyLevel.Account,
-                        scope = RuleScope.Domain,
-                        target = target,
-                        action = RuleAction.Allow,
-                        priority = AllowDomainPriority,
-                        enabled = enabled,
-                    ),
-            )
+            val rulesToSave =
+                existingRules.ifEmpty {
+                    listOf(
+                        PolicyRule(
+                            id = UUID.randomUUID().toString(),
+                            level = PolicyLevel.Account,
+                            scope = RuleScope.Domain,
+                            target = target,
+                            action = RuleAction.Allow,
+                            priority = AllowDomainPriority,
+                            enabled = enabled,
+                        ),
+                    )
+                }
+            rulesToSave.forEach { rule ->
+                saveRule(rule.copy(enabled = enabled, priority = AllowDomainPriority))
+            }
         }
 
         private fun syncNow() {
@@ -669,6 +698,16 @@ class RulesViewModel
                 it.scope == RuleScope.Domain &&
                     it.target == DomainWildcard &&
                     it.action == RuleAction.Block
+            }
+
+        private fun List<PolicyRule>.googleSearchAllowed(): Boolean =
+            GoogleSearchDomains.all { domain ->
+                any {
+                    it.enabled &&
+                        it.scope == RuleScope.Domain &&
+                        it.target == domain &&
+                        it.action == RuleAction.Allow
+                }
             }
 
         private fun logInternetSwitch(

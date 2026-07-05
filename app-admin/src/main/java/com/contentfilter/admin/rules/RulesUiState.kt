@@ -19,6 +19,7 @@ data class RulesUiState(
     val internetBlocked: Boolean = false,
     val googleSearchAllowed: Boolean = false,
     val pendingInternetBlocked: Boolean? = null,
+    val pendingGoogleSearchAllowed: Boolean? = null,
     val limitPackageName: String = "",
     val limitMinutes: String = "",
     val appSearchQuery: String = "",

@@ -239,6 +239,8 @@ private fun RulesScreen(
                     InternetModeCard(
                         blocked = state.internetBlocked,
                         googleAllowed = state.googleSearchAllowed,
+                        webModeUpdating = state.pendingInternetBlocked != null,
+                        googleUpdating = state.pendingGoogleSearchAllowed != null,
                         onBlockedChanged = onInternetBlockedChanged,
                         onGoogleAllowedChanged = onGoogleSearchAllowedChanged,
                     )
@@ -632,6 +634,8 @@ private fun RuleEditorCard(
 private fun InternetModeCard(
     blocked: Boolean,
     googleAllowed: Boolean,
+    webModeUpdating: Boolean,
+    googleUpdating: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
     onGoogleAllowedChanged: (Boolean) -> Unit,
 ) {
@@ -660,7 +664,11 @@ private fun InternetModeCard(
                         style = MaterialTheme.typography.bodyMedium,
                     )
                 }
-                Switch(checked = blocked, onCheckedChange = onBlockedChanged)
+                Switch(
+                    checked = blocked,
+                    enabled = !webModeUpdating,
+                    onCheckedChange = onBlockedChanged,
+                )
             }
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -677,7 +685,11 @@ private fun InternetModeCard(
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
-                Switch(checked = googleAllowed, onCheckedChange = onGoogleAllowedChanged)
+                Switch(
+                    checked = googleAllowed,
+                    enabled = !blocked && !webModeUpdating && !googleUpdating,
+                    onCheckedChange = onGoogleAllowedChanged,
+                )
             }
         }
     }
