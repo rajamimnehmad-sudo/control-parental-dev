@@ -92,8 +92,11 @@ class RulesViewModel
                     selectedDeviceId = selectedDeviceId,
                     internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
                     googleSearchAllowed =
-                        formState.pendingGoogleSearchAllowed
-                            ?: rules.googleSearchAllowed(),
+                        if (formState.pendingInternetBlocked ?: savedInternetBlocked) {
+                            formState.pendingGoogleSearchAllowed ?: rules.googleSearchAllowed()
+                        } else {
+                            true
+                        },
                     appControls =
                         if (selectedDeviceId == null) {
                             emptyList()
@@ -330,11 +333,17 @@ class RulesViewModel
                         }
                         if (blocked) {
                             setGoogleSearchAllowedRules(allowed = false)
+                        } else {
+                            clearSearchEngineRules(targetDeviceId)
                         }
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
                             policyRules.first {
                                 it.internetBlocked() == blocked &&
-                                    (!blocked || !it.googleSearchAllowed())
+                                    if (blocked) {
+                                        !it.googleSearchAllowed()
+                                    } else {
+                                        it.searchEngineBlockRules().none { rule -> rule.enabled }
+                                    }
                             }
                         } ?: error("Room no confirmó el nuevo estado de Internet.")
                     }
@@ -755,8 +764,48 @@ class RulesViewModel
         private suspend fun setGoogleSearchAllowedRules(allowed: Boolean) {
             val targetDeviceId = selectedDeviceIdForRules() ?: return
             SearchEngineDomains.forEach { domain ->
-                setAllowedDomain(domain, allowed, targetDeviceId)
+                setSearchEngineDomain(domain, allowed, targetDeviceId)
             }
+        }
+
+        private suspend fun clearSearchEngineRules(deviceId: String) {
+            SearchEngineDomains.forEach { domain ->
+                setRulesForDomain(
+                    target = domain,
+                    action = RuleAction.Allow,
+                    enabled = false,
+                    priority = AllowDomainPriority,
+                    deviceId = deviceId,
+                )
+                setRulesForDomain(
+                    target = domain,
+                    action = RuleAction.Block,
+                    enabled = false,
+                    priority = SearchEngineBlockPriority,
+                    deviceId = deviceId,
+                )
+            }
+        }
+
+        private suspend fun setSearchEngineDomain(
+            target: String,
+            allowed: Boolean,
+            deviceId: String,
+        ) {
+            setRulesForDomain(
+                target = target,
+                action = RuleAction.Allow,
+                enabled = allowed,
+                priority = AllowDomainPriority,
+                deviceId = deviceId,
+            )
+            setRulesForDomain(
+                target = target,
+                action = RuleAction.Block,
+                enabled = !allowed,
+                priority = SearchEngineBlockPriority,
+                deviceId = deviceId,
+            )
         }
 
         private suspend fun setAllowedDomain(
@@ -764,11 +813,27 @@ class RulesViewModel
             enabled: Boolean,
             deviceId: String,
         ) {
+            setRulesForDomain(
+                target = target,
+                action = RuleAction.Allow,
+                enabled = enabled,
+                priority = AllowDomainPriority,
+                deviceId = deviceId,
+            )
+        }
+
+        private suspend fun setRulesForDomain(
+            target: String,
+            action: RuleAction,
+            enabled: Boolean,
+            priority: Int,
+            deviceId: String,
+        ) {
             val existingRules =
                 uiState.value.rules.filter {
                     it.scope == RuleScope.Domain &&
                         it.target == target &&
-                        it.action == RuleAction.Allow
+                        it.action == action
                 }
             val rulesToSave =
                 existingRules.ifEmpty {
@@ -778,14 +843,14 @@ class RulesViewModel
                             level = PolicyLevel.Account,
                             scope = RuleScope.Domain,
                             target = target,
-                            action = RuleAction.Allow,
-                            priority = AllowDomainPriority,
+                            action = action,
+                            priority = priority,
                             enabled = enabled,
                         ),
                     )
                 }
             rulesToSave.forEach { rule ->
-                saveRule(rule.copy(enabled = enabled, priority = AllowDomainPriority), deviceId)
+                saveRule(rule.copy(enabled = enabled, priority = priority), deviceId)
             }
         }
 

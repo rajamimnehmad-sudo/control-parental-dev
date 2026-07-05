@@ -107,6 +107,20 @@ class VpnDomainPolicyEvaluatorTest {
         assertIs<PolicyDecision.Block>(evaluator.evaluate("app.com", snapshot, activeHealth()))
     }
 
+    @Test
+    fun `blocks search engine when explicit search block overrides stale allow`() {
+        val snapshot =
+            snapshot(
+                rule("*", RuleAction.Block, priority = 10),
+                rule("google.com", RuleAction.Allow, priority = 1_000),
+                rule("google.com", RuleAction.Block, priority = 3_000),
+            )
+
+        val decision = evaluator.evaluate("www.google.com", snapshot, activeHealth())
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
     private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =
         PolicySnapshot(
             id = "test",
@@ -155,6 +169,7 @@ class VpnDomainPolicyEvaluatorTest {
             listOf(
                 "google.com",
                 "bing.com",
+                "yahoo.com",
                 "search.yahoo.com",
                 "duckduckgo.com",
             )

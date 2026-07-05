@@ -86,12 +86,25 @@ internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
 
 internal fun List<PolicyRule>.googleSearchAllowed(): Boolean =
     SearchEngineDomains.all { domain ->
+        none {
+            it.enabled &&
+                it.scope == RuleScope.Domain &&
+                it.target == domain &&
+                it.action == RuleAction.Block
+        } &&
         any {
             it.enabled &&
                 it.scope == RuleScope.Domain &&
                 it.target == domain &&
                 it.action == RuleAction.Allow
         }
+    }
+
+internal fun List<PolicyRule>.searchEngineBlockRules(): List<PolicyRule> =
+    filter {
+        it.scope == RuleScope.Domain &&
+            it.target in SearchEngineDomains &&
+            it.action == RuleAction.Block
     }
 
 internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List<UserDeviceUiState> {
@@ -212,11 +225,13 @@ internal const val DomainWildcard = "*"
 internal const val InternetBlockPriority = 10
 internal const val BlockDomainPriority = 2_000
 internal const val AllowDomainPriority = 1_000
+internal const val SearchEngineBlockPriority = 3_000
 internal const val LogTag = "RulesViewModel"
 internal val SearchEngineDomains =
     listOf(
         "google.com",
         "bing.com",
+        "yahoo.com",
         "search.yahoo.com",
         "duckduckgo.com",
     )
