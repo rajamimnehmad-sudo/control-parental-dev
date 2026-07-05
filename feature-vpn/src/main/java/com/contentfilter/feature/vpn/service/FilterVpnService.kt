@@ -168,14 +168,15 @@ class FilterVpnService : VpnService() {
         strictWebBlock: Boolean,
     ): Builder =
         apply {
-            upstreamServers.forEach { server -> addDnsServer(server) }
             if (strictWebBlock) {
+                upstreamServers.forEach { server -> addDnsServer(server) }
                 addRoute(AllIpv4Route, AllTrafficPrefixLength)
                 runCatching { addRoute(AllIpv6Route, AllTrafficPrefixLength) }
             } else {
                 upstreamServers
                     .filterIsInstance<Inet4Address>()
                     .forEach { server ->
+                        addDnsServer(server)
                         server.hostAddress?.let { address ->
                             addRoute(address, SingleIpv4HostPrefixLength)
                         }
