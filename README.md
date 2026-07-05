@@ -91,7 +91,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 68
+versionCode 69
 versionName 1.0.1-dev
 ```
 
@@ -108,7 +108,7 @@ Actualizar este README cuando cambie:
 - Reglas Admin se aplican por dispositivo.
 - Solicitudes y aprobaciones usan `deviceId`.
 - Modo web cerrado bloquea dominios via VPN.
-- Toggle "Permitir buscadores" controla Google, Bing, Yahoo y DuckDuckGo cuando modo web esta cerrado.
+- Toggle "Permitir buscadores" controla Google, variantes regionales de Google, Bing, Yahoo y DuckDuckGo cuando modo web esta cerrado.
 - Con modo web abierto, buscadores quedan abiertos.
 - Las reglas de internet bloquean dominios por VPN/DNS sin cerrar el navegador; Chrome/Samsung Internet solo se cierra por reglas o limites de app.
 - Las apps se actualizan manualmente desde la pantalla `Actualizaciones`.

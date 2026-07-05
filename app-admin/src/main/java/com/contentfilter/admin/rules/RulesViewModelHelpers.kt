@@ -230,6 +230,17 @@ internal const val LogTag = "RulesViewModel"
 internal val SearchEngineDomains =
     listOf(
         "google.com",
+        "google.com.ar",
+        "google.com.br",
+        "google.com.mx",
+        "google.com.co",
+        "google.com.uy",
+        "google.com.py",
+        "google.cl",
+        "google.es",
+        "google.co.uk",
+        "google.co.in",
+        "google.ca",
         "bing.com",
         "yahoo.com",
         "search.yahoo.com",

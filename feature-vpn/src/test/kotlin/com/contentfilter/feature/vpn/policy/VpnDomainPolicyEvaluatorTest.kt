@@ -102,6 +102,7 @@ class VpnDomainPolicyEvaluatorTest {
             assertIs<PolicyDecision.Allow>(decision, "Expected $domain to be allowed")
         }
         assertIs<PolicyDecision.Allow>(evaluator.evaluate("www.google.com", snapshot, activeHealth()))
+        assertIs<PolicyDecision.Allow>(evaluator.evaluate("www.google.com.ar", snapshot, activeHealth()))
         assertIs<PolicyDecision.Allow>(evaluator.evaluate("www.bing.com", snapshot, activeHealth()))
         assertIs<PolicyDecision.Allow>(evaluator.evaluate("duckduckgo.com", snapshot, activeHealth()))
         assertIs<PolicyDecision.Block>(evaluator.evaluate("app.com", snapshot, activeHealth()))
@@ -168,6 +169,17 @@ class VpnDomainPolicyEvaluatorTest {
         val SearchEngineDomains =
             listOf(
                 "google.com",
+                "google.com.ar",
+                "google.com.br",
+                "google.com.mx",
+                "google.com.co",
+                "google.com.uy",
+                "google.com.py",
+                "google.cl",
+                "google.es",
+                "google.co.uk",
+                "google.co.in",
+                "google.ca",
                 "bing.com",
                 "yahoo.com",
                 "search.yahoo.com",
