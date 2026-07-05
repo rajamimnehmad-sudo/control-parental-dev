@@ -265,12 +265,13 @@ internal fun RuleScope.displayName(): String =
         RuleScope.Global -> "Global"
     }
 
-internal val GoogleSearchDomainsForUi =
+internal val SearchEngineDomainsForUi =
     setOf(
-        "google.com",
         "gstatic.com",
         "googleapis.com",
         "googleusercontent.com",
-        "bing.com",
-        "duckduckgo.com",
+        "yimg.com",
+        "bing.net",
+        "duck.com",
     )
+        .plus(SearchEngineDomains)

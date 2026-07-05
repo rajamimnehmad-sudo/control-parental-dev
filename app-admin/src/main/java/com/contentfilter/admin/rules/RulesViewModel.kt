@@ -227,7 +227,7 @@ class RulesViewModel
                 runCatching {
                     setGoogleSearchAllowedRules(allowed)
                     syncScheduler.requestSync()
-                    syncNow()
+                    check(syncNow()) { "No se pudo sincronizar buscadores." }
                 }.onSuccess {
                     form.update {
                         it.copy(
@@ -344,26 +344,36 @@ class RulesViewModel
                         ui = uiState.value.internetBlocked,
                     )
                     syncScheduler.requestSync()
-                    syncNow()
-                    form.update {
-                        it.copy(
-                            pendingInternetBlocked = null,
-                            pendingGoogleSearchAllowed = if (blocked) null else it.pendingGoogleSearchAllowed,
-                            message =
-                                if (blocked) {
-                                    "Modo web: bloquear todo excepto permitidos. Buscadores bloqueados."
-                                } else {
-                                    "Modo web: permitir todo excepto bloqueados."
-                                },
+                    val synced = syncNow()
+                    if (synced) {
+                        form.update {
+                            it.copy(
+                                pendingInternetBlocked = null,
+                                pendingGoogleSearchAllowed = if (blocked) null else it.pendingGoogleSearchAllowed,
+                                message =
+                                    if (blocked) {
+                                        "Modo web: bloquear todo excepto permitidos. Buscadores bloqueados."
+                                    } else {
+                                        "Modo web: permitir todo excepto bloqueados."
+                                    },
+                            )
+                        }
+                        logInternetSwitch(
+                            stage = "ui-final",
+                            touched = blocked,
+                            pending = null,
+                            room = roomAfterSave,
+                            ui = blocked,
                         )
+                    } else {
+                        form.update {
+                            it.copy(
+                                pendingInternetBlocked = null,
+                                pendingGoogleSearchAllowed = if (blocked) null else it.pendingGoogleSearchAllowed,
+                                message = "Cambio guardado localmente. Se sincronizará cuando haya conexión.",
+                            )
+                        }
                     }
-                    logInternetSwitch(
-                        stage = "ui-final",
-                        touched = blocked,
-                        pending = null,
-                        room = roomAfterSave,
-                        ui = blocked,
-                    )
                 } else {
                     form.update {
                         it.copy(
@@ -492,7 +502,9 @@ class RulesViewModel
 
         init {
             syncScheduler.requestSync()
-            syncNow()
+            viewModelScope.launch {
+                syncNow()
+            }
             refreshInstalledApps()
         }
 
@@ -645,7 +657,7 @@ class RulesViewModel
         }
 
         private suspend fun setGoogleSearchAllowedRules(allowed: Boolean) {
-            GoogleSearchDomains.forEach { domain ->
+            SearchEngineDomains.forEach { domain ->
                 setAllowedDomain(domain, allowed)
             }
         }
@@ -679,11 +691,7 @@ class RulesViewModel
             }
         }
 
-        private fun syncNow() {
-            viewModelScope.launch(Dispatchers.IO) {
-                syncEngine.syncCoreDataFull()
-            }
-        }
+        private suspend fun syncNow(): Boolean = withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull().success }
 
         private fun logInternetSwitch(
             stage: String,

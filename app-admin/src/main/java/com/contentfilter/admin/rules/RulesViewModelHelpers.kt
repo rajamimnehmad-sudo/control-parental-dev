@@ -85,7 +85,7 @@ internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
     }
 
 internal fun List<PolicyRule>.googleSearchAllowed(): Boolean =
-    GoogleSearchDomains.all { domain ->
+    SearchEngineDomains.all { domain ->
         any {
             it.enabled &&
                 it.scope == RuleScope.Domain &&
@@ -213,9 +213,12 @@ internal const val InternetBlockPriority = 10
 internal const val BlockDomainPriority = 2_000
 internal const val AllowDomainPriority = 1_000
 internal const val LogTag = "RulesViewModel"
-internal val GoogleSearchDomains =
+internal val SearchEngineDomains =
     listOf(
         "google.com",
+        "bing.com",
+        "search.yahoo.com",
+        "duckduckgo.com",
     )
 internal val YouTubeWebDomains =
     listOf(

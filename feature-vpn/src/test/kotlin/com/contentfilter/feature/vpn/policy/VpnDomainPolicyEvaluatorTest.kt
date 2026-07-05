@@ -75,6 +75,38 @@ class VpnDomainPolicyEvaluatorTest {
         assertTrue(allow.safeSearchRequired)
     }
 
+    @Test
+    fun `blocks search engines when web is blocked and search engines are disabled`() {
+        val snapshot = snapshot(rule("*", RuleAction.Block, priority = 10))
+
+        SearchEngineDomains.forEach { domain ->
+            val decision = evaluator.evaluate(domain, snapshot, activeHealth())
+
+            assertIs<PolicyDecision.Block>(decision, "Expected $domain to be blocked")
+        }
+    }
+
+    @Test
+    fun `allows search engines but blocks result domains when web is blocked`() {
+        val snapshot =
+            snapshot(
+                rule("*", RuleAction.Block, priority = 10),
+                *SearchEngineDomains
+                    .map { domain -> rule(domain, RuleAction.Allow, priority = 1_000) }
+                    .toTypedArray(),
+            )
+
+        SearchEngineDomains.forEach { domain ->
+            val decision = evaluator.evaluate(domain, snapshot, activeHealth())
+
+            assertIs<PolicyDecision.Allow>(decision, "Expected $domain to be allowed")
+        }
+        assertIs<PolicyDecision.Allow>(evaluator.evaluate("www.google.com", snapshot, activeHealth()))
+        assertIs<PolicyDecision.Allow>(evaluator.evaluate("www.bing.com", snapshot, activeHealth()))
+        assertIs<PolicyDecision.Allow>(evaluator.evaluate("duckduckgo.com", snapshot, activeHealth()))
+        assertIs<PolicyDecision.Block>(evaluator.evaluate("app.com", snapshot, activeHealth()))
+    }
+
     private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =
         PolicySnapshot(
             id = "test",
@@ -86,6 +118,7 @@ class VpnDomainPolicyEvaluatorTest {
         target: String,
         action: RuleAction,
         safeSearchRequired: Boolean = false,
+        priority: Int = 0,
     ): PolicyRule =
         PolicyRule(
             id = "rule-$target",
@@ -93,7 +126,7 @@ class VpnDomainPolicyEvaluatorTest {
             scope = RuleScope.Domain,
             target = target,
             action = action,
-            priority = 0,
+            priority = priority,
             enabled = true,
             safeSearchRequired = safeSearchRequired,
         )
@@ -118,5 +151,12 @@ class VpnDomainPolicyEvaluatorTest {
 
     private companion object {
         const val FixedTime = 1_735_689_600_000L
+        val SearchEngineDomains =
+            listOf(
+                "google.com",
+                "bing.com",
+                "search.yahoo.com",
+                "duckduckgo.com",
+            )
     }
 }

@@ -101,7 +101,7 @@ private fun RulesScreen(
         state.rules.filter {
             it.scope == RuleScope.Domain &&
                 it.target != "*" &&
-                it.target !in GoogleSearchDomainsForUi &&
+            it.target !in SearchEngineDomainsForUi &&
                 it.action == if (state.internetBlocked) RuleAction.Allow else RuleAction.Block
         }
     val otherRules = state.rules.filter { it.scope != RuleScope.App && it.scope != RuleScope.Domain }
