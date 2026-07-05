@@ -42,21 +42,21 @@ class SearchEngineScreenDetector {
             )
         }
         if (!visibleText.indicatesSearchEngineScreen()) {
-            if (recentDnsBlockHost != null) {
-                return SearchEngineScreenDiagnosis(
-                    shouldLeave = true,
-                    reason = "dueToRecentDnsBlock",
-                    packageCategory = packageCategory.label,
-                    recentDnsBlockHost = recentDnsBlockHost,
-                    searchBlockRules = blockRuleCount,
-                    visibleTextLength = visibleText.length,
-                )
-            }
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
-                reason = "no-search-signal",
+                reason = if (recentDnsBlockHost != null) "recent-dns-block-observed" else "no-search-signal",
                 packageCategory = packageCategory.label,
-                recentDnsBlockHost = null,
+                recentDnsBlockHost = recentDnsBlockHost,
+                searchBlockRules = blockRuleCount,
+                visibleTextLength = visibleText.length,
+            )
+        }
+        if (packageCategory == SearchSurfaceCategory.Browser) {
+            return SearchEngineScreenDiagnosis(
+                shouldLeave = false,
+                reason = "browser-search-signal-observed",
+                packageCategory = packageCategory.label,
+                recentDnsBlockHost = recentDnsBlockHost,
                 searchBlockRules = blockRuleCount,
                 visibleTextLength = visibleText.length,
             )

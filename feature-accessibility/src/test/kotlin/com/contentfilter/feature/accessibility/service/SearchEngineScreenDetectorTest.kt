@@ -14,8 +14,8 @@ class SearchEngineScreenDetectorTest {
     private val detector = SearchEngineScreenDetector()
 
     @Test
-    fun `leaves browser search screen when search engines are blocked`() {
-        assertTrue(
+    fun `does not leave browser search screen when search engines are blocked`() {
+        assertFalse(
             detector.shouldLeaveSearchEngine(
                 packageName = "com.android.chrome",
                 snapshot = snapshot(rule("google.com", RuleAction.Block)),
@@ -75,7 +75,7 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
-    fun `leaves Chrome without visible signal after recent DNS search block`() {
+    fun `does not leave Chrome without visible signal after recent DNS search block`() {
         val diagnosis =
             detector.diagnose(
                 packageName = "com.android.chrome",
@@ -84,15 +84,15 @@ class SearchEngineScreenDetectorTest {
                 recentDnsBlockHost = "google.com",
             )
 
-        assertTrue(diagnosis.shouldLeave)
+        assertFalse(diagnosis.shouldLeave)
         assertEquals("browser", diagnosis.packageCategory)
-        assertEquals("dueToRecentDnsBlock", diagnosis.reason)
+        assertEquals("recent-dns-block-observed", diagnosis.reason)
         assertEquals("google.com", diagnosis.recentDnsBlockHost)
     }
 
 
     @Test
-    fun `diagnoses blocked search screen`() {
+    fun `diagnoses browser search screen without leaving Chrome`() {
         val diagnosis =
             detector.diagnose(
                 packageName = "com.android.chrome",
@@ -100,8 +100,8 @@ class SearchEngineScreenDetectorTest {
                 visibleText = "Google Search resultados de busqueda",
             )
 
-        assertTrue(diagnosis.shouldLeave)
-        assertEquals("blocked-search-screen", diagnosis.reason)
+        assertFalse(diagnosis.shouldLeave)
+        assertEquals("browser-search-signal-observed", diagnosis.reason)
         assertEquals(1, diagnosis.searchBlockRules)
     }
 
