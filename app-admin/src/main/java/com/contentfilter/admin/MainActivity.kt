@@ -24,7 +24,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.auth.AdminAuthRoute
 import com.contentfilter.admin.dashboard.DashboardRoute
-import com.contentfilter.admin.devices.DevicesRoute
 import com.contentfilter.admin.requests.AdminRequestsRoute
 import com.contentfilter.admin.rules.RulesRoute
 import com.contentfilter.admin.updates.AdminUpdatesRoute
@@ -78,9 +77,8 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
             when (destination) {
                 AdminDestination.Login -> AdminAuthRoute()
                 AdminDestination.Dashboard -> DashboardRoute()
-                AdminDestination.Devices -> DevicesRoute()
+                AdminDestination.Devices -> RulesRoute()
                 AdminDestination.Requests -> AdminRequestsRoute(refreshKey = requestsRefreshKey)
-                AdminDestination.Rules -> RulesRoute()
                 AdminDestination.Updates -> AdminUpdatesRoute()
             }
         }
@@ -123,8 +121,7 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
 private enum class AdminDestination(val label: String) {
     Login("Login"),
     Dashboard("Panel"),
-    Devices("Dispositivos"),
+    Devices("Mis dispositivos"),
     Requests("Solicitudes"),
-    Rules("Reglas"),
     Updates("Actualizaciones"),
 }

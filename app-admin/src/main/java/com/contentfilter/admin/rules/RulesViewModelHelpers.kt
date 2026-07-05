@@ -100,19 +100,34 @@ internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List
                     ?.mapNotNull { it.updatedAt.toEpochMillisOrNull() }
                     ?.maxOrNull()
             val lastSeen = device?.lastSeenAtEpochMillis ?: newestAppSeen
+            val status =
+                when {
+                    lastSeen == null -> UserDeviceStatus.Unknown
+                    System.currentTimeMillis() - lastSeen <= ActiveDeviceWindowMillis -> UserDeviceStatus.Active
+                    else -> UserDeviceStatus.Inactive
+                }
             UserDeviceUiState(
                 id = deviceId,
                 name = device?.displayName ?: "Usuario",
-                active = lastSeen?.let { System.currentTimeMillis() - it <= ActiveDeviceWindowMillis } ?: false,
+                status = status,
                 lastSeenLabel = lastSeen.toLastSeenLabel(),
                 appCount = appsByDevice[deviceId]?.distinctBy { it.packageName }?.size ?: 0,
+                userLabel = "Usuario",
             )
         }.sortedWith(
             compareByDescending<UserDeviceUiState> { it.appCount > 0 }
-                .thenByDescending { it.active }
+                .thenBy { it.status.sortOrder }
                 .thenBy { it.name.lowercase() },
         )
 }
+
+private val UserDeviceStatus.sortOrder: Int
+    get() =
+        when (this) {
+            UserDeviceStatus.Active -> 0
+            UserDeviceStatus.Inactive -> 1
+            UserDeviceStatus.Unknown -> 2
+        }
 
 internal fun List<UserDeviceUiState>.selectedDeviceId(requestedDeviceId: String?): String? {
     val requested = firstOrNull { it.id == requestedDeviceId }

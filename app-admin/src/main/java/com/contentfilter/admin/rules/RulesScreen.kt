@@ -55,6 +55,7 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
         onAllowDomainMinutesChanged = viewModel::onAllowDomainMinutesChanged,
         onAppSearchChanged = viewModel::onAppSearchChanged,
         onRefreshApps = viewModel::refreshApps,
+        onGeneratePairingCode = viewModel::generatePairingCode,
         onDeviceSelected = viewModel::onDeviceSelected,
         onDeviceCleared = viewModel::clearDeviceSelection,
         onDeviceDeleted = viewModel::deleteDevicePermanently,
@@ -81,6 +82,7 @@ private fun RulesScreen(
     onAllowDomainMinutesChanged: (String) -> Unit,
     onAppSearchChanged: (String) -> Unit,
     onRefreshApps: () -> Unit,
+    onGeneratePairingCode: () -> Unit,
     onDeviceSelected: (String) -> Unit,
     onDeviceCleared: () -> Unit,
     onDeviceDeleted: (String) -> Unit,
@@ -114,7 +116,7 @@ private fun RulesScreen(
                     .padding(20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text("Reglas", style = MaterialTheme.typography.headlineSmall)
+            Text("Mis dispositivos", style = MaterialTheme.typography.headlineSmall)
             if (state.offlineMode) {
                 Text("Modo Offline / Desarrollo", color = MaterialTheme.colorScheme.error)
             }
@@ -169,7 +171,7 @@ private fun RulesScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            Text("Reglas", style = MaterialTheme.typography.headlineSmall)
+            Text("Mis dispositivos", style = MaterialTheme.typography.headlineSmall)
         }
         if (state.offlineMode) {
             item {
@@ -183,7 +185,32 @@ private fun RulesScreen(
         }
         if (selectedDevice == null) {
             item {
-                SectionHeader(title = "Celulares Usuario", count = state.userDevices.size)
+                Button(
+                    onClick = onGeneratePairingCode,
+                    enabled = !state.pairingLoading,
+                    modifier = Modifier.fillMaxWidth(),
+                ) {
+                    Text(if (state.pairingLoading) "Generando..." else "Generar código de enlace")
+                }
+            }
+            if (state.pairingCode.isNotBlank()) {
+                item {
+                    Card(modifier = Modifier.fillMaxWidth()) {
+                        Column(
+                            modifier = Modifier.padding(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(2.dp),
+                        ) {
+                            Text("Código para App Usuario", style = MaterialTheme.typography.labelLarge)
+                            Text(state.pairingCode, style = MaterialTheme.typography.headlineMedium)
+                            if (state.pairingExpiresAt.isNotBlank()) {
+                                Text("Vence: ${state.pairingExpiresAt}", style = MaterialTheme.typography.bodySmall)
+                            }
+                        }
+                    }
+                }
+            }
+            item {
+                SectionHeader(title = "Dispositivos vinculados", count = state.userDevices.size)
             }
             if (state.userDevices.isEmpty()) {
                 item {

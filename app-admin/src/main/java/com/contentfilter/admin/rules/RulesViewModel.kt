@@ -21,6 +21,7 @@ import com.contentfilter.core.domain.usecase.admin.SavePolicyRuleUseCase
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteResult
+import com.contentfilter.core.network.remote.SupabaseActivationClient
 import com.contentfilter.core.network.remote.SupabaseDevMaintenanceClient
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
@@ -52,6 +53,7 @@ class RulesViewModel
         private val saveDailyLimit: SaveDailyLimitUseCase,
         private val deviceRepository: DeviceRepository,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
+        private val activationClient: SupabaseActivationClient,
         private val devMaintenanceClient: SupabaseDevMaintenanceClient,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
@@ -139,6 +141,27 @@ class RulesViewModel
         fun refreshApps() {
             form.update { it.copy(message = "Cargando apps...") }
             refreshInstalledApps()
+        }
+
+        fun generatePairingCode() {
+            viewModelScope.launch {
+                form.update { it.copy(pairingLoading = true, message = "Generando código...") }
+                when (val result = activationClient.createDevicePairingCode()) {
+                    is RemoteResult.Success ->
+                        form.update {
+                            it.copy(
+                                pairingCode = result.value.code,
+                                pairingExpiresAt = result.value.expiresAt,
+                                pairingLoading = false,
+                                message = "Código listo. Pasalo a la App Usuario.",
+                            )
+                        }
+                    is RemoteResult.Failure ->
+                        form.update {
+                            it.copy(pairingLoading = false, message = "No se pudo generar código.")
+                        }
+                }
+            }
         }
 
         fun onDeviceSelected(deviceId: String) {

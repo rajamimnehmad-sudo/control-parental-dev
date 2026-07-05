@@ -24,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
@@ -53,7 +54,7 @@ internal fun SelectedDeviceHeader(
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(device.name, style = MaterialTheme.typography.titleMedium)
                     Text(
-                        text = "${if (device.active) "Activo" else "Desconectado"} | ${device.lastSeenLabel}",
+                        text = "${device.status.label} | ${device.userLabel} | ${device.lastSeenLabel}",
                         style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -95,10 +96,10 @@ internal fun UserDeviceCard(
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     val indicatorColor =
-        if (device.active) {
-            MaterialTheme.colorScheme.primary
-        } else {
-            MaterialTheme.colorScheme.error
+        when (device.status) {
+            UserDeviceStatus.Active -> Color(0xFF2E7D32)
+            UserDeviceStatus.Inactive -> MaterialTheme.colorScheme.error
+            UserDeviceStatus.Unknown -> MaterialTheme.colorScheme.outline
         }
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -122,7 +123,7 @@ internal fun UserDeviceCard(
             ) {
                 Text(device.name, style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = "${if (device.active) "Activo" else "Desconectado"} | ${device.lastSeenLabel} | ${device.appCount} apps",
+                    text = "${device.status.label} | ${device.userLabel} | ${device.lastSeenLabel} | ${device.appCount} apps",
                     style = MaterialTheme.typography.bodySmall,
                 )
             }
@@ -171,6 +172,14 @@ internal fun UserDeviceCard(
         )
     }
 }
+
+private val UserDeviceStatus.label: String
+    get() =
+        when (this) {
+            UserDeviceStatus.Active -> "Activo"
+            UserDeviceStatus.Inactive -> "Desconectado"
+            UserDeviceStatus.Unknown -> "Desconocido"
+        }
 
 @Composable
 internal fun SectionHeader(

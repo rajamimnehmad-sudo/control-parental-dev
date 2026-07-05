@@ -26,6 +26,9 @@ data class RulesUiState(
     val selectedAction: RuleAction = RuleAction.Block,
     val pendingAppAllowed: Map<String, Boolean> = emptyMap(),
     val pendingDeviceDeleteIds: Set<String> = emptySet(),
+    val pairingCode: String = "",
+    val pairingExpiresAt: String = "",
+    val pairingLoading: Boolean = false,
     val offlineMode: Boolean = true,
     val message: String = "",
 )
@@ -33,10 +36,17 @@ data class RulesUiState(
 data class UserDeviceUiState(
     val id: String,
     val name: String,
-    val active: Boolean,
+    val status: UserDeviceStatus,
     val lastSeenLabel: String,
     val appCount: Int,
+    val userLabel: String = "Usuario",
 )
+
+enum class UserDeviceStatus {
+    Active,
+    Inactive,
+    Unknown,
+}
 
 data class AppControlUiState(
     val appName: String,
