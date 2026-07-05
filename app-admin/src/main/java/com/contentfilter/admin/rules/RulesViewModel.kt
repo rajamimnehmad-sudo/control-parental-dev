@@ -215,12 +215,7 @@ class RulesViewModel
 
         fun setInternetBlocked(blocked: Boolean) {
             val currentState = uiState.value
-            val existing =
-                currentState.rules.firstOrNull {
-                    it.scope == RuleScope.Domain &&
-                        it.target == DomainWildcard &&
-                        it.action == RuleAction.Block
-                }
+            val existingRules = currentState.rules.internetBlockRules()
             val previousRoom = currentState.rules.internetBlocked()
             logInternetSwitch(
                 stage = "tap",
@@ -245,18 +240,23 @@ class RulesViewModel
             viewModelScope.launch {
                 val saved =
                     runCatching {
-                        saveRule(
-                            existing?.copy(enabled = blocked)
-                                ?: PolicyRule(
-                                    id = UUID.randomUUID().toString(),
-                                    level = PolicyLevel.Account,
-                                    scope = RuleScope.Domain,
-                                    target = DomainWildcard,
-                                    action = RuleAction.Block,
-                                    priority = InternetBlockPriority,
-                                    enabled = blocked,
-                                ),
-                        )
+                        val rulesToSave =
+                            existingRules.ifEmpty {
+                                listOf(
+                                    PolicyRule(
+                                        id = UUID.randomUUID().toString(),
+                                        level = PolicyLevel.Account,
+                                        scope = RuleScope.Domain,
+                                        target = DomainWildcard,
+                                        action = RuleAction.Block,
+                                        priority = InternetBlockPriority,
+                                        enabled = blocked,
+                                    ),
+                                )
+                            }
+                        rulesToSave.forEach { rule ->
+                            saveRule(rule.copy(enabled = blocked))
+                        }
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
                             policyRules.first { it.internetBlocked() == blocked }
                         } ?: error("Room no confirmó el nuevo estado de Internet.")
@@ -662,9 +662,11 @@ class RulesViewModel
                 .firstOrNull()
 
         private fun List<PolicyRule>.internetBlocked(): Boolean =
-            any {
-                it.enabled &&
-                    it.scope == RuleScope.Domain &&
+            internetBlockRules().any { it.enabled }
+
+        private fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
+            filter {
+                it.scope == RuleScope.Domain &&
                     it.target == DomainWildcard &&
                     it.action == RuleAction.Block
             }
