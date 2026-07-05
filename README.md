@@ -91,7 +91,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 75
+versionCode 77
 versionName 1.0.1-dev
 ```
 
@@ -116,6 +116,8 @@ Actualizar este README cuando cambie:
 - Diagnostico interno por capas para buscadores: VPN/DNS y Accessibility registran motivo tecnico en Logcat.
 - Accessibility tambien revisa cambios de contenido de ventana para detectar resultados que cargan sin cambiar de pantalla.
 - El filtro interno de Accessibility cubre `TYPE_WINDOW_CONTENT_CHANGED` y los logs indican el tipo de evento procesado.
+- Admin no muestra error falso al cambiar buscadores si la escritura local ya fue confirmada y el sync queda diferido.
+- Admin bloquea controles de Internet durante guardado para evitar requests cruzadas/doble tap y registra `requestId`.
 - Con modo web abierto, buscadores quedan abiertos.
 - Las reglas de internet bloquean dominios por VPN/DNS sin cerrar el navegador; Chrome/Samsung Internet solo se cierra por reglas o limites de app.
 - Las apps se actualizan manualmente desde la pantalla `Actualizaciones`.

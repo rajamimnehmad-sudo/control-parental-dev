@@ -32,6 +32,7 @@ import com.contentfilter.core.domain.model.PolicyRule
 internal fun InternetModeCard(
     blocked: Boolean,
     searchEnginesAllowed: Boolean,
+    internetSaving: Boolean,
     webModeUpdating: Boolean,
     searchEnginesUpdating: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
@@ -61,10 +62,13 @@ internal fun InternetModeCard(
                             },
                         style = MaterialTheme.typography.bodyMedium,
                     )
+                    if (internetSaving) {
+                        Text("Guardando...", style = MaterialTheme.typography.bodySmall)
+                    }
                 }
                 Switch(
                     checked = blocked,
-                    enabled = !webModeUpdating,
+                    enabled = !internetSaving && !webModeUpdating,
                     onCheckedChange = onBlockedChanged,
                 )
             }
@@ -90,7 +94,7 @@ internal fun InternetModeCard(
                 }
                 Switch(
                     checked = searchEnginesAllowed,
-                    enabled = blocked && !webModeUpdating && !searchEnginesUpdating,
+                    enabled = blocked && !internetSaving && !webModeUpdating && !searchEnginesUpdating,
                     onCheckedChange = onSearchEnginesAllowedChanged,
                     colors =
                         SwitchDefaults.colors(
@@ -114,6 +118,8 @@ private val SearchBlockedTrackColor = Color(0xFFFFCDD2)
 internal fun AllowDomainEditorCard(
     domain: String,
     minutes: String,
+    enabled: Boolean,
+    saving: Boolean,
     onDomainChanged: (String) -> Unit,
     onMinutesChanged: (String) -> Unit,
     onAllow: () -> Unit,
@@ -123,14 +129,18 @@ internal fun AllowDomainEditorCard(
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text("Lista blanca", style = MaterialTheme.typography.titleMedium)
+            ) {
+                Text("Lista blanca", style = MaterialTheme.typography.titleMedium)
+                if (saving) {
+                    Text("Guardando...", style = MaterialTheme.typography.bodySmall)
+                }
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = domain,
                 onValueChange = onDomainChanged,
                 label = { Text("Sitio permitido") },
                 singleLine = true,
+                enabled = enabled,
             )
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
@@ -139,10 +149,11 @@ internal fun AllowDomainEditorCard(
                 label = { Text("Minutos por día opcional") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                enabled = enabled,
             )
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onAllow) { Text("Permitir") }
-                OutlinedButton(onClick = onAllowWithLimit) { Text("Permitir con tiempo") }
+                Button(onClick = onAllow, enabled = enabled) { Text("Permitir") }
+                OutlinedButton(onClick = onAllowWithLimit, enabled = enabled) { Text("Permitir con tiempo") }
             }
         }
     }
@@ -152,6 +163,7 @@ internal fun AllowDomainEditorCard(
 internal fun RuleCard(
     rule: PolicyRule,
     dailyLimitMinutes: Int? = null,
+    enabled: Boolean = true,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -175,6 +187,7 @@ internal fun RuleCard(
                 }
                 Switch(
                     checked = rule.enabled,
+                    enabled = enabled,
                     onCheckedChange = { onToggle() },
                 )
             }
@@ -183,7 +196,7 @@ internal fun RuleCard(
                 Text("Límite diario: $dailyLimitMinutes min")
             }
             Text("Estado: ${if (rule.enabled) "Activada" else "Desactivada"}")
-            OutlinedButton(onClick = { confirmDelete = true }) {
+            OutlinedButton(onClick = { confirmDelete = true }, enabled = enabled) {
                 Text("Eliminar")
             }
         }
@@ -215,6 +228,7 @@ internal fun RuleCard(
 @Composable
 internal fun DomainLimitCard(
     limit: DailyLimit,
+    enabled: Boolean = true,
     onDelete: () -> Unit,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
@@ -226,7 +240,7 @@ internal fun DomainLimitCard(
             Text(limit.target, style = MaterialTheme.typography.titleMedium)
             Text("Límite diario: ${limit.limitMinutes} min")
             Text("Estado: ${if (limit.enabled) "Activado" else "Desactivado"}")
-            OutlinedButton(onClick = { confirmDelete = true }) {
+            OutlinedButton(onClick = { confirmDelete = true }, enabled = enabled) {
                 Text("Eliminar límite")
             }
         }

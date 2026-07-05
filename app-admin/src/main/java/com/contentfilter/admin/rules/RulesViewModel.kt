@@ -26,6 +26,7 @@ import com.contentfilter.core.network.remote.SupabaseActivationClient
 import com.contentfilter.core.network.remote.SupabaseDevMaintenanceClient
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
+import com.contentfilter.core.sync.engine.SyncResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +71,7 @@ class RulesViewModel
                 RulesUiState(),
             )
         private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
+        private var internetSaveRequestId = 0L
         private val selectedPolicyDeviceId = form.map { it.selectedDeviceId }.distinctUntilChanged()
         private val policyRules = selectedPolicyDeviceId.flatMapLatest { observePolicyRules(it) }
         private val dailyLimits = selectedPolicyDeviceId.flatMapLatest { observeDailyLimits(it) }
@@ -223,32 +225,94 @@ class RulesViewModel
         fun createDomainLimit() = createLimit(PolicyTargetType.Domain)
 
         fun setSearchEnginesAllowed(allowed: Boolean) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
+            val previousState = uiState.value.searchEnginesAllowed
+            val requestId =
+                beginInternetSave(
+                    action = "search-engines",
+                    deviceId = targetDeviceId,
+                    previousState = previousState.toString(),
+                    requestedState = allowed.toString(),
+                ) ?: return
             form.update {
                 it.copy(
+                    internetSaving = true,
                     pendingSearchEnginesAllowed = allowed,
                     message = if (allowed) "Permitiendo buscadores..." else "Bloqueando buscadores...",
                 )
             }
+            logSearchEngineSwitch(
+                stage = "tap",
+                allowed = allowed,
+                deviceId = targetDeviceId,
+                pending = allowed,
+                roomAllowed = uiState.value.rules.searchEnginesAllowed(),
+            )
             viewModelScope.launch {
-                runCatching {
-                    setSearchEnginesAllowedRules(allowed)
-                    syncScheduler.requestSync()
-                    check(syncNow()) { "No se pudo sincronizar buscadores." }
-                }.onSuccess {
-                    form.update {
-                        it.copy(
-                            pendingSearchEnginesAllowed = null,
-                            message = if (allowed) "Buscadores permitidos." else "Buscadores bloqueados.",
-                        )
+                val saved =
+                    runCatching {
+                        setSearchEnginesAllowedRules(allowed, targetDeviceId)
+                        withTimeoutOrNull(RoomConfirmTimeoutMillis) {
+                            policyRules.first { it.searchEnginesAllowed() == allowed }
+                        } ?: error("Room no confirmó buscadores.")
                     }
-                }.onFailure {
-                    form.update {
-                        it.copy(
-                            pendingSearchEnginesAllowed = null,
-                            message = "No se pudo cambiar buscadores. Intentá otra vez.",
-                        )
+                if (saved.isFailure) {
+                    Log.e(
+                        LogTag,
+                        "searchEngineSwitch save failed requestId=$requestId allowed=$allowed deviceId=$targetDeviceId reason=${saved.exceptionOrNull()?.javaClass?.simpleName}",
+                        saved.exceptionOrNull(),
+                    )
+                    if (isCurrentInternetSave(requestId)) {
+                        form.update {
+                            it.copy(
+                                internetSaving = false,
+                                pendingSearchEnginesAllowed = null,
+                                message = "No se pudo cambiar buscadores. Intentá otra vez.",
+                            )
+                        }
                     }
+                    return@launch
                 }
+                logSearchEngineSwitch(
+                    stage = "room-confirmed",
+                    allowed = allowed,
+                    deviceId = targetDeviceId,
+                    pending = form.value.pendingSearchEnginesAllowed,
+                    roomAllowed = saved.getOrThrow().searchEnginesAllowed(),
+                )
+                syncScheduler.requestSync()
+                val synced = syncNowWithResult()
+                Log.i(
+                    LogTag,
+                    "searchEngineSwitch sync finished requestId=$requestId allowed=$allowed deviceId=$targetDeviceId success=${synced.success} message=${synced.message}",
+                )
+                if (!isCurrentInternetSave(requestId)) {
+                    Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=search-engines")
+                    return@launch
+                }
+                form.update {
+                    it.copy(
+                        internetSaving = false,
+                        pendingSearchEnginesAllowed = null,
+                        message =
+                            if (synced.success) {
+                                if (allowed) "Buscadores permitidos." else "Buscadores bloqueados."
+                            } else {
+                                if (allowed) {
+                                    "Buscadores permitidos localmente. Se sincronizará cuando haya conexión."
+                                } else {
+                                    "Buscadores bloqueados localmente. Se sincronizará cuando haya conexión."
+                                }
+                            },
+                    )
+                }
+                logSearchEngineSwitch(
+                    stage = "ui-final",
+                    allowed = allowed,
+                    deviceId = targetDeviceId,
+                    pending = null,
+                    roomAllowed = uiState.value.rules.searchEnginesAllowed(),
+                )
             }
         }
 
@@ -260,17 +324,49 @@ class RulesViewModel
                 form.update { it.copy(message = "Ingresá sitio permitido y minutos válidos.") }
                 return
             }
+            val requestId =
+                beginInternetSave(
+                    action = "allow-domain-limit",
+                    deviceId = targetDeviceId,
+                    previousState = "domain=${uiState.value.rules.any { it.target == target && it.enabled }}",
+                    requestedState = "domain=$target minutes=$minutes",
+                ) ?: return
             viewModelScope.launch {
-                saveAllowedDomain(target, targetDeviceId)
-                saveDomainDailyLimit(target, minutes, targetDeviceId)
-                syncScheduler.requestSync()
-                syncNow()
+                val saved =
+                    runCatching {
+                        saveAllowedDomain(target, targetDeviceId)
+                        saveDomainDailyLimit(target, minutes, targetDeviceId)
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                if (!isCurrentInternetSave(requestId)) {
+                    Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=allow-domain-limit")
+                    return@launch
+                }
+                val result = saved.getOrNull()
+                Log.i(
+                    LogTag,
+                    "internetSave finished requestId=$requestId action=allow-domain-limit deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
+                )
                 form.update {
-                    it.copy(
-                        allowDomain = "",
-                        allowDomainMinutes = "",
-                        message = "Sitio permitido con límite guardado.",
-                    )
+                    if (saved.isSuccess) {
+                        it.copy(
+                            internetSaving = false,
+                            allowDomain = "",
+                            allowDomainMinutes = "",
+                            message =
+                                if (result?.success == false) {
+                                    "Sitio permitido guardado localmente. Se sincronizará cuando haya conexión."
+                                } else {
+                                    "Sitio permitido con límite guardado."
+                                },
+                        )
+                    } else {
+                        it.copy(
+                            internetSaving = false,
+                            message = "No se pudo guardar el sitio permitido con límite.",
+                        )
+                    }
                 }
             }
         }
@@ -284,6 +380,13 @@ class RulesViewModel
             val currentState = uiState.value
             val existingRules = currentState.rules.internetBlockRules()
             val previousRoom = currentState.rules.internetBlocked()
+            val requestId =
+                beginInternetSave(
+                    action = "internet-mode",
+                    deviceId = targetDeviceId,
+                    previousState = previousRoom.toString(),
+                    requestedState = blocked.toString(),
+                ) ?: return
             logInternetSwitch(
                 stage = "tap",
                 touched = blocked,
@@ -293,6 +396,7 @@ class RulesViewModel
             )
             form.update {
                 it.copy(
+                    internetSaving = true,
                     pendingInternetBlocked = blocked,
                     pendingSearchEnginesAllowed = if (blocked) false else it.pendingSearchEnginesAllowed,
                     message = if (blocked) "Activando lista blanca..." else "Abriendo Internet...",
@@ -327,7 +431,7 @@ class RulesViewModel
                         }
                         if (blocked) {
                             clearLegacyDomainBlockRules(targetDeviceId)
-                            setSearchEnginesAllowedRules(allowed = false)
+                            setSearchEnginesAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
                         } else {
                             clearLegacyDomainBlockRules(targetDeviceId)
                             clearSearchEngineRules(targetDeviceId)
@@ -355,8 +459,13 @@ class RulesViewModel
                     syncScheduler.requestSync()
                     val synced = syncNow()
                     if (synced) {
+                        if (!isCurrentInternetSave(requestId)) {
+                            Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=internet-mode")
+                            return@launch
+                        }
                         form.update {
                             it.copy(
+                                internetSaving = false,
                                 pendingInternetBlocked = null,
                                 pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
                                 message =
@@ -375,8 +484,13 @@ class RulesViewModel
                             ui = blocked,
                         )
                     } else {
+                        if (!isCurrentInternetSave(requestId)) {
+                            Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=internet-mode")
+                            return@launch
+                        }
                         form.update {
                             it.copy(
+                                internetSaving = false,
                                 pendingInternetBlocked = null,
                                 pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
                                 message = "Cambio guardado localmente. Se sincronizará cuando haya conexión.",
@@ -384,12 +498,15 @@ class RulesViewModel
                         }
                     }
                 } else {
-                    form.update {
-                        it.copy(
-                            pendingInternetBlocked = null,
-                            pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
-                            message = "No se pudo cambiar el modo web. Intentá otra vez.",
-                        )
+                    if (isCurrentInternetSave(requestId)) {
+                        form.update {
+                            it.copy(
+                                internetSaving = false,
+                                pendingInternetBlocked = null,
+                                pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
+                                message = "No se pudo cambiar el modo web. Intentá otra vez.",
+                            )
+                        }
                     }
                     logInternetSwitch(
                         stage = "save-failed",
@@ -404,26 +521,89 @@ class RulesViewModel
 
         fun toggle(rule: PolicyRule) {
             val targetDeviceId = selectedDeviceIdForRules() ?: return
+            val requestId =
+                if (rule.scope == RuleScope.Domain) {
+                    beginInternetSave(
+                        action = "toggle-domain-rule",
+                        deviceId = targetDeviceId,
+                        previousState = "${rule.target}:${rule.enabled}",
+                        requestedState = "${rule.target}:${!rule.enabled}",
+                    ) ?: return
+                } else {
+                    null
+                }
             viewModelScope.launch {
-                saveRule(rule.copy(enabled = !rule.enabled), targetDeviceId)
-                syncScheduler.requestSync()
-                syncNow()
+                val saved =
+                    runCatching {
+                        saveRule(rule.copy(enabled = !rule.enabled), targetDeviceId)
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                if (requestId != null) {
+                    if (!isCurrentInternetSave(requestId)) {
+                        Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=toggle-domain-rule")
+                        return@launch
+                    }
+                    val result = saved.getOrNull()
+                    Log.i(
+                        LogTag,
+                        "internetSave finished requestId=$requestId action=toggle-domain-rule deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
+                    )
+                    form.update {
+                        it.copy(
+                            internetSaving = false,
+                            message =
+                                if (saved.isSuccess) {
+                                    "Regla actualizada."
+                                } else {
+                                    "No se pudo actualizar la regla."
+                                },
+                        )
+                    }
+                }
             }
         }
 
         fun delete(rule: PolicyRule) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
+            val requestId =
+                if (rule.scope == RuleScope.Domain) {
+                    beginInternetSave(
+                        action = "delete-domain-rule",
+                        deviceId = targetDeviceId,
+                        previousState = "${rule.target}:enabled=${rule.enabled}",
+                        requestedState = "${rule.target}:deleted",
+                    ) ?: return
+                } else {
+                    null
+                }
             viewModelScope.launch {
                 val associatedLimit = rule.associatedDomainLimit()
-                deleteRule(rule)
-                if (associatedLimit != null) {
-                    deleteDailyLimitUseCase(associatedLimit)
+                val saved =
+                    runCatching {
+                        deleteRule(rule)
+                        if (associatedLimit != null) {
+                            deleteDailyLimitUseCase(associatedLimit)
+                        }
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                if (requestId != null && !isCurrentInternetSave(requestId)) {
+                    Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=delete-domain-rule")
+                    return@launch
                 }
-                syncScheduler.requestSync()
-                syncNow()
+                val result = saved.getOrNull()
+                Log.i(
+                    LogTag,
+                    "internetSave finished requestId=${requestId ?: 0} action=delete-rule deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
+                )
                 form.update {
                     it.copy(
+                        internetSaving = if (requestId != null) false else it.internetSaving,
                         message =
-                            if (associatedLimit != null) {
+                            if (!saved.isSuccess) {
+                                "No se pudo eliminar la regla."
+                            } else if (associatedLimit != null) {
                                 "Regla y límite asociado eliminados."
                             } else {
                                 "Regla eliminada."
@@ -434,11 +614,41 @@ class RulesViewModel
         }
 
         fun deleteDomainLimit(limit: DailyLimit) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
+            val requestId =
+                beginInternetSave(
+                    action = "delete-domain-limit",
+                    deviceId = targetDeviceId,
+                    previousState = "${limit.target}:enabled=${limit.enabled}",
+                    requestedState = "${limit.target}:deleted",
+                ) ?: return
             viewModelScope.launch {
-                deleteDailyLimitUseCase(limit)
-                syncScheduler.requestSync()
-                syncNow()
-                form.update { it.copy(message = "Límite de dominio eliminado.") }
+                val saved =
+                    runCatching {
+                        deleteDailyLimitUseCase(limit)
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                if (!isCurrentInternetSave(requestId)) {
+                    Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=delete-domain-limit")
+                    return@launch
+                }
+                val result = saved.getOrNull()
+                Log.i(
+                    LogTag,
+                    "internetSave finished requestId=$requestId action=delete-domain-limit deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
+                )
+                form.update {
+                    it.copy(
+                        internetSaving = false,
+                        message =
+                            if (saved.isSuccess) {
+                                "Límite de dominio eliminado."
+                            } else {
+                                "No se pudo eliminar el límite de dominio."
+                            },
+                    )
+                }
             }
         }
 
@@ -584,43 +794,78 @@ class RulesViewModel
                 form.update { it.copy(message = "Ingresá minutos válidos o dejá el campo vacío.") }
                 return
             }
-            viewModelScope.launch {
+            val internetRequestId =
                 if (scope == RuleScope.Domain && action == RuleAction.Allow) {
-                    saveAllowedDomain(target, targetDeviceId)
-                    if (allowDomainMinutes != null) {
-                        saveDomainDailyLimit(target, allowDomainMinutes, targetDeviceId)
-                    }
+                    beginInternetSave(
+                        action = "allow-domain",
+                        deviceId = targetDeviceId,
+                        previousState = "domain=${uiState.value.rules.any { it.target == target && it.enabled }}",
+                        requestedState = "domain=$target minutes=${allowDomainMinutes ?: "none"}",
+                    ) ?: return
                 } else {
-                    saveRule(
-                        PolicyRule(
-                            id = UUID.randomUUID().toString(),
-                            level = PolicyLevel.Account,
-                            scope = scope,
-                            target = target,
-                            action = action,
-                            priority = 100,
-                            enabled = true,
-                        ),
-                        targetDeviceId,
+                    null
+                }
+            viewModelScope.launch {
+                val saved =
+                    runCatching {
+                        if (scope == RuleScope.Domain && action == RuleAction.Allow) {
+                            saveAllowedDomain(target, targetDeviceId)
+                            if (allowDomainMinutes != null) {
+                                saveDomainDailyLimit(target, allowDomainMinutes, targetDeviceId)
+                            }
+                        } else {
+                            saveRule(
+                                PolicyRule(
+                                    id = UUID.randomUUID().toString(),
+                                    level = PolicyLevel.Account,
+                                    scope = scope,
+                                    target = target,
+                                    action = action,
+                                    priority = 100,
+                                    enabled = true,
+                                ),
+                                targetDeviceId,
+                            )
+                        }
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                if (internetRequestId != null && !isCurrentInternetSave(internetRequestId)) {
+                    Log.i(LogTag, "internetSave stale response ignored requestId=$internetRequestId action=allow-domain")
+                    return@launch
+                }
+                val result = saved.getOrNull()
+                if (internetRequestId != null) {
+                    Log.i(
+                        LogTag,
+                        "internetSave finished requestId=$internetRequestId action=allow-domain deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
                     )
                 }
-                syncScheduler.requestSync()
-                syncNow()
                 form.update {
                     when (scope) {
                         RuleScope.App -> it.copy(appPackageName = "", message = "App bloqueada.")
                         RuleScope.Domain ->
                             if (action == RuleAction.Allow) {
-                                it.copy(
-                                    allowDomain = "",
-                                    allowDomainMinutes = "",
-                                    message =
-                                        if (allowDomainMinutes != null) {
-                                            "Sitio permitido con límite guardado."
-                                        } else {
-                                            "Sitio permitido."
-                                        },
-                                )
+                                if (saved.isSuccess) {
+                                    it.copy(
+                                        internetSaving = false,
+                                        allowDomain = "",
+                                        allowDomainMinutes = "",
+                                        message =
+                                            if (result?.success == false) {
+                                                "Sitio permitido guardado localmente. Se sincronizará cuando haya conexión."
+                                            } else if (allowDomainMinutes != null) {
+                                                "Sitio permitido con límite guardado."
+                                            } else {
+                                                "Sitio permitido."
+                                            },
+                                    )
+                                } else {
+                                    it.copy(
+                                        internetSaving = false,
+                                        message = "No se pudo guardar el sitio permitido.",
+                                    )
+                                }
                             } else {
                                 it.copy(message = "Regla guardada.")
                             }
@@ -742,8 +987,10 @@ class RulesViewModel
                 null
             }
 
-        private suspend fun setSearchEnginesAllowedRules(allowed: Boolean) {
-            val targetDeviceId = selectedDeviceIdForRules() ?: return
+        private suspend fun setSearchEnginesAllowedRules(
+            allowed: Boolean,
+            targetDeviceId: String,
+        ) {
             SearchEngineDomains.forEach { domain ->
                 setSearchEngineDomain(domain, allowed, targetDeviceId)
             }
@@ -882,7 +1129,50 @@ class RulesViewModel
             return selectedDeviceId
         }
 
-        private suspend fun syncNow(): Boolean = withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull().success }
+        private suspend fun syncNow(): Boolean = syncNowWithResult().success
+
+        private suspend fun syncNowWithResult(): SyncResult =
+            withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull() }
+
+        private fun beginInternetSave(
+            action: String,
+            deviceId: String,
+            previousState: String,
+            requestedState: String,
+        ): Long? {
+            if (form.value.internetSaving) {
+                Log.i(
+                    LogTag,
+                    "internetSave ignored action=$action deviceId=$deviceId previousState=$previousState requestedState=$requestedState reason=already-saving requestId=$internetSaveRequestId",
+                )
+                form.update { it.copy(message = "Guardando cambio anterior...") }
+                return null
+            }
+            val requestId = ++internetSaveRequestId
+            Log.i(
+                LogTag,
+                "internetSave start requestId=$requestId action=$action deviceId=$deviceId previousState=$previousState requestedState=$requestedState",
+            )
+            form.update { it.copy(internetSaving = true, message = "Guardando...") }
+            return requestId
+        }
+
+        private fun isCurrentInternetSave(requestId: Long): Boolean = requestId == internetSaveRequestId
+
+        private fun logSearchEngineSwitch(
+            stage: String,
+            allowed: Boolean,
+            deviceId: String,
+            pending: Boolean?,
+            roomAllowed: Boolean,
+        ) {
+            if (BuildConfig.DEBUG) {
+                Log.d(
+                    LogTag,
+                    "searchEngineSwitch stage=$stage allowed=$allowed deviceId=$deviceId pending=$pending roomAllowed=$roomAllowed",
+                )
+            }
+        }
 
         private fun logInternetSwitch(
             stage: String,

@@ -272,6 +272,7 @@ private fun RulesScreen(
                     InternetModeCard(
                         blocked = state.internetBlocked,
                         searchEnginesAllowed = state.searchEnginesAllowed,
+                        internetSaving = state.internetSaving,
                         webModeUpdating = state.pendingInternetBlocked != null,
                         searchEnginesUpdating = state.pendingSearchEnginesAllowed != null,
                         onBlockedChanged = onInternetBlockedChanged,
@@ -282,6 +283,8 @@ private fun RulesScreen(
                     AllowDomainEditorCard(
                         domain = state.allowDomain,
                         minutes = state.allowDomainMinutes,
+                        enabled = !state.internetSaving,
+                        saving = state.internetSaving,
                         onDomainChanged = onAllowDomainChanged,
                         onMinutesChanged = onAllowDomainMinutesChanged,
                         onAllow = onCreateDomainAllow,
@@ -303,6 +306,7 @@ private fun RulesScreen(
                     RuleCard(
                         rule = rule,
                         dailyLimitMinutes = visibleDomainLimits.firstOrNull { it.target == rule.target }?.limitMinutes,
+                        enabled = !state.internetSaving,
                         onToggle = { onToggle(rule) },
                         onDelete = { onDelete(rule) },
                     )
@@ -312,7 +316,7 @@ private fun RulesScreen(
                         SectionHeader(title = "Límites sin regla visible", count = orphanDomainLimits.size)
                     }
                     items(orphanDomainLimits, key = { it.id }) { limit ->
-                        DomainLimitCard(limit = limit, onDelete = { onDeleteDomainLimit(limit) })
+                        DomainLimitCard(limit = limit, enabled = !state.internetSaving, onDelete = { onDeleteDomainLimit(limit) })
                     }
                 }
             }

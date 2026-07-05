@@ -17,6 +17,7 @@ data class RulesUiState(
     val allowDomainMinutes: String = "",
     val internetBlocked: Boolean = false,
     val searchEnginesAllowed: Boolean = false,
+    val internetSaving: Boolean = false,
     val pendingInternetBlocked: Boolean? = null,
     val pendingSearchEnginesAllowed: Boolean? = null,
     val limitPackageName: String = "",
