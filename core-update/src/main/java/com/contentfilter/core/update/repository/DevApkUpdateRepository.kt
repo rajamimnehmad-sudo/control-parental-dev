@@ -13,6 +13,7 @@ import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
 import java.security.MessageDigest
+import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 
 class DevApkUpdateRepository
@@ -22,6 +23,14 @@ class DevApkUpdateRepository
         private val configProvider: UpdateConfigProvider,
         private val httpClient: OkHttpClient,
     ) : ApkUpdateRepository {
+        private val updateHttpClient =
+            httpClient.newBuilder()
+                .connectTimeout(NetworkTimeoutSeconds, TimeUnit.SECONDS)
+                .readTimeout(NetworkTimeoutSeconds, TimeUnit.SECONDS)
+                .writeTimeout(NetworkTimeoutSeconds, TimeUnit.SECONDS)
+                .callTimeout(DownloadTimeoutSeconds, TimeUnit.SECONDS)
+                .build()
+
         override suspend fun checkForUpdate(currentVersionCode: Int): UpdateCheckResult =
             withContext(Dispatchers.IO) {
                 val url = configProvider.manifestUrl()
@@ -39,13 +48,22 @@ class DevApkUpdateRepository
             withContext(Dispatchers.IO) {
                 val request = Request.Builder().url(manifest.apkUrl).get().build()
                 runCatching {
-                    httpClient.newCall(request).execute().use { response ->
+                    updateHttpClient.newCall(request).execute().use { response ->
                         if (!response.isSuccessful) return@withContext UpdateDownloadResult.DownloadError
                         val body = response.body ?: return@withContext UpdateDownloadResult.DownloadError
                         val updateDir = File(context.cacheDir, UpdateCacheDir).apply { mkdirs() }
                         val apk = File(updateDir, manifest.apkFileName())
-                        apk.outputStream().use { output ->
-                            body.byteStream().use { input -> input.copyTo(output) }
+                        val partial = File(updateDir, "${apk.name}.partial")
+                        apk.delete()
+                        partial.delete()
+                        body.byteStream().use { input ->
+                            partial.outputStream().use { output ->
+                                input.copyTo(output, BufferSizeBytes)
+                            }
+                        }
+                        if (!partial.renameTo(apk)) {
+                            partial.delete()
+                            return@withContext UpdateDownloadResult.DownloadError
                         }
                         if (!apk.sha256Matches(manifest.apkSha256)) {
                             apk.delete()
@@ -59,7 +77,7 @@ class DevApkUpdateRepository
         private fun fetchManifest(url: String): UpdateManifest? {
             val request = Request.Builder().url(url).get().build()
             return runCatching {
-                httpClient.newCall(request).execute().use { response ->
+                updateHttpClient.newCall(request).execute().use { response ->
                     if (!response.isSuccessful) return null
                     response.body?.string()?.toUpdateManifest()
                 }
@@ -97,5 +115,7 @@ class DevApkUpdateRepository
             const val UpdateCacheDir = "updates"
             const val DefaultUpdateApkName = "dev-update.apk"
             const val BufferSizeBytes = 8 * 1024
+            const val NetworkTimeoutSeconds = 30L
+            const val DownloadTimeoutSeconds = 180L
         }
     }
