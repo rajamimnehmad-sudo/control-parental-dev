@@ -32,6 +32,20 @@ class DefaultActivationRepository
         override suspend fun activate(credentials: ActivationCredentials): ActivationResult =
             withContext(Dispatchers.IO) {
                 activationRepository.currentActivation()?.let { activation ->
+                    if (credentials.email.isNotBlank() && credentials.password.isNotBlank()) {
+                        val session =
+                            when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
+                                is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
+                                is RemoteResult.Success -> result.value
+                            }
+                        sessionStore.save(
+                            AuthSession(
+                                accessToken = session.accessToken,
+                                refreshToken = session.refreshToken,
+                                expiresAtEpochMillis = System.currentTimeMillis() + session.expiresInSeconds * 1000,
+                            ),
+                        )
+                    }
                     systemStatusRepository.updateLicenseState(LicenseState.Active)
                     Log.i(
                         LogTag,

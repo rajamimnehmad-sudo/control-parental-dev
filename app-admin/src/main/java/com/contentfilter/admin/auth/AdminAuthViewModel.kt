@@ -64,7 +64,7 @@ class AdminAuthViewModel
 
         fun activate() {
             val state = _uiState.value
-            if (state.activated) {
+            if (state.activated && state.email.isBlank() && state.password.isBlank()) {
                 _uiState.update { it.copy(message = "Administrador activado. No hace falta volver a iniciar sesión.") }
                 return
             }
@@ -72,10 +72,21 @@ class AdminAuthViewModel
                 _uiState.update { it.copy(message = "Modo Offline / Desarrollo") }
                 return
             }
-            if (state.email.isBlank() || state.password.isBlank() || state.activationCode.isBlank()) {
+            if (state.email.isBlank() || state.password.isBlank() || (!state.activated && state.activationCode.isBlank())) {
                 val reason = "Local validation failed: email, password or activation code is blank."
                 Log.w(LogTag, reason)
-                _uiState.update { it.copy(message = activationFailureMessage("Completá email, password y código.")) }
+                _uiState.update {
+                    it.copy(
+                        message =
+                            activationFailureMessage(
+                                if (state.activated) {
+                                    "Completá email y password para renovar la sesión."
+                                } else {
+                                    "Completá email, password y código."
+                                },
+                            ),
+                    )
+                }
                 return
             }
             viewModelScope.launch {
@@ -133,6 +144,7 @@ class AdminAuthViewModel
         private fun activationFailureMessage(reason: String): String {
             val detail = reason.ifBlank { "No se recibió detalle técnico del error." }
             if (detail == OfflineMessage) return OfflineMessage
+            if (detail.startsWith("Completá")) return detail
             return "No se pudo activar. Revisá email, password y código."
         }
 
