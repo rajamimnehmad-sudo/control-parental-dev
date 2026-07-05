@@ -3,6 +3,7 @@ package com.contentfilter.feature.accessibility.service
 import android.accessibilityservice.AccessibilityService
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityNodeInfo
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyTargetType
@@ -52,6 +53,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     private val usageTracker = AppUsageTracker()
     private val settingsProtectionPolicy = SettingsProtectionPolicy()
+    private val searchEngineScreenDetector = SearchEngineScreenDetector()
     private var serviceScope: CoroutineScope? = null
     private var extraTimeExpiryJob: Job? = null
     private var extraTimeExpiryPackageName: String? = null
@@ -83,6 +85,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (DevProtectionMode.isProtectionDisabled(this) || packageName.isAlwaysAllowedPackage()) return
         val elapsed = clock.elapsedRealtimeMillis()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
+        if (handleSearchEngineProtection(packageName)) return
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
         val now = clock.nowEpochMillis()
@@ -145,6 +148,21 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (!settingsProtectionPolicy.shouldLeaveSettings(packageName, className, elapsedRealtimeMillis)) return false
         performGlobalAction(GLOBAL_ACTION_HOME)
         serviceScope?.launch { telemetryReporter.recordSettingsProtection() }
+        return true
+    }
+
+    private fun handleSearchEngineProtection(packageName: String): Boolean {
+        val visibleText = rootInActiveWindow.visibleText()
+        val shouldLeave =
+            searchEngineScreenDetector.shouldLeaveSearchEngine(
+                packageName = packageName,
+                snapshot = snapshotProvider.current().snapshot,
+                visibleText = visibleText,
+            )
+        if (!shouldLeave) return false
+        Log.i(LogTag, "Leaving blocked search engine screen package=$packageName")
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        serviceScope?.launch { telemetryReporter.recordServiceState("Blocked search engine screen.") }
         return true
     }
 
@@ -435,5 +453,23 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 is PolicyDecision.RequireUpdate -> "RequireUpdate"
                 is PolicyDecision.Warn -> "Warn"
             }
+
+        fun AccessibilityNodeInfo?.visibleText(): String {
+            if (this == null) return ""
+            val values = mutableListOf<String>()
+            fun visit(node: AccessibilityNodeInfo?) {
+                if (node == null || values.size >= MaxVisibleTextNodes) return
+                node.text?.toString()?.takeIf { it.isNotBlank() }?.let(values::add)
+                node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let(values::add)
+                for (index in 0 until node.childCount) {
+                    visit(node.getChild(index))
+                    if (values.size >= MaxVisibleTextNodes) return
+                }
+            }
+            visit(this)
+            return values.joinToString(" ")
+        }
+
+        const val MaxVisibleTextNodes = 80
     }
 }

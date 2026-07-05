@@ -114,7 +114,7 @@ class FilterVpnService : VpnService() {
                         "VPN active upstream=${upstreamDnsServers.safeAddresses()} rules=${snapshotProvider.current().snapshot.rules.size} strictWebBlock=$strictWebBlockMode",
                     )
                     vpnInterface = establishVpn()
-                    observeStrictWebBlockMode(scope, strictWebBlockMode)
+                    observeVpnReconnectPolicy(scope, snapshotProvider.current().vpnReconnectKey)
                     VpnController.markStarted(this@FilterVpnService)
                     systemStatusRepository.updateVpnState(ComponentState.Enabled)
                     telemetryReporter.recordServiceState("VPN started.")
@@ -187,22 +187,22 @@ class FilterVpnService : VpnService() {
             }
         }
 
-    private fun observeStrictWebBlockMode(
+    private fun observeVpnReconnectPolicy(
         scope: CoroutineScope,
-        initialMode: Boolean,
+        initialKey: String,
     ) {
         scope.launch {
-            var currentMode = initialMode
+            var currentKey = initialKey
             snapshotProvider
                 .observe()
-                .map { it.strictWebBlockEnabled }
+                .map { it.vpnReconnectKey }
                 .distinctUntilChanged()
-                .collect { nextMode ->
-                    if (nextMode != currentMode) {
-                        Log.i(LogTag, "VPN strict web block changed: $currentMode -> $nextMode")
+                .collect { nextKey ->
+                    if (nextKey != currentKey) {
+                        Log.i(LogTag, "VPN domain policy changed; reconnecting tunnel")
                         requestReconnectVpn()
                     }
-                    currentMode = nextMode
+                    currentKey = nextKey
                 }
         }
     }

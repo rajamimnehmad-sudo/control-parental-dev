@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 
 internal enum class DevicePanel {
     Apps,
@@ -266,12 +267,6 @@ internal fun RuleScope.displayName(): String =
     }
 
 internal val SearchEngineDomainsForUi =
-    setOf(
-        "gstatic.com",
-        "googleapis.com",
-        "googleusercontent.com",
-        "yimg.com",
-        "bing.net",
-        "duck.com",
-    )
+    SearchEngineCatalog.searchSupportDomains
         .plus(SearchEngineDomains)
+        .plus(SecureDnsDomains)

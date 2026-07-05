@@ -8,6 +8,7 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.policy.DefaultPolicyEngine
@@ -122,6 +123,20 @@ class VpnDomainPolicyEvaluatorTest {
         assertIs<PolicyDecision.Block>(decision)
     }
 
+    @Test
+    fun `blocks secure dns providers when explicit search protection block exists`() {
+        val snapshot =
+            snapshot(
+                rule("*", RuleAction.Block, priority = 10),
+                rule("dns.google", RuleAction.Allow, priority = 1_000),
+                rule("dns.google", RuleAction.Block, priority = 3_000),
+            )
+
+        val decision = evaluator.evaluate("dns.google", snapshot, activeHealth())
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
     private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =
         PolicySnapshot(
             id = "test",
@@ -166,24 +181,6 @@ class VpnDomainPolicyEvaluatorTest {
 
     private companion object {
         const val FixedTime = 1_735_689_600_000L
-        val SearchEngineDomains =
-            listOf(
-                "google.com",
-                "google.com.ar",
-                "google.com.br",
-                "google.com.mx",
-                "google.com.co",
-                "google.com.uy",
-                "google.com.py",
-                "google.cl",
-                "google.es",
-                "google.co.uk",
-                "google.co.in",
-                "google.ca",
-                "bing.com",
-                "yahoo.com",
-                "search.yahoo.com",
-                "duckduckgo.com",
-            )
+        val SearchEngineDomains = SearchEngineCatalog.searchEngineDomains
     }
 }

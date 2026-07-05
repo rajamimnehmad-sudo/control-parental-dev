@@ -91,7 +91,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 71
+versionCode 72
 versionName 1.0.1-dev
 ```
 
@@ -110,6 +110,8 @@ Actualizar este README cuando cambie:
 - Modo web cerrado bloquea dominios via VPN.
 - La gestion de Internet es por lista blanca: si Internet esta cerrado, solo pasan dominios permitidos.
 - Toggle "Permitir buscadores" controla Google, variantes regionales de Google, Bing, Yahoo y DuckDuckGo cuando modo web esta cerrado.
+- Buscadores bloqueados tambien bloquea DNS seguro conocido y fuerza reconexion del VPN ante cambios de reglas de dominio.
+- Accessibility saca al usuario de pantallas de buscador detectadas en navegadores cuando buscadores esta bloqueado.
 - Con modo web abierto, buscadores quedan abiertos.
 - Las reglas de internet bloquean dominios por VPN/DNS sin cerrar el navegador; Chrome/Samsung Internet solo se cierra por reglas o limites de app.
 - Las apps se actualizan manualmente desde la pantalla `Actualizaciones`.

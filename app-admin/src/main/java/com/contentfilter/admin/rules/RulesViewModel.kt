@@ -747,10 +747,13 @@ class RulesViewModel
             SearchEngineDomains.forEach { domain ->
                 setSearchEngineDomain(domain, allowed, targetDeviceId)
             }
+            SecureDnsDomains.forEach { domain ->
+                setSecureDnsDomain(domain, blocked = !allowed, targetDeviceId)
+            }
         }
 
         private suspend fun clearSearchEngineRules(deviceId: String) {
-            SearchEngineDomains.forEach { domain ->
+            (SearchEngineDomains + SecureDnsDomains).forEach { domain ->
                 setRulesForDomain(
                     target = domain,
                     action = RuleAction.Allow,
@@ -775,7 +778,8 @@ class RulesViewModel
                         it.scope == RuleScope.Domain &&
                         it.action == RuleAction.Block &&
                         it.target != DomainWildcard &&
-                        it.target !in SearchEngineDomains
+                        it.target !in SearchEngineDomains &&
+                        it.target !in SecureDnsDomains
                 }
                 .forEach { rule ->
                     saveRule(rule.copy(enabled = false), deviceId)
@@ -798,6 +802,27 @@ class RulesViewModel
                 target = target,
                 action = RuleAction.Block,
                 enabled = !allowed,
+                priority = SearchEngineBlockPriority,
+                deviceId = deviceId,
+            )
+        }
+
+        private suspend fun setSecureDnsDomain(
+            target: String,
+            blocked: Boolean,
+            deviceId: String,
+        ) {
+            setRulesForDomain(
+                target = target,
+                action = RuleAction.Allow,
+                enabled = false,
+                priority = AllowDomainPriority,
+                deviceId = deviceId,
+            )
+            setRulesForDomain(
+                target = target,
+                action = RuleAction.Block,
+                enabled = blocked,
                 priority = SearchEngineBlockPriority,
                 deviceId = deviceId,
             )

@@ -6,6 +6,7 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import java.time.Duration
 import java.time.Instant
@@ -219,25 +220,8 @@ internal const val InternetBlockPriority = 10
 internal const val AllowDomainPriority = 1_000
 internal const val SearchEngineBlockPriority = 3_000
 internal const val LogTag = "RulesViewModel"
-internal val SearchEngineDomains =
-    listOf(
-        "google.com",
-        "google.com.ar",
-        "google.com.br",
-        "google.com.mx",
-        "google.com.co",
-        "google.com.uy",
-        "google.com.py",
-        "google.cl",
-        "google.es",
-        "google.co.uk",
-        "google.co.in",
-        "google.ca",
-        "bing.com",
-        "yahoo.com",
-        "search.yahoo.com",
-        "duckduckgo.com",
-    )
+internal val SearchEngineDomains = SearchEngineCatalog.searchEngineDomains
+internal val SecureDnsDomains = SearchEngineCatalog.secureDnsDomains
 internal val YouTubeWebDomains =
     listOf(
         "youtube.com",

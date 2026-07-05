@@ -11,6 +11,7 @@ import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import kotlin.test.Test
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertTrue
 
 class VpnPolicyStateTest {
@@ -97,6 +98,34 @@ class VpnPolicyStateTest {
             )
 
         assertFalse(state.strictWebBlockEnabled)
+    }
+
+    @Test
+    fun `vpn reconnect key changes when search engine rule action changes`() {
+        val allowed =
+            state(
+                rule(
+                    target = "*",
+                    action = RuleAction.Block,
+                ),
+                rule(
+                    target = "google.com",
+                    action = RuleAction.Allow,
+                ),
+            )
+        val blocked =
+            state(
+                rule(
+                    target = "*",
+                    action = RuleAction.Block,
+                ),
+                rule(
+                    target = "google.com",
+                    action = RuleAction.Block,
+                ),
+            )
+
+        assertNotEquals(allowed.vpnReconnectKey, blocked.vpnReconnectKey)
     }
 
     private fun state(vararg rules: PolicyRule): VpnPolicyState =

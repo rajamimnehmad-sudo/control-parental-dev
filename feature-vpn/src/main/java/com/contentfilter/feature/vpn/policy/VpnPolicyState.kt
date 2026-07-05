@@ -31,6 +31,17 @@ data class VpnPolicyState(
             return wildcardBlocked && !hasAllowedDomain
         }
 
+    val vpnReconnectKey: String
+        get() {
+            val domainRules =
+                snapshot.rules
+                    .asSequence()
+                    .filter { it.enabled && it.scope == RuleScope.Domain }
+                    .sortedWith(compareBy({ it.target }, { it.action.name }, { it.priority }))
+                    .joinToString("|") { "${it.target}:${it.action}:${it.priority}" }
+            return "strict=$strictWebBlockEnabled;domains=$domainRules"
+        }
+
     companion object {
         private const val DomainWildcard = "*"
 
