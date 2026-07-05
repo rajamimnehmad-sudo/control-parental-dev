@@ -91,7 +91,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 66
+versionCode 67
 versionName 1.0.1-dev
 ```
 
@@ -110,7 +110,7 @@ Actualizar este README cuando cambie:
 - Modo web cerrado bloquea dominios via VPN.
 - Toggle "Permitir buscadores" controla Google, Bing, Yahoo y DuckDuckGo cuando modo web esta cerrado.
 - Con modo web abierto, buscadores quedan abiertos.
-- Si un dominio se bloquea mientras el navegador esta activo, Accessibility sale del navegador al detectar el bloqueo reciente del VPN.
+- Si un dominio bloqueado explicitamente o con limite vencido se bloquea mientras el navegador esta activo, Accessibility sale del navegador al detectar el bloqueo reciente del VPN.
 - Las apps se actualizan manualmente desde la pantalla `Actualizaciones`.
 
 ## Verificacion Rapida Antes De Trabajar

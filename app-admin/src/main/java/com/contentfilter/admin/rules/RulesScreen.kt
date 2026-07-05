@@ -51,8 +51,6 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
     RulesScreen(
         state = state,
         onDomainChanged = viewModel::onDomainChanged,
-        onDomainLimitDomainChanged = viewModel::onDomainLimitDomainChanged,
-        onDomainLimitMinutesChanged = viewModel::onDomainLimitMinutesChanged,
         onAllowDomainChanged = viewModel::onAllowDomainChanged,
         onAllowDomainMinutesChanged = viewModel::onAllowDomainMinutesChanged,
         onAppSearchChanged = viewModel::onAppSearchChanged,
@@ -62,7 +60,6 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
         onDeviceCleared = viewModel::clearDeviceSelection,
         onDeviceDeleted = viewModel::deleteDevicePermanently,
         onCreateDomainBlock = viewModel::createBlockedDomainRule,
-        onCreateDomainLimit = viewModel::createDomainLimit,
         onCreateDomainAllow = viewModel::createAllowedDomainRule,
         onCreateAllowedDomainLimit = viewModel::saveAllowedDomainLimit,
         onInternetBlockedChanged = viewModel::setInternetBlocked,
@@ -79,8 +76,6 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
 private fun RulesScreen(
     state: RulesUiState,
     onDomainChanged: (String) -> Unit,
-    onDomainLimitDomainChanged: (String) -> Unit,
-    onDomainLimitMinutesChanged: (String) -> Unit,
     onAllowDomainChanged: (String) -> Unit,
     onAllowDomainMinutesChanged: (String) -> Unit,
     onAppSearchChanged: (String) -> Unit,
@@ -90,7 +85,6 @@ private fun RulesScreen(
     onDeviceCleared: () -> Unit,
     onDeviceDeleted: (String) -> Unit,
     onCreateDomainBlock: () -> Unit,
-    onCreateDomainLimit: () -> Unit,
     onCreateDomainAllow: () -> Unit,
     onCreateAllowedDomainLimit: () -> Unit,
     onInternetBlockedChanged: (Boolean) -> Unit,
@@ -309,15 +303,6 @@ private fun RulesScreen(
                             onSubmit = onCreateDomainBlock,
                         )
                     }
-                }
-                item {
-                    DomainLimitEditorCard(
-                        domain = state.domainLimitDomain,
-                        minutes = state.domainLimitMinutes,
-                        onDomainChanged = onDomainLimitDomainChanged,
-                        onMinutesChanged = onDomainLimitMinutesChanged,
-                        onSubmit = onCreateDomainLimit,
-                    )
                 }
                 item {
                     SectionHeader(

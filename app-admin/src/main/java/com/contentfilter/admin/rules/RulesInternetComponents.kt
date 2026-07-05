@@ -159,44 +159,6 @@ internal fun AllowDomainEditorCard(
 }
 
 @Composable
-internal fun DomainLimitEditorCard(
-    domain: String,
-    minutes: String,
-    onDomainChanged: (String) -> Unit,
-    onMinutesChanged: (String) -> Unit,
-    onSubmit: () -> Unit,
-) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier.padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            Text("Límite diario de dominio", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "MVP por eventos DNS: cuenta minutos donde hubo consultas al dominio. Es aproximado.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = domain,
-                onValueChange = onDomainChanged,
-                label = { Text("Dominio") },
-                singleLine = true,
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = minutes,
-                onValueChange = onMinutesChanged,
-                label = { Text("Minutos por día") },
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            )
-            Button(onClick = onSubmit) { Text("Guardar límite de dominio") }
-        }
-    }
-}
-
-@Composable
 internal fun RuleCard(
     rule: PolicyRule,
     dailyLimitMinutes: Int? = null,
