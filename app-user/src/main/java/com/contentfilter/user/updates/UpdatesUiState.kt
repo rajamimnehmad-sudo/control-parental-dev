@@ -6,6 +6,7 @@ data class UpdatesUiState(
     val status: UpdatesStatus = UpdatesStatus.Idle,
     val manifest: UpdateManifest? = null,
     val devMessage: String = "",
+    val diagnosticsText: String = "",
 )
 
 enum class UpdatesStatus {

@@ -11,7 +11,9 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.repository.DeviceRepository
+import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDailyLimitsUseCase
@@ -65,6 +67,7 @@ class RulesViewModel
         private val devMaintenanceClient: SupabaseDevMaintenanceClient,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
+        private val telemetryRepository: TelemetryRepository,
     ) : ViewModel() {
         private val form =
             MutableStateFlow(
@@ -263,6 +266,15 @@ class RulesViewModel
                         saved.exceptionOrNull(),
                     )
                     if (isCurrentInternetSave(requestId)) {
+                        recordAdminDiagnostic(
+                            action = "searchEngineSwitch",
+                            deviceId = targetDeviceId,
+                            requestId = requestId,
+                            previousState = previousState.toString(),
+                            requestedState = allowed.toString(),
+                            result = "save-failed",
+                            reason = saved.exceptionOrNull()?.javaClass?.simpleName ?: "unknown",
+                        )
                         form.update {
                             it.copy(
                                 internetSaving = false,
@@ -285,6 +297,15 @@ class RulesViewModel
                 Log.i(
                     LogTag,
                     "searchEngineSwitch sync finished requestId=$requestId allowed=$allowed deviceId=$targetDeviceId success=${synced.success} message=${synced.message}",
+                )
+                recordAdminDiagnostic(
+                    action = "searchEngineSwitch",
+                    deviceId = targetDeviceId,
+                    requestId = requestId,
+                    previousState = previousState.toString(),
+                    requestedState = allowed.toString(),
+                    result = if (synced.success) "synced" else "local-only",
+                    reason = synced.message,
                 )
                 if (!isCurrentInternetSave(requestId)) {
                     Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=search-engines")
@@ -458,6 +479,15 @@ class RulesViewModel
                     )
                     syncScheduler.requestSync()
                     val synced = syncNow()
+                    recordAdminDiagnostic(
+                        action = "internetSave",
+                        deviceId = targetDeviceId,
+                        requestId = requestId,
+                        previousState = previousRoom.toString(),
+                        requestedState = blocked.toString(),
+                        result = if (synced) "synced" else "local-only",
+                        reason = "internet-mode",
+                    )
                     if (synced) {
                         if (!isCurrentInternetSave(requestId)) {
                             Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=internet-mode")
@@ -499,6 +529,15 @@ class RulesViewModel
                     }
                 } else {
                     if (isCurrentInternetSave(requestId)) {
+                        recordAdminDiagnostic(
+                            action = "internetSave",
+                            deviceId = targetDeviceId,
+                            requestId = requestId,
+                            previousState = previousRoom.toString(),
+                            requestedState = blocked.toString(),
+                            result = "save-failed",
+                            reason = saved.exceptionOrNull()?.javaClass?.simpleName ?: "unknown",
+                        )
                         form.update {
                             it.copy(
                                 internetSaving = false,
@@ -1153,6 +1192,15 @@ class RulesViewModel
                 LogTag,
                 "internetSave start requestId=$requestId action=$action deviceId=$deviceId previousState=$previousState requestedState=$requestedState",
             )
+            recordAdminDiagnostic(
+                action = action,
+                deviceId = deviceId,
+                requestId = requestId,
+                previousState = previousState,
+                requestedState = requestedState,
+                result = "start",
+                reason = "tap",
+            )
             form.update { it.copy(internetSaving = true, message = "Guardando...") }
             return requestId
         }
@@ -1188,4 +1236,32 @@ class RulesViewModel
                 )
             }
         }
+
+        private fun recordAdminDiagnostic(
+            action: String,
+            deviceId: String,
+            requestId: Long,
+            previousState: String,
+            requestedState: String,
+            result: String,
+            reason: String,
+        ) {
+            if (BuildConfig.FLAVOR != "dev") return
+            viewModelScope.launch(Dispatchers.IO) {
+                telemetryRepository.record(
+                    TechnicalDiagnostic(
+                        id = UUID.randomUUID().toString(),
+                        type = "admin-rules",
+                        message =
+                            "layer=admin action=$action requestId=$requestId deviceId=${deviceId.safeDeviceId()} " +
+                                "previousState=${previousState.take(MaxDiagnosticValueLength)} " +
+                                "requestedState=${requestedState.take(MaxDiagnosticValueLength)} " +
+                                "result=$result reason=${reason.take(MaxDiagnosticValueLength)}",
+                        occurredAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
+            }
+        }
+
+        private fun String.safeDeviceId(): String = take(8)
     }

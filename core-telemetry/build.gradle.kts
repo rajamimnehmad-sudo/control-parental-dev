@@ -17,6 +17,7 @@ android {
 
 dependencies {
     implementation(project(":core-domain"))
+    implementation(project(":core-database"))
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
     kapt(libs.hilt.compiler)

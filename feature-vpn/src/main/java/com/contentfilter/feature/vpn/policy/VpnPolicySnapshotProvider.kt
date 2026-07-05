@@ -5,6 +5,7 @@ import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
@@ -26,6 +27,7 @@ class VpnPolicySnapshotProvider
         private val dailyLimitRepository: DailyLimitRepository,
         private val systemStatusRepository: SystemStatusRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
+        private val telemetryReporter: VpnTelemetryReporter,
     ) {
         private val state = MutableStateFlow(VpnPolicyState.initial())
         private var observationJob: Job? = null
@@ -44,7 +46,13 @@ class VpnPolicySnapshotProvider
                             snapshot = snapshot.copy(dailyLimits = dailyLimits),
                             health = health.withActiveLicenseIfActivated(activation != null),
                         )
-                    }.collect { state.value = it }
+                    }.collect {
+                        state.value = it
+                        telemetryReporter.recordSnapshotReceived(
+                            snapshot = it.snapshot,
+                            strictWebBlock = it.strictWebBlockEnabled,
+                        )
+                    }
                 }
         }
 
@@ -58,6 +66,10 @@ class VpnPolicySnapshotProvider
                         ),
                     health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
                 )
+            telemetryReporter.recordSnapshotReceived(
+                snapshot = state.value.snapshot,
+                strictWebBlock = state.value.strictWebBlockEnabled,
+            )
         }
 
         fun current(): VpnPolicyState = state.value

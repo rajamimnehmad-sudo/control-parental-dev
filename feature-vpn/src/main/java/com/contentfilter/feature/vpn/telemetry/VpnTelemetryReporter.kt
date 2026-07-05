@@ -1,7 +1,11 @@
 package com.contentfilter.feature.vpn.telemetry
 
 import com.contentfilter.core.domain.model.PolicyDecision
+import com.contentfilter.core.domain.model.PolicySnapshot
+import com.contentfilter.core.domain.model.RuleAction
+import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
+import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
 import java.util.UUID
 import javax.inject.Inject
@@ -13,6 +17,7 @@ class VpnTelemetryReporter
     @Inject
     constructor(
         private val telemetryRepository: TelemetryRepository,
+        private val deviceActivationRepository: DeviceActivationRepository,
     ) {
         suspend fun recordServiceState(state: String) {
             record(type = "vpn-state", message = state)
@@ -22,6 +27,49 @@ class VpnTelemetryReporter
             record(
                 type = "vpn-dns-decision",
                 message = "DNS decision: ${decision.label()}",
+            )
+        }
+
+        suspend fun recordSearchProtectionDnsDecision(
+            domainHost: String,
+            decision: PolicyDecision,
+            strictWebBlock: Boolean,
+            allowRules: Int,
+            blockRules: Int,
+            totalRules: Int,
+        ) {
+            val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
+            record(
+                type = "search-protection",
+                message =
+                    "layer=vpn-dns deviceId=$deviceId action=dns-decision host=${domainHost.sanitizeHost()} " +
+                        "result=${decision.label()} strict=$strictWebBlock allowRules=$allowRules " +
+                        "blockRules=$blockRules ruleCount=$totalRules",
+            )
+        }
+
+        suspend fun recordReconnectApplied(reason: String) {
+            val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
+            record(
+                type = "search-protection",
+                message = "layer=reconnect deviceId=$deviceId action=reconnect result=applied reason=${reason.take(MaxMessageLength)}",
+            )
+        }
+
+        suspend fun recordSnapshotReceived(
+            snapshot: PolicySnapshot,
+            strictWebBlock: Boolean,
+        ) {
+            val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
+            val searchBlockRules =
+                snapshot.rules.count {
+                    it.enabled && it.scope == RuleScope.Domain && it.action == RuleAction.Block && it.target.isSearchRuleTarget()
+                }
+            record(
+                type = "search-protection",
+                message =
+                    "layer=sync deviceId=$deviceId action=snapshot-received result=applied " +
+                        "ruleCount=${snapshot.rules.size} searchBlockRules=$searchBlockRules strict=$strictWebBlock",
             )
         }
 
@@ -58,6 +106,22 @@ class VpnTelemetryReporter
                 is PolicyDecision.RequireUpdate -> "RequireUpdate"
                 is PolicyDecision.Warn -> "Warn"
             }
+
+        private fun String.safeDeviceId(): String = take(8)
+
+        private fun String.sanitizeHost(): String =
+            lowercase()
+                .substringBefore("/")
+                .substringBefore("?")
+                .take(MaxMessageLength)
+
+        private fun String.isSearchRuleTarget(): Boolean {
+            val value = lowercase()
+            return value.contains("google") ||
+                value.contains("bing") ||
+                value.contains("yahoo") ||
+                value.contains("duckduckgo")
+        }
 
         private companion object {
             const val MaxMessageLength = 120

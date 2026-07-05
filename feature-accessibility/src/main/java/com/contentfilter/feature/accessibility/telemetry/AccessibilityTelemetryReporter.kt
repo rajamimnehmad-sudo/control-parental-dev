@@ -2,6 +2,7 @@ package com.contentfilter.feature.accessibility.telemetry
 
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
+import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
 import java.util.UUID
 import javax.inject.Inject
@@ -10,6 +11,7 @@ class AccessibilityTelemetryReporter
     @Inject
     constructor(
         private val telemetryRepository: TelemetryRepository,
+        private val deviceActivationRepository: DeviceActivationRepository,
     ) {
         suspend fun recordServiceState(state: String) {
             record(type = "accessibility-state", message = state)
@@ -27,6 +29,23 @@ class AccessibilityTelemetryReporter
 
         suspend fun recordSettingsProtection() {
             record(type = "accessibility-settings-protection", message = "Settings protection action applied.")
+        }
+
+        suspend fun recordSearchProtection(
+            eventLabel: String,
+            packageName: String,
+            reason: String,
+            blockRules: Int,
+            result: String,
+        ) {
+            val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
+            record(
+                type = "search-protection",
+                message =
+                    "layer=accessibility deviceId=$deviceId action=search-screen event=$eventLabel " +
+                        "packageName=${packageName.take(MaxMessageLength)} result=$result " +
+                        "blockRules=$blockRules reason=${reason.take(MaxMessageLength)}",
+            )
         }
 
         suspend fun recordError(message: String) {
@@ -58,6 +77,8 @@ class AccessibilityTelemetryReporter
                 is PolicyDecision.RequireUpdate -> "RequireUpdate"
                 is PolicyDecision.Warn -> "Warn"
             }
+
+        private fun String.safeDeviceId(): String = take(8)
 
         private companion object {
             const val MaxMessageLength = 120

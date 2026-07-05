@@ -5,8 +5,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.admin.BuildConfig
 import com.contentfilter.admin.devtools.AdminDevTools
+import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -29,6 +31,7 @@ class DashboardViewModel
         observeRequests: ObserveRequestsUseCase,
         systemStatusRepository: SystemStatusRepository,
         private val devTools: AdminDevTools,
+        private val telemetryRepository: TelemetryRepository,
     ) : ViewModel() {
         private val devToolsState = MutableStateFlow(DevToolsState())
 
@@ -37,8 +40,9 @@ class DashboardViewModel
                 observeDevices(),
                 observeRequests(),
                 systemStatusRepository.observeHealth(),
+                telemetryRepository.observeDiagnostics(),
                 devToolsState,
-            ) { devices, requests, health, devState ->
+            ) { devices, requests, health, diagnostics, devState ->
                 DashboardUiState(
                     deviceCount = devices.count { it.appRole != "admin" },
                     pendingRequests =
@@ -52,6 +56,7 @@ class DashboardViewModel
                     showDevTools = BuildConfig.FLAVOR == "dev",
                     devToolsBusy = devState.busy,
                     devToolsMessage = devState.message,
+                    diagnosticsText = diagnostics.formatDiagnostics(),
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -98,6 +103,12 @@ class DashboardViewModel
                 devTools.resetDev()
             }
 
+        fun clearDiagnostics() =
+            runDevTool("clear_diagnostics") {
+                telemetryRepository.clearDiagnostics()
+                "Diagnóstico limpiado."
+            }
+
         private fun runDevTool(
             name: String,
             block: suspend () -> String,
@@ -123,11 +134,6 @@ class DashboardViewModel
             }
         }
 
-        private fun Long.toDisplayDate(): String =
-            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-                .withZone(ZoneId.systemDefault())
-                .format(Instant.ofEpochMilli(this))
-
         private data class DevToolsState(
             val busy: Boolean = false,
             val message: String = "",
@@ -137,3 +143,20 @@ class DashboardViewModel
             const val LogTag = "DashboardViewModel"
         }
     }
+
+private fun List<TechnicalDiagnostic>.formatDiagnostics(): String {
+    if (isEmpty()) return "Sin eventos."
+    return joinToString(separator = "\n") { diagnostic ->
+        "${diagnostic.occurredAtEpochMillis.toDiagnosticDate()} ${diagnostic.type} ${diagnostic.message}"
+    }
+}
+
+private fun Long.toDiagnosticDate(): String =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(this))
+
+private fun Long.toDisplayDate(): String =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(this))

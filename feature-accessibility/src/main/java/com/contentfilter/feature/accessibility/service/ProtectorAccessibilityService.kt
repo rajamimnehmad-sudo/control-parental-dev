@@ -166,6 +166,15 @@ class ProtectorAccessibilityService : AccessibilityService() {
             LogTag,
             "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} package=$packageName reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} visibleTextLength=${diagnosis.visibleTextLength}",
         )
+        serviceScope?.launch {
+            telemetryReporter.recordSearchProtection(
+                eventLabel = AccessibilityEventFilter.label(eventType),
+                packageName = packageName,
+                reason = diagnosis.reason,
+                blockRules = diagnosis.searchBlockRules,
+                result = if (diagnosis.shouldLeave) "blocked-search-screen" else "no-search-signal",
+            )
+        }
         if (!diagnosis.shouldLeave) return false
         Log.i(LogTag, "Leaving blocked search engine screen package=$packageName")
         performGlobalAction(GLOBAL_ACTION_HOME)

@@ -3,6 +3,8 @@ package com.contentfilter.user.updates
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.contentfilter.core.domain.model.TechnicalDiagnostic
+import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.update.install.ApkInstaller
 import com.contentfilter.core.update.model.UpdateCheckResult
 import com.contentfilter.core.update.model.UpdateDownloadResult
@@ -16,6 +18,9 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.io.File
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,11 +30,22 @@ class UpdatesViewModel
         private val updateRepository: ApkUpdateRepository,
         private val apkInstaller: ApkInstaller,
         private val localDataRepair: UserLocalDataRepair,
+        private val telemetryRepository: TelemetryRepository,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(UpdatesUiState())
         val uiState: StateFlow<UpdatesUiState> = _uiState.asStateFlow()
         private var downloadedApk: File? = null
         private var autoCheckStarted = false
+
+        init {
+            if (BuildConfig.FLAVOR == "dev") {
+                viewModelScope.launch {
+                    telemetryRepository.observeDiagnostics().collect { diagnostics ->
+                        _uiState.update { it.copy(diagnosticsText = diagnostics.formatDiagnostics()) }
+                    }
+                }
+            }
+        }
 
         fun autoCheckAndDownload() {
             if (autoCheckStarted) return
@@ -131,6 +147,19 @@ class UpdatesViewModel
             }
         }
 
+        fun clearDiagnostics() {
+            if (BuildConfig.FLAVOR != "dev") return
+            viewModelScope.launch {
+                runCatching {
+                    telemetryRepository.clearDiagnostics()
+                    _uiState.update { it.copy(devMessage = "Diagnóstico limpiado.") }
+                }.onFailure { exception ->
+                    Log.e(LogTag, "Clear diagnostics failed: ${exception.message}", exception)
+                    _uiState.update { it.copy(devMessage = "No se pudo limpiar diagnóstico.") }
+                }
+            }
+        }
+
         private suspend fun downloadAndMaybeInstall(
             manifest: com.contentfilter.core.update.model.UpdateManifest,
             openInstaller: Boolean,
@@ -158,3 +187,15 @@ class UpdatesViewModel
             const val LogTag = "Updates"
         }
     }
+
+private fun List<TechnicalDiagnostic>.formatDiagnostics(): String {
+    if (isEmpty()) return "Sin eventos."
+    return joinToString(separator = "\n") { diagnostic ->
+        "${diagnostic.occurredAtEpochMillis.toDisplayDate()} ${diagnostic.type} ${diagnostic.message}"
+    }
+}
+
+private fun Long.toDisplayDate(): String =
+    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
+        .withZone(ZoneId.systemDefault())
+        .format(Instant.ofEpochMilli(this))

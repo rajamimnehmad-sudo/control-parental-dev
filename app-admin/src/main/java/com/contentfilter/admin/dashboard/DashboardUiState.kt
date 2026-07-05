@@ -10,4 +10,5 @@ data class DashboardUiState(
     val showDevTools: Boolean = false,
     val devToolsBusy: Boolean = false,
     val devToolsMessage: String = "",
+    val diagnosticsText: String = "",
 )

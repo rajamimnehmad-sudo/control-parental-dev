@@ -10,4 +10,6 @@ interface TelemetryRepository {
     fun observeDiagnostics(): Flow<List<TechnicalDiagnostic>>
 
     suspend fun record(diagnostic: TechnicalDiagnostic)
+
+    suspend fun clearDiagnostics()
 }

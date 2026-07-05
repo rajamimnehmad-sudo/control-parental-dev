@@ -10,10 +10,22 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TechnicalDiagnosticDao {
     @Query("SELECT * FROM technical_diagnostics ORDER BY occurredAtEpochMillis DESC LIMIT :limit")
-    fun observeLatest(limit: Int = 100): Flow<List<TechnicalDiagnosticEntity>>
+    fun observeLatest(limit: Int = 200): Flow<List<TechnicalDiagnosticEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: TechnicalDiagnosticEntity)
+
+    @Query(
+        """
+        DELETE FROM technical_diagnostics
+        WHERE id NOT IN (
+            SELECT id FROM technical_diagnostics
+            ORDER BY occurredAtEpochMillis DESC
+            LIMIT :limit
+        )
+        """,
+    )
+    suspend fun trimToLatest(limit: Int = 200)
 
     @Query("DELETE FROM technical_diagnostics")
     suspend fun deleteAll()

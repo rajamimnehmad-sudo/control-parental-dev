@@ -17,6 +17,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -33,6 +35,7 @@ fun DashboardRoute(viewModel: DashboardViewModel = hiltViewModel()) {
         onClearExtraTimeGrants = viewModel::clearExtraTimeGrants,
         onClearDuplicateDevices = viewModel::clearDuplicateDevices,
         onResetDev = viewModel::resetDev,
+        onClearDiagnostics = viewModel::clearDiagnostics,
     )
 }
 
@@ -46,8 +49,11 @@ private fun DashboardScreen(
     onClearExtraTimeGrants: () -> Unit,
     onClearDuplicateDevices: () -> Unit,
     onResetDev: () -> Unit,
+    onClearDiagnostics: () -> Unit,
 ) {
     var pendingAction by remember { mutableStateOf<DevAction?>(null) }
+    var showDiagnostics by remember { mutableStateOf(false) }
+    val clipboardManager = LocalClipboardManager.current
     Column(
         modifier =
             Modifier
@@ -109,6 +115,24 @@ private fun DashboardScreen(
             ) {
                 Text("Reset DEV completo")
             }
+            Button(
+                onClick = { showDiagnostics = true },
+                enabled = !state.devToolsBusy,
+            ) {
+                Text("Ver diagnóstico")
+            }
+            Button(
+                onClick = { clipboardManager.setText(AnnotatedString(state.diagnosticsText)) },
+                enabled = !state.devToolsBusy,
+            ) {
+                Text("Copiar diagnóstico")
+            }
+            Button(
+                onClick = onClearDiagnostics,
+                enabled = !state.devToolsBusy,
+            ) {
+                Text("Limpiar diagnóstico")
+            }
             if (state.devToolsMessage.isNotBlank()) {
                 Text(state.devToolsMessage, color = MaterialTheme.colorScheme.error)
             }
@@ -140,6 +164,32 @@ private fun DashboardScreen(
             dismissButton = {
                 TextButton(onClick = { pendingAction = null }) {
                     Text("Cancelar")
+                }
+            },
+        )
+    }
+    if (showDiagnostics) {
+        AlertDialog(
+            onDismissRequest = { showDiagnostics = false },
+            title = { Text("Diagnóstico") },
+            text = {
+                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                    Text(state.diagnosticsText)
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(state.diagnosticsText))
+                        showDiagnostics = false
+                    },
+                ) {
+                    Text("Copiar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiagnostics = false }) {
+                    Text("Cerrar")
                 }
             },
         )

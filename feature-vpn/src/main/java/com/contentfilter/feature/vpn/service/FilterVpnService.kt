@@ -204,6 +204,7 @@ class FilterVpnService : VpnService() {
                 .collect { nextKey ->
                     if (nextKey != currentKey) {
                         Log.i(LogTag, "VPN domain policy changed; reconnecting tunnel")
+                        telemetryReporter.recordReconnectApplied("vpnReconnectKey-changed")
                         requestReconnectVpn()
                     }
                     currentKey = nextKey
@@ -322,7 +323,7 @@ class FilterVpnService : VpnService() {
         }
     }
 
-    private fun logSearchProtectionDnsLayer(
+    private suspend fun logSearchProtectionDnsLayer(
         domain: String,
         decision: PolicyDecision,
         state: VpnPolicyState,
@@ -345,6 +346,14 @@ class FilterVpnService : VpnService() {
         Log.i(
             LogTag,
             "Search protection layer=vpn-dns domain=$domain decision=${decision.searchProtectionLabel()} strict=${state.strictWebBlockEnabled} allowRules=$allowRules blockRules=$blockRules totalRules=${state.snapshot.rules.size}",
+        )
+        telemetryReporter.recordSearchProtectionDnsDecision(
+            domainHost = domain,
+            decision = decision,
+            strictWebBlock = state.strictWebBlockEnabled,
+            allowRules = allowRules,
+            blockRules = blockRules,
+            totalRules = state.snapshot.rules.size,
         )
     }
 

@@ -10,5 +10,5 @@ import dagger.hilt.components.SingletonComponent
 @InstallIn(SingletonComponent::class)
 abstract class TelemetryModule {
     @Binds
-    abstract fun bindTelemetryRepository(repository: InMemoryTelemetryRepository): TelemetryRepository
+    abstract fun bindTelemetryRepository(repository: RoomTelemetryRepository): TelemetryRepository
 }

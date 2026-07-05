@@ -219,6 +219,7 @@ internal const val DomainWildcard = "*"
 internal const val InternetBlockPriority = 10
 internal const val AllowDomainPriority = 1_000
 internal const val SearchEngineBlockPriority = 3_000
+internal const val MaxDiagnosticValueLength = 80
 internal const val LogTag = "RulesViewModel"
 internal val SearchEngineDomains = SearchEngineCatalog.searchEngineDomains
 internal val SecureDnsDomains = SearchEngineCatalog.secureDnsDomains
