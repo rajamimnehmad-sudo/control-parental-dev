@@ -13,6 +13,7 @@ import com.contentfilter.core.database.dao.SyncCursorDao
 import com.contentfilter.core.database.dao.SystemHealthDao
 import com.contentfilter.core.database.dao.TechnicalDiagnosticDao
 import com.contentfilter.core.database.dao.UsageSessionDao
+import com.contentfilter.core.domain.model.DeviceActivation
 import com.contentfilter.core.network.config.DeviceTokenProvider
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteResult
@@ -95,14 +96,35 @@ class UserLocalDataRepair
                 RepairResult.NeedsActivation(cleaned = true)
             }
 
+        fun hasRevokedLicenseNotice(): Boolean = preferences.getBoolean(RevokedLicenseNoticeKey, false)
+
+        suspend fun clearStaleDataAfterActivation(activation: DeviceActivation) =
+            withContext(Dispatchers.IO) {
+                val cleanupKey = activation.cleanupKey()
+                if (preferences.getString(LastActivationCleanupKey, null) == cleanupKey) return@withContext
+                clearAccountScopedData("activation-linked", keepDeviceId = activation.deviceId)
+                rememberLocalSession(activation.accountId, activation.deviceId)
+                rememberActivationCleanup(activation)
+                preferences.edit()
+                    .remove(RevokedLicenseNoticeKey)
+                    .apply()
+            }
+
         private suspend fun clearForRelink(reason: String) {
             Log.i(LogTag, "Clearing local user data for relink. reason=$reason")
             clearAccountScopedData(reason, keepDeviceId = null)
             deviceTokenProvider.clearDeviceToken()
-            preferences.edit()
+            val editor =
+                preferences.edit()
                 .remove(LastAccountIdKey)
                 .remove(LastDeviceIdKey)
-                .apply()
+                .remove(LastActivationCleanupKey)
+            if (reason == "manual-dev-reset") {
+                editor.remove(RevokedLicenseNoticeKey)
+            } else if (reason != "missing-local-activation") {
+                editor.putBoolean(RevokedLicenseNoticeKey, true)
+            }
+            editor.apply()
         }
 
         private suspend fun clearAccountScopedData(
@@ -150,6 +172,14 @@ class UserLocalDataRepair
                 .apply()
         }
 
+        private fun rememberActivationCleanup(activation: DeviceActivation) {
+            preferences.edit()
+                .putString(LastActivationCleanupKey, activation.cleanupKey())
+                .apply()
+        }
+
+        private fun DeviceActivation.cleanupKey(): String = "$accountId:$deviceId"
+
         private fun clearOldVersionCacheIfNeeded() {
             val lastVersion = preferences.getInt(LastVersionCodeKey, MissingVersionCode)
             if (lastVersion != BuildConfig.VERSION_CODE) {
@@ -173,6 +203,8 @@ class UserLocalDataRepair
             const val LastVersionCodeKey = "last-version-code"
             const val LastAccountIdKey = "last-account-id"
             const val LastDeviceIdKey = "last-device-id"
+            const val LastActivationCleanupKey = "last-activation-cleanup"
+            const val RevokedLicenseNoticeKey = "revoked-license-notice"
             const val MissingVersionCode = -1
         }
     }

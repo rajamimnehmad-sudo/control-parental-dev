@@ -18,6 +18,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 @Composable
 fun ActivationRoute(
     modifier: Modifier = Modifier,
+    notice: String = "",
     viewModel: ActivationViewModel = hiltViewModel(),
 ) {
     val state = viewModel.uiState.collectAsStateWithLifecycle()
@@ -26,6 +27,7 @@ fun ActivationRoute(
         onActivationCodeChanged = viewModel::onActivationCodeChanged,
         onDeviceNameChanged = viewModel::onDeviceNameChanged,
         onActivate = viewModel::activate,
+        notice = notice,
         modifier = modifier,
     )
 }
@@ -36,6 +38,7 @@ fun ActivationScreen(
     onActivationCodeChanged: (String) -> Unit,
     onDeviceNameChanged: (String) -> Unit,
     onActivate: () -> Unit,
+    notice: String = "",
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -49,6 +52,9 @@ fun ActivationScreen(
         if (state.activated) {
             Text(text = state.message, style = MaterialTheme.typography.bodyMedium)
             return@Column
+        }
+        if (notice.isNotBlank()) {
+            Text(text = notice, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
         OutlinedTextField(
             value = state.deviceName,

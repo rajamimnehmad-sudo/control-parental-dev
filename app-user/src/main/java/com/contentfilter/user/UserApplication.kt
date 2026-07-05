@@ -13,6 +13,7 @@ import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -69,9 +70,24 @@ class UserApplication :
                 .collect {
                     val activation = deviceActivationRepository.currentActivation()
                     if (activation != null) {
+                        runCatching { localDataRepair.clearStaleDataAfterActivation(activation) }
                         runCatching { installedAppPublisher.publish(activation) }
+                        runCatching { syncScheduler.requestSync() }
+                        runCatching { syncEngine.syncCoreDataFull() }
                     }
                 }
         }
+        appScope.launch {
+            while (true) {
+                delay(DeviceLicenseValidationIntervalMillis)
+                if (deviceActivationRepository.currentActivation() != null) {
+                    runCatching { localDataRepair.repairIfNeeded() }
+                }
+            }
+        }
+    }
+
+    private companion object {
+        const val DeviceLicenseValidationIntervalMillis = 60_000L
     }
 }

@@ -151,7 +151,7 @@ private fun RulesScreen(
                         EmptySectionText("Abrí la App Usuario para detectar y sincronizar apps.")
                     }
                 }
-                items(state.appControls, key = { "${it.deviceName}:${it.packageName}" }) { app ->
+                items(state.appControls, key = { it.packageName }) { app ->
                     AppControlCard(
                         app = app,
                         onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },
@@ -258,7 +258,7 @@ private fun RulesScreen(
                         EmptySectionText("Abrí la App Usuario para detectar y sincronizar apps.")
                     }
                 }
-                items(state.appControls, key = { "${it.deviceName}:${it.packageName}" }) { app ->
+                items(state.appControls, key = { it.packageName }) { app ->
                     AppControlCard(
                         app = app,
                         onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },

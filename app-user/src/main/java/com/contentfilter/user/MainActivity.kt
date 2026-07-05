@@ -97,7 +97,7 @@ private fun UserAppRoot(
         return
     }
     if (rootState.needsActivation) {
-        ActivationRoute(modifier = modifier)
+        ActivationRoute(modifier = modifier, notice = rootState.activationNotice)
         return
     }
     Scaffold(

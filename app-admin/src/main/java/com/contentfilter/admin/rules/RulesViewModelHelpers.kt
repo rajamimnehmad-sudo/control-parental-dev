@@ -39,7 +39,7 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
     pendingAllowed: Map<String, Boolean>,
 ): List<AppControlUiState> {
     val devicesById = devices.associateBy { it.id }
-    return distinctBy { it.deviceId to it.packageName }
+    return distinctBy { it.packageName }
         .map { app ->
             val effectiveRule = rules.effectiveAppRule(app.packageName)
             val limit =
@@ -71,7 +71,7 @@ internal fun List<RemoteInstalledAppDto>.forSelectedUserDevice(
     val directApps = filter { it.deviceId == selectedDeviceId }
     if (userDeviceIds.size != 1 || selectedDeviceId !in userDeviceIds) return directApps
     val orphanApps = filter { it.deviceId !in userDeviceIds }
-    return (directApps + orphanApps).distinctBy { it.deviceId to it.packageName }
+    return (directApps + orphanApps).distinctBy { it.packageName }
 }
 
 internal fun List<PolicyRule>.internetBlocked(): Boolean =
