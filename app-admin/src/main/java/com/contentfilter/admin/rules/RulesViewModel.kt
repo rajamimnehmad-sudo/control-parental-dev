@@ -11,6 +11,7 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDailyLimitsUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
@@ -20,6 +21,7 @@ import com.contentfilter.core.domain.usecase.admin.SavePolicyRuleUseCase
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteResult
+import com.contentfilter.core.network.remote.SupabaseDevMaintenanceClient
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -48,7 +50,9 @@ class RulesViewModel
         private val saveRule: SavePolicyRuleUseCase,
         private val deleteRule: DeletePolicyRuleUseCase,
         private val saveDailyLimit: SaveDailyLimitUseCase,
+        private val deviceRepository: DeviceRepository,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
+        private val devMaintenanceClient: SupabaseDevMaintenanceClient,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
     ) : ViewModel() {
@@ -144,6 +148,39 @@ class RulesViewModel
 
         fun clearDeviceSelection() {
             form.update { it.copy(selectedDeviceId = null, appSearchQuery = "", message = "") }
+        }
+
+        fun deleteDevicePermanently(deviceId: String) {
+            form.update {
+                it.copy(
+                    pendingDeviceDeleteIds = it.pendingDeviceDeleteIds + deviceId,
+                    message = "Borrando dispositivo definitivamente...",
+                )
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                when (devMaintenanceClient.purgeDevice(deviceId)) {
+                    is RemoteResult.Success -> {
+                        deviceRepository.deleteDevice(deviceId)
+                        installedApps.update { apps -> apps.filterNot { it.deviceId == deviceId } }
+                        syncEngine.syncDevicesFull()
+                        form.update {
+                            it.copy(
+                                selectedDeviceId = it.selectedDeviceId.takeUnless { selected -> selected == deviceId },
+                                pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
+                                message = "Dispositivo borrado definitivamente.",
+                            )
+                        }
+                    }
+                    is RemoteResult.Failure -> {
+                        form.update {
+                            it.copy(
+                                pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
+                                message = "No se pudo borrar definitivamente el dispositivo.",
+                            )
+                        }
+                    }
+                }
+            }
         }
 
         fun createBlockedAppRule() = createRule(RuleScope.App, RuleAction.Block)

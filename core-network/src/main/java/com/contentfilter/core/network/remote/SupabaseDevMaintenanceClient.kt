@@ -58,6 +58,16 @@ class SupabaseDevMaintenanceClient
                 )
             }
 
+        suspend fun purgeDevice(deviceId: String): RemoteResult<Unit> =
+            withContext(Dispatchers.IO) {
+                listOf(
+                    hardDelete(table = SupabaseTable.DeviceApps.tableName, column = "device_id", value = deviceId),
+                    hardDelete(table = SupabaseTable.AccessRequests.tableName, column = "device_id", value = deviceId),
+                    hardDelete(table = "device_activations", column = "device_id", value = deviceId),
+                    hardDelete(table = SupabaseTable.Devices.tableName, column = "id", value = deviceId),
+                ).firstOrNull { it is RemoteResult.Failure } ?: RemoteResult.Success(Unit)
+            }
+
         suspend fun resetRemoteDev(
             accountId: String,
             keepDeviceId: String?,
@@ -108,6 +118,36 @@ class SupabaseDevMaintenanceClient
                     }
                 } catch (exception: Exception) {
                     exceptionFailure("DEV soft-delete $table", exception)
+                }
+            }
+
+        private suspend fun hardDelete(
+            table: String,
+            column: String,
+            value: String,
+        ): RemoteResult<Unit> =
+            withContext(Dispatchers.IO) {
+                val request =
+                    requestBuilder(
+                        path = "/rest/v1/$table?$column=eq.${value.encode()}",
+                    ) ?: return@withContext RemoteResult.Failure(OfflineUserMessage, retryable = true)
+                try {
+                    httpClient.newCall(
+                        request
+                            .delete()
+                            .header("Prefer", "return=minimal")
+                            .build(),
+                    ).execute().use { response ->
+                        val responseBody = response.body?.string().orEmpty()
+                        if (response.isSuccessful) {
+                            Log.i(LogTag, "DEV hard-delete table=$table column=$column ok")
+                            RemoteResult.Success(Unit)
+                        } else {
+                            httpFailure("DEV hard-delete $table", response.code, responseBody)
+                        }
+                    }
+                } catch (exception: Exception) {
+                    exceptionFailure("DEV hard-delete $table", exception)
                 }
             }
 

@@ -57,6 +57,7 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
         onRefreshApps = viewModel::refreshApps,
         onDeviceSelected = viewModel::onDeviceSelected,
         onDeviceCleared = viewModel::clearDeviceSelection,
+        onDeviceDeleted = viewModel::deleteDevicePermanently,
         onCreateDomainBlock = viewModel::createBlockedDomainRule,
         onCreateDomainLimit = viewModel::createDomainLimit,
         onCreateDomainAllow = viewModel::createAllowedDomainRule,
@@ -82,6 +83,7 @@ private fun RulesScreen(
     onRefreshApps: () -> Unit,
     onDeviceSelected: (String) -> Unit,
     onDeviceCleared: () -> Unit,
+    onDeviceDeleted: (String) -> Unit,
     onCreateDomainBlock: () -> Unit,
     onCreateDomainLimit: () -> Unit,
     onCreateDomainAllow: () -> Unit,
@@ -192,7 +194,9 @@ private fun RulesScreen(
                 UserDeviceCard(
                     device = device,
                     selected = false,
+                    deleting = device.id in state.pendingDeviceDeleteIds,
                     onClick = { onDeviceSelected(device.id) },
+                    onDelete = { onDeviceDeleted(device.id) },
                 )
             }
         } else {

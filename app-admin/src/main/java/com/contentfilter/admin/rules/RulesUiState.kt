@@ -25,6 +25,7 @@ data class RulesUiState(
     val appSearchQuery: String = "",
     val selectedAction: RuleAction = RuleAction.Block,
     val pendingAppAllowed: Map<String, Boolean> = emptyMap(),
+    val pendingDeviceDeleteIds: Set<String> = emptySet(),
     val offlineMode: Boolean = true,
     val message: String = "",
 )
