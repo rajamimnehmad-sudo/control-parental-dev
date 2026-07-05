@@ -13,11 +13,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.contentfilter.core.domain.model.ComponentState
-import com.contentfilter.core.domain.model.PolicySnapshot
-import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicyDecision
-import com.contentfilter.core.domain.model.RuleAction
-import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.feature.vpn.dns.DnsForwarder
 import com.contentfilter.feature.vpn.dns.DnsPacketParser
@@ -300,10 +296,7 @@ class FilterVpnService : VpnService() {
                     "DNS decision=block domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
-                notifyBlockedDomain(
-                    domain = domain,
-                    shouldSignalBrowserClose = shouldSignalBrowserClose(domain, state.snapshot, decision),
-                )
+                notifyBlockedDomain(domain)
                 output.write(responseFactory.nxdomainPacket(question))
             }
             is PolicyDecision.HealthWarning,
@@ -342,14 +335,8 @@ class FilterVpnService : VpnService() {
         telemetryReporter.recordServiceState("SafeSearch extension point reached.")
     }
 
-    private fun notifyBlockedDomain(
-        domain: String,
-        shouldSignalBrowserClose: Boolean,
-    ) {
+    private fun notifyBlockedDomain(domain: String) {
         val normalized = domain.notificationDomain() ?: return
-        if (shouldSignalBrowserClose) {
-            rememberBlockedDomain(normalized)
-        }
         val now = System.currentTimeMillis()
         if (now - (lastBlockedNotificationAt[normalized] ?: 0L) < BlockNotificationCooldownMillis) return
         lastBlockedNotificationAt[normalized] = now
@@ -398,34 +385,6 @@ class FilterVpnService : VpnService() {
         return baseDomain.takeIf { isDirectNavigation && it !in NoisyBaseDomains }
     }
 
-    private fun shouldSignalBrowserClose(
-        domain: String,
-        snapshot: PolicySnapshot,
-        decision: PolicyDecision,
-    ): Boolean {
-        val normalized = domain.normalizedDomain()
-        val explicitDomainBlock =
-            snapshot.rules.any {
-                it.enabled &&
-                    it.scope == RuleScope.Domain &&
-                    it.action == RuleAction.Block &&
-                    it.target.normalizedDomain() != DomainWildcard &&
-                    normalized.matchesDomainTarget(it.target.normalizedDomain())
-            }
-        val matchingDomainLimit =
-            decision is PolicyDecision.Block &&
-                snapshot.dailyLimits.any {
-                    it.enabled &&
-                        it.targetType == PolicyTargetType.Domain &&
-                        normalized.matchesDomainTarget(it.target.normalizedDomain())
-                }
-        return explicitDomainBlock || matchingDomainLimit
-    }
-
-    private fun rememberBlockedDomain(domain: String) {
-        BlockedDomainSignal.remember(this, domain)
-    }
-
     private fun ensureBlockedNotificationChannel() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = getSystemService(NotificationManager::class.java) ?: return
@@ -469,7 +428,6 @@ class FilterVpnService : VpnService() {
         private const val BlockNotificationCooldownMillis = 60_000L
         private const val BlockedChannelId = "content_filter_blocked_sites_v2"
         private const val BlockedNotificationId = 3_000
-        private const val DomainWildcard = "*"
         private val NoisyDomainLabels =
             setOf(
                 "api",
@@ -550,8 +508,6 @@ class FilterVpnService : VpnService() {
                 .lowercase()
                 .removeSuffix(".")
                 .removePrefix("www.")
-
-        private fun String.matchesDomainTarget(target: String): Boolean = this == target || endsWith(".$target")
 
         private fun List<InetAddress>.safeAddresses(): String =
             joinToString(",") { it.hostAddress.orEmpty() }.ifBlank { "none" }

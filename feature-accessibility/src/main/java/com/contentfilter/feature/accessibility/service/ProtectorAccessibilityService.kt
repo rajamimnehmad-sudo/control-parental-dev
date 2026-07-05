@@ -18,7 +18,6 @@ import com.contentfilter.feature.accessibility.policy.AccessibilityPolicySnapsho
 import com.contentfilter.feature.accessibility.telemetry.AccessibilityTelemetryReporter
 import com.contentfilter.feature.accessibility.time.AppUsageTracker
 import com.contentfilter.feature.accessibility.time.UsageTransition
-import com.contentfilter.feature.vpn.service.BlockedDomainSignal
 import com.contentfilter.feature.vpn.service.DevProtectionMode
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -60,9 +59,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var policyRefreshJob: Job? = null
     private var foregroundWatchJob: Job? = null
     private var foregroundWatchPackageName: String? = null
-    private var browserBlockedDomainWatchJob: Job? = null
-    private var browserBlockedDomainWatchPackageName: String? = null
-    private var lastHandledBlockedDomainAtEpochMillis: Long = 0L
     private var appLimitDeadlineJob: Job? = null
     private var appLimitDeadlinePackageName: String? = null
     private var lastPolicyRefreshAtElapsedMillis: Long = 0L
@@ -104,7 +100,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
             serviceScope?.launch { saveTransition(transition) }
         }
         evaluateForegroundApp(packageName, elapsed)
-        enforceRecentBlockedDomainInBrowser(packageName)
         startForegroundWatch(packageName)
         if (transition == null) {
             usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
@@ -128,17 +123,15 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 systemStatusRepository.updateAccessibilityState(ComponentState.Disabled)
                 telemetryReporter.recordServiceState("Accessibility service destroyed.")
                 snapshotProvider.stop()
-        clearExtraTimeExpiry()
-        clearAppLimitDeadline()
-        clearForegroundWatch()
-        clearBrowserBlockedDomainWatch()
-        cancel()
+                clearExtraTimeExpiry()
+                clearAppLimitDeadline()
+                clearForegroundWatch()
+                cancel()
             }
         } else {
             snapshotProvider.stop()
             clearExtraTimeExpiry()
             clearForegroundWatch()
-            clearBrowserBlockedDomainWatch()
         }
         serviceScope = null
         super.onDestroy()
@@ -270,51 +263,14 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     snapshotProvider.refresh()
                 }
                 evaluateForegroundApp(packageName, elapsed)
-                enforceRecentBlockedDomainInBrowser(packageName)
             }
         }
-        startBrowserBlockedDomainWatch(packageName)
     }
 
     private fun clearForegroundWatch() {
         foregroundWatchJob?.cancel()
         foregroundWatchJob = null
         foregroundWatchPackageName = null
-    }
-
-    private fun startBrowserBlockedDomainWatch(packageName: String) {
-        if (!packageName.isBrowserPackage()) {
-            clearBrowserBlockedDomainWatch()
-            return
-        }
-        if (browserBlockedDomainWatchJob?.isActive == true && browserBlockedDomainWatchPackageName == packageName) return
-        clearBrowserBlockedDomainWatch()
-        val scope = serviceScope ?: return
-        browserBlockedDomainWatchPackageName = packageName
-        browserBlockedDomainWatchJob =
-            scope.launch {
-                while (usageTracker.currentPackageName() == packageName) {
-                    delay(BrowserBlockedDomainRecheckMillis)
-                    enforceRecentBlockedDomainInBrowser(packageName)
-                }
-            }
-    }
-
-    private fun clearBrowserBlockedDomainWatch() {
-        browserBlockedDomainWatchJob?.cancel()
-        browserBlockedDomainWatchJob = null
-        browserBlockedDomainWatchPackageName = null
-    }
-
-    private fun enforceRecentBlockedDomainInBrowser(packageName: String) {
-        if (!packageName.isBrowserPackage()) return
-        val blockedDomain = BlockedDomainSignal.mostRecent(this) ?: return
-        val now = clock.nowEpochMillis()
-        if (now - blockedDomain.blockedAtEpochMillis > RecentBlockedDomainWindowMillis) return
-        if (blockedDomain.blockedAtEpochMillis <= lastHandledBlockedDomainAtEpochMillis) return
-        lastHandledBlockedDomainAtEpochMillis = blockedDomain.blockedAtEpochMillis
-        Log.i(LogTag, "Leaving browser after blocked domain=${blockedDomain.domain} package=$packageName")
-        performGlobalAction(GLOBAL_ACTION_HOME)
     }
 
     private fun scheduleAppLimitDeadline(
@@ -416,8 +372,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 250L
         const val BackgroundPolicyRefreshMillis = 1_000L
-        const val BrowserBlockedDomainRecheckMillis = 500L
-        const val RecentBlockedDomainWindowMillis = 5_000L
         const val LogTag = "ProtectorAccessibility"
         val HandledEventTypes =
             setOf(
@@ -462,25 +416,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
             this in ExactAllowedPackageNames ||
                 AllowedPackagePrefixes.any { startsWith(it) } ||
                 endsWith(".launcher")
-
-        val BrowserPackageNames =
-            setOf(
-                "com.android.chrome",
-                "com.sec.android.app.sbrowser",
-                "org.mozilla.firefox",
-                "org.mozilla.firefox_beta",
-                "com.microsoft.emmx",
-                "com.brave.browser",
-                "com.opera.browser",
-                "com.opera.mini.native",
-                "com.duckduckgo.mobile.android",
-                "com.vivaldi.browser",
-                "com.kiwibrowser.browser",
-                "com.UCMobile.intl",
-                "mark.via.gp",
-            )
-
-        fun String.isBrowserPackage(): Boolean = this in BrowserPackageNames
 
         fun Long.toObservedMinutes(): Int =
             if (this <= 0L) {
