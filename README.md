@@ -1,0 +1,123 @@
+# Content Filter
+
+Proyecto Android multi-modulo para control parental en canal DEV.
+
+Contexto operativo oficial para continuar trabajo:
+
+```text
+docs/HANDOFF_ACTUAL.md
+```
+
+No reanalizar arquitectura desde cero salvo pedido explicito.
+
+## Ruta De Trabajo
+
+Usar solo esta carpeta local:
+
+```text
+/Users/yejielnehmad/Developer/content-filter
+```
+
+No compilar ni revisar la carpeta vieja en `Documents`. Si aparece un problema por duplicados de build/caches, revisar primero que no existan:
+
+```text
+.gradle
+.gradle-home
+app-user/build
+```
+
+## Modulos Principales
+
+- `app-user`: app del usuario protegido.
+- `app-admin`: app administrador.
+- `core-domain`: modelos, repositorios y use cases.
+- `core-data`: repositorios Room y outbox.
+- `core-database`: Room, DAOs, entidades, migraciones y schemas.
+- `core-network`: Supabase REST/Auth/Realtime.
+- `core-sync`: SyncEngine, WorkManager, outbox y realtime.
+- `core-policy`: motor puro de decisiones.
+- `feature-vpn`: bloqueo de dominios/web.
+- `feature-accessibility`: bloqueo de apps.
+
+## Reglas De Trabajo
+
+- Trabajar solo con Supabase DEV.
+- No tocar produccion.
+- No guardar secretos en Git.
+- No usar Service Role Key dentro de Android.
+- No borrar datos/tablas sin confirmacion explicita.
+- Mantener Clean Architecture: UI -> ViewModel -> UseCase -> Repository.
+- Priorizar reglas por dispositivo cuando haya duda entre global y device-scoped.
+- El usuario prueba Admin y Usuario en el mismo celular Samsung.
+
+## Build Y Tests
+
+Compilar DEV:
+
+```bash
+./gradlew :app-admin:compileDevDebugKotlin :app-user:compileDevDebugKotlin
+```
+
+Tests relevantes:
+
+```bash
+./gradlew :app-admin:testDevDebugUnitTest :feature-vpn:testDebugUnitTest :core-policy:test
+```
+
+Publicar APKs DEV:
+
+```bash
+scripts/publicar_dev.sh
+```
+
+El script compila, corre tests, prepara manifiestos, valida que suba el `versionCode` y publica en Supabase Storage.
+
+## Actualizaciones DEV
+
+Manifiestos publicados:
+
+```text
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-manifest.json
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-manifest.json
+```
+
+APKs publicadas:
+
+```text
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-debug.apk
+```
+
+Version DEV actual:
+
+```text
+versionCode 64
+versionName 1.0.1-dev
+```
+
+Actualizar este README cuando cambie:
+
+- ruta oficial de trabajo
+- flujo de build/publicacion
+- version DEV publicada
+- reglas operativas importantes
+- modulos principales o comandos de prueba
+
+## Estado Funcional Reciente
+
+- Reglas Admin se aplican por dispositivo.
+- Solicitudes y aprobaciones usan `deviceId`.
+- Modo web cerrado bloquea dominios via VPN.
+- Toggle "Permitir buscadores" controla Google, Bing, Yahoo y DuckDuckGo cuando modo web esta cerrado.
+- Con modo web abierto, buscadores quedan abiertos.
+- Las apps se actualizan manualmente desde la pantalla `Actualizaciones`.
+
+## Verificacion Rapida Antes De Trabajar
+
+```bash
+pwd
+git status --short
+find . -maxdepth 2 \( -path './.gradle' -o -path './.gradle-home' -o -path './app-user/build' \) -print
+```
+
+Si `git status --short` muestra cambios no esperados, no revertirlos sin confirmacion.
