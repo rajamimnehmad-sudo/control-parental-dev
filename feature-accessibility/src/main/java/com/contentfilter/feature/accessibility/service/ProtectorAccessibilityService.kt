@@ -80,12 +80,12 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event == null || event.eventType !in HandledEventTypes) return
+        if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
         if (DevProtectionMode.isProtectionDisabled(this) || packageName.isAlwaysAllowedPackage()) return
         val elapsed = clock.elapsedRealtimeMillis()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
-        if (handleSearchEngineProtection(packageName)) return
+        if (handleSearchEngineProtection(packageName, event.eventType)) return
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
         val now = clock.nowEpochMillis()
@@ -151,7 +151,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
         return true
     }
 
-    private fun handleSearchEngineProtection(packageName: String): Boolean {
+    private fun handleSearchEngineProtection(
+        packageName: String,
+        eventType: Int,
+    ): Boolean {
         val visibleText = rootInActiveWindow.visibleText()
         val diagnosis =
             searchEngineScreenDetector.diagnose(
@@ -161,7 +164,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             )
         Log.i(
             LogTag,
-            "Search protection layer=accessibility package=$packageName reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} visibleTextLength=${diagnosis.visibleTextLength}",
+            "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} package=$packageName reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} visibleTextLength=${diagnosis.visibleTextLength}",
         )
         if (!diagnosis.shouldLeave) return false
         Log.i(LogTag, "Leaving blocked search engine screen package=$packageName")
@@ -399,13 +402,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val BlockRecheckDelayMillis = 250L
         const val BackgroundPolicyRefreshMillis = 1_000L
         const val LogTag = "ProtectorAccessibility"
-        val HandledEventTypes =
-            setOf(
-                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-                AccessibilityEvent.TYPE_WINDOWS_CHANGED,
-                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
-                AccessibilityEvent.TYPE_VIEW_FOCUSED,
-            )
         val ExactAllowedPackageNames =
             setOf(
                 "android",

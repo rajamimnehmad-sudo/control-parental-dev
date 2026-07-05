@@ -91,7 +91,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 74
+versionCode 75
 versionName 1.0.1-dev
 ```
 
@@ -115,6 +115,7 @@ Actualizar este README cuando cambie:
 - Admin muestra el estado de buscadores en verde/rojo y mantiene la logica como lista blanca.
 - Diagnostico interno por capas para buscadores: VPN/DNS y Accessibility registran motivo tecnico en Logcat.
 - Accessibility tambien revisa cambios de contenido de ventana para detectar resultados que cargan sin cambiar de pantalla.
+- El filtro interno de Accessibility cubre `TYPE_WINDOW_CONTENT_CHANGED` y los logs indican el tipo de evento procesado.
 - Con modo web abierto, buscadores quedan abiertos.
 - Las reglas de internet bloquean dominios por VPN/DNS sin cerrar el navegador; Chrome/Samsung Internet solo se cierra por reglas o limites de app.
 - Las apps se actualizan manualmente desde la pantalla `Actualizaciones`.
