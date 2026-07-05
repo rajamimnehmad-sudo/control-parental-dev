@@ -63,6 +63,17 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
         .sortedWith(compareBy({ it.deviceName.lowercase() }, { it.appName.lowercase() }, { it.packageName }))
 }
 
+internal fun List<RemoteInstalledAppDto>.forSelectedUserDevice(
+    selectedDeviceId: String,
+    devices: List<Device>,
+): List<RemoteInstalledAppDto> {
+    val userDeviceIds = devices.userDeviceIds()
+    val directApps = filter { it.deviceId == selectedDeviceId }
+    if (userDeviceIds.size != 1 || selectedDeviceId !in userDeviceIds) return directApps
+    val orphanApps = filter { it.deviceId !in userDeviceIds }
+    return (directApps + orphanApps).distinctBy { it.deviceId to it.packageName }
+}
+
 internal fun List<PolicyRule>.internetBlocked(): Boolean =
     internetBlockRules().any { it.enabled }
 
@@ -85,11 +96,15 @@ internal fun List<PolicyRule>.googleSearchAllowed(): Boolean =
 
 internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List<UserDeviceUiState> {
     val devicesById = associateBy { it.id }
-    val appsByDevice = apps.groupBy { it.deviceId }
-    val localUserDeviceIds =
-        filter { device ->
-            device.appRole != "admin"
-        }.map { it.id }
+    val localUserDeviceIds = userDeviceIds()
+    val appsByDevice =
+        if (localUserDeviceIds.size == 1) {
+            apps.groupBy { app ->
+                if (app.deviceId in localUserDeviceIds) app.deviceId else localUserDeviceIds.first()
+            }
+        } else {
+            apps.filter { it.deviceId in localUserDeviceIds }.groupBy { it.deviceId }
+        }
     return localUserDeviceIds
         .distinct()
         .map { deviceId ->
@@ -119,6 +134,9 @@ internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List
                 .thenBy { it.name.lowercase() },
         )
 }
+
+private fun List<Device>.userDeviceIds(): List<String> =
+    filter { device -> device.appRole != "admin" }.map { it.id }
 
 private val UserDeviceStatus.sortOrder: Int
     get() =

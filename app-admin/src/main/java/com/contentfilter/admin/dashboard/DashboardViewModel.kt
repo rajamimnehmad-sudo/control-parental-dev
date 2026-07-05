@@ -40,7 +40,7 @@ class DashboardViewModel
                 devToolsState,
             ) { devices, requests, health, devState ->
                 DashboardUiState(
-                    deviceCount = devices.size,
+                    deviceCount = devices.count { it.appRole != "admin" },
                     pendingRequests =
                         requests.count {
                             it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote

@@ -90,7 +90,7 @@ class RulesViewModel
                             emptyList()
                         } else {
                             apps
-                                .filter { it.deviceId == selectedDeviceId }
+                                .forSelectedUserDevice(selectedDeviceId, devices)
                                 .toAppControls(rules, limits, devices, formState.pendingAppAllowed)
                         }
                             .filterBySearch(formState.appSearchQuery),
