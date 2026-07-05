@@ -1,0 +1,221 @@
+package com.contentfilter.admin.rules
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.unit.dp
+import com.contentfilter.core.domain.model.RuleAction
+import com.contentfilter.core.domain.model.RuleScope
+
+internal enum class DevicePanel {
+    Apps,
+    Internet,
+}
+
+@Composable
+internal fun SelectedDeviceHeader(
+    device: UserDeviceUiState,
+    selectedPanel: DevicePanel,
+    onPanelSelected: (DevicePanel) -> Unit,
+    onBack: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(device.name, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "${if (device.active) "Activo" else "Desconectado"} | ${device.lastSeenLabel}",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+                OutlinedButton(onClick = onBack) {
+                    Text("Volver")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (selectedPanel == DevicePanel.Apps) {
+                    Button(onClick = { }) {
+                        Text("Apps")
+                    }
+                } else {
+                    OutlinedButton(onClick = { onPanelSelected(DevicePanel.Apps) }) {
+                        Text("Apps")
+                    }
+                }
+                if (selectedPanel == DevicePanel.Internet) {
+                    Button(onClick = { }) {
+                        Text("Internet")
+                    }
+                } else {
+                    OutlinedButton(onClick = { onPanelSelected(DevicePanel.Internet) }) {
+                        Text("Internet")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+internal fun UserDeviceCard(
+    device: UserDeviceUiState,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    val indicatorColor =
+        if (device.active) {
+            MaterialTheme.colorScheme.primary
+        } else {
+            MaterialTheme.colorScheme.error
+        }
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+    ) {
+        Row(
+            modifier = Modifier.padding(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .size(12.dp)
+                        .clip(CircleShape)
+                        .background(indicatorColor),
+            )
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
+            ) {
+                Text(device.name, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    text = "${if (device.active) "Activo" else "Desconectado"} | ${device.lastSeenLabel} | ${device.appCount} apps",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            }
+            Text(
+                text = if (selected) "Elegido" else "Ver",
+                style = MaterialTheme.typography.labelLarge,
+            )
+        }
+    }
+}
+
+@Composable
+internal fun SectionHeader(
+    title: String,
+    count: Int,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text("$count", style = MaterialTheme.typography.labelLarge)
+        }
+        HorizontalDivider()
+    }
+}
+
+@Composable
+internal fun SectionActionHeader(
+    title: String,
+    count: Int,
+    actionText: String,
+    onAction: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("$count", style = MaterialTheme.typography.labelLarge)
+                OutlinedButton(onClick = onAction) {
+                    Text(actionText)
+                }
+            }
+        }
+        HorizontalDivider()
+    }
+}
+
+@Composable
+internal fun EmptySectionText(text: String) {
+    Text(
+        modifier = Modifier.padding(vertical = 4.dp),
+        text = text,
+        style = MaterialTheme.typography.bodyMedium,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
+}
+
+internal fun RuleAction.displayName(): String =
+    when (this) {
+        RuleAction.Allow -> "Permitir"
+        RuleAction.Block -> "Bloquear"
+        RuleAction.Warn -> "Advertir"
+        RuleAction.RequestAuthorization -> "Requiere autorización"
+    }
+
+internal fun RuleScope.displayName(): String =
+    when (this) {
+        RuleScope.App -> "Aplicación"
+        RuleScope.Domain -> "Dominio"
+        RuleScope.Category -> "Categoría"
+        RuleScope.Global -> "Global"
+    }
+
+internal val GoogleSearchDomainsForUi =
+    setOf(
+        "google.com",
+        "gstatic.com",
+        "googleapis.com",
+        "googleusercontent.com",
+        "bing.com",
+        "duckduckgo.com",
+    )
