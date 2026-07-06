@@ -287,7 +287,7 @@ class FilterVpnService : VpnService() {
                 logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
-                    "DNS decision=allow domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} upstream=${upstreamDnsServers.safeAddresses()}",
+                    "DNS decision=allow domain=$domain snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()} upstream=${upstreamDnsServers.safeAddresses()}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
                 if (decision.safeSearchRequired) {
@@ -299,7 +299,7 @@ class FilterVpnService : VpnService() {
                 logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
-                    "DNS decision=grant domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}",
+                    "DNS decision=grant domain=$domain snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)
@@ -310,7 +310,7 @@ class FilterVpnService : VpnService() {
                 logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
-                    "DNS decision=block domain=$domain rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size}",
+                    "DNS decision=block domain=$domain snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
                 notifyBlockedDomain(domain)
@@ -354,7 +354,7 @@ class FilterVpnService : VpnService() {
             }
         Log.i(
             LogTag,
-            "Search protection layer=vpn-dns domain=$domain decision=${decision.searchProtectionLabel()} strict=${state.strictWebBlockEnabled} allowRules=$allowRules blockRules=$blockRules totalRules=${state.snapshot.rules.size}",
+            "Search protection layer=vpn-dns domain=$domain decision=${decision.searchProtectionLabel()} snapshotVersion=${state.snapshot.version} strict=${state.strictWebBlockEnabled} allowRules=$allowRules blockRules=$blockRules totalRules=${state.snapshot.rules.size} reason=${decision.reasonLabel()}",
         )
         if (decision is PolicyDecision.Block) {
             SearchProtectionSignals.recordDnsBlock(domain)
@@ -367,6 +367,8 @@ class FilterVpnService : VpnService() {
             allowRules = allowRules,
             blockRules = blockRules,
             totalRules = state.snapshot.rules.size,
+            snapshotVersion = state.snapshot.version,
+            reason = decision.reasonLabel(),
         )
     }
 
@@ -605,6 +607,18 @@ class FilterVpnService : VpnService() {
                 is PolicyDecision.RequireActivation -> "RequireActivation"
                 is PolicyDecision.RequireUpdate -> "RequireUpdate"
                 is PolicyDecision.Warn -> "Warn"
+            }
+
+        private fun PolicyDecision.reasonLabel(): String =
+            when (this) {
+                is PolicyDecision.Allow -> if (safeSearchRequired) "safe-search-required" else "no-blocking-rule"
+                is PolicyDecision.Block -> reason.take(120)
+                is PolicyDecision.GrantExtraTime -> "extra-time"
+                is PolicyDecision.HealthWarning -> message.take(120)
+                is PolicyDecision.RequestAuthorization -> "request-authorization"
+                is PolicyDecision.RequireActivation -> reason.take(120)
+                is PolicyDecision.RequireUpdate -> reason.take(120)
+                is PolicyDecision.Warn -> message.take(120)
             }
 
         private fun List<InetAddress>.safeAddresses(): String =

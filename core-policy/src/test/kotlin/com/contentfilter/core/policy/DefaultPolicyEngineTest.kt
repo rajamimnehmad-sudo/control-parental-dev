@@ -168,6 +168,15 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
+    fun `base google argentina rule blocks google argentina subdomains`() {
+        val snapshot = policy(rules = listOf(domainRule(target = "google.com.ar", action = RuleAction.Block)))
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com.ar")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.google.com.ar")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("search.google.com.ar")))
+    }
+
+    @Test
     fun `search protection policy blocks clients4 when search blocking is active`() {
         val snapshot = policy(rules = listOf(domainRule(target = "bing.com", action = RuleAction.Block)))
 

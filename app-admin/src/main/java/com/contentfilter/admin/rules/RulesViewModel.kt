@@ -256,7 +256,7 @@ class RulesViewModel
                     runCatching {
                         setSearchEnginesAllowedRules(allowed, targetDeviceId)
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                            policyRules.first { it.searchEnginesAllowed() == allowed }
+                            policyRules.first { it.searchEnginesStateConfirmed(allowed) }
                         } ?: error("Room no confirmó buscadores.")
                     }
                 if (saved.isFailure) {
@@ -462,9 +462,9 @@ class RulesViewModel
                             policyRules.first {
                                 it.internetBlocked() == blocked &&
                                     if (blocked) {
-                                        !it.searchEnginesAllowed()
+                                        it.searchEnginesStateConfirmed(false)
                                     } else {
-                                        it.searchEngineBlockRules().none { rule -> rule.enabled }
+                                        it.searchEnginesStateConfirmed(true)
                                     }
                             }
                         } ?: error("Room no confirmó el nuevo estado de Internet.")
@@ -1142,22 +1142,34 @@ class RulesViewModel
                         it.target == target &&
                         it.action == action
                 }
-            val rulesToSave =
-                existingRules.ifEmpty {
-                    listOf(
-                        PolicyRule(
-                            id = UUID.randomUUID().toString(),
-                            level = PolicyLevel.Account,
-                            scope = RuleScope.Domain,
-                            target = target,
-                            action = action,
-                            priority = priority,
-                            enabled = enabled,
-                        ),
+            val canonicalRule =
+                existingRules
+                    .sortedWith(
+                        compareByDescending<PolicyRule> { it.level.specificity }
+                            .thenByDescending { it.priority }
+                            .thenBy { it.id },
                     )
+                    .firstOrNull()
+                    ?: PolicyRule(
+                        id = UUID.randomUUID().toString(),
+                        level = PolicyLevel.Account,
+                        scope = RuleScope.Domain,
+                        target = target,
+                        action = action,
+                        priority = priority,
+                        enabled = enabled,
+                    )
+            saveRule(canonicalRule.copy(enabled = enabled, priority = priority), deviceId)
+            existingRules
+                .filterNot { it.id == canonicalRule.id }
+                .forEach { duplicate ->
+                    saveRule(duplicate.copy(enabled = false, priority = priority), deviceId)
                 }
-            rulesToSave.forEach { rule ->
-                saveRule(rule.copy(enabled = enabled, priority = priority), deviceId)
+            if (existingRules.size > 1) {
+                Log.i(
+                    LogTag,
+                    "internetSave consolidated duplicate domain rules target=$target action=$action kept=${canonicalRule.id} disabled=${existingRules.size - 1}",
+                )
             }
         }
 

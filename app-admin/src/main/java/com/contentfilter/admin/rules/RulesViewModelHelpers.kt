@@ -86,7 +86,7 @@ internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
     }
 
 internal fun List<PolicyRule>.searchEnginesAllowed(): Boolean =
-    SearchEngineDomains.none { domain ->
+    SearchProtectionDomains.none { domain ->
         any {
             it.enabled &&
                 it.scope == RuleScope.Domain &&
@@ -95,10 +95,32 @@ internal fun List<PolicyRule>.searchEnginesAllowed(): Boolean =
         }
     }
 
+internal fun List<PolicyRule>.searchEnginesStateConfirmed(allowed: Boolean): Boolean =
+    if (allowed) {
+        searchEnginesAllowed()
+    } else {
+        SearchProtectionDomains.all { domain ->
+            any {
+                it.enabled &&
+                    it.scope == RuleScope.Domain &&
+                    it.target == domain &&
+                    it.action == RuleAction.Block
+            }
+        } &&
+            SearchProtectionDomains.none { domain ->
+                any {
+                    it.enabled &&
+                        it.scope == RuleScope.Domain &&
+                        it.target == domain &&
+                        it.action == RuleAction.Allow
+                }
+            }
+    }
+
 internal fun List<PolicyRule>.searchEngineBlockRules(): List<PolicyRule> =
     filter {
         it.scope == RuleScope.Domain &&
-            it.target in SearchEngineDomains &&
+            it.target in SearchProtectionDomains &&
             it.action == RuleAction.Block
     }
 
@@ -217,6 +239,7 @@ internal const val MaxDiagnosticValueLength = 80
 internal const val LogTag = "RulesViewModel"
 internal val SearchEngineDomains = SearchEngineCatalog.searchEngineDomains
 internal val SecureDnsDomains = SearchEngineCatalog.secureDnsDomains
+internal val SearchProtectionDomains = (SearchEngineDomains + SecureDnsDomains).distinct()
 internal val YouTubeWebDomains =
     listOf(
         "youtube.com",

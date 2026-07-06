@@ -39,14 +39,16 @@ class VpnTelemetryReporter
             allowRules: Int,
             blockRules: Int,
             totalRules: Int,
+            snapshotVersion: Long,
+            reason: String,
         ) {
             val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
             record(
                 type = "search-protection",
                 message =
                     "layer=vpn-dns deviceId=$deviceId action=dns-decision host=${domainHost.sanitizeHost()} " +
-                        "result=${decision.label()} strict=$strictWebBlock allowRules=$allowRules " +
-                        "blockRules=$blockRules ruleCount=$totalRules",
+                        "result=${decision.label()} snapshotVersion=$snapshotVersion strict=$strictWebBlock allowRules=$allowRules " +
+                        "blockRules=$blockRules ruleCount=$totalRules reason=${reason.take(MaxMessageLength)}",
             )
         }
 

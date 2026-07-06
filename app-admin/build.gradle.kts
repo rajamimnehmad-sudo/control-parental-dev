@@ -24,7 +24,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 85
+            versionCode = 86
             versionNameSuffix = "-dev"
         }
         create("beta") {
@@ -64,4 +64,5 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
+    testImplementation(libs.kotlin.test)
 }
