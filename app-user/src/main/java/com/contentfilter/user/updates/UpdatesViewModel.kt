@@ -61,11 +61,9 @@ class UpdatesViewModel
                         is UpdateCheckResult.Available -> {
                             _uiState.value =
                                 UpdatesUiState(
-                                    status = UpdatesStatus.Downloading,
+                                    status = UpdatesStatus.Available,
                                     manifest = result.manifest,
-                                    downloadProgressPercent = 0,
                                 )
-                            downloadAndMaybeInstall(result.manifest, openInstaller = true)
                         }
                         UpdateCheckResult.NetworkError,
                         UpdateCheckResult.NotConfigured,
@@ -112,7 +110,7 @@ class UpdatesViewModel
             viewModelScope.launch {
                 _uiState.update { it.copy(status = UpdatesStatus.Downloading, downloadProgressPercent = 0) }
                 runCatching {
-                    downloadAndMaybeInstall(manifest, openInstaller = true)
+                    downloadAndMaybeInstall(manifest)
                 }.onFailure { exception ->
                     Log.e(LogTag, "Update download failed: ${exception.message}", exception)
                     _uiState.update { it.copy(status = UpdatesStatus.DownloadFailed) }
@@ -168,7 +166,6 @@ class UpdatesViewModel
 
         private suspend fun downloadAndMaybeInstall(
             manifest: com.contentfilter.core.update.model.UpdateManifest,
-            openInstaller: Boolean,
         ) {
             when (
                 val result =
@@ -186,7 +183,6 @@ class UpdatesViewModel
                     downloadedApk = result.apk
                     if (apkInstaller.canRequestPackageInstalls()) {
                         _uiState.update { it.copy(status = UpdatesStatus.ReadyToInstall, downloadProgressPercent = 100) }
-                        if (openInstaller) apkInstaller.openPackageInstaller(result.apk)
                     } else {
                         _uiState.update { it.copy(status = UpdatesStatus.NeedsInstallPermission, downloadProgressPercent = 100) }
                     }

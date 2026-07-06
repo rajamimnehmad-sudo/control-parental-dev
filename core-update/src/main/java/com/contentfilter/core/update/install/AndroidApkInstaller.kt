@@ -43,8 +43,9 @@ class AndroidApkInstaller
                         apk,
                     )
                 val intent =
-                    Intent(Intent.ACTION_VIEW)
-                        .setDataAndType(uri, ApkMimeType)
+                    Intent(Intent.ACTION_INSTALL_PACKAGE)
+                        .setData(uri)
+                        .putExtra(Intent.EXTRA_NOT_UNKNOWN_SOURCE, true)
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         .withNewTask()
                 context.startActivity(intent)
@@ -56,7 +57,6 @@ class AndroidApkInstaller
         private fun Intent.withNewTask(): Intent = addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
         private companion object {
-            const val ApkMimeType = "application/vnd.android.package-archive"
             const val LogTag = "ApkInstaller"
         }
     }
