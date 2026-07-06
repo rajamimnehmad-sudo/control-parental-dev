@@ -7,6 +7,7 @@ import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
+import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
 import com.contentfilter.user.repair.UserLocalDataRepair
 import dagger.hilt.android.HiltAndroidApp
@@ -54,6 +55,7 @@ class UserApplication :
 
     override fun onCreate() {
         super.onCreate()
+        runCatching { VpnController.disableDevProtection(this) }
         runCatching { syncScheduler.schedulePeriodicSync() }
         appScope.launch {
             runCatching { localDataRepair.repairIfNeeded() }

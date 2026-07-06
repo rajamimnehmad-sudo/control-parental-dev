@@ -33,7 +33,6 @@ import com.contentfilter.feature.activation.ActivationRoute
 import com.contentfilter.feature.requests.RequestsRoute
 import com.contentfilter.feature.status.SystemStatusRoute
 import com.contentfilter.user.apps.MyAppsRoute
-import com.contentfilter.user.internet.InternetRoute
 import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
@@ -86,9 +85,7 @@ private fun UserAppRoot(
         showAccessibilityDialog = !AccessibilityController.isEnabled(context)
     }
     LaunchedEffect(blockedDomain) {
-        if (!blockedDomain.isNullOrBlank()) {
-            destination = UserDestination.Internet
-        }
+        if (!blockedDomain.isNullOrBlank()) onBlockedDomainConsumed()
     }
     if (rootState.checkingActivation) {
         Box(modifier = modifier.padding(24.dp)) {
@@ -120,11 +117,6 @@ private fun UserAppRoot(
                 UserDestination.Status -> SystemStatusRoute()
                 UserDestination.MyApps -> MyAppsRoute()
                 UserDestination.Requests -> RequestsRoute()
-                UserDestination.Internet ->
-                    InternetRoute(
-                        initialDomain = blockedDomain,
-                        onInitialDomainConsumed = onBlockedDomainConsumed,
-                    )
                 UserDestination.Updates -> UpdatesRoute()
             }
         }
@@ -193,7 +185,6 @@ private enum class UserDestination(val label: String) {
     Status("Estado"),
     MyApps("Mis apps"),
     Requests("Mis solicitudes"),
-    Internet("Internet"),
     Updates("Actualizaciones"),
 }
 

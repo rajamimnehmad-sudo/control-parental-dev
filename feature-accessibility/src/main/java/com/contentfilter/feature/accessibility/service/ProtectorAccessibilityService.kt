@@ -86,7 +86,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (DevProtectionMode.isProtectionDisabled(this) || packageName.isAlwaysAllowedPackage()) return
         val elapsed = clock.elapsedRealtimeMillis()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
-        if (handleSearchEngineProtection(packageName, event.eventType)) return
+        // Web/search protection is frozen. Accessibility remains active only for app protection.
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
         val now = clock.nowEpochMillis()

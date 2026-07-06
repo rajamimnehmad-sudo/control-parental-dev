@@ -32,7 +32,6 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 
 internal enum class DevicePanel {
     Apps,
-    Internet,
 }
 
 @Composable
@@ -71,15 +70,6 @@ internal fun SelectedDeviceHeader(
                 } else {
                     OutlinedButton(onClick = { onPanelSelected(DevicePanel.Apps) }) {
                         Text("Apps")
-                    }
-                }
-                if (selectedPanel == DevicePanel.Internet) {
-                    Button(onClick = { }) {
-                        Text("Internet")
-                    }
-                } else {
-                    OutlinedButton(onClick = { onPanelSelected(DevicePanel.Internet) }) {
-                        Text("Internet")
                     }
                 }
             }

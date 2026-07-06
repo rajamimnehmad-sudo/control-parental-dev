@@ -108,7 +108,7 @@ private fun RulesScreen(
     val orphanDomainLimits = visibleDomainLimits.filter { it.target !in visibleDomainRuleTargets }
     val otherRules = state.rules.filter { it.scope != RuleScope.App && it.scope != RuleScope.Domain }
     val selectedDevice = state.userDevices.firstOrNull { it.id == state.selectedDeviceId }
-    var selectedPanel by rememberSaveable(state.selectedDeviceId) { mutableStateOf(DevicePanel.Apps) }
+    val selectedPanel = DevicePanel.Apps
 
     if (selectedDevice != null && selectedPanel == DevicePanel.Apps) {
         Column(
@@ -128,7 +128,7 @@ private fun RulesScreen(
             SelectedDeviceHeader(
                 device = selectedDevice,
                 selectedPanel = selectedPanel,
-                onPanelSelected = { selectedPanel = it },
+                onPanelSelected = { },
                 onBack = onDeviceCleared,
             )
             SectionActionHeader(
@@ -233,92 +233,38 @@ private fun RulesScreen(
                 SelectedDeviceHeader(
                     device = selectedDevice,
                     selectedPanel = selectedPanel,
-                    onPanelSelected = { selectedPanel = it },
+                    onPanelSelected = { },
                     onBack = onDeviceCleared,
                 )
             }
-            if (selectedPanel == DevicePanel.Apps) {
+            item {
+                SectionActionHeader(
+                    title = "Apps",
+                    count = state.appControls.size,
+                    actionText = "Actualizar",
+                    onAction = onRefreshApps,
+                )
+            }
+            item {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = state.appSearchQuery,
+                    onValueChange = onAppSearchChanged,
+                    label = { Text("Buscar app") },
+                    singleLine = true,
+                )
+            }
+            if (state.appControls.isEmpty()) {
                 item {
-                    SectionActionHeader(
-                        title = "Apps",
-                        count = state.appControls.size,
-                        actionText = "Actualizar",
-                        onAction = onRefreshApps,
-                    )
+                    EmptySectionText("Abrí la App Usuario para detectar y sincronizar apps.")
                 }
-                item {
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = state.appSearchQuery,
-                        onValueChange = onAppSearchChanged,
-                        label = { Text("Buscar app") },
-                        singleLine = true,
-                    )
-                }
-                if (state.appControls.isEmpty()) {
-                    item {
-                        EmptySectionText("Abrí la App Usuario para detectar y sincronizar apps.")
-                    }
-                }
-                items(state.appControls, key = { it.packageName }) { app ->
-                    AppControlCard(
-                        app = app,
-                        onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },
-                        onLimitSaved = { minutes -> onAppLimitSaved(app.packageName, minutes) },
-                    )
-                }
-            } else {
-                item {
-                    InternetModeCard(
-                        blocked = state.internetBlocked,
-                        searchEnginesAllowed = state.searchEnginesAllowed,
-                        internetSaving = state.internetSaving,
-                        webModeUpdating = state.pendingInternetBlocked != null,
-                        searchEnginesUpdating = state.pendingSearchEnginesAllowed != null,
-                        onBlockedChanged = onInternetBlockedChanged,
-                        onSearchEnginesAllowedChanged = onSearchEnginesAllowedChanged,
-                    )
-                }
-                item {
-                    AllowDomainEditorCard(
-                        domain = state.allowDomain,
-                        minutes = state.allowDomainMinutes,
-                        enabled = !state.internetSaving,
-                        saving = state.internetSaving,
-                        onDomainChanged = onAllowDomainChanged,
-                        onMinutesChanged = onAllowDomainMinutesChanged,
-                        onAllow = onCreateDomainAllow,
-                        onAllowWithLimit = onCreateAllowedDomainLimit,
-                    )
-                }
-                item {
-                    SectionHeader(
-                        title = "Lista blanca",
-                        count = visibleDomainRules.size,
-                    )
-                }
-                if (visibleDomainRules.isEmpty()) {
-                    item {
-                        EmptySectionText("No hay sitios permitidos.")
-                    }
-                }
-                items(visibleDomainRules, key = { it.id }) { rule ->
-                    RuleCard(
-                        rule = rule,
-                        dailyLimitMinutes = visibleDomainLimits.firstOrNull { it.target == rule.target }?.limitMinutes,
-                        enabled = !state.internetSaving,
-                        onToggle = { onToggle(rule) },
-                        onDelete = { onDelete(rule) },
-                    )
-                }
-                if (orphanDomainLimits.isNotEmpty()) {
-                    item {
-                        SectionHeader(title = "Límites sin regla visible", count = orphanDomainLimits.size)
-                    }
-                    items(orphanDomainLimits, key = { it.id }) { limit ->
-                        DomainLimitCard(limit = limit, enabled = !state.internetSaving, onDelete = { onDeleteDomainLimit(limit) })
-                    }
-                }
+            }
+            items(state.appControls, key = { it.packageName }) { app ->
+                AppControlCard(
+                    app = app,
+                    onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },
+                    onLimitSaved = { minutes -> onAppLimitSaved(app.packageName, minutes) },
+                )
             }
             if (otherRules.isNotEmpty()) {
                 item {
