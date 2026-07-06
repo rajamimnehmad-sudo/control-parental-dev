@@ -83,8 +83,10 @@ class VpnTelemetryReporter
                 type = "search-protection",
                 message =
                     "layer=sync deviceId=$deviceId action=snapshot-received result=applied " +
+                        "snapshotVersion=${snapshot.version} mode=${if (strictWebBlock) "web-blocked" else "web-open"} " +
                         "policyLoaded=${snapshot.id != SearchProtectionPolicyDefaults.SafeDefaultPolicyId && snapshot.id != LocalDefaultPolicyId} " +
-                        "ruleCount=${snapshot.rules.size} searchBlockRules=$searchBlockRules strict=$strictWebBlock",
+                        "ruleCount=${snapshot.rules.size} activeDomainRules=${snapshot.activeDomainRuleCount()} " +
+                        "searchBlockRules=$searchBlockRules strict=$strictWebBlock",
             )
         }
 
@@ -164,6 +166,9 @@ class VpnTelemetryReporter
                 value.contains("yahoo") ||
                 value.contains("duckduckgo")
         }
+
+        private fun PolicySnapshot.activeDomainRuleCount(): Int =
+            rules.count { it.enabled && it.scope == RuleScope.Domain }
 
         private companion object {
             const val DnsOverTlsPort = 853

@@ -96,12 +96,7 @@ class RulesViewModel
                     userDevices = userDevices,
                     selectedDeviceId = selectedDeviceId,
                     internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
-                    searchEnginesAllowed =
-                        if (formState.pendingInternetBlocked ?: savedInternetBlocked) {
-                            formState.pendingSearchEnginesAllowed ?: rules.searchEnginesAllowed()
-                        } else {
-                            true
-                        },
+                    searchEnginesAllowed = formState.pendingSearchEnginesAllowed ?: rules.searchEnginesAllowed(),
                     appControls =
                         if (selectedDeviceId == null) {
                             emptyList()
@@ -400,7 +395,6 @@ class RulesViewModel
                 return
             }
             val currentState = uiState.value
-            val existingRules = currentState.rules.internetBlockRules()
             val previousRoom = currentState.rules.internetBlocked()
             val requestId =
                 beginInternetSave(
@@ -434,29 +428,18 @@ class RulesViewModel
             viewModelScope.launch {
                 val saved =
                     runCatching {
-                        val rulesToSave =
-                            existingRules.ifEmpty {
-                                listOf(
-                                    PolicyRule(
-                                        id = UUID.randomUUID().toString(),
-                                        level = PolicyLevel.Account,
-                                        scope = RuleScope.Domain,
-                                        target = DomainWildcard,
-                                        action = RuleAction.Block,
-                                        priority = InternetBlockPriority,
-                                        enabled = blocked,
-                                    ),
-                                )
-	                            }
-                        rulesToSave.forEach { rule ->
-                            saveRule(rule.copy(enabled = blocked), targetDeviceId)
-                        }
+                        setRulesForDomain(
+                            target = DomainWildcard,
+                            action = RuleAction.Block,
+                            enabled = blocked,
+                            priority = InternetBlockPriority,
+                            deviceId = targetDeviceId,
+                        )
                         if (blocked) {
                             clearLegacyDomainBlockRules(targetDeviceId)
                             setSearchEnginesAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
                         } else {
                             clearLegacyDomainBlockRules(targetDeviceId)
-                            clearSearchEngineRules(targetDeviceId)
                         }
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
                             policyRules.first {
@@ -464,7 +447,7 @@ class RulesViewModel
                                     if (blocked) {
                                         it.searchEnginesStateConfirmed(false)
                                     } else {
-                                        it.searchEnginesStateConfirmed(true)
+                                        true
                                     }
                             }
                         } ?: error("Room no confirmó el nuevo estado de Internet.")
@@ -498,12 +481,12 @@ class RulesViewModel
                             it.copy(
                                 internetSaving = false,
                                 pendingInternetBlocked = null,
-                                pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
+                                pendingSearchEnginesAllowed = null,
                                 message =
                                     if (blocked) {
                                         "Modo web: bloquear todo excepto permitidos. Buscadores bloqueados."
                                     } else {
-                                        "Modo web: Internet abierto."
+                                        "Modo web: Internet abierto. Buscadores conservan su estado."
                                     },
                             )
                         }
@@ -523,7 +506,7 @@ class RulesViewModel
                             it.copy(
                                 internetSaving = false,
                                 pendingInternetBlocked = null,
-                                pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
+                                pendingSearchEnginesAllowed = null,
                                 message = "Cambio guardado localmente. Se sincronizará cuando haya conexión.",
                             )
                         }
@@ -543,7 +526,7 @@ class RulesViewModel
                             it.copy(
                                 internetSaving = false,
                                 pendingInternetBlocked = null,
-                                pendingSearchEnginesAllowed = if (blocked) null else it.pendingSearchEnginesAllowed,
+                                pendingSearchEnginesAllowed = null,
                                 message = "No se pudo cambiar el modo web. Intentá otra vez.",
                             )
                         }

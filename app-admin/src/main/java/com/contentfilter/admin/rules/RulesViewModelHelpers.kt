@@ -231,6 +231,7 @@ internal val DomainRegex = Regex("^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0
 internal const val ActiveDeviceWindowMillis = 15 * 60 * 1000L
 internal const val SwitchHoldMillis = 2_500L
 internal const val RoomConfirmTimeoutMillis = 5_000L
+// Domain wildcard: enabled Block means whitelist mode; disabled means general Internet is open.
 internal const val DomainWildcard = "*"
 internal const val InternetBlockPriority = 10
 internal const val AllowDomainPriority = 1_000

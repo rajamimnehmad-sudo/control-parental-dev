@@ -39,6 +39,13 @@ class RulesViewModelHelpersTest {
         assertFalse(rules.searchEnginesStateConfirmed(allowed = true))
     }
 
+    @Test
+    fun `visible search state includes secure dns protection blocks`() {
+        val rules = listOf(domainRule(SecureDnsDomains.first(), RuleAction.Block, enabled = true))
+
+        assertFalse(rules.searchEnginesAllowed())
+    }
+
     private fun domainRule(
         target: String,
         action: RuleAction,
