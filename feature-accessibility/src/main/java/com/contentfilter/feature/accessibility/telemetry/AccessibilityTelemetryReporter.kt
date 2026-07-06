@@ -38,16 +38,18 @@ class AccessibilityTelemetryReporter
             reason: String,
             blockRules: Int,
             recentDnsBlockHost: String?,
+            visibleTextLength: Int,
             result: String,
         ) {
             val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
             record(
                 type = "search-protection",
                 message =
-                    "layer=accessibility deviceId=$deviceId action=search-screen event=$eventLabel " +
+                        "layer=accessibility deviceId=$deviceId action=search-screen event=$eventLabel " +
                         "packageName=${packageName.take(MaxMessageLength)} browserCheck=$packageCategory result=$result " +
                         "blockRules=$blockRules reason=${reason.take(MaxMessageLength)} " +
-                        "recentDnsSearchBlock=${recentDnsBlockHost?.sanitizeHost() ?: "none"}",
+                        "recentDnsSearchBlock=${recentDnsBlockHost?.sanitizeHost() ?: "none"} " +
+                        "visibleTextLength=$visibleTextLength",
             )
         }
 

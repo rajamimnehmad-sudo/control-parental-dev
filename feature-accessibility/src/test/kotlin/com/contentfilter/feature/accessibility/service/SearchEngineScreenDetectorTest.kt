@@ -14,23 +14,57 @@ class SearchEngineScreenDetectorTest {
     private val detector = SearchEngineScreenDetector()
 
     @Test
-    fun `does not leave browser search screen when search engines are blocked`() {
-        assertFalse(
+    fun `leaves Chrome search screen when search engines are blocked`() {
+        assertTrue(
             detector.shouldLeaveSearchEngine(
                 packageName = "com.android.chrome",
                 snapshot = snapshot(rule("google.com", RuleAction.Block)),
+                visibleText = "Google Search",
+            ),
+        )
+    }
+
+    @Test
+    fun `leaves Chrome results screen when search engines are blocked`() {
+        assertTrue(
+            detector.shouldLeaveSearchEngine(
+                packageName = "com.android.chrome",
+                snapshot = snapshot(rule("google.com", RuleAction.Block)),
+                visibleText = "Resultados de búsqueda",
+            ),
+        )
+    }
+
+    @Test
+    fun `leaves Chrome after recent blocked Google DNS host`() {
+        assertTrue(
+            detector.shouldLeaveSearchEngine(
+                packageName = "com.android.chrome",
+                snapshot = snapshot(rule("google.com", RuleAction.Block)),
+                visibleText = "Nueva pestaña",
+                recentDnsBlockHost = "google.com",
+            ),
+        )
+    }
+
+    @Test
+    fun `does not leave Chrome when search engines are allowed`() {
+        assertFalse(
+            detector.shouldLeaveSearchEngine(
+                packageName = "com.android.chrome",
+                snapshot = snapshot(rule("google.com", RuleAction.Allow)),
                 visibleText = "Google Search resultados de busqueda",
             ),
         )
     }
 
     @Test
-    fun `does not leave browser when search engines are allowed`() {
+    fun `does not leave normal Chrome page when search engines are blocked`() {
         assertFalse(
             detector.shouldLeaveSearchEngine(
                 packageName = "com.android.chrome",
-                snapshot = snapshot(rule("google.com", RuleAction.Allow)),
-                visibleText = "Google Search resultados de busqueda",
+                snapshot = snapshot(rule("google.com", RuleAction.Block)),
+                visibleText = "Wikipedia Enciclopedia libre Historia Artículo",
             ),
         )
     }
@@ -75,7 +109,7 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
-    fun `does not leave Chrome without visible signal after recent DNS search block`() {
+    fun `diagnoses Chrome recent DNS search block as blocked screen`() {
         val diagnosis =
             detector.diagnose(
                 packageName = "com.android.chrome",
@@ -84,15 +118,15 @@ class SearchEngineScreenDetectorTest {
                 recentDnsBlockHost = "google.com",
             )
 
-        assertFalse(diagnosis.shouldLeave)
+        assertTrue(diagnosis.shouldLeave)
         assertEquals("browser", diagnosis.packageCategory)
-        assertEquals("recent-dns-block-observed", diagnosis.reason)
+        assertEquals("browser-recent-dns-block-observed", diagnosis.reason)
         assertEquals("google.com", diagnosis.recentDnsBlockHost)
     }
 
 
     @Test
-    fun `diagnoses browser search screen without leaving Chrome`() {
+    fun `diagnoses browser search screen as blocked screen`() {
         val diagnosis =
             detector.diagnose(
                 packageName = "com.android.chrome",
@@ -100,7 +134,7 @@ class SearchEngineScreenDetectorTest {
                 visibleText = "Google Search resultados de busqueda",
             )
 
-        assertFalse(diagnosis.shouldLeave)
+        assertTrue(diagnosis.shouldLeave)
         assertEquals("browser-search-signal-observed", diagnosis.reason)
         assertEquals(1, diagnosis.searchBlockRules)
     }

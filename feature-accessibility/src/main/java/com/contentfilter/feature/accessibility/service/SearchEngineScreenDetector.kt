@@ -41,22 +41,29 @@ class SearchEngineScreenDetector {
                 visibleTextLength = visibleText.length,
             )
         }
-        if (!visibleText.indicatesSearchEngineScreen()) {
+        val hasVisibleSearchSignal = visibleText.indicatesSearchEngineScreen()
+        val blockedRecentSearchHost = recentDnsBlockHost?.takeIf { it.isSearchProtectionHost() }
+        if (!hasVisibleSearchSignal && blockedRecentSearchHost == null) {
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
-                reason = if (recentDnsBlockHost != null) "recent-dns-block-observed" else "no-search-signal",
+                reason = "no-search-signal",
                 packageCategory = packageCategory.label,
-                recentDnsBlockHost = recentDnsBlockHost,
+                recentDnsBlockHost = blockedRecentSearchHost,
                 searchBlockRules = blockRuleCount,
                 visibleTextLength = visibleText.length,
             )
         }
         if (packageCategory == SearchSurfaceCategory.Browser) {
             return SearchEngineScreenDiagnosis(
-                shouldLeave = false,
-                reason = "browser-search-signal-observed",
+                shouldLeave = true,
+                reason =
+                    when {
+                        hasVisibleSearchSignal -> "browser-search-signal-observed"
+                        blockedRecentSearchHost != null -> "browser-recent-dns-block-observed"
+                        else -> "browser-search-blocked"
+                    },
                 packageCategory = packageCategory.label,
-                recentDnsBlockHost = recentDnsBlockHost,
+                recentDnsBlockHost = blockedRecentSearchHost,
                 searchBlockRules = blockRuleCount,
                 visibleTextLength = visibleText.length,
             )
@@ -65,7 +72,7 @@ class SearchEngineScreenDetector {
             shouldLeave = true,
             reason = "blocked-search-screen",
             packageCategory = packageCategory.label,
-            recentDnsBlockHost = null,
+            recentDnsBlockHost = blockedRecentSearchHost,
             searchBlockRules = blockRuleCount,
             visibleTextLength = visibleText.length,
         )
@@ -88,9 +95,24 @@ class SearchEngineScreenDetector {
 
     private fun String.indicatesSearchEngineScreen(): Boolean {
         val normalized = lowercase()
-        if (SearchEngineCatalog.searchEngineDomains.any { it in normalized }) return true
+        if (SearchEngineCatalog.searchEngineDomains.any { normalized.contains(it.normalizedHost()) }) return true
         return SearchEngineSignals.any { it in normalized }
     }
+
+    private fun String.isSearchProtectionHost(): Boolean {
+        val normalized = normalizedHost()
+        return SearchEngineCatalog.searchEngineDomains.any { normalized.matchesDomainTarget(it.normalizedHost()) } ||
+            SearchEngineCatalog.secureDnsDomains.any { normalized.matchesDomainTarget(it.normalizedHost()) }
+    }
+
+    private fun String.normalizedHost(): String =
+        lowercase()
+            .substringBefore("/")
+            .substringBefore("?")
+            .removeSuffix(".")
+            .removePrefix("www.")
+
+    private fun String.matchesDomainTarget(target: String): Boolean = this == target || endsWith(".$target")
 
     private companion object {
         val BrowserPackageNames =

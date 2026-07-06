@@ -176,18 +176,47 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 reason = diagnosis.reason,
                 blockRules = diagnosis.searchBlockRules,
                 recentDnsBlockHost = diagnosis.recentDnsBlockHost,
+                visibleTextLength = diagnosis.visibleTextLength,
                 result = if (diagnosis.shouldLeave) "blocked-search-screen" else "no-search-signal",
             )
         }
         if (!diagnosis.shouldLeave) return false
-        Log.i(LogTag, "Leaving blocked search engine screen package=$packageName")
-        performGlobalAction(GLOBAL_ACTION_HOME)
+        Log.i(
+            LogTag,
+            "search-block browser detected package=$packageName reason=${diagnosis.reason} recentDnsBlockHost=${diagnosis.recentDnsBlockHost ?: "none"} visibleTextLength=${diagnosis.visibleTextLength}",
+        )
+        leaveBlockedSearchScreen(packageName)
         serviceScope?.launch {
             telemetryReporter.recordServiceState(
                 "Search protection accessibility action: ${diagnosis.reason}.",
             )
         }
         return true
+    }
+
+    private fun leaveBlockedSearchScreen(packageName: String) {
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        val scope = serviceScope ?: return
+        scope.launch {
+            repeat(SearchBlockHomeRetries) {
+                delay(SearchBlockRetryDelayMillis)
+                val root = rootInActiveWindow
+                if (root?.packageName?.toString() != packageName) return@launch
+                val diagnosis =
+                    searchEngineScreenDetector.diagnose(
+                        packageName = packageName,
+                        snapshot = snapshotProvider.current().snapshot,
+                        visibleText = root.visibleText(),
+                        recentDnsBlockHost = SearchProtectionSignals.recentDnsBlock()?.host,
+                    )
+                if (!diagnosis.shouldLeave) return@launch
+                Log.i(
+                    LogTag,
+                    "search-block browser detected retry=${it + 1} package=$packageName reason=${diagnosis.reason} recentDnsBlockHost=${diagnosis.recentDnsBlockHost ?: "none"} visibleTextLength=${diagnosis.visibleTextLength}",
+                )
+                performGlobalAction(GLOBAL_ACTION_HOME)
+            }
+        }
     }
 
     private fun evaluateForegroundApp(
@@ -413,6 +442,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val MillisPerMinute = 60_000L
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 250L
+        const val SearchBlockRetryDelayMillis = 150L
+        const val SearchBlockHomeRetries = 2
         const val BackgroundPolicyRefreshMillis = 1_000L
         const val LogTag = "ProtectorAccessibility"
         val ExactAllowedPackageNames =
