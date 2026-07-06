@@ -84,14 +84,17 @@ class ProtectorAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
-        if (packageName.isAlwaysAllowedPackage()) return
-        if (blockRetryPackageName != packageName) clearBlockRetry()
         val elapsed = clock.elapsedRealtimeMillis()
+        val now = clock.nowEpochMillis()
+        if (packageName.isAlwaysAllowedPackage()) {
+            handleAlwaysAllowedForeground(packageName, elapsed, now)
+            return
+        }
+        if (blockRetryPackageName != packageName) clearBlockRetry()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
         // Web/search protection is frozen. Accessibility remains active only for app protection.
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
-        val now = clock.nowEpochMillis()
         serviceScope?.let { scope ->
             if (snapshotProvider.ensureCurrentDay(scope)) {
                 usageTracker.finishCurrent(elapsed, now)?.let { transition ->
@@ -111,6 +114,21 @@ class ProtectorAccessibilityService : AccessibilityService() {
             usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
                 serviceScope?.launch { saveTransition(checkpoint) }
             }
+        }
+    }
+
+    private fun handleAlwaysAllowedForeground(
+        packageName: String,
+        elapsedRealtimeMillis: Long,
+        epochMillis: Long,
+    ) {
+        clearBlockRetry()
+        clearForegroundWatch()
+        clearAppLimitDeadline()
+        clearExtraTimeExpiry()
+        if (usageTracker.currentPackageName() == null || usageTracker.currentPackageName() == packageName) return
+        usageTracker.finishCurrent(elapsedRealtimeMillis, epochMillis)?.let { transition ->
+            serviceScope?.launch { saveTransition(transition) }
         }
     }
 
@@ -342,19 +360,25 @@ class ProtectorAccessibilityService : AccessibilityService() {
         foregroundWatchPackageName = packageName
         foregroundWatchJob =
             scope.launch {
-                snapshotProvider.refresh()
+                if (!packageName.isReportedForeground()) return@launch
                 evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())
                 while (usageTracker.currentPackageName() == packageName) {
                     delay(ForegroundRecheckMillis)
+                    if (!packageName.isReportedForeground()) return@launch
                     val elapsed = clock.elapsedRealtimeMillis()
                     val now = clock.nowEpochMillis()
                     usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
                         saveTransition(checkpoint)
                     }
-                    snapshotProvider.refresh()
                     evaluateForegroundApp(packageName, elapsed)
                 }
             }
+    }
+
+    private fun String.isReportedForeground(): Boolean {
+        val activeWindowPackage = rootInActiveWindow?.packageName?.toString()
+        if (activeWindowPackage != null && activeWindowPackage != this) return false
+        return usageTracker.currentPackageName() == this
     }
 
     private fun clearForegroundWatch() {
