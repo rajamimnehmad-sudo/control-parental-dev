@@ -44,33 +44,64 @@ class DevApkUpdateRepository
                 }
             }
 
-        override suspend fun download(manifest: UpdateManifest): UpdateDownloadResult =
+        override suspend fun download(
+            manifest: UpdateManifest,
+            onProgress: (Int) -> Unit,
+        ): UpdateDownloadResult =
             withContext(Dispatchers.IO) {
-                val request = Request.Builder().url(manifest.apkUrl).get().build()
                 runCatching {
-                    updateHttpClient.newCall(request).execute().use { response ->
-                        if (!response.isSuccessful) return@withContext UpdateDownloadResult.DownloadError
-                        val body = response.body ?: return@withContext UpdateDownloadResult.DownloadError
-                        val updateDir = File(context.cacheDir, UpdateCacheDir).apply { mkdirs() }
-                        val apk = File(updateDir, manifest.apkFileName())
-                        val partial = File(updateDir, "${apk.name}.partial")
-                        apk.delete()
-                        partial.delete()
-                        body.byteStream().use { input ->
-                            partial.outputStream().use { output ->
-                                input.copyTo(output, BufferSizeBytes)
+                    val updateDir = File(context.cacheDir, UpdateCacheDir).apply { mkdirs() }
+                    val apk = File(updateDir, manifest.apkFileName())
+                    val partial = File(updateDir, "${apk.name}.partial")
+                    apk.delete()
+                    onProgress(0)
+                    repeat(MaxDownloadAttempts) { attempt ->
+                        val existingBytes = partial.length().takeIf { partial.exists() } ?: 0L
+                        val requestBuilder = Request.Builder().url(manifest.apkUrl).get()
+                        if (existingBytes > 0L) {
+                            requestBuilder.header("Range", "bytes=$existingBytes-")
+                        }
+                        updateHttpClient.newCall(requestBuilder.build()).execute().use { response ->
+                            if (!response.isSuccessful) {
+                                if (attempt == MaxDownloadAttempts - 1) return@withContext UpdateDownloadResult.DownloadError
+                                return@repeat
+                            }
+                            val body = response.body ?: return@withContext UpdateDownloadResult.DownloadError
+                            val append = existingBytes > 0L && response.code == HttpPartialContent
+                            if (!append) partial.delete()
+                            val initialBytes = if (append) existingBytes else 0L
+                            val expectedBytes = body.contentLength().takeIf { it > 0L }?.plus(initialBytes)
+                            body.byteStream().use { input ->
+                                partial.outputStream().use { output ->
+                                    if (append) output.channel.position(output.channel.size())
+                                    val buffer = ByteArray(BufferSizeBytes)
+                                    var downloaded = initialBytes
+                                    while (true) {
+                                        val read = input.read(buffer)
+                                        if (read <= 0) break
+                                        output.write(buffer, 0, read)
+                                        downloaded += read
+                                        expectedBytes?.let { total ->
+                                            onProgress(((downloaded * 100) / total).toInt().coerceIn(0, 99))
+                                        }
+                                    }
+                                }
+                            }
+                            if (expectedBytes == null || partial.length() >= expectedBytes) {
+                                if (!partial.renameTo(apk)) {
+                                    partial.delete()
+                                    return@withContext UpdateDownloadResult.DownloadError
+                                }
+                                if (!apk.sha256Matches(manifest.apkSha256)) {
+                                    apk.delete()
+                                    return@withContext UpdateDownloadResult.InvalidChecksum
+                                }
+                                onProgress(100)
+                                return@withContext UpdateDownloadResult.Success(apk)
                             }
                         }
-                        if (!partial.renameTo(apk)) {
-                            partial.delete()
-                            return@withContext UpdateDownloadResult.DownloadError
-                        }
-                        if (!apk.sha256Matches(manifest.apkSha256)) {
-                            apk.delete()
-                            return@withContext UpdateDownloadResult.InvalidChecksum
-                        }
-                        UpdateDownloadResult.Success(apk)
                     }
+                    UpdateDownloadResult.DownloadError
                 }.getOrElse { UpdateDownloadResult.DownloadError }
             }
 
@@ -114,8 +145,10 @@ class DevApkUpdateRepository
 
             const val UpdateCacheDir = "updates"
             const val DefaultUpdateApkName = "dev-update.apk"
-            const val BufferSizeBytes = 8 * 1024
+            const val BufferSizeBytes = 64 * 1024
             const val NetworkTimeoutSeconds = 30L
             const val DownloadTimeoutSeconds = 180L
+            const val MaxDownloadAttempts = 3
+            const val HttpPartialContent = 206
         }
     }

@@ -40,6 +40,7 @@ class AdminUpdatesViewModel
                                 AdminUpdatesUiState(
                                     status = AdminUpdatesStatus.Downloading,
                                     manifest = result.manifest,
+                                    downloadProgressPercent = 0,
                                 )
                             downloadAndMaybeInstall(result.manifest, openInstaller = true)
                         }
@@ -86,7 +87,7 @@ class AdminUpdatesViewModel
         fun downloadUpdate() {
             val manifest = _uiState.value.manifest ?: return
             viewModelScope.launch {
-                _uiState.update { it.copy(status = AdminUpdatesStatus.Downloading) }
+                _uiState.update { it.copy(status = AdminUpdatesStatus.Downloading, downloadProgressPercent = 0) }
                 runCatching {
                     downloadAndMaybeInstall(manifest, openInstaller = true)
                 }.onFailure { exception ->
@@ -117,20 +118,25 @@ class AdminUpdatesViewModel
             manifest: com.contentfilter.core.update.model.UpdateManifest,
             openInstaller: Boolean,
         ) {
-            when (val result = updateRepository.download(manifest)) {
+            when (
+                val result =
+                    updateRepository.download(manifest) { progress ->
+                        _uiState.update { it.copy(downloadProgressPercent = progress) }
+                    }
+            ) {
                 UpdateDownloadResult.DownloadError -> {
-                    _uiState.update { it.copy(status = AdminUpdatesStatus.DownloadFailed) }
+                    _uiState.update { it.copy(status = AdminUpdatesStatus.DownloadFailed, downloadProgressPercent = null) }
                 }
                 UpdateDownloadResult.InvalidChecksum -> {
-                    _uiState.update { it.copy(status = AdminUpdatesStatus.ChecksumFailed) }
+                    _uiState.update { it.copy(status = AdminUpdatesStatus.ChecksumFailed, downloadProgressPercent = null) }
                 }
                 is UpdateDownloadResult.Success -> {
                     downloadedApk = result.apk
                     if (apkInstaller.canRequestPackageInstalls()) {
-                        _uiState.update { it.copy(status = AdminUpdatesStatus.ReadyToInstall) }
+                        _uiState.update { it.copy(status = AdminUpdatesStatus.ReadyToInstall, downloadProgressPercent = 100) }
                         if (openInstaller) apkInstaller.openPackageInstaller(result.apk)
                     } else {
-                        _uiState.update { it.copy(status = AdminUpdatesStatus.NeedsInstallPermission) }
+                        _uiState.update { it.copy(status = AdminUpdatesStatus.NeedsInstallPermission, downloadProgressPercent = 100) }
                     }
                 }
             }

@@ -103,6 +103,9 @@ private fun UpdatesScreen(
                 }
             }
             UpdatesStatus.Downloading -> {
+                state.downloadProgressPercent?.let { progress ->
+                    Text("Descarga: $progress%", style = MaterialTheme.typography.bodyMedium)
+                }
                 Button(
                     modifier = Modifier.fillMaxWidth(),
                     enabled = false,
