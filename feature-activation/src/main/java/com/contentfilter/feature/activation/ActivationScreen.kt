@@ -25,7 +25,6 @@ fun ActivationRoute(
     ActivationScreen(
         state = state.value,
         onActivationCodeChanged = viewModel::onActivationCodeChanged,
-        onDeviceNameChanged = viewModel::onDeviceNameChanged,
         onActivate = viewModel::activate,
         notice = notice,
         modifier = modifier,
@@ -36,7 +35,6 @@ fun ActivationRoute(
 fun ActivationScreen(
     state: ActivationUiState,
     onActivationCodeChanged: (String) -> Unit,
-    onDeviceNameChanged: (String) -> Unit,
     onActivate: () -> Unit,
     notice: String = "",
     modifier: Modifier = Modifier,
@@ -57,17 +55,10 @@ fun ActivationScreen(
             Text(text = notice, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyMedium)
         }
         OutlinedTextField(
-            value = state.deviceName,
-            onValueChange = onDeviceNameChanged,
-            modifier = Modifier.fillMaxWidth(),
-            label = { Text("Nombre") },
-            singleLine = true,
-        )
-        OutlinedTextField(
             value = state.activationCode,
             onValueChange = onActivationCodeChanged,
             modifier = Modifier.fillMaxWidth(),
-            label = { Text("Código del administrador") },
+            label = { Text("Token del administrador") },
             singleLine = true,
         )
         Button(onClick = onActivate, enabled = !state.isLoading) {

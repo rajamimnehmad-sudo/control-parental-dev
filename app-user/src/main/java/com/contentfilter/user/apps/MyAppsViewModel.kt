@@ -217,15 +217,6 @@ class MyAppsViewModel
             )
         }
 
-        fun requestMoreTime(packageName: String) {
-            saveRequest(
-                requestType = AccessRequestType.EXTRA_TIME,
-                packageName = packageName,
-                requestedMinutes = DefaultExtraMinutes,
-                messageText = "Solicitud de más tiempo creada.",
-            )
-        }
-
         private fun saveRequest(
             requestType: AccessRequestType,
             packageName: String,
@@ -382,7 +373,6 @@ class MyAppsViewModel
                 }
 
         private companion object {
-            const val DefaultExtraMinutes = 15
             const val LogTag = "MyAppsViewModel"
         }
     }

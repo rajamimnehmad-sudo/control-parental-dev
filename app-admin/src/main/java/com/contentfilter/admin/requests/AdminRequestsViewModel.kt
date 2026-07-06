@@ -4,9 +4,11 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.AccessRequest
+import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.usecase.admin.ApproveAccessRequestUseCase
 import com.contentfilter.core.domain.usecase.admin.GrantExtraTimeUseCase
+import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
 import com.contentfilter.core.domain.usecase.admin.SetRequestStatusUseCase
 import com.contentfilter.core.sync.SyncScheduler
@@ -29,6 +31,7 @@ class AdminRequestsViewModel
     @Inject
     constructor(
         observeRequests: ObserveRequestsUseCase,
+        observeDevices: ObserveDevicesUseCase,
         private val approveAccessRequest: ApproveAccessRequestUseCase,
         private val setRequestStatus: SetRequestStatusUseCase,
         private val grantExtraTime: GrantExtraTimeUseCase,
@@ -37,23 +40,35 @@ class AdminRequestsViewModel
     ) : ViewModel() {
         private val syncMessage = MutableStateFlow("")
         private val isLoading = MutableStateFlow(false)
+        private val selectedDeviceId = MutableStateFlow<String?>(null)
 
         val uiState =
-            observeRequests()
-                .map { requests ->
-                    Log.i(LogTag, "Loaded local access requests count=${requests.size}")
-                    requests
-                }
-                .catch { exception ->
-                    Log.e(LogTag, "Requests flow failed: ${exception.message}", exception)
-                    syncMessage.update { "No se pudieron cargar las solicitudes." }
-                    emit(emptyList())
-                }
-                .combine(syncMessage) { requests, message -> requests to message }
-                .combine(isLoading) { (requests, message), loading ->
+            combine(
+                observeRequests()
+                    .map { requests ->
+                        Log.i(LogTag, "Loaded local access requests count=${requests.size}")
+                        requests
+                    }
+                    .catch { exception ->
+                        Log.e(LogTag, "Requests flow failed: ${exception.message}", exception)
+                        syncMessage.update { "No se pudieron cargar las solicitudes." }
+                        emit(emptyList())
+                    },
+                observeDevices(),
+                syncMessage,
+                isLoading,
+                selectedDeviceId,
+            ) { requests, devices, message, loading, selected ->
                     val pendingRequests = requests.filter { it.status.isPending() }
+                    val users = pendingRequests.toUserItems(devices)
+                    val resolvedSelected = selected?.takeIf { id -> users.any { it.deviceId == id } }
                     AdminRequestsUiState(
-                        requests = pendingRequests,
+                        requests =
+                            resolvedSelected?.let { selectedId ->
+                                pendingRequests.filter { it.deviceGroupId == selectedId }
+                            }.orEmpty(),
+                        users = users,
+                        selectedDeviceId = resolvedSelected,
                         offlineMode = false,
                         lastSyncMessage = message,
                         isLoading = loading,
@@ -73,6 +88,14 @@ class AdminRequestsViewModel
         fun refresh() {
             syncScheduler.requestSync()
             syncNow()
+        }
+
+        fun selectUser(deviceId: String) {
+            selectedDeviceId.value = deviceId
+        }
+
+        fun clearUserSelection() {
+            selectedDeviceId.value = null
         }
 
         fun approve(requestId: String) {
@@ -183,8 +206,28 @@ class AdminRequestsViewModel
             const val DefaultGrantMinutes = 15
             const val LogTag = "AdminRequests"
             const val OfflineMessage = "Sin conexión. Mostrando datos guardados."
+            const val UnknownDeviceId = "unknown-device"
         }
     }
 
 private fun RequestStatus.isPending(): Boolean =
     this == RequestStatus.PendingLocal || this == RequestStatus.PendingRemote
+
+private val AccessRequest.deviceGroupId: String
+    get() = deviceId ?: "unknown-device"
+
+private fun List<AccessRequest>.toUserItems(devices: List<Device>): List<AdminRequestUserUiState> {
+    val devicesById = devices.associateBy { it.id }
+    return groupBy { it.deviceGroupId }
+        .map { (deviceId, requests) ->
+            AdminRequestUserUiState(
+                deviceId = deviceId,
+                name = devicesById[deviceId]?.displayName ?: "Usuario",
+                pendingCount = requests.size,
+            )
+        }
+        .sortedWith(
+            compareByDescending<AdminRequestUserUiState> { it.needsAttention }
+                .thenBy { it.name.lowercase() },
+        )
+}

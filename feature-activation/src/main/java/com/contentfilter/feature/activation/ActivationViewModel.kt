@@ -53,11 +53,9 @@ class ActivationViewModel
                 val token = PairingToken.from(value)
                 copy(
                     activationCode = value,
-                    deviceName = deviceName.ifBlank { token.displayName.orEmpty() },
+                    deviceName = token.displayName.orEmpty(),
                 )
             }
-
-        fun onDeviceNameChanged(value: String) = update { copy(deviceName = value) }
 
         fun activate() {
             val state = mutableState.value
@@ -66,11 +64,11 @@ class ActivationViewModel
                 return
             }
             val token = PairingToken.from(state.activationCode)
-            val deviceDisplayName = state.deviceName.ifBlank { token.displayName.orEmpty() }
+            val deviceDisplayName = token.displayName.orEmpty()
             if (deviceDisplayName.isBlank() || token.code.isBlank()) {
                 val reason = "Local validation failed: device name or activation code is blank."
                 Log.w(LogTag, reason)
-                mutableState.update { it.copy(message = "Completá nombre y código.") }
+                mutableState.update { it.copy(message = "Ingresá el token completo del administrador.") }
                 return
             }
             viewModelScope.launch {

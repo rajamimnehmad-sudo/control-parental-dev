@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
+import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
@@ -25,6 +26,7 @@ class AccessibilityPolicySnapshotProvider
     constructor(
         private val policyRepository: PolicyRepository,
         private val dailyLimitRepository: DailyLimitRepository,
+        private val extraTimeGrantRepository: ExtraTimeGrantRepository,
         private val systemStatusRepository: SystemStatusRepository,
         private val usageSessionRepository: UsageSessionRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
@@ -44,6 +46,7 @@ class AccessibilityPolicySnapshotProvider
                     combine(
                         policyRepository.observeActivePolicy(),
                         dailyLimitRepository.observeLimits(),
+                        extraTimeGrantRepository.observeGrants(),
                         systemStatusRepository.observeHealth(),
                         deviceActivationRepository.observeActivation().flatMapLatest { activation ->
                             usageSessionRepository.observeDailyUsage(
@@ -53,10 +56,15 @@ class AccessibilityPolicySnapshotProvider
                                 dayEndEpochMillis = day.endEpochMillis,
                             ).map { dailyUsage -> activation to dailyUsage }
                         },
-                    ) { snapshot, dailyLimits, health, activationAndDailyUsage ->
+                    ) { snapshot, dailyLimits, extraTimeGrants, health, activationAndDailyUsage ->
                         val (activation, dailyUsage) = activationAndDailyUsage
                         AccessibilityPolicyState(
-                            snapshot = snapshot.copy(dailyLimits = dailyLimits, dailyUsage = dailyUsage),
+                            snapshot =
+                                snapshot.copy(
+                                    dailyLimits = dailyLimits,
+                                    dailyUsage = dailyUsage,
+                                    extraTimeGrants = extraTimeGrants,
+                                ),
                             health = health.withActiveLicenseIfActivated(activation != null),
                         )
                     }.collect { state.value = it }
@@ -74,12 +82,14 @@ class AccessibilityPolicySnapshotProvider
                     dayEndEpochMillis = day.endEpochMillis,
                 ).first()
             val dailyLimits = dailyLimitRepository.observeLimits().first()
+            val extraTimeGrants = extraTimeGrantRepository.observeGrants().first()
             state.value =
                 AccessibilityPolicyState(
                     snapshot =
                         policyRepository.getActivePolicy().copy(
                             dailyLimits = dailyLimits,
                             dailyUsage = dailyUsage,
+                            extraTimeGrants = extraTimeGrants,
                         ),
                     health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
                 )

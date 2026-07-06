@@ -48,7 +48,6 @@ fun MyAppsRoute(
         state = state.value,
         onSearchChanged = viewModel::onSearchChanged,
         onRequestAccess = viewModel::requestAccess,
-        onRequestMoreTime = viewModel::requestMoreTime,
         modifier = modifier,
     )
 }
@@ -58,7 +57,6 @@ private fun MyAppsScreen(
     state: MyAppsUiState,
     onSearchChanged: (String) -> Unit,
     onRequestAccess: (String) -> Unit,
-    onRequestMoreTime: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -92,7 +90,6 @@ private fun MyAppsScreen(
                 MyAppRow(
                     app = app,
                     onRequestAccess = { onRequestAccess(app.packageName) },
-                    onRequestMoreTime = { onRequestMoreTime(app.packageName) },
                 )
                 HorizontalDivider()
             }
@@ -104,15 +101,11 @@ private fun MyAppsScreen(
 private fun MyAppRow(
     app: MyAppItemUiState,
     onRequestAccess: () -> Unit,
-    onRequestMoreTime: () -> Unit,
 ) {
     val canRequestAccess =
         app.status == AppAccessStatus.Blocked ||
             app.status == AppAccessStatus.RequiresAuthorization ||
-            app.status == AppAccessStatus.Limited ||
             app.status == AppAccessStatus.LimitReached
-    val canRequestMoreTime =
-        app.status == AppAccessStatus.LimitReached
     Column(
         modifier =
             Modifier
@@ -146,15 +139,7 @@ private fun MyAppRow(
                         onClick = onRequestAccess,
                         enabled = !app.isRequesting,
                     ) {
-                        Text("Acceso completo")
-                    }
-                }
-                if (canRequestMoreTime) {
-                    OutlinedButton(
-                        onClick = onRequestMoreTime,
-                        enabled = !app.isRequesting,
-                    ) {
-                        Text("Pedir tiempo")
+                        Text("Pedir acceso")
                     }
                 }
             }
