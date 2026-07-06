@@ -20,7 +20,6 @@ import com.contentfilter.feature.accessibility.telemetry.AccessibilityTelemetryR
 import com.contentfilter.feature.accessibility.time.AppUsageTracker
 import com.contentfilter.feature.accessibility.time.UsageTransition
 import com.contentfilter.feature.vpn.search.SearchProtectionSignals
-import com.contentfilter.feature.vpn.service.DevProtectionMode
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -83,7 +82,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
-        if (DevProtectionMode.isProtectionDisabled(this) || packageName.isAlwaysAllowedPackage()) return
+        if (packageName.isAlwaysAllowedPackage()) return
         val elapsed = clock.elapsedRealtimeMillis()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
         // Web/search protection is frozen. Accessibility remains active only for app protection.
