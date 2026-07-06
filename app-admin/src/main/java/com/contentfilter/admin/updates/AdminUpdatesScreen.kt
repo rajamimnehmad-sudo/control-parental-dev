@@ -34,6 +34,7 @@ fun AdminUpdatesRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
         state = state,
         onCheck = viewModel::checkForUpdates,
         onDownload = viewModel::downloadUpdate,
+        onInstall = viewModel::installDownloadedUpdate,
         onInstallPermission = viewModel::openInstallPermissionSettings,
     )
 }
@@ -43,6 +44,7 @@ private fun AdminUpdatesScreen(
     state: AdminUpdatesUiState,
     onCheck: () -> Unit,
     onDownload: () -> Unit,
+    onInstall: () -> Unit,
     onInstallPermission: () -> Unit,
 ) {
     Column(
@@ -106,6 +108,20 @@ private fun AdminUpdatesScreen(
                     onClick = onInstallPermission,
                 ) {
                     Text("Permitir instalacion")
+                }
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onInstall,
+                ) {
+                    Text("Instalar")
+                }
+            }
+            AdminUpdatesStatus.ReadyToInstall -> {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onInstall,
+                ) {
+                    Text("Instalar")
                 }
             }
             else -> Unit

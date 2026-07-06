@@ -41,6 +41,7 @@ fun UpdatesRoute(viewModel: UpdatesViewModel = hiltViewModel()) {
         state = state,
         onCheck = viewModel::checkForUpdates,
         onDownload = viewModel::downloadUpdate,
+        onInstall = viewModel::installDownloadedUpdate,
         onInstallPermission = viewModel::openInstallPermissionSettings,
         onResetLocalDataForRelink = viewModel::resetLocalDataForRelink,
         onClearDiagnostics = viewModel::clearDiagnostics,
@@ -52,6 +53,7 @@ private fun UpdatesScreen(
     state: UpdatesUiState,
     onCheck: () -> Unit,
     onDownload: () -> Unit,
+    onInstall: () -> Unit,
     onInstallPermission: () -> Unit,
     onResetLocalDataForRelink: () -> Unit,
     onClearDiagnostics: () -> Unit,
@@ -120,6 +122,20 @@ private fun UpdatesScreen(
                     onClick = onInstallPermission,
                 ) {
                     Text("Permitir instalacion")
+                }
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onInstall,
+                ) {
+                    Text("Instalar")
+                }
+            }
+            UpdatesStatus.ReadyToInstall -> {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onInstall,
+                ) {
+                    Text("Instalar")
                 }
             }
             else -> Unit

@@ -12,6 +12,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 import javax.inject.Inject
@@ -73,8 +74,7 @@ class DevApkUpdateRepository
                             val initialBytes = if (append) existingBytes else 0L
                             val expectedBytes = body.contentLength().takeIf { it > 0L }?.plus(initialBytes)
                             body.byteStream().use { input ->
-                                partial.outputStream().use { output ->
-                                    if (append) output.channel.position(output.channel.size())
+                                FileOutputStream(partial, append).use { output ->
                                     val buffer = ByteArray(BufferSizeBytes)
                                     var downloaded = initialBytes
                                     while (true) {
