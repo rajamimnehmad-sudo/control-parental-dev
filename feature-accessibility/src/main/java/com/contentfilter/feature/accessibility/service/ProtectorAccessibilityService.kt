@@ -63,6 +63,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var foregroundWatchPackageName: String? = null
     private var appLimitDeadlineJob: Job? = null
     private var appLimitDeadlinePackageName: String? = null
+    private var blockRetryJob: Job? = null
+    private var blockRetryPackageName: String? = null
     private var lastPolicyRefreshAtElapsedMillis: Long = 0L
 
     override fun onServiceConnected() {
@@ -83,6 +85,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
         if (packageName.isAlwaysAllowedPackage()) return
+        if (blockRetryPackageName != packageName) clearBlockRetry()
         val elapsed = clock.elapsedRealtimeMillis()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
         // Web/search protection is frozen. Accessibility remains active only for app protection.
@@ -129,12 +132,14 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 clearExtraTimeExpiry()
                 clearAppLimitDeadline()
                 clearForegroundWatch()
+                clearBlockRetry()
                 cancel()
             }
         } else {
             snapshotProvider.stop()
             clearExtraTimeExpiry()
             clearForegroundWatch()
+            clearBlockRetry()
         }
         serviceScope = null
         super.onDestroy()
@@ -287,18 +292,30 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     private fun leaveBlockedApp(packageName: String) {
         Log.i(LogTag, "Blocking foreground app immediately package=$packageName")
+        clearBlockRetry()
         performGlobalAction(GLOBAL_ACTION_HOME)
         val scope = serviceScope ?: return
-        scope.launch {
-            delay(BlockRecheckDelayMillis)
-            if (usageTracker.currentPackageName() == packageName && packageName.isStillBlocked()) {
-                performGlobalAction(GLOBAL_ACTION_HOME)
-                delay(BlockRecheckDelayMillis)
-                if (usageTracker.currentPackageName() == packageName && packageName.isStillBlocked()) {
+        blockRetryPackageName = packageName
+        blockRetryJob =
+            scope.launch {
+                repeat(BlockHomeRetries) {
+                    delay(BlockRecheckDelayMillis)
+                    if (!packageName.isActiveBlockedForeground()) return@launch
                     performGlobalAction(GLOBAL_ACTION_HOME)
                 }
             }
-        }
+    }
+
+    private fun clearBlockRetry() {
+        blockRetryJob?.cancel()
+        blockRetryJob = null
+        blockRetryPackageName = null
+    }
+
+    private fun String.isActiveBlockedForeground(): Boolean {
+        val activeWindowPackage = rootInActiveWindow?.packageName?.toString()
+        if (activeWindowPackage != null && activeWindowPackage != this) return false
+        return (activeWindowPackage == this || usageTracker.currentPackageName() == this) && isStillBlocked()
     }
 
     private fun String.isStillBlocked(): Boolean {
@@ -333,11 +350,11 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     val now = clock.nowEpochMillis()
                     usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
                         saveTransition(checkpoint)
+                    }
                     snapshotProvider.refresh()
+                    evaluateForegroundApp(packageName, elapsed)
                 }
-                evaluateForegroundApp(packageName, elapsed)
             }
-        }
     }
 
     private fun clearForegroundWatch() {
@@ -444,6 +461,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val MillisPerMinute = 60_000L
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 120L
+        const val BlockHomeRetries = 2
         const val SearchBlockRetryDelayMillis = 150L
         const val SearchBlockHomeRetries = 2
         const val BackgroundPolicyRefreshMillis = 1_000L
