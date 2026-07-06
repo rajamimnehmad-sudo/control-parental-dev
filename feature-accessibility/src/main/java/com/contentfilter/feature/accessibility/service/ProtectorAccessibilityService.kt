@@ -286,7 +286,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     private fun leaveBlockedApp(packageName: String) {
-        Log.i(LogTag, "Blocking foreground app pending confirmation package=$packageName")
+        Log.i(LogTag, "Blocking foreground app immediately package=$packageName")
+        performGlobalAction(GLOBAL_ACTION_HOME)
         val scope = serviceScope ?: return
         scope.launch {
             delay(BlockRecheckDelayMillis)
@@ -440,7 +441,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val ForegroundRecheckMillis = 5_000L
         const val MillisPerMinute = 60_000L
         const val MaxDeadlineDelayMillis = 60_000L
-        const val BlockRecheckDelayMillis = 250L
+        const val BlockRecheckDelayMillis = 120L
         const val SearchBlockRetryDelayMillis = 150L
         const val SearchBlockHomeRetries = 2
         const val BackgroundPolicyRefreshMillis = 1_000L
