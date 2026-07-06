@@ -44,6 +44,7 @@ data class UserDeviceUiState(
 
 enum class UserDeviceStatus {
     Active,
+    Unprotected,
     Inactive,
     Unknown,
 }

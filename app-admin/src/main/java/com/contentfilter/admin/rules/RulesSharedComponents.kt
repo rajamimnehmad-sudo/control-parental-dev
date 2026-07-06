@@ -89,7 +89,8 @@ internal fun UserDeviceCard(
     val indicatorColor =
         when (device.status) {
             UserDeviceStatus.Active -> Color(0xFF2E7D32)
-            UserDeviceStatus.Inactive -> MaterialTheme.colorScheme.error
+            UserDeviceStatus.Unprotected -> MaterialTheme.colorScheme.error
+            UserDeviceStatus.Inactive -> Color(0xFFF9A825)
             UserDeviceStatus.Unknown -> MaterialTheme.colorScheme.outline
         }
     Card(
@@ -168,6 +169,7 @@ private val UserDeviceStatus.label: String
     get() =
         when (this) {
             UserDeviceStatus.Active -> "Activo"
+            UserDeviceStatus.Unprotected -> "Protección caída"
             UserDeviceStatus.Inactive -> "Desconectado"
             UserDeviceStatus.Unknown -> "Desconocido"
         }

@@ -165,7 +165,11 @@ class MyAppsViewModel
                                     isRequesting = options.pendingRequestPackages.contains(app.packageName),
                                 )
                             }
-                            .sortedWith(compareBy({ it.name.lowercase() }, { it.packageName })),
+                            .sortedWith(
+                                compareBy<MyAppItemUiState> { it.status.sortOrder }
+                                    .thenBy { it.name.lowercase() }
+                                    .thenBy { it.packageName },
+                            ),
                     searchQuery = options.searchQuery,
                     message = currentMessage,
                 )
@@ -358,6 +362,24 @@ class MyAppsViewModel
             val requests: List<AccessRequest>,
             val usage: List<DailyAppUsage>,
         )
+
+        private val AppAccessStatus.sortOrder: Int
+            get() =
+                when (this) {
+                    AppAccessStatus.Blocked,
+                    AppAccessStatus.RequiresAuthorization,
+                    AppAccessStatus.LimitReached,
+                    AppAccessStatus.WaitingAuthorization,
+                    -> 0
+
+                    AppAccessStatus.Limited,
+                    AppAccessStatus.WaitingExtraTime,
+                    -> 1
+
+                    AppAccessStatus.Allowed,
+                    AppAccessStatus.ExtraTime,
+                    -> 2
+                }
 
         private companion object {
             const val DefaultExtraMinutes = 15

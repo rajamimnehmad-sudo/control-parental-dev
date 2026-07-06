@@ -61,7 +61,11 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
                 isUpdating = pendingAllowed.containsKey(app.packageName),
             )
         }
-        .sortedWith(compareBy({ it.deviceName.lowercase() }, { it.appName.lowercase() }, { it.packageName }))
+        .sortedWith(
+            compareBy<AppControlUiState> { it.accessSortOrder }
+                .thenBy { it.appName.lowercase() }
+                .thenBy { it.packageName },
+        )
 }
 
 internal fun List<RemoteInstalledAppDto>.forSelectedUserDevice(
@@ -172,8 +176,17 @@ private val UserDeviceStatus.sortOrder: Int
     get() =
         when (this) {
             UserDeviceStatus.Active -> 0
-            UserDeviceStatus.Inactive -> 1
-            UserDeviceStatus.Unknown -> 2
+            UserDeviceStatus.Unprotected -> 1
+            UserDeviceStatus.Inactive -> 2
+            UserDeviceStatus.Unknown -> 3
+        }
+
+private val AppControlUiState.accessSortOrder: Int
+    get() =
+        when {
+            !allowed -> 0
+            dailyLimitMinutes != null -> 1
+            else -> 2
         }
 
 internal fun List<UserDeviceUiState>.selectedDeviceId(requestedDeviceId: String?): String? {
