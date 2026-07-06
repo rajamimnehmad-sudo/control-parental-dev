@@ -111,8 +111,7 @@ private fun MyAppRow(
             app.status == AppAccessStatus.Limited ||
             app.status == AppAccessStatus.LimitReached
     val canRequestMoreTime =
-        app.status == AppAccessStatus.LimitReached ||
-            app.status == AppAccessStatus.Blocked
+        app.status == AppAccessStatus.LimitReached
     Column(
         modifier =
             Modifier
@@ -146,7 +145,7 @@ private fun MyAppRow(
                         onClick = onRequestAccess,
                         enabled = !app.isRequesting,
                     ) {
-                        Text("Solicitar acceso")
+                        Text("Acceso completo")
                     }
                 }
                 if (canRequestMoreTime) {

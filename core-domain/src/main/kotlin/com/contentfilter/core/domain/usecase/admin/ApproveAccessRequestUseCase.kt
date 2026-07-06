@@ -9,12 +9,15 @@ import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.repository.AccessRequestRepository
+import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
+import kotlinx.coroutines.flow.first
 import java.util.UUID
 
 class ApproveAccessRequestUseCase(
     private val requestRepository: AccessRequestRepository,
     private val policyRepository: PolicyRepository,
+    private val dailyLimitRepository: DailyLimitRepository,
 ) {
     suspend operator fun invoke(request: AccessRequest) {
         request.allowTarget()?.let { target ->
@@ -26,6 +29,12 @@ class ApproveAccessRequestUseCase(
                         it.action == RuleAction.Block
                 }
                 .forEach { policyRepository.saveRule(it.copy(enabled = false), request.deviceId) }
+            if (request.requestType == AccessRequestType.APP_ACCESS) {
+                dailyLimitRepository.deleteAppLimitsForTarget(
+                    target = target,
+                    deviceId = request.deviceId,
+                )
+            }
         }
         request.toAllowRule()?.let { rule ->
             policyRepository.saveRule(rule, request.deviceId)
@@ -63,4 +72,18 @@ class ApproveAccessRequestUseCase(
     private companion object {
         const val APPROVED_REQUEST_PRIORITY = 1_000
     }
+}
+
+private suspend fun DailyLimitRepository.deleteAppLimitsForTarget(
+    target: String,
+    deviceId: String?,
+) {
+    observeLimits(deviceId)
+        .first()
+        .filter { limit ->
+            limit.enabled &&
+                limit.targetType == PolicyTargetType.App &&
+                limit.target == target
+        }
+        .forEach { deleteLimit(it) }
 }

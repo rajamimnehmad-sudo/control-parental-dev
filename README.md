@@ -91,7 +91,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 85
+versionCode 97
 versionName 1.0.1-dev
 ```
 
@@ -121,6 +121,10 @@ Actualizar este README cuando cambie:
 - Con modo web abierto, buscadores quedan abiertos.
 - Las reglas de internet bloquean dominios por VPN/DNS sin cerrar el navegador; Chrome/Samsung Internet solo se cierra por reglas o limites de app.
 - Las apps se actualizan manualmente desde la pantalla `Actualizaciones`.
+- Bloqueo de apps: Accessibility detecta la app en primer plano y manda `HOME` cuando la politica final es bloquear. Hace pocos reintentos cortos y cancela al cambiar de app para evitar cierres falsos o trabas en Inicio. Android no garantiza latencia identica en todos los eventos, por eso el cierre puede ser instantaneo o tardar 1-2 segundos.
+- Limites de tiempo de apps: si una app permitida agota su limite diario, queda bloqueada por tiempo. El usuario puede pedir `Pedir tiempo` o `Acceso completo`.
+- `Pedir tiempo`: Admin concede minutos extra, por defecto 15 o el valor manual indicado. El extra vence y luego vuelve a aplicar el limite diario.
+- `Acceso completo`: Admin aprueba acceso completo, se desactivan bloqueos directos de esa app, se crea una regla Allow y se elimina el limite diario de esa app. La app queda sin limite hasta que Admin vuelva a configurarlo.
 
 ## Verificacion Rapida Antes De Trabajar
 

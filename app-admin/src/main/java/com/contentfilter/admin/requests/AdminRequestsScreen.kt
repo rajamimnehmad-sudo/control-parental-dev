@@ -127,9 +127,11 @@ private fun RequestCard(
                                     keyboardType = KeyboardType.Number,
                                 ),
                         )
-                        Button(onClick = { onGrant(grantMinutes) }) { Text("Conceder") }
+                        Button(onClick = { onGrant(grantMinutes) }) { Text("Sumar tiempo") }
                     } else {
-                        Button(onClick = onApprove) { Text("Aprobar") }
+                        Button(onClick = onApprove) {
+                            Text(if (request.requestType == AccessRequestType.APP_ACCESS) "Acceso completo" else "Aprobar")
+                        }
                     }
                     OutlinedButton(onClick = onReject) { Text("Rechazar") }
                 }
