@@ -1,5 +1,6 @@
 package com.contentfilter.user.apps
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.AccessRequest
@@ -180,10 +181,22 @@ class MyAppsViewModel
 
         fun refreshApps() {
             viewModelScope.launch(Dispatchers.IO) {
+                message.value = "Sincronizando reglas..."
+                val syncResult = runCatching { syncEngine.syncCoreDataFull() }.getOrNull()
+                Log.i(
+                    LogTag,
+                    "myAppsRefresh syncSuccess=${syncResult?.success} message=${syncResult?.message.orEmpty()}",
+                )
                 detectedApps.value = installedAppPublisher.installedApps()
                 activationRepository.currentActivation()?.let { activation ->
                     runCatching { installedAppPublisher.publish(activation) }
                 }
+                message.value =
+                    if (syncResult?.success == false) {
+                        "No se pudieron actualizar reglas. Mostrando datos guardados."
+                    } else {
+                        ""
+                    }
             }
         }
 
@@ -348,5 +361,6 @@ class MyAppsViewModel
 
         private companion object {
             const val DefaultExtraMinutes = 15
+            const val LogTag = "MyAppsViewModel"
         }
     }

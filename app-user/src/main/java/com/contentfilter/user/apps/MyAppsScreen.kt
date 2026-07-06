@@ -31,12 +31,17 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.Lifecycle
 
 @Composable
 fun MyAppsRoute(
     modifier: Modifier = Modifier,
     viewModel: MyAppsViewModel = hiltViewModel(),
 ) {
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshApps()
+    }
     val state = viewModel.uiState.collectAsStateWithLifecycle()
     MyAppsScreen(
         state = state.value,
