@@ -957,17 +957,37 @@ class RulesViewModel
 
         private fun refreshInstalledApps() {
             viewModelScope.launch(Dispatchers.IO) {
+                val deviceSync = syncEngine.syncCoreDataFull()
+                if (BuildConfig.DEBUG) {
+                    Log.i(
+                        LogTag,
+                        "appsRefresh device-sync result=${deviceSync.success} message=${deviceSync.message}",
+                    )
+                }
                 when (val result = remoteInstalledAppRepository.pullInstalledApps()) {
                     is RemoteResult.Success -> {
                         installedApps.value = result.value
+                        if (BuildConfig.DEBUG) {
+                            val selectedDeviceId = form.value.selectedDeviceId
+                            val selectedCount =
+                                selectedDeviceId
+                                    ?.let { deviceId -> result.value.count { it.deviceId == deviceId } }
+                                    ?: 0
+                            Log.i(
+                                LogTag,
+                                "appsRefresh result=success remoteCount=${result.value.size} selectedDeviceId=$selectedDeviceId selectedCount=$selectedCount",
+                            )
+                        }
                         form.update { state ->
                             state.copy(message = state.message.takeUnless { it == "Cargando apps..." }.orEmpty())
                         }
                     }
-                    is RemoteResult.Failure ->
+                    is RemoteResult.Failure -> {
+                        Log.w(LogTag, "appsRefresh result=failure reason=${result.reason}")
                         form.update {
                             it.copy(message = "No se pudo cargar la lista de apps: ${result.reason}")
                         }
+                    }
                 }
             }
         }
