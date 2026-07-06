@@ -108,7 +108,9 @@ private fun MyAppRow(
 ) {
     val canRequestAccess =
         app.status == AppAccessStatus.Blocked ||
-            app.status == AppAccessStatus.RequiresAuthorization
+            app.status == AppAccessStatus.RequiresAuthorization ||
+            app.status == AppAccessStatus.Limited ||
+            app.status == AppAccessStatus.LimitReached
     val canRequestMoreTime =
         app.status == AppAccessStatus.LimitReached
     Column(

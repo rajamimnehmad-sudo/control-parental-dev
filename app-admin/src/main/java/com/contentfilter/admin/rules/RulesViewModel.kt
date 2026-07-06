@@ -146,19 +146,40 @@ class RulesViewModel
             form.update { it.copy(appSearchQuery = value) }
         }
 
+        fun onPairingUserNameChanged(value: String) {
+            form.update { it.copy(pairingUserName = value, message = "") }
+        }
+
         fun refreshApps() {
             form.update { it.copy(message = "Cargando apps...") }
             refreshInstalledApps()
         }
 
+        fun refreshDevices() {
+            form.update { it.copy(message = "Actualizando dispositivos...") }
+            viewModelScope.launch(Dispatchers.IO) {
+                val devicesResult = syncEngine.syncDevicesFull()
+                syncEngine.syncCoreDataFull()
+                refreshInstalledApps()
+                form.update {
+                    it.copy(message = devicesResult.message.takeIf { message -> message.isNotBlank() }.orEmpty())
+                }
+            }
+        }
+
         fun generatePairingCode() {
+            val userName = form.value.pairingUserName.trim()
+            if (userName.isBlank()) {
+                form.update { it.copy(message = "Ingresá el nombre del usuario.") }
+                return
+            }
             viewModelScope.launch {
                 form.update { it.copy(pairingLoading = true, message = "Generando código...") }
                 when (val result = activationClient.createDevicePairingCode()) {
                     is RemoteResult.Success ->
                         form.update {
                             it.copy(
-                                pairingCode = result.value.code,
+                                pairingCode = result.value.code.withPairingName(userName),
                                 pairingExpiresAt = result.value.expiresAt,
                                 pairingLoading = false,
                                 message = "Código listo. Pasalo a la App Usuario.",
@@ -169,6 +190,17 @@ class RulesViewModel
                             it.copy(pairingLoading = false, message = "No se pudo generar código.")
                         }
                 }
+            }
+        }
+
+        fun clearPairingCode() {
+            form.update {
+                it.copy(
+                    pairingUserName = "",
+                    pairingCode = "",
+                    pairingExpiresAt = "",
+                    message = "Código copiado.",
+                )
             }
         }
 
@@ -1296,4 +1328,14 @@ class RulesViewModel
         }
 
         private fun String.safeDeviceId(): String = take(8)
+
+        private fun String.withPairingName(userName: String): String {
+            val safeName =
+                userName
+                    .trim()
+                    .replace(Regex("\\s+"), "-")
+                    .trim('-')
+                    .take(32)
+            return "${safeName.ifBlank { "usuario" }}-${trim()}"
+        }
     }

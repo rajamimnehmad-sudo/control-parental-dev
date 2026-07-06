@@ -26,6 +26,7 @@ data class RulesUiState(
     val selectedAction: RuleAction = RuleAction.Block,
     val pendingAppAllowed: Map<String, Boolean> = emptyMap(),
     val pendingDeviceDeleteIds: Set<String> = emptySet(),
+    val pairingUserName: String = "",
     val pairingCode: String = "",
     val pairingExpiresAt: String = "",
     val pairingLoading: Boolean = false,

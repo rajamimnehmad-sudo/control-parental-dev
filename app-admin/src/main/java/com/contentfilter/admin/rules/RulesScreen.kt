@@ -35,6 +35,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -54,7 +56,10 @@ fun RulesRoute(viewModel: RulesViewModel = hiltViewModel()) {
         onAllowDomainMinutesChanged = viewModel::onAllowDomainMinutesChanged,
         onAppSearchChanged = viewModel::onAppSearchChanged,
         onRefreshApps = viewModel::refreshApps,
+        onRefreshDevices = viewModel::refreshDevices,
+        onPairingUserNameChanged = viewModel::onPairingUserNameChanged,
         onGeneratePairingCode = viewModel::generatePairingCode,
+        onPairingCodeCopied = viewModel::clearPairingCode,
         onDeviceSelected = viewModel::onDeviceSelected,
         onDeviceCleared = viewModel::clearDeviceSelection,
         onDeviceDeleted = viewModel::deleteDevicePermanently,
@@ -77,7 +82,10 @@ private fun RulesScreen(
     onAllowDomainMinutesChanged: (String) -> Unit,
     onAppSearchChanged: (String) -> Unit,
     onRefreshApps: () -> Unit,
+    onRefreshDevices: () -> Unit,
+    onPairingUserNameChanged: (String) -> Unit,
     onGeneratePairingCode: () -> Unit,
+    onPairingCodeCopied: () -> Unit,
     onDeviceSelected: (String) -> Unit,
     onDeviceCleared: () -> Unit,
     onDeviceDeleted: (String) -> Unit,
@@ -91,6 +99,7 @@ private fun RulesScreen(
     onDelete: (PolicyRule) -> Unit,
     onDeleteDomainLimit: (DailyLimit) -> Unit,
 ) {
+    val clipboardManager = LocalClipboardManager.current
     val visibleDomainRules =
         state.rules.filter {
             it.scope == RuleScope.Domain &&
@@ -187,12 +196,26 @@ private fun RulesScreen(
         }
         if (selectedDevice == null) {
             item {
-                Button(
-                    onClick = onGeneratePairingCode,
-                    enabled = !state.pairingLoading,
-                    modifier = Modifier.fillMaxWidth(),
-                ) {
-                    Text(if (state.pairingLoading) "Generando..." else "Generar código de enlace")
+                Card(modifier = Modifier.fillMaxWidth()) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
+                            value = state.pairingUserName,
+                            onValueChange = onPairingUserNameChanged,
+                            label = { Text("Nombre del usuario") },
+                            singleLine = true,
+                        )
+                        Button(
+                            onClick = onGeneratePairingCode,
+                            enabled = !state.pairingLoading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text(if (state.pairingLoading) "Generando..." else "Generar código de enlace")
+                        }
+                    }
                 }
             }
             if (state.pairingCode.isNotBlank()) {
@@ -207,12 +230,26 @@ private fun RulesScreen(
                             if (state.pairingExpiresAt.isNotBlank()) {
                                 Text("Vence: ${state.pairingExpiresAt}", style = MaterialTheme.typography.bodySmall)
                             }
+                            Button(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = {
+                                    clipboardManager.setText(AnnotatedString(state.pairingCode))
+                                    onPairingCodeCopied()
+                                },
+                            ) {
+                                Text("Copiar código")
+                            }
                         }
                     }
                 }
             }
             item {
-                SectionHeader(title = "Dispositivos vinculados", count = state.userDevices.size)
+                SectionActionHeader(
+                    title = "Dispositivos vinculados",
+                    count = state.userDevices.size,
+                    actionText = "Actualizar",
+                    onAction = onRefreshDevices,
+                )
             }
             if (state.userDevices.isEmpty()) {
                 item {

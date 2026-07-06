@@ -48,7 +48,14 @@ class ActivationViewModel
             }
         }
 
-        fun onActivationCodeChanged(value: String) = update { copy(activationCode = value) }
+        fun onActivationCodeChanged(value: String) =
+            update {
+                val token = PairingToken.from(value)
+                copy(
+                    activationCode = value,
+                    deviceName = deviceName.ifBlank { token.displayName.orEmpty() },
+                )
+            }
 
         fun onDeviceNameChanged(value: String) = update { copy(deviceName = value) }
 
@@ -58,7 +65,9 @@ class ActivationViewModel
                 mutableState.update { it.copy(message = "Dispositivo enlazado. No hace falta volver a enlazar.") }
                 return
             }
-            if (state.deviceName.isBlank() || state.activationCode.isBlank()) {
+            val token = PairingToken.from(state.activationCode)
+            val deviceDisplayName = state.deviceName.ifBlank { token.displayName.orEmpty() }
+            if (deviceDisplayName.isBlank() || token.code.isBlank()) {
                 val reason = "Local validation failed: device name or activation code is blank."
                 Log.w(LogTag, reason)
                 mutableState.update { it.copy(message = "Completá nombre y código.") }
@@ -72,8 +81,8 @@ class ActivationViewModel
                             ActivationCredentials(
                                 email = "",
                                 password = "",
-                                activationCode = state.activationCode.trim(),
-                                deviceDisplayName = state.deviceName.ifBlank { "Android" },
+                                activationCode = token.code,
+                                deviceDisplayName = deviceDisplayName,
                                 appVersionCode = 1,
                             ),
                         )
@@ -119,6 +128,29 @@ class ActivationViewModel
             val detail = reason.ifBlank { "No se recibió detalle técnico del error." }
             if (detail == OfflineMessage) return OfflineMessage
             return "No se pudo enlazar. Revisá el código o pedí uno nuevo al administrador."
+        }
+
+        private data class PairingToken(
+            val code: String,
+            val displayName: String?,
+        ) {
+            companion object {
+                fun from(rawValue: String): PairingToken {
+                    val trimmed = rawValue.trim()
+                    val separator = trimmed.lastIndexOf('-')
+                    if (separator <= 0 || separator >= trimmed.lastIndex - 1) {
+                        return PairingToken(code = trimmed, displayName = null)
+                    }
+                    val name =
+                        trimmed
+                            .substring(0, separator)
+                            .replace('-', ' ')
+                            .trim()
+                            .takeIf { it.isNotBlank() }
+                    val code = trimmed.substring(separator + 1).trim()
+                    return PairingToken(code = code, displayName = name)
+                }
+            }
         }
 
         private companion object {
