@@ -686,6 +686,11 @@ class RulesViewModel
                 }
             val blockRules = matchingRules.filter { it.action == RuleAction.Block }
             val allowRules = matchingRules.filter { it.action == RuleAction.Allow }
+            val authorizationRules = matchingRules.filter { it.action == RuleAction.RequestAuthorization }
+            val appLimits =
+                uiState.value.limits.filter {
+                    it.targetType == PolicyTargetType.App && it.target == packageName
+                }
             form.update {
                 it.copy(
                     pendingAppAllowed = it.pendingAppAllowed + (packageName to allowed),
@@ -695,12 +700,19 @@ class RulesViewModel
             viewModelScope.launch {
                 val synced =
                     runCatching {
+                        appLimits.forEach { deleteDailyLimitUseCase(it) }
                         if (allowed) {
                             blockRules.filter { it.enabled }.forEach {
                                 saveRule(it.copy(enabled = false), targetDeviceId)
                             }
+                            authorizationRules.filter { it.enabled }.forEach {
+                                saveRule(it.copy(enabled = false), targetDeviceId)
+                            }
                         } else {
                             allowRules.filter { it.enabled }.forEach {
+                                saveRule(it.copy(enabled = false), targetDeviceId)
+                            }
+                            authorizationRules.filter { it.enabled }.forEach {
                                 saveRule(it.copy(enabled = false), targetDeviceId)
                             }
                             saveRule(
@@ -745,13 +757,17 @@ class RulesViewModel
                 uiState.value.limits.firstOrNull {
                     it.targetType == PolicyTargetType.App && it.target == packageName
                 }
+            val matchingRules =
+                uiState.value.rules.filter {
+                    it.scope == RuleScope.App && it.target == packageName
+                }
             viewModelScope.launch {
                 if (minutes == null || minutes <= 0) {
-                    if (existing != null) {
-                        saveDailyLimit(existing.copy(enabled = false), targetDeviceId)
-                    }
-                    form.update { it.copy(message = "Límite de app desactivado.") }
+                    form.update { it.copy(message = "Ingresá minutos válidos.") }
                 } else {
+                    matchingRules
+                        .filter { it.enabled && (it.action == RuleAction.Block || it.action == RuleAction.RequestAuthorization) }
+                        .forEach { saveRule(it.copy(enabled = false), targetDeviceId) }
                     saveDailyLimit(
                         DailyLimit(
                             id = existing?.id ?: UUID.randomUUID().toString(),

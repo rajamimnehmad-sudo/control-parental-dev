@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -107,9 +108,7 @@ private fun MyAppRow(
 ) {
     val canRequestAccess =
         app.status == AppAccessStatus.Blocked ||
-            app.status == AppAccessStatus.RequiresAuthorization ||
-            app.status == AppAccessStatus.Limited ||
-            app.status == AppAccessStatus.LimitReached
+            app.status == AppAccessStatus.RequiresAuthorization
     val canRequestMoreTime =
         app.status == AppAccessStatus.LimitReached
     Column(
@@ -163,17 +162,18 @@ private fun MyAppRow(
 
 @Composable
 private fun StatusLabel(status: AppAccessStatus) {
+    val color = status.statusColor()
     Box(
         modifier =
             Modifier
                 .clip(RoundedCornerShape(6.dp))
-                .background(MaterialTheme.colorScheme.secondaryContainer)
+                .background(color.copy(alpha = 0.18f))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(
             text = status.displayName(),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSecondaryContainer,
+            color = color,
         )
     }
 }
@@ -234,3 +234,22 @@ private fun AppAccessStatus.displayName(): String =
         AppAccessStatus.WaitingAuthorization -> "Esperando autorización"
         AppAccessStatus.WaitingExtraTime -> "Esperando más tiempo"
     }
+
+private fun AppAccessStatus.statusColor(): Color =
+    when (this) {
+        AppAccessStatus.Allowed,
+        AppAccessStatus.ExtraTime,
+        -> AllowedGreen
+        AppAccessStatus.Limited,
+        AppAccessStatus.LimitReached,
+        AppAccessStatus.WaitingExtraTime,
+        -> WarningYellow
+        AppAccessStatus.Blocked,
+        AppAccessStatus.RequiresAuthorization,
+        AppAccessStatus.WaitingAuthorization,
+        -> BlockedRed
+    }
+
+private val AllowedGreen = Color(0xFF2E7D32)
+private val BlockedRed = Color(0xFFC62828)
+private val WarningYellow = Color(0xFFF9A825)

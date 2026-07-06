@@ -56,7 +56,7 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
                 isSystemApp = app.isSystemApp,
                 iconBase64 = app.iconBase64,
                 deviceName = devicesById[app.deviceId]?.displayName ?: "Usuario",
-                allowed = pendingAllowed[app.packageName] ?: (effectiveRule?.action != RuleAction.Block),
+                allowed = pendingAllowed[app.packageName] ?: (limit != null || effectiveRule?.action != RuleAction.Block),
                 dailyLimitMinutes = limit?.limitMinutes,
                 isUpdating = pendingAllowed.containsKey(app.packageName),
             )
