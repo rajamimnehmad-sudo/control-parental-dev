@@ -325,6 +325,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         foregroundWatchPackageName = packageName
         foregroundWatchJob =
             scope.launch {
+                snapshotProvider.refresh()
+                evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())
                 while (usageTracker.currentPackageName() == packageName) {
                     delay(ForegroundRecheckMillis)
                     val elapsed = clock.elapsedRealtimeMillis()
@@ -438,7 +440,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     private companion object {
         const val CheckpointIntervalMillis = 15_000L
-        const val ForegroundRecheckMillis = 5_000L
+        const val ForegroundRecheckMillis = 250L
         const val MillisPerMinute = 60_000L
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 120L
