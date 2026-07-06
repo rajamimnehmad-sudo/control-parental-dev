@@ -63,6 +63,7 @@ class DevApkUpdateRepository
                         }
                         updateHttpClient.newCall(requestBuilder.build()).execute().use { response ->
                             if (!response.isSuccessful) {
+                                if (existingBytes > 0L) partial.delete()
                                 if (attempt == MaxDownloadAttempts - 1) return@withContext UpdateDownloadResult.DownloadError
                                 return@repeat
                             }
