@@ -108,8 +108,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (transition != null) {
             serviceScope?.launch { saveTransition(transition) }
         }
-        evaluateForegroundApp(packageName, elapsed)
-        startForegroundWatch(packageName)
+        val blocked = evaluateForegroundApp(packageName, elapsed)
+        if (!blocked) startForegroundWatch(packageName)
         if (transition == null) {
             usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
                 serviceScope?.launch { saveTransition(checkpoint) }
@@ -244,7 +244,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private fun evaluateForegroundApp(
         packageName: String,
         elapsedRealtimeMillis: Long,
-    ) {
+    ): Boolean {
         val state = snapshotProvider.current()
         val persistedMinutes =
             state.snapshot.dailyUsage
@@ -275,6 +275,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 clearExtraTimeExpiry()
                 clearAppLimitDeadline()
                 leaveBlockedApp(packageName)
+                return true
             }
             is PolicyDecision.Warn,
             is PolicyDecision.RequireActivation,
@@ -283,6 +284,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             -> clearExtraTimeExpiry()
             is PolicyDecision.GrantExtraTime -> scheduleExtraTimeExpiry(packageName, decision.validUntilEpochMillis)
         }
+        return false
     }
 
     private fun maybeRefreshPolicies(elapsedRealtimeMillis: Long) {
@@ -309,6 +311,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     private fun leaveBlockedApp(packageName: String) {
+        if (blockRetryPackageName == packageName && blockRetryJob?.isActive == true) return
         Log.i(LogTag, "Blocking foreground app immediately package=$packageName")
         clearBlockRetry()
         performGlobalAction(GLOBAL_ACTION_HOME)
@@ -331,9 +334,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     private fun String.isActiveBlockedForeground(): Boolean {
-        val activeWindowPackage = rootInActiveWindow?.packageName?.toString()
-        if (activeWindowPackage != null && activeWindowPackage != this) return false
-        return (activeWindowPackage == this || usageTracker.currentPackageName() == this) && isStillBlocked()
+        val activeWindowPackage = rootInActiveWindow?.packageName?.toString() ?: return false
+        return activeWindowPackage == this && isStillBlocked()
     }
 
     private fun String.isStillBlocked(): Boolean {
@@ -361,7 +363,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         foregroundWatchJob =
             scope.launch {
                 if (!packageName.isReportedForeground()) return@launch
-                evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())
+                if (evaluateForegroundApp(packageName, clock.elapsedRealtimeMillis())) return@launch
                 while (usageTracker.currentPackageName() == packageName) {
                     delay(ForegroundRecheckMillis)
                     if (!packageName.isReportedForeground()) return@launch
@@ -370,7 +372,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     usageTracker.checkpointCurrent(elapsed, now, CheckpointIntervalMillis)?.let { checkpoint ->
                         saveTransition(checkpoint)
                     }
-                    evaluateForegroundApp(packageName, elapsed)
+                    if (evaluateForegroundApp(packageName, elapsed)) return@launch
                 }
             }
     }
