@@ -129,7 +129,7 @@ private fun RulesScreen(
         ) {
             Text("Mis dispositivos", style = MaterialTheme.typography.headlineSmall)
             if (state.offlineMode) {
-                Text("Modo Offline / Desarrollo", color = MaterialTheme.colorScheme.error)
+                Text("Sin conexion. Mostrando datos guardados.", color = MaterialTheme.colorScheme.error)
             }
             if (state.message.isNotBlank()) {
                 Text(state.message, color = MaterialTheme.colorScheme.error)
@@ -186,7 +186,7 @@ private fun RulesScreen(
         }
         if (state.offlineMode) {
             item {
-                Text("Modo Offline / Desarrollo", color = MaterialTheme.colorScheme.error)
+                Text("Sin conexion. Mostrando datos guardados.", color = MaterialTheme.colorScheme.error)
             }
         }
         if (state.message.isNotBlank()) {

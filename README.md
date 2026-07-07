@@ -36,6 +36,9 @@ app-user/build
 - `core-network`: Supabase REST/Auth/Realtime.
 - `core-sync`: SyncEngine, WorkManager, outbox y realtime.
 - `core-policy`: motor puro de decisiones.
+- `core-security`: activacion y sesion local.
+- `core-update`: descarga e instalacion de APKs DEV.
+- `core-telemetry`: diagnostico tecnico interno no visible en UI normal.
 - `feature-vpn`: bloqueo de dominios/web.
 - `feature-accessibility`: bloqueo de apps.
 
@@ -91,7 +94,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 106
+versionCode 108
 versionName 1.0.1-dev
 ```
 
@@ -130,6 +133,12 @@ Actualizar este README cuando cambie:
 - App Admin queda activada en el celular por token de administrador; no debe pedir login repetido.
 - App Usuario se activa solo con token generado desde Admin.
 - Solicitudes Admin se revisan por usuario y cada solicitud muestra icono de app con acciones directas.
+- DEV 108 limpia UI tecnica: el Panel Admin ya no muestra botones de reset/borrado/diagnostico DEV y la pantalla Actualizaciones del Usuario ya no muestra herramientas DEV.
+- El paquete Admin viejo `devices` fue eliminado; `Mis dispositivos` usa la pantalla unificada de reglas/apps.
+- Se elimino el modulo vacio `core-license`; el estado de activacion/licencia funcional queda en `core-domain`, `core-security` y repositorios existentes.
+- El Panel Admin muestra `Responsable` en lugar de `Guia`.
+- En solicitudes, `Rechazar` queda visible como boton de ancho completo.
+- El tiempo extra concedido se refleja en listas de Admin y Usuario con minutos restantes.
 
 ## Verificacion Rapida Antes De Trabajar
 

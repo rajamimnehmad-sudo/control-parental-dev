@@ -2,6 +2,7 @@ package com.contentfilter.admin.rules
 
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
+import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
@@ -36,6 +37,8 @@ internal fun normalizeLimitTarget(
 internal fun List<RemoteInstalledAppDto>.toAppControls(
     rules: List<PolicyRule>,
     limits: List<DailyLimit>,
+    grants: List<ExtraTimeGrant>,
+    nowEpochMillis: Long,
     devices: List<Device>,
     pendingAllowed: Map<String, Boolean>,
 ): List<AppControlUiState> {
@@ -43,6 +46,7 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
     return distinctBy { it.packageName }
         .map { app ->
             val effectiveRule = rules.effectiveAppRule(app.packageName)
+            val extraTimeRemainingMinutes = grants.activeExtraTimeRemainingMinutes(app.packageName, nowEpochMillis)
             val limit =
                 limits.firstOrNull {
                     it.enabled &&
@@ -56,8 +60,11 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
                 isSystemApp = app.isSystemApp,
                 iconBase64 = app.iconBase64,
                 deviceName = devicesById[app.deviceId]?.displayName ?: "Usuario",
-                allowed = pendingAllowed[app.packageName] ?: (limit != null || effectiveRule?.action != RuleAction.Block),
+                allowed =
+                    pendingAllowed[app.packageName]
+                        ?: (extraTimeRemainingMinutes != null || limit != null || effectiveRule?.action != RuleAction.Block),
                 dailyLimitMinutes = limit?.limitMinutes,
+                extraTimeRemainingMinutes = extraTimeRemainingMinutes,
                 isUpdating = pendingAllowed.containsKey(app.packageName),
             )
         }
@@ -184,8 +191,8 @@ private val UserDeviceStatus.sortOrder: Int
 private val AppControlUiState.accessSortOrder: Int
     get() =
         when {
-            !allowed -> 0
-            dailyLimitMinutes != null -> 1
+            !allowed && extraTimeRemainingMinutes == null -> 0
+            extraTimeRemainingMinutes != null || dailyLimitMinutes != null -> 1
             else -> 2
         }
 
@@ -226,6 +233,23 @@ private fun List<PolicyRule>.effectiveAppRule(packageName: String): PolicyRule? 
         )
         .firstOrNull()
 
+private fun List<ExtraTimeGrant>.activeExtraTimeRemainingMinutes(
+    packageName: String,
+    nowEpochMillis: Long,
+): Int? =
+    asSequence()
+        .filter {
+            it.targetType == PolicyTargetType.App &&
+                it.target == packageName &&
+                it.validUntilEpochMillis > nowEpochMillis
+        }
+        .map { it.validUntilEpochMillis }
+        .maxOrNull()
+        ?.remainingMinutesFrom(nowEpochMillis)
+
+private fun Long.remainingMinutesFrom(nowEpochMillis: Long): Int =
+    ((this - nowEpochMillis + MinuteMillis - 1) / MinuteMillis).toInt().coerceAtLeast(1)
+
 private fun String.toEpochMillisOrNull(): Long? = runCatching { Instant.parse(this).toEpochMilli() }.getOrNull()
 
 private fun Long?.toLastSeenLabel(): String =
@@ -244,6 +268,7 @@ internal val DomainRegex = Regex("^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0
 internal const val ActiveDeviceWindowMillis = 15 * 60 * 1000L
 internal const val SwitchHoldMillis = 2_500L
 internal const val RoomConfirmTimeoutMillis = 5_000L
+internal const val MinuteMillis = 60_000L
 // Domain wildcard: enabled Block means whitelist mode; disabled means general Internet is open.
 internal const val DomainWildcard = "*"
 internal const val InternetBlockPriority = 10

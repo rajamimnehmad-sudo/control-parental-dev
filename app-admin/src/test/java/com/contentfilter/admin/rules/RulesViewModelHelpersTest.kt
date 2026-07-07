@@ -2,6 +2,7 @@ package com.contentfilter.admin.rules
 
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
+import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
@@ -70,6 +71,8 @@ class RulesViewModelHelpersTest {
                             enabled = true,
                         ),
                     ),
+                grants = emptyList(),
+                nowEpochMillis = NowEpochMillis,
                 devices = listOf(Device(id = DeviceId, accountId = AccountId, displayName = "Usuario")),
                 pendingAllowed = emptyMap(),
             )
@@ -78,6 +81,36 @@ class RulesViewModelHelpersTest {
             listOf("com.example.zeta", "com.example.middle", "com.example.alpha"),
             controls.map { it.packageName },
         )
+    }
+
+    @Test
+    fun `app controls expose active extra time remaining and sort before allowed apps`() {
+        val controls =
+            listOf(
+                remoteApp("Allowed", "com.example.allowed"),
+                remoteApp("Extra", "com.example.extra"),
+            ).toAppControls(
+                rules = listOf(appRule("com.example.extra", RuleAction.Block)),
+                limits = emptyList(),
+                grants =
+                    listOf(
+                        ExtraTimeGrant(
+                            id = "grant-extra",
+                            requestId = "request-extra",
+                            targetType = PolicyTargetType.App,
+                            target = "com.example.extra",
+                            grantedMinutes = 10,
+                            validUntilEpochMillis = NowEpochMillis + 10 * MinuteMillis,
+                        ),
+                    ),
+                nowEpochMillis = NowEpochMillis,
+                devices = listOf(Device(id = DeviceId, accountId = AccountId, displayName = "Usuario")),
+                pendingAllowed = emptyMap(),
+            )
+
+        assertEquals(listOf("com.example.extra", "com.example.allowed"), controls.map { it.packageName })
+        assertEquals(10, controls.first().extraTimeRemainingMinutes)
+        assertTrue(controls.first().allowed)
     }
 
     private fun domainRule(
@@ -129,5 +162,6 @@ class RulesViewModelHelpersTest {
     private companion object {
         const val AccountId = "account"
         const val DeviceId = "device"
+        const val NowEpochMillis = 1_000_000L
     }
 }

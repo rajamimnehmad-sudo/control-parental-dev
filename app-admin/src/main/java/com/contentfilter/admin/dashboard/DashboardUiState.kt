@@ -9,8 +9,4 @@ data class DashboardUiState(
     val communityName: String = "",
     val guideName: String = "",
     val offlineMode: Boolean = true,
-    val showDevTools: Boolean = false,
-    val devToolsBusy: Boolean = false,
-    val devToolsMessage: String = "",
-    val diagnosticsText: String = "",
 )

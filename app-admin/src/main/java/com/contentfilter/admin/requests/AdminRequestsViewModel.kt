@@ -212,7 +212,7 @@ class AdminRequestsViewModel
         private suspend fun syncNowBlocking(): Boolean =
             withContext(Dispatchers.IO) {
                 val outboxResult = syncEngine.syncOnce()
-                val result = syncEngine.syncAccessRequestsFull()
+                val result = syncEngine.syncRequestResultsFull()
                 Log.i(
                     LogTag,
                     "Immediate admin requests sync outboxSuccess=${outboxResult.success} resultsSuccess=${result.success} message=${result.message}",

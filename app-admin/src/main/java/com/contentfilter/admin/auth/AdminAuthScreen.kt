@@ -44,7 +44,7 @@ private fun AdminAuthScreen(
     ) {
         Text("Activación Admin", style = MaterialTheme.typography.headlineSmall)
         if (state.offlineMode) {
-            Text("Modo Offline / Desarrollo", color = MaterialTheme.colorScheme.error)
+            Text("Sin conexion. Mostrando datos guardados.", color = MaterialTheme.colorScheme.error)
         }
         if (state.activated) {
             Text(state.message, style = MaterialTheme.typography.bodyMedium)

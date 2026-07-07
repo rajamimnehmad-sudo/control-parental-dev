@@ -24,7 +24,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 106
+            versionCode = 108
             versionNameSuffix = "-dev"
         }
         create("beta") {
@@ -46,7 +46,6 @@ dependencies {
     implementation(project(":core-domain"))
     implementation(project(":core-data"))
     implementation(project(":core-database"))
-    implementation(project(":core-license"))
     implementation(project(":core-network"))
     implementation(project(":core-security"))
     implementation(project(":core-sync"))

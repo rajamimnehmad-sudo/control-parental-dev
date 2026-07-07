@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.contentfilter.admin.BuildConfig
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
+import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
@@ -13,6 +14,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.repository.DeviceRepository
+import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
@@ -32,12 +34,14 @@ import com.contentfilter.core.sync.engine.SyncResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -62,6 +66,7 @@ class RulesViewModel
         private val saveDailyLimit: SaveDailyLimitUseCase,
         private val deleteDailyLimitUseCase: DeleteDailyLimitUseCase,
         private val deviceRepository: DeviceRepository,
+        grantRepository: ExtraTimeGrantRepository,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
         private val activationClient: SupabaseActivationClient,
         private val devMaintenanceClient: SupabaseDevMaintenanceClient,
@@ -78,32 +83,60 @@ class RulesViewModel
         private val selectedPolicyDeviceId = form.map { it.selectedDeviceId }.distinctUntilChanged()
         private val policyRules = selectedPolicyDeviceId.flatMapLatest { observePolicyRules(it) }
         private val dailyLimits = selectedPolicyDeviceId.flatMapLatest { observeDailyLimits(it) }
-
-        val uiState =
+        private val extraTimeGrants = grantRepository.observeGrants()
+        private val nowTicks =
+            flow {
+                while (true) {
+                    emit(System.currentTimeMillis())
+                    delay(MinuteMillis)
+                }
+            }
+        private val policyState =
             combine(
                 policyRules,
                 dailyLimits,
+                extraTimeGrants,
+                nowTicks,
+            ) { rules, limits, grants, nowEpochMillis ->
+                RulesPolicyState(
+                    rules = rules,
+                    limits = limits,
+                    grants = grants,
+                    nowEpochMillis = nowEpochMillis,
+                )
+            }
+
+        val uiState =
+            combine(
+                policyState,
                 observeDevices(),
                 installedApps,
                 form,
-            ) { rules, limits, devices, apps, formState ->
+            ) { policy, devices, apps, formState ->
                 val userDevices = devices.toUserDevices(apps)
                 val selectedDeviceId = userDevices.selectedDeviceId(formState.selectedDeviceId)
-                val savedInternetBlocked = rules.internetBlocked()
+                val savedInternetBlocked = policy.rules.internetBlocked()
                 formState.copy(
-                    rules = rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
-                    limits = limits.sortedWith(compareBy({ it.targetType.name }, { it.target })),
+                    rules = policy.rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
+                    limits = policy.limits.sortedWith(compareBy({ it.targetType.name }, { it.target })),
                     userDevices = userDevices,
                     selectedDeviceId = selectedDeviceId,
                     internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
-                    searchEnginesAllowed = formState.pendingSearchEnginesAllowed ?: rules.searchEnginesAllowed(),
+                    searchEnginesAllowed = formState.pendingSearchEnginesAllowed ?: policy.rules.searchEnginesAllowed(),
                     appControls =
                         if (selectedDeviceId == null) {
                             emptyList()
                         } else {
                             apps
                                 .forSelectedUserDevice(selectedDeviceId, devices)
-                                .toAppControls(rules, limits, devices, formState.pendingAppAllowed)
+                                .toAppControls(
+                                    rules = policy.rules,
+                                    limits = policy.limits,
+                                    grants = policy.grants,
+                                    nowEpochMillis = policy.nowEpochMillis,
+                                    devices = devices,
+                                    pendingAllowed = formState.pendingAppAllowed,
+                                )
                         }
                             .filterBySearch(formState.appSearchQuery),
                     offlineMode = false,
@@ -1006,10 +1039,12 @@ class RulesViewModel
         private fun refreshInstalledApps() {
             viewModelScope.launch(Dispatchers.IO) {
                 val deviceSync = syncEngine.syncCoreDataFull()
+                val requestResultsSync = syncEngine.syncRequestResultsFull()
                 if (BuildConfig.DEBUG) {
                     Log.i(
                         LogTag,
-                        "appsRefresh device-sync result=${deviceSync.success} message=${deviceSync.message}",
+                        "appsRefresh device-sync result=${deviceSync.success} message=${deviceSync.message} " +
+                            "requestResultsSync=${requestResultsSync.success} requestResultsMessage=${requestResultsSync.message}",
                     )
                 }
                 when (val result = remoteInstalledAppRepository.pullInstalledApps()) {
@@ -1326,6 +1361,13 @@ class RulesViewModel
                 )
             }
         }
+
+        private data class RulesPolicyState(
+            val rules: List<PolicyRule>,
+            val limits: List<DailyLimit>,
+            val grants: List<ExtraTimeGrant>,
+            val nowEpochMillis: Long,
+        )
 
         private fun String.safeDeviceId(): String = take(8)
 

@@ -63,7 +63,7 @@ class AdminAuthViewModel
                 return
             }
             if (state.offlineMode) {
-                _uiState.update { it.copy(message = "Modo Offline / Desarrollo") }
+                _uiState.update { it.copy(message = "Sin conexion. Mostrando datos guardados.") }
                 return
             }
             val token = PairingToken.from(state.activationCode)

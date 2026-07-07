@@ -66,7 +66,7 @@ fun AdminRequestsRoute(
             }
         }
         if (state.offlineMode) {
-            Text("Modo Offline / Desarrollo", color = MaterialTheme.colorScheme.error)
+            Text("Sin conexion. Mostrando datos guardados.", color = MaterialTheme.colorScheme.error)
         }
         if (state.message.isNotBlank()) {
             Text(state.message, color = MaterialTheme.colorScheme.error)
@@ -184,10 +184,23 @@ private fun RequestCard(
                                 keyboardType = KeyboardType.Number,
                             ),
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { onGrant(grantMinutes) }) { Text("Dar tiempo") }
-                        Button(onClick = onApprove) { Text("Acceso completo") }
-                        OutlinedButton(onClick = onReject) { Text("Rechazar") }
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onApprove,
+                    ) {
+                        Text("Acceso completo")
+                    }
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = { onGrant(grantMinutes) },
+                    ) {
+                        Text("Dar tiempo")
+                    }
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onReject,
+                    ) {
+                        Text("Rechazar")
                     }
                 }
             } else {

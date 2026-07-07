@@ -26,10 +26,12 @@ import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -62,6 +64,13 @@ class MyAppsViewModel
         private val searchQuery = MutableStateFlow("")
         private val pendingRequestPackages = MutableStateFlow<Set<String>>(emptySet())
         private val day = currentDay()
+        private val nowTicks =
+            flow {
+                while (true) {
+                    emit(System.currentTimeMillis())
+                    delay(MinuteMillis)
+                }
+            }
         private val appUiOptions =
             combine(searchQuery, pendingRequestPackages) { query, pendingPackages ->
                 AppUiOptions(query, pendingPackages)
@@ -106,13 +115,13 @@ class MyAppsViewModel
                 appPolicyState,
                 message,
                 appUiOptions,
-            ) { apps, policyState, currentMessage, options ->
+                nowTicks,
+            ) { apps, policyState, currentMessage, options, now ->
                 val usageByPackage = policyState.usage.associateBy { it.packageName }
                 val appLimits =
                     policyState.limits
                         .filter { it.enabled && it.targetType == PolicyTargetType.App }
                         .associateBy { it.target }
-                val now = System.currentTimeMillis()
                 MyAppsUiState(
                     apps =
                         apps
@@ -124,6 +133,8 @@ class MyAppsViewModel
                                             it.target == app.packageName &&
                                             it.validUntilEpochMillis > now
                                     }
+                                val extraTimeRemainingMinutes =
+                                    policyState.grants.activeExtraTimeRemainingMinutes(app.packageName, now)
                                 val pendingRequests =
                                     policyState.requests.filter {
                                         it.targetType == PolicyTargetType.App &&
@@ -161,6 +172,7 @@ class MyAppsViewModel
                                     iconBase64 = app.iconBase64,
                                     status = status,
                                     dailyLimitMinutes = dailyLimit?.limitMinutes,
+                                    extraTimeRemainingMinutes = extraTimeRemainingMinutes,
                                     usedMinutes = usedMinutes,
                                     isRequesting = options.pendingRequestPackages.contains(app.packageName),
                                 )
@@ -186,17 +198,19 @@ class MyAppsViewModel
         fun refreshApps() {
             viewModelScope.launch(Dispatchers.IO) {
                 message.value = "Sincronizando reglas..."
-                val syncResult = runCatching { syncEngine.syncCoreDataFull() }.getOrNull()
+                val coreSyncResult = runCatching { syncEngine.syncCoreDataFull() }.getOrNull()
+                val requestResultsSyncResult = runCatching { syncEngine.syncRequestResultsFull() }.getOrNull()
                 Log.i(
                     LogTag,
-                    "myAppsRefresh syncSuccess=${syncResult?.success} message=${syncResult?.message.orEmpty()}",
+                    "myAppsRefresh coreSyncSuccess=${coreSyncResult?.success} coreMessage=${coreSyncResult?.message.orEmpty()} " +
+                        "requestResultsSuccess=${requestResultsSyncResult?.success} requestResultsMessage=${requestResultsSyncResult?.message.orEmpty()}",
                 )
                 detectedApps.value = installedAppPublisher.installedApps()
                 activationRepository.currentActivation()?.let { activation ->
                     runCatching { installedAppPublisher.publish(activation) }
                 }
                 message.value =
-                    if (syncResult?.success == false) {
+                    if (coreSyncResult?.success == false || requestResultsSyncResult?.success == false) {
                         "No se pudieron actualizar reglas. Mostrando datos guardados."
                     } else {
                         ""
@@ -304,6 +318,23 @@ class MyAppsViewModel
             )
         }
 
+        private fun List<ExtraTimeGrant>.activeExtraTimeRemainingMinutes(
+            packageName: String,
+            nowEpochMillis: Long,
+        ): Int? =
+            asSequence()
+                .filter {
+                    it.targetType == PolicyTargetType.App &&
+                        it.target == packageName &&
+                        it.validUntilEpochMillis > nowEpochMillis
+                }
+                .map { it.validUntilEpochMillis }
+                .maxOrNull()
+                ?.remainingMinutesFrom(nowEpochMillis)
+
+        private fun Long.remainingMinutesFrom(nowEpochMillis: Long): Int =
+            ((this - nowEpochMillis + MinuteMillis - 1) / MinuteMillis).toInt().coerceAtLeast(1)
+
         private fun AccessRequest.toRemoteDto(
             accountId: String,
             deviceId: String,
@@ -374,5 +405,6 @@ class MyAppsViewModel
 
         private companion object {
             const val LogTag = "MyAppsViewModel"
+            const val MinuteMillis = 60_000L
         }
     }

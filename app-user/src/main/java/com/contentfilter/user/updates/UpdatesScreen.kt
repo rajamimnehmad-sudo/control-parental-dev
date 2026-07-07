@@ -9,21 +9,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -43,8 +36,6 @@ fun UpdatesRoute(viewModel: UpdatesViewModel = hiltViewModel()) {
         onDownload = viewModel::downloadUpdate,
         onInstall = viewModel::installDownloadedUpdate,
         onInstallPermission = viewModel::openInstallPermissionSettings,
-        onResetLocalDataForRelink = viewModel::resetLocalDataForRelink,
-        onClearDiagnostics = viewModel::clearDiagnostics,
     )
 }
 
@@ -55,12 +46,7 @@ private fun UpdatesScreen(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onInstallPermission: () -> Unit,
-    onResetLocalDataForRelink: () -> Unit,
-    onClearDiagnostics: () -> Unit,
 ) {
-    var confirmReset by remember { mutableStateOf(false) }
-    var showDiagnostics by remember { mutableStateOf(false) }
-    val clipboardManager = LocalClipboardManager.current
     Column(
         modifier =
             Modifier
@@ -149,95 +135,6 @@ private fun UpdatesScreen(
         ) {
             Text("Buscar actualizacion")
         }
-        if (BuildConfig.FLAVOR == "dev") {
-            Text("Herramientas DEV", style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { confirmReset = true },
-            ) {
-                Text("Resetear datos locales y reenlazar")
-            }
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { showDiagnostics = true },
-            ) {
-                Text("Ver diagnóstico")
-            }
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { clipboardManager.setText(AnnotatedString(state.diagnosticsText)) },
-            ) {
-                Text("Copiar diagnóstico")
-            }
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = { clipboardManager.setText(AnnotatedString(state.diagnosticsSummaryText)) },
-            ) {
-                Text("Copiar resumen corto")
-            }
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onClearDiagnostics,
-            ) {
-                Text("Limpiar diagnóstico")
-            }
-            if (state.devMessage.isNotBlank()) {
-                Text(state.devMessage, color = MaterialTheme.colorScheme.error)
-            }
-        }
-    }
-    if (confirmReset) {
-        AlertDialog(
-            onDismissRequest = { confirmReset = false },
-            title = { Text("Resetear datos locales") },
-            text = {
-                Text(
-                    "Esto limpia Room, Outbox, cache, device local y activacion local. " +
-                        "No borra Auth, Account ni datos remotos.",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        confirmReset = false
-                        onResetLocalDataForRelink()
-                    },
-                ) {
-                    Text("Resetear")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { confirmReset = false }) {
-                    Text("Cancelar")
-                }
-            },
-        )
-    }
-    if (showDiagnostics) {
-        AlertDialog(
-            onDismissRequest = { showDiagnostics = false },
-            title = { Text("Diagnóstico") },
-            text = {
-                Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
-                    Text(state.diagnosticsText)
-                }
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        clipboardManager.setText(AnnotatedString(state.diagnosticsText))
-                        showDiagnostics = false
-                    },
-                ) {
-                    Text("Copiar")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDiagnostics = false }) {
-                    Text("Cerrar")
-                }
-            },
-        )
     }
 }
 

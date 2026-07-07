@@ -122,7 +122,7 @@ private fun MyAppRow(
                 Text(app.name, style = MaterialTheme.typography.titleSmall)
                 Text(app.packageName, style = MaterialTheme.typography.bodySmall)
             }
-            StatusLabel(app.status)
+            StatusLabel(app.status, app.extraTimeRemainingMinutes)
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -148,7 +148,10 @@ private fun MyAppRow(
 }
 
 @Composable
-private fun StatusLabel(status: AppAccessStatus) {
+private fun StatusLabel(
+    status: AppAccessStatus,
+    extraTimeRemainingMinutes: Int?,
+) {
     val color = status.statusColor()
     Box(
         modifier =
@@ -158,7 +161,7 @@ private fun StatusLabel(status: AppAccessStatus) {
                 .padding(horizontal = 8.dp, vertical = 4.dp),
     ) {
         Text(
-            text = status.displayName(),
+            text = status.displayName(extraTimeRemainingMinutes),
             style = MaterialTheme.typography.labelSmall,
             color = color,
         )
@@ -210,12 +213,12 @@ private fun FallbackIcon(name: String) {
     }
 }
 
-private fun AppAccessStatus.displayName(): String =
+private fun AppAccessStatus.displayName(extraTimeRemainingMinutes: Int? = null): String =
     when (this) {
         AppAccessStatus.Allowed -> "Permitida"
         AppAccessStatus.Limited -> "Con límite"
         AppAccessStatus.LimitReached -> "Límite agotado"
-        AppAccessStatus.ExtraTime -> "Tiempo extra activo"
+        AppAccessStatus.ExtraTime -> extraTimeRemainingMinutes?.let { "Extra ${it}m" } ?: "Tiempo extra activo"
         AppAccessStatus.Blocked -> "Bloqueada"
         AppAccessStatus.RequiresAuthorization -> "Requiere autorización"
         AppAccessStatus.WaitingAuthorization -> "Esperando autorización"

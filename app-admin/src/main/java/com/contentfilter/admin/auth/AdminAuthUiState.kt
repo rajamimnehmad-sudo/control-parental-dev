@@ -5,5 +5,5 @@ data class AdminAuthUiState(
     val activated: Boolean = false,
     val offlineMode: Boolean = true,
     val loading: Boolean = false,
-    val message: String = "Modo Offline / Desarrollo",
+    val message: String = "Sin conexion. Mostrando datos guardados.",
 )

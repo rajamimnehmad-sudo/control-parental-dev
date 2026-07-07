@@ -12,12 +12,14 @@ data class MyAppItemUiState(
     val iconBase64: String?,
     val status: AppAccessStatus,
     val dailyLimitMinutes: Int?,
+    val extraTimeRemainingMinutes: Int? = null,
     val usedMinutes: Int,
     val isRequesting: Boolean = false,
 ) {
     val remainingMinutes: Int? = dailyLimitMinutes?.let { (it - usedMinutes).coerceAtLeast(0) }
     val limitText: String =
         when {
+            extraTimeRemainingMinutes != null -> "Tiempo extra: restan $extraTimeRemainingMinutes min"
             dailyLimitMinutes == null -> "Sin límite"
             remainingMinutes == 0 -> "Límite agotado: $usedMinutes/$dailyLimitMinutes min hoy"
             else -> "Restan $remainingMinutes min de $dailyLimitMinutes min"

@@ -51,6 +51,10 @@ internal fun AppControlCard(
         if (!showLimitDialog) minutes = ""
     }
     val status = app.status()
+    val limitText =
+        app.extraTimeRemainingMinutes?.let { "Tiempo extra: restan $it min" }
+            ?: app.dailyLimitMinutes?.let { "Límite: $it min/día" }
+            ?: "Sin límite"
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(12.dp),
@@ -96,7 +100,7 @@ internal fun AppControlCard(
                 )
                 Text(
                     modifier = Modifier.weight(1f),
-                    text = app.dailyLimitMinutes?.let { "Límite: $it min/día" } ?: "Sin límite",
+                    text = limitText,
                     style = MaterialTheme.typography.bodySmall,
                 )
                 OutlinedButton(
@@ -168,6 +172,7 @@ private data class AppControlStatus(
 
 private fun AppControlUiState.status(): AppControlStatus =
     when {
+        extraTimeRemainingMinutes != null -> AppControlStatus("Extra ${extraTimeRemainingMinutes}m", WarningYellow)
         dailyLimitMinutes != null -> AppControlStatus("Con tiempo", WarningYellow)
         allowed -> AppControlStatus("Permitida", AllowedGreen)
         else -> AppControlStatus("Bloqueada", BlockedRed)

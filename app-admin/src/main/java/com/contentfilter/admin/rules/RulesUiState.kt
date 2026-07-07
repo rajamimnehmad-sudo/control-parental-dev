@@ -59,5 +59,6 @@ data class AppControlUiState(
     val deviceName: String,
     val allowed: Boolean,
     val dailyLimitMinutes: Int?,
+    val extraTimeRemainingMinutes: Int? = null,
     val isUpdating: Boolean = false,
 )

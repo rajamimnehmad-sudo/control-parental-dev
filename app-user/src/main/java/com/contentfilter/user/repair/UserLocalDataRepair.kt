@@ -90,12 +90,6 @@ class UserLocalDataRepair
                 }
             }
 
-        suspend fun resetLocalDataForRelink(): RepairResult =
-            withContext(Dispatchers.IO) {
-                clearForRelink("manual-dev-reset")
-                RepairResult.NeedsActivation(cleaned = true)
-            }
-
         fun hasRevokedLicenseNotice(): Boolean = preferences.getBoolean(RevokedLicenseNoticeKey, false)
 
         suspend fun clearStaleDataAfterActivation(activation: DeviceActivation) =
@@ -119,9 +113,7 @@ class UserLocalDataRepair
                 .remove(LastAccountIdKey)
                 .remove(LastDeviceIdKey)
                 .remove(LastActivationCleanupKey)
-            if (reason == "manual-dev-reset") {
-                editor.remove(RevokedLicenseNoticeKey)
-            } else if (reason != "missing-local-activation") {
+            if (reason != "missing-local-activation") {
                 editor.putBoolean(RevokedLicenseNoticeKey, true)
             }
             editor.apply()
