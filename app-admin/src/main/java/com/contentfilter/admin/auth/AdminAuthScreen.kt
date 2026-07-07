@@ -14,7 +14,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -24,10 +23,7 @@ fun AdminAuthRoute(viewModel: AdminAuthViewModel = hiltViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     AdminAuthScreen(
         state = state,
-        onEmail = viewModel::onEmailChanged,
-        onPassword = viewModel::onPasswordChanged,
         onCode = viewModel::onActivationCodeChanged,
-        onName = viewModel::onDeviceNameChanged,
         onActivate = viewModel::activate,
     )
 }
@@ -35,10 +31,7 @@ fun AdminAuthRoute(viewModel: AdminAuthViewModel = hiltViewModel()) {
 @Composable
 private fun AdminAuthScreen(
     state: AdminAuthUiState,
-    onEmail: (String) -> Unit,
-    onPassword: (String) -> Unit,
     onCode: (String) -> Unit,
-    onName: (String) -> Unit,
     onActivate: () -> Unit,
 ) {
     Column(
@@ -49,7 +42,7 @@ private fun AdminAuthScreen(
                 .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Login / Activacion", style = MaterialTheme.typography.headlineSmall)
+        Text("Activación Admin", style = MaterialTheme.typography.headlineSmall)
         if (state.offlineMode) {
             Text("Modo Offline / Desarrollo", color = MaterialTheme.colorScheme.error)
         }
@@ -59,31 +52,9 @@ private fun AdminAuthScreen(
         }
         OutlinedTextField(
             modifier = Modifier.fillMaxWidth(),
-            value = state.email,
-            onValueChange = onEmail,
-            label = { Text("Email") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = state.password,
-            onValueChange = onPassword,
-            label = { Text("Password") },
-            singleLine = true,
-            visualTransformation = PasswordVisualTransformation(),
-        )
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
             value = state.activationCode,
             onValueChange = onCode,
-            label = { Text("Codigo de activacion") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = state.deviceName,
-            onValueChange = onName,
-            label = { Text("Nombre del administrador") },
+            label = { Text("Token de administrador") },
             singleLine = true,
         )
         Button(

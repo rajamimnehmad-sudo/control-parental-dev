@@ -42,6 +42,20 @@ class SupabaseRestClient
                 executeArray(path, source = "Supabase select ${table.tableName}")
             }
 
+        suspend fun selectAccounts(updatedAfterIso: String?): RemoteResult<JSONArray> =
+            withContext(Dispatchers.IO) {
+                val path =
+                    buildString {
+                        append("/rest/v1/accounts?select=id,name,community_id,updated_at,deleted_at,communities(name,guide_label)")
+                        if (updatedAfterIso != null) {
+                            append("&updated_at=gt.")
+                            append(URLEncoder.encode(updatedAfterIso, Charsets.UTF_8.name()))
+                        }
+                        append("&order=updated_at.asc")
+                    }
+                executeArray(path, source = "Supabase select accounts")
+            }
+
         suspend fun selectAll(table: SupabaseTable): RemoteResult<JSONArray> =
             withContext(Dispatchers.IO) {
                 executeArray(

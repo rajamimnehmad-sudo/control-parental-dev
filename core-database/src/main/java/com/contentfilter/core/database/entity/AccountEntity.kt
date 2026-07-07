@@ -7,4 +7,7 @@ import androidx.room.PrimaryKey
 data class AccountEntity(
     @PrimaryKey val id: String,
     val name: String,
+    val communityId: String?,
+    val communityName: String,
+    val guideName: String,
 )

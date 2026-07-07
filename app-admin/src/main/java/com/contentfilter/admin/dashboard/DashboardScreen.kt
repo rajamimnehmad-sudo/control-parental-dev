@@ -66,6 +66,12 @@ private fun DashboardScreen(
         if (state.offlineMode) {
             Text("Modo Offline / Desarrollo", color = MaterialTheme.colorScheme.error)
         }
+        if (state.communityName.isNotBlank()) {
+            Text("Comunidad: ${state.communityName}")
+        }
+        if (state.guideName.isNotBlank()) {
+            Text("Guía: ${state.guideName}")
+        }
         Text("Dispositivos: ${state.deviceCount}")
         Text("Solicitudes pendientes: ${state.pendingRequests}")
         Text("Sincronizacion: ${state.syncState}")

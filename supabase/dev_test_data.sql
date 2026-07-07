@@ -151,37 +151,8 @@ begin
         );
     end if;
 
-    for dev_code in
-        select generate_series(1, 100)::text
-    loop
-        if not exists (
-            select 1
-            from public.activation_codes
-            where account_id = dev_account_id
-              and deleted_at is null
-              and code_hash = extensions.crypt(dev_code, code_hash)
-        ) then
-            insert into public.activation_codes (
-                account_id,
-                code_hash,
-                expires_at,
-                used_at,
-                deleted_at
-            )
-            values (
-                dev_account_id,
-                extensions.crypt(dev_code, extensions.gen_salt('bf')),
-                now() + interval '5 years',
-                null,
-                null
-            );
-        end if;
-    end loop;
-
     raise notice 'Dev E2E account_id: %', dev_account_id;
     raise notice 'Activation code for App Usuario: TEST-USER-CODE';
     raise notice 'Activation code for App Admin: TEST-ADMIN-CODE';
-    raise notice 'DEV activation codes for App Usuario: 1-50';
-    raise notice 'DEV activation codes for App Admin: 51-100';
-    raise notice 'Use the same Auth email/password in both apps.';
+    raise notice 'Legacy numeric activation codes 1-100 are no longer generated.';
 end $$;

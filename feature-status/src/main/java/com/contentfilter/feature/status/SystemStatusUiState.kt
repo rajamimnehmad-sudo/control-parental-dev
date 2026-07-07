@@ -15,6 +15,8 @@ data class SystemStatusUiState(
     val activationState: String,
     val appVersion: String,
     val isVpnActive: Boolean,
+    val communityName: String = "",
+    val guideName: String = "",
 ) {
     fun withVpnRunning(isRunning: Boolean): SystemStatusUiState =
         if (isRunning) {
@@ -32,7 +34,11 @@ data class SystemStatusUiState(
         }
 
     companion object {
-        fun from(snapshot: SystemHealthSnapshot): SystemStatusUiState =
+        fun from(
+            snapshot: SystemHealthSnapshot,
+            communityName: String = "",
+            guideName: String = "",
+        ): SystemStatusUiState =
             SystemStatusUiState(
                 title = "Estado del sistema",
                 protectionLevel = snapshot.protectionLevel,
@@ -43,6 +49,8 @@ data class SystemStatusUiState(
                 activationState = snapshot.licenseState.displayName(),
                 appVersion = "1.0.0",
                 isVpnActive = snapshot.vpnState == ComponentState.Enabled,
+                communityName = communityName,
+                guideName = guideName,
             )
 
         private fun ComponentState.displayName(): String =

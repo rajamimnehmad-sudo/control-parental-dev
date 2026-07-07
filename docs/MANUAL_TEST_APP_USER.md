@@ -208,7 +208,7 @@ Resultado esperado:
 - No existe tienda permitida/lista permitida final.
 - El diseno visual es MVP, no version final.
 - Supabase puede no estar configurado en esta prueba.
-- Licencias, pagos, comunidades y Super Admin siguen pendientes.
+- Pagos y Super Admin siguen pendientes. Comunidades ya tienen base DEV.
 - La pantalla de bloqueo es basica.
 - El flujo automatico completo desde Accessibility hacia bloqueo puede estar parcial.
 - SafeSearch queda preparado como extension, sin implementacion final.
@@ -262,4 +262,3 @@ La prueba manual queda aprobada si:
 - Estado, solicitudes y uso diario cargan.
 - VPN y Accesibilidad usan permisos oficiales.
 - La app sigue estable despues de activar/desactivar permisos.
-

@@ -109,6 +109,7 @@ class DefaultActivationRepository
                         id = domain.deviceId,
                         accountId = domain.accountId,
                         displayName = credentials.deviceDisplayName,
+                        appRole = credentials.appRole,
                     ),
                 )
                 systemStatusRepository.updateLicenseState(LicenseState.Active)

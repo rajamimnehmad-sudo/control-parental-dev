@@ -72,7 +72,7 @@ Se corrigio en la ultima tanda:
 - Formulario separado para limite diario de app.
 - Se aclaro que el limite diario es por app, no global del telefono.
 - Se corrigio envio de `deleted_at` en `RemotePolicyRuleDto.toJson()` para que borrar regla llegue a Supabase.
-- `versionCode` DEV subido a 26 en Usuario y Admin.
+- `versionCode` DEV actual: 106 en Usuario y Admin.
 - Build y tests pasaron.
 - APKs DEV publicadas en Supabase Storage.
 
@@ -81,8 +81,8 @@ Se corrigio en la ultima tanda:
 Version DEV publicada en Supabase Storage:
 
 ```text
-versionCode 26
-versionName 1.0.0-dev
+versionCode 106
+versionName 1.0.1-dev
 ```
 
 Manifiestos:
@@ -102,8 +102,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados/locales:
 
 ```text
-Usuario: fd1e2bfca04ef1e6c6688c0d445081ef3ff47cc3d8d0652ad80766130d83db9d
-Admin:   27a22c159870ef1d7486822045f67bd2395de8c5e979c55216331f52c05a3f7d
+Usuario: fe99c800daba6bc9a2d69355db74f36bf50e05790fc17bf578fa90fbdc4710d7
+Admin:   ede8208a9a204bc1e0edfe8b5bbf0cb17cea6199f00c315dbc1946db981826ca
 ```
 
 Rutas locales:
@@ -123,7 +123,7 @@ Ultimo commit confirmado en Git:
 da5b353 Fix sync session refresh
 ```
 
-Importante: hay muchos cambios locales posteriores a `da5b353`. Esos cambios ya fueron compilados y publicados como `versionCode 26`, pero al momento de este handoff no estan necesariamente committeados.
+Importante: revisar `git status --short` antes de seguir. No revertir cambios locales sin confirmacion del usuario.
 
 Antes de seguir trabajando, revisar:
 
@@ -267,11 +267,11 @@ supabase/dev_test_data.sql
 supabase/fix_activate_device_pgcrypto.sql
 ```
 
-Códigos DEV:
+Códigos DEV legacy:
 
-- Usuario: 1 a 50.
-- Admin: 51 a 100.
-- Siguen siendo de un solo uso.
+- Los códigos numéricos 1-100 quedan reemplazados por tokens aleatorios.
+- Admin se activa por token de administrador en el dispositivo.
+- Usuario se activa por token generado desde Admin.
 
 ## Build, test y publicacion
 
@@ -355,5 +355,5 @@ Toma docs/HANDOFF_ACTUAL.md como contexto oficial del proyecto.
 No reanalices la arquitectura.
 No avances de fase.
 Continuemos desde ese estado.
-Primero revisa git status --short y confirma que versionCode 26 esta publicado.
+Primero revisa git status --short y confirma que versionCode 106 esta publicado.
 ```

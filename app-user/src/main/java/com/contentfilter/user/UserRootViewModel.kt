@@ -74,7 +74,7 @@ class UserRootViewModel
         private companion object {
             const val DeviceLicenseValidationIntervalMillis = 30_000L
             const val RevokedLicenseMessage =
-                "Este dispositivo ya no tiene licencia. Pedí un nuevo código al administrador."
+                "Este dispositivo ya no tiene protección activa. Pedí un nuevo token al administrador."
         }
     }
 

@@ -11,6 +11,9 @@ import com.contentfilter.core.domain.usecase.admin.GrantExtraTimeUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
 import com.contentfilter.core.domain.usecase.admin.SetRequestStatusUseCase
+import com.contentfilter.core.network.dto.RemoteInstalledAppDto
+import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
+import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -35,12 +38,28 @@ class AdminRequestsViewModel
         private val approveAccessRequest: ApproveAccessRequestUseCase,
         private val setRequestStatus: SetRequestStatusUseCase,
         private val grantExtraTime: GrantExtraTimeUseCase,
+        private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
     ) : ViewModel() {
         private val syncMessage = MutableStateFlow("")
         private val isLoading = MutableStateFlow(false)
         private val selectedDeviceId = MutableStateFlow<String?>(null)
+        private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
+        private val localState =
+            combine(
+                installedApps,
+                syncMessage,
+                isLoading,
+                selectedDeviceId,
+            ) { apps, message, loading, selected ->
+                RequestsLocalState(
+                    apps = apps,
+                    message = message,
+                    loading = loading,
+                    selectedDeviceId = selected,
+                )
+            }
 
         val uiState =
             combine(
@@ -55,23 +74,22 @@ class AdminRequestsViewModel
                         emit(emptyList())
                     },
                 observeDevices(),
-                syncMessage,
-                isLoading,
-                selectedDeviceId,
-            ) { requests, devices, message, loading, selected ->
+                localState,
+            ) { requests, devices, local ->
                     val pendingRequests = requests.filter { it.status.isPending() }
                     val users = pendingRequests.toUserItems(devices)
-                    val resolvedSelected = selected?.takeIf { id -> users.any { it.deviceId == id } }
+                    val resolvedSelected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
                     AdminRequestsUiState(
                         requests =
                             resolvedSelected?.let { selectedId ->
                                 pendingRequests.filter { it.deviceGroupId == selectedId }
+                                    .toRequestItems(local.apps)
                             }.orEmpty(),
                         users = users,
                         selectedDeviceId = resolvedSelected,
                         offlineMode = false,
-                        lastSyncMessage = message,
-                        isLoading = loading,
+                        lastSyncMessage = local.message,
+                        isLoading = local.loading,
                     )
                 }
                 .stateIn(
@@ -88,6 +106,7 @@ class AdminRequestsViewModel
         fun refresh() {
             syncScheduler.requestSync()
             syncNow()
+            refreshInstalledApps()
         }
 
         fun selectUser(deviceId: String) {
@@ -102,11 +121,12 @@ class AdminRequestsViewModel
             viewModelScope.launch {
                 runCatching {
                     val request = uiState.value.requests.firstOrNull { it.id == requestId }
-                    if (request?.status?.isPending() == false) return@runCatching
-                    if (request == null) {
+                    val domainRequest = request?.request
+                    if (domainRequest?.status?.isPending() == false) return@runCatching
+                    if (domainRequest == null) {
                         setRequestStatus(requestId, RequestStatus.Approved)
                     } else {
-                        approveAccessRequest(request)
+                        approveAccessRequest(domainRequest)
                     }
                     syncScheduler.requestSync()
                     syncNowBlocking()
@@ -122,7 +142,7 @@ class AdminRequestsViewModel
             viewModelScope.launch {
                 runCatching {
                     val request = uiState.value.requests.firstOrNull { it.id == requestId }
-                    if (request?.status?.isPending() == false) return@runCatching
+                    if (request?.request?.status?.isPending() == false) return@runCatching
                     setRequestStatus(requestId, RequestStatus.Rejected)
                     syncScheduler.requestSync()
                     syncNowBlocking()
@@ -180,6 +200,15 @@ class AdminRequestsViewModel
             }
         }
 
+        private fun refreshInstalledApps() {
+            viewModelScope.launch(Dispatchers.IO) {
+                when (val result = remoteInstalledAppRepository.pullInstalledApps()) {
+                    is RemoteResult.Success -> installedApps.update { result.value }
+                    is RemoteResult.Failure -> Log.w(LogTag, "Installed apps pull failed: ${result.reason}")
+                }
+            }
+        }
+
         private suspend fun syncNowBlocking(): Boolean =
             withContext(Dispatchers.IO) {
                 val outboxResult = syncEngine.syncOnce()
@@ -208,6 +237,13 @@ class AdminRequestsViewModel
             const val OfflineMessage = "Sin conexión. Mostrando datos guardados."
             const val UnknownDeviceId = "unknown-device"
         }
+
+        private data class RequestsLocalState(
+            val apps: List<RemoteInstalledAppDto>,
+            val message: String,
+            val loading: Boolean,
+            val selectedDeviceId: String?,
+        )
     }
 
 private fun RequestStatus.isPending(): Boolean =
@@ -230,4 +266,21 @@ private fun List<AccessRequest>.toUserItems(devices: List<Device>): List<AdminRe
             compareByDescending<AdminRequestUserUiState> { it.needsAttention }
                 .thenBy { it.name.lowercase() },
         )
+}
+
+private fun List<AccessRequest>.toRequestItems(apps: List<RemoteInstalledAppDto>): List<AdminAccessRequestUiState> {
+    val appsByDeviceAndPackage = apps.associateBy { "${it.deviceId}:${it.packageName}" }
+    val appsByPackage = apps.distinctBy { it.packageName }.associateBy { it.packageName }
+    return map { request ->
+        val packageName = request.targetPackageName ?: request.target
+        val app =
+            request.deviceId
+                ?.let { deviceId -> appsByDeviceAndPackage["$deviceId:$packageName"] }
+                ?: appsByPackage[packageName]
+        AdminAccessRequestUiState(
+            request = request,
+            appName = app?.appName?.takeIf { it.isNotBlank() } ?: packageName,
+            iconBase64 = app?.iconBase64,
+        )
+    }
 }

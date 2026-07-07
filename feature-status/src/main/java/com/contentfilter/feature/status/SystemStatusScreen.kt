@@ -48,6 +48,12 @@ fun SystemStatusScreen(
         Text(text = state.title, style = MaterialTheme.typography.headlineMedium)
         StatusBadge(level = state.protectionLevel)
         Text(text = state.summary, style = MaterialTheme.typography.bodyLarge)
+        if (state.communityName.isNotBlank()) {
+            Text(text = "Comunidad: ${state.communityName}", style = MaterialTheme.typography.bodyMedium)
+        }
+        if (state.guideName.isNotBlank()) {
+            Text(text = "Guía: ${state.guideName}", style = MaterialTheme.typography.bodyMedium)
+        }
         Text(text = "VPN: ${state.vpnState}", style = MaterialTheme.typography.bodyMedium)
         Text(text = "Accesibilidad: ${state.accessibilityState}", style = MaterialTheme.typography.bodyMedium)
         Text(text = "Sincronización: ${state.syncState}", style = MaterialTheme.typography.bodyMedium)

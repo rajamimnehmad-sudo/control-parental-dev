@@ -2,6 +2,7 @@ package com.contentfilter.core.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
@@ -43,10 +44,12 @@ import com.contentfilter.core.database.entity.UsageSessionEntity
         SyncCursorEntity::class,
         OutboxOperationEntity::class,
     ],
-    version = 5,
+    version = 6,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun accountDao(): AccountDao
+
     abstract fun policyDao(): PolicyDao
 
     abstract fun systemHealthDao(): SystemHealthDao

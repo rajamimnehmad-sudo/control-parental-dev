@@ -1,6 +1,7 @@
 package com.contentfilter.core.network.remote
 
 enum class SupabaseTable(val tableName: String) {
+    Accounts("accounts"),
     Devices("devices"),
     DeviceApps("device_apps"),
     Policies("policies"),

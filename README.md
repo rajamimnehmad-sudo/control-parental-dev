@@ -91,7 +91,7 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 102
+versionCode 106
 versionName 1.0.1-dev
 ```
 
@@ -125,6 +125,11 @@ Actualizar este README cuando cambie:
 - Limites de tiempo de apps: si una app permitida agota su limite diario, queda bloqueada por tiempo. El usuario puede pedir `Pedir tiempo` o `Acceso completo`.
 - `Pedir tiempo`: Admin concede minutos extra, por defecto 15 o el valor manual indicado. El extra vence y luego vuelve a aplicar el limite diario.
 - `Acceso completo`: Admin aprueba acceso completo, se desactivan bloqueos directos de esa app, se crea una regla Allow y se elimina el limite diario de esa app. La app queda sin limite hasta que Admin vuelva a configurarlo.
+- Comunidad DEV activa: `Comunidad Primero Año`.
+- Los codigos numericos legacy 1-100 quedaron reemplazados por tokens aleatorios.
+- App Admin queda activada en el celular por token de administrador; no debe pedir login repetido.
+- App Usuario se activa solo con token generado desde Admin.
+- Solicitudes Admin se revisan por usuario y cada solicitud muestra icono de app con acciones directas.
 
 ## Verificacion Rapida Antes De Trabajar
 

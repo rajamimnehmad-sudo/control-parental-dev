@@ -1,11 +1,13 @@
 package com.contentfilter.core.sync.engine
 
 import android.util.Log
+import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceDao
 import com.contentfilter.core.database.dao.ExtraTimeGrantDao
 import com.contentfilter.core.database.dao.PolicyDao
+import com.contentfilter.core.network.dto.RemoteAccountDto
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
 import com.contentfilter.core.network.dto.RemoteDailyLimitDto
 import com.contentfilter.core.network.dto.RemoteDeviceDto
@@ -17,12 +19,23 @@ import javax.inject.Inject
 class RoomRemoteApplier
     @Inject
     constructor(
+        private val accountDao: AccountDao,
         private val policyDao: PolicyDao,
         private val deviceDao: DeviceDao,
         private val dailyLimitDao: DailyLimitDao,
         private val accessRequestDao: AccessRequestDao,
         private val extraTimeGrantDao: ExtraTimeGrantDao,
     ) {
+        suspend fun applyAccounts(values: List<RemoteAccountDto>) {
+            values.forEach { account ->
+                if (account.deletedAt == null) {
+                    accountDao.upsert(account.toEntity())
+                } else {
+                    accountDao.deleteById(account.id)
+                }
+            }
+        }
+
         suspend fun applyPolicies(values: List<RemotePolicyDto>) {
             values.forEach { policy ->
                 if (policy.active && policy.deletedAt == null) {

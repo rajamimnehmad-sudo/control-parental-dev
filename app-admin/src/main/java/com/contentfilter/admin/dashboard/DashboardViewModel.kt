@@ -7,14 +7,19 @@ import com.contentfilter.admin.BuildConfig
 import com.contentfilter.admin.devtools.AdminDevTools
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.model.RequestStatus
+import com.contentfilter.core.domain.repository.AccountRepository
+import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -24,25 +29,44 @@ import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class DashboardViewModel
     @Inject
     constructor(
         observeDevices: ObserveDevicesUseCase,
         observeRequests: ObserveRequestsUseCase,
         systemStatusRepository: SystemStatusRepository,
+        activationRepository: DeviceActivationRepository,
+        accountRepository: AccountRepository,
         private val devTools: AdminDevTools,
         private val telemetryRepository: TelemetryRepository,
     ) : ViewModel() {
         private val devToolsState = MutableStateFlow(DevToolsState())
+        private val accountFlow =
+            activationRepository.observeActivation().flatMapLatest { activation ->
+                activation?.accountId?.let(accountRepository::observeAccount) ?: flowOf(null)
+            }
+        private val localState =
+            combine(
+                accountFlow,
+                telemetryRepository.observeDiagnostics(),
+                devToolsState,
+            ) { account, diagnostics, devState ->
+                DashboardLocalState(
+                    communityName = account?.communityName.orEmpty(),
+                    guideName = account?.guideName.orEmpty(),
+                    diagnostics = diagnostics,
+                    devState = devState,
+                )
+            }
 
         val uiState =
             combine(
                 observeDevices(),
                 observeRequests(),
                 systemStatusRepository.observeHealth(),
-                telemetryRepository.observeDiagnostics(),
-                devToolsState,
-            ) { devices, requests, health, diagnostics, devState ->
+                localState,
+            ) { devices, requests, health, local ->
                 DashboardUiState(
                     deviceCount = devices.count { it.appRole != "admin" },
                     pendingRequests =
@@ -52,11 +76,13 @@ class DashboardViewModel
                     syncState = health.syncState.name,
                     systemState = health.protectionLevel.name,
                     lastSync = health.checkedAtEpochMillis.toDisplayDate(),
+                    communityName = local.communityName,
+                    guideName = local.guideName,
                     offlineMode = false,
                     showDevTools = BuildConfig.FLAVOR == "dev",
-                    devToolsBusy = devState.busy,
-                    devToolsMessage = devState.message,
-                    diagnosticsText = diagnostics.formatDiagnostics(),
+                    devToolsBusy = local.devState.busy,
+                    devToolsMessage = local.devState.message,
+                    diagnosticsText = local.diagnostics.formatDiagnostics(),
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -137,6 +163,13 @@ class DashboardViewModel
         private data class DevToolsState(
             val busy: Boolean = false,
             val message: String = "",
+        )
+
+        private data class DashboardLocalState(
+            val communityName: String,
+            val guideName: String,
+            val diagnostics: List<TechnicalDiagnostic>,
+            val devState: DevToolsState,
         )
 
         private companion object {

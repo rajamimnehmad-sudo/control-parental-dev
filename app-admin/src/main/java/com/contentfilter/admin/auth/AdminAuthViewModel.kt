@@ -54,17 +54,11 @@ class AdminAuthViewModel
             }
         }
 
-        fun onEmailChanged(value: String) = update { copy(email = value) }
-
-        fun onPasswordChanged(value: String) = update { copy(password = value) }
-
         fun onActivationCodeChanged(value: String) = update { copy(activationCode = value) }
-
-        fun onDeviceNameChanged(value: String) = update { copy(deviceName = value) }
 
         fun activate() {
             val state = _uiState.value
-            if (state.activated && state.email.isBlank() && state.password.isBlank()) {
+            if (state.activated) {
                 _uiState.update { it.copy(message = "Administrador activado. No hace falta volver a iniciar sesión.") }
                 return
             }
@@ -72,20 +66,13 @@ class AdminAuthViewModel
                 _uiState.update { it.copy(message = "Modo Offline / Desarrollo") }
                 return
             }
-            if (state.email.isBlank() || state.password.isBlank() || (!state.activated && state.activationCode.isBlank())) {
-                val reason = "Local validation failed: email, password or activation code is blank."
+            val token = PairingToken.from(state.activationCode)
+            val displayName = token.displayName ?: "Administrador"
+            if (token.code.isBlank()) {
+                val reason = "Local validation failed: admin activation token is blank."
                 Log.w(LogTag, reason)
                 _uiState.update {
-                    it.copy(
-                        message =
-                            activationFailureMessage(
-                                if (state.activated) {
-                                    "Completá email y password para renovar la sesión."
-                                } else {
-                                    "Completá email, password y código."
-                                },
-                            ),
-                    )
+                    it.copy(message = activationFailureMessage("Ingresá el token de administrador."))
                 }
                 return
             }
@@ -95,10 +82,10 @@ class AdminAuthViewModel
                     runCatching {
                         activationRepository.activate(
                             ActivationCredentials(
-                                email = state.email.trim(),
-                                password = state.password,
-                                activationCode = state.activationCode.trim(),
-                                deviceDisplayName = state.deviceName.ifBlank { "Admin Android" },
+                                email = "",
+                                password = "",
+                                activationCode = token.code,
+                                deviceDisplayName = displayName,
                                 appVersionCode = BuildConfig.VERSION_CODE,
                                 appRole = AdminRole,
                             ),
@@ -144,8 +131,32 @@ class AdminAuthViewModel
         private fun activationFailureMessage(reason: String): String {
             val detail = reason.ifBlank { "No se recibió detalle técnico del error." }
             if (detail == OfflineMessage) return OfflineMessage
-            if (detail.startsWith("Completá")) return detail
-            return "No se pudo activar. Revisá email, password y código."
+            if (detail.startsWith("Ingresá")) return detail
+            return "No se pudo activar. Revisá el token o pedí uno nuevo."
+        }
+
+        private data class PairingToken(
+            val code: String,
+            val displayName: String?,
+        ) {
+            companion object {
+                fun from(rawValue: String): PairingToken {
+                    val trimmed = rawValue.trim()
+                    val separator = trimmed.lastIndexOf('-')
+                    if (separator <= 0 || separator >= trimmed.lastIndex - 1) {
+                        return PairingToken(code = trimmed, displayName = null)
+                    }
+                    return PairingToken(
+                        code = trimmed.substring(separator + 1).trim(),
+                        displayName =
+                            trimmed
+                                .substring(0, separator)
+                                .replace('-', ' ')
+                                .trim()
+                                .takeIf { it.isNotBlank() },
+                    )
+                }
+            }
         }
 
         private companion object {

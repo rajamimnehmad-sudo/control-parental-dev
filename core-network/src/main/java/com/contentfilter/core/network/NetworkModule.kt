@@ -5,11 +5,13 @@ import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.network.realtime.RealtimeSubscription
 import com.contentfilter.core.network.realtime.SupabaseRealtimeSubscription
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
+import com.contentfilter.core.network.remote.RemoteAccountRepository
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteDeviceRepository
+import com.contentfilter.core.network.remote.SupabaseRemoteAccountRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteLimitRepository
 import com.contentfilter.core.network.remote.SupabaseRemotePolicyRepository
@@ -27,6 +29,9 @@ import javax.inject.Singleton
 abstract class NetworkModule {
     @Binds
     abstract fun bindSupabaseConfigProvider(provider: BuildConfigSupabaseConfigProvider): SupabaseConfigProvider
+
+    @Binds
+    abstract fun bindRemoteAccountRepository(repository: SupabaseRemoteAccountRepository): RemoteAccountRepository
 
     @Binds
     abstract fun bindRemotePolicyRepository(repository: SupabaseRemotePolicyRepository): RemotePolicyRepository

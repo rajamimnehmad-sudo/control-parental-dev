@@ -2,6 +2,7 @@ package com.contentfilter.core.database
 
 import android.content.Context
 import androidx.room.Room
+import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
@@ -31,6 +32,9 @@ object DatabaseModule {
         Room.databaseBuilder(context, AppDatabase::class.java, "content-filter.db")
             .addMigrations(*DatabaseMigrations.All)
             .build()
+
+    @Provides
+    fun provideAccountDao(database: AppDatabase): AccountDao = database.accountDao()
 
     @Provides
     fun providePolicyDao(database: AppDatabase): PolicyDao = database.policyDao()

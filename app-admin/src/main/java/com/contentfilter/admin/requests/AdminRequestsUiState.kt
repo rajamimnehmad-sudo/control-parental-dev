@@ -3,7 +3,7 @@ package com.contentfilter.admin.requests
 import com.contentfilter.core.domain.model.AccessRequest
 
 data class AdminRequestsUiState(
-    val requests: List<AccessRequest> = emptyList(),
+    val requests: List<AdminAccessRequestUiState> = emptyList(),
     val users: List<AdminRequestUserUiState> = emptyList(),
     val selectedDeviceId: String? = null,
     val offlineMode: Boolean = true,
@@ -11,6 +11,14 @@ data class AdminRequestsUiState(
     val lastSyncMessage: String = "",
     val isLoading: Boolean = false,
 )
+
+data class AdminAccessRequestUiState(
+    val request: AccessRequest,
+    val appName: String,
+    val iconBase64: String?,
+) {
+    val id: String = request.id
+}
 
 data class AdminRequestUserUiState(
     val deviceId: String,

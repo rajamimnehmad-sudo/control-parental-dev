@@ -1,6 +1,7 @@
 package com.contentfilter.core.network.remote
 
 import com.contentfilter.core.network.config.AuthTokenProvider
+import com.contentfilter.core.network.config.DeviceTokenProvider
 import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.network.dto.RemoteDeviceActivationDto
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,7 @@ class SupabaseActivationClient
     constructor(
         private val configProvider: SupabaseConfigProvider,
         private val authTokenProvider: AuthTokenProvider,
+        private val deviceTokenProvider: DeviceTokenProvider,
         private val httpClient: OkHttpClient,
     ) {
         suspend fun createDevicePairingCode(ttlMinutes: Int = 15): RemoteResult<PairingCodeDto> =
@@ -25,9 +27,10 @@ class SupabaseActivationClient
                 val config = configProvider.current()
                 val baseUrl = config.normalizedUrlOrNull()
                 val token = authTokenProvider.currentToken()
-                if (baseUrl == null || token == null) {
+                val deviceToken = deviceTokenProvider.currentDeviceToken()
+                if (baseUrl == null || (token == null && deviceToken == null)) {
                     return@withContext RemoteResult.Failure(
-                        "Supabase pairing requires an authenticated admin session.",
+                        "Supabase pairing requires an activated admin device.",
                         retryable = true,
                     )
                 }
@@ -40,11 +43,14 @@ class SupabaseActivationClient
                     Request.Builder()
                         .url("$baseUrl/rest/v1/rpc/create_device_pairing_code")
                         .header("apikey", config.anonKey)
-                        .header("Authorization", "Bearer $token")
+                        .header("Authorization", "Bearer ${token ?: config.anonKey}")
                         .header("Content-Type", "application/json")
                         .post(body)
-                        .build()
-                executePairingCodeRequest(request, "Supabase create_device_pairing_code RPC")
+                if (deviceToken != null) {
+                    request.header("x-device-token", deviceToken)
+                }
+                val builtRequest = request.build()
+                executePairingCodeRequest(builtRequest, "Supabase create_device_pairing_code RPC")
             }
 
         suspend fun activateDevice(

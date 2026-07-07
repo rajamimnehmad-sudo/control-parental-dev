@@ -6,6 +6,8 @@ data class DashboardUiState(
     val syncState: String = "Unknown",
     val systemState: String = "Unknown",
     val lastSync: String = "Sin datos",
+    val communityName: String = "",
+    val guideName: String = "",
     val offlineMode: Boolean = true,
     val showDevTools: Boolean = false,
     val devToolsBusy: Boolean = false,

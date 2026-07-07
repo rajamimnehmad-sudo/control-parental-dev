@@ -6,6 +6,7 @@ import com.contentfilter.core.database.entity.SyncCursorEntity
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.network.remote.RemoteAccountRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
@@ -19,6 +20,7 @@ class DefaultSyncEngine
     @Inject
     constructor(
         private val outboxProcessor: OutboxProcessor,
+        private val accountRepository: RemoteAccountRepository,
         private val deviceRepository: RemoteDeviceRepository,
         private val policyRepository: RemotePolicyRepository,
         private val limitRepository: RemoteLimitRepository,
@@ -230,6 +232,12 @@ class DefaultSyncEngine
 
         private suspend fun pullCoreDataResults(forceFull: Boolean): List<Boolean> =
             listOf(
+                pull(
+                    table = SupabaseTable.Accounts,
+                    request = { accountRepository.pullAccounts(cursorFor(SupabaseTable.Accounts, forceFull)) },
+                    apply = applier::applyAccounts,
+                    updatedAt = { it.updatedAt },
+                ),
                 pull(
                     table = SupabaseTable.Devices,
                     request = { deviceRepository.pullDevices(cursorFor(SupabaseTable.Devices, forceFull)) },

@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
+import com.contentfilter.core.domain.repository.AccountRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.feature.accessibility.service.AccessibilityController
@@ -13,24 +14,36 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import javax.inject.Inject
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class SystemStatusViewModel
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
         private val repository: SystemStatusRepository,
         activationRepository: DeviceActivationRepository,
+        accountRepository: AccountRepository,
     ) : ViewModel() {
+        private val activationFlow = activationRepository.observeActivation()
+        private val accountFlow =
+            activationFlow.flatMapLatest { activation ->
+                activation?.accountId?.let(accountRepository::observeAccount) ?: flowOf(null)
+            }
+
         val uiState =
             combine(
                 repository.observeHealth(),
-                activationRepository.observeActivation(),
-            ) { health, activation ->
+                activationFlow,
+                accountFlow,
+            ) { health, activation, account ->
                 val accessibilityState =
                     if (AccessibilityController.isEnabled(context)) {
                         ComponentState.Enabled
@@ -46,6 +59,8 @@ class SystemStatusViewModel
                         ),
                     shouldPersistAccessibility = health.accessibilityState != accessibilityState,
                     shouldPersistLicense = health.licenseState != licenseState,
+                    communityName = account?.communityName.orEmpty(),
+                    guideName = account?.guideName.orEmpty(),
                 )
             }
                 .onEach { status ->
@@ -56,7 +71,7 @@ class SystemStatusViewModel
                         repository.updateLicenseState(status.snapshot.licenseState)
                     }
                 }
-                .map { SystemStatusUiState.from(it.snapshot) }
+                .map { SystemStatusUiState.from(it.snapshot, it.communityName, it.guideName) }
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(stopTimeoutMillis = 5_000),
@@ -71,6 +86,8 @@ class SystemStatusViewModel
                             activationState = "PendingActivation",
                             appVersion = "1.0.0",
                             isVpnActive = false,
+                            communityName = "",
+                            guideName = "",
                         ),
                 )
 
@@ -78,5 +95,7 @@ class SystemStatusViewModel
             val snapshot: SystemHealthSnapshot,
             val shouldPersistAccessibility: Boolean,
             val shouldPersistLicense: Boolean,
+            val communityName: String,
+            val guideName: String,
         )
     }

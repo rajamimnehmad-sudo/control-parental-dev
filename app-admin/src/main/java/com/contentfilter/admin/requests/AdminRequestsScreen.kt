@@ -1,6 +1,9 @@
 package com.contentfilter.admin.requests
 
+import android.graphics.BitmapFactory
+import android.util.Base64
 import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,16 +30,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.contentfilter.core.domain.model.AccessRequest
-import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.RequestStatus
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 
 @Composable
 fun AdminRequestsRoute(
@@ -110,10 +109,10 @@ fun AdminRequestsRoute(
             LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 items(state.requests, key = { it.id }) { request ->
                     RequestCard(
-                        request = request,
-                        onApprove = { viewModel.approve(request.id) },
-                        onReject = { viewModel.reject(request.id) },
-                        onGrant = { minutes -> viewModel.grantTime(request, minutes) },
+                        item = request,
+                        onApprove = { viewModel.approve(request.request.id) },
+                        onReject = { viewModel.reject(request.request.id) },
+                        onGrant = { minutes -> viewModel.grantTime(request.request, minutes) },
                     )
                 }
             }
@@ -157,11 +156,12 @@ private fun RequestUserCard(
 
 @Composable
 private fun RequestCard(
-    request: AccessRequest,
+    item: AdminAccessRequestUiState,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     onGrant: (String) -> Unit,
 ) {
+    val request = item.request
     var grantMinutes by remember(request.id, request.requestedMinutes) {
         mutableStateOf((request.requestedMinutes ?: 15).toString())
     }
@@ -170,15 +170,7 @@ private fun RequestCard(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Text(request.requestType.displayName(), style = MaterialTheme.typography.titleMedium)
-            Text("Objetivo: ${request.displayTarget()}")
-            if (request.reason.isNotBlank()) {
-                Text("Motivo: ${request.reason}")
-            }
-            request.requestedMinutes?.let { minutes ->
-                Text("Minutos pedidos: $minutes")
-            }
-            Text("Fecha: ${request.createdAtEpochMillis.toDisplayDate()}", style = MaterialTheme.typography.bodySmall)
+            AppRequestIcon(appName = item.appName, iconBase64 = item.iconBase64)
             if (request.status.isPending()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -205,21 +197,42 @@ private fun RequestCard(
     }
 }
 
-private fun AccessRequestType.displayName(): String =
-    when (this) {
-        AccessRequestType.APP_ACCESS -> "Solicitud de app"
-        AccessRequestType.DOMAIN_ACCESS -> "Solicitud de sitio web"
-        AccessRequestType.EXTRA_TIME -> "Solicitud de tiempo extra"
-        AccessRequestType.OTHER -> "Solicitud"
+@Composable
+private fun AppRequestIcon(
+    appName: String,
+    iconBase64: String?,
+) {
+    val bitmap =
+        remember(iconBase64) {
+            iconBase64?.let {
+                runCatching {
+                    val bytes = Base64.decode(it, Base64.DEFAULT)
+                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                }.getOrNull()
+            }
+        }
+    Box(
+        modifier =
+            Modifier
+                .size(64.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = appName,
+                modifier = Modifier.size(48.dp),
+            )
+        } else {
+            Text(appName.take(1).uppercase(), style = MaterialTheme.typography.titleLarge)
+        }
     }
+}
 
-private fun AccessRequest.displayTarget(): String =
-    when (requestType) {
-        AccessRequestType.APP_ACCESS -> targetPackageName ?: target
-        AccessRequestType.DOMAIN_ACCESS -> targetDomain ?: target
-        AccessRequestType.EXTRA_TIME -> targetPackageName ?: targetDomain ?: target
-        AccessRequestType.OTHER -> target
-    }
+private fun RequestStatus.isPending(): Boolean =
+    this == RequestStatus.PendingLocal || this == RequestStatus.PendingRemote
 
 private fun RequestStatus.displayName(): String =
     when (this) {
@@ -230,11 +243,3 @@ private fun RequestStatus.displayName(): String =
         RequestStatus.Rejected -> "Rechazada"
         RequestStatus.Expired -> "Expirada"
     }
-
-private fun RequestStatus.isPending(): Boolean =
-    this == RequestStatus.PendingLocal || this == RequestStatus.PendingRemote
-
-private fun Long.toDisplayDate(): String =
-    DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-        .withZone(ZoneId.systemDefault())
-        .format(Instant.ofEpochMilli(this))

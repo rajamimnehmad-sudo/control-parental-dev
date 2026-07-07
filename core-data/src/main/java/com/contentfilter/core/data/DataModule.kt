@@ -1,6 +1,7 @@
 package com.contentfilter.core.data
 
 import com.contentfilter.core.domain.repository.AccessRequestRepository
+import com.contentfilter.core.domain.repository.AccountRepository
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
@@ -16,6 +17,9 @@ import dagger.hilt.components.SingletonComponent
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class DataModule {
+    @Binds
+    abstract fun bindAccountRepository(repository: RoomAccountRepository): AccountRepository
+
     @Binds
     abstract fun bindPolicyRepository(repository: RoomPolicyRepository): PolicyRepository
 
