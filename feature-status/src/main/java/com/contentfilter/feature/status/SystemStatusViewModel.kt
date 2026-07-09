@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.repository.AccountRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.feature.accessibility.service.AccessibilityController
+import com.contentfilter.feature.vpn.service.VpnController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
@@ -50,13 +51,21 @@ class SystemStatusViewModel
                     } else {
                         ComponentState.Disabled
                     }
+                val vpnState =
+                    if (VpnController.isRunning(context)) {
+                        ComponentState.Enabled
+                    } else {
+                        ComponentState.Disabled
+                    }
                 val licenseState = if (activation != null) LicenseState.Active else health.licenseState
                 NormalizedStatus(
                     snapshot =
                         health.copy(
+                            vpnState = vpnState,
                             accessibilityState = accessibilityState,
                             licenseState = licenseState,
                         ),
+                    shouldPersistVpn = health.vpnState != vpnState,
                     shouldPersistAccessibility = health.accessibilityState != accessibilityState,
                     shouldPersistLicense = health.licenseState != licenseState,
                     communityName = account?.communityName.orEmpty(),
@@ -64,6 +73,9 @@ class SystemStatusViewModel
                 )
             }
                 .onEach { status ->
+                    if (status.shouldPersistVpn) {
+                        repository.updateVpnState(status.snapshot.vpnState)
+                    }
                     if (status.shouldPersistAccessibility) {
                         repository.updateAccessibilityState(status.snapshot.accessibilityState)
                     }
@@ -93,6 +105,7 @@ class SystemStatusViewModel
 
         private data class NormalizedStatus(
             val snapshot: SystemHealthSnapshot,
+            val shouldPersistVpn: Boolean,
             val shouldPersistAccessibility: Boolean,
             val shouldPersistLicense: Boolean,
             val communityName: String,

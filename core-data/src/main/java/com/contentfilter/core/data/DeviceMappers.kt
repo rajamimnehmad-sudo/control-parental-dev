@@ -1,6 +1,7 @@
 package com.contentfilter.core.data
 
 import com.contentfilter.core.database.entity.DeviceEntity
+import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.Device
 
 internal fun DeviceEntity.toDomain(): Device =
@@ -10,6 +11,10 @@ internal fun DeviceEntity.toDomain(): Device =
         displayName = displayName,
         appRole = appRole,
         lastSeenAtEpochMillis = lastSeenAtEpochMillis,
+        vpnState = vpnState.toComponentState(),
+        accessibilityState = accessibilityState.toComponentState(),
+        protectionAlert = protectionAlert,
+        protectionUpdatedAtEpochMillis = protectionUpdatedAtEpochMillis,
     )
 
 internal fun Device.toEntity(): DeviceEntity =
@@ -19,4 +24,11 @@ internal fun Device.toEntity(): DeviceEntity =
         displayName = displayName,
         appRole = appRole,
         lastSeenAtEpochMillis = lastSeenAtEpochMillis,
+        vpnState = vpnState.name,
+        accessibilityState = accessibilityState.name,
+        protectionAlert = protectionAlert,
+        protectionUpdatedAtEpochMillis = protectionUpdatedAtEpochMillis,
     )
+
+private fun String.toComponentState(): ComponentState =
+    runCatching { ComponentState.valueOf(this) }.getOrDefault(ComponentState.Unknown)

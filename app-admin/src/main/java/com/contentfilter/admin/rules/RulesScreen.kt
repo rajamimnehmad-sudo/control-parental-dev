@@ -83,11 +83,13 @@ import com.contentfilter.core.ui.StatusChip
 
 @Composable
 fun RulesRoute(
+    entryMode: RulesEntryMode = RulesEntryMode.Apps,
     onBack: (() -> Unit)? = null,
     viewModel: RulesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     RulesScreen(
+        entryMode = entryMode,
         state = state,
         onBack = onBack,
         onAppSearchChanged = viewModel::onAppSearchChanged,
@@ -114,8 +116,14 @@ fun RulesRoute(
     )
 }
 
+enum class RulesEntryMode {
+    Apps,
+    Web,
+}
+
 @Composable
 private fun RulesScreen(
+    entryMode: RulesEntryMode,
     state: RulesUiState,
     onBack: (() -> Unit)?,
     onAppSearchChanged: (String) -> Unit,
@@ -143,10 +151,13 @@ private fun RulesScreen(
     val clipboardManager = LocalClipboardManager.current
     val otherRules = state.rules.filter { it.scope != RuleScope.App && it.scope != RuleScope.Domain }
     val selectedDevice = state.userDevices.firstOrNull { it.id == state.selectedDeviceId }
-    var selectedPanel by rememberSaveable(selectedDevice?.id) { mutableStateOf(DevicePanel.Apps) }
+    val initialPanel = if (entryMode == RulesEntryMode.Web) DevicePanel.Web else DevicePanel.Apps
+    var selectedPanel by rememberSaveable(selectedDevice?.id, entryMode) { mutableStateOf(initialPanel) }
+    val effectivePanel = if (entryMode == RulesEntryMode.Web) DevicePanel.Web else selectedPanel
 
     if (selectedDevice == null) {
         UsersListContent(
+            entryMode = entryMode,
             state = state,
             clipboardManager = clipboardManager,
             onBack = onBack,
@@ -161,7 +172,8 @@ private fun RulesScreen(
         UserDetailContent(
                 state = state,
                 selectedDevice = selectedDevice,
-                selectedPanel = selectedPanel,
+                entryMode = entryMode,
+                selectedPanel = effectivePanel,
                 otherRules = otherRules,
                 onBack = onDeviceCleared,
                 onPanelSelected = { selectedPanel = it },
@@ -185,6 +197,7 @@ private fun RulesScreen(
 
 @Composable
 private fun UsersListContent(
+    entryMode: RulesEntryMode,
     state: RulesUiState,
     clipboardManager: androidx.compose.ui.platform.ClipboardManager,
     onBack: (() -> Unit)?,
@@ -220,6 +233,7 @@ private fun UsersListContent(
                 .background(AdminSurface),
     ) {
         UsersGlassHeader(
+            entryMode = entryMode,
             searchQuery = userSearchQuery,
             totalCount = state.userDevices.size,
             onSearchChanged = { userSearchQuery = it },
@@ -304,6 +318,7 @@ private fun UsersListContent(
 
 @Composable
 private fun UsersGlassHeader(
+    entryMode: RulesEntryMode,
     searchQuery: String,
     totalCount: Int,
     onSearchChanged: (String) -> Unit,
@@ -340,12 +355,17 @@ private fun UsersGlassHeader(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = "Usuarios protegidos",
+                    text = if (entryMode == RulesEntryMode.Web) "Web" else "Apps",
                     style = MaterialTheme.typography.headlineSmall,
                     color = HeaderInk,
                 )
                 Text(
-                    text = "$totalCount total · dispositivos, apps y reglas",
+                    text =
+                        if (entryMode == RulesEntryMode.Web) {
+                            "$totalCount total · elegir usuario para configurar Web"
+                        } else {
+                            "$totalCount total · elegir usuario para configurar apps"
+                        },
                     style = MaterialTheme.typography.bodyMedium,
                     color = HeaderMuted,
                 )
@@ -545,6 +565,13 @@ private fun ProtectedUserCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = HeaderMuted,
                 )
+                device.protectionAlert?.let { alert ->
+                    Text(
+                        text = alert,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
             }
             Box {
                 IconButton(
@@ -677,7 +704,7 @@ private val UserDeviceStatus.label: String
     get() =
         when (this) {
             UserDeviceStatus.Active -> "Activo"
-            UserDeviceStatus.Unprotected -> "Pendiente"
+            UserDeviceStatus.Unprotected -> "Protección caída"
             UserDeviceStatus.Inactive -> "Pendiente"
             UserDeviceStatus.Unknown -> "Pendiente"
         }
@@ -707,6 +734,7 @@ private fun lerpDp(
 private fun UserDetailContent(
     state: RulesUiState,
     selectedDevice: UserDeviceUiState,
+    entryMode: RulesEntryMode,
     selectedPanel: DevicePanel,
     otherRules: List<PolicyRule>,
     onBack: () -> Unit,
@@ -765,6 +793,7 @@ private fun UserDetailContent(
     ) {
         UserDetailHeader(
             device = selectedDevice,
+            entryMode = entryMode,
             selectedPanel = selectedPanel,
             collapseProgress = headerProgress,
             onPanelSelected = onPanelSelected,
@@ -1107,6 +1136,7 @@ private fun CompactActionBanner(
 @Composable
 private fun UserDetailHeader(
     device: UserDeviceUiState,
+    entryMode: RulesEntryMode,
     selectedPanel: DevicePanel,
     collapseProgress: Float,
     onPanelSelected: (DevicePanel) -> Unit,
@@ -1170,55 +1200,48 @@ private fun UserDetailHeader(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (selectedPanel == DevicePanel.Apps) {
+            if (entryMode == RulesEntryMode.Web) {
                 Button(
-                    modifier = Modifier.weight(1f),
-                    onClick = { },
-                    shape = RoundedCornerShape(tabShape),
-                ) {
-                    Text("Aplicaciones")
-                }
-            } else {
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    onClick = { onPanelSelected(DevicePanel.Apps) },
-                    shape = RoundedCornerShape(tabShape),
-                ) {
-                    Text("Aplicaciones")
-                }
-            }
-            if (selectedPanel == DevicePanel.AppGroups) {
-                Button(
-                    modifier = Modifier.weight(1f),
-                    onClick = { },
-                    shape = RoundedCornerShape(tabShape),
-                ) {
-                Text("Apps en grupo")
-                }
-            } else {
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    onClick = { onPanelSelected(DevicePanel.AppGroups) },
-                    shape = RoundedCornerShape(tabShape),
-                ) {
-                    Text("Apps en grupo")
-                }
-            }
-            if (selectedPanel == DevicePanel.Web) {
-                Button(
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.fillMaxWidth(),
                     onClick = { },
                     shape = RoundedCornerShape(tabShape),
                 ) {
                     Text("Web")
                 }
             } else {
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
-                    onClick = { onPanelSelected(DevicePanel.Web) },
-                    shape = RoundedCornerShape(tabShape),
-                ) {
-                    Text("Web")
+                if (selectedPanel == DevicePanel.Apps) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = { },
+                        shape = RoundedCornerShape(tabShape),
+                    ) {
+                        Text("Aplicaciones")
+                    }
+                } else {
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { onPanelSelected(DevicePanel.Apps) },
+                        shape = RoundedCornerShape(tabShape),
+                    ) {
+                        Text("Aplicaciones")
+                    }
+                }
+                if (selectedPanel == DevicePanel.AppGroups) {
+                    Button(
+                        modifier = Modifier.weight(1f),
+                        onClick = { },
+                        shape = RoundedCornerShape(tabShape),
+                    ) {
+                        Text("Apps en grupo")
+                    }
+                } else {
+                    OutlinedButton(
+                        modifier = Modifier.weight(1f),
+                        onClick = { onPanelSelected(DevicePanel.AppGroups) },
+                        shape = RoundedCornerShape(tabShape),
+                    ) {
+                        Text("Apps en grupo")
+                    }
                 }
             }
         }

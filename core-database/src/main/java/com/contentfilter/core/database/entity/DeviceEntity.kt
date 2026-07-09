@@ -14,4 +14,8 @@ data class DeviceEntity(
     val displayName: String,
     val appRole: String = "user",
     val lastSeenAtEpochMillis: Long? = null,
+    val vpnState: String = "Unknown",
+    val accessibilityState: String = "Unknown",
+    val protectionAlert: String? = null,
+    val protectionUpdatedAtEpochMillis: Long? = null,
 )

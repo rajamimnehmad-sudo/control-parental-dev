@@ -8,6 +8,7 @@ import com.contentfilter.core.database.entity.DeviceEntity
 import com.contentfilter.core.database.entity.ExtraTimeGrantEntity
 import com.contentfilter.core.database.entity.PolicyEntity
 import com.contentfilter.core.database.entity.PolicyRuleEntity
+import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
 import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
 import com.contentfilter.core.network.dto.RemoteAppGroupDto
@@ -33,7 +34,17 @@ internal fun RemoteDeviceDto.toEntity(): DeviceEntity =
         displayName = if (deletedAt == null) displayName else "$displayName (inactivo)",
         appRole = appRole,
         lastSeenAtEpochMillis = lastSeenAt?.toEpochMillis(),
+        vpnState = vpnState.toComponentStateName(),
+        accessibilityState = accessibilityState.toComponentStateName(),
+        protectionAlert = protectionAlert,
+        protectionUpdatedAtEpochMillis = protectionUpdatedAt?.toEpochMillis(),
     )
+
+private fun String?.toComponentStateName(): String =
+    this
+        ?.let { value -> runCatching { ComponentState.valueOf(value) }.getOrNull() }
+        ?.name
+        ?: ComponentState.Unknown.name
 
 internal fun RemotePolicyRuleDto.toEntity(): PolicyRuleEntity =
     PolicyRuleEntity(

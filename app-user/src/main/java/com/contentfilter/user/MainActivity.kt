@@ -3,6 +3,8 @@ package com.contentfilter.user
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -66,6 +68,7 @@ import com.contentfilter.feature.activation.ActivationRoute
 import com.contentfilter.feature.requests.RequestsRoute
 import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
+import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.BuildConfig
 import com.contentfilter.user.apps.MyAppsRoute
 import com.contentfilter.user.internet.UserWebViewModel
@@ -110,7 +113,14 @@ private fun UserAppRoot(
     var destination by rememberSaveable { mutableStateOf(UserDestination.Home) }
     var backStack by rememberSaveable { mutableStateOf<List<UserDestination>>(emptyList()) }
     var showAccessibilityDialog by rememberSaveable { mutableStateOf(false) }
+    var showVpnDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    val vpnPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            if (VpnController.prepareIntent(context) == null) {
+                VpnController.start(context)
+            }
+        }
     val rootViewModel: UserRootViewModel = hiltViewModel()
     val rootState by rootViewModel.uiState.collectAsStateWithLifecycle()
     val updatesViewModel: UpdatesViewModel = hiltViewModel()
@@ -124,6 +134,16 @@ private fun UserAppRoot(
     }
     LaunchedEffect(destination) {
         showAccessibilityDialog = !AccessibilityController.isEnabled(context)
+    }
+    LaunchedEffect(rootState.needsActivation, statusState.isVpnActive) {
+        if (!rootState.needsActivation && !statusState.isVpnActive) {
+            val permissionIntent = VpnController.prepareIntent(context)
+            if (permissionIntent == null) {
+                VpnController.start(context)
+            } else {
+                showVpnDialog = true
+            }
+        }
     }
     LaunchedEffect(blockedDomain) {
         if (!blockedDomain.isNullOrBlank()) onBlockedDomainConsumed()
@@ -184,6 +204,14 @@ private fun UserAppRoot(
                         onBack = ::goBack,
                         vpnActive = statusState.isVpnActive,
                         accessibilityActive = statusState.accessibilityState == "Activa",
+                        onActivateWebProtection = {
+                            val permissionIntent = VpnController.prepareIntent(context)
+                            if (permissionIntent == null) {
+                                VpnController.start(context)
+                            } else {
+                                vpnPermissionLauncher.launch(permissionIntent)
+                            }
+                        },
                     )
                 UserDestination.Updates ->
                     UpdatesRoute(
@@ -252,6 +280,32 @@ private fun UserAppRoot(
             },
             dismissButton = {
                 OutlinedButton(onClick = { showAccessibilityDialog = false }) {
+                    Text("Luego")
+                }
+            },
+        )
+    } else if (showVpnDialog && !statusState.isVpnActive) {
+        AlertDialog(
+            onDismissRequest = { showVpnDialog = false },
+            title = { Text("Protección web apagada") },
+            text = { Text("La protección web necesita la VPN activa.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showVpnDialog = false
+                        val permissionIntent = VpnController.prepareIntent(context)
+                        if (permissionIntent == null) {
+                            VpnController.start(context)
+                        } else {
+                            vpnPermissionLauncher.launch(permissionIntent)
+                        }
+                    },
+                ) {
+                    Text("Activar protección web")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showVpnDialog = false }) {
                     Text("Luego")
                 }
             },
@@ -337,6 +391,7 @@ private fun UserWebTab(
     onBack: () -> Unit,
     vpnActive: Boolean,
     accessibilityActive: Boolean,
+    onActivateWebProtection: () -> Unit,
     viewModel: UserWebViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -362,17 +417,20 @@ private fun UserWebTab(
                 },
             accent = ProductSky,
         )
-        if (blocked && !accessibilityActive) {
+        if (!accessibilityActive) {
             ProductCard {
                 Text("Accessibility apagado.", style = MaterialTheme.typography.bodyMedium)
             }
         }
-        if (blocked && !vpnActive) {
+        if (!vpnActive) {
             ProductCard {
                 Text("VPN apagada.", style = MaterialTheme.typography.bodyMedium)
+                Button(onClick = onActivateWebProtection) {
+                    Text("Activar protección web")
+                }
             }
         }
-        if (blocked && !protectionActive) {
+        if (!protectionActive) {
             ProductCard {
                 Text("Protección web no activa.", style = MaterialTheme.typography.bodyMedium)
             }

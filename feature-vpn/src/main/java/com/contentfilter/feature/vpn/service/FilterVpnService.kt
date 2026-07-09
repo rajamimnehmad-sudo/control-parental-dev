@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
@@ -147,7 +148,7 @@ class FilterVpnService : VpnService() {
     private fun stopVpn(reason: String) {
         VpnController.markStopped(this, reason)
         updateVpnState(ComponentState.Disabled)
-        recordServiceState("VPN stopped: $reason")
+        recordServiceState("${DeviceProtectionAlert.WebDisabled} reason=$reason")
         cleanup()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()

@@ -130,10 +130,12 @@ class SupabaseRestClient
                 }
             }
 
-        fun deviceSeenJson(): JSONObject =
-            JSONObject()
-                .put("last_seen_at", Instant.now().toString())
-                .put("updated_at", Instant.now().toString())
+        fun deviceSeenJson(): JSONObject {
+            val now = Instant.now().toString()
+            return JSONObject()
+                .put("last_seen_at", now)
+                .put("updated_at", now)
+        }
 
         private suspend fun executeArray(
             path: String,

@@ -5,6 +5,7 @@ import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.UsageSession
@@ -145,7 +146,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             scope.launch {
                 transition?.let { saveTransition(it) }
                 systemStatusRepository.updateAccessibilityState(ComponentState.Disabled)
-                telemetryReporter.recordServiceState("Accessibility service destroyed.")
+                telemetryReporter.recordServiceState(DeviceProtectionAlert.AppsDisabled)
                 snapshotProvider.stop()
                 clearExtraTimeExpiry()
                 clearAppLimitDeadline()

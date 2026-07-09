@@ -192,7 +192,8 @@ class DefaultSyncEngine
 
         private suspend fun markCurrentDeviceSeen() {
             val activation = deviceActivationRepository.currentActivation() ?: return
-            when (val result = deviceRepository.markDeviceSeen(activation.deviceId)) {
+            val health = systemStatusRepository.currentHealth()
+            when (val result = deviceRepository.markDeviceSeen(activation.deviceId, health)) {
                 is RemoteResult.Success -> Unit
                 is RemoteResult.Failure -> Log.w(LogTag, "Device heartbeat failed: ${result.reason}")
             }

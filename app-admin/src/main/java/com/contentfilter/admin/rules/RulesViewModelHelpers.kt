@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.AppGroup
+import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
@@ -184,6 +185,8 @@ internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List
             val lastSeen = device?.lastSeenAtEpochMillis ?: newestAppSeen
             val status =
                 when {
+                    device?.vpnState == ComponentState.Disabled ||
+                        device?.accessibilityState == ComponentState.Disabled -> UserDeviceStatus.Unprotected
                     lastSeen == null -> UserDeviceStatus.Unknown
                     System.currentTimeMillis() - lastSeen <= ActiveDeviceWindowMillis -> UserDeviceStatus.Active
                     else -> UserDeviceStatus.Inactive
@@ -194,6 +197,7 @@ internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List
                 status = status,
                 lastSeenLabel = lastSeen.toLastSeenLabel(),
                 appCount = appsByDevice[deviceId]?.distinctBy { it.packageName }?.size ?: 0,
+                protectionAlert = device?.protectionAlert,
                 userLabel = "Usuario",
             )
         }.sortedWith(

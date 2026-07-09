@@ -55,6 +55,7 @@ data class UserDeviceUiState(
     val status: UserDeviceStatus,
     val lastSeenLabel: String,
     val appCount: Int,
+    val protectionAlert: String? = null,
     val userLabel: String = "Usuario",
 )
 

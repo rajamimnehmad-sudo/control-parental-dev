@@ -41,6 +41,7 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
@@ -83,6 +84,7 @@ import com.contentfilter.admin.BuildConfig
 import com.contentfilter.admin.auth.AdminAuthRoute
 import com.contentfilter.admin.dashboard.DashboardRoute
 import com.contentfilter.admin.requests.AdminRequestsRoute
+import com.contentfilter.admin.rules.RulesEntryMode
 import com.contentfilter.admin.rules.RulesRoute
 import com.contentfilter.admin.updates.AdminUpdatesRoute
 import com.contentfilter.admin.updates.AdminUpdatesStatus
@@ -166,7 +168,8 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
                     ) {
                         DashboardRoute()
                     }
-                AdminSection.Users -> RulesRoute(onBack = { section = null })
+                AdminSection.Apps -> RulesRoute(entryMode = RulesEntryMode.Apps, onBack = { section = null })
+                AdminSection.Web -> RulesRoute(entryMode = RulesEntryMode.Web, onBack = { section = null })
                 AdminSection.Requests ->
                     SectionContainer(
                         title = "Solicitudes",
@@ -192,7 +195,8 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
                             )
                         AdminTab.Community ->
                             CommunityTab(
-                                onUsers = { section = AdminSection.Users },
+                                onApps = { section = AdminSection.Apps },
+                                onWeb = { section = AdminSection.Web },
                                 onRequests = {
                                     requestsRefreshKey += 1
                                     section = AdminSection.Requests
@@ -870,7 +874,8 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
 
 @Composable
 private fun CommunityTab(
-    onUsers: () -> Unit,
+    onApps: () -> Unit,
+    onWeb: () -> Unit,
     onRequests: () -> Unit,
 ) {
     VisualPage(
@@ -883,18 +888,25 @@ private fun CommunityTab(
             accent = Teal,
         )
         FeatureTile(
+            icon = Icons.Filled.Search,
+            title = "Apps",
+            subtitle = "Elegir usuario y configurar apps",
+            accent = Sky,
+            onClick = onApps,
+        )
+        FeatureTile(
+            icon = Icons.Filled.Person,
+            title = "Web",
+            subtitle = "Elegir usuario y bloquear navegación web",
+            accent = Teal,
+            onClick = onWeb,
+        )
+        FeatureTile(
             icon = Icons.Filled.Notifications,
             title = "Solicitudes",
             subtitle = "Aprobar accesos y tiempo extra",
             accent = Sun,
             onClick = onRequests,
-        )
-        FeatureTile(
-            icon = Icons.Filled.Person,
-            title = "Usuarios protegidos",
-            subtitle = "Dispositivos, apps, grupos y reglas",
-            accent = Sky,
-            onClick = onUsers,
         )
     }
 }
@@ -1211,7 +1223,8 @@ private enum class AdminTab(
 
 private enum class AdminSection {
     Panel,
-    Users,
+    Apps,
+    Web,
     Requests,
     Updates,
 }

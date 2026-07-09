@@ -114,6 +114,24 @@ object DatabaseMigrations {
             }
         }
 
+    val Migration7To8: Migration =
+        object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE devices ADD COLUMN vpnState TEXT NOT NULL DEFAULT 'Unknown'")
+                db.execSQL("ALTER TABLE devices ADD COLUMN accessibilityState TEXT NOT NULL DEFAULT 'Unknown'")
+                db.execSQL("ALTER TABLE devices ADD COLUMN protectionAlert TEXT")
+                db.execSQL("ALTER TABLE devices ADD COLUMN protectionUpdatedAtEpochMillis INTEGER")
+            }
+        }
+
     val All: Array<Migration> =
-        arrayOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5, Migration5To6, Migration6To7)
+        arrayOf(
+            Migration1To2,
+            Migration2To3,
+            Migration3To4,
+            Migration4To5,
+            Migration5To6,
+            Migration6To7,
+            Migration7To8,
+        )
 }
