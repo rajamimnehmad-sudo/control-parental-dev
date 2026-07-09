@@ -163,14 +163,17 @@ curl -fsSL https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev
 
 ## Flujo recomendado por ticket
 
-1. Leer `docs/HANDOFF_ACTUAL.md`.
-2. Leer solo el area de `docs/AREAS.md`.
-3. Revisar matriz de impacto.
-4. Abrir los 2 a 5 archivos principales del area.
-5. Cambiar lo minimo.
-6. Validar con build/test minimo del area.
-7. Si cambio Android, bump versionCode, commit, push, verificar Actions y manifests.
-8. Si no cambio Android, commit opcional segun pedido y no publicar.
+1. Trabajar en tickets chicos.
+2. Leer `docs/HANDOFF_ACTUAL.md`.
+3. Usar `docs/CODEX_MAP.md` solo para ubicarse.
+4. Leer solo el area necesaria en `docs/AREAS.md`.
+5. Revisar matriz de impacto.
+6. Abrir solo los archivos necesarios del area afectada.
+7. No revisar todo el repo salvo auditoria explicita.
+8. Cambiar lo minimo.
+9. Validar con build/test minimo del area.
+10. Si cambio Android, bump versionCode, commit, push, verificar Actions y manifests.
+11. Si no cambio Android, commit opcional segun pedido y no publicar APK.
 
 ## NO TOCAR
 
@@ -203,4 +206,3 @@ Para cambios no Android:
 
 - Archivos modificados.
 - Confirmacion: no build, no versionCode, no APK porque no cambio codigo Android.
-
