@@ -2,8 +2,6 @@ package com.contentfilter.feature.status
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -13,6 +11,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductLargeFeatureCard
+import com.contentfilter.core.ui.ProductMint
+import com.contentfilter.core.ui.ProductSky
+import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.core.ui.StatusBadge
 import com.contentfilter.feature.vpn.service.VpnController
 
@@ -38,27 +41,44 @@ fun SystemStatusScreen(
     state: SystemStatusUiState,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ProductVisualPage(
+        modifier = modifier,
+        title = state.title,
+        subtitle = state.summary,
     ) {
-        Text(text = state.title, style = MaterialTheme.typography.headlineMedium)
-        StatusBadge(level = state.protectionLevel)
-        Text(text = state.summary, style = MaterialTheme.typography.bodyLarge)
-        if (state.communityName.isNotBlank()) {
-            Text(text = "Comunidad: ${state.communityName}", style = MaterialTheme.typography.bodyMedium)
+        ProductLargeFeatureCard(
+            title = "Protección activa",
+            subtitle = "Estado del dispositivo, sincronización y servicios necesarios.",
+            accent = ProductMint,
+        )
+        ProductCard {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                StatusBadge(level = state.protectionLevel)
+                if (state.communityName.isNotBlank()) {
+                    StatusLine("Comunidad", state.communityName)
+                }
+                if (state.guideName.isNotBlank()) {
+                    StatusLine("Guía", state.guideName)
+                }
+                StatusLine("VPN", state.vpnState)
+                StatusLine("Accesibilidad", state.accessibilityState)
+                StatusLine("Sincronización", state.syncState)
+                StatusLine("Activación", state.activationState)
+                StatusLine("Versión", state.appVersion)
+            }
         }
-        if (state.guideName.isNotBlank()) {
-            Text(text = "Guía: ${state.guideName}", style = MaterialTheme.typography.bodyMedium)
-        }
-        Text(text = "VPN: ${state.vpnState}", style = MaterialTheme.typography.bodyMedium)
-        Text(text = "Accesibilidad: ${state.accessibilityState}", style = MaterialTheme.typography.bodyMedium)
-        Text(text = "Sincronización: ${state.syncState}", style = MaterialTheme.typography.bodyMedium)
-        Text(text = "Activación: ${state.activationState}", style = MaterialTheme.typography.bodyMedium)
-        Text(text = "Versión: ${state.appVersion}", style = MaterialTheme.typography.bodyMedium)
-        Text("Web congelado temporalmente. El bloqueo activo es solo por apps.", style = MaterialTheme.typography.bodySmall)
+        ProductLargeFeatureCard(
+            title = "Apps primero",
+            subtitle = "El bloqueo web sigue congelado temporalmente. El control activo principal es por apps.",
+            accent = ProductSky,
+        )
     }
+}
+
+@Composable
+private fun StatusLine(
+    label: String,
+    value: String,
+) {
+    Text(text = "$label: $value", style = MaterialTheme.typography.bodyMedium)
 }

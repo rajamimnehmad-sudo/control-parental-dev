@@ -205,7 +205,7 @@ internal fun RuleCard(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Eliminar regla") },
-            text = { Text("Esta regla se eliminará de este entorno DEV.") },
+            text = { Text("Esta regla se eliminará.") },
             confirmButton = {
                 Button(
                     onClick = {
@@ -249,7 +249,7 @@ internal fun DomainLimitCard(
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text("Eliminar límite") },
-            text = { Text("Este límite de dominio se eliminará de este entorno DEV.") },
+            text = { Text("Este límite de dominio se eliminará.") },
             confirmButton = {
                 Button(
                     onClick = {

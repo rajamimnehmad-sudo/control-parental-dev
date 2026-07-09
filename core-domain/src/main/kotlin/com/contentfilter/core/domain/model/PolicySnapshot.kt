@@ -11,4 +11,5 @@ data class PolicySnapshot(
     val dailyLimits: List<DailyLimit> = emptyList(),
     val dailyUsage: List<DailyAppUsage> = emptyList(),
     val extraTimeGrants: List<ExtraTimeGrant> = emptyList(),
+    val appGroups: List<AppGroup> = emptyList(),
 )

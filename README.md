@@ -70,10 +70,11 @@ Tests relevantes:
 Publicar APKs DEV:
 
 ```bash
-scripts/publicar_dev.sh
+scripts/publicar_admin_dev.sh
+scripts/publicar_usuario_dev.sh
 ```
 
-El script compila, corre tests, prepara manifiestos, valida que suba el `versionCode` y publica en Supabase Storage.
+Los scripts compilan la app elegida, corren su test DEV, preparan manifiesto, validan que suba el `versionCode` y publican en Supabase Storage DEV. `scripts/publicar_dev.sh` queda solo para publicar ambas apps juntas.
 
 ## Actualizaciones DEV
 
@@ -94,7 +95,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 Version DEV actual:
 
 ```text
-versionCode 108
+App Usuario versionCode 126
+App Admin versionCode 147
 versionName 1.0.1-dev
 ```
 
@@ -139,6 +141,17 @@ Actualizar este README cuando cambie:
 - El Panel Admin muestra `Responsable` en lugar de `Guia`.
 - En solicitudes, `Rechazar` queda visible como boton de ancho completo.
 - El tiempo extra concedido se refleja en listas de Admin y Usuario con minutos restantes.
+- Grupos de apps: Admin puede armar un grupo por usuario/dispositivo o aplicarlo a varios usuarios destino con limite diario compartido; Usuario ve barra de progreso del grupo. La ventana diaria reinicia a las 12 PM.
+- Supabase DEV incluye `app_groups`, `app_group_apps` y base para grupos de usuarios.
+- App Admin DEV 122 agrega primera capa visual moderna: Home con hero, tarjetas grandes, menu inferior mas visual y accesos a Comunidad/Ajustes.
+- App Admin DEV 124 ordena la base visual con iconos internos reutilizables, navegacion inferior con iconos reales, flechas reales y header integrado en Usuarios protegidos.
+- App Admin DEV 125 unifica headers internos al estilo Comunidad, con flecha atras integrada y titulos sin duplicar.
+- App Admin DEV 126 reemplaza iconos dibujados a mano por Material Icons Core liviano y corrige la card de Usuarios protegidos.
+- App Admin DEV 127 agrega padding de barra de estado en headers para que no se tapen con hora/senal/bateria.
+- App Admin DEV 128 rediseña detalle de usuario con nombre como header, flecha atras integrada y tabs acordes al resto.
+- App Admin DEV 129 corrige Usuarios protegidos para que el contenido no quede bajo el header antes de actualizar y muestra el token de usuario dentro de la misma ventana.
+- App Admin DEV 130 mejora Aplicaciones con filtros rapidos, busqueda compacta y orden confirmado al bloquear.
+- App Admin DEV 131 deja fijo el header del usuario en Aplicaciones, mueve el chip de estado al lado del nombre, enfoca automaticamente la busqueda y quita la seleccion gris de filtros.
 
 ## Verificacion Rapida Antes De Trabajar
 

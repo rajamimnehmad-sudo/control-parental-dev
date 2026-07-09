@@ -131,6 +131,40 @@ class SupabaseActivationClient
                 executeActivationRequest(request, "Supabase pair_device_with_code RPC")
             }
 
+        suspend fun pairAdminDeviceWithPassword(
+            pairingCode: String,
+            email: String,
+            password: String,
+            displayName: String,
+            appVersionCode: Int,
+            accessToken: String? = null,
+        ): RemoteResult<RemoteDeviceActivationDto> =
+            withContext(Dispatchers.IO) {
+                val config = configProvider.current()
+                val baseUrl = config.normalizedUrlOrNull()
+                if (baseUrl == null) {
+                    return@withContext RemoteResult.Failure("Supabase pairing is not configured.", retryable = true)
+                }
+                val body =
+                    JSONObject()
+                        .put("pairing_code", pairingCode)
+                        .put("admin_email", email)
+                        .put("admin_password", password)
+                        .put("device_display_name", displayName)
+                        .put("device_app_version_code", appVersionCode)
+                        .toString()
+                        .toRequestBody(JsonMediaType)
+                val request =
+                    Request.Builder()
+                        .url("$baseUrl/rest/v1/rpc/pair_admin_device_with_password")
+                        .header("apikey", config.anonKey)
+                        .header("Authorization", "Bearer ${accessToken ?: config.anonKey}")
+                        .header("Content-Type", "application/json")
+                        .post(body)
+                        .build()
+                executeActivationRequest(request, "Supabase pair_admin_device_with_password RPC")
+            }
+
         suspend fun revokeDevice(deviceId: String): RemoteResult<Unit> =
             withContext(Dispatchers.IO) {
                 val config = configProvider.current()

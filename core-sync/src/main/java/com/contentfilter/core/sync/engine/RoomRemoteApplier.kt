@@ -3,12 +3,15 @@ package com.contentfilter.core.sync.engine
 import android.util.Log
 import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
+import com.contentfilter.core.database.dao.AppGroupDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceDao
 import com.contentfilter.core.database.dao.ExtraTimeGrantDao
 import com.contentfilter.core.database.dao.PolicyDao
 import com.contentfilter.core.network.dto.RemoteAccountDto
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
+import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
+import com.contentfilter.core.network.dto.RemoteAppGroupDto
 import com.contentfilter.core.network.dto.RemoteDailyLimitDto
 import com.contentfilter.core.network.dto.RemoteDeviceDto
 import com.contentfilter.core.network.dto.RemoteExtraTimeGrantDto
@@ -25,6 +28,7 @@ class RoomRemoteApplier
         private val dailyLimitDao: DailyLimitDao,
         private val accessRequestDao: AccessRequestDao,
         private val extraTimeGrantDao: ExtraTimeGrantDao,
+        private val appGroupDao: AppGroupDao,
     ) {
         suspend fun applyAccounts(values: List<RemoteAccountDto>) {
             values.forEach { account ->
@@ -82,6 +86,26 @@ class RoomRemoteApplier
                     dailyLimitDao.upsert(limit.toEntity())
                 } else {
                     dailyLimitDao.deleteById(limit.id)
+                }
+            }
+        }
+
+        suspend fun applyAppGroups(values: List<RemoteAppGroupDto>) {
+            values.forEach { group ->
+                if (group.deletedAt == null) {
+                    appGroupDao.upsertGroup(group.toEntity())
+                } else {
+                    appGroupDao.deleteGroupById(group.id)
+                }
+            }
+        }
+
+        suspend fun applyAppGroupApps(values: List<RemoteAppGroupAppDto>) {
+            values.forEach { app ->
+                if (app.deletedAt == null) {
+                    appGroupDao.upsertApp(app.toEntity())
+                } else {
+                    appGroupDao.deleteAppById(app.id)
                 }
             }
         }

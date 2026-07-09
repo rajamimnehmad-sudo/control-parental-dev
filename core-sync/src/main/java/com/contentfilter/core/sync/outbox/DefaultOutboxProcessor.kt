@@ -4,6 +4,8 @@ import android.util.Log
 import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.entity.OutboxOperationEntity
+import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
+import com.contentfilter.core.network.dto.RemoteAppGroupDto
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
 import com.contentfilter.core.network.dto.RemoteDailyLimitDto
 import com.contentfilter.core.network.dto.RemoteExtraTimeGrantDto
@@ -73,6 +75,8 @@ class DefaultOutboxProcessor
                 PoliciesTable -> policyRepository.upsertPolicy(operation.toPolicyDto())
                 PolicyRulesTable -> policyRepository.upsertPolicyRule(operation.toPolicyRuleDto())
                 DailyLimitsTable -> limitRepository.upsertDailyLimit(operation.toDailyLimitDto())
+                AppGroupsTable -> limitRepository.upsertAppGroup(operation.toAppGroupDto())
+                AppGroupAppsTable -> limitRepository.upsertAppGroupApp(operation.toAppGroupAppDto())
                 AccessRequestsTable -> requestRepository.upsertAccessRequest(operation.toAccessRequestDto())
                 ExtraTimeGrantsTable -> requestRepository.upsertExtraTimeGrant(operation.toExtraTimeGrantDto())
                 else -> RemoteResult.Failure("Unsupported outbox table ${operation.tableName}.", retryable = false)
@@ -86,6 +90,12 @@ class DefaultOutboxProcessor
 
         private suspend fun OutboxOperationEntity.toDailyLimitDto(): RemoteDailyLimitDto =
             RemoteDailyLimitDto.fromJson(payloadJsonWithAccount())
+
+        private suspend fun OutboxOperationEntity.toAppGroupDto(): RemoteAppGroupDto =
+            RemoteAppGroupDto.fromJson(payloadJsonWithAccountAndDevice())
+
+        private suspend fun OutboxOperationEntity.toAppGroupAppDto(): RemoteAppGroupAppDto =
+            RemoteAppGroupAppDto.fromJson(payloadJsonWithAccountAndDevice())
 
         private suspend fun OutboxOperationEntity.toAccessRequestDto(): RemoteAccessRequestDto =
             RemoteAccessRequestDto.fromJson(payloadJsonWithAccountAndDevice())
@@ -115,6 +125,8 @@ class DefaultOutboxProcessor
             const val PoliciesTable = "policies"
             const val PolicyRulesTable = "policy_rules"
             const val DailyLimitsTable = "daily_limits"
+            const val AppGroupsTable = "app_groups"
+            const val AppGroupAppsTable = "app_group_apps"
             const val AccessRequestsTable = "access_requests"
             const val ExtraTimeGrantsTable = "extra_time_grants"
             const val LogTag = "OutboxProcessor"

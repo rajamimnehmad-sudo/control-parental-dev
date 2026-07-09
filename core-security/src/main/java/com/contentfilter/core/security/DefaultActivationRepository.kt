@@ -54,7 +54,43 @@ class DefaultActivationRepository
                     return@withContext ActivationResult.Activated(activation)
                 }
                 val activation =
-                    if (credentials.email.isBlank() && credentials.password.isBlank()) {
+                    if (credentials.appRole == AdminRole && credentials.email.isNotBlank() && credentials.password.isNotBlank()) {
+                        val existingSession =
+                            when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
+                                is RemoteResult.Success -> result.value
+                                is RemoteResult.Failure -> null
+                            }
+                        val paired =
+                            when (
+                                val result =
+                                    activationClient.pairAdminDeviceWithPassword(
+                                        pairingCode = credentials.activationCode,
+                                        email = credentials.email,
+                                        password = credentials.password,
+                                        displayName = credentials.deviceDisplayName,
+                                        appVersionCode = credentials.appVersionCode,
+                                        accessToken = existingSession?.accessToken,
+                                    )
+                            ) {
+                                is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
+                                is RemoteResult.Success ->
+                                    result.value.also { dto ->
+                                        dto.deviceToken?.let(deviceTokenProvider::saveDeviceToken)
+                                    }
+                            }
+                        val session = existingSession ?: when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
+                            is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
+                            is RemoteResult.Success -> result.value
+                        }
+                        sessionStore.save(
+                            AuthSession(
+                                accessToken = session.accessToken,
+                                refreshToken = session.refreshToken,
+                                expiresAtEpochMillis = System.currentTimeMillis() + session.expiresInSeconds * 1000,
+                            ),
+                        )
+                        paired
+                    } else if (credentials.email.isBlank() && credentials.password.isBlank()) {
                         when (
                             val result =
                                 activationClient.pairDeviceWithCode(
@@ -118,5 +154,6 @@ class DefaultActivationRepository
 
         private companion object {
             const val LogTag = "ActivationRepository"
+            const val AdminRole = "admin"
         }
     }

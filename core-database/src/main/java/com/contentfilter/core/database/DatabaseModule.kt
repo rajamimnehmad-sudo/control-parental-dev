@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
+import com.contentfilter.core.database.dao.AppGroupDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.DeviceDao
@@ -68,4 +69,7 @@ object DatabaseModule {
 
     @Provides
     fun provideOutboxOperationDao(database: AppDatabase): OutboxOperationDao = database.outboxOperationDao()
+
+    @Provides
+    fun provideAppGroupDao(database: AppDatabase): AppGroupDao = database.appGroupDao()
 }

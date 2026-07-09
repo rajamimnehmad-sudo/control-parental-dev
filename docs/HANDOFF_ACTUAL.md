@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-07
+Fecha de corte: 2026-07-09
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -40,7 +40,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada:
 
 ```text
-versionCode 108
+App Usuario versionCode 129
+App Admin versionCode 148
 versionName 1.0.1-dev
 ```
 
@@ -61,8 +62,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256:
 
 ```text
-Usuario: c91c5f8ca44d58c25aa18093ac25971356b7924a94af6cf964efd2b1611e0554
-Admin:   4ee1e88d93ed88aa86ddbfa83249eca0f6e4f5c1df74dd7878db72e54aecdc03
+Usuario: a29b8774e09a3ec914666cd0be2d9a7830f6e3a934aa730c203010b676eb2a9d
+Admin:   9b93b95b897da1481b7c921a84715c81cc124fd6f813030a013757cf3e78381e
 ```
 
 ## Estado funcional
@@ -72,7 +73,7 @@ Admin:   4ee1e88d93ed88aa86ddbfa83249eca0f6e4f5c1df74dd7878db72e54aecdc03
 - App Usuario se activa solo con token generado desde Admin.
 - Comunidad DEV activa: `Comunidad Primero Año`.
 - Codigos numericos legacy 1-100 reemplazados por tokens aleatorios.
-- Mis dispositivos es la entrada unica para dispositivos y reglas.
+- Usuarios es la entrada unica del Admin para usuarios protegidos, aplicaciones y grupos de apps.
 - La seccion separada Reglas ya no esta en navegacion.
 - Bloqueo de apps por Accessibility funciona y cierra apps bloqueadas rapido.
 - VPN/bloqueo web queda fuera del proximo ticket salvo que el usuario lo pida.
@@ -81,6 +82,13 @@ Admin:   4ee1e88d93ed88aa86ddbfa83249eca0f6e4f5c1df74dd7878db72e54aecdc03
 - Si Admin concede tiempo extra, Admin y Usuario muestran minutos restantes.
 - Si Admin concede acceso completo, se elimina limite diario de esa app y queda permitida.
 - Apps bloqueadas o limitadas aparecen antes que apps permitidas.
+- App Admin permite crear grupos de apps dentro de un usuario elegido, con limite diario compartido.
+- En Admin, el menu inferior dice Usuarios; al entrar lista usuarios, al abrir uno muestra pestañas Aplicaciones y Grupos de apps.
+- Una app solo puede estar en un grupo del mismo usuario; si ya esta en otro grupo, la UI avisa.
+- El listado normal de aplicaciones muestra etiqueta del grupo cuando corresponde.
+- App Usuario muestra grupos de apps con barra de progreso real y reset diario a las 12 PM.
+- El motor bloquea todas las apps del grupo cuando el limite compartido se agota; los limites individuales de app pueden convivir.
+- Supabase DEV tiene `app_groups`, `app_group_apps` y tablas base para grupos de usuarios (`protected_user_groups`, `protected_user_group_members`).
 - Panel Admin muestra comunidad y responsable, sin herramientas tecnicas DEV.
 - Pantalla Actualizaciones del Usuario ya no muestra reset/diagnostico DEV.
 
@@ -103,7 +111,45 @@ Verificacion ejecutada:
 scripts/publicar_dev.sh
 ```
 
-Resultado: build/tests OK y DEV 108 publicado.
+Resultado: build/tests OK, App Usuario DEV 129 publicada y App Admin DEV 148 publicada.
+
+Publicacion DEV recomendada por app:
+
+```bash
+scripts/publicar_admin_dev.sh
+scripts/publicar_usuario_dev.sh
+```
+
+`scripts/publicar_dev.sh` queda disponible para publicar ambas apps juntas, pero no usarlo para cambios Admin-only o Usuario-only.
+
+Nota 2026-07-07: DEV 124 ordena la base visual Admin con iconos internos reutilizables, navegacion inferior con iconos reales, flechas reales y header integrado en Usuarios protegidos.
+Nota 2026-07-07: App Admin DEV 125 unifica headers internos al estilo Comunidad, con flecha atras integrada y titulos sin duplicar. App Usuario queda en DEV 124.
+Nota 2026-07-07: App Admin DEV 126 reemplaza iconos dibujados a mano por Material Icons Core liviano y corrige la card de Usuarios protegidos para que el estado no se corte.
+Nota 2026-07-08: App Admin DEV 127 agrega padding de barra de estado en headers para que no se tapen con hora/senal/bateria en el telefono.
+Nota 2026-07-08: App Admin DEV 128 rediseña detalle de usuario con nombre como header, flecha atras integrada y tabs acordes al resto.
+Nota 2026-07-08: App Admin DEV 129 corrige Usuarios protegidos para que el contenido no quede bajo el header antes de actualizar y muestra el token de usuario dentro de la misma ventana.
+Nota 2026-07-08: App Admin DEV 130 mejora Aplicaciones con filtros rapidos, busqueda compacta y orden confirmado al bloquear.
+Nota 2026-07-08: App Admin DEV 131 deja fijo el header del usuario en Aplicaciones, mueve el chip de estado al lado del nombre, enfoca automaticamente la busqueda y quita la seleccion gris de filtros.
+Nota 2026-07-08: App Admin DEV 132 usa el pez como icono y en Home, limpia el token al copiar y genera tokens de usuario validos por 3 horas en Supabase DEV.
+Nota 2026-07-08: App Admin DEV 133 integra el pez en Home sin fondo blanco y mueve la accion borrar usuario a un menu de tres puntos.
+Nota 2026-07-08: App Admin DEV 134 deja Todas como filtro inicial en apps, simplifica seleccion de filtros, compacta tarjetas y usa el banner superior para estados de acciones.
+Nota 2026-07-08: App Admin DEV 135 compacta automaticamente el header del detalle de usuario al scrollear o abrir busqueda, sube el titulo y reduce el banner de accion.
+Nota 2026-07-08: App Admin DEV 136 suaviza con animacion la compactacion del header y agrega flotacion sutil al pez del Home.
+Nota 2026-07-08: App Admin DEV 137 hace que el header acompane directamente el scroll y cambia el pez del Home a saludo al entrar o tocar.
+Nota 2026-07-08: App Admin DEV 138 suaviza la compactacion del header con resorte corto y agrega animacion avanzada del pez en Home con loop, parpadeo, escape/vuelta y reaccion al tocar.
+Nota 2026-07-08: App Admin DEV 139 reemplaza el pez del Home por una version vectorial por capas, con parpadeo visible, aleteo real, cola animada y giro 360.
+Nota 2026-07-08: App Admin DEV 140 refina el pez del Home con cara mas limpia, aletas mas visibles y volumen tipo 3D mediante gradientes, luces y sombras.
+Nota 2026-07-08: App Admin DEV 141 reemplaza el pez artesanal por un asset Lottie 2D liviano, con capas animadas y layout del hero sin solapar texto.
+Nota 2026-07-08: App Admin DEV 142 vuelve el pez del Home al diseno de DEV 139 y elimina Lottie del Admin para salir de la version rechazada.
+Nota 2026-07-08: App Admin DEV 143 usa el pez premium del paquete en el Home, manteniendo la animacion de DEV 142 con aleteo visible de aletas y cola.
+Nota 2026-07-08: App Admin DEV 144 convierte FeedbackBanner en banner premium con degradado turquesa/azul, texto blanco, pez animado por estado y Home sin giro 360.
+Nota 2026-07-08: App Admin DEV 145 aplica el banner premium con pez al mensaje compacto del detalle de apps, donde antes seguia el banner celeste viejo.
+Nota 2026-07-09: Se agregan scripts de publicacion DEV separados por app y el banner premium queda aplicado de forma explicita en Admin y Usuario.
+Nota 2026-07-09: App Usuario DEV 125 y App Admin DEV 146 publicadas con banner premium compartido, scripts separados verificados y docs actualizadas.
+Nota 2026-07-09: App Usuario DEV 126 agrega Home al estilo Admin, unifica estetica de pantallas de Usuario, y App Admin DEV 147 actualiza el banner premium compartido con el pez al fondo derecho.
+Nota 2026-07-09: App Usuario DEV 127 mueve solicitudes a Home y estado a Ajustes, oculta nombres tecnicos de apps, mejora solicitudes con iconos/nombres amigables y agrega filtros/progreso en Mis apps. App Admin DEV 148 renombra grupos a Apps en grupo y corrige scroll del detalle de aplicaciones.
+Nota 2026-07-09: App Usuario DEV 128 ajusta Mis apps al estilo visual del panel Admin, muestra Apps en grupo solo en su filtro, separa mas la pila de iconos y suma pez Home con burbujas/sombra/animacion.
+Nota 2026-07-09: App Usuario DEV 129 agrega Web al menu, flechas atras con historial, refresh real en Mis apps, Ajustes mas moderno, iconos compartidos Material y banner mas compacto con pez patrullando.
 
 ## Modulos principales
 

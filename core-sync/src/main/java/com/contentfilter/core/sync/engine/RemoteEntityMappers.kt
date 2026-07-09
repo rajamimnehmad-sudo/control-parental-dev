@@ -1,5 +1,7 @@
 package com.contentfilter.core.sync.engine
 
+import com.contentfilter.core.database.entity.AppGroupAppEntity
+import com.contentfilter.core.database.entity.AppGroupEntity
 import com.contentfilter.core.database.entity.AccessRequestEntity
 import com.contentfilter.core.database.entity.DailyLimitEntity
 import com.contentfilter.core.database.entity.DeviceEntity
@@ -7,6 +9,8 @@ import com.contentfilter.core.database.entity.ExtraTimeGrantEntity
 import com.contentfilter.core.database.entity.PolicyEntity
 import com.contentfilter.core.database.entity.PolicyRuleEntity
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
+import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
+import com.contentfilter.core.network.dto.RemoteAppGroupDto
 import com.contentfilter.core.network.dto.RemoteDailyLimitDto
 import com.contentfilter.core.network.dto.RemoteDeviceDto
 import com.contentfilter.core.network.dto.RemoteExtraTimeGrantDto
@@ -50,6 +54,27 @@ internal fun RemoteDailyLimitDto.toEntity(): DailyLimitEntity =
         target = target,
         limitMinutes = limitMinutes,
         enabled = enabled && deletedAt == null,
+    )
+
+internal fun RemoteAppGroupDto.toEntity(): AppGroupEntity =
+    AppGroupEntity(
+        id = id,
+        deviceId = deviceId,
+        name = name,
+        color = color,
+        limitMinutes = limitMinutes,
+        resetMinuteOfDay = resetMinuteOfDay,
+        enabled = enabled && deletedAt == null,
+        updatedAtEpochMillis = updatedAt.toEpochMillis(),
+    )
+
+internal fun RemoteAppGroupAppDto.toEntity(): AppGroupAppEntity =
+    AppGroupAppEntity(
+        id = id,
+        groupId = groupId,
+        packageName = packageName,
+        enabled = enabled && deletedAt == null,
+        updatedAtEpochMillis = updatedAt.toEpochMillis(),
     )
 
 internal fun RemoteAccessRequestDto.toEntity(): AccessRequestEntity =

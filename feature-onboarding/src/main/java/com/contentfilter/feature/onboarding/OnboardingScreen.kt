@@ -1,28 +1,22 @@
 package com.contentfilter.feature.onboarding
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.contentfilter.core.ui.ProductLargeFeatureCard
+import com.contentfilter.core.ui.ProductTeal
+import com.contentfilter.core.ui.ProductVisualPage
 
 @Composable
 fun OnboardingScreen(modifier: Modifier = Modifier) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ProductVisualPage(
+        modifier = modifier,
+        title = "Content Filter",
+        subtitle = "Prepará protección, permisos y sincronización",
     ) {
-        Text(text = "Community Content Filter", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            text = "Initial setup will guide VPN, accessibility, sync, updates, and license activation.",
-            style = MaterialTheme.typography.bodyLarge,
+        ProductLargeFeatureCard(
+            title = "Primer inicio",
+            subtitle = "La configuración guía activación, accesibilidad, sincronización y actualizaciones.",
+            accent = ProductTeal,
         )
     }
 }

@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.admin.BuildConfig
+import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
@@ -13,6 +14,7 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
+import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
@@ -66,6 +68,7 @@ class RulesViewModel
         private val saveDailyLimit: SaveDailyLimitUseCase,
         private val deleteDailyLimitUseCase: DeleteDailyLimitUseCase,
         private val deviceRepository: DeviceRepository,
+        private val appGroupRepository: AppGroupRepository,
         grantRepository: ExtraTimeGrantRepository,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
         private val activationClient: SupabaseActivationClient,
@@ -83,6 +86,7 @@ class RulesViewModel
         private val selectedPolicyDeviceId = form.map { it.selectedDeviceId }.distinctUntilChanged()
         private val policyRules = selectedPolicyDeviceId.flatMapLatest { observePolicyRules(it) }
         private val dailyLimits = selectedPolicyDeviceId.flatMapLatest { observeDailyLimits(it) }
+        private val appGroups = selectedPolicyDeviceId.flatMapLatest { appGroupRepository.observeGroups(it) }
         private val extraTimeGrants = grantRepository.observeGrants()
         private val nowTicks =
             flow {
@@ -95,12 +99,14 @@ class RulesViewModel
             combine(
                 policyRules,
                 dailyLimits,
+                appGroups,
                 extraTimeGrants,
                 nowTicks,
-            ) { rules, limits, grants, nowEpochMillis ->
+            ) { rules, limits, groups, grants, nowEpochMillis ->
                 RulesPolicyState(
                     rules = rules,
                     limits = limits,
+                    appGroups = groups,
                     grants = grants,
                     nowEpochMillis = nowEpochMillis,
                 )
@@ -119,6 +125,16 @@ class RulesViewModel
                 formState.copy(
                     rules = policy.rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
                     limits = policy.limits.sortedWith(compareBy({ it.targetType.name }, { it.target })),
+                    appGroups =
+                        policy.appGroups.map { group ->
+                            AppGroupUiState(
+                                id = group.id,
+                                name = group.name,
+                                limitMinutes = group.limitMinutes,
+                                resetLabel = "12 PM",
+                                appPackages = group.apps.filter { it.enabled }.map { it.packageName }.sorted(),
+                            )
+                        },
                     userDevices = userDevices,
                     selectedDeviceId = selectedDeviceId,
                     internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
@@ -133,6 +149,7 @@ class RulesViewModel
                                     rules = policy.rules,
                                     limits = policy.limits,
                                     grants = policy.grants,
+                                    appGroups = policy.appGroups,
                                     nowEpochMillis = policy.nowEpochMillis,
                                     devices = devices,
                                     pendingAllowed = formState.pendingAppAllowed,
@@ -179,6 +196,56 @@ class RulesViewModel
             form.update { it.copy(appSearchQuery = value) }
         }
 
+        fun onGroupNameChanged(value: String) {
+            form.update { it.copy(groupName = value, message = "") }
+        }
+
+        fun onGroupMinutesChanged(value: String) {
+            form.update { it.copy(groupMinutes = value.filter(Char::isDigit), message = "") }
+        }
+
+        fun onGroupAppToggled(
+            packageName: String,
+            selected: Boolean,
+        ) {
+            form.update {
+                it.copy(
+                    groupSelectedPackages =
+                        if (selected) {
+                            it.groupSelectedPackages + packageName
+                        } else {
+                            it.groupSelectedPackages - packageName
+                        },
+                    message = "",
+                )
+            }
+        }
+
+        fun editAppGroup(groupId: String) {
+            val group = uiState.value.appGroups.firstOrNull { it.id == groupId } ?: return
+            form.update {
+                it.copy(
+                    editingGroupId = group.id,
+                    groupName = group.name,
+                    groupMinutes = group.limitMinutes.toString(),
+                    groupSelectedPackages = group.appPackages.toSet(),
+                    message = "",
+                )
+            }
+        }
+
+        fun cancelAppGroupEdit() {
+            form.update {
+                it.copy(
+                    editingGroupId = null,
+                    groupName = "",
+                    groupMinutes = "",
+                    groupSelectedPackages = emptySet(),
+                    message = "",
+                )
+            }
+        }
+
         fun onPairingUserNameChanged(value: String) {
             form.update { it.copy(pairingUserName = value, message = "") }
         }
@@ -208,7 +275,7 @@ class RulesViewModel
             }
             viewModelScope.launch {
                 form.update { it.copy(pairingLoading = true, message = "Generando código...") }
-                when (val result = activationClient.createDevicePairingCode()) {
+                when (val result = activationClient.createDevicePairingCode(ttlMinutes = UserPairingTokenTtlMinutes)) {
                     is RemoteResult.Success ->
                         form.update {
                             it.copy(
@@ -238,12 +305,32 @@ class RulesViewModel
         }
 
         fun onDeviceSelected(deviceId: String) {
-            form.update { it.copy(selectedDeviceId = deviceId, appSearchQuery = "", message = "Cargando apps...") }
+            form.update {
+                it.copy(
+                    selectedDeviceId = deviceId,
+                    appSearchQuery = "",
+                    editingGroupId = null,
+                    groupName = "",
+                    groupMinutes = "",
+                    groupSelectedPackages = emptySet(),
+                    message = "Cargando apps...",
+                )
+            }
             refreshInstalledApps()
         }
 
         fun clearDeviceSelection() {
-            form.update { it.copy(selectedDeviceId = null, appSearchQuery = "", message = "") }
+            form.update {
+                it.copy(
+                    selectedDeviceId = null,
+                    appSearchQuery = "",
+                    editingGroupId = null,
+                    groupName = "",
+                    groupMinutes = "",
+                    groupSelectedPackages = emptySet(),
+                    message = "",
+                )
+            }
         }
 
         fun deleteDevicePermanently(deviceId: String) {
@@ -759,7 +846,7 @@ class RulesViewModel
             form.update {
                 it.copy(
                     pendingAppAllowed = it.pendingAppAllowed + (packageName to allowed),
-                    message = if (allowed) "Permitiendo app..." else "Bloqueando app...",
+                    message = "Guardando...",
                 )
             }
             viewModelScope.launch {
@@ -803,7 +890,7 @@ class RulesViewModel
                             when {
                                 synced && allowed -> "App permitida."
                                 synced -> "App bloqueada."
-                                else -> "Cambio guardado localmente. Se sincronizará cuando haya conexión."
+                                else -> "No se pudo guardar en la nube. Se sincronizará cuando haya conexión."
                             },
                     )
                 }
@@ -830,6 +917,7 @@ class RulesViewModel
                 if (minutes == null || minutes <= 0) {
                     form.update { it.copy(message = "Ingresá minutos válidos.") }
                 } else {
+                    form.update { it.copy(message = "Guardando...") }
                     matchingRules
                         .filter { it.enabled && (it.action == RuleAction.Block || it.action == RuleAction.RequestAuthorization) }
                         .forEach { saveRule(it.copy(enabled = false), targetDeviceId) }
@@ -843,10 +931,132 @@ class RulesViewModel
                         ),
                         targetDeviceId,
                     )
-                    form.update { it.copy(message = "Límite de app guardado.") }
+                    form.update { it.copy(message = "Tiempo guardado.") }
                 }
                 syncScheduler.requestSync()
                 syncNow()
+            }
+        }
+
+        fun saveAppGroup() {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
+            val state = form.value
+            val name = state.groupName.trim()
+            val minutes = state.groupMinutes.toIntOrNull()
+            val packages = state.groupSelectedPackages.toList().sorted()
+            val editingGroupId = state.editingGroupId
+            val existingGroups = uiState.value.appGroups
+            val duplicateName =
+                existingGroups.firstOrNull {
+                    it.id != editingGroupId && it.name.equals(name, ignoreCase = true)
+                }
+            val packageInOtherGroup =
+                existingGroups.firstOrNull { group ->
+                    group.id != editingGroupId && group.appPackages.any { it in packages }
+                }
+            when {
+                name.isBlank() -> {
+                    form.update { it.copy(message = "Ingresá un nombre para el grupo.") }
+                    return
+                }
+                duplicateName != null -> {
+                    form.update { it.copy(message = "Ya existe un grupo con ese nombre.") }
+                    return
+                }
+                minutes == null || minutes <= 0 -> {
+                    form.update { it.copy(message = "Ingresá minutos válidos para el grupo.") }
+                    return
+                }
+                packages.isEmpty() -> {
+                    form.update { it.copy(message = "Elegí al menos una app para el grupo.") }
+                    return
+                }
+                packageInOtherGroup != null -> {
+                    form.update { it.copy(message = "Una app elegida ya está en ${packageInOtherGroup.name}. Sacala de ese grupo o editá ese grupo.") }
+                    return
+                }
+            }
+            viewModelScope.launch {
+                form.update { it.copy(groupSaving = true, message = if (editingGroupId == null) "Guardando grupo..." else "Actualizando grupo...") }
+                val saved =
+                    runCatching {
+                        val group =
+                            AppGroup(
+                                id = editingGroupId ?: UUID.randomUUID().toString(),
+                                deviceId = targetDeviceId,
+                                name = name,
+                                color = "teal",
+                                limitMinutes = minutes,
+                                resetMinuteOfDay = NoonMinuteOfDay,
+                                enabled = true,
+                            )
+                        appGroupRepository.replaceGroupApps(group, packages)
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                form.update {
+                    if (saved.isSuccess) {
+                        it.copy(
+                            editingGroupId = null,
+                            groupName = "",
+                            groupMinutes = "",
+                            groupSelectedPackages = emptySet(),
+                            groupSaving = false,
+                            message =
+                                if (editingGroupId == null) {
+                                    "Apps en grupo guardado."
+                                } else {
+                                    "Apps en grupo actualizado."
+                                },
+                        )
+                    } else {
+                        it.copy(groupSaving = false, message = "No se pudo guardar el grupo.")
+                    }
+                }
+            }
+        }
+
+        fun deleteAppGroup(groupId: String) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
+            val group = uiState.value.appGroups.firstOrNull { it.id == groupId } ?: return
+            form.update {
+                it.copy(
+                    pendingAppGroupDeleteIds = it.pendingAppGroupDeleteIds + groupId,
+                    message = "Borrando grupo...",
+                )
+            }
+            viewModelScope.launch {
+                val saved =
+                    runCatching {
+                        appGroupRepository.deleteGroup(
+                            AppGroup(
+                                id = group.id,
+                                deviceId = targetDeviceId,
+                                name = group.name,
+                                color = "teal",
+                                limitMinutes = group.limitMinutes,
+                                resetMinuteOfDay = NoonMinuteOfDay,
+                                enabled = false,
+                            ),
+                        )
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                form.update {
+                    it.copy(
+                        pendingAppGroupDeleteIds = it.pendingAppGroupDeleteIds - groupId,
+                        editingGroupId = it.editingGroupId.takeUnless { editingId -> editingId == groupId },
+                        groupName = if (it.editingGroupId == groupId) "" else it.groupName,
+                        groupMinutes = if (it.editingGroupId == groupId) "" else it.groupMinutes,
+                        groupSelectedPackages = if (it.editingGroupId == groupId) emptySet() else it.groupSelectedPackages,
+                        message =
+                            if (saved.isSuccess) {
+                                "Grupo eliminado. Las apps vuelven a sus reglas individuales."
+                            } else {
+                                "No se pudo eliminar el grupo."
+                            },
+                    )
+                }
             }
         }
 
@@ -1365,6 +1575,7 @@ class RulesViewModel
         private data class RulesPolicyState(
             val rules: List<PolicyRule>,
             val limits: List<DailyLimit>,
+            val appGroups: List<AppGroup>,
             val grants: List<ExtraTimeGrant>,
             val nowEpochMillis: Long,
         )
@@ -1379,5 +1590,10 @@ class RulesViewModel
                     .trim('-')
                     .take(32)
             return "${safeName.ifBlank { "usuario" }}-${trim()}"
+        }
+
+        private companion object {
+            const val NoonMinuteOfDay = 720
+            const val UserPairingTokenTtlMinutes = 180
         }
     }

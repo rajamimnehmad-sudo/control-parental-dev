@@ -32,6 +32,15 @@ class DefaultPolicyEngine : PolicyEngine {
         activeGrant(snapshot.extraTimeGrants, PolicyTargetType.Global, GlobalExtraTimeTarget, context.time)?.let {
             return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
         }
+        val appGroups =
+            snapshot.appGroups.filter { group ->
+                group.enabled && group.apps.any { app -> app.enabled && app.packageName == context.packageName }
+            }
+        appGroups.forEach { group ->
+            activeGrant(snapshot.extraTimeGrants, PolicyTargetType.Category, group.id, context.time)?.let {
+                return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
+            }
+        }
         val usedMinutesToday =
             maxOf(
                 context.usedMinutesToday,
@@ -43,6 +52,17 @@ class DefaultPolicyEngine : PolicyEngine {
                 .minByOrNull { it.limitMinutes }
         if (limit != null && usedMinutesToday > limit.limitMinutes) {
             return PolicyDecision.Block("Daily limit exceeded for ${context.packageName}.")
+        }
+        appGroups.forEach { group ->
+            val groupUsedMinutes =
+                group.apps
+                    .asSequence()
+                    .filter { it.enabled }
+                    .mapNotNull { groupApp -> snapshot.dailyUsage.firstOrNull { it.packageName == groupApp.packageName } }
+                    .sumOf { it.usedMinutes }
+            if (groupUsedMinutes >= group.limitMinutes) {
+                return PolicyDecision.Block("Daily group limit exceeded for ${group.name}.")
+            }
         }
         val rule = snapshot.rules.bestMatchingRule(context)
         return rule?.toDecision(context.packageName) ?: PolicyDecision.Allow()

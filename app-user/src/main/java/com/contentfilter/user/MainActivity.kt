@@ -4,10 +4,24 @@ import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.keyframes
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -23,15 +37,35 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ContentFilterTheme
+import com.contentfilter.core.ui.PremiumFishMascot
+import com.contentfilter.core.ui.ProductFeatureTile
+import com.contentfilter.core.ui.ProductHeroPanel
+import com.contentfilter.core.ui.ProductIcon
+import com.contentfilter.core.ui.ProductLargeFeatureCard
+import com.contentfilter.core.ui.ProductMint
+import com.contentfilter.core.ui.ProductNavGlyph
+import com.contentfilter.core.ui.ProductSky
+import com.contentfilter.core.ui.ProductStatCard
+import com.contentfilter.core.ui.ProductSun
+import com.contentfilter.core.ui.ProductTeal
+import com.contentfilter.core.ui.ProductViolet
+import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.feature.accessibility.service.AccessibilityController
 import com.contentfilter.feature.activation.ActivationRoute
 import com.contentfilter.feature.requests.RequestsRoute
-import com.contentfilter.feature.status.SystemStatusRoute
+import com.contentfilter.feature.requests.RequestsViewModel
+import com.contentfilter.feature.status.SystemStatusViewModel
+import com.contentfilter.user.BuildConfig
 import com.contentfilter.user.apps.MyAppsRoute
 import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
@@ -71,13 +105,18 @@ private fun UserAppRoot(
     blockedDomain: String? = null,
     onBlockedDomainConsumed: () -> Unit = {},
 ) {
-    var destination by rememberSaveable { mutableStateOf(UserDestination.MyApps) }
+    var destination by rememberSaveable { mutableStateOf(UserDestination.Home) }
+    var backStack by rememberSaveable { mutableStateOf<List<UserDestination>>(emptyList()) }
     var showAccessibilityDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val rootViewModel: UserRootViewModel = hiltViewModel()
     val rootState by rootViewModel.uiState.collectAsStateWithLifecycle()
     val updatesViewModel: UpdatesViewModel = hiltViewModel()
     val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
+    val requestsViewModel: RequestsViewModel = hiltViewModel()
+    val requestsState by requestsViewModel.uiState.collectAsStateWithLifecycle()
+    val statusViewModel: SystemStatusViewModel = hiltViewModel()
+    val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         updatesViewModel.autoCheckAndDownload()
     }
@@ -97,15 +136,28 @@ private fun UserAppRoot(
         ActivationRoute(modifier = modifier, notice = rootState.activationNotice)
         return
     }
+    fun navigateTo(target: UserDestination) {
+        if (target == destination) return
+        backStack = backStack + destination
+        destination = target
+    }
+    fun goBack() {
+        val previous = backStack.lastOrNull() ?: UserDestination.Home
+        backStack = backStack.dropLast(1)
+        destination = previous
+    }
+    BackHandler(enabled = destination != UserDestination.Home) {
+        goBack()
+    }
     Scaffold(
         modifier = modifier,
         bottomBar = {
             NavigationBar {
-                UserDestination.entries.forEach { item ->
+                UserDestination.entries.filter { it.showInNav }.forEach { item ->
                     NavigationBarItem(
                         selected = destination == item,
-                        onClick = { destination = item },
-                        icon = {},
+                        onClick = { navigateTo(item) },
+                        icon = { ProductNavGlyph(icon = item.icon, selected = destination == item) },
                         label = { Text(item.label) },
                     )
                 }
@@ -114,10 +166,29 @@ private fun UserAppRoot(
     ) { padding ->
         Box(modifier = Modifier.padding(padding)) {
             when (destination) {
-                UserDestination.Status -> SystemStatusRoute()
-                UserDestination.MyApps -> MyAppsRoute()
-                UserDestination.Requests -> RequestsRoute()
-                UserDestination.Updates -> UpdatesRoute()
+                UserDestination.Home ->
+                    UserHomeTab(
+                        pendingRequests = requestsState.pendingCount,
+                        latestRequestLabel = requestsState.requests.firstOrNull()?.requestType?.name.orEmpty(),
+                        onApps = { navigateTo(UserDestination.MyApps) },
+                        onRequests = { navigateTo(UserDestination.Requests) },
+                        onWeb = { navigateTo(UserDestination.Web) },
+                        onUpdates = { navigateTo(UserDestination.Updates) },
+                    )
+                UserDestination.MyApps -> MyAppsRoute(onBack = ::goBack)
+                UserDestination.Requests -> RequestsRoute(onBack = ::goBack)
+                UserDestination.Web -> UserWebTab(onBack = ::goBack)
+                UserDestination.Updates ->
+                    UpdatesRoute(
+                        onBack = ::goBack,
+                        protectionSummary = statusState.summary,
+                        communityName = statusState.communityName,
+                        guideName = statusState.guideName,
+                        vpnState = statusState.vpnState,
+                        accessibilityState = statusState.accessibilityState,
+                        syncState = statusState.syncState,
+                        activationState = statusState.activationState,
+                    )
             }
         }
     }
@@ -132,7 +203,7 @@ private fun UserAppRoot(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { destination = UserDestination.Updates }) {
+                OutlinedButton(onClick = { navigateTo(UserDestination.Updates) }) {
                     Text("Ver")
                 }
             },
@@ -148,7 +219,7 @@ private fun UserAppRoot(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { destination = UserDestination.Updates }) {
+                OutlinedButton(onClick = { navigateTo(UserDestination.Updates) }) {
                     Text("Ver")
                 }
             },
@@ -181,11 +252,193 @@ private fun UserAppRoot(
     }
 }
 
-private enum class UserDestination(val label: String) {
-    Status("Estado"),
-    MyApps("Mis apps"),
-    Requests("Mis solicitudes"),
-    Updates("Actualizaciones"),
+@Composable
+private fun UserHomeTab(
+    pendingRequests: Int,
+    latestRequestLabel: String,
+    onApps: () -> Unit,
+    onRequests: () -> Unit,
+    onWeb: () -> Unit,
+    onUpdates: () -> Unit,
+) {
+    ProductVisualPage(
+        title = "Hola",
+        subtitle = "Tu dispositivo protegido está listo",
+    ) {
+        ProductHeroPanel(
+            title = "Content Filter",
+            subtitle = "Revisá tus apps, permisos y solicitudes desde una experiencia más clara.",
+            mascot = {
+                UserHomeFish(modifier = Modifier.size(170.dp))
+            },
+        )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ProductStatCard(
+                modifier = Modifier.weight(1f),
+                value = "5",
+                label = "secciones",
+                accent = ProductSky,
+            )
+            ProductStatCard(
+                modifier = Modifier.weight(1f),
+                value = "DEV",
+                label = "versión ${BuildConfig.VERSION_CODE}",
+                accent = ProductMint,
+            )
+        }
+        ProductFeatureTile(
+            icon = ProductIcon.Search,
+            title = "Mis apps",
+            subtitle = "Estado, límites y pedidos de acceso",
+            accent = ProductTeal,
+            onClick = onApps,
+        )
+        ProductFeatureTile(
+            icon = ProductIcon.Bell,
+            title = "Solicitudes pendientes",
+            subtitle =
+                if (pendingRequests == 0) {
+                    "No hay pedidos pendientes"
+                } else {
+                    "$pendingRequests pendientes${latestRequestLabel.ifBlank { "" }.let { if (it.isBlank()) "" else " · tocá para ver" }}"
+                },
+            accent = ProductSun,
+            onClick = onRequests,
+        )
+        ProductFeatureTile(
+            icon = ProductIcon.Web,
+            title = "Web",
+            subtitle = "Sección preparada para control web",
+            accent = ProductSky,
+            onClick = onWeb,
+        )
+        ProductFeatureTile(
+            icon = ProductIcon.Update,
+            title = "Ajustes",
+            subtitle = "Protección, sincronización y actualizaciones",
+            accent = ProductViolet,
+            onClick = onUpdates,
+        )
+    }
+}
+
+@Composable
+private fun UserWebTab(onBack: () -> Unit) {
+    ProductVisualPage(
+        title = "Web",
+        subtitle = "Control web",
+        onBack = onBack,
+    ) {
+        ProductLargeFeatureCard(
+            title = "Web",
+            subtitle = "Esta sección queda preparada para próximos controles web.",
+            accent = ProductSky,
+        )
+    }
+}
+
+@Composable
+private fun UserHomeFish(modifier: Modifier = Modifier) {
+    val loop = rememberInfiniteTransition(label = "user-home-fish")
+    val swimX by loop.animateFloat(
+        initialValue = 0f,
+        targetValue = 0f,
+        animationSpec =
+            infiniteRepeatable(
+                animation =
+                    keyframes {
+                        durationMillis = 7600
+                        0f at 0 using FastOutSlowInEasing
+                        -8f at 900 using FastOutSlowInEasing
+                        9f at 1850 using FastOutSlowInEasing
+                        -15f at 2800 using FastOutSlowInEasing
+                        18f at 4300 using FastOutSlowInEasing
+                        3f at 6100 using FastOutSlowInEasing
+                        0f at 7600 using FastOutSlowInEasing
+                    },
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "user-home-fish-x",
+    )
+    val swimY by loop.animateFloat(
+        initialValue = 0f,
+        targetValue = 0f,
+        animationSpec =
+            infiniteRepeatable(
+                animation =
+                    keyframes {
+                        durationMillis = 3600
+                        0f at 0 using FastOutSlowInEasing
+                        -9f at 900 using FastOutSlowInEasing
+                        5f at 1900 using FastOutSlowInEasing
+                        -3f at 2850 using FastOutSlowInEasing
+                        0f at 3600 using FastOutSlowInEasing
+                    },
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "user-home-fish-y",
+    )
+    val roll by loop.animateFloat(
+        initialValue = -4f,
+        targetValue = 5f,
+        animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "user-home-fish-roll",
+    )
+    val bubbleRise by loop.animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Restart),
+        label = "user-home-bubbles",
+    )
+    Box(modifier = modifier) {
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            drawCircle(
+                color = Color.Black.copy(alpha = 0.18f),
+                radius = size.width * 0.22f,
+                center = Offset(size.width * 0.55f, size.height * 0.80f),
+            )
+            listOf(0.12f, 0.36f, 0.62f, 0.84f).forEachIndexed { index, phase ->
+                val t = (bubbleRise + phase) % 1f
+                val x = size.width * (0.10f + index * 0.16f)
+                val y = size.height * (0.86f - t * 0.70f)
+                val r = size.minDimension * (0.025f + index * 0.006f)
+                drawCircle(
+                    color = Color.White.copy(alpha = 0.22f * (1f - t * 0.35f)),
+                    radius = r,
+                    center = Offset(x, y),
+                    style = Stroke(width = 2.2f),
+                )
+            }
+        }
+        PremiumFishMascot(
+            modifier =
+                Modifier
+                    .align(Alignment.Center)
+                    .size(138.dp)
+                    .graphicsLayer {
+                        translationX = swimX.dp.toPx()
+                        translationY = swimY.dp.toPx()
+                        rotationZ = roll
+                        scaleX = 1.04f
+                        scaleY = 1.04f
+                    },
+        )
+    }
+}
+
+private enum class UserDestination(
+    val label: String,
+    val icon: ProductIcon,
+    val showInNav: Boolean = true,
+) {
+    Home("Home", ProductIcon.Home),
+    MyApps("Mis apps", ProductIcon.Search),
+    Web("Web", ProductIcon.Web),
+    Requests("Solicitudes", ProductIcon.Bell, showInNav = false),
+    Updates("Ajustes", ProductIcon.Settings),
 }
 
 private fun Intent.blockedDomainExtra(): String? =

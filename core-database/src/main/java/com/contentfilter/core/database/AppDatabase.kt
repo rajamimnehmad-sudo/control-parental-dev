@@ -4,6 +4,7 @@ import androidx.room.Database
 import androidx.room.RoomDatabase
 import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
+import com.contentfilter.core.database.dao.AppGroupDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.DeviceDao
@@ -16,6 +17,8 @@ import com.contentfilter.core.database.dao.TechnicalDiagnosticDao
 import com.contentfilter.core.database.dao.UsageSessionDao
 import com.contentfilter.core.database.entity.AccessRequestEntity
 import com.contentfilter.core.database.entity.AccountEntity
+import com.contentfilter.core.database.entity.AppGroupAppEntity
+import com.contentfilter.core.database.entity.AppGroupEntity
 import com.contentfilter.core.database.entity.DailyLimitEntity
 import com.contentfilter.core.database.entity.DeviceActivationEntity
 import com.contentfilter.core.database.entity.DeviceEntity
@@ -43,8 +46,10 @@ import com.contentfilter.core.database.entity.UsageSessionEntity
         ExtraTimeGrantEntity::class,
         SyncCursorEntity::class,
         OutboxOperationEntity::class,
+        AppGroupEntity::class,
+        AppGroupAppEntity::class,
     ],
-    version = 6,
+    version = 7,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -71,4 +76,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun syncCursorDao(): SyncCursorDao
 
     abstract fun outboxOperationDao(): OutboxOperationDao
+
+    abstract fun appGroupDao(): AppGroupDao
 }

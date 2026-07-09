@@ -7,6 +7,8 @@ enum class SupabaseTable(val tableName: String) {
     Policies("policies"),
     PolicyRules("policy_rules"),
     DailyLimits("daily_limits"),
+    AppGroups("app_groups"),
+    AppGroupApps("app_group_apps"),
     AccessRequests("access_requests"),
     ExtraTimeGrants("extra_time_grants"),
 }

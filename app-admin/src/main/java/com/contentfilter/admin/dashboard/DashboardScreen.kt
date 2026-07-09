@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,9 +30,8 @@ private fun DashboardScreen(state: DashboardUiState) {
                 .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Panel administrador", style = MaterialTheme.typography.headlineSmall)
         if (state.offlineMode) {
-            Text("Sin conexion. Mostrando datos guardados.", color = MaterialTheme.colorScheme.error)
+            Text("Sin conexion. Mostrando datos guardados.")
         }
         if (state.communityName.isNotBlank()) {
             Text("Comunidad: ${state.communityName}")

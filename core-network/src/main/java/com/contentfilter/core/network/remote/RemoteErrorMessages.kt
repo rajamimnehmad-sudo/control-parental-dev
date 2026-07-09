@@ -20,7 +20,7 @@ internal fun httpFailure(
         if (code >= 500) {
             OfflineUserMessage
         } else {
-            "No se pudo completar la operación."
+            responseBody.toReadableErrorDetail().ifBlank { "No se pudo completar la operación." }
         }
     Log.w(LogTag, "$source failed. HTTP $code. Body: ${responseBody.ifBlank { "<empty>" }}")
     return RemoteResult.Failure(reason = reason, retryable = code >= 500)
@@ -54,15 +54,21 @@ private fun String.toReadableErrorDetail(): String {
     if (trimmed.isBlank()) return ""
     return runCatching {
         val json = JSONObject(trimmed)
-        listOf(
-            json.optString("message"),
-            json.optString("msg"),
-            json.optString("error_description"),
-            json.optString("error"),
-            json.optString("hint"),
-            json.optString("details"),
-            json.optString("code"),
-        ).filter { it.isNotBlank() }
+        val primary =
+            listOf(
+                json.optString("message"),
+                json.optString("msg"),
+                json.optString("error_description"),
+                json.optString("error"),
+            ).firstOrNull { it.isNotBlank() }.orEmpty()
+        val secondary =
+            listOf(
+                json.optString("hint"),
+                json.optString("details"),
+            ).filter { it.isNotBlank() }
+        listOf(primary)
+            .plus(secondary)
+            .filter { it.isNotBlank() }
             .distinct()
             .joinToString(separator = " | ")
             .ifBlank { trimmed }

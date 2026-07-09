@@ -73,6 +73,47 @@ object DatabaseMigrations {
             }
         }
 
+    val Migration6To7: Migration =
+        object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS app_groups (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        deviceId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        color TEXT NOT NULL,
+                        limitMinutes INTEGER NOT NULL,
+                        resetMinuteOfDay INTEGER NOT NULL,
+                        enabled INTEGER NOT NULL,
+                        updatedAtEpochMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_app_groups_deviceId ON app_groups(deviceId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_app_groups_enabled ON app_groups(enabled)")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS app_group_apps (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        groupId TEXT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        enabled INTEGER NOT NULL,
+                        updatedAtEpochMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_app_group_apps_groupId ON app_group_apps(groupId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_app_group_apps_packageName ON app_group_apps(packageName)")
+                db.execSQL(
+                    """
+                    CREATE UNIQUE INDEX IF NOT EXISTS index_app_group_apps_groupId_packageName
+                    ON app_group_apps(groupId, packageName)
+                    """.trimIndent(),
+                )
+            }
+        }
+
     val All: Array<Migration> =
-        arrayOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5, Migration5To6)
+        arrayOf(Migration1To2, Migration2To3, Migration3To4, Migration4To5, Migration5To6, Migration6To7)
 }

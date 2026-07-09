@@ -10,6 +10,7 @@ data class AdminRequestsUiState(
     val message: String = "",
     val lastSyncMessage: String = "",
     val isLoading: Boolean = false,
+    val pendingActionIds: Set<String> = emptySet(),
 )
 
 data class AdminAccessRequestUiState(

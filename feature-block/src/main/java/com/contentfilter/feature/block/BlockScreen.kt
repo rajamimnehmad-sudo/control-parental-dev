@@ -1,35 +1,33 @@
 package com.contentfilter.feature.block
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
+import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductLargeFeatureCard
+import com.contentfilter.core.ui.ProductSun
+import com.contentfilter.core.ui.ProductVisualPage
 
 @Composable
 fun BlockScreen(
     onRequestAccess: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
+    ProductVisualPage(
+        modifier = modifier,
+        title = "Acceso bloqueado",
+        subtitle = "Esta app o sitio está restringido",
     ) {
-        Text(text = "Acceso bloqueado", style = MaterialTheme.typography.headlineMedium)
-        Text(
-            text = "Esta app o sitio está bloqueado por las reglas locales.",
-            style = MaterialTheme.typography.bodyLarge,
+        ProductLargeFeatureCard(
+            title = "Pedí permiso",
+            subtitle = "Tu administrador puede aprobar acceso o darte tiempo extra.",
+            accent = ProductSun,
         )
-        Button(onClick = onRequestAccess) {
-            Text("Solicitar acceso")
+        ProductCard {
+            Button(onClick = onRequestAccess) {
+                Text("Solicitar acceso")
+            }
         }
     }
 }

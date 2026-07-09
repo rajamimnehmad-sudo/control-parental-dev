@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -36,6 +34,12 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.domain.model.RequestStatus
+import com.contentfilter.core.ui.ActionButtonTone
+import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
+import com.contentfilter.core.ui.ProgressActionButton
+import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductSectionHeader
+import com.contentfilter.core.ui.StatusChip
 
 @Composable
 fun AdminRequestsRoute(
@@ -50,14 +54,11 @@ fun AdminRequestsRoute(
         modifier =
             Modifier
                 .fillMaxSize()
-                .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 16.dp, vertical = 14.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Solicitudes", style = MaterialTheme.typography.headlineSmall)
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
             OutlinedButton(
                 onClick = viewModel::refresh,
                 enabled = !state.isLoading,
@@ -66,21 +67,17 @@ fun AdminRequestsRoute(
             }
         }
         if (state.offlineMode) {
-            Text("Sin conexion. Mostrando datos guardados.", color = MaterialTheme.colorScheme.error)
+            FeedbackBanner("Sin conexion. Mostrando datos guardados.", isError = true)
         }
         if (state.message.isNotBlank()) {
-            Text(state.message, color = MaterialTheme.colorScheme.error)
-        }
-        Text("Pendientes: ${state.users.sumOf { it.pendingCount }}", style = MaterialTheme.typography.bodyMedium)
-        if (state.isLoading) {
-            Text("Cargando solicitudes...", style = MaterialTheme.typography.bodySmall)
+            FeedbackBanner(state.message, isError = true)
         }
         if (state.lastSyncMessage.isNotBlank()) {
-            Text(state.lastSyncMessage, style = MaterialTheme.typography.bodySmall)
+            FeedbackBanner(state.lastSyncMessage, isError = state.lastSyncMessage.startsWith("No se pudo"))
         }
         val selectedUser = state.users.firstOrNull { it.deviceId == state.selectedDeviceId }
         if (selectedUser == null) {
-            Text("Usuarios con solicitudes: ${state.users.size}", style = MaterialTheme.typography.bodyMedium)
+            ProductSectionHeader("Usuarios", count = state.users.size)
             if (state.users.isEmpty()) {
                 Text("No hay solicitudes para revisar.")
             }
@@ -110,6 +107,7 @@ fun AdminRequestsRoute(
                 items(state.requests, key = { it.id }) { request ->
                     RequestCard(
                         item = request,
+                        pendingActionIds = state.pendingActionIds,
                         onApprove = { viewModel.approve(request.request.id) },
                         onReject = { viewModel.reject(request.request.id) },
                         onGrant = { minutes -> viewModel.grantTime(request.request, minutes) },
@@ -125,12 +123,9 @@ private fun RequestUserCard(
     user: AdminRequestUserUiState,
     onClick: () -> Unit,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-    ) {
+    ProductCard(onClick = onClick) {
         Row(
-            modifier = Modifier.padding(12.dp),
+            modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -147,9 +142,13 @@ private fun RequestUserCard(
             }
             Column(modifier = Modifier.weight(1f)) {
                 Text(user.name, style = MaterialTheme.typography.titleMedium)
-                Text("${user.pendingCount} solicitudes pendientes", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "${user.pendingCount} solicitudes pendientes",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             }
-            Text("Ver", style = MaterialTheme.typography.labelLarge)
+            StatusChip("Ver", MaterialTheme.colorScheme.primary)
         }
     }
 }
@@ -157,20 +156,38 @@ private fun RequestUserCard(
 @Composable
 private fun RequestCard(
     item: AdminAccessRequestUiState,
+    pendingActionIds: Set<String>,
     onApprove: () -> Unit,
     onReject: () -> Unit,
     onGrant: (String) -> Unit,
 ) {
     val request = item.request
+    val approveLoading = "${request.id}:approve" in pendingActionIds
+    val grantLoading = "${request.id}:grant" in pendingActionIds
+    val rejectLoading = "${request.id}:reject" in pendingActionIds
+    val actionLoading = approveLoading || grantLoading || rejectLoading
     var grantMinutes by remember(request.id, request.requestedMinutes) {
         mutableStateOf((request.requestedMinutes ?: 15).toString())
     }
-    Card(modifier = Modifier.fillMaxWidth()) {
+    ProductCard {
         Column(
-            modifier = Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            AppRequestIcon(appName = item.appName, iconBase64 = item.iconBase64)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                AppRequestIcon(appName = item.appName, iconBase64 = item.iconBase64)
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(item.appName, style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        request.targetPackageName ?: request.target,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                StatusChip("Pendiente", MaterialTheme.colorScheme.primary)
+            }
             if (request.status.isPending()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -184,24 +201,34 @@ private fun RequestCard(
                                 keyboardType = KeyboardType.Number,
                             ),
                     )
-                    Button(
+                    ProgressActionButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = onApprove,
-                    ) {
-                        Text("Acceso completo")
-                    }
-                    Button(
+                        enabled = !actionLoading,
+                        loading = approveLoading,
+                        loadingText = "Aprobando...",
+                        successText = "Aprobada",
+                        text = "Acceso completo",
+                    )
+                    ProgressActionButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onGrant(grantMinutes) },
-                    ) {
-                        Text("Dar tiempo")
-                    }
-                    OutlinedButton(
+                        enabled = !actionLoading,
+                        loading = grantLoading,
+                        loadingText = "Guardando...",
+                        successText = "Tiempo dado",
+                        text = "Dar tiempo",
+                    )
+                    ProgressActionButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = onReject,
-                    ) {
-                        Text("Rechazar")
-                    }
+                        enabled = !actionLoading,
+                        loading = rejectLoading,
+                        loadingText = "Rechazando...",
+                        successText = "Rechazada",
+                        text = "Rechazar",
+                        tone = ActionButtonTone.Destructive,
+                    )
                 }
             } else {
                 Text("Solicitud ${request.status.displayName().lowercase()}.")

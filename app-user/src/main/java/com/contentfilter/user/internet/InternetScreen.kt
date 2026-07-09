@@ -3,13 +3,9 @@ package com.contentfilter.user.internet
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -22,6 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.ui.PremiumFeedbackBanner
+import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductLargeFeatureCard
+import com.contentfilter.core.ui.ProductSky
+import com.contentfilter.core.ui.ProductVisualPage
 
 @Composable
 fun InternetRoute(
@@ -59,22 +60,20 @@ private fun InternetScreen(
     onRequestAccessForDomain: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    LazyColumn(
-        modifier =
-            modifier
-                .fillMaxSize()
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ProductVisualPage(
+        modifier = modifier,
+        title = "Internet",
+        subtitle = "Pedidos de acceso web",
     ) {
-        item {
-            Text("Internet", style = MaterialTheme.typography.headlineSmall)
-        }
         if (state.message.isNotBlank()) {
-            item {
-                Text(state.message, style = MaterialTheme.typography.bodyMedium)
-            }
+            PremiumFeedbackBanner(text = state.message, isError = state.message.startsWith("No se pudo"))
         }
-        item {
+        ProductLargeFeatureCard(
+            title = "Acceso web",
+            subtitle = "El bloqueo principal sigue enfocado en apps, pero podés pedir acceso a sitios bloqueados.",
+            accent = ProductSky,
+        )
+        ProductCard {
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = state.domainInput,
@@ -82,8 +81,6 @@ private fun InternetScreen(
                 label = { Text("Pegar link o dominio") },
                 singleLine = true,
             )
-        }
-        item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(
                     onClick = onRequestOneHour,
@@ -99,22 +96,20 @@ private fun InternetScreen(
                 }
             }
         }
-        item {
-            Text("Últimos sitios bloqueados", style = MaterialTheme.typography.titleMedium)
-        }
-        if (state.recentBlockedDomains.isEmpty()) {
-            item {
+        Text("Últimos sitios bloqueados", style = MaterialTheme.typography.titleMedium)
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (state.recentBlockedDomains.isEmpty()) {
                 Text("Todavía no hay sitios bloqueados recientes.", style = MaterialTheme.typography.bodyMedium)
+            } else {
+                state.recentBlockedDomains.forEach { item ->
+                    BlockedDomainRow(
+                        item = item,
+                        onRequestOneHour = { onRequestOneHourForDomain(item.domain) },
+                        onRequestAccess = { onRequestAccessForDomain(item.domain) },
+                        sending = state.isSending,
+                    )
+                }
             }
-        }
-        items(state.recentBlockedDomains, key = { it.domain }) { item ->
-            BlockedDomainRow(
-                item = item,
-                onRequestOneHour = { onRequestOneHourForDomain(item.domain) },
-                onRequestAccess = { onRequestAccessForDomain(item.domain) },
-                sending = state.isSending,
-            )
-            HorizontalDivider()
         }
     }
 }
@@ -126,32 +121,31 @@ private fun BlockedDomainRow(
     onRequestAccess: () -> Unit,
     sending: Boolean,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(vertical = 6.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(item.domain, style = MaterialTheme.typography.titleSmall)
-            if (item.pending) {
-                Text("Esperando respuesta adm", style = MaterialTheme.typography.bodySmall)
+    ProductCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(item.domain, style = MaterialTheme.typography.titleSmall)
+                if (item.pending) {
+                    Text("Esperando respuesta adm", style = MaterialTheme.typography.bodySmall)
+                }
             }
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            OutlinedButton(
-                onClick = onRequestOneHour,
-                enabled = !sending && !item.pending,
-            ) {
-                Text("1 hora")
-            }
-            Button(
-                onClick = onRequestAccess,
-                enabled = !sending && !item.pending,
-            ) {
-                Text("Acceso")
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                OutlinedButton(
+                    onClick = onRequestOneHour,
+                    enabled = !sending && !item.pending,
+                ) {
+                    Text("1 hora")
+                }
+                Button(
+                    onClick = onRequestAccess,
+                    enabled = !sending && !item.pending,
+                ) {
+                    Text("Acceso")
+                }
             }
         }
     }

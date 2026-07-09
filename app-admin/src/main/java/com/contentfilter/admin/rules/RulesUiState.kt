@@ -10,6 +10,7 @@ data class RulesUiState(
     val userDevices: List<UserDeviceUiState> = emptyList(),
     val selectedDeviceId: String? = null,
     val appControls: List<AppControlUiState> = emptyList(),
+    val appGroups: List<AppGroupUiState> = emptyList(),
     val appPackageName: String = "",
     val domainLimitDomain: String = "",
     val domainLimitMinutes: String = "",
@@ -23,6 +24,12 @@ data class RulesUiState(
     val limitPackageName: String = "",
     val limitMinutes: String = "",
     val appSearchQuery: String = "",
+    val groupName: String = "",
+    val groupMinutes: String = "",
+    val groupSelectedPackages: Set<String> = emptySet(),
+    val editingGroupId: String? = null,
+    val groupSaving: Boolean = false,
+    val pendingAppGroupDeleteIds: Set<String> = emptySet(),
     val selectedAction: RuleAction = RuleAction.Block,
     val pendingAppAllowed: Map<String, Boolean> = emptyMap(),
     val pendingDeviceDeleteIds: Set<String> = emptySet(),
@@ -32,6 +39,14 @@ data class RulesUiState(
     val pairingLoading: Boolean = false,
     val offlineMode: Boolean = true,
     val message: String = "",
+)
+
+data class AppGroupUiState(
+    val id: String,
+    val name: String,
+    val limitMinutes: Int,
+    val resetLabel: String,
+    val appPackages: List<String>,
 )
 
 data class UserDeviceUiState(
@@ -58,7 +73,10 @@ data class AppControlUiState(
     val iconBase64: String?,
     val deviceName: String,
     val allowed: Boolean,
+    val confirmedAllowed: Boolean,
     val dailyLimitMinutes: Int?,
     val extraTimeRemainingMinutes: Int? = null,
+    val groupName: String? = null,
+    val groupLimitMinutes: Int? = null,
     val isUpdating: Boolean = false,
 )

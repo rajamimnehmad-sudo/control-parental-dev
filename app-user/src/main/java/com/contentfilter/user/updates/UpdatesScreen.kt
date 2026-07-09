@@ -1,14 +1,11 @@
 package com.contentfilter.user.updates
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -20,10 +17,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.ui.PremiumFeedbackBanner
+import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductLargeFeatureCard
+import com.contentfilter.core.ui.ProductMint
+import com.contentfilter.core.ui.ProductSky
+import com.contentfilter.core.ui.ProductStatCard
+import com.contentfilter.core.ui.ProductVisualPage
+import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.user.BuildConfig
 
 @Composable
-fun UpdatesRoute(viewModel: UpdatesViewModel = hiltViewModel()) {
+fun UpdatesRoute(
+    onBack: (() -> Unit)? = null,
+    protectionSummary: String = "",
+    communityName: String = "",
+    guideName: String = "",
+    vpnState: String = "",
+    accessibilityState: String = "",
+    syncState: String = "",
+    activationState: String = "",
+    viewModel: UpdatesViewModel = hiltViewModel(),
+) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         if (state.status == UpdatesStatus.Idle) {
@@ -36,6 +51,14 @@ fun UpdatesRoute(viewModel: UpdatesViewModel = hiltViewModel()) {
         onDownload = viewModel::downloadUpdate,
         onInstall = viewModel::installDownloadedUpdate,
         onInstallPermission = viewModel::openInstallPermissionSettings,
+        onBack = onBack,
+        protectionSummary = protectionSummary,
+        communityName = communityName,
+        guideName = guideName,
+        vpnState = vpnState,
+        accessibilityState = accessibilityState,
+        syncState = syncState,
+        activationState = activationState,
     )
 }
 
@@ -46,36 +69,88 @@ private fun UpdatesScreen(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onInstallPermission: () -> Unit,
+    onBack: (() -> Unit)?,
+    protectionSummary: String,
+    communityName: String,
+    guideName: String,
+    vpnState: String,
+    accessibilityState: String,
+    syncState: String,
+    activationState: String,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ProductVisualPage(
+        title = "Ajustes",
+        subtitle = "Protección y versión instalada ${BuildConfig.VERSION_CODE}",
+        onBack = onBack,
     ) {
-        Text(
-            text = "Actualizaciones",
-            style = MaterialTheme.typography.headlineSmall,
-        )
-        Text(
+        PremiumFeedbackBanner(
             text = state.status.message(),
-            style = MaterialTheme.typography.bodyLarge,
+            isError =
+                state.status == UpdatesStatus.SearchFailed ||
+                    state.status == UpdatesStatus.DownloadFailed ||
+                    state.status == UpdatesStatus.ChecksumFailed,
         )
-        Text(
-            text = "Version instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-            style = MaterialTheme.typography.titleMedium,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            ProductStatCard(
+                modifier = Modifier.weight(1f),
+                value = BuildConfig.VERSION_CODE.toString(),
+                label = "versión",
+                accent = ProductViolet,
+            )
+            ProductStatCard(
+                modifier = Modifier.weight(1f),
+                value = activationState.ifBlank { "..." },
+                label = "activación",
+                accent = ProductMint,
+            )
+        }
+        ProductLargeFeatureCard(
+            title = "Protección",
+            subtitle = protectionSummary.ifBlank { "Resumen del dispositivo protegido." },
+            accent = ProductSky,
         )
-        state.manifest?.let { manifest ->
+        ProductCard {
+            Text("Estado del dispositivo", style = MaterialTheme.typography.titleMedium)
+            if (communityName.isNotBlank()) {
+                Text("Comunidad: $communityName", style = MaterialTheme.typography.bodyMedium)
+            }
+            if (guideName.isNotBlank()) {
+                Text("Guía: $guideName", style = MaterialTheme.typography.bodyMedium)
+            }
+            Text("Accesibilidad: ${accessibilityState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
+            Text("VPN: ${vpnState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
+            Text("Sincronización: ${syncState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
+            Text("Activación: ${activationState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
+        }
+        ProductLargeFeatureCard(
+            title = "Actualizaciones",
+            subtitle = "Buscá nuevas versiones DEV y completá la instalación desde Android.",
+            accent = ProductSky,
+        )
+        ProductCard {
             Text(
-                text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
+                text = "Versión instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 style = MaterialTheme.typography.titleMedium,
             )
-            Text(
-                text = manifest.releaseNotes.ifBlank { "Sin notas de version." },
-                style = MaterialTheme.typography.bodyMedium,
-            )
+            state.manifest?.let { manifest ->
+                Text(
+                    text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = manifest.releaseNotes.ifBlank { "Sin notas de version." },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            if (state.status == UpdatesStatus.Downloading) {
+                LinearProgressIndicator(
+                    progress = { (state.downloadProgressPercent ?: 0) / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
         Spacer(modifier = Modifier.height(8.dp))
         when (state.status) {

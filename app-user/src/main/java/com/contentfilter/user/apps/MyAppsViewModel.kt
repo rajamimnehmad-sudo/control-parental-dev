@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.AccessRequest
+import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.DailyAppUsage
 import com.contentfilter.core.domain.model.DailyLimit
@@ -14,6 +15,7 @@ import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.repository.AccessRequestRepository
+import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
@@ -55,12 +57,14 @@ class MyAppsViewModel
         private val syncEngine: SyncEngine,
         policyRepository: PolicyRepository,
         dailyLimitRepository: DailyLimitRepository,
+        appGroupRepository: AppGroupRepository,
         grantRepository: ExtraTimeGrantRepository,
         private val activationRepository: DeviceActivationRepository,
         usageSessionRepository: UsageSessionRepository,
     ) : ViewModel() {
         private val detectedApps = MutableStateFlow<List<InstalledAppPublisher.DetectedApp>>(emptyList())
         private val message = MutableStateFlow("")
+        private val isRefreshing = MutableStateFlow(false)
         private val searchQuery = MutableStateFlow("")
         private val pendingRequestPackages = MutableStateFlow<Set<String>>(emptySet())
         private val day = currentDay()
@@ -72,17 +76,18 @@ class MyAppsViewModel
                 }
             }
         private val appUiOptions =
-            combine(searchQuery, pendingRequestPackages) { query, pendingPackages ->
-                AppUiOptions(query, pendingPackages)
+            combine(searchQuery, pendingRequestPackages, isRefreshing) { query, pendingPackages, refreshing ->
+                AppUiOptions(query, pendingPackages, refreshing)
             }
         private val policyAndLimits =
             combine(
                 policyRepository.observeActivePolicy(),
                 dailyLimitRepository.observeLimits(),
+                appGroupRepository.observeGroups(),
                 grantRepository.observeGrants(),
                 accessRequestRepository.observePendingRequests(),
-            ) { policy, limits, grants, requests ->
-                PolicyAndLimits(policy, limits, grants, requests)
+            ) { policy, limits, appGroups, grants, requests ->
+                PolicyAndLimits(policy, limits, appGroups, grants, requests)
             }
         private val appPolicyState =
             combine(
@@ -103,6 +108,7 @@ class MyAppsViewModel
                 AppPolicyState(
                     policyAndLimits.policy,
                     policyAndLimits.limits,
+                    policyAndLimits.appGroups,
                     policyAndLimits.grants,
                     policyAndLimits.requests,
                     usage,
@@ -123,6 +129,25 @@ class MyAppsViewModel
                         .filter { it.enabled && it.targetType == PolicyTargetType.App }
                         .associateBy { it.target }
                 MyAppsUiState(
+                    appGroups =
+                        policyState.appGroups
+                            .map { group ->
+                                val groupPackages = group.apps.filter { it.enabled }.map { it.packageName }.toSet()
+                                val usedMinutes =
+                                    policyState.usage
+                                        .filter { it.packageName in groupPackages }
+                                        .sumOf { it.usedMinutes }
+                                MyAppGroupUiState(
+                                    id = group.id,
+                                    name = group.name,
+                                    limitMinutes = group.limitMinutes,
+                                    usedMinutes = usedMinutes,
+                                    appCount = groupPackages.size,
+                                    color = group.color,
+                                    packageNames = groupPackages.sorted(),
+                                )
+                            }
+                            .sortedBy { it.name.lowercase() },
                     apps =
                         apps
                             .filterBySearch(options.searchQuery)
@@ -167,7 +192,7 @@ class MyAppsViewModel
                                         else -> AppAccessStatus.Allowed
                                     }
                                 MyAppItemUiState(
-                                    name = app.name,
+                                    name = app.name.takeIf { it.isNotBlank() && !it.startsWith("com.") } ?: "App",
                                     packageName = app.packageName,
                                     iconBase64 = app.iconBase64,
                                     status = status,
@@ -184,6 +209,7 @@ class MyAppsViewModel
                             ),
                     searchQuery = options.searchQuery,
                     message = currentMessage,
+                    isRefreshing = options.refreshing,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -196,25 +222,34 @@ class MyAppsViewModel
         }
 
         fun refreshApps() {
+            if (isRefreshing.value) return
             viewModelScope.launch(Dispatchers.IO) {
-                message.value = "Sincronizando reglas..."
-                val coreSyncResult = runCatching { syncEngine.syncCoreDataFull() }.getOrNull()
-                val requestResultsSyncResult = runCatching { syncEngine.syncRequestResultsFull() }.getOrNull()
-                Log.i(
-                    LogTag,
-                    "myAppsRefresh coreSyncSuccess=${coreSyncResult?.success} coreMessage=${coreSyncResult?.message.orEmpty()} " +
-                        "requestResultsSuccess=${requestResultsSyncResult?.success} requestResultsMessage=${requestResultsSyncResult?.message.orEmpty()}",
-                )
-                detectedApps.value = installedAppPublisher.installedApps()
-                activationRepository.currentActivation()?.let { activation ->
-                    runCatching { installedAppPublisher.publish(activation) }
-                }
-                message.value =
-                    if (coreSyncResult?.success == false || requestResultsSyncResult?.success == false) {
-                        "No se pudieron actualizar reglas. Mostrando datos guardados."
-                    } else {
-                        ""
+                isRefreshing.value = true
+                try {
+                    message.value = "Sincronizando reglas..."
+                    val coreSyncResult = runCatching { syncEngine.syncCoreDataFull() }.getOrNull()
+                    val requestResultsSyncResult = runCatching { syncEngine.syncRequestResultsFull() }.getOrNull()
+                    Log.i(
+                        LogTag,
+                        "myAppsRefresh coreSyncSuccess=${coreSyncResult?.success} coreMessage=${coreSyncResult?.message.orEmpty()} " +
+                            "requestResultsSuccess=${requestResultsSyncResult?.success} requestResultsMessage=${requestResultsSyncResult?.message.orEmpty()}",
+                    )
+                    detectedApps.value = installedAppPublisher.installedApps()
+                    activationRepository.currentActivation()?.let { activation ->
+                        runCatching { installedAppPublisher.publish(activation) }
                     }
+                    message.value =
+                        if (coreSyncResult?.success == false || requestResultsSyncResult?.success == false) {
+                            "No se pudieron actualizar reglas. Mostrando datos guardados."
+                        } else {
+                            "Apps actualizadas."
+                        }
+                } catch (exception: Exception) {
+                    Log.e(LogTag, "myAppsRefresh failed: ${exception.message}", exception)
+                    message.value = "No se pudieron actualizar apps."
+                } finally {
+                    isRefreshing.value = false
+                }
             }
         }
 
@@ -310,11 +345,13 @@ class MyAppsViewModel
 
         private fun currentDay(): LocalDay {
             val zone = ZoneId.systemDefault()
+            val now = java.time.LocalDateTime.now(zone)
             val today = LocalDate.now(zone)
+            val startDate = if (now.toLocalTime().isBefore(java.time.LocalTime.NOON)) today.minusDays(1) else today
             return LocalDay(
-                localDate = today.toString(),
-                startEpochMillis = today.atStartOfDay(zone).toInstant().toEpochMilli(),
-                endEpochMillis = today.plusDays(1).atStartOfDay(zone).toInstant().toEpochMilli(),
+                localDate = startDate.toString(),
+                startEpochMillis = startDate.atTime(java.time.LocalTime.NOON).atZone(zone).toInstant().toEpochMilli(),
+                endEpochMillis = startDate.plusDays(1).atTime(java.time.LocalTime.NOON).atZone(zone).toInstant().toEpochMilli(),
             )
         }
 
@@ -368,11 +405,13 @@ class MyAppsViewModel
         private data class AppUiOptions(
             val searchQuery: String,
             val pendingRequestPackages: Set<String>,
+            val refreshing: Boolean,
         )
 
         private data class PolicyAndLimits(
             val policy: PolicySnapshot,
             val limits: List<DailyLimit>,
+            val appGroups: List<AppGroup>,
             val grants: List<ExtraTimeGrant>,
             val requests: List<AccessRequest>,
         )
@@ -380,6 +419,7 @@ class MyAppsViewModel
         private data class AppPolicyState(
             val policy: PolicySnapshot,
             val limits: List<DailyLimit>,
+            val appGroups: List<AppGroup>,
             val grants: List<ExtraTimeGrant>,
             val requests: List<AccessRequest>,
             val usage: List<DailyAppUsage>,

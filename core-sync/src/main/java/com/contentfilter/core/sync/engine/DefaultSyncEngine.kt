@@ -262,6 +262,18 @@ class DefaultSyncEngine
                     apply = applier::applyDailyLimits,
                     updatedAt = { it.updatedAt },
                 ),
+                pull(
+                    table = SupabaseTable.AppGroups,
+                    request = { limitRepository.pullAppGroups(cursorFor(SupabaseTable.AppGroups, forceFull)) },
+                    apply = applier::applyAppGroups,
+                    updatedAt = { it.updatedAt },
+                ),
+                pull(
+                    table = SupabaseTable.AppGroupApps,
+                    request = { limitRepository.pullAppGroupApps(cursorFor(SupabaseTable.AppGroupApps, forceFull)) },
+                    apply = applier::applyAppGroupApps,
+                    updatedAt = { it.updatedAt },
+                ),
             )
 
         private suspend fun cursorFor(table: SupabaseTable): String? =

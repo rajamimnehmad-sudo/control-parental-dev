@@ -27,6 +27,7 @@ class AdminAuthViewModel
     constructor(
         private val activationRepository: ActivationRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
+        private val localDataResetter: AdminLocalDataResetter,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
         private val realtimeSyncCoordinator: RealtimeSyncCoordinator,
@@ -49,12 +50,67 @@ class AdminAuthViewModel
                                 message = "Administrador activado. No hace falta volver a iniciar sesión.",
                             )
                         }
+                    } else {
+                        _uiState.update {
+                            it.copy(
+                                activated = false,
+                                loading = false,
+                                showResetConfirmation = false,
+                                message = "",
+                            )
+                        }
                     }
                 }
             }
         }
 
         fun onActivationCodeChanged(value: String) = update { copy(activationCode = value) }
+
+        fun onEmailChanged(value: String) = update { copy(email = value) }
+
+        fun onPasswordChanged(value: String) = update { copy(password = value) }
+
+        fun onConfirmPasswordChanged(value: String) = update { copy(confirmPassword = value) }
+
+        fun requestResetLocalAdmin() = update { copy(showResetConfirmation = true) }
+
+        fun dismissResetLocalAdmin() = update { copy(showResetConfirmation = false) }
+
+        fun resetLocalAdmin() {
+            viewModelScope.launch {
+                _uiState.update {
+                    it.copy(
+                        loading = true,
+                        showResetConfirmation = false,
+                        message = "Reseteando datos locales",
+                    )
+                }
+                runCatching {
+                    realtimeSyncCoordinator.stop()
+                    localDataResetter.resetForNewAdminToken()
+                }.onFailure { exception ->
+                    Log.e(LogTag, "Local admin reset failed: ${exception.message}", exception)
+                    _uiState.update {
+                        it.copy(
+                            loading = false,
+                            message = "No se pudo resetear esta app. Cerrala y volvé a intentar.",
+                        )
+                    }
+                    return@launch
+                }
+                _uiState.update {
+                    it.copy(
+                        activationCode = "",
+                        email = "",
+                        password = "",
+                        confirmPassword = "",
+                        activated = false,
+                        loading = false,
+                        message = "Listo. Ingresá el nuevo token de administrador.",
+                    )
+                }
+            }
+        }
 
         fun activate() {
             val state = _uiState.value
@@ -76,14 +132,27 @@ class AdminAuthViewModel
                 }
                 return
             }
+            val email = state.email.trim().lowercase()
+            if (!email.contains('@') || !email.contains('.')) {
+                _uiState.update { it.copy(message = activationFailureMessage("Ingresá el email del administrador.")) }
+                return
+            }
+            if (state.password.length < 8) {
+                _uiState.update { it.copy(message = activationFailureMessage("La contraseña debe tener al menos 8 caracteres.")) }
+                return
+            }
+            if (state.password != state.confirmPassword) {
+                _uiState.update { it.copy(message = activationFailureMessage("Las contraseñas no coinciden.")) }
+                return
+            }
             viewModelScope.launch {
                 _uiState.update { it.copy(loading = true, message = "Activando") }
                 val result =
                     runCatching {
                         activationRepository.activate(
                             ActivationCredentials(
-                                email = "",
-                                password = "",
+                                email = email,
+                                password = state.password,
                                 activationCode = token.code,
                                 deviceDisplayName = displayName,
                                 appVersionCode = BuildConfig.VERSION_CODE,
@@ -132,6 +201,13 @@ class AdminAuthViewModel
             val detail = reason.ifBlank { "No se recibió detalle técnico del error." }
             if (detail == OfflineMessage) return OfflineMessage
             if (detail.startsWith("Ingresá")) return detail
+            if (detail.startsWith("La contraseña")) return detail
+            if (detail.startsWith("Las contraseñas")) return detail
+            if (detail.startsWith("Ese email")) return detail
+            if (detail.startsWith("Email")) return detail
+            if (detail.startsWith("Este administrador")) return detail
+            if (detail.startsWith("Token de administrador")) return detail
+            if (detail.startsWith("La licencia")) return detail
             return "No se pudo activar. Revisá el token o pedí uno nuevo."
         }
 

@@ -2,6 +2,7 @@ package com.contentfilter.core.data
 
 import com.contentfilter.core.domain.repository.AccessRequestRepository
 import com.contentfilter.core.domain.repository.AccountRepository
+import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
@@ -43,4 +44,7 @@ abstract class DataModule {
 
     @Binds
     abstract fun bindDeviceRepository(repository: RoomDeviceRepository): DeviceRepository
+
+    @Binds
+    abstract fun bindAppGroupRepository(repository: RoomAppGroupRepository): AppGroupRepository
 }

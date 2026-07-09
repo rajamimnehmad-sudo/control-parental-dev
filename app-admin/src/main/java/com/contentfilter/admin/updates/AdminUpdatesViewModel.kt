@@ -3,11 +3,13 @@ package com.contentfilter.admin.updates
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.contentfilter.admin.auth.AdminLocalDataResetter
 import com.contentfilter.admin.BuildConfig
 import com.contentfilter.core.update.install.ApkInstaller
 import com.contentfilter.core.update.model.UpdateCheckResult
 import com.contentfilter.core.update.model.UpdateDownloadResult
 import com.contentfilter.core.update.repository.ApkUpdateRepository
+import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +25,8 @@ class AdminUpdatesViewModel
     constructor(
         private val updateRepository: ApkUpdateRepository,
         private val apkInstaller: ApkInstaller,
+        private val localDataResetter: AdminLocalDataResetter,
+        private val realtimeSyncCoordinator: RealtimeSyncCoordinator,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(AdminUpdatesUiState())
         val uiState: StateFlow<AdminUpdatesUiState> = _uiState.asStateFlow()
@@ -109,6 +113,38 @@ class AdminUpdatesViewModel
                 apkInstaller.openInstallPermissionSettings()
             }.onFailure { exception ->
                 Log.e(LogTag, "Open install permission settings failed: ${exception.message}", exception)
+            }
+        }
+
+        fun requestResetLocalAdmin() {
+            _uiState.update { it.copy(showResetConfirmation = true, resetMessage = "") }
+        }
+
+        fun dismissResetLocalAdmin() {
+            _uiState.update { it.copy(showResetConfirmation = false) }
+        }
+
+        fun resetLocalAdmin() {
+            viewModelScope.launch {
+                _uiState.update {
+                    it.copy(
+                        showResetConfirmation = false,
+                        resetMessage = "Reseteando administrador local...",
+                    )
+                }
+                runCatching {
+                    realtimeSyncCoordinator.stop()
+                    localDataResetter.resetForNewAdminToken()
+                }.onSuccess {
+                    _uiState.update {
+                        it.copy(resetMessage = "Listo. La app volverá al Login para ingresar el nuevo token.")
+                    }
+                }.onFailure { exception ->
+                    Log.e(LogTag, "Admin local reset failed: ${exception.message}", exception)
+                    _uiState.update {
+                        it.copy(resetMessage = "No se pudo resetear. Cerrá la app y volvé a intentar.")
+                    }
+                }
             }
         }
 

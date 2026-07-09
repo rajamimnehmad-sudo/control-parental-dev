@@ -45,6 +45,7 @@ class AdminRequestsViewModel
         private val syncMessage = MutableStateFlow("")
         private val isLoading = MutableStateFlow(false)
         private val selectedDeviceId = MutableStateFlow<String?>(null)
+        private val pendingActionIds = MutableStateFlow<Set<String>>(emptySet())
         private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
         private val localState =
             combine(
@@ -52,12 +53,14 @@ class AdminRequestsViewModel
                 syncMessage,
                 isLoading,
                 selectedDeviceId,
-            ) { apps, message, loading, selected ->
+                pendingActionIds,
+            ) { apps, message, loading, selected, pendingActions ->
                 RequestsLocalState(
                     apps = apps,
                     message = message,
                     loading = loading,
                     selectedDeviceId = selected,
+                    pendingActionIds = pendingActions,
                 )
             }
 
@@ -90,6 +93,7 @@ class AdminRequestsViewModel
                         offlineMode = false,
                         lastSyncMessage = local.message,
                         isLoading = local.loading,
+                        pendingActionIds = local.pendingActionIds,
                     )
                 }
                 .stateIn(
@@ -118,7 +122,9 @@ class AdminRequestsViewModel
         }
 
         fun approve(requestId: String) {
+            val actionId = requestId.actionId("approve")
             viewModelScope.launch {
+                pendingActionIds.update { it + actionId }
                 runCatching {
                     val request = uiState.value.requests.firstOrNull { it.id == requestId }
                     val domainRequest = request?.request
@@ -134,12 +140,16 @@ class AdminRequestsViewModel
                 }.onFailure { exception ->
                     Log.e(LogTag, "Approve failed requestId=$requestId: ${exception.message}", exception)
                     syncMessage.update { "No se pudo aprobar la solicitud." }
+                }.also {
+                    pendingActionIds.update { it - actionId }
                 }
             }
         }
 
         fun reject(requestId: String) {
+            val actionId = requestId.actionId("reject")
             viewModelScope.launch {
+                pendingActionIds.update { it + actionId }
                 runCatching {
                     val request = uiState.value.requests.firstOrNull { it.id == requestId }
                     if (request?.request?.status?.isPending() == false) return@runCatching
@@ -150,6 +160,8 @@ class AdminRequestsViewModel
                 }.onFailure { exception ->
                     Log.e(LogTag, "Reject failed requestId=$requestId: ${exception.message}", exception)
                     syncMessage.update { "No se pudo rechazar la solicitud." }
+                }.also {
+                    pendingActionIds.update { it - actionId }
                 }
             }
         }
@@ -158,7 +170,9 @@ class AdminRequestsViewModel
             request: AccessRequest,
             rawMinutes: String,
         ) {
+            val actionId = request.id.actionId("grant")
             viewModelScope.launch {
+                pendingActionIds.update { it + actionId }
                 runCatching {
                     if (!request.status.isPending()) return@runCatching
                     val minutes =
@@ -176,6 +190,8 @@ class AdminRequestsViewModel
                 }.onFailure { exception ->
                     Log.e(LogTag, "Grant time failed requestId=${request.id}: ${exception.message}", exception)
                     syncMessage.update { "No se pudo conceder tiempo extra." }
+                }.also {
+                    pendingActionIds.update { it - actionId }
                 }
             }
         }
@@ -243,8 +259,11 @@ class AdminRequestsViewModel
             val message: String,
             val loading: Boolean,
             val selectedDeviceId: String?,
+            val pendingActionIds: Set<String>,
         )
     }
+
+private fun String.actionId(action: String): String = "$this:$action"
 
 private fun RequestStatus.isPending(): Boolean =
     this == RequestStatus.PendingLocal || this == RequestStatus.PendingRemote
@@ -269,8 +288,8 @@ private fun List<AccessRequest>.toUserItems(devices: List<Device>): List<AdminRe
 }
 
 private fun List<AccessRequest>.toRequestItems(apps: List<RemoteInstalledAppDto>): List<AdminAccessRequestUiState> {
-    val appsByDeviceAndPackage = apps.associateBy { "${it.deviceId}:${it.packageName}" }
-    val appsByPackage = apps.distinctBy { it.packageName }.associateBy { it.packageName }
+    val appsByDeviceAndPackage = apps.preferAppsWithIcons().associateBy { "${it.deviceId}:${it.packageName}" }
+    val appsByPackage = apps.preferAppsWithIcons().distinctBy { it.packageName }.associateBy { it.packageName }
     return map { request ->
         val packageName = request.targetPackageName ?: request.target
         val app =
@@ -284,3 +303,9 @@ private fun List<AccessRequest>.toRequestItems(apps: List<RemoteInstalledAppDto>
         )
     }
 }
+
+private fun List<RemoteInstalledAppDto>.preferAppsWithIcons(): List<RemoteInstalledAppDto> =
+    sortedWith(
+        compareByDescending<RemoteInstalledAppDto> { !it.iconBase64.isNullOrBlank() }
+            .thenByDescending { it.updatedAt },
+    )

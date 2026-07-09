@@ -3,6 +3,7 @@ package com.contentfilter.admin.rules
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
+import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
@@ -38,14 +39,25 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
     rules: List<PolicyRule>,
     limits: List<DailyLimit>,
     grants: List<ExtraTimeGrant>,
+    appGroups: List<AppGroup>,
     nowEpochMillis: Long,
     devices: List<Device>,
     pendingAllowed: Map<String, Boolean>,
 ): List<AppControlUiState> {
     val devicesById = devices.associateBy { it.id }
-    return distinctBy { it.packageName }
+    val groupsByPackage =
+        appGroups
+            .filter { it.enabled }
+            .flatMap { group ->
+                group.apps
+                    .filter { it.enabled }
+                    .map { app -> app.packageName to group }
+            }.toMap()
+    return preferAppsWithIcons()
+        .distinctBy { it.packageName }
         .map { app ->
             val effectiveRule = rules.effectiveAppRule(app.packageName)
+            val appGroup = groupsByPackage[app.packageName]
             val extraTimeRemainingMinutes = grants.activeExtraTimeRemainingMinutes(app.packageName, nowEpochMillis)
             val limit =
                 limits.firstOrNull {
@@ -53,6 +65,10 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
                         it.targetType == PolicyTargetType.App &&
                         it.target == app.packageName
                 }
+            val confirmedAllowed =
+                extraTimeRemainingMinutes != null ||
+                    limit != null ||
+                    effectiveRule?.action != RuleAction.Block
             AppControlUiState(
                 appName = app.appName,
                 packageName = app.packageName,
@@ -60,11 +76,12 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
                 isSystemApp = app.isSystemApp,
                 iconBase64 = app.iconBase64,
                 deviceName = devicesById[app.deviceId]?.displayName ?: "Usuario",
-                allowed =
-                    pendingAllowed[app.packageName]
-                        ?: (extraTimeRemainingMinutes != null || limit != null || effectiveRule?.action != RuleAction.Block),
+                allowed = pendingAllowed[app.packageName] ?: confirmedAllowed,
+                confirmedAllowed = confirmedAllowed,
                 dailyLimitMinutes = limit?.limitMinutes,
                 extraTimeRemainingMinutes = extraTimeRemainingMinutes,
+                groupName = appGroup?.name,
+                groupLimitMinutes = appGroup?.limitMinutes,
                 isUpdating = pendingAllowed.containsKey(app.packageName),
             )
         }
@@ -83,8 +100,16 @@ internal fun List<RemoteInstalledAppDto>.forSelectedUserDevice(
     val directApps = filter { it.deviceId == selectedDeviceId }
     if (userDeviceIds.size != 1 || selectedDeviceId !in userDeviceIds) return directApps
     val orphanApps = filter { it.deviceId !in userDeviceIds }
-    return (directApps + orphanApps).distinctBy { it.packageName }
+    return (directApps + orphanApps).preferAppsWithIcons().distinctBy { it.packageName }
 }
+
+internal fun List<RemoteInstalledAppDto>.preferAppsWithIcons(): List<RemoteInstalledAppDto> =
+    sortedWith(
+        compareByDescending<RemoteInstalledAppDto> { it.iconBase64.hasVisibleIcon() }
+            .thenByDescending { it.updatedAt },
+    )
+
+private fun String?.hasVisibleIcon(): Boolean = !isNullOrBlank()
 
 internal fun List<PolicyRule>.internetBlocked(): Boolean =
     internetBlockRules().any { it.enabled }
@@ -191,7 +216,7 @@ private val UserDeviceStatus.sortOrder: Int
 private val AppControlUiState.accessSortOrder: Int
     get() =
         when {
-            !allowed && extraTimeRemainingMinutes == null -> 0
+            !confirmedAllowed && extraTimeRemainingMinutes == null -> 0
             extraTimeRemainingMinutes != null || dailyLimitMinutes != null -> 1
             else -> 2
         }

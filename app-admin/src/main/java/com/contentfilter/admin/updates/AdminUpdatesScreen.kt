@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -36,6 +37,9 @@ fun AdminUpdatesRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
         onDownload = viewModel::downloadUpdate,
         onInstall = viewModel::installDownloadedUpdate,
         onInstallPermission = viewModel::openInstallPermissionSettings,
+        onRequestReset = viewModel::requestResetLocalAdmin,
+        onDismissReset = viewModel::dismissResetLocalAdmin,
+        onConfirmReset = viewModel::resetLocalAdmin,
     )
 }
 
@@ -46,7 +50,27 @@ private fun AdminUpdatesScreen(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onInstallPermission: () -> Unit,
+    onRequestReset: () -> Unit,
+    onDismissReset: () -> Unit,
+    onConfirmReset: () -> Unit,
 ) {
+    if (state.showResetConfirmation) {
+        AlertDialog(
+            onDismissRequest = onDismissReset,
+            title = { Text("Cambiar administrador") },
+            text = { Text("Se borrará el admin guardado solo en este teléfono. Después podrás ingresar un token nuevo desde Login.") },
+            confirmButton = {
+                Button(onClick = onConfirmReset) {
+                    Text("Resetear")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = onDismissReset) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
     Column(
         modifier =
             Modifier
@@ -55,10 +79,6 @@ private fun AdminUpdatesScreen(
                 .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
-            text = "Actualizaciones",
-            style = MaterialTheme.typography.headlineSmall,
-        )
         Text(
             text = state.status.message(),
             style = MaterialTheme.typography.bodyLarge,
@@ -134,6 +154,24 @@ private fun AdminUpdatesScreen(
             onClick = onCheck,
         ) {
             Text("Buscar actualizacion")
+        }
+        Spacer(modifier = Modifier.height(12.dp))
+        Text(
+            text = "Administrador de este teléfono",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = "Usá esta opción si quedó un admin viejo y necesitás ingresar un token nuevo.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onRequestReset,
+        ) {
+            Text("Cambiar administrador")
+        }
+        if (state.resetMessage.isNotBlank()) {
+            Text(state.resetMessage, style = MaterialTheme.typography.bodyMedium)
         }
     }
 }
