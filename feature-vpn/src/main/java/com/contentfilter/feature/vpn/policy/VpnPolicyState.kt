@@ -8,6 +8,7 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.policy.SearchProtectionPolicyDefaults
+import com.contentfilter.core.domain.model.webNavigationBlocked
 
 data class VpnPolicyState(
     val snapshot: PolicySnapshot,
@@ -29,7 +30,7 @@ data class VpnPolicyState(
                         it.target != DomainWildcard &&
                         it.action == RuleAction.Allow
                 }
-            return wildcardBlocked && !hasAllowedDomain
+            return (wildcardBlocked && !hasAllowedDomain) || snapshot.rules.webNavigationBlocked()
         }
 
     val vpnReconnectKey: String

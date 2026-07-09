@@ -49,6 +49,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -107,6 +108,7 @@ fun RulesRoute(
         onDeviceDeleted = viewModel::deleteDevicePermanently,
         onAppAllowedChanged = viewModel::setAppAllowed,
         onAppLimitSaved = viewModel::saveAppControlLimit,
+        onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
         onToggle = viewModel::toggle,
         onDelete = viewModel::delete,
     )
@@ -134,6 +136,7 @@ private fun RulesScreen(
     onDeviceDeleted: (String) -> Unit,
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
+    onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -173,6 +176,7 @@ private fun RulesScreen(
                 onDeleteAppGroup = onDeleteAppGroup,
                 onAppAllowedChanged = onAppAllowedChanged,
                 onAppLimitSaved = onAppLimitSaved,
+                onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
                 onToggle = onToggle,
                 onDelete = onDelete,
         )
@@ -718,6 +722,7 @@ private fun UserDetailContent(
     onDeleteAppGroup: (String) -> Unit,
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
+    onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -731,7 +736,7 @@ private fun UserDetailContent(
             (listState.firstVisibleItemScrollOffset / 72f).coerceIn(0f, 1f)
         }
     val headerTargetProgress =
-        if (searchExpanded || selectedPanel == DevicePanel.AppGroups) {
+        if (searchExpanded || selectedPanel != DevicePanel.Apps) {
             1f
         } else {
             scrollHeaderProgress
@@ -777,71 +782,84 @@ private fun UserDetailContent(
                     bottom = 18.dp,
                 ),
         ) {
-            if (selectedPanel == DevicePanel.Apps) {
-            item {
-                AppsToolbar(
-                    apps = state.appControls,
-                    selectedFilter = appFilter,
-                    searchQuery = state.appSearchQuery,
-                    searchExpanded = searchExpanded,
-                    onFilterSelected = { appFilter = it },
-                    onSearchExpandedChanged = { expanded ->
-                        searchExpanded = expanded
-                        if (!expanded) onAppSearchChanged("")
-                    },
-                    onSearchChanged = onAppSearchChanged,
-                    onRefreshApps = onRefreshApps,
-                )
-            }
-            if (displayedApps.isEmpty()) {
-                item {
-                    EmptySectionText(
-                        if (state.appControls.isEmpty()) {
-                            "Abrí la App Usuario para detectar y sincronizar apps."
-                        } else {
-                            "No hay apps en este filtro."
-                        },
-                    )
+            when (selectedPanel) {
+                DevicePanel.Apps -> {
+                    item {
+                        AppsToolbar(
+                            apps = state.appControls,
+                            selectedFilter = appFilter,
+                            searchQuery = state.appSearchQuery,
+                            searchExpanded = searchExpanded,
+                            onFilterSelected = { appFilter = it },
+                            onSearchExpandedChanged = { expanded ->
+                                searchExpanded = expanded
+                                if (!expanded) onAppSearchChanged("")
+                            },
+                            onSearchChanged = onAppSearchChanged,
+                            onRefreshApps = onRefreshApps,
+                        )
+                    }
+                    if (displayedApps.isEmpty()) {
+                        item {
+                            EmptySectionText(
+                                if (state.appControls.isEmpty()) {
+                                    "Abrí la App Usuario para detectar y sincronizar apps."
+                                } else {
+                                    "No hay apps en este filtro."
+                                },
+                            )
+                        }
+                    }
+                    items(displayedApps, key = { it.packageName }) { app ->
+                        AppControlCard(
+                            app = app,
+                            onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },
+                            onLimitSaved = { minutes -> onAppLimitSaved(app.packageName, minutes) },
+                        )
+                    }
+                    if (otherRules.isNotEmpty()) {
+                        item {
+                            ProductSectionHeader(title = "Otras reglas", count = otherRules.size)
+                        }
+                        items(otherRules, key = { it.id }) { rule ->
+                            RuleCard(rule = rule, onToggle = { onToggle(rule) }, onDelete = { onDelete(rule) })
+                        }
+                    }
+                }
+                DevicePanel.AppGroups -> {
+                    item {
+                        OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
+                            value = state.appSearchQuery,
+                            onValueChange = onAppSearchChanged,
+                            label = { Text("Buscar app para agrupar") },
+                            singleLine = true,
+                        )
+                    }
+                    item {
+                        AppGroupsPanel(
+                            state = state,
+                            onGroupNameChanged = onGroupNameChanged,
+                            onGroupMinutesChanged = onGroupMinutesChanged,
+                            onGroupAppToggled = onGroupAppToggled,
+                            onSaveAppGroup = onSaveAppGroup,
+                            onEditAppGroup = onEditAppGroup,
+                            onCancelAppGroupEdit = onCancelAppGroupEdit,
+                            onDeleteAppGroup = onDeleteAppGroup,
+                        )
+                    }
+                }
+                DevicePanel.Web -> {
+                    item {
+                        WebNavigationPanel(
+                            blocked = state.internetBlocked,
+                            saving = state.internetSaving,
+                            protectionActive = selectedDevice.status == UserDeviceStatus.Active,
+                            onBlockedChanged = onWebNavigationBlockedChanged,
+                        )
+                    }
                 }
             }
-            items(displayedApps, key = { it.packageName }) { app ->
-                AppControlCard(
-                    app = app,
-                    onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },
-                    onLimitSaved = { minutes -> onAppLimitSaved(app.packageName, minutes) },
-                )
-            }
-            if (otherRules.isNotEmpty()) {
-                item {
-                    ProductSectionHeader(title = "Otras reglas", count = otherRules.size)
-                }
-                items(otherRules, key = { it.id }) { rule ->
-                    RuleCard(rule = rule, onToggle = { onToggle(rule) }, onDelete = { onDelete(rule) })
-                }
-            }
-            } else {
-            item {
-                OutlinedTextField(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = state.appSearchQuery,
-                    onValueChange = onAppSearchChanged,
-                    label = { Text("Buscar app para agrupar") },
-                    singleLine = true,
-                )
-            }
-            item {
-                AppGroupsPanel(
-                    state = state,
-                    onGroupNameChanged = onGroupNameChanged,
-                    onGroupMinutesChanged = onGroupMinutesChanged,
-                    onGroupAppToggled = onGroupAppToggled,
-                    onSaveAppGroup = onSaveAppGroup,
-                    onEditAppGroup = onEditAppGroup,
-                    onCancelAppGroupEdit = onCancelAppGroupEdit,
-                    onDeleteAppGroup = onDeleteAppGroup,
-                )
-            }
-        }
         }
     }
 }
@@ -954,6 +972,53 @@ private fun AppsToolbar(
                     onClick = { onFilterSelected(AppQuickFilter.Open) },
                 )
             }
+        }
+    }
+}
+
+@Composable
+private fun WebNavigationPanel(
+    blocked: Boolean,
+    saving: Boolean,
+    protectionActive: Boolean,
+    onBlockedChanged: (Boolean) -> Unit,
+) {
+    ProductCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Text("Bloquear navegación web", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text =
+                        if (blocked) {
+                            "Activado: navegación web bloqueada por el administrador."
+                        } else {
+                            "Desactivado: navegación web permitida."
+                        },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = HeaderMuted,
+                )
+                if (saving) {
+                    Text("Guardando...", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
+                }
+                if (blocked && !protectionActive) {
+                    FeedbackBanner(
+                        "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
+                        isError = true,
+                    )
+                }
+            }
+            Switch(
+                checked = blocked,
+                enabled = !saving,
+                onCheckedChange = onBlockedChanged,
+            )
         }
     }
 }
@@ -1137,6 +1202,23 @@ private fun UserDetailHeader(
                     shape = RoundedCornerShape(tabShape),
                 ) {
                     Text("Apps en grupo")
+                }
+            }
+            if (selectedPanel == DevicePanel.Web) {
+                Button(
+                    modifier = Modifier.weight(1f),
+                    onClick = { },
+                    shape = RoundedCornerShape(tabShape),
+                ) {
+                    Text("Web")
+                }
+            } else {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    onClick = { onPanelSelected(DevicePanel.Web) },
+                    shape = RoundedCornerShape(tabShape),
+                ) {
+                    Text("Web")
                 }
             }
         }

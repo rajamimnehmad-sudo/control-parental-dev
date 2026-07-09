@@ -13,6 +13,7 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
@@ -567,7 +568,7 @@ class RulesViewModel
                     internetSaving = true,
                     pendingInternetBlocked = blocked,
                     pendingSearchEnginesAllowed = if (blocked) false else it.pendingSearchEnginesAllowed,
-                    message = if (blocked) "Activando lista blanca..." else "Abriendo Internet...",
+                    message = "Guardando...",
                 )
             }
             logInternetSwitch(
@@ -581,9 +582,16 @@ class RulesViewModel
                 val saved =
                     runCatching {
                         setRulesForDomain(
-                            target = DomainWildcard,
+                            target = WebNavigationPolicy.RuleTarget,
                             action = RuleAction.Block,
                             enabled = blocked,
+                            priority = WebNavigationBlockPriority,
+                            deviceId = targetDeviceId,
+                        )
+                        setRulesForDomain(
+                            target = DomainWildcard,
+                            action = RuleAction.Block,
+                            enabled = false,
                             priority = InternetBlockPriority,
                             deviceId = targetDeviceId,
                         )
@@ -636,9 +644,9 @@ class RulesViewModel
                                 pendingSearchEnginesAllowed = null,
                                 message =
                                     if (blocked) {
-                                        "Modo web: bloquear todo excepto permitidos. Buscadores bloqueados."
+                                        "Bloquear navegación web activado."
                                     } else {
-                                        "Modo web: Internet abierto. Buscadores conservan su estado."
+                                        "Navegación web permitida."
                                     },
                             )
                         }
@@ -1357,9 +1365,10 @@ class RulesViewModel
         private suspend fun clearLegacyDomainBlockRules(deviceId: String) {
             uiState.value.rules
                 .filter {
-                    it.enabled &&
+                        it.enabled &&
                         it.scope == RuleScope.Domain &&
                         it.action == RuleAction.Block &&
+                        it.target != WebNavigationPolicy.RuleTarget &&
                         it.target != DomainWildcard &&
                         it.target !in SearchEngineDomains &&
                         it.target !in SecureDnsDomains

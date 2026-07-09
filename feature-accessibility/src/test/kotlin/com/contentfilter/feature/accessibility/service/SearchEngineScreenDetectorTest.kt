@@ -5,6 +5,7 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.WebNavigationPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -56,6 +57,19 @@ class SearchEngineScreenDetectorTest {
                 visibleText = "Google Search resultados de busqueda",
             ),
         )
+    }
+
+    @Test
+    fun `leaves browser immediately when web navigation is blocked`() {
+        val diagnosis =
+            detector.diagnose(
+                packageName = "com.android.chrome",
+                snapshot = snapshot(rule(WebNavigationPolicy.RuleTarget, RuleAction.Block)),
+                visibleText = "Nueva pestaña",
+            )
+
+        assertTrue(diagnosis.shouldLeave)
+        assertEquals("web-navigation-blocked", diagnosis.reason)
     }
 
     @Test

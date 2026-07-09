@@ -48,6 +48,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ContentFilterTheme
 import com.contentfilter.core.ui.PremiumFishMascot
+import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductFeatureTile
 import com.contentfilter.core.ui.ProductHeroPanel
 import com.contentfilter.core.ui.ProductIcon
@@ -67,6 +68,7 @@ import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.user.BuildConfig
 import com.contentfilter.user.apps.MyAppsRoute
+import com.contentfilter.user.internet.UserWebViewModel
 import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
@@ -177,7 +179,12 @@ private fun UserAppRoot(
                     )
                 UserDestination.MyApps -> MyAppsRoute(onBack = ::goBack)
                 UserDestination.Requests -> RequestsRoute(onBack = ::goBack)
-                UserDestination.Web -> UserWebTab(onBack = ::goBack)
+                UserDestination.Web ->
+                    UserWebTab(
+                        onBack = ::goBack,
+                        vpnActive = statusState.isVpnActive,
+                        accessibilityActive = statusState.accessibilityState == "Activa",
+                    )
                 UserDestination.Updates ->
                     UpdatesRoute(
                         onBack = ::goBack,
@@ -326,17 +333,50 @@ private fun UserHomeTab(
 }
 
 @Composable
-private fun UserWebTab(onBack: () -> Unit) {
+private fun UserWebTab(
+    onBack: () -> Unit,
+    vpnActive: Boolean,
+    accessibilityActive: Boolean,
+    viewModel: UserWebViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val blocked = state.webNavigationBlocked
+    val protectionActive = vpnActive && accessibilityActive
     ProductVisualPage(
         title = "Web",
-        subtitle = "Control web",
+        subtitle = "Bloquear navegación web",
         onBack = onBack,
     ) {
         ProductLargeFeatureCard(
-            title = "Web",
-            subtitle = "Esta sección queda preparada para próximos controles web.",
+            title =
+                if (blocked) {
+                    "Navegación web bloqueada por el administrador"
+                } else {
+                    "Navegación web permitida"
+                },
+            subtitle =
+                if (blocked) {
+                    "El usuario no puede modificar este estado."
+                } else {
+                    "Sin bloqueo web activo desde el administrador."
+                },
             accent = ProductSky,
         )
+        if (blocked && !accessibilityActive) {
+            ProductCard {
+                Text("Accessibility apagado.", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        if (blocked && !vpnActive) {
+            ProductCard {
+                Text("VPN apagada.", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        if (blocked && !protectionActive) {
+            ProductCard {
+                Text("Protección web no activa.", style = MaterialTheme.typography.bodyMedium)
+            }
+        }
     }
 }
 

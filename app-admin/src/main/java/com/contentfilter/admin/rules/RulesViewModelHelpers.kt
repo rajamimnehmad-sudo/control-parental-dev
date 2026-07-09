@@ -9,6 +9,8 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
+import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import java.time.Duration
 import java.time.Instant
@@ -112,12 +114,12 @@ internal fun List<RemoteInstalledAppDto>.preferAppsWithIcons(): List<RemoteInsta
 private fun String?.hasVisibleIcon(): Boolean = !isNullOrBlank()
 
 internal fun List<PolicyRule>.internetBlocked(): Boolean =
-    internetBlockRules().any { it.enabled }
+    webNavigationBlocked() || internetBlockRules().any { it.enabled }
 
 internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
     filter {
         it.scope == RuleScope.Domain &&
-            it.target == DomainWildcard &&
+            (it.target == DomainWildcard || it.target == WebNavigationPolicy.RuleTarget) &&
             it.action == RuleAction.Block
     }
 
@@ -299,6 +301,7 @@ internal const val DomainWildcard = "*"
 internal const val InternetBlockPriority = 10
 internal const val AllowDomainPriority = 1_000
 internal const val SearchEngineBlockPriority = 3_000
+internal const val WebNavigationBlockPriority = WebNavigationPolicy.RulePriority
 internal const val MaxDiagnosticValueLength = 80
 internal const val LogTag = "RulesViewModel"
 internal val SearchEngineDomains = SearchEngineCatalog.searchEngineDomains

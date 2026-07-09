@@ -16,6 +16,8 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
+import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.webNavigationBlocked
 
 /**
  * Deterministic policy engine for app and domain decisions.
@@ -76,6 +78,11 @@ class DefaultPolicyEngine : PolicyEngine {
         deviceDecision(context.device)?.let { return it }
         if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
             return PolicyDecision.Allow()
+        }
+        if (snapshot.rules.webNavigationBlocked() &&
+            WebNavigationPolicy.isWebNavigationDomain(normalizedContext.domain)
+        ) {
+            return PolicyDecision.Block("Blocked by web navigation policy.")
         }
         activeGrant(
             snapshot.extraTimeGrants,
@@ -244,6 +251,7 @@ class DefaultPolicyEngine : PolicyEngine {
         fun String.matchesAny(targets: Set<String>): Boolean = targets.any { matchesDomainTarget(it) }
 
         fun PolicySnapshot.hasSearchEngineBlockRule(): Boolean =
+            rules.webNavigationBlocked() ||
             rules.any {
                 it.enabled &&
                     it.scope == RuleScope.Domain &&

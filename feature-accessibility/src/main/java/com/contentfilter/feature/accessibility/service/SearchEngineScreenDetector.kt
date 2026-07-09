@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
+import com.contentfilter.core.domain.model.webNavigationBlocked
 
 class SearchEngineScreenDetector {
     fun shouldLeaveSearchEngine(
@@ -27,6 +28,16 @@ class SearchEngineScreenDetector {
                 packageCategory = packageCategory.label,
                 recentDnsBlockHost = null,
                 searchBlockRules = 0,
+                visibleTextLength = visibleText.length,
+            )
+        }
+        if (snapshot.rules.webNavigationBlocked()) {
+            return SearchEngineScreenDiagnosis(
+                shouldLeave = true,
+                reason = "web-navigation-blocked",
+                packageCategory = packageCategory.label,
+                recentDnsBlockHost = recentDnsBlockHost,
+                searchBlockRules = snapshot.searchEngineBlockRuleCount(),
                 visibleTextLength = visibleText.length,
             )
         }

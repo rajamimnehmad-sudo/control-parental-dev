@@ -36,6 +36,7 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 internal enum class DevicePanel {
     Apps,
     AppGroups,
+    Web,
 }
 
 @Composable

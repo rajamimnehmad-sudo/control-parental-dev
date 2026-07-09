@@ -18,6 +18,7 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
+import com.contentfilter.core.domain.model.WebNavigationPolicy
 import kotlin.test.Test
 import kotlin.test.assertIs
 
@@ -202,6 +203,26 @@ class DefaultPolicyEngineTest {
 
             assertIs<PolicyDecision.Block>(decision, "Expected $domain to be blocked")
         }
+    }
+
+    @Test
+    fun `web navigation block blocks search domains without blocking app domains`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.RuleTarget,
+                            action = RuleAction.Block,
+                            priority = WebNavigationPolicy.RulePriority,
+                        ),
+                    ),
+            )
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("duckduckgo.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("api.whatsapp.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("maps.googleapis.com")))
     }
 
     @Test

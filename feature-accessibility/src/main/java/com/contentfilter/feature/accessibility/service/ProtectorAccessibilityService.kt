@@ -92,7 +92,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         }
         if (blockRetryPackageName != packageName) clearBlockRetry()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
-        // Web/search protection is frozen. Accessibility remains active only for app protection.
+        if (handleSearchEngineProtection(packageName, event.eventType)) return
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
         serviceScope?.let { scope ->

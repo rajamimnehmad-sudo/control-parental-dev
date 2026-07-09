@@ -9,6 +9,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
+import com.contentfilter.core.domain.model.WebNavigationPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -40,6 +41,19 @@ class VpnPolicyStateTest {
             )
 
         assertFalse(state.strictWebBlockEnabled)
+    }
+
+    @Test
+    fun `enables strict browser tunnel for web navigation block`() {
+        val state =
+            state(
+                rule(
+                    target = WebNavigationPolicy.RuleTarget,
+                    action = RuleAction.Block,
+                ),
+            )
+
+        assertTrue(state.strictWebBlockEnabled)
     }
 
     @Test
