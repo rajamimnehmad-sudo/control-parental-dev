@@ -4,6 +4,7 @@ import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
+import android.media.AudioAttributes
 import android.os.Build
 
 class VpnNotificationFactory(
@@ -19,10 +20,17 @@ class VpnNotificationFactory(
                 Notification.Builder(context)
             }
         return builder
-            .setSmallIcon(android.R.drawable.stat_sys_warning)
-            .setContentTitle("Content Filter")
-            .setContentText("Proteccion DNS local activa")
+            .setSmallIcon(android.R.drawable.ic_lock_lock)
+            .setContentTitle("Protección activa")
+            .setContentText("El dispositivo está protegido")
             .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setShowWhen(false)
+            .setLocalOnly(true)
+            .setDefaults(0)
+            .setSound(null)
+            .setVibrate(null)
+            .setPriority(Notification.PRIORITY_LOW)
             .setCategory(Notification.CATEGORY_SERVICE)
             .build()
     }
@@ -33,9 +41,15 @@ class VpnNotificationFactory(
         val channel =
             NotificationChannel(
                 ChannelId,
-                "Proteccion local",
+                "Protección",
                 NotificationManager.IMPORTANCE_LOW,
-            )
+            ).apply {
+                description = "Estado de protección del dispositivo"
+                setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+                setSound(null, AudioAttributes.Builder().build())
+            }
         manager.createNotificationChannel(channel)
     }
 
