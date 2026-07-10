@@ -178,17 +178,28 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `search protection policy blocks clients4 when search blocking is active`() {
+    fun `search protection rule does not block support domains when web navigation is open`() {
         val snapshot = policy(rules = listOf(domainRule(target = "bing.com", action = RuleAction.Block)))
 
         val decision = engine.evaluateDomain(snapshot, domainContext("clients4.google.com"))
 
-        assertIs<PolicyDecision.Block>(decision)
+        assertIs<PolicyDecision.Allow>(decision)
     }
 
     @Test
-    fun `search protection policy blocks clientservices without blocking all googleapis`() {
-        val snapshot = policy(rules = listOf(domainRule(target = "google.com", action = RuleAction.Block)))
+    fun `web navigation block protects clientservices without blocking all googleapis`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.RuleTarget,
+                            action = RuleAction.Block,
+                            priority = WebNavigationPolicy.RulePriority,
+                        ),
+                        domainRule(target = "google.com", action = RuleAction.Block),
+                    ),
+            )
 
         assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("clientservices.googleapis.com")))
         assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("maps.googleapis.com")))

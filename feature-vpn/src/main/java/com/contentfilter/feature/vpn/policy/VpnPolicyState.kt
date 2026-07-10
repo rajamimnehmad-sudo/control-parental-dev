@@ -72,8 +72,9 @@ data class VpnPolicyState(
             candidate: PolicySnapshot,
         ): PolicySnapshot =
             when {
-                candidate.isEmptyLocalDefault() && current.rules.isNotEmpty() -> current
-                candidate.isEmptyLocalDefault() -> safeDefaultSnapshot()
+                candidate.isEmptyLocalDefault() &&
+                    current.rules.isNotEmpty() &&
+                    current.id != SafeDefaultPolicyId -> current
                 else -> candidate
             }
 

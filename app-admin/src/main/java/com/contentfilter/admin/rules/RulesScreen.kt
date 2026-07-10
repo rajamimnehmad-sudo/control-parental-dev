@@ -933,7 +933,10 @@ private fun UserDetailContent(
                             googleResultsAllowed = state.googleResultsAllowed,
                             imagesBlocked = state.imagesBlocked,
                             safeSearchEnabled = state.safeSearchEnabled,
-                            saving = state.internetSaving,
+                            navigationSaving = state.pendingInternetBlocked != null,
+                            googleResultsSaving = state.pendingGoogleResultsAllowed != null,
+                            imagesSaving = state.pendingImagesBlocked != null,
+                            safeSearchSaving = state.pendingSafeSearchEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
                             onGoogleResultsAllowedChanged = onGoogleResultsAllowedChanged,
@@ -1065,7 +1068,10 @@ private fun WebNavigationPanel(
     googleResultsAllowed: Boolean,
     imagesBlocked: Boolean,
     safeSearchEnabled: Boolean,
-    saving: Boolean,
+    navigationSaving: Boolean,
+    googleResultsSaving: Boolean,
+    imagesSaving: Boolean,
+    safeSearchSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
     onGoogleResultsAllowedChanged: (Boolean) -> Unit,
@@ -1081,30 +1087,34 @@ private fun WebNavigationPanel(
                         "Activado: navegación web bloqueada por el administrador."
                     } else {
                         "Desactivado: navegación web permitida."
-                    },
+                },
                 checked = blocked,
-                enabled = !saving,
+                enabled = !navigationSaving,
+                saving = navigationSaving,
                 onCheckedChange = onBlockedChanged,
             )
             WebSwitchRow(
                 title = "Permitir resultados de Google",
                 description = "Chrome y Google pueden mostrar búsquedas, pero no abrir resultados.",
                 checked = googleResultsAllowed,
-                enabled = blocked && !saving,
+                enabled = blocked && !googleResultsSaving,
+                saving = googleResultsSaving,
                 onCheckedChange = onGoogleResultsAllowedChanged,
             )
             WebSwitchRow(
                 title = "Bloquear fotos/imágenes",
                 description = "Bloquea Google Imágenes y dominios obvios de galerías.",
                 checked = imagesBlocked,
-                enabled = blocked && !saving,
+                enabled = blocked && !imagesSaving,
+                saving = imagesSaving,
                 onCheckedChange = onImagesBlockedChanged,
             )
             WebSwitchRow(
                 title = "SafeSearch activado",
                 description = "Fuerza búsqueda segura cuando se puede y bloquea buscadores no asegurados.",
                 checked = safeSearchEnabled,
-                enabled = blocked && !saving,
+                enabled = blocked && !safeSearchSaving,
+                saving = safeSearchSaving,
                 onCheckedChange = onSafeSearchChanged,
             )
             WebSwitchRow(
@@ -1112,11 +1122,9 @@ private fun WebNavigationPanel(
                 description = "Próximamente.",
                 checked = false,
                 enabled = false,
+                saving = false,
                 onCheckedChange = {},
             )
-            if (saving) {
-                Text("Guardando...", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
-            }
             if (blocked && !protectionActive) {
                 FeedbackBanner(
                     "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
@@ -1133,6 +1141,7 @@ private fun WebSwitchRow(
     description: String,
     checked: Boolean,
     enabled: Boolean,
+    saving: Boolean,
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
@@ -1146,6 +1155,9 @@ private fun WebSwitchRow(
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium)
             Text(description, style = MaterialTheme.typography.bodyMedium, color = HeaderMuted)
+            if (saving) {
+                Text("Guardando...", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
+            }
         }
         Switch(
             checked = checked,

@@ -26,6 +26,7 @@ class SearchEngineScreenDetector {
     ): SearchEngineScreenDiagnosis {
         val packageCategory = packageName.searchSurfaceCategory()
         val webNavigationBlocked = snapshot.rules.webNavigationBlocked()
+        val blockRuleCount = snapshot.searchEngineBlockRuleCount()
         if (packageCategory == SearchSurfaceCategory.NonBrowser) {
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
@@ -33,7 +34,7 @@ class SearchEngineScreenDetector {
                 webNavigationBlocked = webNavigationBlocked,
                 packageCategory = packageCategory.label,
                 recentDnsBlockHost = null,
-                searchBlockRules = 0,
+                searchBlockRules = blockRuleCount,
                 visibleTextLength = visibleText.length,
             )
         }
@@ -83,53 +84,12 @@ class SearchEngineScreenDetector {
                 visibleTextLength = visibleText.length,
             )
         }
-        val blockRuleCount = snapshot.searchEngineBlockRuleCount()
-        if (blockRuleCount == 0) {
-            return SearchEngineScreenDiagnosis(
-                shouldLeave = false,
-                reason = "search-rules-not-blocked",
-                webNavigationBlocked = webNavigationBlocked,
-                packageCategory = packageCategory.label,
-                recentDnsBlockHost = null,
-                searchBlockRules = 0,
-                visibleTextLength = visibleText.length,
-            )
-        }
-        val hasVisibleSearchSignal = visibleText.indicatesSearchEngineScreen()
-        val blockedRecentSearchHost = recentDnsBlockHost?.takeIf { it.isSearchProtectionHost() }
-        if (!hasVisibleSearchSignal && blockedRecentSearchHost == null) {
-            return SearchEngineScreenDiagnosis(
-                shouldLeave = false,
-                reason = "no-search-signal",
-                webNavigationBlocked = webNavigationBlocked,
-                packageCategory = packageCategory.label,
-                recentDnsBlockHost = blockedRecentSearchHost,
-                searchBlockRules = blockRuleCount,
-                visibleTextLength = visibleText.length,
-            )
-        }
-        if (packageCategory == SearchSurfaceCategory.Browser) {
-            return SearchEngineScreenDiagnosis(
-                shouldLeave = true,
-                reason =
-                    when {
-                        hasVisibleSearchSignal -> "browser-search-signal-observed"
-                        blockedRecentSearchHost != null -> "browser-recent-dns-block-observed"
-                        else -> "browser-search-blocked"
-                    },
-                webNavigationBlocked = webNavigationBlocked,
-                packageCategory = packageCategory.label,
-                recentDnsBlockHost = blockedRecentSearchHost,
-                searchBlockRules = blockRuleCount,
-                visibleTextLength = visibleText.length,
-            )
-        }
         return SearchEngineScreenDiagnosis(
-            shouldLeave = true,
-            reason = "blocked-search-screen",
+            shouldLeave = false,
+            reason = "web-navigation-open",
             webNavigationBlocked = webNavigationBlocked,
             packageCategory = packageCategory.label,
-            recentDnsBlockHost = blockedRecentSearchHost,
+            recentDnsBlockHost = null,
             searchBlockRules = blockRuleCount,
             visibleTextLength = visibleText.length,
         )
@@ -150,12 +110,6 @@ class SearchEngineScreenDetector {
                 it.target in SearchEngineCatalog.searchEngineDomains
         }
 
-    private fun String.indicatesSearchEngineScreen(): Boolean {
-        val normalized = lowercase()
-        if (SearchEngineCatalog.searchEngineDomains.any { normalized.contains(it.normalizedHost()) }) return true
-        return SearchEngineSignals.any { it in normalized }
-    }
-
     private fun String.indicatesGoogleSearchScreen(): Boolean =
         contains("google") &&
             (contains("search") ||
@@ -167,20 +121,12 @@ class SearchEngineScreenDetector {
     private fun String.hasImageSignal(): Boolean =
         ImageSignals.any { it in this } || ImageExtensions.any { it in this }
 
-    private fun String.isSearchProtectionHost(): Boolean {
-        val normalized = normalizedHost()
-        return SearchEngineCatalog.searchEngineDomains.any { normalized.matchesDomainTarget(it.normalizedHost()) } ||
-            SearchEngineCatalog.secureDnsDomains.any { normalized.matchesDomainTarget(it.normalizedHost()) }
-    }
-
     private fun String.normalizedHost(): String =
         lowercase()
             .substringBefore("/")
             .substringBefore("?")
             .removeSuffix(".")
             .removePrefix("www.")
-
-    private fun String.matchesDomainTarget(target: String): Boolean = this == target || endsWith(".$target")
 
     private companion object {
         val BrowserPackageNames =
@@ -203,18 +149,6 @@ class SearchEngineScreenDetector {
         val SearchAppPackageNames =
             setOf(
                 "com.google.android.googlequicksearchbox",
-            )
-
-        val SearchEngineSignals =
-            setOf(
-                "google search",
-                "buscar con google",
-                "bing search",
-                "yahoo search",
-                "duckduckgo search",
-                "search results",
-                "resultados de búsqueda",
-                "resultados de busqueda",
             )
 
         val ImageSignals =

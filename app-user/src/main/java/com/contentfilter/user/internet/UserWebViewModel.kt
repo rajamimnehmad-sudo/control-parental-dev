@@ -27,7 +27,11 @@ class UserWebViewModel
                     val blocked = snapshot.rules.webNavigationBlocked()
                     Log.i(
                         LogTag,
-                        "webNavigation user snapshot policy=${snapshot.id} version=${snapshot.version} blocked=$blocked",
+                        "webNavigation user snapshot policy=${snapshot.id} version=${snapshot.version} " +
+                            "webNavigationBlocked=$blocked " +
+                            "googleResultsAllowed=${snapshot.rules.googleResultsAllowed()} " +
+                            "blockImages=${snapshot.rules.webImagesBlocked()} " +
+                            "safeSearch=${snapshot.rules.safeSearchEnabled()}",
                     )
                     UserWebUiState(
                         webNavigationBlocked = blocked,

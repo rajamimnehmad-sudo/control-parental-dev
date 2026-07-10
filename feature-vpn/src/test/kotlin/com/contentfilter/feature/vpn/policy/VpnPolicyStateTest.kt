@@ -173,14 +173,13 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `uses safe default when startup only has empty local default`() {
+    fun `uses empty local default when startup policy is open`() {
         val emptyCurrent = PolicySnapshot(id = "empty", version = 0L, rules = emptyList())
         val emptyLocal = PolicySnapshot(id = "local-default", version = 1L, rules = emptyList())
 
         val resolved = VpnPolicyState.resolveSnapshot(current = emptyCurrent, candidate = emptyLocal)
 
-        assertEquals(VpnPolicyState.SafeDefaultPolicyId, resolved.id)
-        assertTrue(resolved.rules.any { it.target == "google.com" && it.action == RuleAction.Block && it.enabled })
+        assertEquals(emptyLocal, resolved)
     }
 
     private fun state(vararg rules: PolicyRule): VpnPolicyState =

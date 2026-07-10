@@ -123,6 +123,21 @@ class RulesViewModel
                 val userDevices = devices.toUserDevices(apps)
                 val selectedDeviceId = userDevices.selectedDeviceId(formState.selectedDeviceId)
                 val savedInternetBlocked = policy.rules.internetBlocked()
+                if (BuildConfig.DEBUG) {
+                    Log.d(
+                        LogTag,
+                        "webNavigation admin state selectedDeviceId=$selectedDeviceId " +
+                            "webNavigationBlocked=$savedInternetBlocked " +
+                            "googleResultsAllowed=${policy.rules.googleResultsAllowedForWeb()} " +
+                            "blockImages=${policy.rules.imagesBlockedForWeb()} " +
+                            "safeSearch=${policy.rules.safeSearchEnabledForWeb()} " +
+                            "pendingNavigation=${formState.pendingInternetBlocked} " +
+                            "pendingGoogle=${formState.pendingGoogleResultsAllowed} " +
+                            "pendingImages=${formState.pendingImagesBlocked} " +
+                            "pendingSafeSearch=${formState.pendingSafeSearchEnabled} " +
+                            "policyRevision=${policy.rules.webPolicyRevision()}",
+                    )
+                }
                 formState.copy(
                     rules = policy.rules.sortedWith(compareBy({ it.scope.name }, { it.target })),
                     limits = policy.limits.sortedWith(compareBy({ it.targetType.name }, { it.target })),
@@ -644,10 +659,9 @@ class RulesViewModel
                         ui = uiState.value.internetBlocked,
                     )
                     syncScheduler.requestSync()
-                    val synced = syncNow()
                     Log.i(
                         LogTag,
-                        "webNavigation admin synced deviceId=$targetDeviceId requested=$blocked stored=$roomAfterSave syncSuccess=$synced",
+                        "webNavigation admin sync requested deviceId=$targetDeviceId requested=$blocked stored=$roomAfterSave",
                     )
                     recordAdminDiagnostic(
                         action = "internetSave",
@@ -655,54 +669,36 @@ class RulesViewModel
                         requestId = requestId,
                         previousState = previousRoom.toString(),
                         requestedState = blocked.toString(),
-                        result = if (synced) "synced" else "local-only",
+                        result = "local-confirmed",
                         reason = "internet-mode",
                     )
-                    if (synced) {
-                        if (!isCurrentInternetSave(requestId)) {
-                            Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=internet-mode")
-                            return@launch
-                        }
-                        form.update {
-                            it.copy(
-                                internetSaving = false,
-                                pendingInternetBlocked = null,
-                                pendingSearchEnginesAllowed = null,
-                                pendingGoogleResultsAllowed = null,
-                                pendingImagesBlocked = null,
-                                pendingSafeSearchEnabled = null,
-                                message =
-                                    if (blocked) {
-                                        "Bloquear navegación web activado."
-                                    } else {
-                                        "Navegación web permitida."
-                                    },
-                            )
-                        }
-                        logInternetSwitch(
-                            stage = "ui-final",
-                            touched = blocked,
-                            pending = null,
-                            room = roomAfterSave,
-                            ui = blocked,
-                        )
-                    } else {
-                        if (!isCurrentInternetSave(requestId)) {
-                            Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=internet-mode")
-                            return@launch
-                        }
-                        form.update {
-                            it.copy(
-                                internetSaving = false,
-                                pendingInternetBlocked = null,
-                                pendingSearchEnginesAllowed = null,
-                                pendingGoogleResultsAllowed = null,
-                                pendingImagesBlocked = null,
-                                pendingSafeSearchEnabled = null,
-                                message = "Cambio guardado localmente. Se sincronizará cuando haya conexión.",
-                            )
-                        }
+                    if (!isCurrentInternetSave(requestId)) {
+                        Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=internet-mode")
+                        return@launch
                     }
+                    form.update {
+                        it.copy(
+                            internetSaving = false,
+                            pendingInternetBlocked = null,
+                            pendingSearchEnginesAllowed = null,
+                            pendingGoogleResultsAllowed = null,
+                            pendingImagesBlocked = null,
+                            pendingSafeSearchEnabled = null,
+                            message =
+                                if (blocked) {
+                                    "Bloquear navegación web activado."
+                                } else {
+                                    "Navegación web permitida."
+                                },
+                        )
+                    }
+                    logInternetSwitch(
+                        stage = "ui-final",
+                        touched = blocked,
+                        pending = null,
+                        room = roomAfterSave,
+                        ui = blocked,
+                    )
                 } else {
                     if (isCurrentInternetSave(requestId)) {
                         recordAdminDiagnostic(
@@ -743,6 +739,8 @@ class RulesViewModel
                 requestedState = allowed,
                 pending = { state -> state.copy(pendingGoogleResultsAllowed = allowed) },
                 save = { deviceId -> setGoogleResultsAllowedRules(allowed, deviceId) },
+                confirmed = { rules -> rules.googleResultsAllowedForWeb() == allowed },
+                clearPending = { state -> state.copy(pendingGoogleResultsAllowed = null) },
                 successMessage =
                     if (allowed) {
                         "Resultados de Google permitidos."
@@ -758,6 +756,8 @@ class RulesViewModel
                 requestedState = blocked,
                 pending = { state -> state.copy(pendingImagesBlocked = blocked) },
                 save = { deviceId -> setImagesBlockedRules(blocked, deviceId) },
+                confirmed = { rules -> rules.imagesBlockedForWeb() == blocked },
+                clearPending = { state -> state.copy(pendingImagesBlocked = null) },
                 successMessage =
                     if (blocked) {
                         "Fotos e imágenes bloqueadas."
@@ -773,6 +773,8 @@ class RulesViewModel
                 requestedState = enabled,
                 pending = { state -> state.copy(pendingSafeSearchEnabled = enabled) },
                 save = { deviceId -> setSafeSearchRules(enabled, deviceId) },
+                confirmed = { rules -> rules.safeSearchEnabledForWeb() == enabled },
+                clearPending = { state -> state.copy(pendingSafeSearchEnabled = null) },
                 successMessage =
                     if (enabled) {
                         "SafeSearch activado."
@@ -787,6 +789,8 @@ class RulesViewModel
             requestedState: Boolean,
             pending: (RulesUiState) -> RulesUiState,
             save: suspend (String) -> Unit,
+            confirmed: (List<PolicyRule>) -> Boolean,
+            clearPending: (RulesUiState) -> RulesUiState,
             successMessage: String,
         ) {
             val targetDeviceId = uiState.value.selectedDeviceId
@@ -806,24 +810,18 @@ class RulesViewModel
                 val saved =
                     runCatching {
                         save(targetDeviceId)
+                        withTimeoutOrNull(RoomConfirmTimeoutMillis) {
+                            policyRules.first { confirmed(it) }
+                        } ?: error("Room no confirmó $action.")
                         syncScheduler.requestSync()
-                        syncNowWithResult()
                     }
                 if (!isCurrentInternetSave(requestId)) return@launch
-                val syncResult = saved.getOrNull()
                 form.update {
-                    it.copy(
+                    clearPending(it).copy(
                         internetSaving = false,
-                        pendingGoogleResultsAllowed = null,
-                        pendingImagesBlocked = null,
-                        pendingSafeSearchEnabled = null,
                         message =
                             if (saved.isSuccess) {
-                                if (syncResult?.success == false) {
-                                    "Cambio guardado localmente. Se sincronizará cuando haya conexión."
-                                } else {
-                                    successMessage
-                                }
+                                successMessage
                             } else {
                                 "No se pudo guardar el cambio web."
                             },

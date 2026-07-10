@@ -108,7 +108,8 @@ class DefaultPolicyEngine : PolicyEngine {
         }
         val rule = snapshot.rules.bestMatchingRule(normalizedContext)
         val decision = rule?.toDecision(normalizedContext.domain) ?: PolicyDecision.Allow()
-        if (decision is PolicyDecision.Allow &&
+        if (snapshot.rules.webNavigationBlocked() &&
+            decision is PolicyDecision.Allow &&
             normalizedContext.domain.isSearchProtectionDomain() &&
             snapshot.hasSearchEngineBlockRule()
         ) {

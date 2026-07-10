@@ -118,7 +118,7 @@ internal fun List<RemoteInstalledAppDto>.preferAppsWithIcons(): List<RemoteInsta
 private fun String?.hasVisibleIcon(): Boolean = !isNullOrBlank()
 
 internal fun List<PolicyRule>.internetBlocked(): Boolean =
-    webNavigationBlocked() || internetBlockRules().any { it.enabled }
+    webNavigationBlocked()
 
 internal fun List<PolicyRule>.googleResultsAllowedForWeb(): Boolean = googleResultsAllowed()
 
@@ -132,6 +132,14 @@ internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
             (it.target == DomainWildcard || it.target == WebNavigationPolicy.RuleTarget) &&
             it.action == RuleAction.Block
     }
+
+internal fun List<PolicyRule>.webPolicyRevision(): Int =
+    asSequence()
+        .filter { it.scope == RuleScope.Domain }
+        .map { "${it.target}:${it.action}:${it.enabled}:${it.priority}" }
+        .sorted()
+        .joinToString("|")
+        .hashCode()
 
 internal fun List<PolicyRule>.searchEnginesAllowed(): Boolean =
     SearchProtectionDomains.none { domain ->

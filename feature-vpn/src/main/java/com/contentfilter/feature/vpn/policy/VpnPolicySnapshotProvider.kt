@@ -2,6 +2,9 @@ package com.contentfilter.feature.vpn.policy
 
 import android.util.Log
 import com.contentfilter.core.domain.model.LicenseState
+import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.safeSearchEnabled
+import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
@@ -52,7 +55,12 @@ class VpnPolicySnapshotProvider
                         state.value = it
                         Log.i(
                             LogTag,
-                            "webNavigation vpn applied policy=${it.snapshot.id} version=${it.snapshot.version} blocked=${it.snapshot.rules.webNavigationBlocked()} strict=${it.strictWebBlockEnabled}",
+                            "webNavigation vpn applied policy=${it.snapshot.id} version=${it.snapshot.version} " +
+                                "webNavigationBlocked=${it.snapshot.rules.webNavigationBlocked()} " +
+                                "googleResultsAllowed=${it.snapshot.rules.googleResultsAllowed()} " +
+                                "blockImages=${it.snapshot.rules.webImagesBlocked()} " +
+                                "safeSearch=${it.snapshot.rules.safeSearchEnabled()} " +
+                                "mode=${if (it.strictWebBlockEnabled) "web-blocked" else "web-open"}",
                         )
                         telemetryReporter.recordSnapshotReceived(
                             snapshot = it.snapshot,
@@ -77,7 +85,12 @@ class VpnPolicySnapshotProvider
             )
             Log.i(
                 LogTag,
-                "webNavigation vpn applied policy=${state.value.snapshot.id} version=${state.value.snapshot.version} blocked=${state.value.snapshot.rules.webNavigationBlocked()} strict=${state.value.strictWebBlockEnabled}",
+                "webNavigation vpn applied policy=${state.value.snapshot.id} version=${state.value.snapshot.version} " +
+                    "webNavigationBlocked=${state.value.snapshot.rules.webNavigationBlocked()} " +
+                    "googleResultsAllowed=${state.value.snapshot.rules.googleResultsAllowed()} " +
+                    "blockImages=${state.value.snapshot.rules.webImagesBlocked()} " +
+                    "safeSearch=${state.value.snapshot.rules.safeSearchEnabled()} " +
+                    "mode=${if (state.value.strictWebBlockEnabled) "web-blocked" else "web-open"}",
             )
         }
 

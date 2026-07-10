@@ -10,6 +10,9 @@ import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.ProtectionAlertType
 import com.contentfilter.core.domain.model.UsageSession
+import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.safeSearchEnabled
+import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
@@ -185,16 +188,24 @@ class ProtectorAccessibilityService : AccessibilityService() {
         eventType: Int,
     ): Boolean {
         val visibleText = rootInActiveWindow.visibleText()
+        val snapshot = snapshotProvider.current().snapshot
         val diagnosis =
             searchEngineScreenDetector.diagnose(
                 packageName = packageName,
-                snapshot = snapshotProvider.current().snapshot,
+                snapshot = snapshot,
                 visibleText = visibleText,
                 recentDnsBlockHost = SearchProtectionSignals.recentDnsBlock()?.host,
             )
         Log.i(
             LogTag,
-            "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} package=$packageName webNavigationBlocked=${diagnosis.webNavigationBlocked} reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} visibleTextLength=${diagnosis.visibleTextLength}",
+            "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} " +
+                "package=$packageName webNavigationBlocked=${diagnosis.webNavigationBlocked} " +
+                "googleResultsAllowed=${snapshot.rules.googleResultsAllowed()} " +
+                "blockImages=${snapshot.rules.webImagesBlocked()} " +
+                "safeSearch=${snapshot.rules.safeSearchEnabled()} " +
+                "mode=${if (diagnosis.shouldLeave) "web-blocked" else "web-open"} " +
+                "reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} " +
+                "visibleTextLength=${diagnosis.visibleTextLength}",
         )
         serviceScope?.launch {
             telemetryReporter.recordSearchProtection(
