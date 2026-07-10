@@ -64,11 +64,11 @@ class ActivationViewModel
                 return
             }
             val token = PairingToken.from(state.activationCode)
-            val deviceDisplayName = token.displayName.orEmpty()
-            if (deviceDisplayName.isBlank() || token.code.isBlank()) {
+            val deviceDisplayName = token.displayName ?: DefaultDeviceDisplayName
+            if (token.code.isBlank()) {
                 val reason = "Local validation failed: device name or activation code is blank."
                 Log.w(LogTag, reason)
-                mutableState.update { it.copy(message = "Ingresá el token completo del administrador.") }
+                mutableState.update { it.copy(message = "Ingresá el token del administrador.") }
                 return
             }
             viewModelScope.launch {
@@ -157,25 +157,41 @@ class ActivationViewModel
             companion object {
                 fun from(rawValue: String): PairingToken {
                     val trimmed = rawValue.trim()
-                    val separator = trimmed.lastIndexOf('-')
-                    if (separator <= 0 || separator >= trimmed.lastIndex - 1) {
-                        return PairingToken(code = trimmed, displayName = null)
-                    }
+                    val directCode = trimmed.normalizedPairingCodeOrNull()
+                    if (directCode != null) return PairingToken(code = directCode, displayName = null)
+
+                    val parts = trimmed.split(Regex("[^A-Za-z0-9]+")).filter { it.isNotBlank() }
+                    val code = parts.lastOrNull { it.normalizedPairingCodeOrNull() != null }
+                        ?.normalizedPairingCodeOrNull()
+                        .orEmpty()
+                    if (code.isBlank()) return PairingToken(code = "", displayName = null)
+
                     val name =
-                        trimmed
-                            .substring(0, separator)
-                            .replace('-', ' ')
+                        parts
+                            .takeWhile { it.normalizedPairingCodeOrNull() == null }
+                            .joinToString(" ")
                             .trim()
                             .takeIf { it.isNotBlank() }
-                    val code = trimmed.substring(separator + 1).trim()
                     return PairingToken(code = code, displayName = name)
                 }
+
+                private fun String.normalizedPairingCodeOrNull(): String? {
+                    val normalized = trim().uppercase()
+                    return if (normalized.matches(UserPairingCodeRegex)) {
+                        normalized
+                    } else {
+                        null
+                    }
+                }
+
+                private val UserPairingCodeRegex = Regex("[A-Z0-9]{6}")
             }
         }
 
         private companion object {
             const val LogTag = "ActivationViewModel"
             const val OfflineMessage = "Sin conexión. Mostrando datos guardados."
+            const val DefaultDeviceDisplayName = "Dispositivo protegido"
 
             fun String.maskForLog(): String =
                 if (length <= 4) "****" else "${take(2)}***${takeLast(2)}"
