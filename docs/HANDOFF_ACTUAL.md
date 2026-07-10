@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-09
+Fecha de corte: 2026-07-10
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -37,12 +37,21 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada:
+Version historica al corte anterior:
 
 ```text
 App Usuario versionCode 129
 App Admin versionCode 148
 versionName 1.0.1-dev
+```
+
+Version publicada real al 2026-07-10:
+
+```text
+App Usuario versionCode 160
+App Admin versionCode 160
+versionName 1.0.1-dev
+Commit main: 4927a40 Add basic web control switches
 ```
 
 Manifiestos:
@@ -62,8 +71,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256:
 
 ```text
-Usuario: a29b8774e09a3ec914666cd0be2d9a7830f6e3a934aa730c203010b676eb2a9d
-Admin:   9b93b95b897da1481b7c921a84715c81cc124fd6f813030a013757cf3e78381e
+Usuario DEV 160: 3ca050a96ab24fbc8a5503678f35c3b106a1fbeb6d0b5486f8f5b54484411f5c
+Admin DEV 160:   b56da30c7a9b9bbe2283221156b0e973b4f22d37df8fb8cb8e0d58584cc2b177
 ```
 
 ## Estado funcional
@@ -71,12 +80,17 @@ Admin:   9b93b95b897da1481b7c921a84715c81cc124fd6f813030a013757cf3e78381e
 - App Usuario y App Admin usan activacion real con Supabase DEV.
 - App Admin se activa por token de administrador.
 - App Usuario se activa solo con token generado desde Admin.
-- Comunidad DEV activa: `Comunidad Primero Año`.
+- Comunidad DEV activa actual de pruebas: `Ajdut`.
 - Codigos numericos legacy 1-100 reemplazados por tokens aleatorios.
 - Usuarios es la entrada unica del Admin para usuarios protegidos, aplicaciones y grupos de apps.
 - La seccion separada Reglas ya no esta en navegacion.
 - Bloqueo de apps por Accessibility funciona y cierra apps bloqueadas rapido.
-- VPN/bloqueo web queda fuera del proximo ticket salvo que el usuario lo pida.
+- VPN esta siempre activa en App Usuario cuando hay permiso; Admin cambia politica Web, no prende/apaga VPN.
+- Web Admin mantiene flujo real: Comunidad -> Web -> elegir usuario -> configurar Web.
+- Web Admin DEV 160 tiene switches: Bloquear navegacion web, Permitir resultados de Google, Bloquear fotos/imagenes, SafeSearch activado, Proteccion con IA deshabilitada como "Proximamente".
+- Web Usuario DEV 160 muestra estado simple de navegacion, Google, imagenes, SafeSearch e IA, sin permitir cambios.
+- Bloqueo Web se representa con reglas internas de dominio en `WebNavigationPolicy`; no requiere migracion Room nueva.
+- VPN/DNS refuerza por dominio. Accessibility decide salir a Home en Chrome/Google cuando corresponde. Limitacion real: Chrome normal no permite tapar imagenes ni inspeccionar URL completa desde DNS.
 - Solicitudes Admin se agrupan por usuario con indicador rojo.
 - En cada solicitud se ve icono de app y acciones: acceso completo, dar tiempo, rechazar.
 - Si Admin concede tiempo extra, Admin y Usuario muestran minutos restantes.
@@ -91,6 +105,11 @@ Admin:   9b93b95b897da1481b7c921a84715c81cc124fd6f813030a013757cf3e78381e
 - Supabase DEV tiene `app_groups`, `app_group_apps` y tablas base para grupos de usuarios (`protected_user_groups`, `protected_user_group_members`).
 - Panel Admin muestra comunidad y responsable, sin herramientas tecnicas DEV.
 - Pantalla Actualizaciones del Usuario ya no muestra reset/diagnostico DEV.
+- Activacion Usuario DEV 159+ acepta token simple de 6 caracteres, token nombre-CODIGO y texto pegado con codigo.
+- Al activar Usuario, se limpia activacion local vieja incompatible y se guarda solo el nuevo deviceId.
+- Supabase DEV `pair_device_with_code` devuelve errores mas especificos: codigo inexistente, usado, vencido, borrado, rol incorrecto o licencia.
+- El bug de token valido fue licencia DEV de `Ajdut` suspendida/vencida; se reactivo en Supabase DEV hasta 2027-07-10, max_user_devices 250.
+- Web Super Admin legacy fue restaurada porque el usuario la necesita. URL conocida: `https://web-super-admin-nine.vercel.app/communities`. No borrar `web-super-admin` salvo ticket explicito.
 
 ## Limpieza/refactor reciente
 
@@ -150,6 +169,10 @@ Nota 2026-07-09: App Usuario DEV 126 agrega Home al estilo Admin, unifica esteti
 Nota 2026-07-09: App Usuario DEV 127 mueve solicitudes a Home y estado a Ajustes, oculta nombres tecnicos de apps, mejora solicitudes con iconos/nombres amigables y agrega filtros/progreso en Mis apps. App Admin DEV 148 renombra grupos a Apps en grupo y corrige scroll del detalle de aplicaciones.
 Nota 2026-07-09: App Usuario DEV 128 ajusta Mis apps al estilo visual del panel Admin, muestra Apps en grupo solo en su filtro, separa mas la pila de iconos y suma pez Home con burbujas/sombra/animacion.
 Nota 2026-07-09: App Usuario DEV 129 agrega Web al menu, flechas atras con historial, refresh real en Mis apps, Ajustes mas moderno, iconos compartidos Material y banner mas compacto con pez patrullando.
+Nota 2026-07-10: DEV 156-158 corrige reenlace Usuario tras borrar dispositivo remoto, mantiene formulario de activacion disponible y acepta codigos simples o pegados.
+Nota 2026-07-10: DEV 159 separa errores reales de activacion/token en Supabase, reemplaza activacion local vieja y publica Usuario/Admin 159.
+Nota 2026-07-10: Se reactiva licencia DEV de comunidad `Ajdut`; el fallo "token invalido" era licencia suspendida/vencida, no parser ni app.
+Nota 2026-07-10: DEV 160 agrega switches Web basicos en Admin -> Web -> Usuario y tab Web Usuario muestra estados. Commit `4927a40`.
 
 ## Modulos principales
 
