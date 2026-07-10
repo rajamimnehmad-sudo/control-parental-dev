@@ -11,4 +11,5 @@ enum class SupabaseTable(val tableName: String) {
     AppGroupApps("app_group_apps"),
     AccessRequests("access_requests"),
     ExtraTimeGrants("extra_time_grants"),
+    DevicePushTokens("device_push_tokens"),
 }

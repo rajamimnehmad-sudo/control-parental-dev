@@ -76,39 +76,22 @@ import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val blockedDomainIntent = MutableStateFlow<String?>(null)
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        blockedDomainIntent.value = intent.blockedDomainExtra()
         setContent {
             ContentFilterTheme {
-                val blockedDomain by blockedDomainIntent.collectAsStateWithLifecycle()
-                UserAppRoot(
-                    modifier = Modifier.fillMaxSize(),
-                    blockedDomain = blockedDomain,
-                    onBlockedDomainConsumed = { blockedDomainIntent.value = null },
-                )
+                UserAppRoot(modifier = Modifier.fillMaxSize())
             }
         }
-    }
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        setIntent(intent)
-        blockedDomainIntent.value = intent.blockedDomainExtra()
     }
 }
 
 @Composable
 private fun UserAppRoot(
     modifier: Modifier = Modifier,
-    blockedDomain: String? = null,
-    onBlockedDomainConsumed: () -> Unit = {},
 ) {
     var destination by rememberSaveable { mutableStateOf(UserDestination.Home) }
     var backStack by rememberSaveable { mutableStateOf<List<UserDestination>>(emptyList()) }
@@ -144,9 +127,6 @@ private fun UserAppRoot(
                 showVpnDialog = true
             }
         }
-    }
-    LaunchedEffect(blockedDomain) {
-        if (!blockedDomain.isNullOrBlank()) onBlockedDomainConsumed()
     }
     if (rootState.checkingActivation) {
         Box(modifier = modifier.padding(24.dp)) {
@@ -538,10 +518,3 @@ private enum class UserDestination(
     Requests("Solicitudes", ProductIcon.Bell, showInNav = false),
     Updates("Ajustes", ProductIcon.Settings),
 }
-
-private fun Intent.blockedDomainExtra(): String? =
-    takeIf { action == OpenInternetAction }
-        ?.getStringExtra(ExtraBlockedDomain)
-
-const val OpenInternetAction = "com.contentfilter.user.OPEN_INTERNET"
-const val ExtraBlockedDomain = "blocked_domain"

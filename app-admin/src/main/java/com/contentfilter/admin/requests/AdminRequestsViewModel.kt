@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.AccessRequest
+import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.usecase.admin.ApproveAccessRequestUseCase
@@ -79,7 +80,10 @@ class AdminRequestsViewModel
                 observeDevices(),
                 localState,
             ) { requests, devices, local ->
-                    val pendingRequests = requests.filter { it.status.isPending() }
+                    val pendingRequests =
+                        requests.filter {
+                            it.status.isPending() && it.requestType != AccessRequestType.DOMAIN_ACCESS
+                        }
                     val users = pendingRequests.toUserItems(devices)
                     val resolvedSelected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
                     AdminRequestsUiState(

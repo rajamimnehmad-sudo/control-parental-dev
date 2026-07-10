@@ -43,7 +43,8 @@ class RequestsViewModel
                     .collect { (requests, grants) ->
                         val pendingRequests =
                             requests.filter {
-                                it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote
+                                (it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote) &&
+                                    it.requestType != AccessRequestType.DOMAIN_ACCESS
                             }
                         val latestResult =
                             requests

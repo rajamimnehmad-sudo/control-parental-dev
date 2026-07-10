@@ -1,9 +1,5 @@
 package com.contentfilter.feature.vpn.service
 
-import android.app.Notification
-import android.app.NotificationChannel
-import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
@@ -15,9 +11,11 @@ import android.util.Log
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
+import com.contentfilter.core.domain.model.ProtectionAlertType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
+import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.feature.vpn.dns.DnsForwarder
 import com.contentfilter.feature.vpn.dns.DnsPacketParser
@@ -61,6 +59,8 @@ class FilterVpnService : VpnService() {
 
     @Inject lateinit var telemetryReporter: VpnTelemetryReporter
 
+    @Inject lateinit var pushNotificationRepository: PushNotificationRepository
+
     private val parser = DnsPacketParser()
     private val responseFactory = DnsResponseFactory()
     private val dnsForwarder = DnsForwarder { socket -> protect(socket) }
@@ -69,7 +69,6 @@ class FilterVpnService : VpnService() {
     private var readerJob: Job? = null
     private var upstreamDnsServers: List<InetAddress> = emptyList()
     private var strictWebBlockMode = false
-    private val lastBlockedNotificationAt = mutableMapOf<String, Long>()
     private val lastUnsupportedPacketDiagnosticAt = mutableMapOf<String, Long>()
     private var lastParsedDnsPacketDiagnosticAt: Long = 0L
 
@@ -149,6 +148,7 @@ class FilterVpnService : VpnService() {
         VpnController.markStopped(this, reason)
         updateVpnState(ComponentState.Disabled)
         recordServiceState("${DeviceProtectionAlert.WebDisabled} reason=$reason")
+        reportProtectionAlert(ProtectionAlertType.WebDisabled)
         cleanup()
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -163,6 +163,12 @@ class FilterVpnService : VpnService() {
     private fun recordServiceState(message: String) {
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             telemetryReporter.recordServiceState(message)
+        }
+    }
+
+    private fun reportProtectionAlert(type: ProtectionAlertType) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            pushNotificationRepository.reportProtectionAlert(type)
         }
     }
 
@@ -314,7 +320,6 @@ class FilterVpnService : VpnService() {
                     "DNS decision=block domain=$domain snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
-                notifyBlockedDomain(domain)
                 output.write(responseFactory.nxdomainPacket(question))
             }
             is PolicyDecision.HealthWarning,
@@ -412,68 +417,6 @@ class FilterVpnService : VpnService() {
         telemetryReporter.recordUnsupportedPacket(diagnostic)
     }
 
-    private fun notifyBlockedDomain(domain: String) {
-        val normalized = domain.notificationDomain() ?: return
-        val now = System.currentTimeMillis()
-        if (now - (lastBlockedNotificationAt[normalized] ?: 0L) < BlockNotificationCooldownMillis) return
-        lastBlockedNotificationAt[normalized] = now
-        ensureBlockedNotificationChannel()
-        val intent =
-            Intent().apply {
-                setClassName(packageName, UserMainActivityClassName)
-                action = OpenInternetAction
-                putExtra(ExtraBlockedDomain, normalized)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
-        val pendingIntent =
-            PendingIntent.getActivity(
-                this,
-                normalized.hashCode(),
-                intent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-            )
-        val builder =
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Notification.Builder(this, BlockedChannelId)
-            } else {
-                @Suppress("DEPRECATION")
-                Notification.Builder(this)
-            }
-        val notification =
-            builder
-                .setSmallIcon(android.R.drawable.stat_sys_warning)
-                .setContentTitle("Sitio bloqueado")
-                .setContentText("$normalized - tocar para pedir permiso")
-                .setContentIntent(pendingIntent)
-                .setAutoCancel(true)
-                .setOnlyAlertOnce(true)
-                .setCategory(Notification.CATEGORY_STATUS)
-                .build()
-        getSystemService(NotificationManager::class.java)
-            ?.notify(BlockedNotificationId, notification)
-    }
-
-    private fun String.notificationDomain(): String? {
-        val labels = normalizedDomain().split(".").filter { it.isNotBlank() }
-        if (labels.size < 2) return null
-        if (labels.any { it in NoisyDomainLabels }) return null
-        val baseDomain = labels.takeLast(2).joinToString(".")
-        val isDirectNavigation = labels.size == 2 || (labels.size == 3 && labels.first() == "www")
-        return baseDomain.takeIf { isDirectNavigation && it !in NoisyBaseDomains }
-    }
-
-    private fun ensureBlockedNotificationChannel() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-        val manager = getSystemService(NotificationManager::class.java) ?: return
-        val channel =
-            NotificationChannel(
-                BlockedChannelId,
-                "Sitios bloqueados",
-                NotificationManager.IMPORTANCE_DEFAULT,
-            )
-        manager.createNotificationChannel(channel)
-    }
-
     private fun cleanup() {
         readerJob?.cancel()
         readerJob = null
@@ -489,9 +432,6 @@ class FilterVpnService : VpnService() {
         const val ActionStart = "com.contentfilter.feature.vpn.START"
         const val ActionStop = "com.contentfilter.feature.vpn.STOP"
         const val ActionReconnect = "com.contentfilter.feature.vpn.RECONNECT"
-        const val OpenInternetAction = "com.contentfilter.user.OPEN_INTERNET"
-        const val ExtraBlockedDomain = "blocked_domain"
-        const val UserMainActivityClassName = "com.contentfilter.user.MainActivity"
 
         private const val DefaultMtu = 1500
         private const val LocalVpnAddress = "10.8.0.2"
@@ -502,37 +442,7 @@ class FilterVpnService : VpnService() {
         private const val AllIpv6Route = "::"
         private const val AllTrafficPrefixLength = 0
         private const val SingleIpv4HostPrefixLength = 32
-        private const val BlockNotificationCooldownMillis = 60_000L
         private const val PacketDiagnosticCooldownMillis = 5_000L
-        private const val BlockedChannelId = "content_filter_blocked_sites_v2"
-        private const val BlockedNotificationId = 3_000
-        private val NoisyDomainLabels =
-            setOf(
-                "api",
-                "apis",
-                "auth",
-                "collect",
-                "crash",
-                "discover",
-                "events",
-                "firebase",
-                "gms",
-                "graph",
-                "logs",
-                "metrics",
-                "optimizationguide-pa",
-                "telemetry",
-                "us-auth2",
-                "vas",
-            )
-        private val NoisyBaseDomains =
-            setOf(
-                "googleapis.com",
-                "gstatic.com",
-                "samsungapps.com",
-                "samsungosp.com",
-                "ureca-lab.com",
-            )
         private const val StopReasonAndroid = "android_stopped_vpn"
         private const val StopReasonApp = "app_stopped_vpn"
         private const val StopReasonDevRescue = "dev_protection_disabled"

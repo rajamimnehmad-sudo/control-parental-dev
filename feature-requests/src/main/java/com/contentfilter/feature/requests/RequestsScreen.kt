@@ -77,7 +77,7 @@ fun RequestsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (state.requests.isEmpty()) {
-                Text("No hay solicitudes pendientes. Pedilas desde Mis apps o Internet.")
+                Text("No hay solicitudes pendientes. Pedilas desde Mis apps.")
             } else {
                 state.requests.forEach { request ->
                     UserRequestCard(

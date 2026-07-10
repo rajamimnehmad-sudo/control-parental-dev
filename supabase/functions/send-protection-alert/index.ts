@@ -1,0 +1,186 @@
+import { createClient } from "@supabase/supabase-js";
+
+type AlertPayload = {
+  device_id?: string;
+  alert_type?: string;
+};
+
+type AlertEvent = {
+  event_id: string;
+  account_id: string;
+  device_name: string;
+  title: string;
+  body: string;
+};
+
+type PushToken = {
+  fcm_token: string;
+};
+
+Deno.serve(async (request) => {
+  if (request.method !== "POST") {
+    return json({ error: "Method not allowed" }, 405);
+  }
+
+  const supabaseUrl = requiredEnv("SUPABASE_URL");
+  const anonKey = requiredEnv("SUPABASE_ANON_KEY");
+  const serviceRoleKey = requiredEnv("SUPABASE_SERVICE_ROLE_KEY");
+  const deviceToken = request.headers.get("x-device-token") ?? "";
+  const authHeader = request.headers.get("authorization") ?? `Bearer ${anonKey}`;
+  const payload = await request.json().catch(() => ({})) as AlertPayload;
+
+  if (!payload.device_id || !payload.alert_type) {
+    return json({ error: "Missing device_id or alert_type" }, 400);
+  }
+
+  const anonClient = createClient(supabaseUrl, anonKey, {
+    global: {
+      headers: {
+        authorization: authHeader,
+        "x-device-token": deviceToken,
+      },
+    },
+  });
+
+  const { data: eventRows, error: eventError } = await anonClient.rpc("create_protection_alert_event", {
+    p_device_id: payload.device_id,
+    p_alert_type: payload.alert_type,
+  });
+  if (eventError) {
+    return json({ error: eventError.message }, 403);
+  }
+
+  const event = (eventRows?.[0] ?? null) as AlertEvent | null;
+  if (!event) {
+    return json({ error: "Event not created" }, 500);
+  }
+
+  const serviceClient = createClient(supabaseUrl, serviceRoleKey);
+  const { data: tokens, error: tokenError } = await serviceClient
+    .from("device_push_tokens")
+    .select("fcm_token")
+    .eq("account_id", event.account_id)
+    .eq("app_role", "admin")
+    .is("deleted_at", null);
+  if (tokenError) {
+    return json({ error: tokenError.message }, 500);
+  }
+
+  const uniqueTokens = Array.from(new Set((tokens ?? []).map((item: PushToken) => item.fcm_token).filter(Boolean)));
+  const results = await Promise.all(uniqueTokens.map((token) => sendFcm(token, event)));
+
+  return json({
+    event_id: event.event_id,
+    sent: results.filter((result) => result.ok).length,
+    failed: results.filter((result) => !result.ok).length,
+  });
+});
+
+async function sendFcm(token: string, event: AlertEvent): Promise<{ ok: boolean; status: number; body: string }> {
+  const projectId = requiredEnv("FCM_PROJECT_ID");
+  const accessToken = await fcmAccessToken();
+  const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
+    method: "POST",
+    headers: {
+      authorization: `Bearer ${accessToken}`,
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      message: {
+        token,
+        notification: {
+          title: event.title,
+          body: event.body,
+        },
+        android: {
+          priority: "high",
+          notification: {
+            channel_id: "urgent_protection_alerts",
+            priority: "PRIORITY_HIGH",
+            visibility: "PUBLIC",
+          },
+        },
+        data: {
+          type: "protection_alert",
+          event_id: event.event_id,
+          device_name: event.device_name,
+        },
+      },
+    }),
+  });
+  return { ok: response.ok, status: response.status, body: await response.text() };
+}
+
+async function fcmAccessToken(): Promise<string> {
+  const serviceAccount = JSON.parse(requiredEnv("FCM_SERVICE_ACCOUNT_JSON"));
+  const now = Math.floor(Date.now() / 1000);
+  const jwtHeader = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
+  const jwtClaim = base64Url(JSON.stringify({
+    iss: serviceAccount.client_email,
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600,
+  }));
+  const unsignedJwt = `${jwtHeader}.${jwtClaim}`;
+  const key = await crypto.subtle.importKey(
+    "pkcs8",
+    pemToArrayBuffer(serviceAccount.private_key),
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("RSASSA-PKCS1-v1_5", key, new TextEncoder().encode(unsignedJwt));
+  const jwt = `${unsignedJwt}.${base64Url(signature)}`;
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion: jwt,
+    }),
+  });
+  const body = await response.json();
+  if (!response.ok || !body.access_token) {
+    throw new Error("Could not obtain FCM access token");
+  }
+  return body.access_token;
+}
+
+function requiredEnv(name: string): string {
+  const value = Deno.env.get(name);
+  if (!value) throw new Error(`Missing ${name}`);
+  return value;
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const base64 = pem
+    .replace("-----BEGIN PRIVATE KEY-----", "")
+    .replace("-----END PRIVATE KEY-----", "")
+    .replace(/\s/g, "");
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+function base64Url(value: string | ArrayBuffer): string {
+  const bytes = typeof value === "string" ? new TextEncoder().encode(value) : new Uint8Array(value);
+  let binary = "";
+  bytes.forEach((byte) => {
+    binary += String.fromCharCode(byte);
+  });
+  return btoa(binary)
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/g, "");
+}
+
+function json(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json" },
+  });
+}

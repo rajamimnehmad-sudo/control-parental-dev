@@ -96,6 +96,33 @@ class SupabaseRestClient
                 }
             }
 
+        suspend fun invokeFunction(
+            functionName: String,
+            json: JSONObject,
+        ): RemoteResult<Unit> =
+            withContext(Dispatchers.IO) {
+                val request =
+                    requestBuilder("/functions/v1/$functionName")
+                        ?: return@withContext RemoteResult.Failure(OfflineUserMessage, retryable = true)
+                val body = json.toString().toRequestBody(JsonMediaType)
+                try {
+                    httpClient.newCall(request.post(body).build()).execute().use { response ->
+                        val responseBody = response.body?.string().orEmpty()
+                        if (response.isSuccessful) {
+                            RemoteResult.Success(Unit)
+                        } else {
+                            httpFailure(
+                                source = "Supabase function $functionName",
+                                code = response.code,
+                                responseBody = responseBody,
+                            )
+                        }
+                    }
+                } catch (exception: Exception) {
+                    exceptionFailure("Supabase function $functionName", exception)
+                }
+            }
+
         suspend fun patchById(
             table: SupabaseTable,
             id: String,

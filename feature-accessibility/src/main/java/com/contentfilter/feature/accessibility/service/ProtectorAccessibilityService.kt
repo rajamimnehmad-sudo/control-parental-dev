@@ -8,8 +8,10 @@ import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.ProtectionAlertType
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
+import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
 import com.contentfilter.core.sync.SyncScheduler
@@ -45,6 +47,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     @Inject lateinit var systemStatusRepository: SystemStatusRepository
 
     @Inject lateinit var telemetryReporter: AccessibilityTelemetryReporter
+
+    @Inject lateinit var pushNotificationRepository: PushNotificationRepository
 
     @Inject lateinit var usageSessionRepository: UsageSessionRepository
 
@@ -147,6 +151,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 transition?.let { saveTransition(it) }
                 systemStatusRepository.updateAccessibilityState(ComponentState.Disabled)
                 telemetryReporter.recordServiceState(DeviceProtectionAlert.AppsDisabled)
+                pushNotificationRepository.reportProtectionAlert(ProtectionAlertType.AppsDisabled)
                 snapshotProvider.stop()
                 clearExtraTimeExpiry()
                 clearAppLimitDeadline()

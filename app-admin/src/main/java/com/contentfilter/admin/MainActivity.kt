@@ -1,9 +1,14 @@
 package com.contentfilter.admin
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
@@ -77,12 +82,15 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.BuildConfig
 import com.contentfilter.admin.auth.AdminAuthRoute
 import com.contentfilter.admin.dashboard.DashboardRoute
+import com.contentfilter.admin.push.AdminPushViewModel
 import com.contentfilter.admin.requests.AdminRequestsRoute
 import com.contentfilter.admin.rules.RulesEntryMode
 import com.contentfilter.admin.rules.RulesRoute
@@ -110,13 +118,28 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
     var tab by rememberSaveable { mutableStateOf(AdminTab.Home) }
     var section by rememberSaveable { mutableStateOf<AdminSection?>(null) }
     var requestsRefreshKey by rememberSaveable { mutableStateOf(0) }
+    val context = LocalContext.current
     val rootViewModel: AdminRootViewModel = hiltViewModel()
     val rootState by rootViewModel.uiState.collectAsStateWithLifecycle()
+    val pushViewModel: AdminPushViewModel = hiltViewModel()
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            pushViewModel.registerIfReady()
+        }
     val updatesViewModel: AdminUpdatesViewModel = hiltViewModel()
     val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(rootState.activated) {
         if (rootState.activated) {
             updatesViewModel.autoCheckAndDownload()
+            if (
+                Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                pushViewModel.registerIfReady()
+            }
         }
     }
     LaunchedEffect(rootState.activated) {
@@ -170,6 +193,7 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
                     }
                 AdminSection.Apps -> RulesRoute(entryMode = RulesEntryMode.Apps, onBack = { section = null })
                 AdminSection.Web -> RulesRoute(entryMode = RulesEntryMode.Web, onBack = { section = null })
+                AdminSection.ManageUsers -> RulesRoute(entryMode = RulesEntryMode.ManageUsers, onBack = { section = null })
                 AdminSection.Requests ->
                     SectionContainer(
                         title = "Solicitudes",
@@ -191,6 +215,7 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
                         AdminTab.Home ->
                             HomeTab(
                                 onCommunity = { tab = AdminTab.Community },
+                                onManageUsers = { section = AdminSection.ManageUsers },
                                 onSettings = { tab = AdminTab.Settings },
                             )
                         AdminTab.Community ->
@@ -255,6 +280,7 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
 @Composable
 private fun HomeTab(
     onCommunity: () -> Unit,
+    onManageUsers: () -> Unit,
     onSettings: () -> Unit,
 ) {
     VisualPage(
@@ -282,9 +308,16 @@ private fun HomeTab(
         FeatureTile(
             icon = Icons.Filled.Person,
             title = "Comunidad",
-            subtitle = "Solicitudes y usuarios protegidos",
+            subtitle = "Apps, Web y solicitudes",
             accent = Teal,
             onClick = onCommunity,
+        )
+        FeatureTile(
+            icon = Icons.Filled.Person,
+            title = "Administrar usuarios",
+            subtitle = "Ver, agregar y borrar usuarios",
+            accent = Sky,
+            onClick = onManageUsers,
         )
         FeatureTile(
             icon = Icons.Filled.Settings,
@@ -1225,6 +1258,7 @@ private enum class AdminSection {
     Panel,
     Apps,
     Web,
+    ManageUsers,
     Requests,
     Updates,
 }

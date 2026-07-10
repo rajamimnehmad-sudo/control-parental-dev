@@ -119,6 +119,7 @@ fun RulesRoute(
 enum class RulesEntryMode {
     Apps,
     Web,
+    ManageUsers,
 }
 
 @Composable
@@ -165,7 +166,11 @@ private fun RulesScreen(
             onPairingUserNameChanged = onPairingUserNameChanged,
             onGeneratePairingCode = onGeneratePairingCode,
             onPairingCodeCopied = onPairingCodeCopied,
-            onDeviceSelected = onDeviceSelected,
+            onDeviceSelected = if (entryMode == RulesEntryMode.ManageUsers) {
+                {}
+            } else {
+                onDeviceSelected
+            },
             onDeviceDeleted = onDeviceDeleted,
         )
     } else {
@@ -210,6 +215,7 @@ private fun UsersListContent(
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var userSearchQuery by rememberSaveable { mutableStateOf("") }
+    var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val filteredDevices =
         remember(state.userDevices, userSearchQuery) {
             val normalized = userSearchQuery.trim().lowercase()
@@ -235,8 +241,13 @@ private fun UsersListContent(
         UsersGlassHeader(
             entryMode = entryMode,
             searchQuery = userSearchQuery,
+            searchExpanded = searchExpanded,
             totalCount = state.userDevices.size,
             onSearchChanged = { userSearchQuery = it },
+            onSearchExpandedChanged = { expanded ->
+                searchExpanded = expanded
+                if (!expanded) userSearchQuery = ""
+            },
             onCreateUser = { showCreateDialog = true },
             onRefresh = onRefreshDevices,
             onBack = onBack,
@@ -295,6 +306,7 @@ private fun UsersListContent(
                 ProtectedUserCard(
                     device = device,
                     deleting = device.id in state.pendingDeviceDeleteIds,
+                    showActions = entryMode == RulesEntryMode.ManageUsers,
                     onClick = { onDeviceSelected(device.id) },
                     onDelete = { onDeviceDeleted(device.id) },
                 )
@@ -302,7 +314,7 @@ private fun UsersListContent(
         }
     }
 
-    if (showCreateDialog) {
+    if (showCreateDialog && entryMode == RulesEntryMode.ManageUsers) {
         NewUserDialog(
             state = state,
             onDismiss = { showCreateDialog = false },
@@ -320,8 +332,10 @@ private fun UsersListContent(
 private fun UsersGlassHeader(
     entryMode: RulesEntryMode,
     searchQuery: String,
+    searchExpanded: Boolean,
     totalCount: Int,
     onSearchChanged: (String) -> Unit,
+    onSearchExpandedChanged: (Boolean) -> Unit,
     onCreateUser: () -> Unit,
     onRefresh: () -> Unit,
     onBack: (() -> Unit)?,
@@ -355,16 +369,21 @@ private fun UsersGlassHeader(
                 verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
                 Text(
-                    text = if (entryMode == RulesEntryMode.Web) "Web" else "Apps",
+                    text =
+                        when (entryMode) {
+                            RulesEntryMode.Web -> "Web"
+                            RulesEntryMode.ManageUsers -> "Administrar usuarios"
+                            RulesEntryMode.Apps -> "Apps"
+                        },
                     style = MaterialTheme.typography.headlineSmall,
                     color = HeaderInk,
                 )
                 Text(
                     text =
-                        if (entryMode == RulesEntryMode.Web) {
-                            "$totalCount total · elegir usuario para configurar Web"
-                        } else {
-                            "$totalCount total · elegir usuario para configurar apps"
+                        when (entryMode) {
+                            RulesEntryMode.Web -> "$totalCount total · elegir usuario para configurar Web"
+                            RulesEntryMode.ManageUsers -> "$totalCount total · ver, agregar o borrar usuarios"
+                            RulesEntryMode.Apps -> "$totalCount total · elegir usuario para configurar apps"
                         },
                     style = MaterialTheme.typography.bodyMedium,
                     color = HeaderMuted,
@@ -384,22 +403,36 @@ private fun UsersGlassHeader(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedTextField(
-                modifier = Modifier.weight(1f),
-                value = searchQuery,
-                onValueChange = onSearchChanged,
-                placeholder = { Text("Buscar protegido") },
-                singleLine = true,
-                leadingIcon = {
-                    Icon(
-                        imageVector = Icons.Filled.Search,
-                        contentDescription = null,
-                        tint = HeaderMuted,
-                    )
-                },
-                shape = RoundedCornerShape(18.dp),
-            )
-            UserCreateButton(onClick = onCreateUser)
+            if (searchExpanded) {
+                OutlinedTextField(
+                    modifier = Modifier.weight(1f),
+                    value = searchQuery,
+                    onValueChange = onSearchChanged,
+                    placeholder = { Text("Buscar protegido") },
+                    singleLine = true,
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.Search,
+                            contentDescription = null,
+                            tint = HeaderMuted,
+                        )
+                    },
+                    shape = RoundedCornerShape(18.dp),
+                )
+            } else {
+                Box(modifier = Modifier.weight(1f))
+            }
+            HeaderIconButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
+                Icon(
+                    imageVector = Icons.Filled.Search,
+                    contentDescription = "Buscar usuario",
+                    tint = HeaderInk,
+                    modifier = Modifier.size(22.dp),
+                )
+            }
+            if (entryMode == RulesEntryMode.ManageUsers) {
+                UserCreateButton(onClick = onCreateUser)
+            }
         }
     }
 }
@@ -532,6 +565,7 @@ private fun UserMetricCard(
 private fun ProtectedUserCard(
     device: UserDeviceUiState,
     deleting: Boolean,
+    showActions: Boolean,
     onClick: () -> Unit,
     onDelete: () -> Unit,
 ) {
@@ -573,29 +607,31 @@ private fun ProtectedUserCard(
                     )
                 }
             }
-            Box {
-                IconButton(
-                    onClick = { actionsExpanded = true },
-                    enabled = !deleting,
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.MoreVert,
-                        contentDescription = "Acciones",
-                        tint = HeaderMuted,
-                    )
-                }
-                DropdownMenu(
-                    expanded = actionsExpanded,
-                    onDismissRequest = { actionsExpanded = false },
-                ) {
-                    DropdownMenuItem(
-                        text = { Text(if (deleting) "Borrando..." else "Borrar") },
+            if (showActions) {
+                Box {
+                    IconButton(
+                        onClick = { actionsExpanded = true },
                         enabled = !deleting,
-                        onClick = {
-                            actionsExpanded = false
-                            confirmDelete = true
-                        },
-                    )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.MoreVert,
+                            contentDescription = "Acciones",
+                            tint = HeaderMuted,
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = actionsExpanded,
+                        onDismissRequest = { actionsExpanded = false },
+                    ) {
+                        DropdownMenuItem(
+                            text = { Text(if (deleting) "Borrando..." else "Borrar") },
+                            enabled = !deleting,
+                            onClick = {
+                                actionsExpanded = false
+                                confirmDelete = true
+                            },
+                        )
+                    }
                 }
             }
         }
@@ -1195,20 +1231,12 @@ private fun UserDetailHeader(
                 }
             }
         }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (entryMode == RulesEntryMode.Web) {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = { },
-                    shape = RoundedCornerShape(tabShape),
-                ) {
-                    Text("Web")
-                }
-            } else {
+        if (entryMode == RulesEntryMode.Apps) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
                 if (selectedPanel == DevicePanel.Apps) {
                     Button(
                         modifier = Modifier.weight(1f),
