@@ -75,7 +75,7 @@ class ActivationViewModel
                 val oldActivation = deviceActivationRepository.currentActivation()
                 Log.i(
                     LogTag,
-                    "Activation requested. token=${token.code.maskForLog()} oldDeviceId=${oldActivation?.deviceId} localActivated=${oldActivation != null}",
+                    "Activation requested. rawInput=${state.activationCode.maskForLog()} normalizedCode=${token.code.maskForLog()} tokenMode=${token.mode.logName} oldDeviceId=${oldActivation?.deviceId} localActivated=${oldActivation != null}",
                 )
                 mutableState.update { it.copy(isLoading = true, message = "Enlazando dispositivo...") }
                 val result =
@@ -101,9 +101,10 @@ class ActivationViewModel
                         )
                     }
                 if (result is ActivationResult.Activated) {
+                    val savedActivation = deviceActivationRepository.currentActivation()
                     Log.i(
                         LogTag,
-                        "Activation stored. oldDeviceId=${oldActivation?.deviceId} newDeviceId=${result.activation.deviceId} accountId=${result.activation.accountId}",
+                        "Activation success. oldDeviceId=${oldActivation?.deviceId} newDeviceId=${result.activation.deviceId} localDeviceSaved=${savedActivation?.deviceId == result.activation.deviceId} accountId=${result.activation.accountId}",
                     )
                     realtimeSyncCoordinator.stop()
                     realtimeSyncCoordinator.start()
@@ -119,7 +120,7 @@ class ActivationViewModel
                         )
                     }
                 } else if (result is ActivationResult.Failed) {
-                    Log.e(LogTag, "Activation failed. Reason: ${result.reason.ifBlank { "<blank reason>" }}")
+                    Log.e(LogTag, "Activation failed. rpcResult=failure rpcErrorCode=${result.reason.ifBlank { "<blank reason>" }}")
                 }
                 mutableState.update {
                     val navigationTarget =
@@ -147,24 +148,33 @@ class ActivationViewModel
         private fun activationFailureMessage(reason: String): String {
             val detail = reason.ifBlank { "No se recibió detalle técnico del error." }
             if (detail == OfflineMessage) return OfflineMessage
+            val normalized = detail.lowercase()
+            if ("already used" in normalized) return "Ese código ya fue usado. Pedí uno nuevo al administrador."
+            if ("expired" in normalized) return "Ese código venció. Pedí uno nuevo al administrador."
+            if ("not found" in normalized || "invalid pairing code" in normalized) {
+                return "Código inválido. Revisá el código o pedí uno nuevo."
+            }
+            if ("license" in normalized) return "No se pudo enlazar por la licencia de la comunidad."
+            if ("role mismatch" in normalized) return "Ese código no corresponde a esta app."
             return "No se pudo enlazar. Revisá el código o pedí uno nuevo al administrador."
         }
 
         private data class PairingToken(
             val code: String,
             val displayName: String?,
+            val mode: TokenMode,
         ) {
             companion object {
                 fun from(rawValue: String): PairingToken {
                     val trimmed = rawValue.trim()
                     val directCode = trimmed.normalizedPairingCodeOrNull()
-                    if (directCode != null) return PairingToken(code = directCode, displayName = null)
+                    if (directCode != null) return PairingToken(code = directCode, displayName = null, mode = TokenMode.Plain)
 
                     val parts = trimmed.split(Regex("[^A-Za-z0-9]+")).filter { it.isNotBlank() }
                     val code = parts.lastOrNull { it.normalizedPairingCodeOrNull() != null }
                         ?.normalizedPairingCodeOrNull()
                         .orEmpty()
-                    if (code.isBlank()) return PairingToken(code = "", displayName = null)
+                    if (code.isBlank()) return PairingToken(code = "", displayName = null, mode = TokenMode.PastedText)
 
                     val name =
                         parts
@@ -172,7 +182,11 @@ class ActivationViewModel
                             .joinToString(" ")
                             .trim()
                             .takeIf { it.isNotBlank() }
-                    return PairingToken(code = code, displayName = name)
+                    return PairingToken(
+                        code = code,
+                        displayName = name,
+                        mode = if (name == null) TokenMode.PastedText else TokenMode.NameCode,
+                    )
                 }
 
                 private fun String.normalizedPairingCodeOrNull(): String? {
@@ -186,6 +200,12 @@ class ActivationViewModel
 
                 private val UserPairingCodeRegex = Regex("[A-Z0-9]{6}")
             }
+        }
+
+        private enum class TokenMode(val logName: String) {
+            Plain("plain"),
+            NameCode("name-code"),
+            PastedText("pasted-text"),
         }
 
         private companion object {

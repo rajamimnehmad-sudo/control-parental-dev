@@ -1,5 +1,6 @@
 package com.contentfilter.core.network.remote
 
+import android.util.Log
 import com.contentfilter.core.network.config.AuthTokenProvider
 import com.contentfilter.core.network.config.DeviceTokenProvider
 import com.contentfilter.core.network.config.SupabaseConfigProvider
@@ -112,9 +113,14 @@ class SupabaseActivationClient
                 if (baseUrl == null) {
                     return@withContext RemoteResult.Failure("Supabase pairing is not configured.", retryable = true)
                 }
+                val normalizedPairingCode = pairingCode.normalizedPairingCodeForRpc()
+                Log.i(
+                    LogTag,
+                    "pair_device_with_code request. normalizedCode=${normalizedPairingCode.maskForLog()} appRole=$appRole",
+                )
                 val body =
                     JSONObject()
-                        .put("pairing_code", pairingCode)
+                        .put("pairing_code", normalizedPairingCode)
                         .put("device_display_name", displayName)
                         .put("device_app_version_code", appVersionCode)
                         .put("device_app_role", appRole)
@@ -212,9 +218,13 @@ class SupabaseActivationClient
                     val responseBody = response.body?.string().orEmpty()
                     if (response.isSuccessful) {
                         val first = JSONArray(responseBody).getJSONObject(0)
-                        RemoteResult.Success(RemoteDeviceActivationDto.fromJson(first))
+                        RemoteDeviceActivationDto.fromJson(first).also { dto ->
+                            Log.i(LogTag, "$source success. deviceId=${dto.deviceId} activationId=${dto.activationId}")
+                        }.let { dto -> RemoteResult.Success(dto) }
                     } else {
-                        httpFailure(source, response.code, responseBody)
+                        httpFailure(source, response.code, responseBody).also { failure ->
+                            Log.w(LogTag, "$source rpcResult=failure rpcErrorCode=${failure.reason}")
+                        }
                     }
                 }
             } catch (exception: Exception) {
@@ -251,6 +261,13 @@ class SupabaseActivationClient
 
         private companion object {
             const val Source = "Supabase activate_device RPC"
+            const val LogTag = "SupabaseActivation"
             val JsonMediaType = "application/json".toMediaType()
+
+            fun String.normalizedPairingCodeForRpc(): String =
+                filter { it.isLetterOrDigit() }.uppercase()
+
+            fun String.maskForLog(): String =
+                if (length <= 4) "****" else "${take(2)}***${takeLast(2)}"
         }
     }

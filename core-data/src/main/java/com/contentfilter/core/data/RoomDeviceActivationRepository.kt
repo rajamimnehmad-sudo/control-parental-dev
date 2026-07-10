@@ -17,6 +17,7 @@ class RoomDeviceActivationRepository
         override suspend fun currentActivation(): DeviceActivation? = dao.latest()?.toDomain()
 
         override suspend fun saveActivation(activation: DeviceActivation) {
+            dao.deleteAll()
             dao.upsert(activation.toEntity())
         }
     }
