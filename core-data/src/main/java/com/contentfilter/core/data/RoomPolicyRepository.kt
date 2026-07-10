@@ -89,14 +89,17 @@ class RoomPolicyRepository
             if (currentPolicy != null && !currentPolicy.id.isRemoteCompatibleId()) {
                 policyDao.deactivatePolicy(currentPolicy.id)
             }
+            val now = System.currentTimeMillis()
             val policy =
                 currentPolicy
                     ?.takeIf { it.id.isRemoteCompatibleId() }
-                    ?: createDefaultPolicy(targetDeviceId)
+                    ?.copy(version = now, updatedAtEpochMillis = now, active = true)
+                    ?: createDefaultPolicy(targetDeviceId, now)
+            policyDao.upsertPolicy(policy)
             policyDao.upsertRule(rule.toEntity(policy.id))
             val accountId = deviceActivationDao.latest()?.accountId
-            outboxDao.upsert(policy.toOutboxOperation(accountId))
-            outboxDao.upsert(rule.toOutboxOperation(policy.id, accountId))
+            outboxDao.upsert(policy.toOutboxOperation(accountId, now))
+            outboxDao.upsert(rule.toOutboxOperation(policy.id, accountId, now + 1))
         }
 
         override suspend fun deleteRule(rule: PolicyRule) {
@@ -109,14 +112,17 @@ class RoomPolicyRepository
             outboxDao.upsert(rule.toDeletedOutboxOperation(policy.id, accountId))
         }
 
-        private suspend fun createDefaultPolicy(deviceId: String?): PolicyEntity {
+        private suspend fun createDefaultPolicy(
+            deviceId: String?,
+            now: Long,
+        ): PolicyEntity {
             val policy =
                 PolicyEntity(
                     id = UUID.randomUUID().toString(),
                     deviceId = deviceId,
-                    version = System.currentTimeMillis(),
+                    version = now,
                     active = true,
-                    updatedAtEpochMillis = System.currentTimeMillis(),
+                    updatedAtEpochMillis = now,
                 )
             policyDao.upsertPolicy(policy)
             return policy
@@ -145,8 +151,10 @@ class RoomPolicyRepository
 
         private fun String.isRemoteCompatibleId(): Boolean = runCatching { UUID.fromString(this) }.isSuccess
 
-        private fun PolicyEntity.toOutboxOperation(accountId: String?): OutboxOperationEntity {
-            val now = System.currentTimeMillis()
+        private fun PolicyEntity.toOutboxOperation(
+            accountId: String?,
+            now: Long,
+        ): OutboxOperationEntity {
             val payload =
                 org.json.JSONObject()
                     .put("id", id)
@@ -162,8 +170,8 @@ class RoomPolicyRepository
         private fun PolicyRule.toOutboxOperation(
             policyId: String,
             accountId: String?,
+            now: Long,
         ): OutboxOperationEntity {
-            val now = System.currentTimeMillis()
             val payload =
                 org.json.JSONObject()
                     .put("id", id)

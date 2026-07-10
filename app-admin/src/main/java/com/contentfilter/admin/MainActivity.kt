@@ -214,18 +214,16 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
                     when (tab) {
                         AdminTab.Home ->
                             HomeTab(
-                                onCommunity = { tab = AdminTab.Community },
                                 onManageUsers = { section = AdminSection.ManageUsers },
-                                onSettings = { tab = AdminTab.Settings },
+                                onRequests = {
+                                    requestsRefreshKey += 1
+                                    section = AdminSection.Requests
+                                },
                             )
                         AdminTab.Community ->
                             CommunityTab(
                                 onApps = { section = AdminSection.Apps },
                                 onWeb = { section = AdminSection.Web },
-                                onRequests = {
-                                    requestsRefreshKey += 1
-                                    section = AdminSection.Requests
-                                },
                             )
                         AdminTab.Settings ->
                             SettingsTab(
@@ -279,9 +277,8 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeTab(
-    onCommunity: () -> Unit,
     onManageUsers: () -> Unit,
-    onSettings: () -> Unit,
+    onRequests: () -> Unit,
 ) {
     VisualPage(
         title = "Hola",
@@ -296,18 +293,11 @@ private fun HomeTab(
             onClick = onManageUsers,
         )
         FeatureTile(
-            icon = Icons.Filled.Person,
-            title = "Comunidad",
-            subtitle = "Apps, Web y solicitudes",
-            accent = Teal,
-            onClick = onCommunity,
-        )
-        FeatureTile(
-            icon = Icons.Filled.Settings,
-            title = "Ajustes",
-            subtitle = "Panel, actualizaciones y versión",
-            accent = Violet,
-            onClick = onSettings,
+            icon = Icons.Filled.Notifications,
+            title = "Solicitudes",
+            subtitle = "Aprobar accesos y tiempo extra",
+            accent = Sun,
+            onClick = onRequests,
         )
     }
 }
@@ -892,7 +882,6 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
 private fun CommunityTab(
     onApps: () -> Unit,
     onWeb: () -> Unit,
-    onRequests: () -> Unit,
 ) {
     VisualPage(
         title = "Comunidad",
@@ -916,13 +905,6 @@ private fun CommunityTab(
             subtitle = "Elegir usuario y bloquear navegación web",
             accent = Teal,
             onClick = onWeb,
-        )
-        FeatureTile(
-            icon = Icons.Filled.Notifications,
-            title = "Solicitudes",
-            subtitle = "Aprobar accesos y tiempo extra",
-            accent = Sun,
-            onClick = onRequests,
         )
     }
 }

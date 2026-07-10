@@ -45,9 +45,21 @@ class RoomDailyLimitRepository
             deviceId: String?,
         ) {
             val targetDeviceId = deviceId ?: deviceActivationDao.latest()?.deviceId
-            val policy = activePolicy(targetDeviceId) ?: createDefaultPolicy(targetDeviceId)
+            val currentPolicy = activePolicy(targetDeviceId)
+            if (currentPolicy != null && !currentPolicy.id.isRemoteCompatibleId()) {
+                policyDao.deactivatePolicy(currentPolicy.id)
+            }
+            val now = System.currentTimeMillis()
+            val policy =
+                currentPolicy
+                    ?.takeIf { it.id.isRemoteCompatibleId() }
+                    ?.copy(version = now, updatedAtEpochMillis = now, active = true)
+                    ?: createDefaultPolicy(targetDeviceId, now)
+            policyDao.upsertPolicy(policy)
             dailyLimitDao.upsert(limit.toEntity().copy(policyId = policy.id))
-            outboxDao.upsert(limit.toOutboxOperation(policy.id, deviceActivationDao.latest()?.accountId))
+            val accountId = deviceActivationDao.latest()?.accountId
+            outboxDao.upsert(policy.toOutboxOperation(accountId, now))
+            outboxDao.upsert(limit.toOutboxOperation(policy.id, accountId, now + 1))
         }
 
         override suspend fun deleteLimit(limit: DailyLimit) {
@@ -73,24 +85,49 @@ class RoomDailyLimitRepository
                 policyDao.activePolicy()
             }
 
-        private suspend fun createDefaultPolicy(deviceId: String?): PolicyEntity {
+        private suspend fun createDefaultPolicy(
+            deviceId: String?,
+            now: Long,
+        ): PolicyEntity {
             val policy =
                 PolicyEntity(
                     id = UUID.randomUUID().toString(),
                     deviceId = deviceId,
-                    version = System.currentTimeMillis(),
+                    version = now,
                     active = true,
-                    updatedAtEpochMillis = System.currentTimeMillis(),
+                    updatedAtEpochMillis = now,
                 )
             policyDao.upsertPolicy(policy)
             return policy
         }
 
+        private fun String.isRemoteCompatibleId(): Boolean = runCatching { UUID.fromString(this) }.isSuccess
+
+        private fun PolicyEntity.toOutboxOperation(
+            accountId: String?,
+            now: Long,
+        ): OutboxOperationEntity {
+            val payload =
+                org.json.JSONObject()
+                    .put("id", id)
+                    .put("account_id", accountId)
+                    .put("device_id", deviceId)
+                    .put("version", version)
+                    .put("active", active)
+                    .put("updated_at", Instant.ofEpochMilli(updatedAtEpochMillis).toString())
+                    .toString()
+            return outboxOperation(
+                payload = payload,
+                now = now,
+                tableName = POLICIES_TABLE,
+            )
+        }
+
         private fun DailyLimit.toOutboxOperation(
             policyId: String,
             accountId: String?,
+            now: Long,
         ): OutboxOperationEntity {
-            val now = System.currentTimeMillis()
             val payload =
                 org.json.JSONObject()
                     .put("id", id)
@@ -105,6 +142,7 @@ class RoomDailyLimitRepository
             return outboxOperation(
                 payload = payload,
                 now = now,
+                tableName = DAILY_LIMITS_TABLE,
             )
         }
 
@@ -129,16 +167,18 @@ class RoomDailyLimitRepository
             return outboxOperation(
                 payload = payload,
                 now = now,
+                tableName = DAILY_LIMITS_TABLE,
             )
         }
 
         private fun outboxOperation(
             payload: String,
             now: Long,
+            tableName: String,
         ): OutboxOperationEntity =
             OutboxOperationEntity(
                 id = UUID.randomUUID().toString(),
-                tableName = DAILY_LIMITS_TABLE,
+                tableName = tableName,
                 operation = UPSERT_OPERATION,
                 payload = payload,
                 status = PENDING_STATUS,
@@ -148,6 +188,7 @@ class RoomDailyLimitRepository
             )
 
         private companion object {
+            const val POLICIES_TABLE = "policies"
             const val DAILY_LIMITS_TABLE = "daily_limits"
             const val UPSERT_OPERATION = "Upsert"
             const val PENDING_STATUS = "Pending"

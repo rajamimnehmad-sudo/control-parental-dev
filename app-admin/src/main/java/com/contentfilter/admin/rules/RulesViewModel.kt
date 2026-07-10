@@ -30,7 +30,6 @@ import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseActivationClient
-import com.contentfilter.core.network.remote.SupabaseDevMaintenanceClient
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.engine.SyncResult
@@ -73,7 +72,6 @@ class RulesViewModel
         grantRepository: ExtraTimeGrantRepository,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
         private val activationClient: SupabaseActivationClient,
-        private val devMaintenanceClient: SupabaseDevMaintenanceClient,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
         private val telemetryRepository: TelemetryRepository,
@@ -359,20 +357,24 @@ class RulesViewModel
             form.update {
                 it.copy(
                     pendingDeviceDeleteIds = it.pendingDeviceDeleteIds + deviceId,
-                    message = "Borrando dispositivo definitivamente...",
+                    message = "Borrando usuario...",
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
-                when (devMaintenanceClient.purgeDevice(deviceId)) {
+                when (activationClient.revokeDevice(deviceId)) {
                     is RemoteResult.Success -> {
                         deviceRepository.deleteDevice(deviceId)
                         installedApps.update { apps -> apps.filterNot { it.deviceId == deviceId } }
-                        syncEngine.syncDevicesFull()
+                        val syncResult = syncEngine.syncDevicesFull()
+                        Log.i(
+                            LogTag,
+                            "deleteUser finished deviceId=$deviceId syncSuccess=${syncResult.success} message=${syncResult.message}",
+                        )
                         form.update {
                             it.copy(
                                 selectedDeviceId = it.selectedDeviceId.takeUnless { selected -> selected == deviceId },
                                 pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
-                                message = "Dispositivo borrado definitivamente.",
+                                message = "Usuario borrado.",
                             )
                         }
                     }
@@ -380,7 +382,7 @@ class RulesViewModel
                         form.update {
                             it.copy(
                                 pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
-                                message = "No se pudo borrar definitivamente el dispositivo.",
+                                message = "No se pudo borrar el usuario.",
                             )
                         }
                     }
@@ -968,6 +970,10 @@ class RulesViewModel
             allowed: Boolean,
         ) {
             val targetDeviceId = selectedDeviceIdForRules() ?: return
+            Log.i(
+                LogTag,
+                "appControl requested action=setAllowed deviceId=$targetDeviceId package=$packageName allowed=$allowed",
+            )
             val matchingRules =
                 uiState.value.rules.filter {
                     it.scope == RuleScope.App && it.target == packageName
@@ -1030,6 +1036,10 @@ class RulesViewModel
                             },
                     )
                 }
+                Log.i(
+                    LogTag,
+                    "appControl saved action=setAllowed deviceId=$targetDeviceId package=$packageName allowed=$allowed syncSuccess=$synced",
+                )
                 kotlinx.coroutines.delay(SwitchHoldMillis)
                 form.update { it.copy(pendingAppAllowed = it.pendingAppAllowed - packageName) }
             }
@@ -1041,6 +1051,10 @@ class RulesViewModel
         ) {
             val targetDeviceId = selectedDeviceIdForRules() ?: return
             val minutes = rawMinutes.filter(Char::isDigit).toIntOrNull()
+            Log.i(
+                LogTag,
+                "appControl requested action=saveLimit deviceId=$targetDeviceId package=$packageName minutes=$minutes",
+            )
             val existing =
                 uiState.value.limits.firstOrNull {
                     it.targetType == PolicyTargetType.App && it.target == packageName
@@ -1070,7 +1084,11 @@ class RulesViewModel
                     form.update { it.copy(message = "Tiempo guardado.") }
                 }
                 syncScheduler.requestSync()
-                syncNow()
+                val synced = syncNow()
+                Log.i(
+                    LogTag,
+                    "appControl saved action=saveLimit deviceId=$targetDeviceId package=$packageName minutes=$minutes syncSuccess=$synced",
+                )
             }
         }
 
