@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.AccessRequest
 import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.PolicyLevel
+import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyTargetType
@@ -180,7 +181,27 @@ class ApproveAccessRequestUseCaseTest {
             savedRules += rule
         }
 
+        override suspend fun saveRules(
+            rules: List<PolicyRule>,
+            deviceId: String?,
+            requestId: String?,
+        ): PolicyMutationReceipt {
+            savedRules += rules
+            return receipt(deviceId, requestId)
+        }
+
         override suspend fun deleteRule(rule: PolicyRule) = Unit
+
+        private fun receipt(
+            deviceId: String?,
+            requestId: String?,
+        ) = PolicyMutationReceipt(
+            requestId = requestId ?: "request",
+            deviceId = deviceId ?: "device-1",
+            policyId = snapshot.id,
+            revision = snapshot.version,
+            operationIds = emptyList(),
+        )
     }
 
     private class FakeDailyLimitRepository(
@@ -193,11 +214,28 @@ class ApproveAccessRequestUseCaseTest {
         override suspend fun saveLimit(
             limit: DailyLimit,
             deviceId: String?,
-        ) = Unit
+            requestId: String?,
+        ) = receipt(deviceId, requestId)
 
-        override suspend fun deleteLimit(limit: DailyLimit) {
+        override suspend fun deleteLimit(
+            limit: DailyLimit,
+            deviceId: String?,
+            requestId: String?,
+        ): PolicyMutationReceipt {
             deletedIds += limit.id
+            return receipt(deviceId, requestId)
         }
+
+        private fun receipt(
+            deviceId: String?,
+            requestId: String?,
+        ) = PolicyMutationReceipt(
+            requestId = requestId ?: "request",
+            deviceId = deviceId ?: "device-1",
+            policyId = "policy",
+            revision = 1L,
+            operationIds = emptyList(),
+        )
     }
 
     private companion object {
