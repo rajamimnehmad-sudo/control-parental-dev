@@ -132,7 +132,7 @@ private fun UserRequestCard(
 private fun AccessRequestType.displayName(): String =
     when (this) {
         AccessRequestType.APP_ACCESS -> "Solicitud de app"
-        AccessRequestType.DOMAIN_ACCESS -> "Solicitud de sitio web"
+        AccessRequestType.DOMAIN_ACCESS -> "Solicitud no disponible"
         AccessRequestType.EXTRA_TIME -> "Solicitud de tiempo extra"
         AccessRequestType.OTHER -> "Solicitud"
     }
@@ -159,7 +159,7 @@ private fun rememberRequestTarget(request: AccessRequest): RequestTargetUi {
         val packageName = request.targetPackageName ?: request.target.takeIf { it.contains(".") }
         if (request.requestType == AccessRequestType.DOMAIN_ACCESS) {
             RequestTargetUi(
-                title = request.targetDomain ?: request.target.ifBlank { "Sitio web" },
+                title = "Solicitud no disponible",
                 icon = null,
                 web = true,
             )
@@ -221,7 +221,7 @@ private data class RequestTargetUi(
 private fun AccessRequestType.fallbackTitle(requestedMinutes: Int?): String =
     when (this) {
         AccessRequestType.APP_ACCESS -> "App"
-        AccessRequestType.DOMAIN_ACCESS -> "Sitio web"
+        AccessRequestType.DOMAIN_ACCESS -> "Solicitud no disponible"
         AccessRequestType.EXTRA_TIME -> "Tiempo extra ${requestedMinutes ?: 0} min"
         AccessRequestType.OTHER -> "Solicitud"
     }

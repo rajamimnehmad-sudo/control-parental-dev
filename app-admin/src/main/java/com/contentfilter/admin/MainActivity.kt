@@ -288,36 +288,19 @@ private fun HomeTab(
         subtitle = "Tu panel de administración está listo",
     ) {
         AdminHeroCard()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = "3",
-                label = "secciones",
-                accent = Sky,
-            )
-            StatCard(
-                modifier = Modifier.weight(1f),
-                value = "DEV",
-                label = "versión ${BuildConfig.VERSION_CODE}",
-                accent = Mint,
-            )
-        }
-        FeatureTile(
-            icon = Icons.Filled.Person,
-            title = "Comunidad",
-            subtitle = "Apps, Web y solicitudes",
-            accent = Teal,
-            onClick = onCommunity,
-        )
         FeatureTile(
             icon = Icons.Filled.Person,
             title = "Administrar usuarios",
             subtitle = "Ver, agregar y borrar usuarios",
             accent = Sky,
             onClick = onManageUsers,
+        )
+        FeatureTile(
+            icon = Icons.Filled.Person,
+            title = "Comunidad",
+            subtitle = "Apps, Web y solicitudes",
+            accent = Teal,
+            onClick = onCommunity,
         )
         FeatureTile(
             icon = Icons.Filled.Settings,

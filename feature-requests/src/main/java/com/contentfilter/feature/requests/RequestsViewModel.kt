@@ -79,13 +79,6 @@ class RequestsViewModel
                 requestedMinutes = null,
             )
 
-        fun requestDomainAccess() =
-            saveRequest(
-                requestType = AccessRequestType.DOMAIN_ACCESS,
-                targetType = PolicyTargetType.Domain,
-                requestedMinutes = null,
-            )
-
         fun requestExtraTime() =
             saveRequest(
                 requestType = AccessRequestType.EXTRA_TIME,
