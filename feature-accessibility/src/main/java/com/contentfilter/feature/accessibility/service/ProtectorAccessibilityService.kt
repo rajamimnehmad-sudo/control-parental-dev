@@ -194,7 +194,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             )
         Log.i(
             LogTag,
-            "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} package=$packageName reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} visibleTextLength=${diagnosis.visibleTextLength}",
+            "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} package=$packageName webNavigationBlocked=${diagnosis.webNavigationBlocked} reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} visibleTextLength=${diagnosis.visibleTextLength}",
         )
         serviceScope?.launch {
             telemetryReporter.recordSearchProtection(

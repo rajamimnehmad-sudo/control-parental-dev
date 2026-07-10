@@ -1,5 +1,6 @@
 package com.contentfilter.user.internet
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -20,7 +21,12 @@ class UserWebViewModel
             policyRepository
                 .observeActivePolicy()
                 .map { snapshot ->
-                    UserWebUiState(webNavigationBlocked = snapshot.rules.webNavigationBlocked())
+                    val blocked = snapshot.rules.webNavigationBlocked()
+                    Log.i(
+                        LogTag,
+                        "webNavigation user snapshot policy=${snapshot.id} version=${snapshot.version} blocked=$blocked",
+                    )
+                    UserWebUiState(webNavigationBlocked = blocked)
                 }
                 .stateIn(
                     scope = viewModelScope,
@@ -32,3 +38,5 @@ class UserWebViewModel
 data class UserWebUiState(
     val webNavigationBlocked: Boolean = false,
 )
+
+private const val LogTag = "UserWebViewModel"

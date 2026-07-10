@@ -563,6 +563,10 @@ class RulesViewModel
                 room = previousRoom,
                 ui = currentState.internetBlocked,
             )
+            Log.i(
+                LogTag,
+                "webNavigation admin requested deviceId=$targetDeviceId requested=$blocked storedBefore=$previousRoom",
+            )
             form.update {
                 it.copy(
                     internetSaving = true,
@@ -600,6 +604,7 @@ class RulesViewModel
                             setSearchEnginesAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
                         } else {
                             clearLegacyDomainBlockRules(targetDeviceId)
+                            setSearchEnginesAllowedRules(allowed = true, targetDeviceId = targetDeviceId)
                         }
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
                             policyRules.first {
@@ -613,6 +618,10 @@ class RulesViewModel
                         } ?: error("Room no confirmó el nuevo estado de Internet.")
                     }
                 val roomAfterSave = saved.getOrNull()?.internetBlocked() ?: previousRoom
+                Log.i(
+                    LogTag,
+                    "webNavigation admin stored deviceId=$targetDeviceId requested=$blocked stored=$roomAfterSave",
+                )
                 if (saved.isSuccess) {
                     logInternetSwitch(
                         stage = "room-confirmed",
@@ -623,6 +632,10 @@ class RulesViewModel
                     )
                     syncScheduler.requestSync()
                     val synced = syncNow()
+                    Log.i(
+                        LogTag,
+                        "webNavigation admin synced deviceId=$targetDeviceId requested=$blocked stored=$roomAfterSave syncSuccess=$synced",
+                    )
                     recordAdminDiagnostic(
                         action = "internetSave",
                         deviceId = targetDeviceId,

@@ -1,6 +1,8 @@
 package com.contentfilter.feature.vpn.policy
 
+import android.util.Log
 import com.contentfilter.core.domain.model.LicenseState
+import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
@@ -48,6 +50,10 @@ class VpnPolicySnapshotProvider
                         )
                     }.collect {
                         state.value = it
+                        Log.i(
+                            LogTag,
+                            "webNavigation vpn applied policy=${it.snapshot.id} version=${it.snapshot.version} blocked=${it.snapshot.rules.webNavigationBlocked()} strict=${it.strictWebBlockEnabled}",
+                        )
                         telemetryReporter.recordSnapshotReceived(
                             snapshot = it.snapshot,
                             strictWebBlock = it.strictWebBlockEnabled,
@@ -68,6 +74,10 @@ class VpnPolicySnapshotProvider
             telemetryReporter.recordSnapshotReceived(
                 snapshot = state.value.snapshot,
                 strictWebBlock = state.value.strictWebBlockEnabled,
+            )
+            Log.i(
+                LogTag,
+                "webNavigation vpn applied policy=${state.value.snapshot.id} version=${state.value.snapshot.version} blocked=${state.value.snapshot.rules.webNavigationBlocked()} strict=${state.value.strictWebBlockEnabled}",
             )
         }
 
@@ -96,5 +106,9 @@ class VpnPolicySnapshotProvider
                     candidate = snapshot,
                 )
             return VpnPolicyState(snapshot = resolvedSnapshot, health = health)
+        }
+
+        private companion object {
+            const val LogTag = "VpnPolicySnapshot"
         }
     }

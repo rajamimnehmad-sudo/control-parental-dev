@@ -21,20 +21,23 @@ class SearchEngineScreenDetector {
         recentDnsBlockHost: String? = null,
     ): SearchEngineScreenDiagnosis {
         val packageCategory = packageName.searchSurfaceCategory()
+        val webNavigationBlocked = snapshot.rules.webNavigationBlocked()
         if (packageCategory == SearchSurfaceCategory.NonBrowser) {
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
                 reason = "non-browser",
+                webNavigationBlocked = webNavigationBlocked,
                 packageCategory = packageCategory.label,
                 recentDnsBlockHost = null,
                 searchBlockRules = 0,
                 visibleTextLength = visibleText.length,
             )
         }
-        if (snapshot.rules.webNavigationBlocked()) {
+        if (webNavigationBlocked) {
             return SearchEngineScreenDiagnosis(
                 shouldLeave = true,
                 reason = "web-navigation-blocked",
+                webNavigationBlocked = webNavigationBlocked,
                 packageCategory = packageCategory.label,
                 recentDnsBlockHost = recentDnsBlockHost,
                 searchBlockRules = snapshot.searchEngineBlockRuleCount(),
@@ -46,6 +49,7 @@ class SearchEngineScreenDetector {
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
                 reason = "search-rules-not-blocked",
+                webNavigationBlocked = webNavigationBlocked,
                 packageCategory = packageCategory.label,
                 recentDnsBlockHost = null,
                 searchBlockRules = 0,
@@ -58,6 +62,7 @@ class SearchEngineScreenDetector {
             return SearchEngineScreenDiagnosis(
                 shouldLeave = false,
                 reason = "no-search-signal",
+                webNavigationBlocked = webNavigationBlocked,
                 packageCategory = packageCategory.label,
                 recentDnsBlockHost = blockedRecentSearchHost,
                 searchBlockRules = blockRuleCount,
@@ -73,6 +78,7 @@ class SearchEngineScreenDetector {
                         blockedRecentSearchHost != null -> "browser-recent-dns-block-observed"
                         else -> "browser-search-blocked"
                     },
+                webNavigationBlocked = webNavigationBlocked,
                 packageCategory = packageCategory.label,
                 recentDnsBlockHost = blockedRecentSearchHost,
                 searchBlockRules = blockRuleCount,
@@ -82,6 +88,7 @@ class SearchEngineScreenDetector {
         return SearchEngineScreenDiagnosis(
             shouldLeave = true,
             reason = "blocked-search-screen",
+            webNavigationBlocked = webNavigationBlocked,
             packageCategory = packageCategory.label,
             recentDnsBlockHost = blockedRecentSearchHost,
             searchBlockRules = blockRuleCount,
@@ -165,6 +172,7 @@ class SearchEngineScreenDetector {
 data class SearchEngineScreenDiagnosis(
     val shouldLeave: Boolean,
     val reason: String,
+    val webNavigationBlocked: Boolean,
     val packageCategory: String,
     val recentDnsBlockHost: String?,
     val searchBlockRules: Int,
