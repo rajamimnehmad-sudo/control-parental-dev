@@ -29,4 +29,5 @@ data class PolicyRuleEntity(
     val action: String,
     val priority: Int,
     val enabled: Boolean,
+    val updatedAtEpochMillis: Long,
 )

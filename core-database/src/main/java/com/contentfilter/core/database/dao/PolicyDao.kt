@@ -51,6 +51,9 @@ interface PolicyDao {
     @Query("SELECT * FROM policy_rules WHERE policyId = :policyId")
     suspend fun rulesForPolicy(policyId: String): List<PolicyRuleEntity>
 
+    @Query("SELECT * FROM policy_rules WHERE id = :ruleId LIMIT 1")
+    suspend fun ruleById(ruleId: String): PolicyRuleEntity?
+
     @Query("SELECT * FROM policy_rules WHERE policyId = :policyId")
     fun observeRulesForPolicy(policyId: String): Flow<List<PolicyRuleEntity>>
 

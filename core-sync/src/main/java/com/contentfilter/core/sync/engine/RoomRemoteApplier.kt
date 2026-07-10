@@ -1,15 +1,17 @@
 package com.contentfilter.core.sync.engine
 
 import android.util.Log
-import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
+import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AppGroupDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceDao
 import com.contentfilter.core.database.dao.ExtraTimeGrantDao
 import com.contentfilter.core.database.dao.PolicyDao
-import com.contentfilter.core.network.dto.RemoteAccountDto
+import com.contentfilter.core.database.entity.PolicyEntity
+import com.contentfilter.core.database.entity.PolicyRuleEntity
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
+import com.contentfilter.core.network.dto.RemoteAccountDto
 import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
 import com.contentfilter.core.network.dto.RemoteAppGroupDto
 import com.contentfilter.core.network.dto.RemoteDailyLimitDto
@@ -42,6 +44,23 @@ class RoomRemoteApplier
 
         suspend fun applyPolicies(values: List<RemotePolicyDto>) {
             values.forEach { policy ->
+                val incoming = policy.toEntity()
+                val currentById = policyDao.policyById(policy.id)
+                val policyDeviceId = policy.deviceId
+                val currentActive =
+                    if (policyDeviceId != null) {
+                        policyDao.activePolicyForDevice(policyDeviceId)
+                    } else {
+                        policyDao.activePolicy()
+                    }
+                if (!shouldApplyRemotePolicy(incoming, currentById, currentActive)) {
+                    Log.i(
+                        LogTag,
+                        "Skipped stale policy id=${policy.id.take(8)} deviceId=${policy.deviceId?.take(8) ?: "none"} " +
+                            "remoteVersion=${incoming.version} localVersion=${currentById?.version ?: currentActive?.version}",
+                    )
+                    return@forEach
+                }
                 if (policy.active && policy.deletedAt == null) {
                     val deviceId = policy.deviceId
                     if (deviceId != null) {
@@ -50,7 +69,7 @@ class RoomRemoteApplier
                         policyDao.deactivateOtherPoliciesWithoutDevice(policy.id)
                     }
                 }
-                policyDao.upsertPolicy(policy.toEntity())
+                policyDao.upsertPolicy(incoming)
             }
         }
 
@@ -72,8 +91,18 @@ class RoomRemoteApplier
 
         suspend fun applyPolicyRules(values: List<RemotePolicyRuleDto>) {
             values.forEach { rule ->
+                val incoming = rule.toEntity()
+                val current = policyDao.ruleById(rule.id)
+                if (!shouldApplyRemoteRule(incoming, current)) {
+                    Log.i(
+                        LogTag,
+                        "Skipped stale policy rule id=${rule.id.take(8)} policyId=${rule.policyId.take(8)} " +
+                            "remoteUpdatedAt=${incoming.updatedAtEpochMillis} localUpdatedAt=${current?.updatedAtEpochMillis}",
+                    )
+                    return@forEach
+                }
                 if (rule.deletedAt == null) {
-                    policyDao.upsertRule(rule.toEntity())
+                    policyDao.upsertRule(incoming)
                 } else {
                     policyDao.deleteRuleById(rule.id)
                 }
@@ -137,3 +166,31 @@ class RoomRemoteApplier
             const val LogTag = "RoomRemoteApplier"
         }
     }
+
+internal fun shouldApplyRemotePolicy(
+    incoming: PolicyEntity,
+    currentById: PolicyEntity?,
+    currentActive: PolicyEntity?,
+): Boolean {
+    if (currentById != null && incoming.isOlderThan(currentById)) return false
+    if (
+        incoming.active &&
+        currentActive != null &&
+        currentActive.id != incoming.id &&
+        !incoming.isNewerThan(currentActive)
+    ) {
+        return false
+    }
+    return true
+}
+
+internal fun shouldApplyRemoteRule(
+    incoming: PolicyRuleEntity,
+    current: PolicyRuleEntity?,
+): Boolean = current == null || incoming.updatedAtEpochMillis >= current.updatedAtEpochMillis
+
+private fun PolicyEntity.isOlderThan(other: PolicyEntity): Boolean =
+    version < other.version || (version == other.version && updatedAtEpochMillis < other.updatedAtEpochMillis)
+
+private fun PolicyEntity.isNewerThan(other: PolicyEntity): Boolean =
+    version > other.version || (version == other.version && updatedAtEpochMillis > other.updatedAtEpochMillis)

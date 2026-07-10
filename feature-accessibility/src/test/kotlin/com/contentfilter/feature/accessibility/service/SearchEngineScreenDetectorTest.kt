@@ -138,7 +138,6 @@ class SearchEngineScreenDetectorTest {
         assertEquals(null, diagnosis.recentDnsBlockHost)
     }
 
-
     @Test
     fun `diagnoses browser search screen as open when web navigation is open`() {
         val diagnosis =

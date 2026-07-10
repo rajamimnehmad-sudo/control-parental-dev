@@ -17,5 +17,13 @@ interface PolicyRepository {
         deviceId: String? = null,
     )
 
+    suspend fun saveRules(
+        rules: List<PolicyRule>,
+        deviceId: String? = null,
+    ): Long {
+        rules.forEach { saveRule(it, deviceId) }
+        return getActivePolicy(deviceId).version
+    }
+
     suspend fun deleteRule(rule: PolicyRule)
 }

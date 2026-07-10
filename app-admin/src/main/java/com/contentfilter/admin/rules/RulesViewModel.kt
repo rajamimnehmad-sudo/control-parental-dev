@@ -6,18 +6,18 @@ import androidx.lifecycle.viewModelScope
 import com.contentfilter.admin.BuildConfig
 import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.DailyLimit
-import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
-import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
+import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
+import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
@@ -34,8 +34,8 @@ import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.engine.SyncResult
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -50,8 +50,6 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import java.time.Duration
-import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
@@ -69,6 +67,7 @@ class RulesViewModel
         private val deleteDailyLimitUseCase: DeleteDailyLimitUseCase,
         private val deviceRepository: DeviceRepository,
         private val appGroupRepository: AppGroupRepository,
+        private val policyRepository: PolicyRepository,
         grantRepository: ExtraTimeGrantRepository,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
         private val activationClient: SupabaseActivationClient,
@@ -324,7 +323,10 @@ class RulesViewModel
             }
         }
 
-        fun onDeviceSelected(deviceId: String) {
+        fun onDeviceSelected(
+            deviceId: String,
+            refreshApps: Boolean = true,
+        ) {
             form.update {
                 it.copy(
                     selectedDeviceId = deviceId,
@@ -333,10 +335,10 @@ class RulesViewModel
                     groupName = "",
                     groupMinutes = "",
                     groupSelectedPackages = emptySet(),
-                    message = "Cargando apps...",
+                    message = if (refreshApps) "Cargando apps..." else "",
                 )
             }
-            refreshInstalledApps()
+            if (refreshApps) refreshInstalledApps()
         }
 
         fun clearDeviceSelection() {
@@ -588,69 +590,61 @@ class RulesViewModel
             )
             Log.i(
                 LogTag,
-                "webNavigation admin requested deviceId=$targetDeviceId requested=$blocked storedBefore=$previousRoom",
+                "webNavigation admin requested requestId=$requestId deviceId=$targetDeviceId " +
+                    "requestedBlocked=$blocked mainBefore=$previousRoom policyRevision=${currentState.rules.webPolicyRevision()}",
             )
             form.update {
                 it.copy(
                     internetSaving = true,
-                    pendingInternetBlocked = blocked,
-                    pendingSearchEnginesAllowed = if (blocked) false else it.pendingSearchEnginesAllowed,
-                    pendingGoogleResultsAllowed = if (blocked) it.pendingGoogleResultsAllowed else false,
-                    pendingImagesBlocked = if (blocked) it.pendingImagesBlocked else false,
+                    pendingInternetBlocked = previousRoom,
                     message = "Guardando...",
                 )
             }
             logInternetSwitch(
                 stage = "pending",
                 touched = blocked,
-                pending = blocked,
+                pending = previousRoom,
                 room = previousRoom,
-                ui = blocked,
+                ui = previousRoom,
             )
             viewModelScope.launch {
                 val saved =
                     runCatching {
-                        setRulesForDomain(
-                            target = WebNavigationPolicy.RuleTarget,
-                            action = RuleAction.Block,
-                            enabled = blocked,
-                            priority = WebNavigationBlockPriority,
-                            deviceId = targetDeviceId,
-                        )
-                        setRulesForDomain(
-                            target = DomainWildcard,
-                            action = RuleAction.Block,
-                            enabled = false,
-                            priority = InternetBlockPriority,
-                            deviceId = targetDeviceId,
-                        )
-                        if (blocked) {
-                            clearLegacyDomainBlockRules(targetDeviceId)
-                            setSearchEnginesAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
-                            setGoogleResultsAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
-                            setImagesBlockedRules(blocked = uiState.value.imagesBlocked, targetDeviceId = targetDeviceId)
-                            setSafeSearchRules(enabled = uiState.value.safeSearchEnabled, targetDeviceId = targetDeviceId)
-                        } else {
-                            clearLegacyDomainBlockRules(targetDeviceId)
-                            setSearchEnginesAllowedRules(allowed = true, targetDeviceId = targetDeviceId)
-                            setGoogleResultsAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
-                            setImagesBlockedRules(blocked = false, targetDeviceId = targetDeviceId)
+                        val before = policyRepository.getActivePolicy(targetDeviceId)
+                        check(before.deviceId == null || before.deviceId == targetDeviceId) {
+                            "Room devolvió una policy de otro dispositivo."
                         }
-                        withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                            policyRules.first {
-                                it.internetBlocked() == blocked &&
-                                    if (blocked) {
-                                        it.searchEnginesStateConfirmed(false)
-                                    } else {
-                                        true
-                                    }
-                            }
-                        } ?: error("Room no confirmó el nuevo estado de Internet.")
+                        val ruleChanges =
+                            before.rules.webNavigationModeChanges(
+                                blocked = blocked,
+                                imagesBlocked = currentState.imagesBlocked,
+                                safeSearchEnabled = currentState.safeSearchEnabled,
+                            )
+                        val revision = saveRule.saveAll(ruleChanges, targetDeviceId)
+                        val confirmed =
+                            withTimeoutOrNull(RoomConfirmTimeoutMillis) {
+                                policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
+                                    snapshot.deviceId == targetDeviceId &&
+                                        snapshot.version >= revision &&
+                                        snapshot.rules.internetBlocked() == blocked
+                                }
+                            } ?: error("Room no confirmó la regla principal de Internet.")
+                        WebModeLocalSave(
+                            beforeBlocked = before.rules.internetBlocked(),
+                            confirmedRules = confirmed.rules,
+                            revision = confirmed.version,
+                            auxiliaryChanges = ruleChanges.drop(1).size,
+                        )
                     }
-                val roomAfterSave = saved.getOrNull()?.internetBlocked() ?: previousRoom
+                val roomAfterSave = saved.getOrNull()?.confirmedRules?.internetBlocked() ?: previousRoom
                 Log.i(
                     LogTag,
-                    "webNavigation admin stored deviceId=$targetDeviceId requested=$blocked stored=$roomAfterSave",
+                    "webNavigation admin room result requestId=$requestId deviceId=$targetDeviceId " +
+                        "requestedBlocked=$blocked mainBefore=${saved.getOrNull()?.beforeBlocked ?: previousRoom} " +
+                        "mainAfter=$roomAfterSave roomConfirmed=${saved.isSuccess} " +
+                        "policyRevision=${saved.getOrNull()?.revision ?: "none"} " +
+                        "updatedAt=${saved.getOrNull()?.revision ?: "none"} " +
+                        "auxiliaryChanges=${saved.getOrNull()?.auxiliaryChanges ?: 0}",
                 )
                 if (saved.isSuccess) {
                     logInternetSwitch(
@@ -663,7 +657,8 @@ class RulesViewModel
                     syncScheduler.requestSync()
                     Log.i(
                         LogTag,
-                        "webNavigation admin sync requested deviceId=$targetDeviceId requested=$blocked stored=$roomAfterSave",
+                        "webNavigation admin sync requested requestId=$requestId deviceId=$targetDeviceId " +
+                            "requestedBlocked=$blocked stored=$roomAfterSave policyRevision=${saved.getOrThrow().revision}",
                     )
                     recordAdminDiagnostic(
                         action = "internetSave",
@@ -686,12 +681,7 @@ class RulesViewModel
                             pendingGoogleResultsAllowed = null,
                             pendingImagesBlocked = null,
                             pendingSafeSearchEnabled = null,
-                            message =
-                                if (blocked) {
-                                    "Bloquear navegación web activado."
-                                } else {
-                                    "Navegación web permitida."
-                                },
+                            message = "Guardado. Sincronizando...",
                         )
                     }
                     logInternetSwitch(
@@ -701,6 +691,33 @@ class RulesViewModel
                         room = roomAfterSave,
                         ui = blocked,
                     )
+                    val syncResult = syncNowWithResult()
+                    Log.i(
+                        LogTag,
+                        "webNavigation admin sync finished requestId=$requestId deviceId=$targetDeviceId " +
+                            "requestedBlocked=$blocked success=${syncResult.success} message=${syncResult.message}",
+                    )
+                    if (!isCurrentInternetSave(requestId)) {
+                        Log.i(
+                            LogTag,
+                            "internetSave stale response ignored requestId=$requestId action=internet-mode-sync",
+                        )
+                        return@launch
+                    }
+                    form.update {
+                        it.copy(
+                            message =
+                                if (syncResult.success) {
+                                    if (blocked) {
+                                        "Bloquear navegación web activado."
+                                    } else {
+                                        "Navegación web permitida."
+                                    }
+                                } else {
+                                    "Guardado localmente. Sincronización pendiente."
+                                },
+                        )
+                    }
                 } else {
                     if (isCurrentInternetSave(requestId)) {
                         recordAdminDiagnostic(
@@ -1216,9 +1233,6 @@ class RulesViewModel
 
         init {
             syncScheduler.requestSync()
-            viewModelScope.launch {
-                syncNow()
-            }
             refreshInstalledApps()
         }
 
@@ -1585,25 +1599,6 @@ class RulesViewModel
             }
         }
 
-        private suspend fun clearLegacyDomainBlockRules(deviceId: String) {
-            uiState.value.rules
-                .filter {
-                        it.enabled &&
-                        it.scope == RuleScope.Domain &&
-                        it.action == RuleAction.Block &&
-                        it.target != WebNavigationPolicy.RuleTarget &&
-                        it.target != WebNavigationPolicy.GoogleResultsAllowedTarget &&
-                        it.target != WebNavigationPolicy.ImagesBlockedTarget &&
-                        it.target != WebNavigationPolicy.SafeSearchTarget &&
-                        it.target != DomainWildcard &&
-                        it.target !in SearchEngineDomains &&
-                        it.target !in SecureDnsDomains
-                }
-                .forEach { rule ->
-                    saveRule(rule.copy(enabled = false), deviceId)
-                }
-        }
-
         private suspend fun setSearchEngineDomain(
             target: String,
             allowed: Boolean,
@@ -1813,6 +1808,13 @@ class RulesViewModel
             val appGroups: List<AppGroup>,
             val grants: List<ExtraTimeGrant>,
             val nowEpochMillis: Long,
+        )
+
+        private data class WebModeLocalSave(
+            val beforeBlocked: Boolean,
+            val confirmedRules: List<PolicyRule>,
+            val revision: Long,
+            val auxiliaryChanges: Int,
         )
 
         private fun String.safeDeviceId(): String = take(8)

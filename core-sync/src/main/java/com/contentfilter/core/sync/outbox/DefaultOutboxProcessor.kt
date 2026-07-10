@@ -4,9 +4,9 @@ import android.util.Log
 import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.entity.OutboxOperationEntity
+import com.contentfilter.core.network.dto.RemoteAccessRequestDto
 import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
 import com.contentfilter.core.network.dto.RemoteAppGroupDto
-import com.contentfilter.core.network.dto.RemoteAccessRequestDto
 import com.contentfilter.core.network.dto.RemoteDailyLimitDto
 import com.contentfilter.core.network.dto.RemoteExtraTimeGrantDto
 import com.contentfilter.core.network.dto.RemotePolicyDto
@@ -28,7 +28,7 @@ class DefaultOutboxProcessor
         private val limitRepository: RemoteLimitRepository,
     ) : OutboxProcessor {
         override suspend fun processPending() {
-            val operations = outboxDao.pending()
+            val operations = outboxDao.pending(limit = MaxOperationsPerRun)
             if (operations.isNotEmpty()) {
                 Log.i(LogTag, "Processing pending outbox operations count=${operations.size}")
             }
@@ -130,5 +130,6 @@ class DefaultOutboxProcessor
             const val AccessRequestsTable = "access_requests"
             const val ExtraTimeGrantsTable = "extra_time_grants"
             const val LogTag = "OutboxProcessor"
+            const val MaxOperationsPerRun = 250
         }
     }

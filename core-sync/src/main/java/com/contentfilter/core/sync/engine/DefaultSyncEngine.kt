@@ -14,6 +14,8 @@ import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseTable
 import com.contentfilter.core.sync.outbox.OutboxProcessor
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 class DefaultSyncEngine
@@ -30,7 +32,11 @@ class DefaultSyncEngine
         private val systemStatusRepository: SystemStatusRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
     ) : SyncEngine {
-        override suspend fun syncOnce(): SyncResult {
+        private val policySyncMutex = Mutex()
+
+        override suspend fun syncOnce(): SyncResult = policySyncMutex.withLock { syncOnceLocked() }
+
+        private suspend fun syncOnceLocked(): SyncResult {
             markCurrentDeviceSeen()
             runCatching {
                 outboxProcessor.processPending()
@@ -83,7 +89,9 @@ class DefaultSyncEngine
                 }
             }
 
-        override suspend fun syncCoreDataFull(): SyncResult {
+        override suspend fun syncCoreDataFull(): SyncResult = policySyncMutex.withLock { syncCoreDataFullLocked() }
+
+        private suspend fun syncCoreDataFullLocked(): SyncResult {
             markCurrentDeviceSeen()
             runCatching {
                 outboxProcessor.processPending()

@@ -1,10 +1,11 @@
 package com.contentfilter.admin.rules
 
+import com.contentfilter.core.domain.model.AppGroup
+import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
-import com.contentfilter.core.domain.model.AppGroup
-import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
@@ -18,6 +19,7 @@ import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import java.time.Duration
 import java.time.Instant
+import java.util.UUID
 
 internal fun normalizeTarget(
     scope: RuleScope,
@@ -117,8 +119,7 @@ internal fun List<RemoteInstalledAppDto>.preferAppsWithIcons(): List<RemoteInsta
 
 private fun String?.hasVisibleIcon(): Boolean = !isNullOrBlank()
 
-internal fun List<PolicyRule>.internetBlocked(): Boolean =
-    webNavigationBlocked()
+internal fun List<PolicyRule>.internetBlocked(): Boolean = webNavigationBlocked()
 
 internal fun List<PolicyRule>.googleResultsAllowedForWeb(): Boolean = googleResultsAllowed()
 
@@ -140,6 +141,150 @@ internal fun List<PolicyRule>.webPolicyRevision(): Int =
         .sorted()
         .joinToString("|")
         .hashCode()
+
+internal fun List<PolicyRule>.webNavigationModeChanges(
+    blocked: Boolean,
+    imagesBlocked: Boolean,
+    safeSearchEnabled: Boolean,
+): List<PolicyRule> {
+    val working = toMutableList()
+    val changes = linkedMapOf<String, PolicyRule>()
+
+    fun plan(
+        target: String,
+        action: RuleAction,
+        enabled: Boolean,
+        priority: Int,
+        createWhenDisabled: Boolean = false,
+    ) {
+        val existing =
+            working
+                .filter { it.scope == RuleScope.Domain && it.target == target && it.action == action }
+                .sortedWith(
+                    compareByDescending<PolicyRule> { it.enabled }
+                        .thenByDescending { it.priority }
+                        .thenBy { it.id },
+                )
+        val canonical =
+            existing.firstOrNull()
+                ?: if (enabled || createWhenDisabled) {
+                    PolicyRule(
+                        id = UUID.randomUUID().toString(),
+                        level = PolicyLevel.Account,
+                        scope = RuleScope.Domain,
+                        target = target,
+                        action = action,
+                        priority = priority,
+                        enabled = enabled,
+                    )
+                } else {
+                    return
+                }
+        val desired = canonical.copy(enabled = enabled, priority = priority)
+        if (canonical !in working) working += canonical
+        if (desired != canonical) {
+            working[working.indexOfFirst { it.id == canonical.id }] = desired
+            changes[desired.id] = desired
+        } else if (existing.isEmpty()) {
+            changes[desired.id] = desired
+        }
+        existing.drop(1).forEach { duplicate ->
+            if (duplicate.enabled || duplicate.priority != priority) {
+                val disabled = duplicate.copy(enabled = false, priority = priority)
+                working[working.indexOfFirst { it.id == duplicate.id }] = disabled
+                changes[disabled.id] = disabled
+            }
+        }
+    }
+
+    plan(
+        target = WebNavigationPolicy.RuleTarget,
+        action = RuleAction.Block,
+        enabled = blocked,
+        priority = WebNavigationBlockPriority,
+        createWhenDisabled = true,
+    )
+    plan(DomainWildcard, RuleAction.Block, enabled = false, priority = InternetBlockPriority)
+
+    if (blocked) {
+        SearchEngineDomains.forEach { domain ->
+            plan(domain, RuleAction.Allow, enabled = false, priority = AllowDomainPriority)
+            plan(domain, RuleAction.Block, enabled = true, priority = SearchEngineBlockPriority)
+        }
+        SecureDnsDomains.forEach { domain ->
+            plan(domain, RuleAction.Allow, enabled = false, priority = AllowDomainPriority)
+            plan(domain, RuleAction.Block, enabled = true, priority = SearchEngineBlockPriority)
+        }
+        plan(
+            WebNavigationPolicy.GoogleResultsAllowedTarget,
+            RuleAction.Allow,
+            enabled = false,
+            priority = WebNavigationBlockPriority + 10,
+        )
+        WebNavigationPolicy.GoogleSearchDomains.forEach { domain ->
+            plan(domain, RuleAction.Allow, enabled = false, priority = AllowDomainPriority)
+        }
+        plan(
+            WebNavigationPolicy.ImagesBlockedTarget,
+            RuleAction.Block,
+            enabled = imagesBlocked,
+            priority = WebNavigationBlockPriority + 20,
+        )
+        WebNavigationPolicy.ImageDomains.forEach { domain ->
+            plan(
+                target = domain,
+                action = RuleAction.Block,
+                enabled = imagesBlocked,
+                priority = SearchEngineBlockPriority + 10,
+            )
+        }
+        plan(
+            WebNavigationPolicy.SafeSearchTarget,
+            RuleAction.Allow,
+            enabled = safeSearchEnabled,
+            priority = WebNavigationBlockPriority + 30,
+        )
+        WebNavigationPolicy.UnsafeSearchDomains.forEach { domain ->
+            plan(domain, RuleAction.Block, enabled = safeSearchEnabled, priority = SearchEngineBlockPriority)
+        }
+    } else {
+        SearchEngineDomains.forEach { domain ->
+            plan(domain, RuleAction.Allow, enabled = true, priority = AllowDomainPriority)
+            plan(domain, RuleAction.Block, enabled = false, priority = SearchEngineBlockPriority)
+        }
+        SecureDnsDomains.forEach { domain ->
+            plan(domain, RuleAction.Allow, enabled = false, priority = AllowDomainPriority)
+            plan(domain, RuleAction.Block, enabled = false, priority = SearchEngineBlockPriority)
+        }
+        plan(
+            WebNavigationPolicy.GoogleResultsAllowedTarget,
+            RuleAction.Allow,
+            enabled = false,
+            priority = WebNavigationBlockPriority + 10,
+        )
+        WebNavigationPolicy.GoogleSearchDomains.forEach { domain ->
+            plan(domain, RuleAction.Allow, enabled = false, priority = AllowDomainPriority)
+        }
+        plan(
+            WebNavigationPolicy.ImagesBlockedTarget,
+            RuleAction.Block,
+            enabled = false,
+            priority = WebNavigationBlockPriority + 20,
+        )
+        WebNavigationPolicy.ImageDomains.forEach { domain ->
+            plan(
+                target = domain,
+                action = RuleAction.Block,
+                enabled = false,
+                priority = SearchEngineBlockPriority + 10,
+            )
+        }
+        WebNavigationPolicy.UnsafeSearchDomains.forEach { domain ->
+            plan(domain, RuleAction.Block, enabled = false, priority = SearchEngineBlockPriority)
+        }
+    }
+    return changes.values.toList()
+}
 
 internal fun List<PolicyRule>.searchEnginesAllowed(): Boolean =
     SearchProtectionDomains.none { domain ->

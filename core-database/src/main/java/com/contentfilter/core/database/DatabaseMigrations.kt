@@ -124,6 +124,15 @@ object DatabaseMigrations {
             }
         }
 
+    val Migration8To9: Migration =
+        object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE policy_rules ADD COLUMN updatedAtEpochMillis INTEGER NOT NULL DEFAULT 0",
+                )
+            }
+        }
+
     val All: Array<Migration> =
         arrayOf(
             Migration1To2,
@@ -133,5 +142,6 @@ object DatabaseMigrations {
             Migration5To6,
             Migration6To7,
             Migration7To8,
+            Migration8To9,
         )
 }

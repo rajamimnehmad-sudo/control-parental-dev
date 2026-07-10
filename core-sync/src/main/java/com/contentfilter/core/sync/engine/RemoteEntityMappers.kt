@@ -1,8 +1,8 @@
 package com.contentfilter.core.sync.engine
 
+import com.contentfilter.core.database.entity.AccessRequestEntity
 import com.contentfilter.core.database.entity.AppGroupAppEntity
 import com.contentfilter.core.database.entity.AppGroupEntity
-import com.contentfilter.core.database.entity.AccessRequestEntity
 import com.contentfilter.core.database.entity.DailyLimitEntity
 import com.contentfilter.core.database.entity.DeviceEntity
 import com.contentfilter.core.database.entity.ExtraTimeGrantEntity
@@ -55,6 +55,7 @@ internal fun RemotePolicyRuleDto.toEntity(): PolicyRuleEntity =
         action = action,
         priority = priority,
         enabled = enabled && deletedAt == null,
+        updatedAtEpochMillis = updatedAt.toEpochMillis(),
     )
 
 internal fun RemoteDailyLimitDto.toEntity(): DailyLimitEntity =

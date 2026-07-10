@@ -199,7 +199,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         Log.i(
             LogTag,
             "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} " +
-                "package=$packageName webNavigationBlocked=${diagnosis.webNavigationBlocked} " +
+                "package=$packageName policyVersion=${snapshot.version} " +
+                "webNavigationBlocked=${diagnosis.webNavigationBlocked} " +
                 "googleResultsAllowed=${snapshot.rules.googleResultsAllowed()} " +
                 "blockImages=${snapshot.rules.webImagesBlocked()} " +
                 "safeSearch=${snapshot.rules.safeSearchEnabled()} " +

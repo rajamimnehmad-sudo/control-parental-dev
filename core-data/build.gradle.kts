@@ -18,7 +18,9 @@ android {
 dependencies {
     implementation(project(":core-domain"))
     implementation(project(":core-database"))
+    implementation(libs.androidx.room.ktx)
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
     kapt(libs.hilt.compiler)
+    testImplementation(libs.kotlin.test)
 }

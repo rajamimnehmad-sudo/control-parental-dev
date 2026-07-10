@@ -105,7 +105,12 @@ fun RulesRoute(
         onPairingUserNameChanged = viewModel::onPairingUserNameChanged,
         onGeneratePairingCode = viewModel::generatePairingCode,
         onPairingCodeCopied = viewModel::clearPairingCode,
-        onDeviceSelected = viewModel::onDeviceSelected,
+        onDeviceSelected = { deviceId ->
+            viewModel.onDeviceSelected(
+                deviceId = deviceId,
+                refreshApps = entryMode != RulesEntryMode.Web,
+            )
+        },
         onDeviceCleared = viewModel::clearDeviceSelection,
         onDeviceDeleted = viewModel::deleteDevicePermanently,
         onAppAllowedChanged = viewModel::setAppAllowed,

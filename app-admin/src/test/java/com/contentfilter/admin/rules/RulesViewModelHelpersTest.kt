@@ -3,11 +3,14 @@ package com.contentfilter.admin.rules
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
-import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.webImagesBlocked
+import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -15,6 +18,53 @@ import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RulesViewModelHelpersTest {
+    @Test
+    fun `web block plan writes the main rule first`() {
+        val changes =
+            emptyList<PolicyRule>().webNavigationModeChanges(
+                blocked = true,
+                imagesBlocked = false,
+                safeSearchEnabled = true,
+            )
+
+        assertEquals(WebNavigationPolicy.RuleTarget, changes.first().target)
+        assertTrue(changes.first().enabled)
+        assertTrue(changes.applyTo(emptyList()).webNavigationBlocked())
+    }
+
+    @Test
+    fun `web allow plan disables stale wildcard search dns and image blocks`() {
+        val current =
+            listOf(
+                domainRule(WebNavigationPolicy.RuleTarget, RuleAction.Block, enabled = true),
+                domainRule(DomainWildcard, RuleAction.Block, enabled = true),
+                domainRule(SearchEngineDomains.first(), RuleAction.Block, enabled = true),
+                domainRule(SecureDnsDomains.first(), RuleAction.Block, enabled = true),
+                domainRule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block, enabled = true),
+                domainRule(WebNavigationPolicy.ImageDomains.first(), RuleAction.Block, enabled = true),
+                domainRule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow, enabled = true),
+            )
+
+        val changes =
+            current.webNavigationModeChanges(
+                blocked = false,
+                imagesBlocked = true,
+                safeSearchEnabled = true,
+            )
+        val result = changes.applyTo(current)
+
+        assertEquals(WebNavigationPolicy.RuleTarget, changes.first().target)
+        assertFalse(result.webNavigationBlocked())
+        assertFalse(result.webImagesBlocked())
+        assertFalse(result.any { it.enabled && it.action == RuleAction.Block && it.target == DomainWildcard })
+        assertFalse(result.any { it.enabled && it.action == RuleAction.Block && it.target in SearchProtectionDomains })
+        assertFalse(
+            result.any {
+                it.enabled && it.action == RuleAction.Block && WebNavigationPolicy.isImageDomain(it.target)
+            },
+        )
+    }
+
     @Test
     fun `does not confirm blocked search engines until all search protection domains are blocked`() {
         val rules = SearchProtectionDomains.dropLast(1).map { domainRule(it, RuleAction.Block, enabled = true) }
@@ -70,7 +120,7 @@ class RulesViewModelHelpersTest {
                             limitMinutes = 15,
                             enabled = true,
                         ),
-                ),
+                    ),
                 grants = emptyList(),
                 appGroups = emptyList(),
                 nowEpochMillis = NowEpochMillis,
@@ -103,7 +153,7 @@ class RulesViewModelHelpersTest {
                             grantedMinutes = 10,
                             validUntilEpochMillis = NowEpochMillis + 10 * MinuteMillis,
                         ),
-                ),
+                    ),
                 appGroups = emptyList(),
                 nowEpochMillis = NowEpochMillis,
                 devices = listOf(Device(id = DeviceId, accountId = AccountId, displayName = "Usuario")),
@@ -160,6 +210,11 @@ class RulesViewModelHelpersTest {
             iconBase64 = null,
             updatedAt = "2026-07-06T00:00:00Z",
         )
+
+    private fun List<PolicyRule>.applyTo(current: List<PolicyRule>): List<PolicyRule> {
+        val changesById = associateBy { it.id }
+        return current.map { changesById[it.id] ?: it } + filter { change -> current.none { it.id == change.id } }
+    }
 
     private companion object {
         const val AccountId = "account"

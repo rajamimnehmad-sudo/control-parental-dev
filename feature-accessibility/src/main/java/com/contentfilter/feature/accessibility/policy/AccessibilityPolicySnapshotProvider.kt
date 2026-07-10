@@ -1,13 +1,18 @@
 package com.contentfilter.feature.accessibility.policy
 
-import com.contentfilter.core.domain.model.LicenseState
+import android.util.Log
 import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.ExtraTimeGrant
+import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.UsageSession
-import com.contentfilter.core.domain.repository.DailyLimitRepository
+import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.safeSearchEnabled
+import com.contentfilter.core.domain.model.webImagesBlocked
+import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.domain.repository.AppGroupRepository
+import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
@@ -81,7 +86,7 @@ class AccessibilityPolicySnapshotProvider
                                 ),
                             health = health.withActiveLicenseIfActivated(activation != null),
                         )
-                    }.collect { state.value = it }
+                    }.collect { applyState(it, source = "room-flow") }
                 }
         }
 
@@ -98,7 +103,7 @@ class AccessibilityPolicySnapshotProvider
             val dailyLimits = dailyLimitRepository.observeLimits().first()
             val appGroups = appGroupRepository.observeGroups().first()
             val extraTimeGrants = extraTimeGrantRepository.observeGrants().first()
-            state.value =
+            applyState(
                 AccessibilityPolicyState(
                     snapshot =
                         policyRepository.getActivePolicy().copy(
@@ -108,7 +113,9 @@ class AccessibilityPolicySnapshotProvider
                             extraTimeGrants = extraTimeGrants,
                         ),
                     health = systemStatusRepository.currentHealth().withActiveLicenseIfActivated(activation != null),
-                )
+                ),
+                source = "refresh",
+            )
             observedDay = day
         }
 
@@ -128,6 +135,22 @@ class AccessibilityPolicySnapshotProvider
             observedDay = null
         }
 
+        private fun applyState(
+            value: AccessibilityPolicyState,
+            source: String,
+        ) {
+            state.value = value
+            val rules = value.snapshot.rules
+            Log.i(
+                LogTag,
+                "webNavigation accessibility applied source=$source policy=${value.snapshot.id} " +
+                    "version=${value.snapshot.version} webNavigationBlocked=${rules.webNavigationBlocked()} " +
+                    "googleResultsAllowed=${rules.googleResultsAllowed()} blockImages=${rules.webImagesBlocked()} " +
+                    "safeSearch=${rules.safeSearchEnabled()} " +
+                    "mode=${if (rules.webNavigationBlocked()) "web-blocked" else "web-open"}",
+            )
+        }
+
         private fun com.contentfilter.core.domain.model.SystemHealthSnapshot.withActiveLicenseIfActivated(
             isActivated: Boolean,
         ): com.contentfilter.core.domain.model.SystemHealthSnapshot =
@@ -139,4 +162,8 @@ class AccessibilityPolicySnapshotProvider
             val appGroups: List<AppGroup>,
             val extraTimeGrants: List<ExtraTimeGrant>,
         )
+
+        private companion object {
+            const val LogTag = "AccessibilityPolicySnapshot"
+        }
     }

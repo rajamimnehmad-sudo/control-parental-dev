@@ -15,7 +15,10 @@ internal fun PolicyRuleEntity.toDomain(): PolicyRule =
         enabled = enabled,
     )
 
-internal fun PolicyRule.toEntity(policyId: String): PolicyRuleEntity =
+internal fun PolicyRule.toEntity(
+    policyId: String,
+    updatedAtEpochMillis: Long,
+): PolicyRuleEntity =
     PolicyRuleEntity(
         id = id,
         policyId = policyId,
@@ -24,6 +27,7 @@ internal fun PolicyRule.toEntity(policyId: String): PolicyRuleEntity =
         action = action.name,
         priority = priority,
         enabled = enabled,
+        updatedAtEpochMillis = updatedAtEpochMillis,
     )
 
 private inline fun <reified T : Enum<T>> enumValueOrDefault(

@@ -2,8 +2,8 @@ package com.contentfilter.core.database
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
-import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
+import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AppGroupDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
@@ -49,7 +49,7 @@ import com.contentfilter.core.database.entity.UsageSessionEntity
         AppGroupEntity::class,
         AppGroupAppEntity::class,
     ],
-    version = 8,
+    version = 9,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

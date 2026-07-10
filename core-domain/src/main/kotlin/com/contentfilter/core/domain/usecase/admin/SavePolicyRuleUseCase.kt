@@ -12,4 +12,9 @@ class SavePolicyRuleUseCase(
     ) {
         repository.saveRule(rule, deviceId)
     }
+
+    suspend fun saveAll(
+        rules: List<PolicyRule>,
+        deviceId: String? = null,
+    ): Long = repository.saveRules(rules, deviceId)
 }
