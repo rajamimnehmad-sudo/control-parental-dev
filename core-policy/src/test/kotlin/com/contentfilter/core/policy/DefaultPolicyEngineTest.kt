@@ -159,22 +159,22 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `base google rule blocks google subdomains`() {
+    fun `stale google web rule does not block when web navigation is open`() {
         val snapshot = policy(rules = listOf(domainRule(target = "google.com", action = RuleAction.Block)))
 
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com")))
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.google.com")))
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("search.google.com")))
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("search.google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
     }
 
     @Test
-    fun `base google argentina rule blocks google argentina subdomains`() {
+    fun `stale google argentina web rule does not block when web navigation is open`() {
         val snapshot = policy(rules = listOf(domainRule(target = "google.com.ar", action = RuleAction.Block)))
 
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com.ar")))
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.google.com.ar")))
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("search.google.com.ar")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com.ar")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.google.com.ar")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("search.google.com.ar")))
     }
 
     @Test
@@ -207,7 +207,18 @@ class DefaultPolicyEngineTest {
 
     @Test
     fun `blocks search engines when web is blocked and search engines are disabled`() {
-        val snapshot = policy(rules = listOf(domainRule(target = "*", action = RuleAction.Block)))
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.RuleTarget,
+                            action = RuleAction.Block,
+                            priority = WebNavigationPolicy.RulePriority,
+                        ),
+                        domainRule(target = "*", action = RuleAction.Block),
+                    ),
+            )
 
         SearchEngineCatalog.searchEngineDomains.forEach { domain ->
             val decision = engine.evaluateDomain(snapshot, domainContext(domain))
@@ -237,25 +248,29 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `allows search engines but blocks result domains when web is blocked`() {
+    fun `blocks search engines and result domains when web is blocked`() {
         val snapshot =
             policy(
                 rules =
-                    listOf(domainRule(target = "*", action = RuleAction.Block)) +
-                        SearchEngineCatalog.searchEngineDomains.map { domain ->
-                            domainRule(target = domain, action = RuleAction.Allow, priority = 1_000)
-                        },
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.RuleTarget,
+                            action = RuleAction.Block,
+                            priority = WebNavigationPolicy.RulePriority,
+                        ),
+                        domainRule(target = "*", action = RuleAction.Block),
+                    ),
             )
 
         SearchEngineCatalog.searchEngineDomains.forEach { domain ->
             val decision = engine.evaluateDomain(snapshot, domainContext(domain))
 
-            assertIs<PolicyDecision.Allow>(decision, "Expected $domain to be allowed")
+            assertIs<PolicyDecision.Block>(decision, "Expected $domain to be blocked")
         }
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.google.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.google.com.ar")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.bing.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("duckduckgo.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.google.com.ar")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.bing.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("duckduckgo.com")))
         assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("app.com")))
     }
 
@@ -265,6 +280,11 @@ class DefaultPolicyEngineTest {
             policy(
                 rules =
                     listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.RuleTarget,
+                            action = RuleAction.Block,
+                            priority = WebNavigationPolicy.RulePriority,
+                        ),
                         domainRule(target = "*", action = RuleAction.Block, priority = 10),
                         domainRule(target = "google.com", action = RuleAction.Allow, priority = 1_000),
                         domainRule(target = "google.com", action = RuleAction.Block, priority = 3_000),
@@ -282,6 +302,11 @@ class DefaultPolicyEngineTest {
             policy(
                 rules =
                     listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.RuleTarget,
+                            action = RuleAction.Block,
+                            priority = WebNavigationPolicy.RulePriority,
+                        ),
                         domainRule(target = "*", action = RuleAction.Block, priority = 10),
                         domainRule(target = "dns.google", action = RuleAction.Allow, priority = 1_000),
                         domainRule(target = "dns.google", action = RuleAction.Block, priority = 3_000),
@@ -294,12 +319,33 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `safe default snapshot blocks search and secure dns hosts`() {
+    fun `safe default snapshot does not block without web navigation rule`() {
         val snapshot = SearchProtectionPolicyDefaults.safeDefaultSnapshot()
 
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com")))
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("dns.google")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("dns.google")))
+    }
+
+    @Test
+    fun `web options do not block domains when web navigation is open`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(target = WebNavigationPolicy.ImagesBlockedTarget, action = RuleAction.Block),
+                        domainRule(target = WebNavigationPolicy.SafeSearchTarget, action = RuleAction.Allow),
+                        domainRule(target = "images.google.com", action = RuleAction.Block),
+                        domainRule(target = "duckduckgo.com", action = RuleAction.Block),
+                        domainRule(target = "dns.google", action = RuleAction.Block),
+                        domainRule(target = "*", action = RuleAction.Block),
+                    ),
+            )
+
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("images.google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("duckduckgo.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("dns.google")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("example.com")))
     }
 
     @Test

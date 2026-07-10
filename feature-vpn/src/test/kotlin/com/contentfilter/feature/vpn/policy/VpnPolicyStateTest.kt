@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 
 class VpnPolicyStateTest {
     @Test
-    fun `enables strict web block for wildcard domain block`() {
+    fun `keeps dns mode for stale wildcard domain block`() {
         val state =
             state(
                 rule(
@@ -27,7 +27,7 @@ class VpnPolicyStateTest {
                 ),
             )
 
-        assertTrue(state.strictWebBlockEnabled)
+        assertFalse(state.strictWebBlockEnabled)
     }
 
     @Test

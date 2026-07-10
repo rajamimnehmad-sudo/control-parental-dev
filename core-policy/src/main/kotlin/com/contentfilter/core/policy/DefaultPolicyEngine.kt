@@ -82,7 +82,8 @@ class DefaultPolicyEngine : PolicyEngine {
         if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
             return PolicyDecision.Allow()
         }
-        if (snapshot.rules.webNavigationBlocked() &&
+        val webNavigationBlocked = snapshot.rules.webNavigationBlocked()
+        if (webNavigationBlocked &&
             WebNavigationPolicy.isWebNavigationDomain(normalizedContext.domain)
         ) {
             if (snapshot.rules.googleResultsAllowed() &&
@@ -92,10 +93,16 @@ class DefaultPolicyEngine : PolicyEngine {
             }
             return PolicyDecision.Block("Blocked by web navigation policy.")
         }
-        if (snapshot.rules.webImagesBlocked() && WebNavigationPolicy.isImageDomain(normalizedContext.domain)) {
+        if (webNavigationBlocked &&
+            snapshot.rules.webImagesBlocked() &&
+            WebNavigationPolicy.isImageDomain(normalizedContext.domain)
+        ) {
             return PolicyDecision.Block("Blocked by image policy.")
         }
-        if (snapshot.rules.safeSearchEnabled() && WebNavigationPolicy.isUnsafeSearchDomain(normalizedContext.domain)) {
+        if (webNavigationBlocked &&
+            snapshot.rules.safeSearchEnabled() &&
+            WebNavigationPolicy.isUnsafeSearchDomain(normalizedContext.domain)
+        ) {
             return PolicyDecision.Block("Blocked by SafeSearch policy.")
         }
         activeGrant(
@@ -106,9 +113,13 @@ class DefaultPolicyEngine : PolicyEngine {
         )?.let {
             return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
         }
-        val rule = snapshot.rules.bestMatchingRule(normalizedContext)
+        val rule =
+            snapshot.rules.bestMatchingRule(
+                context = normalizedContext,
+                ignoreWebAuxiliaryBlocks = !webNavigationBlocked,
+            )
         val decision = rule?.toDecision(normalizedContext.domain) ?: PolicyDecision.Allow()
-        if (snapshot.rules.webNavigationBlocked() &&
+        if (webNavigationBlocked &&
             decision is PolicyDecision.Allow &&
             normalizedContext.domain.isSearchProtectionDomain() &&
             snapshot.hasSearchEngineBlockRule()
@@ -180,11 +191,18 @@ class DefaultPolicyEngine : PolicyEngine {
             .sortedWith(ruleComparator)
             .firstOrNull()
 
-    private fun List<PolicyRule>.bestMatchingRule(context: DomainPolicyContext): PolicyRule? =
+    private fun List<PolicyRule>.bestMatchingRule(
+        context: DomainPolicyContext,
+        ignoreWebAuxiliaryBlocks: Boolean = false,
+    ): PolicyRule? =
         asSequence()
             .filter { it.enabled }
             .filter { it.isActiveAt(context.time) }
             .filter { it.matchesDomain(context) }
+            .filterNot {
+                ignoreWebAuxiliaryBlocks &&
+                    it.isWebAuxiliaryBlockRule()
+            }
             .sortedWith(ruleComparator)
             .firstOrNull()
 
@@ -281,5 +299,18 @@ class DefaultPolicyEngine : PolicyEngine {
         fun String.isSearchProtectionDomain(): Boolean =
             SearchEngineCatalog.searchEngineDomains.any { matchesDomainTarget(it) } ||
                 SearchEngineCatalog.secureDnsDomains.any { matchesDomainTarget(it) }
+
+        fun PolicyRule.isWebAuxiliaryBlockRule(): Boolean {
+            if (scope != RuleScope.Domain || action != RuleAction.Block) return false
+            val normalizedTarget = target.normalizedDomain()
+            return normalizedTarget == DomainWildcard ||
+                normalizedTarget == WebNavigationPolicy.RuleTarget ||
+                normalizedTarget == WebNavigationPolicy.ImagesBlockedTarget ||
+                normalizedTarget == WebNavigationPolicy.SafeSearchTarget ||
+                normalizedTarget.isSearchProtectionRuleTarget() ||
+                WebNavigationPolicy.isGoogleSearchDomain(normalizedTarget) ||
+                WebNavigationPolicy.isUnsafeSearchDomain(normalizedTarget) ||
+                WebNavigationPolicy.isImageDomain(normalizedTarget)
+        }
     }
 }

@@ -3,7 +3,6 @@ package com.contentfilter.feature.vpn.policy
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicySnapshot
-import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
@@ -15,23 +14,7 @@ data class VpnPolicyState(
     val health: SystemHealthSnapshot,
 ) {
     val strictWebBlockEnabled: Boolean
-        get() {
-            val wildcardBlocked =
-                snapshot.rules.any {
-                    it.enabled &&
-                        it.scope == RuleScope.Domain &&
-                        it.target == DomainWildcard &&
-                        it.action == RuleAction.Block
-                }
-            val hasAllowedDomain =
-                snapshot.rules.any {
-                    it.enabled &&
-                        it.scope == RuleScope.Domain &&
-                        it.target != DomainWildcard &&
-                        it.action == RuleAction.Allow
-                }
-            return (wildcardBlocked && !hasAllowedDomain) || snapshot.rules.webNavigationBlocked()
-        }
+        get() = snapshot.rules.webNavigationBlocked()
 
     val vpnReconnectKey: String
         get() {
@@ -46,7 +29,6 @@ data class VpnPolicyState(
 
     companion object {
         const val SafeDefaultPolicyId = SearchProtectionPolicyDefaults.SafeDefaultPolicyId
-        private const val DomainWildcard = "*"
 
         fun initial(): VpnPolicyState =
             VpnPolicyState(
