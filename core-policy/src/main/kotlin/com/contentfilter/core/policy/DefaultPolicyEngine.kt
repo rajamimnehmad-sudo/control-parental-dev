@@ -63,7 +63,9 @@ class DefaultPolicyEngine : PolicyEngine {
                 group.apps
                     .asSequence()
                     .filter { it.enabled }
-                    .mapNotNull { groupApp -> snapshot.dailyUsage.firstOrNull { it.packageName == groupApp.packageName } }
+                    .mapNotNull { groupApp ->
+                        snapshot.dailyUsage.firstOrNull { it.packageName == groupApp.packageName }
+                    }
                     .sumOf { it.usedMinutes }
             if (groupUsedMinutes >= group.limitMinutes) {
                 return PolicyDecision.Block("Daily group limit exceeded for ${group.name}.")
@@ -285,12 +287,12 @@ class DefaultPolicyEngine : PolicyEngine {
 
         fun PolicySnapshot.hasSearchEngineBlockRule(): Boolean =
             rules.webNavigationBlocked() ||
-            rules.any {
-                it.enabled &&
-                    it.scope == RuleScope.Domain &&
-                    it.action == RuleAction.Block &&
-                    it.target.normalizedDomain().isSearchProtectionRuleTarget()
-            }
+                rules.any {
+                    it.enabled &&
+                        it.scope == RuleScope.Domain &&
+                        it.action == RuleAction.Block &&
+                        it.target.normalizedDomain().isSearchProtectionRuleTarget()
+                }
 
         fun String.isSearchProtectionRuleTarget(): Boolean =
             SearchEngineCatalog.searchEngineDomains.any { matchesDomainTarget(it) || it.matchesDomainTarget(this) } ||

@@ -147,9 +147,27 @@ class VpnPolicyStateTest {
     fun `initial state uses safe default search blocking rules`() {
         val state = VpnPolicyState.initial()
 
-        assertTrue(state.snapshot.rules.any { it.target == "google.com" && it.action == RuleAction.Block && it.enabled })
-        assertTrue(state.snapshot.rules.any { it.target == "clients4.google.com" && it.action == RuleAction.Block && it.enabled })
-        assertTrue(state.snapshot.rules.any { it.target == "dns.google" && it.action == RuleAction.Block && it.enabled })
+        assertTrue(
+            state.snapshot.rules.any {
+                it.target == "google.com" &&
+                    it.action == RuleAction.Block &&
+                    it.enabled
+            },
+        )
+        assertTrue(
+            state.snapshot.rules.any {
+                it.target == "clients4.google.com" &&
+                    it.action == RuleAction.Block &&
+                    it.enabled
+            },
+        )
+        assertTrue(
+            state.snapshot.rules.any {
+                it.target == "dns.google" &&
+                    it.action == RuleAction.Block &&
+                    it.enabled
+            },
+        )
     }
 
     @Test
