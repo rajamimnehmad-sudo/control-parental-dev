@@ -131,17 +131,18 @@ BUCKET_URL="$SUPABASE_URL/storage/v1/object/public/dev-updates"
 REMOTE_MANIFEST="$BUCKET_URL/$FILE_PREFIX-dev-manifest.json"
 LOCAL_APK="$ROOT_DIR/$MODULE/build/outputs/apk/dev/debug/$FILE_PREFIX-dev-debug.apk"
 LOCAL_META="$ROOT_DIR/$MODULE/build/outputs/apk/dev/debug/output-metadata.json"
-OUT_APK="$OUT_DIR/$FILE_PREFIX-dev-debug.apk"
 OUT_MANIFEST="$OUT_DIR/$FILE_PREFIX-dev-manifest.json"
 
 printf 'Compilando App %s DEV...\n' "$LABEL"
 ./gradlew ":$MODULE:assembleDevDebug" ":$MODULE:testDevDebugUnitTest" -x uploadDevUpdatesToStorage
 
 mkdir -p "$OUT_DIR"
-cp "$LOCAL_APK" "$OUT_APK"
 
 VERSION_CODE="$(json_value "$LOCAL_META" versionCode)"
 VERSION_NAME="$(json_value "$LOCAL_META" versionName)"
+APK_NAME="$FILE_PREFIX-dev-$VERSION_CODE-debug.apk"
+OUT_APK="$OUT_DIR/$APK_NAME"
+cp "$LOCAL_APK" "$OUT_APK"
 APK_SHA="$(shasum -a 256 "$OUT_APK" | awk '{print $1}')"
 REMOTE_VERSION="$(remote_version_code "$REMOTE_MANIFEST")"
 
@@ -155,7 +156,7 @@ write_manifest \
     "$OUT_MANIFEST" \
     "$VERSION_CODE" \
     "$VERSION_NAME" \
-    "$BUCKET_URL/$FILE_PREFIX-dev-debug.apk" \
+    "$BUCKET_URL/$APK_NAME" \
     "$APK_SHA" \
     "Build DEV $LABEL preparado para pruebas internas."
 
@@ -166,15 +167,14 @@ fi
 
 printf 'Subiendo App %s DEV a staging...\n' "$LABEL"
 supabase storage cp --experimental --linked --content-type application/json "$OUT_MANIFEST" "ss:///dev-updates/$STAGING_PREFIX/$FILE_PREFIX-dev-manifest.json"
-supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive "$OUT_APK" "ss:///dev-updates/$STAGING_PREFIX/$FILE_PREFIX-dev-debug.apk"
+supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive "$OUT_APK" "ss:///dev-updates/$STAGING_PREFIX/$APK_NAME"
 
 printf 'Archivando App %s DEV anterior si existe...\n' "$LABEL"
 supabase storage mv --experimental --linked "ss:///dev-updates/$FILE_PREFIX-dev-manifest.json" "ss:///dev-updates/$FILE_PREFIX-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
-supabase storage mv --experimental --linked "ss:///dev-updates/$FILE_PREFIX-dev-debug.apk" "ss:///dev-updates/$FILE_PREFIX-dev-debug.apk.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 
 printf 'Publicando App %s DEV...\n' "$LABEL"
+supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/$APK_NAME" "ss:///dev-updates/$APK_NAME"
 supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/$FILE_PREFIX-dev-manifest.json" "ss:///dev-updates/$FILE_PREFIX-dev-manifest.json"
-supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/$FILE_PREFIX-dev-debug.apk" "ss:///dev-updates/$FILE_PREFIX-dev-debug.apk"
 
 cat <<EOF
 Listo.
@@ -183,7 +183,7 @@ App $LABEL versionCode $VERSION_CODE publicada en DEV.
 Manifest:
   $BUCKET_URL/$FILE_PREFIX-dev-manifest.json
 APK:
-  $BUCKET_URL/$FILE_PREFIX-dev-debug.apk
+  $BUCKET_URL/$APK_NAME
 SHA-256:
   $APK_SHA
 EOF

@@ -16,6 +16,22 @@ require_file() {
     fi
 }
 
+manifest_apk_name() {
+    python3 - "$1" <<'PY'
+import json
+import sys
+import urllib.parse
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    apk_url = json.load(handle)["apkUrl"]
+
+name = urllib.parse.unquote(urllib.parse.urlparse(apk_url).path.rsplit("/", 1)[-1])
+if not name or "/" in name or name in {".", ".."}:
+    raise SystemExit("Nombre de APK invalido en manifest")
+print(name)
+PY
+}
+
 if ! command -v supabase >/dev/null 2>&1; then
     printf 'Falta Supabase CLI. Instalar en macOS: brew install supabase/tap/supabase\n' >&2
     exit 1
@@ -23,8 +39,10 @@ fi
 
 require_file "$OUT_DIR/app-user-dev-manifest.json"
 require_file "$OUT_DIR/app-admin-dev-manifest.json"
-require_file "$OUT_DIR/app-user-dev-debug.apk"
-require_file "$OUT_DIR/app-admin-dev-debug.apk"
+USER_APK_NAME="$(manifest_apk_name "$OUT_DIR/app-user-dev-manifest.json")"
+ADMIN_APK_NAME="$(manifest_apk_name "$OUT_DIR/app-admin-dev-manifest.json")"
+require_file "$OUT_DIR/$USER_APK_NAME"
+require_file "$OUT_DIR/$ADMIN_APK_NAME"
 
 cd "$ROOT_DIR"
 
@@ -37,20 +55,18 @@ printf 'Subiendo manifiestos y APKs al bucket publico dev-updates...\n'
 printf 'Subiendo artefactos nuevos a staging...\n'
 supabase storage cp --experimental --linked --content-type application/json build/dev-updates/app-user-dev-manifest.json "ss:///dev-updates/$STAGING_PREFIX/app-user-dev-manifest.json"
 supabase storage cp --experimental --linked --content-type application/json build/dev-updates/app-admin-dev-manifest.json "ss:///dev-updates/$STAGING_PREFIX/app-admin-dev-manifest.json"
-supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/app-user-dev-debug.apk "ss:///dev-updates/$STAGING_PREFIX/app-user-dev-debug.apk"
-supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/app-admin-dev-debug.apk "ss:///dev-updates/$STAGING_PREFIX/app-admin-dev-debug.apk"
+supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive "build/dev-updates/$USER_APK_NAME" "ss:///dev-updates/$STAGING_PREFIX/$USER_APK_NAME"
+supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive "build/dev-updates/$ADMIN_APK_NAME" "ss:///dev-updates/$STAGING_PREFIX/$ADMIN_APK_NAME"
 
 printf 'Archivando artefactos dev anteriores si existen...\n'
 supabase storage mv --experimental --linked ss:///dev-updates/app-user-dev-manifest.json "ss:///dev-updates/app-user-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 supabase storage mv --experimental --linked ss:///dev-updates/app-admin-dev-manifest.json "ss:///dev-updates/app-admin-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
-supabase storage mv --experimental --linked ss:///dev-updates/app-user-dev-debug.apk "ss:///dev-updates/app-user-dev-debug.apk.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
-supabase storage mv --experimental --linked ss:///dev-updates/app-admin-dev-debug.apk "ss:///dev-updates/app-admin-dev-debug.apk.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 
 printf 'Publicando artefactos staged...\n'
+supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/$USER_APK_NAME" "ss:///dev-updates/$USER_APK_NAME"
+supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/$ADMIN_APK_NAME" "ss:///dev-updates/$ADMIN_APK_NAME"
 supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/app-user-dev-manifest.json" ss:///dev-updates/app-user-dev-manifest.json
 supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/app-admin-dev-manifest.json" ss:///dev-updates/app-admin-dev-manifest.json
-supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/app-user-dev-debug.apk" ss:///dev-updates/app-user-dev-debug.apk
-supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/app-admin-dev-debug.apk" ss:///dev-updates/app-admin-dev-debug.apk
 
 cat <<EOF
 Listo.
@@ -60,8 +76,8 @@ Manifiestos:
   https://$PROJECT_REF.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-manifest.json
 
 APKs:
-  https://$PROJECT_REF.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-debug.apk
-  https://$PROJECT_REF.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-debug.apk
+  https://$PROJECT_REF.supabase.co/storage/v1/object/public/dev-updates/$USER_APK_NAME
+  https://$PROJECT_REF.supabase.co/storage/v1/object/public/dev-updates/$ADMIN_APK_NAME
 
 APK Usuario publicada.
 APK Admin publicada.

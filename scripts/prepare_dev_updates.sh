@@ -90,23 +90,26 @@ require_file "$ADMIN_APK"
 require_file "$USER_META"
 require_file "$ADMIN_META"
 
-mkdir -p "$OUT_DIR"
-
-cp "$USER_APK" "$OUT_DIR/app-user-dev-debug.apk"
-cp "$ADMIN_APK" "$OUT_DIR/app-admin-dev-debug.apk"
-
 USER_VERSION_CODE="$(metadata_value "$USER_META" versionCode)"
 USER_VERSION_NAME="$(metadata_value "$USER_META" versionName)"
 ADMIN_VERSION_CODE="$(metadata_value "$ADMIN_META" versionCode)"
 ADMIN_VERSION_NAME="$(metadata_value "$ADMIN_META" versionName)"
-USER_SHA="$(sha256_file "$OUT_DIR/app-user-dev-debug.apk")"
-ADMIN_SHA="$(sha256_file "$OUT_DIR/app-admin-dev-debug.apk")"
+USER_APK_NAME="app-user-dev-$USER_VERSION_CODE-debug.apk"
+ADMIN_APK_NAME="app-admin-dev-$ADMIN_VERSION_CODE-debug.apk"
+
+mkdir -p "$OUT_DIR"
+rm -f "$OUT_DIR/app-user-dev-debug.apk" "$OUT_DIR/app-admin-dev-debug.apk"
+cp "$USER_APK" "$OUT_DIR/$USER_APK_NAME"
+cp "$ADMIN_APK" "$OUT_DIR/$ADMIN_APK_NAME"
+
+USER_SHA="$(sha256_file "$OUT_DIR/$USER_APK_NAME")"
+ADMIN_SHA="$(sha256_file "$OUT_DIR/$ADMIN_APK_NAME")"
 
 write_manifest \
     "$OUT_DIR/app-user-dev-manifest.json" \
     "$USER_VERSION_CODE" \
     "$USER_VERSION_NAME" \
-    "app-user-dev-debug.apk" \
+    "$USER_APK_NAME" \
     "$USER_SHA" \
     "Build DEV Usuario preparado para pruebas internas."
 
@@ -114,7 +117,7 @@ write_manifest \
     "$OUT_DIR/app-admin-dev-manifest.json" \
     "$ADMIN_VERSION_CODE" \
     "$ADMIN_VERSION_NAME" \
-    "app-admin-dev-debug.apk" \
+    "$ADMIN_APK_NAME" \
     "$ADMIN_SHA" \
     "Build DEV Admin preparado para pruebas internas."
 
@@ -128,14 +131,14 @@ Subir al bucket publico dev-updates con:
 O manualmente con Supabase CLI 2.x:
   supabase storage cp --experimental --linked --content-type application/json build/dev-updates/app-user-dev-manifest.json ss:///dev-updates/app-user-dev-manifest.json
   supabase storage cp --experimental --linked --content-type application/json build/dev-updates/app-admin-dev-manifest.json ss:///dev-updates/app-admin-dev-manifest.json
-  supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/app-user-dev-debug.apk ss:///dev-updates/app-user-dev-debug.apk
-  supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/app-admin-dev-debug.apk ss:///dev-updates/app-admin-dev-debug.apk
+  supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/$USER_APK_NAME ss:///dev-updates/$USER_APK_NAME
+  supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive build/dev-updates/$ADMIN_APK_NAME ss:///dev-updates/$ADMIN_APK_NAME
 
 URLs:
   $BUCKET_URL/app-user-dev-manifest.json
   $BUCKET_URL/app-admin-dev-manifest.json
-  $BUCKET_URL/app-user-dev-debug.apk
-  $BUCKET_URL/app-admin-dev-debug.apk
+  $BUCKET_URL/$USER_APK_NAME
+  $BUCKET_URL/$ADMIN_APK_NAME
 
 SHA-256:
   Usuario: $USER_SHA
