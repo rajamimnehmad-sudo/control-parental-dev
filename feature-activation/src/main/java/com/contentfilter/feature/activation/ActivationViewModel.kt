@@ -59,7 +59,7 @@ class ActivationViewModel
 
         fun activate() {
             val state = mutableState.value
-            if (state.activated) {
+            if (state.activated && state.activationCode.isBlank()) {
                 mutableState.update { it.copy(message = "Dispositivo enlazado. No hace falta volver a enlazar.") }
                 return
             }
@@ -72,6 +72,11 @@ class ActivationViewModel
                 return
             }
             viewModelScope.launch {
+                val oldActivation = deviceActivationRepository.currentActivation()
+                Log.i(
+                    LogTag,
+                    "Activation requested. token=${token.code.maskForLog()} oldDeviceId=${oldActivation?.deviceId} localActivated=${oldActivation != null}",
+                )
                 mutableState.update { it.copy(isLoading = true, message = "Enlazando dispositivo...") }
                 val result =
                     runCatching {
@@ -96,16 +101,33 @@ class ActivationViewModel
                         )
                     }
                 if (result is ActivationResult.Activated) {
+                    Log.i(
+                        LogTag,
+                        "Activation stored. oldDeviceId=${oldActivation?.deviceId} newDeviceId=${result.activation.deviceId} accountId=${result.activation.accountId}",
+                    )
                     realtimeSyncCoordinator.stop()
                     realtimeSyncCoordinator.start()
                     syncScheduler.requestSync()
                     viewModelScope.launch(Dispatchers.IO) {
-                        syncEngine.syncCoreDataFull()
+                        val syncResult =
+                            runCatching {
+                                syncEngine.syncCoreDataFull()
+                            }
+                        Log.i(
+                            LogTag,
+                            "Initial sync after activation. newDeviceId=${result.activation.deviceId} success=${syncResult.isSuccess} error=${syncResult.exceptionOrNull()?.javaClass?.simpleName}",
+                        )
                     }
                 } else if (result is ActivationResult.Failed) {
                     Log.e(LogTag, "Activation failed. Reason: ${result.reason.ifBlank { "<blank reason>" }}")
                 }
                 mutableState.update {
+                    val navigationTarget =
+                        when (result) {
+                            is ActivationResult.Activated -> "home"
+                            is ActivationResult.Failed -> "activation"
+                        }
+                    Log.i(LogTag, "Activation finished. navigationTarget=$navigationTarget")
                     it.copy(
                         isLoading = false,
                         message =
@@ -154,5 +176,8 @@ class ActivationViewModel
         private companion object {
             const val LogTag = "ActivationViewModel"
             const val OfflineMessage = "Sin conexión. Mostrando datos guardados."
+
+            fun String.maskForLog(): String =
+                if (length <= 4) "****" else "${take(2)}***${takeLast(2)}"
         }
     }

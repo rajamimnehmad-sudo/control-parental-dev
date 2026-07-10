@@ -64,11 +64,19 @@ class UserLocalDataRepair
                 if (isDifferentLocalSession(activation.accountId, activation.deviceId)) {
                     clearAccountScopedData("room-session-changed", activation.deviceId)
                 }
+                Log.i(
+                    LogTag,
+                    "Local activation state. accountId=${activation.accountId} deviceId=${activation.deviceId} hasDeviceToken=true",
+                )
 
                 when (val remoteDevices = remoteDeviceRepository.pullDevices(updatedAfterIso = null)) {
                     is RemoteResult.Success -> {
                         val remoteDeviceExists =
                             remoteDevices.value.any { it.id == activation.deviceId && it.deletedAt == null }
+                        Log.i(
+                            LogTag,
+                            "Remote device validation. deviceId=${activation.deviceId} exists=$remoteDeviceExists",
+                        )
                         if (!remoteDeviceExists) {
                             clearForRelink("remote-device-missing")
                             return@withContext RepairResult.NeedsActivation(cleaned = true)

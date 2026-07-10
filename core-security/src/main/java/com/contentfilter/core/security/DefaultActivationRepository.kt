@@ -32,6 +32,16 @@ class DefaultActivationRepository
         override suspend fun activate(credentials: ActivationCredentials): ActivationResult =
             withContext(Dispatchers.IO) {
                 activationRepository.currentActivation()?.let { activation ->
+                    val isTokenRelink =
+                        credentials.email.isBlank() &&
+                            credentials.password.isBlank() &&
+                            credentials.activationCode.isNotBlank()
+                    if (isTokenRelink) {
+                        Log.i(
+                            LogTag,
+                            "Existing local activation will be replaced by token relink. oldDeviceId=${activation.deviceId}",
+                        )
+                    } else {
                     if (credentials.email.isNotBlank() && credentials.password.isNotBlank()) {
                         val session =
                             when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
@@ -52,6 +62,7 @@ class DefaultActivationRepository
                         "Activation skipped; local device is already activated deviceId=${activation.deviceId}",
                     )
                     return@withContext ActivationResult.Activated(activation)
+                    }
                 }
                 val activation =
                     if (credentials.appRole == AdminRole && credentials.email.isNotBlank() && credentials.password.isNotBlank()) {
@@ -140,6 +151,10 @@ class DefaultActivationRepository
                         activatedAtEpochMillis = System.currentTimeMillis(),
                     )
                 activationRepository.saveActivation(domain)
+                Log.i(
+                    LogTag,
+                    "Activation saved. accountId=${domain.accountId} newDeviceId=${domain.deviceId}",
+                )
                 deviceRepository.saveDevice(
                     Device(
                         id = domain.deviceId,
