@@ -140,6 +140,12 @@ class RulesViewModel
                     selectedDeviceId = selectedDeviceId,
                     internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
                     searchEnginesAllowed = formState.pendingSearchEnginesAllowed ?: policy.rules.searchEnginesAllowed(),
+                    googleResultsAllowed =
+                        formState.pendingGoogleResultsAllowed ?: policy.rules.googleResultsAllowedForWeb(),
+                    imagesBlocked =
+                        formState.pendingImagesBlocked ?: policy.rules.imagesBlockedForWeb(),
+                    safeSearchEnabled =
+                        formState.pendingSafeSearchEnabled ?: policy.rules.safeSearchEnabledForWeb(),
                     appControls =
                         if (selectedDeviceId == null) {
                             emptyList()
@@ -572,6 +578,8 @@ class RulesViewModel
                     internetSaving = true,
                     pendingInternetBlocked = blocked,
                     pendingSearchEnginesAllowed = if (blocked) false else it.pendingSearchEnginesAllowed,
+                    pendingGoogleResultsAllowed = if (blocked) it.pendingGoogleResultsAllowed else false,
+                    pendingImagesBlocked = if (blocked) it.pendingImagesBlocked else false,
                     message = "Guardando...",
                 )
             }
@@ -602,9 +610,14 @@ class RulesViewModel
                         if (blocked) {
                             clearLegacyDomainBlockRules(targetDeviceId)
                             setSearchEnginesAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
+                            setGoogleResultsAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
+                            setImagesBlockedRules(blocked = uiState.value.imagesBlocked, targetDeviceId = targetDeviceId)
+                            setSafeSearchRules(enabled = uiState.value.safeSearchEnabled, targetDeviceId = targetDeviceId)
                         } else {
                             clearLegacyDomainBlockRules(targetDeviceId)
                             setSearchEnginesAllowedRules(allowed = true, targetDeviceId = targetDeviceId)
+                            setGoogleResultsAllowedRules(allowed = false, targetDeviceId = targetDeviceId)
+                            setImagesBlockedRules(blocked = false, targetDeviceId = targetDeviceId)
                         }
                         withTimeoutOrNull(RoomConfirmTimeoutMillis) {
                             policyRules.first {
@@ -655,6 +668,9 @@ class RulesViewModel
                                 internetSaving = false,
                                 pendingInternetBlocked = null,
                                 pendingSearchEnginesAllowed = null,
+                                pendingGoogleResultsAllowed = null,
+                                pendingImagesBlocked = null,
+                                pendingSafeSearchEnabled = null,
                                 message =
                                     if (blocked) {
                                         "Bloquear navegación web activado."
@@ -680,6 +696,9 @@ class RulesViewModel
                                 internetSaving = false,
                                 pendingInternetBlocked = null,
                                 pendingSearchEnginesAllowed = null,
+                                pendingGoogleResultsAllowed = null,
+                                pendingImagesBlocked = null,
+                                pendingSafeSearchEnabled = null,
                                 message = "Cambio guardado localmente. Se sincronizará cuando haya conexión.",
                             )
                         }
@@ -700,6 +719,9 @@ class RulesViewModel
                                 internetSaving = false,
                                 pendingInternetBlocked = null,
                                 pendingSearchEnginesAllowed = null,
+                                pendingGoogleResultsAllowed = null,
+                                pendingImagesBlocked = null,
+                                pendingSafeSearchEnabled = null,
                                 message = "No se pudo cambiar el modo web. Intentá otra vez.",
                             )
                         }
@@ -710,6 +732,101 @@ class RulesViewModel
                         pending = null,
                         room = previousRoom,
                         ui = previousRoom,
+                    )
+                }
+            }
+        }
+
+        fun setGoogleResultsAllowed(allowed: Boolean) {
+            setWebOption(
+                action = "google-results",
+                requestedState = allowed,
+                pending = { state -> state.copy(pendingGoogleResultsAllowed = allowed) },
+                save = { deviceId -> setGoogleResultsAllowedRules(allowed, deviceId) },
+                successMessage =
+                    if (allowed) {
+                        "Resultados de Google permitidos."
+                    } else {
+                        "Resultados de Google bloqueados."
+                    },
+            )
+        }
+
+        fun setImagesBlocked(blocked: Boolean) {
+            setWebOption(
+                action = "images-blocked",
+                requestedState = blocked,
+                pending = { state -> state.copy(pendingImagesBlocked = blocked) },
+                save = { deviceId -> setImagesBlockedRules(blocked, deviceId) },
+                successMessage =
+                    if (blocked) {
+                        "Fotos e imágenes bloqueadas."
+                    } else {
+                        "Fotos e imágenes permitidas."
+                    },
+            )
+        }
+
+        fun setSafeSearchEnabled(enabled: Boolean) {
+            setWebOption(
+                action = "safe-search",
+                requestedState = enabled,
+                pending = { state -> state.copy(pendingSafeSearchEnabled = enabled) },
+                save = { deviceId -> setSafeSearchRules(enabled, deviceId) },
+                successMessage =
+                    if (enabled) {
+                        "SafeSearch activado."
+                    } else {
+                        "SafeSearch desactivado."
+                    },
+            )
+        }
+
+        private fun setWebOption(
+            action: String,
+            requestedState: Boolean,
+            pending: (RulesUiState) -> RulesUiState,
+            save: suspend (String) -> Unit,
+            successMessage: String,
+        ) {
+            val targetDeviceId = uiState.value.selectedDeviceId
+            if (targetDeviceId == null) {
+                form.update { it.copy(message = "Seleccioná un dispositivo.") }
+                return
+            }
+            val requestId =
+                beginInternetSave(
+                    action = action,
+                    deviceId = targetDeviceId,
+                    previousState = "web-option",
+                    requestedState = requestedState.toString(),
+                ) ?: return
+            form.update { pending(it).copy(internetSaving = true, message = "Guardando...") }
+            viewModelScope.launch {
+                val saved =
+                    runCatching {
+                        save(targetDeviceId)
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                if (!isCurrentInternetSave(requestId)) return@launch
+                val syncResult = saved.getOrNull()
+                form.update {
+                    it.copy(
+                        internetSaving = false,
+                        pendingGoogleResultsAllowed = null,
+                        pendingImagesBlocked = null,
+                        pendingSafeSearchEnabled = null,
+                        message =
+                            if (saved.isSuccess) {
+                                if (syncResult?.success == false) {
+                                    "Cambio guardado localmente. Se sincronizará cuando haya conexión."
+                                } else {
+                                    successMessage
+                                }
+                            } else {
+                                "No se pudo guardar el cambio web."
+                            },
                     )
                 }
             }
@@ -1375,6 +1492,83 @@ class RulesViewModel
             }
         }
 
+        private suspend fun setGoogleResultsAllowedRules(
+            allowed: Boolean,
+            targetDeviceId: String,
+        ) {
+            setRulesForDomain(
+                target = WebNavigationPolicy.GoogleResultsAllowedTarget,
+                action = RuleAction.Allow,
+                enabled = allowed,
+                priority = WebNavigationBlockPriority + 10,
+                deviceId = targetDeviceId,
+            )
+            WebNavigationPolicy.GoogleSearchDomains.forEach { domain ->
+                setRulesForDomain(
+                    target = domain,
+                    action = RuleAction.Allow,
+                    enabled = allowed,
+                    priority = AllowDomainPriority,
+                    deviceId = targetDeviceId,
+                )
+            }
+            if (allowed) {
+                WebNavigationPolicy.UnsafeSearchDomains.forEach { domain ->
+                    setRulesForDomain(
+                        target = domain,
+                        action = RuleAction.Block,
+                        enabled = uiState.value.safeSearchEnabled,
+                        priority = SearchEngineBlockPriority,
+                        deviceId = targetDeviceId,
+                    )
+                }
+            }
+        }
+
+        private suspend fun setImagesBlockedRules(
+            blocked: Boolean,
+            targetDeviceId: String,
+        ) {
+            setRulesForDomain(
+                target = WebNavigationPolicy.ImagesBlockedTarget,
+                action = RuleAction.Block,
+                enabled = blocked,
+                priority = WebNavigationBlockPriority + 20,
+                deviceId = targetDeviceId,
+            )
+            WebNavigationPolicy.ImageDomains.forEach { domain ->
+                setRulesForDomain(
+                    target = domain,
+                    action = RuleAction.Block,
+                    enabled = blocked,
+                    priority = SearchEngineBlockPriority + 10,
+                    deviceId = targetDeviceId,
+                )
+            }
+        }
+
+        private suspend fun setSafeSearchRules(
+            enabled: Boolean,
+            targetDeviceId: String,
+        ) {
+            setRulesForDomain(
+                target = WebNavigationPolicy.SafeSearchTarget,
+                action = RuleAction.Allow,
+                enabled = enabled,
+                priority = WebNavigationBlockPriority + 30,
+                deviceId = targetDeviceId,
+            )
+            WebNavigationPolicy.UnsafeSearchDomains.forEach { domain ->
+                setRulesForDomain(
+                    target = domain,
+                    action = RuleAction.Block,
+                    enabled = enabled,
+                    priority = SearchEngineBlockPriority,
+                    deviceId = targetDeviceId,
+                )
+            }
+        }
+
         private suspend fun clearLegacyDomainBlockRules(deviceId: String) {
             uiState.value.rules
                 .filter {
@@ -1382,6 +1576,9 @@ class RulesViewModel
                         it.scope == RuleScope.Domain &&
                         it.action == RuleAction.Block &&
                         it.target != WebNavigationPolicy.RuleTarget &&
+                        it.target != WebNavigationPolicy.GoogleResultsAllowedTarget &&
+                        it.target != WebNavigationPolicy.ImagesBlockedTarget &&
+                        it.target != WebNavigationPolicy.SafeSearchTarget &&
                         it.target != DomainWildcard &&
                         it.target !in SearchEngineDomains &&
                         it.target !in SecureDnsDomains

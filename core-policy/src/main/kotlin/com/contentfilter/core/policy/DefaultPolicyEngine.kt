@@ -17,6 +17,9 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.safeSearchEnabled
+import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 
 /**
@@ -82,7 +85,18 @@ class DefaultPolicyEngine : PolicyEngine {
         if (snapshot.rules.webNavigationBlocked() &&
             WebNavigationPolicy.isWebNavigationDomain(normalizedContext.domain)
         ) {
+            if (snapshot.rules.googleResultsAllowed() &&
+                WebNavigationPolicy.isGoogleSearchDomain(normalizedContext.domain)
+            ) {
+                return PolicyDecision.Allow(safeSearchRequired = snapshot.rules.safeSearchEnabled())
+            }
             return PolicyDecision.Block("Blocked by web navigation policy.")
+        }
+        if (snapshot.rules.webImagesBlocked() && WebNavigationPolicy.isImageDomain(normalizedContext.domain)) {
+            return PolicyDecision.Block("Blocked by image policy.")
+        }
+        if (snapshot.rules.safeSearchEnabled() && WebNavigationPolicy.isUnsafeSearchDomain(normalizedContext.domain)) {
+            return PolicyDecision.Block("Blocked by SafeSearch policy.")
         }
         activeGrant(
             snapshot.extraTimeGrants,

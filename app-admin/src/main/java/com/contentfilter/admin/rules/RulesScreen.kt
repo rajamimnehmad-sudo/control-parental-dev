@@ -111,6 +111,9 @@ fun RulesRoute(
         onAppAllowedChanged = viewModel::setAppAllowed,
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
+        onGoogleResultsAllowedChanged = viewModel::setGoogleResultsAllowed,
+        onImagesBlockedChanged = viewModel::setImagesBlocked,
+        onSafeSearchChanged = viewModel::setSafeSearchEnabled,
         onToggle = viewModel::toggle,
         onDelete = viewModel::delete,
     )
@@ -146,6 +149,9 @@ private fun RulesScreen(
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
+    onGoogleResultsAllowedChanged: (Boolean) -> Unit,
+    onImagesBlockedChanged: (Boolean) -> Unit,
+    onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -194,6 +200,9 @@ private fun RulesScreen(
                 onAppAllowedChanged = onAppAllowedChanged,
                 onAppLimitSaved = onAppLimitSaved,
                 onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
+                onGoogleResultsAllowedChanged = onGoogleResultsAllowedChanged,
+                onImagesBlockedChanged = onImagesBlockedChanged,
+                onSafeSearchChanged = onSafeSearchChanged,
                 onToggle = onToggle,
                 onDelete = onDelete,
         )
@@ -787,6 +796,9 @@ private fun UserDetailContent(
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
+    onGoogleResultsAllowedChanged: (Boolean) -> Unit,
+    onImagesBlockedChanged: (Boolean) -> Unit,
+    onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -918,9 +930,15 @@ private fun UserDetailContent(
                     item {
                         WebNavigationPanel(
                             blocked = state.internetBlocked,
+                            googleResultsAllowed = state.googleResultsAllowed,
+                            imagesBlocked = state.imagesBlocked,
+                            safeSearchEnabled = state.safeSearchEnabled,
                             saving = state.internetSaving,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
+                            onGoogleResultsAllowedChanged = onGoogleResultsAllowedChanged,
+                            onImagesBlockedChanged = onImagesBlockedChanged,
+                            onSafeSearchChanged = onSafeSearchChanged,
                         )
                     }
                 }
@@ -1044,47 +1062,96 @@ private fun AppsToolbar(
 @Composable
 private fun WebNavigationPanel(
     blocked: Boolean,
+    googleResultsAllowed: Boolean,
+    imagesBlocked: Boolean,
+    safeSearchEnabled: Boolean,
     saving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
+    onGoogleResultsAllowedChanged: (Boolean) -> Unit,
+    onImagesBlockedChanged: (Boolean) -> Unit,
+    onSafeSearchChanged: (Boolean) -> Unit,
 ) {
     ProductCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text("Bloquear navegación web", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    text =
-                        if (blocked) {
-                            "Activado: navegación web bloqueada por el administrador."
-                        } else {
-                            "Desactivado: navegación web permitida."
-                        },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HeaderMuted,
-                )
-                if (saving) {
-                    Text("Guardando...", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
-                }
-                if (blocked && !protectionActive) {
-                    FeedbackBanner(
-                        "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
-                        isError = true,
-                    )
-                }
-            }
-            Switch(
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            WebSwitchRow(
+                title = "Bloquear navegación web",
+                description =
+                    if (blocked) {
+                        "Activado: navegación web bloqueada por el administrador."
+                    } else {
+                        "Desactivado: navegación web permitida."
+                    },
                 checked = blocked,
                 enabled = !saving,
                 onCheckedChange = onBlockedChanged,
             )
+            WebSwitchRow(
+                title = "Permitir resultados de Google",
+                description = "Chrome y Google pueden mostrar búsquedas, pero no abrir resultados.",
+                checked = googleResultsAllowed,
+                enabled = blocked && !saving,
+                onCheckedChange = onGoogleResultsAllowedChanged,
+            )
+            WebSwitchRow(
+                title = "Bloquear fotos/imágenes",
+                description = "Bloquea Google Imágenes y dominios obvios de galerías.",
+                checked = imagesBlocked,
+                enabled = blocked && !saving,
+                onCheckedChange = onImagesBlockedChanged,
+            )
+            WebSwitchRow(
+                title = "SafeSearch activado",
+                description = "Fuerza búsqueda segura cuando se puede y bloquea buscadores no asegurados.",
+                checked = safeSearchEnabled,
+                enabled = blocked && !saving,
+                onCheckedChange = onSafeSearchChanged,
+            )
+            WebSwitchRow(
+                title = "Protección con IA",
+                description = "Próximamente.",
+                checked = false,
+                enabled = false,
+                onCheckedChange = {},
+            )
+            if (saving) {
+                Text("Guardando...", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
+            }
+            if (blocked && !protectionActive) {
+                FeedbackBanner(
+                    "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
+                    isError = true,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun WebSwitchRow(
+    title: String,
+    description: String,
+    checked: Boolean,
+    enabled: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(description, style = MaterialTheme.typography.bodyMedium, color = HeaderMuted)
+        }
+        Switch(
+            checked = checked,
+            enabled = enabled,
+            onCheckedChange = onCheckedChange,
+        )
     }
 }
 

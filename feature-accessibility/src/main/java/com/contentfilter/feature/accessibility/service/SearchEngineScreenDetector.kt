@@ -4,6 +4,10 @@ import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
+import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.safeSearchEnabled
+import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 
 class SearchEngineScreenDetector {
@@ -34,6 +38,41 @@ class SearchEngineScreenDetector {
             )
         }
         if (webNavigationBlocked) {
+            if (snapshot.rules.googleResultsAllowed() && packageCategory != SearchSurfaceCategory.NonBrowser) {
+                val normalizedText = visibleText.lowercase()
+                val recentHost = recentDnsBlockHost?.normalizedHost()
+                val imageBlocked =
+                    snapshot.rules.webImagesBlocked() &&
+                        (normalizedText.hasImageSignal() ||
+                            recentHost?.let(WebNavigationPolicy::isImageDomain) == true)
+                val unsafeSearchBlocked =
+                    snapshot.rules.safeSearchEnabled() &&
+                        recentHost?.let(WebNavigationPolicy::isUnsafeSearchDomain) == true
+                val onGoogleSearch =
+                    normalizedText.indicatesGoogleSearchScreen() ||
+                        recentHost?.let(WebNavigationPolicy::isGoogleSearchDomain) == true
+                val openedExternalResult =
+                    recentHost != null &&
+                        !WebNavigationPolicy.isGoogleSearchDomain(recentHost) &&
+                        !WebNavigationPolicy.isImageDomain(recentHost)
+                val shouldLeave = imageBlocked || unsafeSearchBlocked || openedExternalResult || !onGoogleSearch
+                return SearchEngineScreenDiagnosis(
+                    shouldLeave = shouldLeave,
+                    reason =
+                        when {
+                            imageBlocked -> "images-blocked"
+                            unsafeSearchBlocked -> "unsafe-search-blocked"
+                            openedExternalResult -> "google-result-opened"
+                            onGoogleSearch -> "google-results-allowed"
+                            else -> "web-blocked-not-google-results"
+                        },
+                    webNavigationBlocked = webNavigationBlocked,
+                    packageCategory = packageCategory.label,
+                    recentDnsBlockHost = recentDnsBlockHost,
+                    searchBlockRules = snapshot.searchEngineBlockRuleCount(),
+                    visibleTextLength = visibleText.length,
+                )
+            }
             return SearchEngineScreenDiagnosis(
                 shouldLeave = true,
                 reason = "web-navigation-blocked",
@@ -117,6 +156,17 @@ class SearchEngineScreenDetector {
         return SearchEngineSignals.any { it in normalized }
     }
 
+    private fun String.indicatesGoogleSearchScreen(): Boolean =
+        contains("google") &&
+            (contains("search") ||
+                contains("buscar") ||
+                contains("resultados") ||
+                contains("resultados de búsqueda") ||
+                contains("resultados de busqueda"))
+
+    private fun String.hasImageSignal(): Boolean =
+        ImageSignals.any { it in this } || ImageExtensions.any { it in this }
+
     private fun String.isSearchProtectionHost(): Boolean {
         val normalized = normalizedHost()
         return SearchEngineCatalog.searchEngineDomains.any { normalized.matchesDomainTarget(it.normalizedHost()) } ||
@@ -165,6 +215,26 @@ class SearchEngineScreenDetector {
                 "search results",
                 "resultados de búsqueda",
                 "resultados de busqueda",
+            )
+
+        val ImageSignals =
+            setOf(
+                "google imágenes",
+                "google imagenes",
+                "images",
+                "imágenes",
+                "imagenes",
+            )
+
+        val ImageExtensions =
+            setOf(
+                ".jpg",
+                ".jpeg",
+                ".png",
+                ".webp",
+                ".gif",
+                ".bmp",
+                ".svg",
             )
     }
 }

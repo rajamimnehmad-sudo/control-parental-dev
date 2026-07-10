@@ -394,9 +394,37 @@ private fun UserWebTab(
                     "El usuario no puede modificar este estado."
                 } else {
                     "Sin bloqueo web activo desde el administrador."
-                },
+            },
             accent = ProductSky,
         )
+        UserWebStatusCard(
+            title = "Resultados de Google",
+            value =
+                if (blocked && state.googleResultsAllowed) {
+                    "Permitidos"
+                } else {
+                    "No permitidos"
+                },
+        )
+        UserWebStatusCard(
+            title = "Fotos e imágenes",
+            value =
+                if (blocked && state.imagesBlocked) {
+                    "Bloqueadas"
+                } else {
+                    "Permitidas"
+                },
+        )
+        UserWebStatusCard(
+            title = "SafeSearch",
+            value =
+                if (blocked && state.safeSearchEnabled) {
+                    "Activo"
+                } else {
+                    "Sin forzar"
+                },
+        )
+        UserWebStatusCard(title = "Protección con IA", value = "Próximamente")
         if (!accessibilityActive) {
             ProductCard {
                 Text("Accessibility apagado.", style = MaterialTheme.typography.bodyMedium)
@@ -414,6 +442,23 @@ private fun UserWebTab(
             ProductCard {
                 Text("Protección web no activa.", style = MaterialTheme.typography.bodyMedium)
             }
+        }
+    }
+}
+
+@Composable
+private fun UserWebStatusCard(
+    title: String,
+    value: String,
+) {
+    ProductCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(title, style = MaterialTheme.typography.bodyMedium)
+            Text(value, style = MaterialTheme.typography.titleMedium)
         }
     }
 }

@@ -11,6 +11,9 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.safeSearchEnabled
+import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import java.time.Duration
@@ -116,6 +119,12 @@ private fun String?.hasVisibleIcon(): Boolean = !isNullOrBlank()
 
 internal fun List<PolicyRule>.internetBlocked(): Boolean =
     webNavigationBlocked() || internetBlockRules().any { it.enabled }
+
+internal fun List<PolicyRule>.googleResultsAllowedForWeb(): Boolean = googleResultsAllowed()
+
+internal fun List<PolicyRule>.imagesBlockedForWeb(): Boolean = webImagesBlocked()
+
+internal fun List<PolicyRule>.safeSearchEnabledForWeb(): Boolean = safeSearchEnabled()
 
 internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
     filter {
