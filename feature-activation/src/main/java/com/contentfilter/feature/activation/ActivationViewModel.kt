@@ -8,7 +8,7 @@ import com.contentfilter.core.domain.model.ActivationResult
 import com.contentfilter.core.domain.repository.ActivationRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.SyncScheduler
-import com.contentfilter.core.sync.engine.SyncEngine
+import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -26,7 +26,7 @@ class ActivationViewModel
         private val activationRepository: ActivationRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
         private val syncScheduler: SyncScheduler,
-        private val syncEngine: SyncEngine,
+        private val targetedPolicySyncCoordinator: TargetedPolicySyncCoordinator,
         private val realtimeSyncCoordinator: RealtimeSyncCoordinator,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ActivationUiState())
@@ -112,7 +112,10 @@ class ActivationViewModel
                     viewModelScope.launch(Dispatchers.IO) {
                         val syncResult =
                             runCatching {
-                                syncEngine.syncCoreDataFull()
+                                targetedPolicySyncCoordinator.refresh(
+                                    deviceId = result.activation.deviceId,
+                                    reason = "activation-view-model",
+                                )
                             }
                         Log.i(
                             LogTag,

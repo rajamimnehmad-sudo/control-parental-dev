@@ -8,6 +8,8 @@ import androidx.room.PrimaryKey
     tableName = "outbox_operations",
     indices = [
         Index(value = ["status", "createdAtEpochMillis"]),
+        Index(value = ["status", "priority", "createdAtEpochMillis"]),
+        Index(value = ["aggregateId", "status", "revision"]),
     ],
 )
 data class OutboxOperationEntity(
@@ -19,4 +21,9 @@ data class OutboxOperationEntity(
     val attemptCount: Int,
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long,
+    val requestId: String? = null,
+    val aggregateId: String? = null,
+    val deviceId: String? = null,
+    val revision: Long? = null,
+    val priority: Int = 0,
 )

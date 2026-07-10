@@ -10,4 +10,7 @@ data class Device(
     val accessibilityState: ComponentState = ComponentState.Unknown,
     val protectionAlert: String? = null,
     val protectionUpdatedAtEpochMillis: Long? = null,
+    val appliedPolicyId: String? = null,
+    val appliedPolicyRevision: Long? = null,
+    val policyAppliedAtEpochMillis: Long? = null,
 )

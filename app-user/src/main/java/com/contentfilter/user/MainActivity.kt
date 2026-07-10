@@ -48,6 +48,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
+import com.contentfilter.core.domain.repository.DeviceActivationRepository
+import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.ui.ContentFilterTheme
 import com.contentfilter.core.ui.PremiumFishMascot
 import com.contentfilter.core.ui.ProductCard
@@ -76,15 +79,34 @@ import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @javax.inject.Inject
+    lateinit var activationRepository: DeviceActivationRepository
+
+    @javax.inject.Inject
+    lateinit var targetedPolicySyncCoordinator: TargetedPolicySyncCoordinator
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             ContentFilterTheme {
                 UserAppRoot(modifier = Modifier.fillMaxSize())
             }
+        }
+    }
+
+    override fun onStart() {
+        super.onStart()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val activation = activationRepository.currentActivation() ?: return@launch
+            targetedPolicySyncCoordinator.refresh(
+                deviceId = activation.deviceId,
+                reason = "foreground",
+            )
         }
     }
 }

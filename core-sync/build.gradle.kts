@@ -13,6 +13,10 @@ android {
     defaultConfig {
         minSdk = 29
     }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
+    }
 }
 
 kapt {
@@ -24,10 +28,12 @@ dependencies {
     implementation(project(":core-data"))
     implementation(project(":core-database"))
     implementation(project(":core-network"))
+    implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.hilt.android)
     ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
+    testImplementation("org.json:json:20240303")
 }

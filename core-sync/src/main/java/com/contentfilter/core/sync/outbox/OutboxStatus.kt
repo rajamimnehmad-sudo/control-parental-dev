@@ -4,4 +4,5 @@ enum class OutboxStatus {
     Pending,
     Synced,
     Failed,
+    Superseded,
 }

@@ -5,6 +5,7 @@ import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
+import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
@@ -16,7 +17,6 @@ import com.contentfilter.core.domain.model.googleResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
-import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import java.time.Duration
 import java.time.Instant
 import java.util.UUID
@@ -43,7 +43,7 @@ internal fun normalizeLimitTarget(
         else -> null
     }
 
-internal fun List<RemoteInstalledAppDto>.toAppControls(
+internal fun List<InstalledApp>.toAppControls(
     rules: List<PolicyRule>,
     limits: List<DailyLimit>,
     grants: List<ExtraTimeGrant>,
@@ -100,10 +100,10 @@ internal fun List<RemoteInstalledAppDto>.toAppControls(
         )
 }
 
-internal fun List<RemoteInstalledAppDto>.forSelectedUserDevice(
+internal fun List<InstalledApp>.forSelectedUserDevice(
     selectedDeviceId: String,
     devices: List<Device>,
-): List<RemoteInstalledAppDto> {
+): List<InstalledApp> {
     val userDeviceIds = devices.userDeviceIds()
     val directApps = filter { it.deviceId == selectedDeviceId }
     if (userDeviceIds.size != 1 || selectedDeviceId !in userDeviceIds) return directApps
@@ -111,10 +111,10 @@ internal fun List<RemoteInstalledAppDto>.forSelectedUserDevice(
     return (directApps + orphanApps).preferAppsWithIcons().distinctBy { it.packageName }
 }
 
-internal fun List<RemoteInstalledAppDto>.preferAppsWithIcons(): List<RemoteInstalledAppDto> =
+internal fun List<InstalledApp>.preferAppsWithIcons(): List<InstalledApp> =
     sortedWith(
-        compareByDescending<RemoteInstalledAppDto> { it.iconBase64.hasVisibleIcon() }
-            .thenByDescending { it.updatedAt },
+        compareByDescending<InstalledApp> { it.iconBase64.hasVisibleIcon() }
+            .thenByDescending { it.updatedAtEpochMillis },
     )
 
 private fun String?.hasVisibleIcon(): Boolean = !isNullOrBlank()
@@ -325,7 +325,7 @@ internal fun List<PolicyRule>.searchEngineBlockRules(): List<PolicyRule> =
             it.action == RuleAction.Block
     }
 
-internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List<UserDeviceUiState> {
+internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDeviceUiState> {
     val devicesById = associateBy { it.id }
     val localUserDeviceIds = userDeviceIds()
     val appsByDevice =
@@ -342,7 +342,7 @@ internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List
             val device = devicesById[deviceId]
             val newestAppSeen =
                 appsByDevice[deviceId]
-                    ?.mapNotNull { it.updatedAt.toEpochMillisOrNull() }
+                    ?.map { it.updatedAtEpochMillis }
                     ?.maxOrNull()
             val lastSeen = device?.lastSeenAtEpochMillis ?: newestAppSeen
             val status =
@@ -369,8 +369,7 @@ internal fun List<Device>.toUserDevices(apps: List<RemoteInstalledAppDto>): List
         )
 }
 
-private fun List<Device>.userDeviceIds(): List<String> =
-    filter { device -> device.appRole != "admin" }.map { it.id }
+private fun List<Device>.userDeviceIds(): List<String> = filter { device -> device.appRole != "admin" }.map { it.id }
 
 private val UserDeviceStatus.sortOrder: Int
     get() =
@@ -462,6 +461,7 @@ internal const val ActiveDeviceWindowMillis = 15 * 60 * 1000L
 internal const val SwitchHoldMillis = 2_500L
 internal const val RoomConfirmTimeoutMillis = 5_000L
 internal const val MinuteMillis = 60_000L
+
 // Domain wildcard: enabled Block means whitelist mode; disabled means general Internet is open.
 internal const val DomainWildcard = "*"
 internal const val InternetBlockPriority = 10

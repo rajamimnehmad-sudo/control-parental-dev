@@ -12,6 +12,9 @@ data class RemoteDeviceDto(
     val accessibilityState: String?,
     val protectionAlert: String?,
     val protectionUpdatedAt: String?,
+    val appliedPolicyId: String?,
+    val appliedPolicyRevision: Long?,
+    val policyAppliedAt: String?,
     val updatedAt: String,
     val deletedAt: String?,
 ) {
@@ -27,6 +30,14 @@ data class RemoteDeviceDto(
                 accessibilityState = json.optNullableString("accessibility_state"),
                 protectionAlert = json.optNullableString("protection_alert"),
                 protectionUpdatedAt = json.optNullableString("protection_updated_at"),
+                appliedPolicyId = json.optNullableString("applied_policy_id"),
+                appliedPolicyRevision =
+                    if (json.isNull("applied_policy_revision")) {
+                        null
+                    } else {
+                        json.getLong("applied_policy_revision")
+                    },
+                policyAppliedAt = json.optNullableString("policy_applied_at"),
                 updatedAt = json.getString("updated_at"),
                 deletedAt = json.optNullableString("deleted_at"),
             )

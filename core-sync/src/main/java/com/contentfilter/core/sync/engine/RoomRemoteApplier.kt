@@ -1,6 +1,8 @@
 package com.contentfilter.core.sync.engine
 
 import android.util.Log
+import androidx.room.withTransaction
+import com.contentfilter.core.database.AppDatabase
 import com.contentfilter.core.database.dao.AccessRequestDao
 import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AppGroupDao
@@ -24,6 +26,7 @@ import javax.inject.Inject
 class RoomRemoteApplier
     @Inject
     constructor(
+        private val database: AppDatabase,
         private val accountDao: AccountDao,
         private val policyDao: PolicyDao,
         private val deviceDao: DeviceDao,
@@ -31,8 +34,26 @@ class RoomRemoteApplier
         private val accessRequestDao: AccessRequestDao,
         private val extraTimeGrantDao: ExtraTimeGrantDao,
         private val appGroupDao: AppGroupDao,
-    ) {
-        suspend fun applyAccounts(values: List<RemoteAccountDto>) {
+    ) : RemoteApplier {
+        override suspend fun applyPolicyBundle(
+            policy: RemotePolicyDto,
+            rules: List<RemotePolicyRuleDto>,
+            limits: List<RemoteDailyLimitDto>,
+            groups: List<RemoteAppGroupDto>,
+            groupApps: List<RemoteAppGroupAppDto>,
+        ): Boolean =
+            database.withTransaction {
+                applyPolicies(listOf(policy))
+                val stored = policyDao.policyById(policy.id)
+                if (stored == null || stored.version > policy.version) return@withTransaction false
+                applyPolicyRules(rules)
+                applyDailyLimits(limits)
+                applyAppGroups(groups)
+                applyAppGroupApps(groupApps)
+                true
+            }
+
+        override suspend fun applyAccounts(values: List<RemoteAccountDto>) {
             values.forEach { account ->
                 if (account.deletedAt == null) {
                     accountDao.upsert(account.toEntity())
@@ -42,7 +63,7 @@ class RoomRemoteApplier
             }
         }
 
-        suspend fun applyPolicies(values: List<RemotePolicyDto>) {
+        override suspend fun applyPolicies(values: List<RemotePolicyDto>) {
             values.forEach { policy ->
                 val incoming = policy.toEntity()
                 val currentById = policyDao.policyById(policy.id)
@@ -73,7 +94,7 @@ class RoomRemoteApplier
             }
         }
 
-        suspend fun applyDevices(values: List<RemoteDeviceDto>) {
+        override suspend fun applyDevices(values: List<RemoteDeviceDto>) {
             if (values.isNotEmpty()) {
                 Log.i(
                     LogTag,
@@ -89,7 +110,7 @@ class RoomRemoteApplier
             }
         }
 
-        suspend fun applyPolicyRules(values: List<RemotePolicyRuleDto>) {
+        override suspend fun applyPolicyRules(values: List<RemotePolicyRuleDto>) {
             values.forEach { rule ->
                 val incoming = rule.toEntity()
                 val current = policyDao.ruleById(rule.id)
@@ -109,37 +130,53 @@ class RoomRemoteApplier
             }
         }
 
-        suspend fun applyDailyLimits(values: List<RemoteDailyLimitDto>) {
+        override suspend fun applyDailyLimits(values: List<RemoteDailyLimitDto>) {
             values.forEach { limit ->
+                val incoming = limit.toEntity()
+                val current = dailyLimitDao.byId(limit.id)
+                if (current != null && incoming.updatedAtEpochMillis < current.updatedAtEpochMillis) {
+                    Log.i(
+                        LogTag,
+                        "Skipped stale daily limit id=${limit.id.take(8)} " +
+                            "remoteUpdatedAt=${incoming.updatedAtEpochMillis} localUpdatedAt=${current.updatedAtEpochMillis}",
+                    )
+                    return@forEach
+                }
                 if (limit.deletedAt == null) {
-                    dailyLimitDao.upsert(limit.toEntity())
+                    dailyLimitDao.upsert(incoming)
                 } else {
-                    dailyLimitDao.deleteById(limit.id)
+                    dailyLimitDao.upsert(incoming.copy(enabled = false))
                 }
             }
         }
 
-        suspend fun applyAppGroups(values: List<RemoteAppGroupDto>) {
+        override suspend fun applyAppGroups(values: List<RemoteAppGroupDto>) {
             values.forEach { group ->
+                val incoming = group.toEntity()
+                val current = appGroupDao.groupById(group.id)
+                if (current != null && incoming.updatedAtEpochMillis < current.updatedAtEpochMillis) return@forEach
                 if (group.deletedAt == null) {
-                    appGroupDao.upsertGroup(group.toEntity())
+                    appGroupDao.upsertGroup(incoming)
                 } else {
-                    appGroupDao.deleteGroupById(group.id)
+                    appGroupDao.upsertGroup(incoming.copy(enabled = false))
                 }
             }
         }
 
-        suspend fun applyAppGroupApps(values: List<RemoteAppGroupAppDto>) {
+        override suspend fun applyAppGroupApps(values: List<RemoteAppGroupAppDto>) {
             values.forEach { app ->
+                val incoming = app.toEntity()
+                val current = appGroupDao.appById(app.id)
+                if (current != null && incoming.updatedAtEpochMillis < current.updatedAtEpochMillis) return@forEach
                 if (app.deletedAt == null) {
-                    appGroupDao.upsertApp(app.toEntity())
+                    appGroupDao.upsertApp(incoming)
                 } else {
-                    appGroupDao.deleteAppById(app.id)
+                    appGroupDao.upsertApp(incoming.copy(enabled = false))
                 }
             }
         }
 
-        suspend fun applyAccessRequests(values: List<RemoteAccessRequestDto>) {
+        override suspend fun applyAccessRequests(values: List<RemoteAccessRequestDto>) {
             if (values.isNotEmpty()) {
                 Log.i(LogTag, "Applying remote access requests count=${values.size}")
             }
@@ -152,7 +189,7 @@ class RoomRemoteApplier
             }
         }
 
-        suspend fun applyExtraTimeGrants(values: List<RemoteExtraTimeGrantDto>) {
+        override suspend fun applyExtraTimeGrants(values: List<RemoteExtraTimeGrantDto>) {
             values.forEach { grant ->
                 if (grant.deletedAt == null) {
                     extraTimeGrantDao.upsert(grant.toEntity())

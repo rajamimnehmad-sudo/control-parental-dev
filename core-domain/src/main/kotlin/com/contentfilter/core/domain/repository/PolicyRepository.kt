@@ -1,5 +1,6 @@
 package com.contentfilter.core.domain.repository
 
+import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import kotlinx.coroutines.flow.Flow
@@ -20,10 +21,8 @@ interface PolicyRepository {
     suspend fun saveRules(
         rules: List<PolicyRule>,
         deviceId: String? = null,
-    ): Long {
-        rules.forEach { saveRule(it, deviceId) }
-        return getActivePolicy(deviceId).version
-    }
+        requestId: String? = null,
+    ): PolicyMutationReceipt
 
     suspend fun deleteRule(rule: PolicyRule)
 }

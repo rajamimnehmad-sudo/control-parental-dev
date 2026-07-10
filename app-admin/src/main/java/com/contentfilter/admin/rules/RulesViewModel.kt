@@ -7,7 +7,9 @@ import com.contentfilter.admin.BuildConfig
 import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.ExtraTimeGrant
+import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
+import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
@@ -17,6 +19,7 @@ import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
+import com.contentfilter.core.domain.repository.InstalledAppRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
@@ -31,6 +34,7 @@ import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseActivationClient
 import com.contentfilter.core.sync.SyncScheduler
+import com.contentfilter.core.sync.engine.PolicyApplicationState
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.engine.SyncResult
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -50,6 +54,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
 
@@ -70,6 +75,7 @@ class RulesViewModel
         private val policyRepository: PolicyRepository,
         grantRepository: ExtraTimeGrantRepository,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
+        private val installedAppRepository: InstalledAppRepository,
         private val activationClient: SupabaseActivationClient,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
@@ -79,7 +85,12 @@ class RulesViewModel
             MutableStateFlow(
                 RulesUiState(),
             )
-        private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
+        private val installedApps =
+            installedAppRepository.observeInstalledApps().stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = emptyList(),
+            )
         private var internetSaveRequestId = 0L
         private val selectedPolicyDeviceId = form.map { it.selectedDeviceId }.distinctUntilChanged()
         private val policyRules = selectedPolicyDeviceId.flatMapLatest { observePolicyRules(it) }
@@ -270,16 +281,15 @@ class RulesViewModel
         }
 
         fun refreshApps() {
-            form.update { it.copy(message = "Cargando apps...") }
-            refreshInstalledApps()
+            form.update { it.copy(message = "Actualizando apps...") }
+            refreshInstalledApps(forceFull = true)
         }
 
         fun refreshDevices() {
             form.update { it.copy(message = "Actualizando dispositivos...") }
             viewModelScope.launch(Dispatchers.IO) {
                 val devicesResult = syncEngine.syncDevicesFull()
-                syncEngine.syncCoreDataFull()
-                refreshInstalledApps()
+                refreshInstalledApps(forceFull = false)
                 form.update {
                     it.copy(message = devicesResult.message.takeIf { message -> message.isNotBlank() }.orEmpty())
                 }
@@ -366,7 +376,7 @@ class RulesViewModel
                 when (activationClient.revokeDevice(deviceId)) {
                     is RemoteResult.Success -> {
                         deviceRepository.deleteDevice(deviceId)
-                        installedApps.update { apps -> apps.filterNot { it.deviceId == deviceId } }
+                        installedAppRepository.deleteForDevice(deviceId)
                         val syncResult = syncEngine.syncDevicesFull()
                         Log.i(
                             LogTag,
@@ -581,6 +591,7 @@ class RulesViewModel
                     previousState = previousRoom.toString(),
                     requestedState = blocked.toString(),
                 ) ?: return
+            val traceRequestId = "web-$requestId"
             logInternetSwitch(
                 stage = "tap",
                 touched = blocked,
@@ -590,7 +601,7 @@ class RulesViewModel
             )
             Log.i(
                 LogTag,
-                "webNavigation admin requested requestId=$requestId deviceId=$targetDeviceId " +
+                "webNavigation admin requested requestId=$traceRequestId deviceId=${targetDeviceId.safeDeviceId()} " +
                     "requestedBlocked=$blocked mainBefore=$previousRoom policyRevision=${currentState.rules.webPolicyRevision()}",
             )
             form.update {
@@ -620,12 +631,12 @@ class RulesViewModel
                                 imagesBlocked = currentState.imagesBlocked,
                                 safeSearchEnabled = currentState.safeSearchEnabled,
                             )
-                        val revision = saveRule.saveAll(ruleChanges, targetDeviceId)
+                        val receipt = saveRule.saveAll(ruleChanges, targetDeviceId, traceRequestId)
                         val confirmed =
                             withTimeoutOrNull(RoomConfirmTimeoutMillis) {
                                 policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
                                     snapshot.deviceId == targetDeviceId &&
-                                        snapshot.version >= revision &&
+                                        snapshot.version >= receipt.revision &&
                                         snapshot.rules.internetBlocked() == blocked
                                 }
                             } ?: error("Room no confirmó la regla principal de Internet.")
@@ -634,12 +645,13 @@ class RulesViewModel
                             confirmedRules = confirmed.rules,
                             revision = confirmed.version,
                             auxiliaryChanges = ruleChanges.drop(1).size,
+                            receipt = receipt,
                         )
                     }
                 val roomAfterSave = saved.getOrNull()?.confirmedRules?.internetBlocked() ?: previousRoom
                 Log.i(
                     LogTag,
-                    "webNavigation admin room result requestId=$requestId deviceId=$targetDeviceId " +
+                    "webNavigation admin room result requestId=$traceRequestId deviceId=${targetDeviceId.safeDeviceId()} " +
                         "requestedBlocked=$blocked mainBefore=${saved.getOrNull()?.beforeBlocked ?: previousRoom} " +
                         "mainAfter=$roomAfterSave roomConfirmed=${saved.isSuccess} " +
                         "policyRevision=${saved.getOrNull()?.revision ?: "none"} " +
@@ -657,7 +669,7 @@ class RulesViewModel
                     syncScheduler.requestSync()
                     Log.i(
                         LogTag,
-                        "webNavigation admin sync requested requestId=$requestId deviceId=$targetDeviceId " +
+                        "webNavigation admin sync requested requestId=$traceRequestId deviceId=${targetDeviceId.safeDeviceId()} " +
                             "requestedBlocked=$blocked stored=$roomAfterSave policyRevision=${saved.getOrThrow().revision}",
                     )
                     recordAdminDiagnostic(
@@ -681,7 +693,7 @@ class RulesViewModel
                             pendingGoogleResultsAllowed = null,
                             pendingImagesBlocked = null,
                             pendingSafeSearchEnabled = null,
-                            message = "Guardado. Sincronizando...",
+                            message = "Guardado en este dispositivo. Sincronizando...",
                         )
                     }
                     logInternetSwitch(
@@ -691,11 +703,17 @@ class RulesViewModel
                         room = roomAfterSave,
                         ui = blocked,
                     )
-                    val syncResult = syncNowWithResult()
+                    val receipt = saved.getOrThrow().receipt
+                    val syncResult =
+                        withContext(Dispatchers.IO) {
+                            syncEngine.syncPolicyChanges(receipt)
+                        }
                     Log.i(
                         LogTag,
-                        "webNavigation admin sync finished requestId=$requestId deviceId=$targetDeviceId " +
-                            "requestedBlocked=$blocked success=${syncResult.success} message=${syncResult.message}",
+                        "webNavigation admin sync finished requestId=$traceRequestId " +
+                            "deviceId=${targetDeviceId.safeDeviceId()} requestedBlocked=$blocked " +
+                            "serverConfirmed=${syncResult.serverConfirmed} revision=${syncResult.revision} " +
+                            "pending=${syncResult.pendingOperationIds.size} error=${syncResult.error}",
                     )
                     if (!isCurrentInternetSave(requestId)) {
                         Log.i(
@@ -707,14 +725,28 @@ class RulesViewModel
                     form.update {
                         it.copy(
                             message =
-                                if (syncResult.success) {
-                                    if (blocked) {
-                                        "Bloquear navegación web activado."
-                                    } else {
-                                        "Navegación web permitida."
-                                    }
+                                if (syncResult.serverConfirmed) {
+                                    "Sincronizado con el servidor. Esperando dispositivo..."
                                 } else {
-                                    "Guardado localmente. Sincronización pendiente."
+                                    "Guardado en este dispositivo. Pendiente por conexión."
+                                },
+                        )
+                    }
+                    if (!syncResult.serverConfirmed) return@launch
+                    val application =
+                        withContext(Dispatchers.IO) {
+                            syncEngine.waitForPolicyApplied(receipt, PolicyApplicationWaitMillis)
+                        }
+                    if (!isCurrentInternetSave(requestId)) return@launch
+                    form.update {
+                        it.copy(
+                            message =
+                                when (application.state) {
+                                    PolicyApplicationState.Applied -> "Aplicado en el dispositivo Usuario."
+                                    PolicyApplicationState.Pending ->
+                                        "Sincronizado con el servidor. Dispositivo sin confirmar."
+                                    PolicyApplicationState.Offline ->
+                                        "Sincronizado con el servidor. Dispositivo sin conexión."
                                 },
                         )
                     }
@@ -871,7 +903,10 @@ class RulesViewModel
                     }
                 if (requestId != null) {
                     if (!isCurrentInternetSave(requestId)) {
-                        Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=toggle-domain-rule")
+                        Log.i(
+                            LogTag,
+                            "internetSave stale response ignored requestId=$requestId action=toggle-domain-rule",
+                        )
                         return@launch
                     }
                     val result = saved.getOrNull()
@@ -989,7 +1024,8 @@ class RulesViewModel
             val targetDeviceId = selectedDeviceIdForRules() ?: return
             Log.i(
                 LogTag,
-                "appControl requested action=setAllowed deviceId=$targetDeviceId package=$packageName allowed=$allowed",
+                "appControl requested action=setAllowed deviceId=${targetDeviceId.safeDeviceId()} " +
+                    "package=$packageName allowed=$allowed",
             )
             val matchingRules =
                 uiState.value.rules.filter {
@@ -1009,56 +1045,97 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch {
-                val synced =
+                val requestId = "app-${UUID.randomUUID()}"
+                val localSave =
                     runCatching {
-                        appLimits.forEach { deleteDailyLimitUseCase(it) }
-                        if (allowed) {
-                            blockRules.filter { it.enabled }.forEach {
-                                saveRule(it.copy(enabled = false), targetDeviceId)
+                        val receipts =
+                            appLimits.map {
+                                deleteDailyLimitUseCase(it, targetDeviceId, requestId)
+                            }.toMutableList()
+                        val ruleChanges =
+                            if (allowed) {
+                                blockRules.filter { it.enabled }.map { it.copy(enabled = false) } +
+                                    authorizationRules.filter { it.enabled }.map { it.copy(enabled = false) }
+                            } else {
+                                allowRules.filter { it.enabled }.map { it.copy(enabled = false) } +
+                                    authorizationRules.filter { it.enabled }.map { it.copy(enabled = false) } +
+                                    listOf(
+                                        blockRules.firstOrNull()?.copy(enabled = true)
+                                            ?: PolicyRule(
+                                                id = UUID.randomUUID().toString(),
+                                                level = PolicyLevel.Account,
+                                                scope = RuleScope.App,
+                                                target = packageName,
+                                                action = RuleAction.Block,
+                                                priority = 100,
+                                                enabled = true,
+                                            ),
+                                    )
                             }
-                            authorizationRules.filter { it.enabled }.forEach {
-                                saveRule(it.copy(enabled = false), targetDeviceId)
-                            }
-                        } else {
-                            allowRules.filter { it.enabled }.forEach {
-                                saveRule(it.copy(enabled = false), targetDeviceId)
-                            }
-                            authorizationRules.filter { it.enabled }.forEach {
-                                saveRule(it.copy(enabled = false), targetDeviceId)
-                            }
-                            saveRule(
-                                blockRules.firstOrNull()?.copy(enabled = true)
-                                    ?: PolicyRule(
-                                        id = UUID.randomUUID().toString(),
-                                        level = PolicyLevel.Account,
-                                        scope = RuleScope.App,
-                                        target = packageName,
-                                        action = RuleAction.Block,
-                                        priority = 100,
-                                        enabled = true,
-                                    ),
-                                targetDeviceId,
-                            )
+                        if (ruleChanges.isNotEmpty()) {
+                            receipts += saveRule.saveAll(ruleChanges, targetDeviceId, requestId)
                         }
-                        syncScheduler.requestSync()
-                        withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull().success }
-                    }.getOrDefault(false)
+                        receipts.maxByOrNull { it.revision }
+                    }
+                if (localSave.isFailure) {
+                    form.update {
+                        it.copy(
+                            pendingAppAllowed = it.pendingAppAllowed - packageName,
+                            message = "No se pudo guardar el cambio de la app.",
+                        )
+                    }
+                    return@launch
+                }
+                form.update {
+                    it.copy(
+                        pendingAppAllowed = it.pendingAppAllowed - packageName,
+                        message = "Guardado en este dispositivo. Sincronizando...",
+                    )
+                }
+                val receipt = localSave.getOrNull()
+                if (receipt == null) {
+                    form.update { it.copy(message = if (allowed) "App permitida." else "App bloqueada.") }
+                    return@launch
+                }
+                syncScheduler.requestSync()
+                val syncResult =
+                    withContext(Dispatchers.IO) {
+                        syncEngine.syncPolicyChanges(receipt)
+                    }
                 form.update {
                     it.copy(
                         message =
-                            when {
-                                synced && allowed -> "App permitida."
-                                synced -> "App bloqueada."
-                                else -> "No se pudo guardar en la nube. Se sincronizará cuando haya conexión."
+                            if (syncResult.serverConfirmed) {
+                                "Sincronizado con el servidor. Esperando dispositivo..."
+                            } else {
+                                "Guardado en este dispositivo. Pendiente por conexión."
                             },
                     )
                 }
+                if (syncResult.serverConfirmed) {
+                    val application =
+                        withContext(Dispatchers.IO) {
+                            syncEngine.waitForPolicyApplied(receipt, PolicyApplicationWaitMillis)
+                        }
+                    form.update {
+                        it.copy(
+                            message =
+                                when (application.state) {
+                                    PolicyApplicationState.Applied -> "Aplicado en el dispositivo Usuario."
+                                    PolicyApplicationState.Pending ->
+                                        "Sincronizado con el servidor. Dispositivo sin confirmar."
+                                    PolicyApplicationState.Offline ->
+                                        "Sincronizado con el servidor. Dispositivo sin conexión."
+                                },
+                        )
+                    }
+                }
+                val synced = syncResult.serverConfirmed
                 Log.i(
                     LogTag,
-                    "appControl saved action=setAllowed deviceId=$targetDeviceId package=$packageName allowed=$allowed syncSuccess=$synced",
+                    "appControl saved requestId=$requestId action=setAllowed " +
+                        "deviceId=${targetDeviceId.safeDeviceId()} allowed=$allowed syncSuccess=$synced",
                 )
-                kotlinx.coroutines.delay(SwitchHoldMillis)
-                form.update { it.copy(pendingAppAllowed = it.pendingAppAllowed - packageName) }
             }
         }
 
@@ -1070,7 +1147,8 @@ class RulesViewModel
             val minutes = rawMinutes.filter(Char::isDigit).toIntOrNull()
             Log.i(
                 LogTag,
-                "appControl requested action=saveLimit deviceId=$targetDeviceId package=$packageName minutes=$minutes",
+                "appControl requested action=saveLimit deviceId=${targetDeviceId.safeDeviceId()} " +
+                    "package=$packageName minutes=$minutes",
             )
             val existing =
                 uiState.value.limits.firstOrNull {
@@ -1083,28 +1161,70 @@ class RulesViewModel
             viewModelScope.launch {
                 if (minutes == null || minutes <= 0) {
                     form.update { it.copy(message = "Ingresá minutos válidos.") }
-                } else {
-                    form.update { it.copy(message = "Guardando...") }
-                    matchingRules
-                        .filter { it.enabled && (it.action == RuleAction.Block || it.action == RuleAction.RequestAuthorization) }
-                        .forEach { saveRule(it.copy(enabled = false), targetDeviceId) }
-                    saveDailyLimit(
-                        DailyLimit(
-                            id = existing?.id ?: UUID.randomUUID().toString(),
-                            targetType = PolicyTargetType.App,
-                            target = packageName,
-                            limitMinutes = minutes,
-                            enabled = true,
-                        ),
-                        targetDeviceId,
-                    )
-                    form.update { it.copy(message = "Tiempo guardado.") }
+                    return@launch
                 }
+                val requestId = "limit-${UUID.randomUUID()}"
+                form.update {
+                    it.copy(
+                        pendingAppAllowed = it.pendingAppAllowed + (packageName to true),
+                        message = "Guardando...",
+                    )
+                }
+                val localSave =
+                    runCatching {
+                        val ruleChanges =
+                            matchingRules
+                                .filter {
+                                    it.enabled &&
+                                        (it.action == RuleAction.Block || it.action == RuleAction.RequestAuthorization)
+                                }.map { it.copy(enabled = false) }
+                        if (ruleChanges.isNotEmpty()) {
+                            saveRule.saveAll(ruleChanges, targetDeviceId, requestId)
+                        }
+                        saveDailyLimit(
+                            DailyLimit(
+                                id = existing?.id ?: UUID.randomUUID().toString(),
+                                targetType = PolicyTargetType.App,
+                                target = packageName,
+                                limitMinutes = minutes,
+                                enabled = true,
+                            ),
+                            targetDeviceId,
+                            requestId,
+                        )
+                    }
+                form.update {
+                    it.copy(
+                        pendingAppAllowed = it.pendingAppAllowed - packageName,
+                        message =
+                            if (localSave.isSuccess) {
+                                "Guardado en este dispositivo. Sincronizando..."
+                            } else {
+                                "No se pudo guardar el límite."
+                            },
+                    )
+                }
+                val receipt = localSave.getOrNull() ?: return@launch
                 syncScheduler.requestSync()
-                val synced = syncNow()
+                val syncResult =
+                    withContext(Dispatchers.IO) {
+                        syncEngine.syncPolicyChanges(receipt)
+                    }
+                form.update {
+                    it.copy(
+                        message =
+                            if (syncResult.serverConfirmed) {
+                                "Sincronizado con el servidor. Esperando dispositivo..."
+                            } else {
+                                "Guardado en este dispositivo. Pendiente por conexión."
+                            },
+                    )
+                }
                 Log.i(
                     LogTag,
-                    "appControl saved action=saveLimit deviceId=$targetDeviceId package=$packageName minutes=$minutes syncSuccess=$synced",
+                    "appControl saved requestId=$requestId action=saveLimit " +
+                        "deviceId=${targetDeviceId.safeDeviceId()} minutes=$minutes " +
+                        "syncSuccess=${syncResult.serverConfirmed}",
                 )
             }
         }
@@ -1143,12 +1263,24 @@ class RulesViewModel
                     return
                 }
                 packageInOtherGroup != null -> {
-                    form.update { it.copy(message = "Una app elegida ya está en ${packageInOtherGroup.name}. Sacala de ese grupo o editá ese grupo.") }
+                    form.update {
+                        it.copy(
+                            message =
+                                "Una app elegida ya está en ${packageInOtherGroup.name}. " +
+                                    "Sacala de ese grupo o editá ese grupo.",
+                        )
+                    }
                     return
                 }
             }
             viewModelScope.launch {
-                form.update { it.copy(groupSaving = true, message = if (editingGroupId == null) "Guardando grupo..." else "Actualizando grupo...") }
+                val requestId = "group-${UUID.randomUUID()}"
+                form.update {
+                    it.copy(
+                        groupSaving = true,
+                        message = if (editingGroupId == null) "Guardando grupo..." else "Actualizando grupo...",
+                    )
+                }
                 val saved =
                     runCatching {
                         val group =
@@ -1161,9 +1293,9 @@ class RulesViewModel
                                 resetMinuteOfDay = NoonMinuteOfDay,
                                 enabled = true,
                             )
-                        appGroupRepository.replaceGroupApps(group, packages)
+                        val receipt = appGroupRepository.replaceGroupApps(group, packages, requestId)
                         syncScheduler.requestSync()
-                        syncNowWithResult()
+                        withContext(Dispatchers.IO) { syncEngine.syncPolicyChanges(receipt) }
                     }
                 form.update {
                     if (saved.isSuccess) {
@@ -1174,10 +1306,10 @@ class RulesViewModel
                             groupSelectedPackages = emptySet(),
                             groupSaving = false,
                             message =
-                                if (editingGroupId == null) {
-                                    "Apps en grupo guardado."
+                                if (saved.getOrNull()?.serverConfirmed == true) {
+                                    "Sincronizado con el servidor. Esperando dispositivo..."
                                 } else {
-                                    "Apps en grupo actualizado."
+                                    "Guardado en este dispositivo. Pendiente por conexión."
                                 },
                         )
                     } else {
@@ -1197,21 +1329,24 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch {
+                val requestId = "group-delete-${UUID.randomUUID()}"
                 val saved =
                     runCatching {
-                        appGroupRepository.deleteGroup(
-                            AppGroup(
-                                id = group.id,
-                                deviceId = targetDeviceId,
-                                name = group.name,
-                                color = "teal",
-                                limitMinutes = group.limitMinutes,
-                                resetMinuteOfDay = NoonMinuteOfDay,
-                                enabled = false,
-                            ),
-                        )
+                        val receipt =
+                            appGroupRepository.deleteGroup(
+                                AppGroup(
+                                    id = group.id,
+                                    deviceId = targetDeviceId,
+                                    name = group.name,
+                                    color = "teal",
+                                    limitMinutes = group.limitMinutes,
+                                    resetMinuteOfDay = NoonMinuteOfDay,
+                                    enabled = false,
+                                ),
+                                requestId,
+                            )
                         syncScheduler.requestSync()
-                        syncNowWithResult()
+                        withContext(Dispatchers.IO) { syncEngine.syncPolicyChanges(receipt) }
                     }
                 form.update {
                     it.copy(
@@ -1221,8 +1356,10 @@ class RulesViewModel
                         groupMinutes = if (it.editingGroupId == groupId) "" else it.groupMinutes,
                         groupSelectedPackages = if (it.editingGroupId == groupId) emptySet() else it.groupSelectedPackages,
                         message =
-                            if (saved.isSuccess) {
-                                "Grupo eliminado. Las apps vuelven a sus reglas individuales."
+                            if (saved.getOrNull()?.serverConfirmed == true) {
+                                "Grupo eliminado y sincronizado con el servidor."
+                            } else if (saved.isSuccess) {
+                                "Grupo eliminado localmente. Pendiente por conexión."
                             } else {
                                 "No se pudo eliminar el grupo."
                             },
@@ -1313,7 +1450,10 @@ class RulesViewModel
                         syncNowWithResult()
                     }
                 if (internetRequestId != null && !isCurrentInternetSave(internetRequestId)) {
-                    Log.i(LogTag, "internetSave stale response ignored requestId=$internetRequestId action=allow-domain")
+                    Log.i(
+                        LogTag,
+                        "internetSave stale response ignored requestId=$internetRequestId action=allow-domain",
+                    )
                     return@launch
                 }
                 val result = saved.getOrNull()
@@ -1414,33 +1554,53 @@ class RulesViewModel
             }
         }
 
-        private fun refreshInstalledApps() {
+        private fun refreshInstalledApps(forceFull: Boolean = false) {
             viewModelScope.launch(Dispatchers.IO) {
-                val deviceSync = syncEngine.syncCoreDataFull()
-                val requestResultsSync = syncEngine.syncRequestResultsFull()
+                val startedAt = System.currentTimeMillis()
+                val selectedDeviceId = form.value.selectedDeviceId ?: return@launch
+                val cachedCount = installedApps.value.count { it.deviceId == selectedDeviceId }
                 if (BuildConfig.DEBUG) {
                     Log.i(
                         LogTag,
-                        "appsRefresh device-sync result=${deviceSync.success} message=${deviceSync.message} " +
-                            "requestResultsSync=${requestResultsSync.success} requestResultsMessage=${requestResultsSync.message}",
+                        "appsRefresh stage=cache requestId=apps-$startedAt deviceId=${selectedDeviceId.safeDeviceId()} " +
+                            "count=$cachedCount durationMs=${System.currentTimeMillis() - startedAt}",
                     )
                 }
-                when (val result = remoteInstalledAppRepository.pullInstalledApps()) {
+                val updatedAfter =
+                    if (forceFull) {
+                        null
+                    } else {
+                        installedAppRepository.latestUpdatedAt(selectedDeviceId)?.let {
+                            Instant.ofEpochMilli(it).toString()
+                        }
+                    }
+                val remoteStartedAt = System.currentTimeMillis()
+                when (
+                    val result =
+                        remoteInstalledAppRepository.pullInstalledApps(
+                            deviceId = selectedDeviceId,
+                            updatedAfterIso = updatedAfter,
+                        )
+                ) {
                     is RemoteResult.Success -> {
-                        installedApps.value = result.value
+                        val remoteApps = result.value.map { it.toInstalledApp() }
+                        installedAppRepository.mergeInstalledApps(remoteApps)
                         if (BuildConfig.DEBUG) {
-                            val selectedDeviceId = form.value.selectedDeviceId
-                            val selectedCount =
-                                selectedDeviceId
-                                    ?.let { deviceId -> result.value.count { it.deviceId == deviceId } }
-                                    ?: 0
                             Log.i(
                                 LogTag,
-                                "appsRefresh result=success remoteCount=${result.value.size} selectedDeviceId=$selectedDeviceId selectedCount=$selectedCount",
+                                "appsRefresh stage=remote-merge requestId=apps-$startedAt " +
+                                    "deviceId=${selectedDeviceId.safeDeviceId()} deltaCount=${remoteApps.size} " +
+                                    "forceFull=$forceFull remoteDurationMs=${System.currentTimeMillis() - remoteStartedAt} " +
+                                    "totalDurationMs=${System.currentTimeMillis() - startedAt}",
                             )
                         }
                         form.update { state ->
-                            state.copy(message = state.message.takeUnless { it == "Cargando apps..." }.orEmpty())
+                            state.copy(
+                                message =
+                                    state.message.takeUnless {
+                                        it == "Cargando apps..." || it == "Actualizando apps..."
+                                    }.orEmpty(),
+                            )
                         }
                     }
                     is RemoteResult.Failure -> {
@@ -1452,6 +1612,19 @@ class RulesViewModel
                 }
             }
         }
+
+        private fun RemoteInstalledAppDto.toInstalledApp(): InstalledApp =
+            InstalledApp(
+                id = id,
+                accountId = accountId,
+                deviceId = deviceId,
+                appName = appName,
+                packageName = packageName,
+                versionName = versionName,
+                isSystemApp = isSystemApp,
+                iconBase64 = iconBase64,
+                updatedAtEpochMillis = runCatching { Instant.parse(updatedAt).toEpochMilli() }.getOrDefault(0L),
+            )
 
         private suspend fun saveAllowedDomain(
             target: String,
@@ -1815,6 +1988,7 @@ class RulesViewModel
             val confirmedRules: List<PolicyRule>,
             val revision: Long,
             val auxiliaryChanges: Int,
+            val receipt: PolicyMutationReceipt,
         )
 
         private fun String.safeDeviceId(): String = take(8)
@@ -1832,5 +2006,6 @@ class RulesViewModel
         private companion object {
             const val NoonMinuteOfDay = 720
             const val UserPairingTokenTtlMinutes = 180
+            const val PolicyApplicationWaitMillis = 8_000L
         }
     }

@@ -22,6 +22,12 @@ interface AppGroupDao {
     @Query("SELECT * FROM app_groups WHERE enabled = 1 AND deviceId = :deviceId ORDER BY name COLLATE NOCASE")
     suspend fun enabledGroupsForDevice(deviceId: String): List<AppGroupEntity>
 
+    @Query("SELECT * FROM app_groups WHERE id = :id LIMIT 1")
+    suspend fun groupById(id: String): AppGroupEntity?
+
+    @Query("SELECT * FROM app_group_apps WHERE id = :id LIMIT 1")
+    suspend fun appById(id: String): AppGroupAppEntity?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertGroup(group: AppGroupEntity)
 

@@ -4,8 +4,13 @@ import android.util.Log
 import com.contentfilter.core.database.dao.SyncCursorDao
 import com.contentfilter.core.database.entity.SyncCursorEntity
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
+import com.contentfilter.core.network.dto.RemoteAppGroupDto
+import com.contentfilter.core.network.dto.RemoteDailyLimitDto
+import com.contentfilter.core.network.dto.RemotePolicyRuleDto
 import com.contentfilter.core.network.remote.RemoteAccountRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
@@ -14,8 +19,12 @@ import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseTable
 import com.contentfilter.core.sync.outbox.OutboxProcessor
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import java.time.Instant
 import javax.inject.Inject
 
 class DefaultSyncEngine
@@ -28,11 +37,12 @@ class DefaultSyncEngine
         private val limitRepository: RemoteLimitRepository,
         private val requestRepository: RemoteRequestRepository,
         private val syncCursorDao: SyncCursorDao,
-        private val applier: RoomRemoteApplier,
+        private val applier: RemoteApplier,
         private val systemStatusRepository: SystemStatusRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
     ) : SyncEngine {
         private val policySyncMutex = Mutex()
+        private val targetedPolicyPullMutex = Mutex()
 
         override suspend fun syncOnce(): SyncResult = policySyncMutex.withLock { syncOnceLocked() }
 
@@ -198,6 +208,180 @@ class DefaultSyncEngine
             )
         }
 
+        override suspend fun syncPolicyChanges(receipt: PolicyMutationReceipt): PolicyFastSyncResult {
+            val startedAt = System.currentTimeMillis()
+            val result = outboxProcessor.processPolicyMutation(receipt)
+            Log.i(
+                LogTag,
+                "policy fast push requestId=${receipt.requestId} deviceId=${receipt.deviceId.take(8)} " +
+                    "policyId=${receipt.policyId.take(8)} revision=${result.revision} " +
+                    "serverConfirmed=${result.serverConfirmed} pending=${result.pendingOperationIds.size} " +
+                    "durationMs=${System.currentTimeMillis() - startedAt}",
+            )
+            return PolicyFastSyncResult(
+                localSaved = true,
+                serverConfirmed = result.serverConfirmed,
+                notificationDelivered = result.notificationDelivered,
+                policyId = receipt.policyId,
+                revision = result.revision,
+                pendingOperationIds = result.pendingOperationIds,
+                error = result.error,
+            )
+        }
+
+        override suspend fun pullPolicyRevision(
+            requestId: String,
+            deviceId: String,
+            policyId: String?,
+            minimumRevision: Long?,
+            reason: String,
+        ): PolicyPullResult =
+            targetedPolicyPullMutex.withLock {
+                val startedAt = System.currentTimeMillis()
+                Log.i(
+                    LogTag,
+                    "policy fast pull start requestId=$requestId deviceId=${deviceId.take(8)} " +
+                        "policyId=${policyId?.take(8) ?: "active"} minimumRevision=$minimumRevision reason=$reason",
+                )
+                val policiesResult =
+                    if (policyId == null) {
+                        policyRepository.pullPoliciesForDevice(deviceId)
+                    } else {
+                        policyRepository.pullPolicyById(policyId)
+                    }
+                val policies =
+                    when (policiesResult) {
+                        is RemoteResult.Success -> policiesResult.value
+                        is RemoteResult.Failure ->
+                            return@withLock failedPolicyPull(
+                                requestId = requestId,
+                                deviceId = deviceId,
+                                policyId = policyId,
+                                reason = policiesResult.reason,
+                                startedAt = startedAt,
+                            )
+                    }
+                val policy =
+                    policies
+                        .asSequence()
+                        .filter { it.deviceId == deviceId && it.active && it.deletedAt == null }
+                        .maxWithOrNull(compareBy({ it.version }, { it.updatedAt }))
+                        ?: return@withLock failedPolicyPull(
+                            requestId = requestId,
+                            deviceId = deviceId,
+                            policyId = policyId,
+                            reason = "No active policy revision is available yet.",
+                            startedAt = startedAt,
+                        )
+                if (minimumRevision != null && policy.version < minimumRevision) {
+                    return@withLock failedPolicyPull(
+                        requestId = requestId,
+                        deviceId = deviceId,
+                        policyId = policy.id,
+                        reason = "Requested policy revision is not available yet.",
+                        startedAt = startedAt,
+                    )
+                }
+                val bundle =
+                    coroutineScope {
+                        val rules = async { policyRepository.pullPolicyRulesForPolicy(policy.id) }
+                        val limits = async { limitRepository.pullDailyLimitsForPolicy(policy.id) }
+                        val groups = async { limitRepository.pullAppGroupsForDevice(deviceId) }
+                        val groupApps = async { limitRepository.pullAppGroupAppsForDevice(deviceId) }
+                        PolicyRemoteBundle(
+                            rules = rules.await(),
+                            limits = limits.await(),
+                            groups = groups.await(),
+                            groupApps = groupApps.await(),
+                        )
+                    }
+                val bundleFailure = bundle.failureReason()
+                if (bundleFailure != null) {
+                    return@withLock failedPolicyPull(
+                        requestId = requestId,
+                        deviceId = deviceId,
+                        policyId = policy.id,
+                        reason = bundleFailure,
+                        startedAt = startedAt,
+                    )
+                }
+                val applied =
+                    applier.applyPolicyBundle(
+                        policy = policy,
+                        rules = (bundle.rules as RemoteResult.Success).value,
+                        limits = (bundle.limits as RemoteResult.Success).value,
+                        groups = (bundle.groups as RemoteResult.Success).value,
+                        groupApps = (bundle.groupApps as RemoteResult.Success).value,
+                    )
+                Log.i(
+                    LogTag,
+                    "policy fast pull applied requestId=$requestId deviceId=${deviceId.take(8)} " +
+                        "policyId=${policy.id.take(8)} revision=${policy.version} roomApplied=$applied " +
+                        "rules=${(bundle.rules as RemoteResult.Success).value.size} " +
+                        "limits=${(bundle.limits as RemoteResult.Success).value.size} " +
+                        "durationMs=${System.currentTimeMillis() - startedAt}",
+                )
+                PolicyPullResult(
+                    success = applied,
+                    requestId = requestId,
+                    deviceId = deviceId,
+                    policyId = policy.id,
+                    revision = policy.version,
+                    roomApplied = applied,
+                    error = if (applied) null else "A newer local revision was already active.",
+                )
+            }
+
+        override suspend fun acknowledgePolicyApplied(
+            requestId: String,
+            deviceId: String,
+            policyId: String,
+            revision: Long,
+        ): Boolean {
+            val startedAt = System.currentTimeMillis()
+            val result = deviceRepository.acknowledgePolicyApplied(deviceId, policyId, revision)
+            val success = result is RemoteResult.Success
+            Log.i(
+                LogTag,
+                "policy applied ack requestId=$requestId deviceId=${deviceId.take(8)} " +
+                    "policyId=${policyId.take(8)} revision=$revision success=$success " +
+                    "durationMs=${System.currentTimeMillis() - startedAt}",
+            )
+            return success
+        }
+
+        override suspend fun waitForPolicyApplied(
+            receipt: PolicyMutationReceipt,
+            timeoutMillis: Long,
+        ): PolicyApplicationResult {
+            val deadline = System.currentTimeMillis() + timeoutMillis
+            var remoteAvailable = false
+            do {
+                when (val result = deviceRepository.pullDevice(receipt.deviceId)) {
+                    is RemoteResult.Success -> {
+                        remoteAvailable = true
+                        val device = result.value.firstOrNull { it.id == receipt.deviceId }
+                        if (
+                            device?.appliedPolicyId == receipt.policyId &&
+                            (device.appliedPolicyRevision ?: 0L) >= receipt.revision
+                        ) {
+                            return PolicyApplicationResult(
+                                state = PolicyApplicationState.Applied,
+                                revision = device.appliedPolicyRevision ?: receipt.revision,
+                                appliedAtEpochMillis = device.policyAppliedAt?.let { Instant.parse(it).toEpochMilli() },
+                            )
+                        }
+                    }
+                    is RemoteResult.Failure -> Unit
+                }
+                if (System.currentTimeMillis() < deadline) delay(PolicyAckPollMillis)
+            } while (System.currentTimeMillis() < deadline)
+            return PolicyApplicationResult(
+                state = if (remoteAvailable) PolicyApplicationState.Pending else PolicyApplicationState.Offline,
+                revision = receipt.revision,
+            )
+        }
+
         private suspend fun markCurrentDeviceSeen() {
             val activation = deviceActivationRepository.currentActivation() ?: return
             val health = systemStatusRepository.currentHealth()
@@ -328,7 +512,45 @@ class DefaultSyncEngine
             }
         }
 
+        private fun failedPolicyPull(
+            requestId: String,
+            deviceId: String,
+            policyId: String?,
+            reason: String,
+            startedAt: Long,
+        ): PolicyPullResult {
+            Log.w(
+                LogTag,
+                "policy fast pull failed requestId=$requestId deviceId=${deviceId.take(8)} " +
+                    "policyId=${policyId?.take(8) ?: "active"} durationMs=${System.currentTimeMillis() - startedAt} " +
+                    "reason=$reason",
+            )
+            return PolicyPullResult(
+                success = false,
+                requestId = requestId,
+                deviceId = deviceId,
+                policyId = policyId,
+                revision = null,
+                roomApplied = false,
+                error = reason,
+            )
+        }
+
         private companion object {
             const val LogTag = "SyncEngine"
+            const val PolicyAckPollMillis = 500L
         }
     }
+
+private data class PolicyRemoteBundle(
+    val rules: RemoteResult<List<RemotePolicyRuleDto>>,
+    val limits: RemoteResult<List<RemoteDailyLimitDto>>,
+    val groups: RemoteResult<List<RemoteAppGroupDto>>,
+    val groupApps: RemoteResult<List<RemoteAppGroupAppDto>>,
+) {
+    fun failureReason(): String? =
+        listOf(rules, limits, groups, groupApps)
+            .filterIsInstance<RemoteResult.Failure>()
+            .firstOrNull()
+            ?.reason
+}

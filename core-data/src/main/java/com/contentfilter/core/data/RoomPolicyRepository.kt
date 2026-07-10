@@ -9,6 +9,7 @@ import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.dao.PolicyDao
 import com.contentfilter.core.database.entity.OutboxOperationEntity
 import com.contentfilter.core.database.entity.PolicyEntity
+import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.repository.PolicyRepository
@@ -94,12 +95,25 @@ class RoomPolicyRepository
         override suspend fun saveRules(
             rules: List<PolicyRule>,
             deviceId: String?,
-        ): Long {
-            if (rules.isEmpty()) return getActivePolicy(deviceId).version
+            requestId: String?,
+        ): PolicyMutationReceipt {
+            val effectiveRequestId = requestId ?: UUID.randomUUID().toString()
+            if (rules.isEmpty()) {
+                val current = getActivePolicy(deviceId)
+                return PolicyMutationReceipt(
+                    requestId = effectiveRequestId,
+                    deviceId = current.deviceId ?: requireNotNull(deviceId),
+                    policyId = current.id,
+                    revision = current.version,
+                    operationIds = emptyList(),
+                )
+            }
             val activation = deviceActivationDao.latest()
-            val targetDeviceId = deviceId ?: activation?.deviceId
+            val targetDeviceId = requireNotNull(deviceId ?: activation?.deviceId)
             val accountId = activation?.accountId
             var storedRevision = 0L
+            var storedPolicyId = ""
+            var operationIds = emptyList<String>()
             database.withTransaction {
                 val currentPolicy = activePolicy(targetDeviceId)
                 if (currentPolicy != null && !currentPolicy.id.isRemoteCompatibleId()) {
@@ -122,17 +136,35 @@ class RoomPolicyRepository
                     }
                 policyDao.upsertPolicy(policy)
                 policyDao.upsertRules(ruleEntities)
-                buildPolicyOutboxOperations(policy, rules, accountId, revision).forEach { operation ->
+                val operations =
+                    buildPolicyOutboxOperations(
+                        policy = policy,
+                        rules = rules,
+                        accountId = accountId,
+                        revision = revision,
+                        requestId = effectiveRequestId,
+                        deviceId = targetDeviceId,
+                    )
+                operations.forEach { operation ->
                     outboxDao.upsert(operation)
                 }
                 storedRevision = revision
+                storedPolicyId = policy.id
+                operationIds = operations.map { it.id }
             }
             Log.i(
                 LogTag,
-                "policy outbox generated deviceId=${targetDeviceId?.take(8) ?: "none"} " +
-                    "policyRevision=$storedRevision policyParent=1 dependentRules=${rules.size}",
+                "policy outbox generated requestId=$effectiveRequestId deviceId=${targetDeviceId.take(8)} " +
+                    "policyId=${storedPolicyId.take(8)} policyRevision=$storedRevision " +
+                    "policyParent=1 dependentRules=${rules.size}",
             )
-            return storedRevision
+            return PolicyMutationReceipt(
+                requestId = effectiveRequestId,
+                deviceId = targetDeviceId,
+                policyId = storedPolicyId,
+                revision = storedRevision,
+                operationIds = operationIds,
+            )
         }
 
         override suspend fun deleteRule(rule: PolicyRule) {
@@ -191,13 +223,32 @@ internal fun buildPolicyOutboxOperations(
     rules: List<PolicyRule>,
     accountId: String?,
     revision: Long,
+    requestId: String,
+    deviceId: String,
 ): List<OutboxOperationEntity> =
     buildList {
         val plan = buildPolicyOutboxPlan(rules.size, revision)
-        add(policy.toOutboxOperation(accountId, plan.first().createdAtEpochMillis))
+        add(
+            policy.toOutboxOperation(
+                accountId = accountId,
+                now = plan.first().createdAtEpochMillis,
+                requestId = requestId,
+                deviceId = deviceId,
+                revision = revision,
+            ),
+        )
         rules.forEachIndexed { index, rule ->
             val entry = plan[index + 1]
-            add(rule.toOutboxOperation(policy.id, accountId, entry.createdAtEpochMillis))
+            add(
+                rule.toOutboxOperation(
+                    policyId = policy.id,
+                    accountId = accountId,
+                    now = entry.createdAtEpochMillis,
+                    requestId = requestId,
+                    deviceId = deviceId,
+                    revision = revision,
+                ),
+            )
         }
     }
 
@@ -218,6 +269,9 @@ internal data class PolicyOutboxEntry(
 private fun PolicyEntity.toOutboxOperation(
     accountId: String?,
     now: Long,
+    requestId: String,
+    deviceId: String,
+    revision: Long,
 ): OutboxOperationEntity {
     val payload =
         org.json.JSONObject()
@@ -228,13 +282,26 @@ private fun PolicyEntity.toOutboxOperation(
             .put("active", active)
             .put("updated_at", Instant.ofEpochMilli(updatedAtEpochMillis).toString())
             .toString()
-    return outboxOperation(POLICIES_TABLE, payload, now)
+    return outboxOperation(
+        tableName = POLICIES_TABLE,
+        rowId = id,
+        payload = payload,
+        now = now,
+        requestId = requestId,
+        aggregateId = id,
+        deviceId = deviceId,
+        revision = revision,
+        priority = POLICY_PARENT_PRIORITY,
+    )
 }
 
 private fun PolicyRule.toOutboxOperation(
     policyId: String,
     accountId: String?,
     now: Long,
+    requestId: String,
+    deviceId: String,
+    revision: Long,
 ): OutboxOperationEntity {
     val payload =
         org.json.JSONObject()
@@ -248,7 +315,17 @@ private fun PolicyRule.toOutboxOperation(
             .put("enabled", enabled)
             .put("updated_at", Instant.ofEpochMilli(now).toString())
             .toString()
-    return outboxOperation(POLICY_RULES_TABLE, payload, now)
+    return outboxOperation(
+        tableName = POLICY_RULES_TABLE,
+        rowId = id,
+        payload = payload,
+        now = now,
+        requestId = requestId,
+        aggregateId = policyId,
+        deviceId = deviceId,
+        revision = revision,
+        priority = POLICY_DEPENDENT_PRIORITY,
+    )
 }
 
 private fun PolicyRule.toDeletedOutboxOperation(
@@ -270,16 +347,32 @@ private fun PolicyRule.toDeletedOutboxOperation(
             .put("updated_at", deletedAt)
             .put("deleted_at", deletedAt)
             .toString()
-    return outboxOperation(POLICY_RULES_TABLE, payload, now)
+    return outboxOperation(
+        tableName = POLICY_RULES_TABLE,
+        rowId = id,
+        payload = payload,
+        now = now,
+        requestId = UUID.randomUUID().toString(),
+        aggregateId = policyId,
+        deviceId = "",
+        revision = now,
+        priority = POLICY_DEPENDENT_PRIORITY,
+    )
 }
 
 private fun outboxOperation(
     tableName: String,
+    rowId: String,
     payload: String,
     now: Long,
+    requestId: String,
+    aggregateId: String,
+    deviceId: String,
+    revision: Long,
+    priority: Int,
 ): OutboxOperationEntity =
     OutboxOperationEntity(
-        id = UUID.randomUUID().toString(),
+        id = "$tableName:$rowId",
         tableName = tableName,
         operation = UPSERT_OPERATION,
         payload = payload,
@@ -287,9 +380,16 @@ private fun outboxOperation(
         attemptCount = 0,
         createdAtEpochMillis = now,
         updatedAtEpochMillis = now,
+        requestId = requestId,
+        aggregateId = aggregateId,
+        deviceId = deviceId.takeIf { it.isNotBlank() },
+        revision = revision,
+        priority = priority,
     )
 
 private const val POLICIES_TABLE = "policies"
 private const val POLICY_RULES_TABLE = "policy_rules"
 private const val UPSERT_OPERATION = "Upsert"
 private const val PENDING_STATUS = "Pending"
+private const val POLICY_PARENT_PRIORITY = 100
+private const val POLICY_DEPENDENT_PRIORITY = 90

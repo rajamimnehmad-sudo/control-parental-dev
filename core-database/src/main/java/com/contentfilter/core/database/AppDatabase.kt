@@ -9,6 +9,7 @@ import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.DeviceDao
 import com.contentfilter.core.database.dao.ExtraTimeGrantDao
+import com.contentfilter.core.database.dao.InstalledAppDao
 import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.dao.PolicyDao
 import com.contentfilter.core.database.dao.SyncCursorDao
@@ -23,6 +24,7 @@ import com.contentfilter.core.database.entity.DailyLimitEntity
 import com.contentfilter.core.database.entity.DeviceActivationEntity
 import com.contentfilter.core.database.entity.DeviceEntity
 import com.contentfilter.core.database.entity.ExtraTimeGrantEntity
+import com.contentfilter.core.database.entity.InstalledAppEntity
 import com.contentfilter.core.database.entity.OutboxOperationEntity
 import com.contentfilter.core.database.entity.PolicyEntity
 import com.contentfilter.core.database.entity.PolicyRuleEntity
@@ -48,8 +50,9 @@ import com.contentfilter.core.database.entity.UsageSessionEntity
         OutboxOperationEntity::class,
         AppGroupEntity::class,
         AppGroupAppEntity::class,
+        InstalledAppEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -78,4 +81,6 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun outboxOperationDao(): OutboxOperationDao
 
     abstract fun appGroupDao(): AppGroupDao
+
+    abstract fun installedAppDao(): InstalledAppDao
 }

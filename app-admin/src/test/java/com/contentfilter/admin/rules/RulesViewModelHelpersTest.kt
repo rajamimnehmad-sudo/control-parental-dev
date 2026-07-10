@@ -3,6 +3,7 @@ package com.contentfilter.admin.rules
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
+import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
@@ -11,7 +12,6 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
-import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -165,6 +165,55 @@ class RulesViewModelHelpersTest {
         assertTrue(controls.first().allowed)
     }
 
+    @Test
+    fun `cached app order stays stable when remote merge order changes`() {
+        val first =
+            listOf(
+                remoteApp("Zeta", "com.example.zeta"),
+                remoteApp("Alpha", "com.example.alpha"),
+            ).toAppControls(
+                rules = emptyList(),
+                limits = emptyList(),
+                grants = emptyList(),
+                appGroups = emptyList(),
+                nowEpochMillis = NowEpochMillis,
+                devices = listOf(Device(id = DeviceId, accountId = AccountId, displayName = "Usuario")),
+                pendingAllowed = emptyMap(),
+            )
+        val refreshed =
+            listOf(
+                remoteApp("Alpha", "com.example.alpha"),
+                remoteApp("Zeta", "com.example.zeta"),
+            ).toAppControls(
+                rules = emptyList(),
+                limits = emptyList(),
+                grants = emptyList(),
+                appGroups = emptyList(),
+                nowEpochMillis = NowEpochMillis,
+                devices = listOf(Device(id = DeviceId, accountId = AccountId, displayName = "Usuario")),
+                pendingAllowed = emptyMap(),
+            )
+
+        assertEquals(first.map { it.packageName }, refreshed.map { it.packageName })
+    }
+
+    @Test
+    fun `pending app state survives cached inventory refresh`() {
+        val control =
+            listOf(remoteApp("Example", "com.example.app")).toAppControls(
+                rules = listOf(appRule("com.example.app", RuleAction.Block)),
+                limits = emptyList(),
+                grants = emptyList(),
+                appGroups = emptyList(),
+                nowEpochMillis = NowEpochMillis,
+                devices = listOf(Device(id = DeviceId, accountId = AccountId, displayName = "Usuario")),
+                pendingAllowed = mapOf("com.example.app" to true),
+            ).single()
+
+        assertTrue(control.allowed)
+        assertTrue(control.isUpdating)
+    }
+
     private fun domainRule(
         target: String,
         action: RuleAction,
@@ -198,8 +247,8 @@ class RulesViewModelHelpersTest {
     private fun remoteApp(
         name: String,
         packageName: String,
-    ): RemoteInstalledAppDto =
-        RemoteInstalledAppDto(
+    ): InstalledApp =
+        InstalledApp(
             id = packageName,
             accountId = AccountId,
             deviceId = DeviceId,
@@ -208,7 +257,7 @@ class RulesViewModelHelpersTest {
             versionName = null,
             isSystemApp = false,
             iconBase64 = null,
-            updatedAt = "2026-07-06T00:00:00Z",
+            updatedAtEpochMillis = 1L,
         )
 
     private fun List<PolicyRule>.applyTo(current: List<PolicyRule>): List<PolicyRule> {

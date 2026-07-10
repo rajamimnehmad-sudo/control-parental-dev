@@ -1,6 +1,8 @@
 package com.contentfilter.core.sync
 
 import com.contentfilter.core.sync.engine.DefaultSyncEngine
+import com.contentfilter.core.sync.engine.RemoteApplier
+import com.contentfilter.core.sync.engine.RoomRemoteApplier
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.outbox.DefaultOutboxProcessor
 import com.contentfilter.core.sync.outbox.OutboxProcessor
@@ -19,6 +21,9 @@ abstract class SyncModule {
 
     @Binds
     abstract fun bindSyncEngine(engine: DefaultSyncEngine): SyncEngine
+
+    @Binds
+    abstract fun bindRemoteApplier(applier: RoomRemoteApplier): RemoteApplier
 
     @Binds
     abstract fun bindOutboxProcessor(processor: DefaultOutboxProcessor): OutboxProcessor

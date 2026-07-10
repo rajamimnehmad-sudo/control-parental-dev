@@ -48,4 +48,6 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.okhttp)
     kapt(libs.hilt.compiler)
+    testImplementation(libs.kotlin.test)
+    testImplementation("org.json:json:20240303")
 }

@@ -133,6 +133,53 @@ object DatabaseMigrations {
             }
         }
 
+    val Migration9To10: Migration =
+        object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE outbox_operations ADD COLUMN requestId TEXT")
+                db.execSQL("ALTER TABLE outbox_operations ADD COLUMN aggregateId TEXT")
+                db.execSQL("ALTER TABLE outbox_operations ADD COLUMN deviceId TEXT")
+                db.execSQL("ALTER TABLE outbox_operations ADD COLUMN revision INTEGER")
+                db.execSQL("ALTER TABLE outbox_operations ADD COLUMN priority INTEGER NOT NULL DEFAULT 0")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_outbox_operations_status_priority_createdAtEpochMillis " +
+                        "ON outbox_operations(status, priority, createdAtEpochMillis)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_outbox_operations_aggregateId_status_revision " +
+                        "ON outbox_operations(aggregateId, status, revision)",
+                )
+                db.execSQL("ALTER TABLE daily_limits ADD COLUMN updatedAtEpochMillis INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE devices ADD COLUMN appliedPolicyId TEXT")
+                db.execSQL("ALTER TABLE devices ADD COLUMN appliedPolicyRevision INTEGER")
+                db.execSQL("ALTER TABLE devices ADD COLUMN policyAppliedAtEpochMillis INTEGER")
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS installed_apps (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        accountId TEXT NOT NULL,
+                        deviceId TEXT NOT NULL,
+                        appName TEXT NOT NULL,
+                        packageName TEXT NOT NULL,
+                        versionName TEXT,
+                        isSystemApp INTEGER NOT NULL,
+                        iconBase64 TEXT,
+                        updatedAtEpochMillis INTEGER NOT NULL
+                    )
+                    """.trimIndent(),
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_installed_apps_deviceId ON installed_apps(deviceId)")
+                db.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_installed_apps_deviceId_packageName " +
+                        "ON installed_apps(deviceId, packageName)",
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_installed_apps_updatedAtEpochMillis " +
+                        "ON installed_apps(updatedAtEpochMillis)",
+                )
+            }
+        }
+
     val All: Array<Migration> =
         arrayOf(
             Migration1To2,
@@ -143,5 +190,6 @@ object DatabaseMigrations {
             Migration6To7,
             Migration7To8,
             Migration8To9,
+            Migration9To10,
         )
 }

@@ -5,7 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.SyncScheduler
-import com.contentfilter.core.sync.engine.SyncEngine
+import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
@@ -17,6 +17,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -31,7 +32,7 @@ class UserApplication :
     lateinit var syncScheduler: SyncScheduler
 
     @Inject
-    lateinit var syncEngine: SyncEngine
+    lateinit var targetedPolicySyncCoordinator: TargetedPolicySyncCoordinator
 
     @Inject
     lateinit var realtimeSyncCoordinator: RealtimeSyncCoordinator
@@ -59,23 +60,39 @@ class UserApplication :
         runCatching { syncScheduler.schedulePeriodicSync() }
         appScope.launch {
             runCatching { localDataRepair.repairIfNeeded() }
-            if (deviceActivationRepository.currentActivation() != null) {
-                runCatching { syncScheduler.requestSync() }
-                runCatching { syncEngine.syncCoreDataFull() }
+            val activation = deviceActivationRepository.currentActivation()
+            if (activation != null) {
                 runCatching { realtimeSyncCoordinator.start() }
+                runCatching {
+                    targetedPolicySyncCoordinator.refresh(
+                        deviceId = activation.deviceId,
+                        reason = "process-start",
+                    )
+                }
+                runCatching { syncScheduler.requestSync() }
             }
         }
         appScope.launch {
             deviceActivationRepository.observeActivation()
                 .map { it?.deviceId }
                 .distinctUntilChanged()
+                .drop(1)
                 .collect {
                     val activation = deviceActivationRepository.currentActivation()
                     if (activation != null) {
                         runCatching { localDataRepair.clearStaleDataAfterActivation(activation) }
                         runCatching { installedAppPublisher.publish(activation) }
+                        runCatching {
+                            realtimeSyncCoordinator.stop()
+                            realtimeSyncCoordinator.start()
+                        }
+                        runCatching {
+                            targetedPolicySyncCoordinator.refresh(
+                                deviceId = activation.deviceId,
+                                reason = "activation",
+                            )
+                        }
                         runCatching { syncScheduler.requestSync() }
-                        runCatching { syncEngine.syncCoreDataFull() }
                     }
                 }
         }

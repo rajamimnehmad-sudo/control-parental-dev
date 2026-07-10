@@ -7,6 +7,7 @@ import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
+import com.contentfilter.core.domain.repository.InstalledAppRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
@@ -47,4 +48,7 @@ abstract class DataModule {
 
     @Binds
     abstract fun bindAppGroupRepository(repository: RoomAppGroupRepository): AppGroupRepository
+
+    @Binds
+    abstract fun bindInstalledAppRepository(repository: RoomInstalledAppRepository): InstalledAppRepository
 }

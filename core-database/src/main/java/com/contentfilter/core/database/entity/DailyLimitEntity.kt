@@ -19,4 +19,5 @@ data class DailyLimitEntity(
     val target: String,
     val limitMinutes: Int,
     val enabled: Boolean,
+    val updatedAtEpochMillis: Long = 0L,
 )

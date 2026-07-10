@@ -18,6 +18,8 @@ import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
+import com.contentfilter.core.sync.engine.EffectivePolicyApplicationTracker
+import com.contentfilter.core.sync.engine.PolicyConsumer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +44,7 @@ class AccessibilityPolicySnapshotProvider
         private val usageSessionRepository: UsageSessionRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
         private val localDayProvider: LocalDayProvider,
+        private val applicationTracker: EffectivePolicyApplicationTracker,
     ) {
         private val state = MutableStateFlow(AccessibilityPolicyState.initial())
         private var observationJob: Job? = null
@@ -148,6 +151,11 @@ class AccessibilityPolicySnapshotProvider
                     "googleResultsAllowed=${rules.googleResultsAllowed()} blockImages=${rules.webImagesBlocked()} " +
                     "safeSearch=${rules.safeSearchEnabled()} " +
                     "mode=${if (rules.webNavigationBlocked()) "web-blocked" else "web-open"}",
+            )
+            applicationTracker.report(
+                PolicyConsumer.Accessibility,
+                value.snapshot.id,
+                value.snapshot.version,
             )
         }
 

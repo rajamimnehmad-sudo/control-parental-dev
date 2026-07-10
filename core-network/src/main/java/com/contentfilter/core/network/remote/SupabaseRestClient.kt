@@ -46,7 +46,10 @@ class SupabaseRestClient
             withContext(Dispatchers.IO) {
                 val path =
                     buildString {
-                        append("/rest/v1/accounts?select=id,name,community_id,updated_at,deleted_at,communities(name,guide_label)")
+                        append(
+                            "/rest/v1/accounts?select=id,name,community_id,updated_at,deleted_at," +
+                                "communities(name,guide_label)",
+                        )
                         if (updatedAfterIso != null) {
                             append("&updated_at=gt.")
                             append(URLEncoder.encode(updatedAfterIso, Charsets.UTF_8.name()))
@@ -62,6 +65,36 @@ class SupabaseRestClient
                     path = "/rest/v1/${table.tableName}?select=*&order=updated_at.asc",
                     source = "Supabase select ${table.tableName}",
                 )
+            }
+
+        suspend fun selectByEquals(
+            table: SupabaseTable,
+            filters: Map<String, String>,
+            updatedAfterIso: String? = null,
+            orderColumn: String = "updated_at",
+            ascending: Boolean = true,
+        ): RemoteResult<JSONArray> =
+            withContext(Dispatchers.IO) {
+                val path =
+                    buildString {
+                        append("/rest/v1/")
+                        append(table.tableName)
+                        append("?select=*")
+                        filters.forEach { (column, value) ->
+                            append("&")
+                            append(column)
+                            append("=eq.")
+                            append(value.urlEncode())
+                        }
+                        if (updatedAfterIso != null) {
+                            append("&updated_at=gt.")
+                            append(updatedAfterIso.urlEncode())
+                        }
+                        append("&order=")
+                        append(orderColumn)
+                        append(if (ascending) ".asc" else ".desc")
+                    }
+                executeArray(path, source = "Supabase targeted select ${table.tableName}")
             }
 
         suspend fun upsert(
@@ -120,6 +153,38 @@ class SupabaseRestClient
                     }
                 } catch (exception: Exception) {
                     exceptionFailure("Supabase function $functionName", exception)
+                }
+            }
+
+        suspend fun broadcast(
+            topic: String,
+            event: String,
+            payload: JSONObject,
+        ): RemoteResult<Unit> =
+            withContext(Dispatchers.IO) {
+                val path = "/realtime/v1/api/broadcast/${topic.urlEncode()}/events/${event.urlEncode()}"
+                val request =
+                    requestBuilder(path)
+                        ?: return@withContext RemoteResult.Failure(OfflineUserMessage, retryable = true)
+                try {
+                    httpClient.newCall(
+                        request
+                            .post(payload.toString().toRequestBody(JsonMediaType))
+                            .build(),
+                    ).execute().use { response ->
+                        val responseBody = response.body?.string().orEmpty()
+                        if (response.isSuccessful) {
+                            RemoteResult.Success(Unit)
+                        } else {
+                            httpFailure(
+                                source = "Supabase realtime broadcast",
+                                code = response.code,
+                                responseBody = responseBody,
+                            )
+                        }
+                    }
+                } catch (exception: Exception) {
+                    exceptionFailure("Supabase realtime broadcast", exception)
                 }
             }
 
@@ -207,4 +272,6 @@ class SupabaseRestClient
         private companion object {
             val JsonMediaType = "application/json".toMediaType()
         }
+
+        private fun String.urlEncode(): String = URLEncoder.encode(this, Charsets.UTF_8.name()).replace("+", "%20")
     }

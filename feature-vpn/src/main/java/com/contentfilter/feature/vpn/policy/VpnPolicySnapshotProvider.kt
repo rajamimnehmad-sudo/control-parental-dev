@@ -10,11 +10,13 @@ import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.sync.engine.EffectivePolicyApplicationTracker
+import com.contentfilter.core.sync.engine.PolicyConsumer
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -33,6 +35,7 @@ class VpnPolicySnapshotProvider
         private val systemStatusRepository: SystemStatusRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
         private val telemetryReporter: VpnTelemetryReporter,
+        private val applicationTracker: EffectivePolicyApplicationTracker,
     ) {
         private val state = MutableStateFlow(VpnPolicyState.initial())
         private var observationJob: Job? = null
@@ -66,6 +69,7 @@ class VpnPolicySnapshotProvider
                             snapshot = it.snapshot,
                             strictWebBlock = it.strictWebBlockEnabled,
                         )
+                        applicationTracker.report(PolicyConsumer.Vpn, it.snapshot.id, it.snapshot.version)
                     }
                 }
         }
@@ -91,6 +95,11 @@ class VpnPolicySnapshotProvider
                     "blockImages=${state.value.snapshot.rules.webImagesBlocked()} " +
                     "safeSearch=${state.value.snapshot.rules.safeSearchEnabled()} " +
                     "mode=${if (state.value.strictWebBlockEnabled) "web-blocked" else "web-open"}",
+            )
+            applicationTracker.report(
+                PolicyConsumer.Vpn,
+                state.value.snapshot.id,
+                state.value.snapshot.version,
             )
         }
 

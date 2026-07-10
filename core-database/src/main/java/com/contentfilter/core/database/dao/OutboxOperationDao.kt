@@ -11,7 +11,7 @@ interface OutboxOperationDao {
     @Query(
         "SELECT * FROM outbox_operations " +
             "WHERE status = :status " +
-            "ORDER BY createdAtEpochMillis ASC " +
+            "ORDER BY priority DESC, createdAtEpochMillis ASC " +
             "LIMIT :limit",
     )
     suspend fun pending(
@@ -21,6 +21,36 @@ interface OutboxOperationDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(operation: OutboxOperationEntity)
+
+    @Query("SELECT * FROM outbox_operations WHERE id = :id LIMIT 1")
+    suspend fun byId(id: String): OutboxOperationEntity?
+
+    @Query(
+        "SELECT * FROM outbox_operations " +
+            "WHERE aggregateId = :aggregateId AND status = :status " +
+            "ORDER BY priority DESC, createdAtEpochMillis ASC",
+    )
+    suspend fun pendingForAggregate(
+        aggregateId: String,
+        status: String = "Pending",
+    ): List<OutboxOperationEntity>
+
+    @Query(
+        "SELECT * FROM outbox_operations " +
+            "WHERE tableName IN (:tableNames) AND status = :status " +
+            "ORDER BY priority DESC, createdAtEpochMillis ASC",
+    )
+    suspend fun pendingForTables(
+        tableNames: List<String>,
+        status: String = "Pending",
+    ): List<OutboxOperationEntity>
+
+    @Query(
+        "SELECT * FROM outbox_operations " +
+            "WHERE aggregateId = :aggregateId AND tableName = 'policies' " +
+            "ORDER BY revision DESC, updatedAtEpochMillis DESC LIMIT 1",
+    )
+    suspend fun latestPolicyOperation(aggregateId: String): OutboxOperationEntity?
 
     @Query(
         "UPDATE outbox_operations " +
@@ -33,6 +63,19 @@ interface OutboxOperationDao {
         attemptCount: Int,
         updatedAt: Long,
     )
+
+    @Query(
+        "UPDATE outbox_operations " +
+            "SET status = :status, attemptCount = :attemptCount, updatedAtEpochMillis = :updatedAt " +
+            "WHERE id = :id AND updatedAtEpochMillis = :expectedUpdatedAt",
+    )
+    suspend fun updateStatusIfCurrent(
+        id: String,
+        expectedUpdatedAt: Long,
+        status: String,
+        attemptCount: Int,
+        updatedAt: Long,
+    ): Int
 
     @Query("DELETE FROM outbox_operations")
     suspend fun deleteAll()

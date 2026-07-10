@@ -38,6 +38,9 @@ internal fun RemoteDeviceDto.toEntity(): DeviceEntity =
         accessibilityState = accessibilityState.toComponentStateName(),
         protectionAlert = protectionAlert,
         protectionUpdatedAtEpochMillis = protectionUpdatedAt?.toEpochMillis(),
+        appliedPolicyId = appliedPolicyId,
+        appliedPolicyRevision = appliedPolicyRevision,
+        policyAppliedAtEpochMillis = policyAppliedAt?.toEpochMillis(),
     )
 
 private fun String?.toComponentStateName(): String =
@@ -66,6 +69,7 @@ internal fun RemoteDailyLimitDto.toEntity(): DailyLimitEntity =
         target = target,
         limitMinutes = limitMinutes,
         enabled = enabled && deletedAt == null,
+        updatedAtEpochMillis = updatedAt.toEpochMillis(),
     )
 
 internal fun RemoteAppGroupDto.toEntity(): AppGroupEntity =

@@ -19,6 +19,7 @@ android {
 dependencies {
     implementation(project(":core-domain"))
     implementation(project(":core-policy"))
+    implementation(project(":core-sync"))
     implementation(libs.androidx.core.ktx)
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)

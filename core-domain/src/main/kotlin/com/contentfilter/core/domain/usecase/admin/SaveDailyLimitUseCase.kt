@@ -1,6 +1,7 @@
 package com.contentfilter.core.domain.usecase.admin
 
 import com.contentfilter.core.domain.model.DailyLimit
+import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 
 class SaveDailyLimitUseCase(
@@ -9,7 +10,6 @@ class SaveDailyLimitUseCase(
     suspend operator fun invoke(
         limit: DailyLimit,
         deviceId: String? = null,
-    ) {
-        repository.saveLimit(limit, deviceId)
-    }
+        requestId: String? = null,
+    ): PolicyMutationReceipt = repository.saveLimit(limit, deviceId, requestId)
 }

@@ -1,6 +1,7 @@
 package com.contentfilter.core.domain.repository
 
 import com.contentfilter.core.domain.model.DailyLimit
+import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import kotlinx.coroutines.flow.Flow
 
 /**
@@ -12,7 +13,12 @@ interface DailyLimitRepository {
     suspend fun saveLimit(
         limit: DailyLimit,
         deviceId: String? = null,
-    )
+        requestId: String? = null,
+    ): PolicyMutationReceipt
 
-    suspend fun deleteLimit(limit: DailyLimit)
+    suspend fun deleteLimit(
+        limit: DailyLimit,
+        deviceId: String? = null,
+        requestId: String? = null,
+    ): PolicyMutationReceipt
 }

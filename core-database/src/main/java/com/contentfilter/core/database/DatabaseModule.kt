@@ -2,13 +2,14 @@ package com.contentfilter.core.database
 
 import android.content.Context
 import androidx.room.Room
-import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AccessRequestDao
+import com.contentfilter.core.database.dao.AccountDao
 import com.contentfilter.core.database.dao.AppGroupDao
 import com.contentfilter.core.database.dao.DailyLimitDao
 import com.contentfilter.core.database.dao.DeviceActivationDao
 import com.contentfilter.core.database.dao.DeviceDao
 import com.contentfilter.core.database.dao.ExtraTimeGrantDao
+import com.contentfilter.core.database.dao.InstalledAppDao
 import com.contentfilter.core.database.dao.OutboxOperationDao
 import com.contentfilter.core.database.dao.PolicyDao
 import com.contentfilter.core.database.dao.SyncCursorDao
@@ -72,4 +73,7 @@ object DatabaseModule {
 
     @Provides
     fun provideAppGroupDao(database: AppDatabase): AppGroupDao = database.appGroupDao()
+
+    @Provides
+    fun provideInstalledAppDao(database: AppDatabase): InstalledAppDao = database.installedAppDao()
 }

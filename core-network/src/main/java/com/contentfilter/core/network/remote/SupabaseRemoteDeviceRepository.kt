@@ -15,6 +15,12 @@ class SupabaseRemoteDeviceRepository
         override suspend fun pullDevices(updatedAfterIso: String?): RemoteResult<List<RemoteDeviceDto>> =
             client.selectUpdatedSince(SupabaseTable.Devices, updatedAfterIso).mapArray(RemoteDeviceDto::fromJson)
 
+        override suspend fun pullDevice(deviceId: String): RemoteResult<List<RemoteDeviceDto>> =
+            client.selectByEquals(
+                table = SupabaseTable.Devices,
+                filters = mapOf("id" to deviceId),
+            ).mapArray(RemoteDeviceDto::fromJson)
+
         override suspend fun markDeviceSeen(
             deviceId: String,
             health: SystemHealthSnapshot?,
@@ -23,6 +29,25 @@ class SupabaseRemoteDeviceRepository
             val result = client.patchById(SupabaseTable.Devices, deviceId, withProtection)
             if (result is RemoteResult.Success || health == null) return result
             return client.patchById(SupabaseTable.Devices, deviceId, client.deviceSeenJson())
+        }
+
+        override suspend fun acknowledgePolicyApplied(
+            deviceId: String,
+            policyId: String,
+            revision: Long,
+        ): RemoteResult<Unit> {
+            val now = Instant.now().toString()
+            return client.patchById(
+                table = SupabaseTable.Devices,
+                id = deviceId,
+                json =
+                    JSONObject()
+                        .put("applied_policy_id", policyId)
+                        .put("applied_policy_revision", revision)
+                        .put("policy_applied_at", now)
+                        .put("last_seen_at", now)
+                        .put("updated_at", now),
+            )
         }
 
         private fun SystemHealthSnapshot.toDeviceSeenJson(): JSONObject {

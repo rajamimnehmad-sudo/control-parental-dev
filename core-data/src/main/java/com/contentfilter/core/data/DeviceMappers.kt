@@ -15,6 +15,9 @@ internal fun DeviceEntity.toDomain(): Device =
         accessibilityState = accessibilityState.toComponentState(),
         protectionAlert = protectionAlert,
         protectionUpdatedAtEpochMillis = protectionUpdatedAtEpochMillis,
+        appliedPolicyId = appliedPolicyId,
+        appliedPolicyRevision = appliedPolicyRevision,
+        policyAppliedAtEpochMillis = policyAppliedAtEpochMillis,
     )
 
 internal fun Device.toEntity(): DeviceEntity =
@@ -28,6 +31,9 @@ internal fun Device.toEntity(): DeviceEntity =
         accessibilityState = accessibilityState.name,
         protectionAlert = protectionAlert,
         protectionUpdatedAtEpochMillis = protectionUpdatedAtEpochMillis,
+        appliedPolicyId = appliedPolicyId,
+        appliedPolicyRevision = appliedPolicyRevision,
+        policyAppliedAtEpochMillis = policyAppliedAtEpochMillis,
     )
 
 private fun String.toComponentState(): ComponentState =
