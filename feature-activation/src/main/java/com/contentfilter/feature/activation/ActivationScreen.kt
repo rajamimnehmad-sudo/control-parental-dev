@@ -48,30 +48,26 @@ fun ActivationScreen(
             subtitle = "Este teléfono se conecta a tu comunidad con un token temporal.",
             accent = ProductTeal,
         )
-        if (state.activated) {
-            FeedbackBanner(text = state.message)
-        } else {
-            if (notice.isNotBlank()) {
-                FeedbackBanner(text = notice, isError = true)
-            }
-            ProductCard {
-                OutlinedTextField(
-                    value = state.activationCode,
-                    onValueChange = onActivationCodeChanged,
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text("Token del administrador") },
-                    singleLine = true,
-                )
-                ProgressActionButton(
-                    onClick = onActivate,
-                    enabled = !state.isLoading,
-                    loading = state.isLoading,
-                    loadingText = "Enlazando...",
-                    successText = "Dispositivo enlazado",
-                    text = "Enlazar",
-                )
-            }
-            FeedbackBanner(text = state.message, isError = state.message.startsWith("No se pudo"))
+        if (notice.isNotBlank()) {
+            FeedbackBanner(text = notice, isError = true)
         }
+        ProductCard {
+            OutlinedTextField(
+                value = state.activationCode,
+                onValueChange = onActivationCodeChanged,
+                modifier = Modifier.fillMaxWidth(),
+                label = { Text("Token del administrador") },
+                singleLine = true,
+            )
+            ProgressActionButton(
+                onClick = onActivate,
+                enabled = !state.isLoading,
+                loading = state.isLoading,
+                loadingText = "Enlazando...",
+                successText = "Dispositivo enlazado",
+                text = "Enlazar",
+            )
+        }
+        FeedbackBanner(text = state.message, isError = state.message.startsWith("No se pudo"))
     }
 }
