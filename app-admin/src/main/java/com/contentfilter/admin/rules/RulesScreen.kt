@@ -1113,7 +1113,7 @@ private fun WebNavigationPanel(
             )
             WebSwitchRow(
                 title = "Bloquear fotos/imágenes",
-                description = "Bloquea Google Imágenes y dominios obvios de galerías.",
+                description = "Filtra vistas de imágenes, miniaturas y hosts multimedia compatibles.",
                 checked = imagesBlocked,
                 enabled = !imagesSaving,
                 saving = imagesSaving,

@@ -139,19 +139,52 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `web preferences that do not change routing avoid a tunnel reconnect`() {
+    fun `external result preference does not reconnect the tunnel`() {
         val restricted =
             state(
                 rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false),
-                rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow),
             )
         val released =
             state(
                 rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
-                rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow).copy(enabled = false),
             )
 
         assertEquals(restricted.vpnReconnectKey, released.vpnReconnectKey)
+    }
+
+    @Test
+    fun `SafeSearch and images reconnect open tunnel and enable encrypted DNS enforcement`() {
+        val open = state()
+        val safeSearch = state(rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow))
+        val images = state(rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block))
+        val both =
+            state(
+                rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow),
+                rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block),
+            )
+
+        assertFalse(open.encryptedDnsEnforcementEnabled)
+        assertTrue(safeSearch.encryptedDnsEnforcementEnabled)
+        assertTrue(images.encryptedDnsEnforcementEnabled)
+        assertTrue(both.encryptedDnsEnforcementEnabled)
+        assertNotEquals(open.vpnReconnectKey, safeSearch.vpnReconnectKey)
+        assertNotEquals(open.vpnReconnectKey, images.vpnReconnectKey)
+        assertNotEquals(safeSearch.vpnReconnectKey, both.vpnReconnectKey)
+    }
+
+    @Test
+    fun `preference changes while globally blocked reuse strict tunnel`() {
+        val main = rule(WebNavigationPolicy.RuleTarget, RuleAction.Block)
+        val blocked = state(main)
+        val blockedWithSafeSearch =
+            state(
+                main,
+                rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow),
+                rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block),
+            )
+
+        assertEquals(blocked.vpnReconnectKey, blockedWithSafeSearch.vpnReconnectKey)
+        assertFalse(blockedWithSafeSearch.encryptedDnsEnforcementEnabled)
     }
 
     @Test
@@ -197,6 +230,21 @@ class VpnPolicyStateTest {
             )
 
         val resolved = VpnPolicyState.resolveSnapshot(current = current, candidate = emptyLocal)
+
+        assertEquals(current, resolved)
+    }
+
+    @Test
+    fun `older revision cannot disable newer SafeSearch policy`() {
+        val current =
+            PolicySnapshot(
+                id = "remote-policy",
+                version = 3L,
+                rules = listOf(rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow)),
+            )
+        val stale = current.copy(version = 2L, rules = current.rules.map { it.copy(enabled = false) })
+
+        val resolved = VpnPolicyState.resolveSnapshot(current = current, candidate = stale)
 
         assertEquals(current, resolved)
     }

@@ -5,6 +5,8 @@ import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
+import com.contentfilter.core.domain.model.safeSearchEnabled
+import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.policy.SearchProtectionPolicyDefaults
 
@@ -15,8 +17,16 @@ data class VpnPolicyState(
     val strictWebBlockEnabled: Boolean
         get() = snapshot.rules.webNavigationBlocked()
 
+    val encryptedDnsEnforcementEnabled: Boolean
+        get() = !strictWebBlockEnabled && (snapshot.rules.safeSearchEnabled() || snapshot.rules.webImagesBlocked())
+
     val vpnReconnectKey: String
-        get() = "strict=$strictWebBlockEnabled"
+        get() =
+            if (strictWebBlockEnabled) {
+                "strict=true"
+            } else {
+                "strict=false;safeSearch=${snapshot.rules.safeSearchEnabled()};images=${snapshot.rules.webImagesBlocked()}"
+            }
 
     companion object {
         const val SafeDefaultPolicyId = SearchProtectionPolicyDefaults.SafeDefaultPolicyId
@@ -44,6 +54,7 @@ data class VpnPolicyState(
             candidate: PolicySnapshot,
         ): PolicySnapshot =
             when {
+                candidate.id == current.id && candidate.version < current.version -> current
                 candidate.isEmptyLocalDefault() &&
                     current.rules.isNotEmpty() &&
                     current.id != SafeDefaultPolicyId -> current

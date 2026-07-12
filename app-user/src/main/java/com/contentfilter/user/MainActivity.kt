@@ -436,7 +436,7 @@ private fun UserWebTab(
             title = "Fotos e imágenes",
             value =
                 if (state.imagesBlocked) {
-                    "Bloqueadas"
+                    "Filtrado activo"
                 } else {
                     "Permitidas"
                 },

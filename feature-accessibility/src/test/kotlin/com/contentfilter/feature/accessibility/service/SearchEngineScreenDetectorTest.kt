@@ -8,7 +8,9 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 class SearchEngineScreenDetectorTest {
     @Test
@@ -114,6 +116,66 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
+    fun `image filtering goes back from media search without closing browser`() {
+        val diagnosis =
+            SearchEngineScreenDetector().diagnose(
+                packageName = Chrome,
+                snapshot =
+                    snapshot(
+                        rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block),
+                        rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
+                    ),
+                currentHost = "google.com",
+                mediaSearchView = true,
+                elapsedRealtimeMillis = 100L,
+            )
+
+        assertEquals(SearchNavigationAction.GoBack, diagnosis.action)
+        assertEquals("media-search-view-blocked", diagnosis.reason)
+        assertTrue(diagnosis.imagesBlocked)
+        assertTrue(diagnosis.mediaSearchView)
+    }
+
+    @Test
+    fun `image search remains available when image filtering is off`() {
+        val diagnosis =
+            SearchEngineScreenDetector().diagnose(
+                packageName = Chrome,
+                snapshot = snapshot(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow)),
+                currentHost = "bing.com",
+                mediaSearchView = true,
+                elapsedRealtimeMillis = 100L,
+            )
+
+        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
+        assertFalse(diagnosis.imagesBlocked)
+    }
+
+    @Test
+    fun `private Chrome session receives the same image and web decisions`() {
+        val policy = snapshot(rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block))
+        val normal =
+            SearchEngineScreenDetector().diagnose(
+                packageName = Chrome,
+                snapshot = policy,
+                currentHost = "duckduckgo.com",
+                mediaSearchView = true,
+                elapsedRealtimeMillis = 100L,
+            )
+        val private =
+            SearchEngineScreenDetector().diagnose(
+                packageName = Chrome,
+                snapshot = policy,
+                currentHost = "duckduckgo.com",
+                mediaSearchView = true,
+                elapsedRealtimeMillis = 101L,
+            )
+
+        assertEquals(normal.action, private.action)
+        assertEquals(normal.reason, private.reason)
+    }
+
+    @Test
     fun `recent search engine signal handles transition from search app to browser`() {
         val diagnosis =
             SearchEngineScreenDetector().diagnose(
@@ -161,6 +223,33 @@ class SearchEngineScreenDetectorTest {
         )
         assertEquals("bing.com", SearchEngineScreenDetector.hostFromAddressBarText("www.bing.com/search"))
         assertNull(SearchEngineScreenDetector.hostFromAddressBarText("Buscar o escribir dirección"))
+    }
+
+    @Test
+    fun `address parser retains only host and media classification`() {
+        val google =
+            SearchEngineScreenDetector.addressObservationFromAddressBarText(
+                "https://www.google.com/search?q=private&tbm=isch",
+            )
+        val bing =
+            SearchEngineScreenDetector.addressObservationFromAddressBarText(
+                "https://www.bing.com/videos/search?q=private",
+            )
+        val yahoo =
+            SearchEngineScreenDetector.addressObservationFromAddressBarText(
+                "https://images.search.yahoo.com/search/images?p=private",
+            )
+        val duckDuckGo =
+            SearchEngineScreenDetector.addressObservationFromAddressBarText(
+                "https://duckduckgo.com/?q=private&ia=images",
+            )
+
+        assertEquals("google.com", google?.host)
+        assertTrue(google?.mediaSearchView == true)
+        assertTrue(bing?.mediaSearchView == true)
+        assertTrue(yahoo?.mediaSearchView == true)
+        assertTrue(duckDuckGo?.mediaSearchView == true)
+        assertFalse(google.toString().contains("private"))
     }
 
     private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =

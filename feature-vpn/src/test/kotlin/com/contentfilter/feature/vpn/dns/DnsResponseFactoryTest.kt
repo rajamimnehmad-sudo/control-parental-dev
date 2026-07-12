@@ -1,5 +1,6 @@
 package com.contentfilter.feature.vpn.dns
 
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
 
@@ -22,11 +23,44 @@ class DnsResponseFactoryTest {
         assertEquals("forcesafesearch.google.com", decodeName(packet, targetOffset))
     }
 
-    private fun question(domain: String): DnsQuestion =
+    @Test
+    fun `Google Bing and DuckDuckGo use their strict DNS targets`() {
+        mapOf(
+            "google.com" to "forcesafesearch.google.com",
+            "bing.com" to "strict.bing.com",
+            "duckduckgo.com" to "safe.duckduckgo.com",
+        ).forEach { (domain, expectedTarget) ->
+            val target = SearchEngineCatalog.safeSearchDnsTarget(domain)
+            val packet = DnsResponseFactory().cnamePacket(question(domain), requireNotNull(target))
+            val targetOffset =
+                Ipv4HeaderSize + UdpHeaderSize + DnsHeaderSize +
+                    encodedNameSize(domain) + QuestionTrailerSize + AnswerFixedSize
+
+            assertEquals(expectedTarget, decodeName(packet, targetOffset))
+        }
+    }
+
+    @Test
+    fun `SafeSearch rewrite also answers Chromium HTTPS DNS records`() {
+        val packet =
+            DnsResponseFactory().cnamePacket(
+                question = question(domain = "google.com", type = DnsTypeHttps),
+                canonicalName = "forcesafesearch.google.com",
+            )
+        val dnsOffset = Ipv4HeaderSize + UdpHeaderSize
+        val typeOffset = dnsOffset + DnsHeaderSize + encodedNameSize("google.com")
+
+        assertEquals(DnsTypeHttps, readUInt16(packet, typeOffset))
+    }
+
+    private fun question(
+        domain: String,
+        type: Int = DnsTypeA,
+    ): DnsQuestion =
         DnsQuestion(
             transactionId = 0x1234,
             domain = domain,
-            type = DnsTypeA,
+            type = type,
             sourceAddress = byteArrayOf(10, 0, 0, 2),
             destinationAddress = byteArrayOf(8, 8, 8, 8),
             sourcePort = 53_000,
@@ -61,6 +95,7 @@ class DnsResponseFactoryTest {
         const val DnsHeaderSize = 12
         const val DnsTypeA = 1
         const val DnsTypeCname = 5
+        const val DnsTypeHttps = 65
         const val Ipv4HeaderSize = 20
         const val QuestionTrailerSize = 4
         const val UdpHeaderSize = 8

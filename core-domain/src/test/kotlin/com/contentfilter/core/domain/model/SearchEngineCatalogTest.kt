@@ -2,6 +2,7 @@ package com.contentfilter.core.domain.model
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -51,7 +52,21 @@ class SearchEngineCatalogTest {
     @Test
     fun `catalog includes secure DNS providers for blocking phase`() {
         assertTrue("dns.google" in SearchEngineCatalog.secureDnsDomains)
-        assertTrue("cloudflare-dns.com" in SearchEngineCatalog.secureDnsDomains)
+        assertTrue("chrome.cloudflare-dns.com" in SearchEngineCatalog.secureDnsDomains)
         assertTrue("dns.quad9.net" in SearchEngineCatalog.secureDnsDomains)
+        assertTrue("doh.cleanbrowsing.org" in SearchEngineCatalog.secureDnsDomains)
+        assertTrue("doh.opendns.com" in SearchEngineCatalog.secureDnsDomains)
+        assertTrue(SearchEngineCatalog.isSecureDnsProviderDomain("dns10.quad9.net"))
+        assertTrue(SearchEngineCatalog.isSecureDnsProviderDomain("www.dns.google"))
+        assertFalse(SearchEngineCatalog.isSecureDnsProviderDomain("google.com"))
+    }
+
+    @Test
+    fun `catalog includes IPv4 and IPv6 resolver routes used by Chromium providers`() {
+        assertTrue("8.8.8.8" in SearchEngineCatalog.encryptedDnsResolverAddresses)
+        assertTrue("1.1.1.1" in SearchEngineCatalog.encryptedDnsResolverAddresses)
+        assertTrue("9.9.9.9" in SearchEngineCatalog.encryptedDnsResolverAddresses)
+        assertTrue("2001:4860:4860::8888" in SearchEngineCatalog.encryptedDnsResolverAddresses)
+        assertTrue("2606:4700:4700::1111" in SearchEngineCatalog.encryptedDnsResolverAddresses)
     }
 }

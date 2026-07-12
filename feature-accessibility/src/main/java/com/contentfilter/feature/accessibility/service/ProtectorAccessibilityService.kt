@@ -199,6 +199,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 snapshot = snapshot,
                 currentHost = page.host,
                 addressBarFocused = page.addressBarFocused,
+                mediaSearchView = page.mediaSearchView,
                 recentSearchEngineId = recentSearchEngine?.engineId,
                 elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
             )
@@ -210,6 +211,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
                 "blockImages=${snapshot.rules.webImagesBlocked()} " +
                 "safeSearch=${snapshot.rules.safeSearchEnabled()} " +
+                "mediaSearchView=${diagnosis.mediaSearchView} " +
                 "searchEngine=${diagnosis.searchEngineId ?: "none"} " +
                 "action=${diagnosis.action} reason=${diagnosis.reason}",
         )
@@ -552,11 +554,16 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 if (node == null || visited >= MaxBrowserNodes) return
                 visited++
                 if (node.viewIdResourceName.isAddressBarViewId()) {
-                    val host =
-                        SearchEngineScreenDetector.hostFromAddressBarText(node.text)
-                            ?: SearchEngineScreenDetector.hostFromAddressBarText(node.contentDescription)
-                    if (host != null && (observation.host == null || node.isFocused)) {
-                        observation = BrowserPageObservation(host = host, addressBarFocused = node.isFocused)
+                    val address =
+                        SearchEngineScreenDetector.addressObservationFromAddressBarText(node.text)
+                            ?: SearchEngineScreenDetector.addressObservationFromAddressBarText(node.contentDescription)
+                    if (address != null && (observation.host == null || node.isFocused)) {
+                        observation =
+                            BrowserPageObservation(
+                                host = address.host,
+                                addressBarFocused = node.isFocused,
+                                mediaSearchView = address.mediaSearchView,
+                            )
                     }
                 }
                 for (index in 0 until node.childCount) {
@@ -588,4 +595,5 @@ class ProtectorAccessibilityService : AccessibilityService() {
 private data class BrowserPageObservation(
     val host: String? = null,
     val addressBarFocused: Boolean = false,
+    val mediaSearchView: Boolean = false,
 )

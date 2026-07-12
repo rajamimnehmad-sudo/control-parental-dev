@@ -173,6 +173,7 @@ class RulesViewModelHelpersTest {
                 preferences(
                     webBlocked = false,
                     externalResultsAllowed = false,
+                    imagesBlocked = cycle % 2 != 0,
                     safeSearch = cycle % 2 == 0,
                 )
             rules = rules.webPolicyChanges(restricted, DeviceId).applyTo(rules)

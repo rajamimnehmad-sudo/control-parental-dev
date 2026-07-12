@@ -350,6 +350,46 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
+    fun `SafeSearch enforcement is identical for normal and private browser sessions`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(target = WebNavigationPolicy.SafeSearchTarget, action = RuleAction.Allow),
+                    ),
+            )
+
+        repeat(2) {
+            val decision = assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+            assertTrue(decision.safeSearchRequired)
+        }
+    }
+
+    @Test
+    fun `SafeSearch and image filtering block known encrypted DNS bootstrap hosts`() {
+        val safeSearch =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(target = WebNavigationPolicy.SafeSearchTarget, action = RuleAction.Allow),
+                    ),
+            )
+        val images =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(target = WebNavigationPolicy.ImagesBlockedTarget, action = RuleAction.Block),
+                    ),
+            )
+
+        listOf("dns.google", "chrome.cloudflare-dns.com", "dns9.quad9.net").forEach { host ->
+            assertIs<PolicyDecision.Block>(engine.evaluateDomain(safeSearch, domainContext(host)))
+            assertIs<PolicyDecision.Block>(engine.evaluateDomain(images, domainContext(host)))
+        }
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(safeSearch, domainContext("example.com")))
+    }
+
+    @Test
     fun `restricted search mode blocks top level external navigation`() {
         val snapshot =
             policy(
@@ -429,7 +469,9 @@ class DefaultPolicyEngineTest {
                     ),
             )
 
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("images.google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("encrypted-tbn8.gstatic.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("tse2.mm.bing.net")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("images.google.com")))
         assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
     }
 

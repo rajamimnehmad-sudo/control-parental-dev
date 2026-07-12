@@ -97,6 +97,12 @@ class DefaultPolicyEngine : PolicyEngine {
         ) {
             return PolicyDecision.Block("External search result navigation is restricted.")
         }
+        if (!webNavigationBlocked &&
+            (snapshot.rules.safeSearchEnabled() || snapshot.rules.webImagesBlocked()) &&
+            SearchEngineCatalog.isSecureDnsProviderDomain(normalizedContext.domain)
+        ) {
+            return PolicyDecision.Block("Encrypted DNS bypass is disabled by web protection.")
+        }
         if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
             return PolicyDecision.Allow()
         }

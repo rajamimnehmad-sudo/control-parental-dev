@@ -36,23 +36,7 @@ object WebNavigationPolicy {
             "duckduckgo.com",
         )
 
-    val ImageDomains: Set<String> =
-        setOf(
-            "images.google.com",
-            "encrypted-tbn0.gstatic.com",
-            "encrypted-tbn1.gstatic.com",
-            "encrypted-tbn2.gstatic.com",
-            "encrypted-tbn3.gstatic.com",
-            "googleusercontent.com",
-            "pinterest.com",
-            "pinimg.com",
-            "imgur.com",
-            "flickr.com",
-            "unsplash.com",
-            "pexels.com",
-            "giphy.com",
-            "tenor.com",
-        )
+    val ImageDomains: Set<String> = WebMediaCatalog.legacyImageRuleTargets
 
     fun isWebNavigationDomain(domain: String): Boolean {
         val normalized = domain.normalizedHost()
@@ -79,8 +63,7 @@ object WebNavigationPolicy {
     }
 
     fun isImageDomain(domain: String): Boolean {
-        val normalized = domain.normalizedHost()
-        return ImageDomains.any { normalized.matchesDomainTarget(it) }
+        return WebMediaCatalog.isImageAssetHost(domain)
     }
 
     private val WebNavigationDomains: Set<String> =

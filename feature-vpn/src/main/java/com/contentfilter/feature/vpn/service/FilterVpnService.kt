@@ -13,10 +13,14 @@ import com.contentfilter.core.domain.model.ProtectionAlertType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
+import com.contentfilter.core.domain.model.WebMediaCatalog
+import com.contentfilter.core.domain.model.safeSearchEnabled
+import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.sync.engine.EffectivePolicyApplicationTracker
 import com.contentfilter.core.sync.engine.PolicyConsumer
+import com.contentfilter.feature.vpn.dns.DnsEnforcementRoutePlanner
 import com.contentfilter.feature.vpn.dns.DnsForwarder
 import com.contentfilter.feature.vpn.dns.DnsPacketParser
 import com.contentfilter.feature.vpn.dns.DnsParseResult
@@ -40,7 +44,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.net.Inet4Address
 import java.net.InetAddress
 import javax.inject.Inject
 
@@ -69,6 +72,7 @@ class FilterVpnService : VpnService() {
     private var readerJob: Job? = null
     private var upstreamDnsServers: List<InetAddress> = emptyList()
     private var strictWebBlockMode = false
+    private var encryptedDnsEnforcementMode = false
     private var appliedVpnReconnectKey: String? = null
     private var requestedVpnReconnectKey: String? = null
     private var lastReportedPolicy: Pair<String, Long>? = null
@@ -119,22 +123,26 @@ class FilterVpnService : VpnService() {
                 try {
                     snapshotProvider.refresh()
                     snapshotProvider.start(scope)
-                    strictWebBlockMode = snapshotProvider.current().strictWebBlockEnabled
+                    val initialState = snapshotProvider.current()
+                    strictWebBlockMode = initialState.strictWebBlockEnabled
+                    encryptedDnsEnforcementMode = initialState.encryptedDnsEnforcementEnabled
                     upstreamDnsServers = currentDnsServers()
                     Log.i(
                         LogTag,
-                        "VPN active upstream=${upstreamDnsServers.safeAddresses()} rules=${snapshotProvider.current().snapshot.rules.size} strictWebBlock=$strictWebBlockMode",
+                        "VPN active upstream=${upstreamDnsServers.safeAddresses()} " +
+                            "rules=${initialState.snapshot.rules.size} strictWebBlock=$strictWebBlockMode " +
+                            "encryptedDnsEnforced=$encryptedDnsEnforcementMode",
                     )
-                    vpnInterface = establishVpn()
-                    val appliedState = snapshotProvider.current()
-                    appliedVpnReconnectKey = appliedState.vpnReconnectKey
+                    val establishedInterface = requireNotNull(establishVpn()) { "VPN establish returned null." }
+                    vpnInterface = establishedInterface
+                    appliedVpnReconnectKey = initialState.vpnReconnectKey
                     requestedVpnReconnectKey = null
-                    reportVpnPolicyApplied(appliedState, source = "tunnel-established")
+                    reportVpnPolicyApplied(initialState, source = "tunnel-established")
                     observeVpnReconnectPolicy(scope)
                     VpnController.markStarted(this@FilterVpnService)
                     systemStatusRepository.updateVpnState(ComponentState.Enabled)
                     telemetryReporter.recordServiceState("VPN started.")
-                    readPackets(requireNotNull(vpnInterface))
+                    readPackets(establishedInterface)
                 } catch (exception: CancellationException) {
                     throw exception
                 } catch (exception: Throwable) {
@@ -193,7 +201,12 @@ class FilterVpnService : VpnService() {
         Builder()
             .setSession("Content Filter VPN")
             .addAddress(LocalVpnAddress, LocalVpnPrefixLength)
-            .applyTrafficRoutes(upstreamDnsServers, strictWebBlockMode)
+            .addAddress(LocalVpnIpv6Address, LocalVpnIpv6PrefixLength)
+            .applyTrafficRoutes(
+                upstreamServers = upstreamDnsServers,
+                strictWebBlock = strictWebBlockMode,
+                enforceEncryptedDns = encryptedDnsEnforcementMode,
+            )
             .allowBrowserApps()
             .setMtu(DefaultMtu)
             .setBlocking(true)
@@ -202,21 +215,20 @@ class FilterVpnService : VpnService() {
     private fun Builder.applyTrafficRoutes(
         upstreamServers: List<InetAddress>,
         strictWebBlock: Boolean,
+        enforceEncryptedDns: Boolean,
     ): Builder =
         apply {
             if (strictWebBlock) {
-                upstreamServers.forEach { server -> addDnsServer(server) }
+                upstreamServers.distinctBy { it.hostAddress }.forEach { server -> addDnsServer(server) }
                 addRoute(AllIpv4Route, AllTrafficPrefixLength)
                 runCatching { addRoute(AllIpv6Route, AllTrafficPrefixLength) }
             } else {
                 upstreamServers
-                    .filterIsInstance<Inet4Address>()
-                    .forEach { server ->
-                        addDnsServer(server)
-                        server.hostAddress?.let { address ->
-                            addRoute(address, SingleIpv4HostPrefixLength)
-                        }
-                    }
+                    .distinctBy { it.hostAddress }
+                    .forEach { server -> addDnsServer(server) }
+                DnsEnforcementRoutePlanner
+                    .hostRoutes(upstreamServers, enforceEncryptedDns)
+                    .forEach { route -> addRoute(route.address, route.prefixLength) }
             }
         }
 
@@ -234,7 +246,8 @@ class FilterVpnService : VpnService() {
                         Log.i(
                             LogTag,
                             "VPN domain policy changed; reconnecting tunnel " +
-                                "revision=${state.snapshot.version} strict=${state.strictWebBlockEnabled}",
+                                "revision=${state.snapshot.version} strict=${state.strictWebBlockEnabled} " +
+                                "encryptedDnsEnforced=${state.encryptedDnsEnforcementEnabled}",
                         )
                         telemetryReporter.recordReconnectApplied("vpnReconnectKey-changed")
                         requestReconnectVpn(nextKey)
@@ -262,7 +275,10 @@ class FilterVpnService : VpnService() {
         Log.i(
             LogTag,
             "VPN effective policy applied source=$source policyId=${state.snapshot.id.take(8)} " +
-                "revision=${state.snapshot.version} strict=${state.strictWebBlockEnabled}",
+                "revision=${state.snapshot.version} strict=${state.strictWebBlockEnabled} " +
+                "safeSearch=${state.snapshot.rules.safeSearchEnabled()} " +
+                "images=${state.snapshot.rules.webImagesBlocked()} " +
+                "encryptedDnsEnforced=${state.encryptedDnsEnforcementEnabled}",
         )
         applicationTracker.report(PolicyConsumer.Vpn, state.snapshot.id, state.snapshot.version)
     }
@@ -451,7 +467,7 @@ class FilterVpnService : VpnService() {
             "SafeSearch DNS mapping applied engine=$engineId policyRevision=$policyRevision",
         )
         telemetryReporter.recordServiceState(
-            "SafeSearch DNS mapping applied engine=$engineId policyRevision=$policyRevision.",
+            "SafeSearch mechanism=dns-cname engine=$engineId policyRevision=$policyRevision.",
         )
     }
 
@@ -480,6 +496,7 @@ class FilterVpnService : VpnService() {
         vpnInterface = null
         upstreamDnsServers = emptyList()
         strictWebBlockMode = false
+        encryptedDnsEnforcementMode = false
         appliedVpnReconnectKey = null
         requestedVpnReconnectKey = null
         lastReportedPolicy = null
@@ -496,12 +513,13 @@ class FilterVpnService : VpnService() {
         private const val DefaultMtu = 1500
         private const val LocalVpnAddress = "10.8.0.2"
         private const val LocalVpnPrefixLength = 32
+        private const val LocalVpnIpv6Address = "fd00:1:fd00:1::2"
+        private const val LocalVpnIpv6PrefixLength = 128
         private const val NoBytesRead = -1
         private const val PacketBufferSize = 32 * 1024
         private const val AllIpv4Route = "0.0.0.0"
         private const val AllIpv6Route = "::"
         private const val AllTrafficPrefixLength = 0
-        private const val SingleIpv4HostPrefixLength = 32
         private const val PacketDiagnosticCooldownMillis = 5_000L
         private const val StopReasonAndroid = "android_stopped_vpn"
         private const val StopReasonApp = "app_stopped_vpn"
@@ -565,7 +583,8 @@ class FilterVpnService : VpnService() {
             val domain = normalizedDomain()
             return SearchEngineCatalog.searchEngineDomains.any { domain.matchesRuleTarget(it) } ||
                 SearchEngineCatalog.searchSupportDomains.any { domain.matchesRuleTarget(it) } ||
-                SearchEngineCatalog.secureDnsDomains.any { domain.matchesRuleTarget(it) }
+                SearchEngineCatalog.secureDnsDomains.any { domain.matchesRuleTarget(it) } ||
+                WebMediaCatalog.isImageAssetHost(domain)
         }
 
         private fun PolicyDecision.searchProtectionLabel(): String =
