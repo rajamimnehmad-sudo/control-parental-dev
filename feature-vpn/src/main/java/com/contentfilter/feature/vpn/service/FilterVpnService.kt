@@ -408,7 +408,7 @@ class FilterVpnService : VpnService() {
                 logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
-                    "DNS decision=allow domain=$domain snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()} upstream=${upstreamDnsServers.safeAddresses()}",
+                    "DNS decision=allow snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()} upstream=${upstreamDnsServers.safeAddresses()}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
                 val safeSearchTarget =
@@ -428,7 +428,7 @@ class FilterVpnService : VpnService() {
                 logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
-                    "DNS decision=grant domain=$domain snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
+                    "DNS decision=grant snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
                 forwardDns(question, output)
@@ -439,7 +439,7 @@ class FilterVpnService : VpnService() {
                 logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
-                    "DNS decision=block domain=$domain snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
+                    "DNS decision=block snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
                 output.write(responseFactory.nxdomainPacket(question))
@@ -510,7 +510,7 @@ class FilterVpnService : VpnService() {
             } else {
                 Log.w(
                     LogTag,
-                    "DNS forward failed domain=${question.domain.normalizedDomain()} upstream=${upstreamDnsServers.safeAddresses()}",
+                    "DNS forward failed upstream=${upstreamDnsServers.safeAddresses()}",
                 )
                 output.write(responseFactory.servfailPacket(question))
             }

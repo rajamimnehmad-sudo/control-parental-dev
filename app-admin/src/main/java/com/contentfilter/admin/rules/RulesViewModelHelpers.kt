@@ -202,7 +202,7 @@ internal fun List<PolicyRule>.webPolicyChanges(
     planCanonical(
         target = WebNavigationPolicy.SafeSearchTarget,
         action = RuleAction.Allow,
-        enabled = desired.safeSearchEnabled,
+        enabled = true,
         priority = WebNavigationBlockPriority + 20,
     )
 
@@ -250,7 +250,7 @@ internal fun WebPolicyPreferences.withPreference(
     when (preference) {
         WebPolicyPreference.NavigationBlocked -> copy(webNavigationBlocked = enabled)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(externalSearchResultsAllowed = enabled)
-        WebPolicyPreference.SafeSearchEnabled -> copy(safeSearchEnabled = enabled)
+        WebPolicyPreference.SafeSearchEnabled -> copy(safeSearchEnabled = true)
     }
 
 internal fun List<PolicyRule>.webPolicyPreferenceChanges(

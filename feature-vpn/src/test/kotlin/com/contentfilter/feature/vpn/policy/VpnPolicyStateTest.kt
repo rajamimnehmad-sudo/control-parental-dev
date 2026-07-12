@@ -154,13 +154,13 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `SafeSearch reconnects open tunnel and enables encrypted DNS enforcement`() {
+    fun `SafeSearch is mandatory even when legacy rule is absent`() {
         val open = state()
         val safeSearch = state(rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow))
 
-        assertFalse(open.encryptedDnsEnforcementEnabled)
+        assertTrue(open.encryptedDnsEnforcementEnabled)
         assertTrue(safeSearch.encryptedDnsEnforcementEnabled)
-        assertNotEquals(open.vpnReconnectKey, safeSearch.vpnReconnectKey)
+        assertEquals(open.vpnReconnectKey, safeSearch.vpnReconnectKey)
     }
 
     @Test
@@ -182,7 +182,7 @@ class VpnPolicyStateTest {
         repeat(8) { bits ->
             val webBlocked = bits and 1 != 0
             val onlyResultsEnabled = bits and 2 == 0
-            val safeSearchEnabled = bits and 4 != 0
+            val safeSearchEnabled = true
             val state = state(*webRules(bits).toTypedArray())
 
             assertEquals(webBlocked, state.strictWebBlockEnabled)
@@ -203,7 +203,10 @@ class VpnPolicyStateTest {
 
     @Test
     fun `activating Solo resultados requests a one-time connection invalidation`() {
-        val open = state(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow))
+        val open =
+            state(
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
+            )
         val restricted =
             state(
                 rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false),

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Building2, LogOut, ShieldCheck } from "lucide-react";
+import { Building2, Database, LogOut, ShieldCheck } from "lucide-react";
 import { requireSuperAdmin } from "@/lib/auth";
 import { signOutAction } from "@/lib/actions";
 
@@ -27,6 +27,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link className="button button-secondary" href="/communities">
                 <Building2 className="h-4 w-4" />
                 Comunidades
+              </Link>
+              <Link className="button button-secondary" href="/web-protection/domain-list">
+                <Database className="h-4 w-4" />
+                Base Web
               </Link>
             </nav>
             <span className="max-w-64 truncate text-sm text-slate-500">{email}</span>

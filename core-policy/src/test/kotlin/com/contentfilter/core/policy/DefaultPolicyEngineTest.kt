@@ -21,7 +21,6 @@ import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
@@ -322,12 +321,12 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `safe default snapshot does not block without web navigation rule`() {
+    fun `safe default snapshot keeps search open while enforcing safe DNS`() {
         val snapshot = SearchProtectionPolicyDefaults.safeDefaultSnapshot()
 
         assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
         assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("dns.google")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("dns.google")))
     }
 
     @Test
@@ -469,7 +468,7 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `SafeSearch remains independent from external result navigation`() {
+    fun `legacy SafeSearch off is ignored without changing external result navigation`() {
         val safeSearchOff =
             policy(
                 rules =
@@ -486,7 +485,7 @@ class DefaultPolicyEngineTest {
             )
         val decision = assertIs<PolicyDecision.Allow>(engine.evaluateDomain(safeSearchOff, domainContext("bing.com")))
 
-        assertFalse(decision.safeSearchRequired)
+        assertTrue(decision.safeSearchRequired)
         assertIs<PolicyDecision.Block>(
             engine.evaluateDomain(
                 safeSearchOff,
@@ -518,7 +517,7 @@ class DefaultPolicyEngineTest {
         repeat(8) { bits ->
             val webBlocked = bits and 1 != 0
             val externalResultsAllowed = bits and 2 != 0
-            val safeSearchEnabled = bits and 4 != 0
+            val safeSearchEnabled = true
             val snapshot = policy(rules = webRules(bits))
 
             val searchDecision = engine.evaluateDomain(snapshot, domainContext("google.com"))

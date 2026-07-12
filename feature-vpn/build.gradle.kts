@@ -23,7 +23,9 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.okhttp)
     kapt(libs.hilt.compiler)
 
     testImplementation(libs.kotlin.test)
+    testImplementation("org.json:json:20240303")
 }

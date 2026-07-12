@@ -124,10 +124,5 @@ object WebProtectionSemantics {
     fun externalSearchResultsAllowed(onlyResultsEnabled: Boolean): Boolean = !onlyResultsEnabled
 }
 
-fun Iterable<PolicyRule>.safeSearchEnabled(): Boolean =
-    any {
-        it.enabled &&
-            it.scope == RuleScope.Domain &&
-            it.action == RuleAction.Allow &&
-            it.target == WebNavigationPolicy.SafeSearchTarget
-    }
+/** SafeSearch is a mandatory local protection. Legacy policy values are ignored. */
+fun Iterable<PolicyRule>.safeSearchEnabled(): Boolean = true

@@ -34,7 +34,7 @@ class WebNavigationPolicyTest {
 
         assertTrue(listOf(removedImageRule).externalSearchResultsAllowed())
         assertFalse(listOf(removedImageRule).onlySearchResultsEnabled())
-        assertFalse(listOf(removedImageRule).safeSearchEnabled())
+        assertTrue(listOf(removedImageRule).safeSearchEnabled())
     }
 
     @Test

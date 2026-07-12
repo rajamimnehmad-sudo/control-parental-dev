@@ -33,7 +33,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
@@ -121,7 +120,6 @@ fun RulesRoute(
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
         onOnlyResultsChanged = viewModel::setOnlyResultsEnabled,
-        onSafeSearchChanged = viewModel::setSafeSearchEnabled,
         onToggle = viewModel::toggle,
         onDelete = viewModel::delete,
     )
@@ -158,7 +156,6 @@ private fun RulesScreen(
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
-    onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -208,7 +205,6 @@ private fun RulesScreen(
                 onAppLimitSaved = onAppLimitSaved,
                 onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
                 onOnlyResultsChanged = onOnlyResultsChanged,
-                onSafeSearchChanged = onSafeSearchChanged,
                 onToggle = onToggle,
                 onDelete = onDelete,
         )
@@ -803,7 +799,6 @@ private fun UserDetailContent(
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
-    onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -936,15 +931,12 @@ private fun UserDetailContent(
                         WebNavigationPanel(
                             blocked = state.internetBlocked,
                             onlyResultsEnabled = state.onlyResultsEnabled,
-                            safeSearchEnabled = state.safeSearchEnabled,
                             presentation = state.webPanelPresentation(),
                             navigationSaving = state.pendingInternetBlocked != null,
                             onlyResultsSaving = state.pendingOnlyResultsEnabled != null,
-                            safeSearchSaving = state.pendingSafeSearchEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
                             onOnlyResultsChanged = onOnlyResultsChanged,
-                            onSafeSearchChanged = onSafeSearchChanged,
                         )
                     }
                 }
@@ -1069,15 +1061,12 @@ private fun AppsToolbar(
 private fun WebNavigationPanel(
     blocked: Boolean,
     onlyResultsEnabled: Boolean,
-    safeSearchEnabled: Boolean,
     presentation: WebPanelPresentation,
     navigationSaving: Boolean,
     onlyResultsSaving: Boolean,
-    safeSearchSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
-    onSafeSearchChanged: (Boolean) -> Unit,
 ) {
     ProductCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1106,13 +1095,10 @@ private fun WebNavigationPanel(
             }
             AnimatedVisibility(visible = presentation.showLayers) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    WebSwitchRow(
-                        title = "Forzar SafeSearch",
-                        description = "Filtra resultados en los buscadores compatibles.",
-                        checked = safeSearchEnabled,
-                        enabled = !safeSearchSaving,
-                        saving = safeSearchSaving,
-                        onCheckedChange = onSafeSearchChanged,
+                    Text(
+                        "SafeSearch se aplica automaticamente.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = HeaderMuted,
                     )
                     WebSwitchRow(
                         title = "Solo resultados",

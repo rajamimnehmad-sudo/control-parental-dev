@@ -1,9 +1,11 @@
 package com.contentfilter.feature.accessibility.service
 
 import android.accessibilityservice.AccessibilityService
+import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.widget.Toast
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
@@ -63,6 +65,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private val settingsProtectionPolicy = SettingsProtectionPolicy()
     private val searchEngineScreenDetector = SearchEngineScreenDetector()
     private val webActionDebouncer = AccessibilityWebActionDebouncer()
+    private val explicitSearchClassifier = ExplicitSearchClassifier()
     private var serviceScope: CoroutineScope? = null
     private var extraTimeExpiryJob: Job? = null
     private var extraTimeExpiryPackageName: String? = null
@@ -75,6 +78,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var blockRetryJob: Job? = null
     private var blockRetryPackageName: String? = null
     private var lastPolicyRefreshAtElapsedMillis: Long = 0L
+    private var lastExplicitSearchNoticeAt: Long = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -103,6 +107,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
+        if (blockExplicitSearchIfNeeded(event, packageName)) return
         val elapsed = clock.elapsedRealtimeMillis()
         val now = clock.nowEpochMillis()
         if (packageName.isAlwaysAllowedPackage()) {
@@ -149,6 +154,40 @@ class ProtectorAccessibilityService : AccessibilityService() {
         usageTracker.finishCurrent(elapsedRealtimeMillis, epochMillis)?.let { transition ->
             serviceScope?.launch { saveTransition(transition) }
         }
+    }
+
+    private fun blockExplicitSearchIfNeeded(
+        event: AccessibilityEvent,
+        packageName: String,
+    ): Boolean {
+        if (event.eventType != AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED) return false
+        if (packageName !in ExplicitSearchPackages) return false
+        val source = event.source ?: return false
+        if (!source.isEditable || !source.isRecognizedSearchField(packageName)) return false
+        val query = source.text?.takeIf { it.isNotBlank() } ?: return false
+        if (explicitSearchClassifier.classify(query) != ExplicitSearchDecision.BlockExplicit) return false
+        source.performAction(
+            AccessibilityNodeInfo.ACTION_SET_TEXT,
+            Bundle().apply {
+                putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, "")
+            },
+        )
+        val elapsed = clock.elapsedRealtimeMillis()
+        if (lastExplicitSearchNoticeAt == 0L || elapsed - lastExplicitSearchNoticeAt >= ExplicitSearchNoticeDebounceMillis) {
+            lastExplicitSearchNoticeAt = elapsed
+            Toast.makeText(this, "Esta búsqueda está bloqueada", Toast.LENGTH_SHORT).show()
+        }
+        Log.i(LogTag, "Explicit search decision=block package=$packageName mechanism=local-classifier")
+        return true
+    }
+
+    private fun AccessibilityNodeInfo.isRecognizedSearchField(packageName: String): Boolean {
+        val viewId = viewIdResourceName?.lowercase().orEmpty()
+        if (packageName == GoogleSearchPackage) {
+            return "search" in viewId || "query" in viewId || className?.toString()?.contains("EditText") == true
+        }
+        return AddressBarViewIdParts.any { viewId.endsWith("/id/$it") || viewId.endsWith(":id/$it") } ||
+            "search" in viewId
     }
 
     override fun onInterrupt() {
@@ -514,7 +553,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val BlockHomeRetries = 2
         const val BackgroundPolicyRefreshMillis = 1_000L
         const val PolicyChangedEventLabel = "POLICY_CHANGED"
+        const val ExplicitSearchNoticeDebounceMillis = 2_000L
+        const val GoogleSearchPackage = "com.google.android.googlequicksearchbox"
         const val LogTag = "ProtectorAccessibility"
+        val ExplicitSearchPackages = setOf("com.android.chrome", GoogleSearchPackage)
         val ExactAllowedPackageNames =
             setOf(
                 "android",

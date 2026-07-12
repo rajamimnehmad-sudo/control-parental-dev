@@ -423,9 +423,7 @@ private fun UserWebTab(
                 },
             accent = ProductSky,
         )
-        if (state.safeSearchEnabled) {
-            UserWebStatusCard(title = "Forzar SafeSearch", value = if (blocked) "Guardado" else "Activo")
-        }
+        UserWebStatusCard(title = "SafeSearch", value = if (blocked) "Automatico" else "Activo")
         if (state.onlyResultsEnabled) {
             UserWebStatusCard(title = "Solo resultados", value = if (blocked) "Guardado" else "Activo")
         }

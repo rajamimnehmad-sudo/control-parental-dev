@@ -48,7 +48,7 @@ class UserWebViewModel
 data class UserWebUiState(
     val webNavigationBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = true,
-    val safeSearchEnabled: Boolean = false,
+    val safeSearchEnabled: Boolean = true,
 ) {
     val onlyResultsEnabled: Boolean
         get() = WebProtectionSemantics.onlyResultsEnabled(externalSearchResultsAllowed)

@@ -110,7 +110,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `complete preference matrix remains independent and has no auxiliary blocks`() {
-        val combinations = (0 until 8).map(::preferencesFromBits)
+        val combinations = (0 until 4).map(::preferencesFromBits)
 
         combinations.forEach { desired ->
             val result =
@@ -125,13 +125,16 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `every Web mutation changes only its selected preference`() {
-        (0 until 8).map(::preferencesFromBits).forEach { initial ->
+        (0 until 4).map(::preferencesFromBits).forEach { initial ->
             val initialRules =
                 emptyList<PolicyRule>()
                     .webPolicyChanges(initial, DeviceId)
                     .applyTo(emptyList())
 
-            WebPolicyPreference.entries.forEach { preference ->
+            listOf(
+                WebPolicyPreference.NavigationBlocked,
+                WebPolicyPreference.ExternalSearchResultsAllowed,
+            ).forEach { preference ->
                 listOf(false, true).forEach { enabled ->
                     val result =
                         initialRules
@@ -146,7 +149,7 @@ class RulesViewModelHelpersTest {
     }
 
     @Test
-    fun `SafeSearch and Solo resultados persist independently`() {
+    fun `legacy SafeSearch off is ignored while Solo resultados persists independently`() {
         var rules =
             emptyList<PolicyRule>()
                 .webPolicyChanges(
@@ -172,7 +175,7 @@ class RulesViewModelHelpersTest {
             rules
                 .webPolicyPreferenceChanges(WebPolicyPreference.SafeSearchEnabled, false, DeviceId)
                 .applyTo(rules)
-        assertFalse(rules.safeSearchEnabledForWeb())
+        assertTrue(rules.safeSearchEnabledForWeb())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
     }
 
@@ -253,7 +256,8 @@ class RulesViewModelHelpersTest {
             ).webPanelPresentation()
         val blocked = RulesUiState(internetBlocked = true, safeSearchEnabled = true).webPanelPresentation()
 
-        assertEquals("Internet totalmente abierto", fullyOpen.headline)
+        assertEquals("Internet abierto con protecciones", fullyOpen.headline)
+        assertEquals(listOf("SafeSearch"), fullyOpen.activeLayers)
         assertEquals("Internet abierto con protecciones", protected.headline)
         assertEquals(listOf("SafeSearch", "Solo resultados"), protected.activeLayers)
         assertTrue(protected.showLayers)
@@ -300,7 +304,7 @@ class RulesViewModelHelpersTest {
                 preferences(
                     webBlocked = false,
                     externalResultsAllowed = false,
-                    safeSearch = cycle % 2 == 0,
+                    safeSearch = true,
                 )
             rules = rules.webPolicyChanges(restricted, DeviceId).applyTo(rules)
             assertEquals(restricted, rules.webPolicyPreferences())
@@ -457,19 +461,19 @@ class RulesViewModelHelpersTest {
     private fun preferences(
         webBlocked: Boolean,
         externalResultsAllowed: Boolean = false,
-        safeSearch: Boolean = false,
+        safeSearch: Boolean = true,
     ): WebPolicyPreferences =
         WebPolicyPreferences(
             webNavigationBlocked = webBlocked,
             externalSearchResultsAllowed = externalResultsAllowed,
-            safeSearchEnabled = safeSearch,
+            safeSearchEnabled = true,
         )
 
     private fun preferencesFromBits(bits: Int): WebPolicyPreferences =
         preferences(
             webBlocked = bits and 1 != 0,
             externalResultsAllowed = bits and 2 != 0,
-            safeSearch = bits and 4 != 0,
+            safeSearch = true,
         )
 
     private fun appRule(

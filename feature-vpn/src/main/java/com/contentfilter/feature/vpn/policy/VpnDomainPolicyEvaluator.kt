@@ -8,6 +8,7 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.policy.PolicyEngine
+import com.contentfilter.feature.vpn.domainlist.DynamicDomainBlocklist
 import javax.inject.Inject
 
 /**
@@ -18,6 +19,7 @@ class VpnDomainPolicyEvaluator
     constructor(
         private val policyEngine: PolicyEngine,
         private val clock: VpnClock,
+        private val domainBlocklist: DynamicDomainBlocklist,
     ) {
         private val dnsUsageTracker = DomainDnsUsageTracker()
 
@@ -29,6 +31,9 @@ class VpnDomainPolicyEvaluator
             val now = clock.nowEpochMillis()
             val minuteOfDay = clock.minuteOfDay(now)
             val normalizedDomain = domain.normalizedDomain()
+            domainBlocklist.categoryFor(normalizedDomain)?.let { category ->
+                return PolicyDecision.Block("Blocked by local domain category: $category.")
+            }
             val policyDecision =
                 policyEngine.evaluateDomain(
                     snapshot = snapshot,

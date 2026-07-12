@@ -11,15 +11,18 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.policy.DefaultPolicyEngine
+import com.contentfilter.feature.vpn.domainlist.DynamicDomainBlocklist
 import kotlin.test.Test
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class VpnDomainPolicyEvaluatorTest {
+    private val domainBlocklist = FakeDomainBlocklist()
     private val evaluator =
         VpnDomainPolicyEvaluator(
             policyEngine = DefaultPolicyEngine(),
             clock = FixedVpnClock,
+            domainBlocklist = domainBlocklist,
         )
 
     @Test
@@ -75,6 +78,15 @@ class VpnDomainPolicyEvaluatorTest {
         assertTrue(allow.safeSearchRequired)
     }
 
+    @Test
+    fun `blocks a domain supplied by the signed local list`() {
+        domainBlocklist.blockedDomain = "dynamic.example"
+
+        val decision = evaluator.evaluate("dynamic.example", snapshot(), activeHealth())
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
     private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =
         PolicySnapshot(
             id = "test",
@@ -115,6 +127,12 @@ class VpnDomainPolicyEvaluatorTest {
         override fun nowEpochMillis(): Long = FixedTime
 
         override fun minuteOfDay(epochMillis: Long): Int = 12 * 60
+    }
+
+    private class FakeDomainBlocklist : DynamicDomainBlocklist {
+        var blockedDomain: String? = null
+
+        override fun categoryFor(domain: String): String? = "adult".takeIf { domain == blockedDomain }
     }
 
     private companion object {

@@ -7,6 +7,7 @@ import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
+import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
 import com.contentfilter.user.repair.UserLocalDataRepair
@@ -16,8 +17,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -46,6 +47,9 @@ class UserApplication :
     @Inject
     lateinit var localDataRepair: UserLocalDataRepair
 
+    @Inject
+    lateinit var webDomainListUpdater: WebDomainListUpdater
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -58,6 +62,13 @@ class UserApplication :
         super.onCreate()
         runCatching { VpnController.disableDevProtection(this) }
         runCatching { syncScheduler.schedulePeriodicSync() }
+        appScope.launch {
+            webDomainListUpdater.refreshIfDue(force = true)
+            while (true) {
+                delay(WebDomainListRefreshIntervalMillis)
+                webDomainListUpdater.refreshIfDue()
+            }
+        }
         appScope.launch {
             runCatching { localDataRepair.repairIfNeeded() }
             val activation = deviceActivationRepository.currentActivation()
@@ -108,5 +119,6 @@ class UserApplication :
 
     private companion object {
         const val DeviceLicenseValidationIntervalMillis = 60_000L
+        const val WebDomainListRefreshIntervalMillis = 6 * 60 * 60 * 1_000L
     }
 }

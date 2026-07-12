@@ -1,0 +1,40 @@
+name: Actualizar base Web DEV
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      action:
+        description: Operacion de base Web DEV
+        required: true
+        default: refresh
+        type: choice
+        options:
+          - refresh
+          - publish_canary
+          - remove_canary
+
+concurrency:
+  group: update-web-domain-list-dev
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: [self-hosted, macOS, dev]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Autenticar Supabase CLI DEV
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          set -euo pipefail
+          supabase login --token "$SUPABASE_ACCESS_TOKEN" --name github-actions-domain-list
+          supabase link --project-ref syeycayasyufedwoprea
+      - name: Generar, firmar y publicar
+        env:
+          DOMAIN_LIST_SIGNING_PRIVATE_KEY_PKCS8_B64: ${{ secrets.DOMAIN_LIST_SIGNING_PRIVATE_KEY_PKCS8_B64 }}
+          ACTION: ${{ inputs.action || (github.event.schedule == '17 3 * * *' && 'refresh') || 'pending' }}
+        run: python3 scripts/web_domain_list/update_ut1.py --action "$ACTION"
