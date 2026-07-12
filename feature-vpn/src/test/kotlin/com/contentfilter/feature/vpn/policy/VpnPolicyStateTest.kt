@@ -139,7 +139,7 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `external result preference does not reconnect the tunnel`() {
+    fun `Solo resultados reconnects the tunnel to cut existing connections`() {
         val restricted =
             state(
                 rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false),
@@ -149,7 +149,8 @@ class VpnPolicyStateTest {
                 rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
             )
 
-        assertEquals(restricted.vpnReconnectKey, released.vpnReconnectKey)
+        assertNotEquals(restricted.vpnReconnectKey, released.vpnReconnectKey)
+        assertTrue(restricted.encryptedDnsEnforcementEnabled)
     }
 
     @Test
@@ -191,20 +192,21 @@ class VpnPolicyStateTest {
     fun `VPN state preserves the complete cumulative Web preference matrix`() {
         repeat(16) { bits ->
             val webBlocked = bits and 1 != 0
+            val onlyResultsEnabled = bits and 2 == 0
             val imagesBlocked = bits and 4 != 0
             val safeSearchEnabled = bits and 8 != 0
             val state = state(*webRules(bits).toTypedArray())
 
             assertEquals(webBlocked, state.strictWebBlockEnabled)
             assertEquals(
-                !webBlocked && (safeSearchEnabled || imagesBlocked),
+                !webBlocked && (onlyResultsEnabled || safeSearchEnabled || imagesBlocked),
                 state.encryptedDnsEnforcementEnabled,
             )
             if (webBlocked) {
                 assertEquals("strict=true", state.vpnReconnectKey)
             } else {
                 assertEquals(
-                    "strict=false;safeSearch=$safeSearchEnabled;images=$imagesBlocked",
+                    "strict=false;onlyResults=$onlyResultsEnabled;safeSearch=$safeSearchEnabled;images=$imagesBlocked",
                     state.vpnReconnectKey,
                 )
             }

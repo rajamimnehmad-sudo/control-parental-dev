@@ -14,6 +14,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.WebMediaCatalog
+import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.repository.PushNotificationRepository
@@ -276,6 +277,7 @@ class FilterVpnService : VpnService() {
             LogTag,
             "VPN effective policy applied source=$source policyId=${state.snapshot.id.take(8)} " +
                 "revision=${state.snapshot.version} strict=${state.strictWebBlockEnabled} " +
+                "onlyResults=${state.snapshot.rules.onlySearchResultsEnabled()} " +
                 "safeSearch=${state.snapshot.rules.safeSearchEnabled()} " +
                 "images=${state.snapshot.rules.webImagesBlocked()} " +
                 "encryptedDnsEnforced=${state.encryptedDnsEnforcementEnabled}",

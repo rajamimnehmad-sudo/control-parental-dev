@@ -391,7 +391,7 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `restricted search mode blocks top level external navigation`() {
+    fun `Solo resultados blocks every external navigation entry point`() {
         val snapshot =
             policy(
                 rules =
@@ -403,13 +403,56 @@ class DefaultPolicyEngineTest {
                     ),
             )
 
-        val decision =
-            engine.evaluateDomain(
-                snapshot,
-                domainContext("example.com", sourceDomain = "google.com", topLevelNavigation = true),
+        listOf(
+            domainContext("example.com", sourceDomain = "google.com", topLevelNavigation = true),
+            domainContext("example.com", sourceDomain = null, topLevelNavigation = true),
+            domainContext("example.com", sourceDomain = null, topLevelNavigation = false),
+            domainContext("example.com", sourceDomain = "example.com", topLevelNavigation = true),
+        ).forEach { context ->
+            assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, context))
+        }
+    }
+
+    @Test
+    fun `Solo resultados ignores manual domain exceptions`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                            action = RuleAction.Allow,
+                        ).copy(enabled = false),
+                        domainRule(target = "example.com", action = RuleAction.Allow, priority = 10_000),
+                    ),
             )
 
-        assertIs<PolicyDecision.Block>(decision)
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("example.com")))
+    }
+
+    @Test
+    fun `Solo resultados allows search engines and required support hosts`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                            action = RuleAction.Allow,
+                        ).copy(enabled = false),
+                    ),
+            )
+
+        listOf(
+            "google.com",
+            "bing.com",
+            "search.yahoo.com",
+            "duckduckgo.com",
+            "fonts.gstatic.com",
+            "forcesafesearch.google.com",
+        ).forEach { host ->
+            assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext(host)), host)
+        }
     }
 
     @Test
@@ -440,6 +483,10 @@ class DefaultPolicyEngineTest {
             policy(
                 rules =
                     listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                            action = RuleAction.Allow,
+                        ).copy(enabled = false),
                         domainRule(
                             target = WebNavigationPolicy.SafeSearchTarget,
                             action = RuleAction.Allow,
@@ -531,7 +578,7 @@ class DefaultPolicyEngineTest {
             }
 
             val encryptedDnsDecision = engine.evaluateDomain(snapshot, domainContext("dns.google"))
-            if (safeSearchEnabled || imagesBlocked) {
+            if (!externalResultsAllowed || safeSearchEnabled || imagesBlocked) {
                 assertIs<PolicyDecision.Block>(encryptedDnsDecision)
             } else {
                 assertIs<PolicyDecision.Allow>(encryptedDnsDecision)

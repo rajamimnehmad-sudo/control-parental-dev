@@ -28,6 +28,27 @@ class SearchEngineCatalogTest {
     }
 
     @Test
+    fun `Solo resultados permits engines and required technical hosts only`() {
+        listOf(
+            "google.com",
+            "bing.com",
+            "search.yahoo.com",
+            "duckduckgo.com",
+            "images.google.com",
+            "images.search.yahoo.com",
+            "fonts.gstatic.com",
+            "ssl.gstatic.com",
+            "forcesafesearch.google.com",
+            "strict.bing.com",
+            "safe.duckduckgo.com",
+        ).forEach { host ->
+            assertTrue(SearchEngineCatalog.isSearchResultsAllowedDomain(host), host)
+        }
+        assertFalse(SearchEngineCatalog.isSearchResultsAllowedDomain("example.com"))
+        assertFalse(SearchEngineCatalog.isSearchResultsAllowedDomain("maps.googleapis.com"))
+    }
+
+    @Test
     fun `catalog identifies each supported search engine without treating support hosts as result pages`() {
         assertEquals("google", SearchEngineCatalog.engineForDomain("www.google.com.ar")?.id)
         assertEquals("bing", SearchEngineCatalog.engineForDomain("www.bing.com")?.id)

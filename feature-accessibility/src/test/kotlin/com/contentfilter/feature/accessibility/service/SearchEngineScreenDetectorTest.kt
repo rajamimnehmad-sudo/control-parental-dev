@@ -56,7 +56,7 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
-    fun `restricted mode goes back when an external result opens`() {
+    fun `restricted mode leaves new external attempts to VPN without closing Chrome`() {
         val detector = SearchEngineScreenDetector()
         detector.diagnose(Chrome, snapshot(), currentHost = "google.com", elapsedRealtimeMillis = 100L)
 
@@ -68,8 +68,8 @@ class SearchEngineScreenDetectorTest {
                 elapsedRealtimeMillis = 101L,
             )
 
-        assertEquals(SearchNavigationAction.GoBack, diagnosis.action)
-        assertEquals("external-result-restricted", diagnosis.reason)
+        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
+        assertEquals("external-domain-blocked-by-vpn", diagnosis.reason)
         assertEquals("google", diagnosis.searchEngineId)
     }
 
@@ -86,7 +86,7 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
-    fun `address bar navigation is not mistaken for a result click`() {
+    fun `manual address navigation is blocked by VPN without Accessibility action`() {
         val detector = SearchEngineScreenDetector()
         detector.diagnose(Chrome, snapshot(), currentHost = "bing.com", elapsedRealtimeMillis = 100L)
 
@@ -100,7 +100,7 @@ class SearchEngineScreenDetectorTest {
             )
 
         assertEquals(SearchNavigationAction.Allow, diagnosis.action)
-        assertEquals("address-bar-navigation", diagnosis.reason)
+        assertEquals("external-domain-blocked-by-vpn", diagnosis.reason)
     }
 
     @Test
@@ -111,12 +111,12 @@ class SearchEngineScreenDetectorTest {
 
         val diagnosis = detector.diagnose(Chrome, safeSearch, currentHost = "example.com", elapsedRealtimeMillis = 101L)
 
-        assertEquals(SearchNavigationAction.GoBack, diagnosis.action)
+        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
         assertEquals("yahoo", diagnosis.searchEngineId)
     }
 
     @Test
-    fun `image filtering goes back from media search without closing browser`() {
+    fun `image filtering uses overlays without Back or Home`() {
         val diagnosis =
             SearchEngineScreenDetector().diagnose(
                 packageName = Chrome,
@@ -130,8 +130,8 @@ class SearchEngineScreenDetectorTest {
                 elapsedRealtimeMillis = 100L,
             )
 
-        assertEquals(SearchNavigationAction.GoBack, diagnosis.action)
-        assertEquals("media-search-view-blocked", diagnosis.reason)
+        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
+        assertEquals("external-results-allowed", diagnosis.reason)
         assertTrue(diagnosis.imagesBlocked)
         assertTrue(diagnosis.mediaSearchView)
     }
@@ -176,7 +176,7 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
-    fun `recent search engine signal handles transition from search app to browser`() {
+    fun `recent search signal does not trigger repeated Back for a new blocked request`() {
         val diagnosis =
             SearchEngineScreenDetector().diagnose(
                 packageName = Chrome,
@@ -186,8 +186,74 @@ class SearchEngineScreenDetectorTest {
                 elapsedRealtimeMillis = 100L,
             )
 
-        assertEquals(SearchNavigationAction.GoBack, diagnosis.action)
+        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
+        assertEquals("external-domain-blocked-by-vpn", diagnosis.reason)
         assertEquals("google", diagnosis.searchEngineId)
+    }
+
+    @Test
+    fun `activating Solo resultados on an existing external tab goes back exactly once`() {
+        val detector = SearchEngineScreenDetector()
+        val released =
+            snapshot(
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
+                version = 20L,
+            )
+        val restricted =
+            snapshot(
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false),
+                version = 21L,
+            )
+        detector.diagnose(Chrome, released, currentHost = "google.com", elapsedRealtimeMillis = 100L)
+        detector.diagnose(Chrome, released, currentHost = "example.com", elapsedRealtimeMillis = 101L)
+
+        val first = detector.diagnose(Chrome, restricted, currentHost = "example.com", elapsedRealtimeMillis = 102L)
+        val repeated = detector.diagnose(Chrome, restricted, currentHost = "example.com", elapsedRealtimeMillis = 103L)
+
+        assertEquals(SearchNavigationAction.GoBack, first.action)
+        assertEquals(SearchNavigationAction.Allow, repeated.action)
+        assertEquals("external-domain-blocked-by-vpn", repeated.reason)
+    }
+
+    @Test
+    fun `activating Solo resultados without a search origin opens default search once`() {
+        val detector = SearchEngineScreenDetector()
+        val released =
+            snapshot(
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
+                version = 30L,
+            )
+        val restricted =
+            snapshot(
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false),
+                version = 31L,
+            )
+        detector.diagnose(Chrome, released, currentHost = "example.com", elapsedRealtimeMillis = 100L)
+
+        val diagnosis =
+            detector.diagnose(Chrome, restricted, currentHost = "example.com", elapsedRealtimeMillis = 101L)
+
+        assertEquals(SearchNavigationAction.OpenDefaultSearch, diagnosis.action)
+    }
+
+    @Test
+    fun `direct favorites history redirects restored tabs and incognito require no Accessibility action`() {
+        val entryPoints = listOf("direct", "favorite", "history", "redirect", "restored", "incognito")
+
+        entryPoints.forEachIndexed { index, _ ->
+            val detector = SearchEngineScreenDetector()
+            detector.diagnose(Chrome, snapshot(), currentHost = "google.com", elapsedRealtimeMillis = 100L)
+            val diagnosis =
+                detector.diagnose(
+                    Chrome,
+                    snapshot(),
+                    currentHost = "external-$index.example",
+                    elapsedRealtimeMillis = 101L,
+                )
+
+            assertEquals(SearchNavigationAction.Allow, diagnosis.action)
+            assertEquals("external-domain-blocked-by-vpn", diagnosis.reason)
+        }
     }
 
     @Test
@@ -198,7 +264,7 @@ class SearchEngineScreenDetectorTest {
         val diagnosis = detector.diagnose(Chrome, snapshot(), currentHost = "example.com", elapsedRealtimeMillis = 102L)
 
         assertEquals(SearchNavigationAction.Allow, diagnosis.action)
-        assertEquals("no-search-transition", diagnosis.reason)
+        assertEquals("external-domain-blocked-by-vpn", diagnosis.reason)
     }
 
     @Test
@@ -234,14 +300,6 @@ class SearchEngineScreenDetectorTest {
                             mediaSearchView = true,
                             elapsedRealtimeMillis = 100L,
                         )
-                    imagesBlocked ->
-                        detector.diagnose(
-                            packageName = Chrome,
-                            snapshot = policy,
-                            currentHost = "google.com",
-                            mediaSearchView = true,
-                            elapsedRealtimeMillis = 100L,
-                        )
                     else -> {
                         detector.diagnose(Chrome, policy, currentHost = "google.com", elapsedRealtimeMillis = 100L)
                         detector.diagnose(Chrome, policy, currentHost = "example.com", elapsedRealtimeMillis = 101L)
@@ -251,9 +309,7 @@ class SearchEngineScreenDetectorTest {
             val expected =
                 when {
                     webBlocked -> SearchNavigationAction.GoHome
-                    imagesBlocked -> SearchNavigationAction.GoBack
-                    externalResultsAllowed -> SearchNavigationAction.Allow
-                    else -> SearchNavigationAction.GoBack
+                    else -> SearchNavigationAction.Allow
                 }
             assertEquals(expected, diagnosis.action)
             assertEquals(webBlocked, diagnosis.webNavigationBlocked)
@@ -299,11 +355,25 @@ class SearchEngineScreenDetectorTest {
         assertFalse(google.toString().contains("private"))
     }
 
-    private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =
+    private fun snapshot(
+        vararg rules: PolicyRule,
+        version: Long = 10L,
+    ): PolicySnapshot =
         PolicySnapshot(
             id = "test",
-            version = 10L,
-            rules = rules.toList(),
+            version = version,
+            rules =
+                rules.toList().let { provided ->
+                    if (provided.any { it.target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget }) {
+                        provided
+                    } else {
+                        provided +
+                            rule(
+                                WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                                RuleAction.Allow,
+                            ).copy(enabled = false)
+                    }
+                },
         )
 
     private fun rule(

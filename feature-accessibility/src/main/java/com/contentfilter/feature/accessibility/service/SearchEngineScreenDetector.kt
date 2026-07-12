@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.WebMediaCatalog
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
+import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import java.net.URI
@@ -11,7 +12,8 @@ import java.net.URI
 class SearchEngineScreenDetector(
     private val searchSessionWindowMillis: Long = DefaultSearchSessionWindowMillis,
 ) {
-    private var searchOrigin: SearchOrigin? = null
+    private val searchOrigins = mutableMapOf<String, SearchOrigin>()
+    private val observedPolicies = mutableMapOf<String, ObservedWebPolicy>()
 
     fun diagnose(
         packageName: String,
@@ -25,11 +27,29 @@ class SearchEngineScreenDetector(
         val packageCategory = packageName.searchSurfaceCategory()
         val webNavigationBlocked = snapshot.rules.webNavigationBlocked()
         val externalResultsAllowed = snapshot.rules.externalSearchResultsAllowed()
+        val onlyResultsEnabled = snapshot.rules.onlySearchResultsEnabled()
         val detectedEngine = SearchEngineCatalog.engineForDomain(currentHost)
-        val origin = searchOrigin?.takeIf { elapsedRealtimeMillis - it.observedAtMillis <= searchSessionWindowMillis }
-        if (origin == null) searchOrigin = null
+        val origin =
+            searchOrigins[packageName]
+                ?.takeIf { elapsedRealtimeMillis - it.observedAtMillis <= searchSessionWindowMillis }
+        if (origin == null) searchOrigins.remove(packageName)
+        val previousPolicy =
+            observedPolicies.put(
+                packageName,
+                ObservedWebPolicy(
+                    webNavigationBlocked = webNavigationBlocked,
+                    onlyResultsEnabled = onlyResultsEnabled,
+                ),
+            )
+        val onlyResultsJustActivated =
+            !webNavigationBlocked &&
+                onlyResultsEnabled &&
+                previousPolicy != null &&
+                (previousPolicy.webNavigationBlocked || previousPolicy.onlyResultsEnabled.not())
 
         if (packageCategory == SearchSurfaceCategory.NonBrowser) {
+            searchOrigins.remove(packageName)
+            observedPolicies.remove(packageName)
             return diagnosis(
                 action = SearchNavigationAction.Allow,
                 reason = "non-browser",
@@ -40,7 +60,7 @@ class SearchEngineScreenDetector(
             )
         }
         if (webNavigationBlocked) {
-            searchOrigin = null
+            searchOrigins.remove(packageName)
             return diagnosis(
                 action = SearchNavigationAction.GoHome,
                 reason = "web-navigation-blocked",
@@ -50,19 +70,18 @@ class SearchEngineScreenDetector(
                 mediaSearchView = mediaSearchView,
             )
         }
-        if (snapshot.rules.webImagesBlocked() && mediaSearchView && !addressBarFocused) {
-            searchOrigin = null
+        if (detectedEngine != null) {
+            searchOrigins[packageName] = SearchOrigin(detectedEngine.id, elapsedRealtimeMillis)
             return diagnosis(
-                action = SearchNavigationAction.GoBack,
-                reason = "media-search-view-blocked",
+                action = SearchNavigationAction.Allow,
+                reason = if (externalResultsAllowed) "external-results-allowed" else "search-results-visible",
                 snapshot = snapshot,
                 packageCategory = packageCategory,
-                engineId = detectedEngine?.id,
-                mediaSearchView = true,
+                engineId = detectedEngine.id,
+                mediaSearchView = mediaSearchView,
             )
         }
-        if (externalResultsAllowed) {
-            searchOrigin = null
+        if (externalResultsAllowed || !onlyResultsEnabled) {
             return diagnosis(
                 action = SearchNavigationAction.Allow,
                 reason = "external-results-allowed",
@@ -72,39 +91,27 @@ class SearchEngineScreenDetector(
                 mediaSearchView = mediaSearchView,
             )
         }
-        if (addressBarFocused) {
-            searchOrigin = null
-            return diagnosis(
-                action = SearchNavigationAction.Allow,
-                reason = "address-bar-navigation",
-                snapshot = snapshot,
-                packageCategory = packageCategory,
-                engineId = detectedEngine?.id,
-                mediaSearchView = mediaSearchView,
-            )
-        }
-        if (detectedEngine != null) {
-            searchOrigin = SearchOrigin(detectedEngine.id, elapsedRealtimeMillis)
-            return diagnosis(
-                action = SearchNavigationAction.Allow,
-                reason = "search-results-visible",
-                snapshot = snapshot,
-                packageCategory = packageCategory,
-                engineId = detectedEngine.id,
-                mediaSearchView = mediaSearchView,
-            )
-        }
         val effectiveOrigin =
             origin
                 ?: recentSearchEngineId?.let { SearchOrigin(it, elapsedRealtimeMillis) }
-        if (effectiveOrigin != null) searchOrigin = effectiveOrigin
-        if (currentHost != null && effectiveOrigin != null) {
+        if (effectiveOrigin != null) searchOrigins[packageName] = effectiveOrigin
+        if (currentHost != null && !SearchEngineCatalog.isSearchResultsAllowedDomain(currentHost)) {
             return diagnosis(
-                action = SearchNavigationAction.GoBack,
-                reason = "external-result-restricted",
+                action =
+                    when {
+                        !onlyResultsJustActivated -> SearchNavigationAction.Allow
+                        effectiveOrigin != null -> SearchNavigationAction.GoBack
+                        else -> SearchNavigationAction.OpenDefaultSearch
+                    },
+                reason =
+                    if (onlyResultsJustActivated) {
+                        "existing-external-page-after-search-only-enabled"
+                    } else {
+                        "external-domain-blocked-by-vpn"
+                    },
                 snapshot = snapshot,
                 packageCategory = packageCategory,
-                engineId = effectiveOrigin.engineId,
+                engineId = effectiveOrigin?.engineId,
                 mediaSearchView = mediaSearchView,
             )
         }
@@ -150,7 +157,14 @@ class SearchEngineScreenDetector(
         val observedAtMillis: Long,
     )
 
+    private data class ObservedWebPolicy(
+        val webNavigationBlocked: Boolean,
+        val onlyResultsEnabled: Boolean,
+    )
+
     companion object {
+        fun isBrowserPackage(packageName: String): Boolean = packageName in BrowserPackageNames
+
         fun addressObservationFromAddressBarText(value: CharSequence?): BrowserAddressObservation? {
             val raw = value?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return null
             if (raw.any(Char::isWhitespace) && "://" !in raw) return null
@@ -224,6 +238,7 @@ enum class SearchNavigationAction {
     Allow,
     GoBack,
     GoHome,
+    OpenDefaultSearch,
 }
 
 private enum class SearchSurfaceCategory(val label: String) {

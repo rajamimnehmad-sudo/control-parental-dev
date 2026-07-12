@@ -5,6 +5,7 @@ import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
+import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -18,14 +19,21 @@ data class VpnPolicyState(
         get() = snapshot.rules.webNavigationBlocked()
 
     val encryptedDnsEnforcementEnabled: Boolean
-        get() = !strictWebBlockEnabled && (snapshot.rules.safeSearchEnabled() || snapshot.rules.webImagesBlocked())
+        get() =
+            !strictWebBlockEnabled &&
+                (
+                    snapshot.rules.onlySearchResultsEnabled() ||
+                        snapshot.rules.safeSearchEnabled() ||
+                        snapshot.rules.webImagesBlocked()
+                )
 
     val vpnReconnectKey: String
         get() =
             if (strictWebBlockEnabled) {
                 "strict=true"
             } else {
-                "strict=false;safeSearch=${snapshot.rules.safeSearchEnabled()};images=${snapshot.rules.webImagesBlocked()}"
+                "strict=false;onlyResults=${snapshot.rules.onlySearchResultsEnabled()};" +
+                    "safeSearch=${snapshot.rules.safeSearchEnabled()};images=${snapshot.rules.webImagesBlocked()}"
             }
 
     companion object {

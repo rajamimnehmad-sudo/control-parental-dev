@@ -20,6 +20,15 @@ object WebMediaCatalog {
             "pexels.com",
             "giphy.com",
             "tenor.com",
+            "images.ctfassets.net",
+            "imagekit.io",
+            "imgix.net",
+            "res.cloudinary.com",
+            "cdninstagram.com",
+            "fbcdn.net",
+            "twimg.com",
+            "gravatar.com",
+            "wp.com",
         )
 
     private val dedicatedImageDomains =
@@ -35,6 +44,15 @@ object WebMediaCatalog {
             "media.tenor.com",
             "external-content.duckduckgo.com",
             "media.zenfs.com",
+            "images.ctfassets.net",
+            "imagekit.io",
+            "imgix.net",
+            "res.cloudinary.com",
+            "cdninstagram.com",
+            "fbcdn.net",
+            "twimg.com",
+            "gravatar.com",
+            "wp.com",
         )
 
     fun isImageAssetHost(domain: String): Boolean {

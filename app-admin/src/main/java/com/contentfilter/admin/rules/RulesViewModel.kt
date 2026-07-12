@@ -14,6 +14,7 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
+import com.contentfilter.core.domain.model.WebProtectionSemantics
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
@@ -484,17 +485,19 @@ class RulesViewModel
             )
         }
 
-        fun setExternalSearchResultsAllowed(allowed: Boolean) {
+        fun setOnlyResultsEnabled(enabled: Boolean) {
+            val externalSearchResultsAllowed =
+                WebProtectionSemantics.externalSearchResultsAllowed(enabled)
             setWebOption(
                 preference = WebPolicyPreference.ExternalSearchResultsAllowed,
-                action = "external-search-results",
-                requestedState = allowed,
+                action = "only-results",
+                requestedState = externalSearchResultsAllowed,
                 previousState = uiState.value.externalSearchResultsAllowed,
                 successMessage =
-                    if (allowed) {
-                        "Aplicado: se pueden abrir páginas desde buscadores."
+                    if (enabled) {
+                        "Solo resultados activado."
                     } else {
-                        "Aplicado: las páginas externas desde buscadores están restringidas."
+                        "Navegación completa desde buscadores activada."
                     },
             )
         }

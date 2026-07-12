@@ -165,6 +165,45 @@ class RulesViewModelHelpersTest {
     }
 
     @Test
+    fun `Internet selector maps open left and blocked right without changing layers`() {
+        val open =
+            RulesUiState(
+                internetBlocked = false,
+                externalSearchResultsAllowed = false,
+                imagesBlocked = true,
+                safeSearchEnabled = true,
+            )
+        val blocked = open.copy(internetBlocked = true)
+
+        assertEquals(InternetMode.Open, open.internetMode)
+        assertEquals(InternetMode.Blocked, blocked.internetMode)
+        assertTrue(open.webLayersVisible)
+        assertFalse(blocked.webLayersVisible)
+        assertTrue(blocked.onlyResultsEnabled)
+        assertTrue(blocked.imagesBlocked)
+        assertTrue(blocked.safeSearchEnabled)
+    }
+
+    @Test
+    fun `Web summary distinguishes fully open protected and blocked states`() {
+        val fullyOpen = RulesUiState(externalSearchResultsAllowed = true).webPanelPresentation()
+        val protected =
+            RulesUiState(
+                externalSearchResultsAllowed = false,
+                imagesBlocked = true,
+                safeSearchEnabled = true,
+            ).webPanelPresentation()
+        val blocked = RulesUiState(internetBlocked = true, imagesBlocked = true).webPanelPresentation()
+
+        assertEquals("Internet totalmente abierto", fullyOpen.headline)
+        assertEquals("Internet abierto con protecciones", protected.headline)
+        assertEquals(listOf("SafeSearch", "Imágenes", "Solo resultados"), protected.activeLayers)
+        assertTrue(protected.showLayers)
+        assertEquals("Internet bloqueado", blocked.headline)
+        assertFalse(blocked.showLayers)
+    }
+
+    @Test
     fun `blocking and unblocking web preserves every secondary preference`() {
         var rules =
             emptyList<PolicyRule>()

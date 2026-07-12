@@ -8,6 +8,7 @@ import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
+import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -23,6 +24,8 @@ import com.contentfilter.core.sync.engine.PolicyConsumer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
@@ -132,6 +135,8 @@ class AccessibilityPolicySnapshotProvider
 
         fun current(): AccessibilityPolicyState = state.value
 
+        fun observe(): StateFlow<AccessibilityPolicyState> = state.asStateFlow()
+
         fun stop() {
             observationJob?.cancel()
             observationJob = null
@@ -149,6 +154,7 @@ class AccessibilityPolicySnapshotProvider
                 "webNavigation accessibility applied source=$source policy=${value.snapshot.id.take(8)} " +
                     "version=${value.snapshot.version} webNavigationBlocked=${rules.webNavigationBlocked()} " +
                     "externalSearchResultsAllowed=${rules.externalSearchResultsAllowed()} " +
+                    "onlyResults=${rules.onlySearchResultsEnabled()} " +
                     "blockImages=${rules.webImagesBlocked()} " +
                     "safeSearch=${rules.safeSearchEnabled()} " +
                     "mode=${if (rules.webNavigationBlocked()) "web-blocked" else "web-open"}",

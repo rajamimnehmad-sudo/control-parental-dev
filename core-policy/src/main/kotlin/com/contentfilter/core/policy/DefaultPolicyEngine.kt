@@ -17,7 +17,7 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
-import com.contentfilter.core.domain.model.externalSearchResultsAllowed
+import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -82,20 +82,27 @@ class DefaultPolicyEngine : PolicyEngine {
         val normalizedContext = context.copy(domain = context.domain.normalizedDomain())
         deviceDecision(context.device)?.let { return it }
         val webNavigationBlocked = snapshot.rules.webNavigationBlocked()
+        val onlySearchResults = !webNavigationBlocked && snapshot.rules.onlySearchResultsEnabled()
         if (webNavigationBlocked &&
             WebNavigationPolicy.isWebNavigationDomain(normalizedContext.domain)
         ) {
             return PolicyDecision.Block("Blocked by web navigation policy.")
         }
-        if (!webNavigationBlocked &&
-            normalizedContext.isTopLevelNavigation &&
-            !snapshot.rules.externalSearchResultsAllowed() &&
-            WebNavigationPolicy.isExternalSearchNavigation(
-                sourceDomain = normalizedContext.sourceDomain,
-                targetDomain = normalizedContext.domain,
-            )
-        ) {
-            return PolicyDecision.Block("External search result navigation is restricted.")
+        if (onlySearchResults) {
+            if (SearchEngineCatalog.isSecureDnsProviderDomain(normalizedContext.domain)) {
+                return PolicyDecision.Block("Encrypted DNS bypass is disabled by search-only protection.")
+            }
+            if (snapshot.rules.webImagesBlocked() && WebNavigationPolicy.isImageDomain(normalizedContext.domain)) {
+                return PolicyDecision.Block("Blocked by image policy.")
+            }
+            if (WebNavigationPolicy.isSearchResultsAllowedDomain(normalizedContext.domain)) {
+                return PolicyDecision.Allow(
+                    safeSearchRequired =
+                        snapshot.rules.safeSearchEnabled() &&
+                            WebNavigationPolicy.isSearchEngineDomain(normalizedContext.domain),
+                )
+            }
+            return PolicyDecision.Block("Blocked by search-only protection.")
         }
         if (!webNavigationBlocked &&
             (snapshot.rules.safeSearchEnabled() || snapshot.rules.webImagesBlocked()) &&

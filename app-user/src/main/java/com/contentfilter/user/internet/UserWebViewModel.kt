@@ -3,6 +3,7 @@ package com.contentfilter.user.internet
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.contentfilter.core.domain.model.WebProtectionSemantics
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
@@ -49,9 +50,20 @@ class UserWebViewModel
 
 data class UserWebUiState(
     val webNavigationBlocked: Boolean = false,
-    val externalSearchResultsAllowed: Boolean = false,
+    val externalSearchResultsAllowed: Boolean = true,
     val imagesBlocked: Boolean = false,
     val safeSearchEnabled: Boolean = false,
-)
+) {
+    val onlyResultsEnabled: Boolean
+        get() = WebProtectionSemantics.onlyResultsEnabled(externalSearchResultsAllowed)
+
+    val activeLayers: List<String>
+        get() =
+            buildList {
+                if (safeSearchEnabled) add("SafeSearch")
+                if (imagesBlocked) add("Imágenes bloqueadas")
+                if (onlyResultsEnabled) add("Solo resultados")
+            }
+}
 
 private const val LogTag = "UserWebViewModel"

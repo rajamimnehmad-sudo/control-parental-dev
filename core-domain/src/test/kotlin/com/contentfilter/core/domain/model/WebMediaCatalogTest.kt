@@ -17,6 +17,10 @@ class WebMediaCatalogTest {
             "external-content.duckduckgo.com",
             "media.zenfs.com",
             "images.unsplash.com",
+            "res.cloudinary.com",
+            "cdninstagram.com",
+            "pbs.twimg.com",
+            "secure.gravatar.com",
         ).forEach { host ->
             assertTrue(WebMediaCatalog.isImageAssetHost(host), host)
         }

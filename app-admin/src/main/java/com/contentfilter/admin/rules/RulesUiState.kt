@@ -3,6 +3,7 @@ package com.contentfilter.admin.rules
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.RuleAction
+import com.contentfilter.core.domain.model.WebProtectionSemantics
 
 data class RulesUiState(
     val rules: List<PolicyRule> = emptyList(),
@@ -17,7 +18,7 @@ data class RulesUiState(
     val allowDomain: String = "",
     val allowDomainMinutes: String = "",
     val internetBlocked: Boolean = false,
-    val externalSearchResultsAllowed: Boolean = false,
+    val externalSearchResultsAllowed: Boolean = true,
     val imagesBlocked: Boolean = false,
     val safeSearchEnabled: Boolean = false,
     val internetSaving: Boolean = false,
@@ -43,7 +44,57 @@ data class RulesUiState(
     val pairingLoading: Boolean = false,
     val offlineMode: Boolean = true,
     val message: String = "",
+) {
+    val internetMode: InternetMode
+        get() = InternetMode.fromBlocked(internetBlocked)
+
+    val onlyResultsEnabled: Boolean
+        get() = WebProtectionSemantics.onlyResultsEnabled(externalSearchResultsAllowed)
+
+    val pendingOnlyResultsEnabled: Boolean?
+        get() =
+            pendingExternalSearchResultsAllowed?.let(WebProtectionSemantics::onlyResultsEnabled)
+
+    val webLayersVisible: Boolean
+        get() = internetMode == InternetMode.Open
+}
+
+enum class InternetMode {
+    Open,
+    Blocked,
+    ;
+
+    companion object {
+        fun fromBlocked(blocked: Boolean): InternetMode = if (blocked) Blocked else Open
+    }
+}
+
+internal data class WebPanelPresentation(
+    val headline: String,
+    val activeLayers: List<String>,
+    val showLayers: Boolean,
 )
+
+internal fun RulesUiState.webPanelPresentation(): WebPanelPresentation {
+    if (!webLayersVisible) {
+        return WebPanelPresentation(
+            headline = "Internet bloqueado",
+            activeLayers = emptyList(),
+            showLayers = false,
+        )
+    }
+    val layers =
+        buildList {
+            if (safeSearchEnabled) add("SafeSearch")
+            if (imagesBlocked) add("Imágenes")
+            if (onlyResultsEnabled) add("Solo resultados")
+        }
+    return WebPanelPresentation(
+        headline = if (layers.isEmpty()) "Internet totalmente abierto" else "Internet abierto con protecciones",
+        activeLayers = layers,
+        showLayers = true,
+    )
+}
 
 data class AppGroupUiState(
     val id: String,

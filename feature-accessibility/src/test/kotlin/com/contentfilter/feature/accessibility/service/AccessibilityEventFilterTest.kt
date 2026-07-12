@@ -16,6 +16,7 @@ class AccessibilityEventFilterTest {
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED))
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_WINDOWS_CHANGED))
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_FOCUSED))
+        assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_SCROLLED))
     }
 
     @Test

@@ -401,60 +401,37 @@ private fun UserWebTab(
     val protectionActive = vpnActive && accessibilityActive
     ProductVisualPage(
         title = "Web",
-        subtitle = "Bloquear navegación web",
+        subtitle = if (blocked) "Internet bloqueado" else "Internet abierto",
         onBack = onBack,
     ) {
         ProductLargeFeatureCard(
             title =
                 if (blocked) {
-                    "Navegación web bloqueada por el administrador"
+                    "Internet bloqueado"
                 } else {
-                    "Navegación web permitida"
+                    if (state.activeLayers.isEmpty()) {
+                        "Internet totalmente abierto"
+                    } else {
+                        "Internet abierto con protecciones"
+                    }
                 },
             subtitle =
                 if (blocked) {
-                    "El usuario no puede modificar este estado."
+                    "Las capas elegidas quedan guardadas hasta que el administrador abra Internet."
                 } else {
-                    "Sin bloqueo web activo desde el administrador."
+                    state.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" }
                 },
             accent = ProductSky,
         )
-        UserWebStatusCard(
-            title = "Abrir páginas desde buscadores",
-            value =
-                if (blocked && state.externalSearchResultsAllowed) {
-                    "Permitido al habilitar Web"
-                } else if (blocked) {
-                    "Restringido al habilitar Web"
-                } else if (state.externalSearchResultsAllowed) {
-                    "Permitido"
-                } else {
-                    "Restringido"
-                },
-        )
-        UserWebStatusCard(
-            title = "Fotos e imágenes",
-            value =
-                if (blocked && state.imagesBlocked) {
-                    "Filtrado al habilitar Web"
-                } else if (state.imagesBlocked) {
-                    "Filtrado activo"
-                } else {
-                    "Permitidas"
-                },
-        )
-        UserWebStatusCard(
-            title = "SafeSearch",
-            value =
-                if (blocked && state.safeSearchEnabled) {
-                    "Activo al habilitar Web"
-                } else if (state.safeSearchEnabled) {
-                    "Activo"
-                } else {
-                    "Sin forzar"
-                },
-        )
-        UserWebStatusCard(title = "Protección con IA", value = "Próximamente")
+        if (state.safeSearchEnabled) {
+            UserWebStatusCard(title = "Forzar SafeSearch", value = if (blocked) "Guardado" else "Activo")
+        }
+        if (state.imagesBlocked) {
+            UserWebStatusCard(title = "Bloquear imágenes", value = if (blocked) "Guardado" else "Activo")
+        }
+        if (state.onlyResultsEnabled) {
+            UserWebStatusCard(title = "Solo resultados", value = if (blocked) "Guardado" else "Activo")
+        }
         if (!accessibilityActive) {
             ProductCard {
                 Text("Accessibility apagado.", style = MaterialTheme.typography.bodyMedium)

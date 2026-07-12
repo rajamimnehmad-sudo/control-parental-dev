@@ -11,6 +11,7 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -64,6 +66,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
@@ -78,6 +81,7 @@ import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.StatusChip
 
@@ -116,7 +120,7 @@ fun RulesRoute(
         onAppAllowedChanged = viewModel::setAppAllowed,
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
-        onExternalSearchResultsAllowedChanged = viewModel::setExternalSearchResultsAllowed,
+        onOnlyResultsChanged = viewModel::setOnlyResultsEnabled,
         onImagesBlockedChanged = viewModel::setImagesBlocked,
         onSafeSearchChanged = viewModel::setSafeSearchEnabled,
         onToggle = viewModel::toggle,
@@ -154,7 +158,7 @@ private fun RulesScreen(
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
-    onExternalSearchResultsAllowedChanged: (Boolean) -> Unit,
+    onOnlyResultsChanged: (Boolean) -> Unit,
     onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
@@ -205,7 +209,7 @@ private fun RulesScreen(
                 onAppAllowedChanged = onAppAllowedChanged,
                 onAppLimitSaved = onAppLimitSaved,
                 onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
-                onExternalSearchResultsAllowedChanged = onExternalSearchResultsAllowedChanged,
+                onOnlyResultsChanged = onOnlyResultsChanged,
                 onImagesBlockedChanged = onImagesBlockedChanged,
                 onSafeSearchChanged = onSafeSearchChanged,
                 onToggle = onToggle,
@@ -801,7 +805,7 @@ private fun UserDetailContent(
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
-    onExternalSearchResultsAllowedChanged: (Boolean) -> Unit,
+    onOnlyResultsChanged: (Boolean) -> Unit,
     onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
@@ -935,16 +939,17 @@ private fun UserDetailContent(
                     item {
                         WebNavigationPanel(
                             blocked = state.internetBlocked,
-                            externalSearchResultsAllowed = state.externalSearchResultsAllowed,
+                            onlyResultsEnabled = state.onlyResultsEnabled,
                             imagesBlocked = state.imagesBlocked,
                             safeSearchEnabled = state.safeSearchEnabled,
+                            presentation = state.webPanelPresentation(),
                             navigationSaving = state.pendingInternetBlocked != null,
-                            externalSearchResultsSaving = state.pendingExternalSearchResultsAllowed != null,
+                            onlyResultsSaving = state.pendingOnlyResultsEnabled != null,
                             imagesSaving = state.pendingImagesBlocked != null,
                             safeSearchSaving = state.pendingSafeSearchEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
-                            onExternalSearchResultsAllowedChanged = onExternalSearchResultsAllowedChanged,
+                            onOnlyResultsChanged = onOnlyResultsChanged,
                             onImagesBlockedChanged = onImagesBlockedChanged,
                             onSafeSearchChanged = onSafeSearchChanged,
                         )
@@ -1070,84 +1075,73 @@ private fun AppsToolbar(
 @Composable
 private fun WebNavigationPanel(
     blocked: Boolean,
-    externalSearchResultsAllowed: Boolean,
+    onlyResultsEnabled: Boolean,
     imagesBlocked: Boolean,
     safeSearchEnabled: Boolean,
+    presentation: WebPanelPresentation,
     navigationSaving: Boolean,
-    externalSearchResultsSaving: Boolean,
+    onlyResultsSaving: Boolean,
     imagesSaving: Boolean,
     safeSearchSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
-    onExternalSearchResultsAllowedChanged: (Boolean) -> Unit,
+    onOnlyResultsChanged: (Boolean) -> Unit,
     onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
 ) {
     ProductCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            InternetModeSelector(
+                blocked = blocked,
+                saving = navigationSaving,
+                onBlockedChanged = onBlockedChanged,
+            )
             Text(
-                text =
-                    buildList {
-                        add(if (blocked) "Internet bloqueado" else "Internet abierto")
-                        if (!externalSearchResultsAllowed) {
-                            add(if (blocked) "Solo resultados al habilitar Web" else "Solo resultados")
-                        }
-                        if (safeSearchEnabled) add("SafeSearch activo")
-                        if (imagesBlocked) add("Imágenes bloqueadas")
-                    }.joinToString(" · "),
+                text = presentation.headline,
                 style = MaterialTheme.typography.titleSmall,
                 color = MaterialTheme.colorScheme.onSurface,
             )
-            WebSwitchRow(
-                title = "Bloquear navegación web",
-                description =
-                    if (blocked) {
-                        "Activado: navegación web bloqueada por el administrador."
-                    } else {
-                        "Desactivado: navegación web permitida."
-                    },
-                checked = blocked,
-                enabled = !navigationSaving,
-                saving = navigationSaving,
-                onCheckedChange = onBlockedChanged,
-            )
-            WebSwitchRow(
-                title = "Permitir abrir páginas desde buscadores",
-                description =
-                    if (externalSearchResultsAllowed) {
-                        "Los resultados pueden abrir páginas externas cuando Web esté permitida."
-                    } else {
-                        "Las búsquedas muestran resultados, pero las páginas externas quedan restringidas."
-                    },
-                checked = externalSearchResultsAllowed,
-                enabled = !externalSearchResultsSaving,
-                saving = externalSearchResultsSaving,
-                onCheckedChange = onExternalSearchResultsAllowedChanged,
-            )
-            WebSwitchRow(
-                title = "Bloquear fotos/imágenes",
-                description = "Filtra vistas de imágenes, miniaturas y hosts multimedia compatibles.",
-                checked = imagesBlocked,
-                enabled = !imagesSaving,
-                saving = imagesSaving,
-                onCheckedChange = onImagesBlockedChanged,
-            )
-            WebSwitchRow(
-                title = "SafeSearch activado",
-                description = "Fuerza búsqueda segura en los buscadores compatibles cuando Web esté permitida.",
-                checked = safeSearchEnabled,
-                enabled = !safeSearchSaving,
-                saving = safeSearchSaving,
-                onCheckedChange = onSafeSearchChanged,
-            )
-            WebSwitchRow(
-                title = "Protección con IA",
-                description = "Próximamente.",
-                checked = false,
-                enabled = false,
-                saving = false,
-                onCheckedChange = {},
-            )
+            if (blocked) {
+                Text(
+                    "Los navegadores no pueden abrir sitios. Tus protecciones quedan guardadas para cuando abras Internet.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = HeaderMuted,
+                )
+            } else {
+                Text(
+                    presentation.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = HeaderMuted,
+                )
+            }
+            AnimatedVisibility(visible = presentation.showLayers) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    WebSwitchRow(
+                        title = "Forzar SafeSearch",
+                        description = "Filtra resultados en los buscadores compatibles.",
+                        checked = safeSearchEnabled,
+                        enabled = !safeSearchSaving,
+                        saving = safeSearchSaving,
+                        onCheckedChange = onSafeSearchChanged,
+                    )
+                    WebSwitchRow(
+                        title = "Bloquear imágenes",
+                        description = "Cubre el contenido visual Web y bloquea hosts multimedia compatibles.",
+                        checked = imagesBlocked,
+                        enabled = !imagesSaving,
+                        saving = imagesSaving,
+                        onCheckedChange = onImagesBlockedChanged,
+                    )
+                    WebSwitchRow(
+                        title = "Solo resultados",
+                        description = "Permite buscar y ver resultados, pero bloquea todos los sitios externos.",
+                        checked = onlyResultsEnabled,
+                        enabled = !onlyResultsSaving,
+                        saving = onlyResultsSaving,
+                        onCheckedChange = onOnlyResultsChanged,
+                    )
+                }
+            }
             if (blocked && !protectionActive) {
                 FeedbackBanner(
                     "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
@@ -1155,6 +1149,93 @@ private fun WebNavigationPanel(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun InternetModeSelector(
+    blocked: Boolean,
+    saving: Boolean,
+    onBlockedChanged: (Boolean) -> Unit,
+) {
+    var dragDistance by remember { mutableStateOf(0f) }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(58.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(Color(0xFFF1F4F5))
+                    .border(1.dp, Color(0xFFD2DADD), RoundedCornerShape(8.dp))
+                    .pointerInput(blocked, saving) {
+                        if (!saving) {
+                            val swipeThreshold = 48.dp.toPx()
+                            detectHorizontalDragGestures(
+                                onDragStart = { dragDistance = 0f },
+                                onDragCancel = { dragDistance = 0f },
+                                onDragEnd = {
+                                    when {
+                                        dragDistance > swipeThreshold && !blocked -> onBlockedChanged(true)
+                                        dragDistance < -swipeThreshold && blocked -> onBlockedChanged(false)
+                                    }
+                                    dragDistance = 0f
+                                },
+                            ) { change, amount ->
+                                change.consume()
+                                dragDistance += amount
+                            }
+                        }
+                    },
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            InternetModeOption(
+                title = "INTERNET ABIERTO",
+                selected = !blocked,
+                enabled = !saving,
+                icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                onClick = { if (blocked) onBlockedChanged(false) },
+            )
+            InternetModeOption(
+                title = "INTERNET BLOQUEADO",
+                selected = blocked,
+                enabled = !saving,
+                icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                onClick = { if (!blocked) onBlockedChanged(true) },
+            )
+        }
+        if (saving) {
+            Text("Aplicando…", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
+        }
+    }
+}
+
+@Composable
+private fun androidx.compose.foundation.layout.RowScope.InternetModeOption(
+    title: String,
+    selected: Boolean,
+    enabled: Boolean,
+    icon: @Composable () -> Unit,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier =
+            Modifier
+                .weight(1f)
+                .height(58.dp)
+                .background(if (selected) ProductSky else Color.Transparent)
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(horizontal = 8.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) { icon() }
+        Text(
+            text = title,
+            modifier = Modifier.padding(start = 6.dp),
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
+        )
     }
 }
 

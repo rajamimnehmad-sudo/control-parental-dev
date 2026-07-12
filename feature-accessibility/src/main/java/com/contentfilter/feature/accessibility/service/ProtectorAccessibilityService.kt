@@ -1,6 +1,9 @@
 package com.contentfilter.feature.accessibility.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
+import android.graphics.Rect
+import android.net.Uri
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
@@ -34,6 +37,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.util.UUID
 import javax.inject.Inject
 
@@ -62,6 +66,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private val usageTracker = AppUsageTracker()
     private val settingsProtectionPolicy = SettingsProtectionPolicy()
     private val searchEngineScreenDetector = SearchEngineScreenDetector()
+    private val webActionDebouncer = AccessibilityWebActionDebouncer()
+    private val webImageOverlayController by lazy { WebImageOverlayController(this) }
     private var serviceScope: CoroutineScope? = null
     private var extraTimeExpiryJob: Job? = null
     private var extraTimeExpiryPackageName: String? = null
@@ -84,6 +90,18 @@ class ProtectorAccessibilityService : AccessibilityService() {
             refreshPolicies()
             snapshotProvider.refresh()
             snapshotProvider.start(scope)
+            launch {
+                snapshotProvider.observe().collect {
+                    withContext(Dispatchers.Main.immediate) {
+                        val packageName = rootInActiveWindow?.packageName?.toString()
+                        if (packageName == null) {
+                            webImageOverlayController.clear()
+                        } else {
+                            handleSearchEngineProtection(packageName, PolicyChangedEventLabel)
+                        }
+                    }
+                }
+            }
             systemStatusRepository.updateAccessibilityState(ComponentState.Enabled)
             telemetryReporter.recordServiceState("Accessibility service connected.")
         }
@@ -100,7 +118,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         }
         if (blockRetryPackageName != packageName) clearBlockRetry()
         if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
-        if (handleSearchEngineProtection(packageName, event.eventType)) return
+        if (handleSearchEngineProtection(packageName, AccessibilityEventFilter.label(event.eventType))) return
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
         serviceScope?.let { scope ->
@@ -130,6 +148,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         elapsedRealtimeMillis: Long,
         epochMillis: Long,
     ) {
+        webImageOverlayController.clear()
         clearBlockRetry()
         clearForegroundWatch()
         clearAppLimitDeadline()
@@ -145,6 +164,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     override fun onDestroy() {
+        webImageOverlayController.clear()
+        webActionDebouncer.clear()
         val elapsed = clock.elapsedRealtimeMillis()
         val now = clock.nowEpochMillis()
         val transition = usageTracker.finishCurrent(elapsed, now)
@@ -185,7 +206,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     private fun handleSearchEngineProtection(
         packageName: String,
-        eventType: Int,
+        eventLabel: String,
     ): Boolean {
         val page = rootInActiveWindow.browserPageObservation()
         val snapshot = snapshotProvider.current().snapshot
@@ -203,9 +224,15 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 recentSearchEngineId = recentSearchEngine?.engineId,
                 elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
             )
+        updateWebImageOverlay(
+            packageName = packageName,
+            page = page,
+            imagesBlocked = diagnosis.imagesBlocked && !diagnosis.webNavigationBlocked,
+            policyRevision = snapshot.version,
+        )
         Log.i(
             LogTag,
-            "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} " +
+            "Search protection layer=accessibility event=$eventLabel " +
                 "package=$packageName policyVersion=${snapshot.version} " +
                 "webNavigationBlocked=${diagnosis.webNavigationBlocked} " +
                 "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
@@ -217,7 +244,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         )
         serviceScope?.launch {
             telemetryReporter.recordSearchProtection(
-                eventLabel = AccessibilityEventFilter.label(eventType),
+                eventLabel = eventLabel,
                 packageName = packageName,
                 packageCategory = diagnosis.packageCategory,
                 reason = diagnosis.reason,
@@ -226,10 +253,28 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 policyRevision = diagnosis.policyRevision,
             )
         }
+        if (
+            diagnosis.action != SearchNavigationAction.Allow &&
+            !webActionDebouncer.shouldPerform(
+                packageName = packageName,
+                host = page.host,
+                policyRevision = diagnosis.policyRevision,
+                action = diagnosis.action,
+                elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
+            )
+        ) {
+            Log.i(
+                LogTag,
+                "Search protection action suppressed package=$packageName " +
+                    "policyVersion=${diagnosis.policyRevision} action=${diagnosis.action}",
+            )
+            return true
+        }
         when (diagnosis.action) {
             SearchNavigationAction.Allow -> return false
             SearchNavigationAction.GoBack -> performGlobalAction(GLOBAL_ACTION_BACK)
             SearchNavigationAction.GoHome -> performGlobalAction(GLOBAL_ACTION_HOME)
+            SearchNavigationAction.OpenDefaultSearch -> openDefaultSearch(packageName)
         }
         serviceScope?.launch {
             telemetryReporter.recordServiceState(
@@ -237,6 +282,57 @@ class ProtectorAccessibilityService : AccessibilityService() {
             )
         }
         return true
+    }
+
+    private fun updateWebImageOverlay(
+        packageName: String,
+        page: BrowserPageObservation,
+        imagesBlocked: Boolean,
+        policyRevision: Long,
+    ) {
+        val browserImagesBlocked = imagesBlocked && SearchEngineScreenDetector.isBrowserPackage(packageName)
+        if (!browserImagesBlocked) {
+            webImageOverlayController.clear()
+            return
+        }
+        val density = resources.displayMetrics.density
+        val displayBounds =
+            OverlayBounds(
+                left = 0,
+                top = 0,
+                right = resources.displayMetrics.widthPixels,
+                bottom = resources.displayMetrics.heightPixels,
+            )
+        val plan =
+            WebImageOverlayPlanner.plan(
+                imagesBlocked = true,
+                rootBounds = page.rootBounds ?: displayBounds,
+                addressBarBounds = page.addressBarBounds,
+                visualBounds = page.visualBounds,
+                individualCoverageReliable = false,
+                fallbackTopInsetPx = (96 * density).toInt(),
+                fallbackBottomInsetPx = (56 * density).toInt(),
+            )
+        webImageOverlayController.apply(plan)
+        Log.i(
+            LogTag,
+            "Web images layer package=$packageName policyVersion=$policyRevision " +
+                "coverage=${plan.coverage} placeholders=${plan.bounds.size}",
+        )
+    }
+
+    private fun openDefaultSearch(packageName: String) {
+        val intent =
+            Intent(Intent.ACTION_VIEW, Uri.parse(DefaultSearchUrl)).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                if (SearchEngineScreenDetector.isBrowserPackage(packageName)) setPackage(packageName)
+            }
+        runCatching { startActivity(intent) }
+            .recoverCatching {
+                intent.setPackage(null)
+                startActivity(intent)
+            }
+            .onFailure { Log.w(LogTag, "Unable to open default search: ${it.javaClass.simpleName}") }
     }
 
     private fun evaluateForegroundApp(
@@ -487,6 +583,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val BlockRecheckDelayMillis = 120L
         const val BlockHomeRetries = 2
         const val BackgroundPolicyRefreshMillis = 1_000L
+        const val DefaultSearchUrl = "https://www.google.com/"
+        const val PolicyChangedEventLabel = "POLICY_CHANGED"
         const val LogTag = "ProtectorAccessibility"
         val ExactAllowedPackageNames =
             setOf(
@@ -547,22 +645,29 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
         fun AccessibilityNodeInfo?.browserPageObservation(): BrowserPageObservation {
             if (this == null) return BrowserPageObservation()
-            var observation = BrowserPageObservation()
+            val rootRect = Rect().also(::getBoundsInScreen)
+            var observation = BrowserPageObservation(rootBounds = rootRect.toOverlayBounds())
             var visited = 0
 
             fun visit(node: AccessibilityNodeInfo?) {
                 if (node == null || visited >= MaxBrowserNodes) return
                 visited++
+                val nodeRect = Rect().also(node::getBoundsInScreen)
+                val nodeBounds = nodeRect.toOverlayBounds()
+                if (WebVisualNodeClassifier.isVisualNode(node.className?.toString(), node.viewIdResourceName)) {
+                    observation = observation.copy(visualBounds = observation.visualBounds + nodeBounds)
+                }
                 if (node.viewIdResourceName.isAddressBarViewId()) {
                     val address =
                         SearchEngineScreenDetector.addressObservationFromAddressBarText(node.text)
                             ?: SearchEngineScreenDetector.addressObservationFromAddressBarText(node.contentDescription)
                     if (address != null && (observation.host == null || node.isFocused)) {
                         observation =
-                            BrowserPageObservation(
+                            observation.copy(
                                 host = address.host,
                                 addressBarFocused = node.isFocused,
                                 mediaSearchView = address.mediaSearchView,
+                                addressBarBounds = nodeBounds,
                             )
                     }
                 }
@@ -575,13 +680,15 @@ class ProtectorAccessibilityService : AccessibilityService() {
             return observation
         }
 
+        fun Rect.toOverlayBounds(): OverlayBounds = OverlayBounds(left, top, right, bottom)
+
         fun String?.isAddressBarViewId(): Boolean {
             val value = this?.lowercase() ?: return false
             return AddressBarViewIdParts.any { part -> value.endsWith("/id/$part") || value.endsWith(":id/$part") } ||
                 (("url" in value || "address" in value || "location" in value) && "bar" in value)
         }
 
-        const val MaxBrowserNodes = 120
+        const val MaxBrowserNodes = 500
         val AddressBarViewIdParts =
             setOf(
                 "url_bar",
@@ -596,4 +703,7 @@ private data class BrowserPageObservation(
     val host: String? = null,
     val addressBarFocused: Boolean = false,
     val mediaSearchView: Boolean = false,
+    val rootBounds: OverlayBounds? = null,
+    val addressBarBounds: OverlayBounds? = null,
+    val visualBounds: List<OverlayBounds> = emptyList(),
 )

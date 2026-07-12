@@ -73,12 +73,31 @@ object SearchEngineCatalog {
             "clients2.google.com",
             "clients4.google.com",
             "clientservices.googleapis.com",
+            "images.google.com",
+            "images.search.yahoo.com",
+            "video.search.yahoo.com",
+            "ogs.google.com",
+            "fonts.googleapis.com",
+            "fonts.gstatic.com",
+            "ssl.gstatic.com",
         )
+
+    private val searchResultsTechnicalDomains =
+        searchNavigationSupportDomains +
+            setOf(
+                "gstatic.com",
+                "googleusercontent.com",
+                "bing.net",
+                "yimg.com",
+                "duck.com",
+            )
 
     val searchEngineDomains: List<String> =
         (engines.flatMap { it.domains } + searchNavigationSupportDomains).distinct()
 
     val searchSupportDomains: Set<String> = engines.flatMapTo(linkedSetOf()) { it.supportDomains }
+
+    val safeSearchDnsTargets: Set<String> = engines.mapNotNullTo(linkedSetOf()) { it.safeSearchDnsTarget }
 
     val encryptedDnsProviders: List<EncryptedDnsProviderDefinition> =
         listOf(
@@ -196,6 +215,13 @@ object SearchEngineCatalog {
 
     fun isSearchEngineDomain(domain: String?): Boolean = engineForDomain(domain) != null
 
+    fun isSearchResultsAllowedDomain(domain: String?): Boolean {
+        val normalized = domain.normalizedSearchHost() ?: return false
+        return isSearchEngineDomain(normalized) ||
+            searchResultsTechnicalDomains.any { normalized.matchesSearchTarget(it) } ||
+            safeSearchDnsTargets.any { normalized.matchesSearchTarget(it) }
+    }
+
     fun isSecureDnsProviderDomain(domain: String?): Boolean {
         val normalized = domain.normalizedSearchHost() ?: return false
         return secureDnsDomains.any { normalized == it || normalized.endsWith(".$it") }
@@ -217,4 +243,6 @@ object SearchEngineCatalog {
             ?.removeSuffix(".")
             ?.removePrefix("www.")
             ?.takeIf { it.isNotBlank() }
+
+    private fun String.matchesSearchTarget(target: String): Boolean = this == target || endsWith(".$target")
 }

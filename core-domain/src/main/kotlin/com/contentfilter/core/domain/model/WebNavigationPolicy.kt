@@ -50,6 +50,8 @@ object WebNavigationPolicy {
 
     fun isSearchEngineDomain(domain: String): Boolean = SearchEngineCatalog.isSearchEngineDomain(domain)
 
+    fun isSearchResultsAllowedDomain(domain: String): Boolean = SearchEngineCatalog.isSearchResultsAllowedDomain(domain)
+
     fun isExternalSearchNavigation(
         sourceDomain: String?,
         targetDomain: String,
@@ -106,6 +108,26 @@ fun Iterable<PolicyRule>.externalSearchResultsAllowed(): Boolean {
             it.action == RuleAction.Allow &&
             it.target == WebNavigationPolicy.LegacyGoogleResultsAllowedTarget
     }
+}
+
+fun Iterable<PolicyRule>.onlySearchResultsEnabled(): Boolean {
+    val hasExternalResultsPreference =
+        any {
+            it.scope == RuleScope.Domain &&
+                it.action == RuleAction.Allow &&
+                (
+                    it.target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget ||
+                        it.target == WebNavigationPolicy.LegacyGoogleResultsAllowedTarget
+                )
+        }
+    return hasExternalResultsPreference &&
+        WebProtectionSemantics.onlyResultsEnabled(externalSearchResultsAllowed())
+}
+
+object WebProtectionSemantics {
+    fun onlyResultsEnabled(externalSearchResultsAllowed: Boolean): Boolean = !externalSearchResultsAllowed
+
+    fun externalSearchResultsAllowed(onlyResultsEnabled: Boolean): Boolean = !onlyResultsEnabled
 }
 
 fun Iterable<PolicyRule>.webImagesBlocked(): Boolean =

@@ -28,6 +28,24 @@ class WebNavigationPolicyTest {
         assertFalse(WebNavigationPolicy.isExternalSearchNavigation("google.com", "bing.com"))
     }
 
+    @Test
+    fun `Solo resultados conversion is explicit and reversible`() {
+        assertTrue(WebProtectionSemantics.onlyResultsEnabled(externalSearchResultsAllowed = false))
+        assertFalse(WebProtectionSemantics.onlyResultsEnabled(externalSearchResultsAllowed = true))
+        assertFalse(WebProtectionSemantics.externalSearchResultsAllowed(onlyResultsEnabled = true))
+        assertTrue(WebProtectionSemantics.externalSearchResultsAllowed(onlyResultsEnabled = false))
+    }
+
+    @Test
+    fun `Solo resultados requires an explicit Web preference rule`() {
+        assertFalse(emptyList<PolicyRule>().onlySearchResultsEnabled())
+        assertTrue(
+            listOf(
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, enabled = false),
+            ).onlySearchResultsEnabled(),
+        )
+    }
+
     private fun rule(
         target: String,
         enabled: Boolean,
