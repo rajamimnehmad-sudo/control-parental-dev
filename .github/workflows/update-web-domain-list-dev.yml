@@ -36,5 +36,6 @@ jobs:
       - name: Generar, firmar y publicar
         env:
           DOMAIN_LIST_SIGNING_PRIVATE_KEY_PKCS8_B64: ${{ secrets.DOMAIN_LIST_SIGNING_PRIVATE_KEY_PKCS8_B64 }}
+          DOMAIN_LIST_PUBLISH_SECRET: ${{ secrets.DOMAIN_LIST_PUBLISH_SECRET }}
           ACTION: ${{ inputs.action || (github.event.schedule == '17 3 * * *' && 'refresh') || 'pending' }}
         run: python3 scripts/web_domain_list/update_ut1.py --action "$ACTION"

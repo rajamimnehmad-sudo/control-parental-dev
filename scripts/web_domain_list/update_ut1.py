@@ -22,6 +22,7 @@ PROJECT_REF = "syeycayasyufedwoprea"
 BUCKET = "dev-updates"
 BASE_PATH = "web-domain-list/dev"
 PUBLIC_BASE = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/public/{BUCKET}/{BASE_PATH}"
+PUBLISH_ENDPOINT = f"https://{PROJECT_REF}.supabase.co/functions/v1/update-web-domain-list"
 SOURCE_BASE = "https://dsi.ut-capitole.fr/blacklists/download"
 ENVIRONMENT = "DEV"
 CANARY = "coca.com"
@@ -223,7 +224,7 @@ def publish(source: dict) -> dict:
         manifest_file.write_text(json.dumps(envelope, separators=(",", ":")), encoding="ascii")
         storage_upload(data_file, f"{BASE_PATH}/versions/{version}.bin", "application/octet-stream", immutable=True)
         storage_upload(manifest_file, f"{BASE_PATH}/versions/{version}.manifest.json", "application/json", immutable=True)
-        storage_upload(manifest_file, f"{BASE_PATH}/current-manifest.json", "application/json", immutable=False)
+        publish_pointer("current-manifest.json", manifest_file.read_text(encoding="ascii"))
     return payload
 
 
@@ -240,6 +241,22 @@ def sign_file(path: pathlib.Path, root: pathlib.Path) -> str:
 
 def storage_upload(source: pathlib.Path, destination: str, content_type: str, immutable: bool) -> None:
     subprocess.run(["supabase", "storage", "cp", "--experimental", "--linked", "--content-type", content_type, "--cache-control", "max-age=31536000" if immutable else "max-age=60", str(source), f"ss:///{BUCKET}/{destination}"], check=True)
+
+
+def publish_pointer(path: str, content: str) -> None:
+    secret = os.environ.get("DOMAIN_LIST_PUBLISH_SECRET")
+    if not secret:
+        raise RuntimeError("DOMAIN_LIST_PUBLISH_SECRET is missing")
+    body = json.dumps({"path": path, "content": content}, separators=(",", ":")).encode("utf-8")
+    request = urllib.request.Request(
+        PUBLISH_ENDPOINT,
+        data=body,
+        headers={"content-type": "application/json", "x-domain-list-publish-secret": secret},
+        method="POST",
+    )
+    with urllib.request.urlopen(request, timeout=30) as response:
+        if response.status != 200:
+            raise RuntimeError(f"pointer publication failed with HTTP {response.status}")
 
 
 def fetch_current_manifest(required: bool) -> dict | None:
@@ -268,7 +285,7 @@ def publish_status(status: dict) -> None:
         with tempfile.TemporaryDirectory(prefix="domain-list-status-") as temporary:
             path = pathlib.Path(temporary) / "status.json"
             path.write_text(json.dumps(body, separators=(",", ":")), encoding="utf-8")
-            storage_upload(path, f"{BASE_PATH}/status.json", "application/json", immutable=False)
+            publish_pointer("status.json", path.read_text(encoding="utf-8"))
     except Exception as error:
         print(f"warning: status publication failed: {error}")
 
