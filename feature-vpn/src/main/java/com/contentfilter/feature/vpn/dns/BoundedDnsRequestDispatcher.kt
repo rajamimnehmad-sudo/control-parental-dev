@@ -40,6 +40,8 @@ internal class BoundedDnsRequestDispatcher<T>(
         queue.send(request)
     }
 
+    fun trySubmit(request: T): Boolean = queue.trySend(request).isSuccess
+
     fun cancel() {
         queue.cancel()
         workers.forEach(Job::cancel)

@@ -7,6 +7,7 @@ import kotlinx.coroutines.withTimeout
 import java.util.concurrent.atomic.AtomicInteger
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BoundedDnsRequestDispatcherTest {
@@ -78,6 +79,35 @@ class BoundedDnsRequestDispatcherTest {
                 assertTrue(active.get() <= WorkerCount)
             } finally {
                 releaseWorkers.complete(Unit)
+                dispatcher.cancel()
+            }
+        }
+
+    @Test
+    fun `non blocking submission drops work when the bounded queue is full`() =
+        runBlocking {
+            val workerStarted = CompletableDeferred<Unit>()
+            val releaseWorker = CompletableDeferred<Unit>()
+            val dispatcher =
+                BoundedDnsRequestDispatcher<Int>(
+                    scope = this,
+                    workerCount = 1,
+                    queueCapacity = 1,
+                    handler = {
+                        workerStarted.complete(Unit)
+                        releaseWorker.await()
+                    },
+                    onFailure = { throw it },
+                )
+
+            try {
+                dispatcher.submit(1)
+                workerStarted.await()
+
+                assertTrue(dispatcher.trySubmit(2))
+                assertFalse(dispatcher.trySubmit(3))
+            } finally {
+                releaseWorker.complete(Unit)
                 dispatcher.cancel()
             }
         }

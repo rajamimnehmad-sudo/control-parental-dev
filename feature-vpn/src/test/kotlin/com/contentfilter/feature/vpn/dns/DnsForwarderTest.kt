@@ -18,10 +18,11 @@ class DnsForwarderTest {
         runBlocking {
             val stalledStarted = CompletableDeferred<Unit>()
             val stalledCancelled = CompletableDeferred<Unit>()
-            val expected = byteArrayOf(4, 2)
+            val query = query()
+            val expected = response(query)
             val forwarder =
                 DnsForwarder(
-                    protectSocket = { true },
+                    protectDatagramSocket = { true },
                     resolver =
                         DnsUpstreamResolver { _, upstream ->
                             if (upstream.hostAddress == StalledResolver) {
@@ -42,7 +43,7 @@ class DnsForwarderTest {
             val response =
                 withTimeout(QueryTimeoutMillis) {
                     forwarder.forward(
-                        payload = byteArrayOf(1),
+                        payload = query,
                         upstreamServers = listOf(address(StalledResolver), address(FastResolver)),
                     )
                 }
@@ -57,18 +58,19 @@ class DnsForwarderTest {
         runBlocking {
             val calls = AtomicInteger(0)
             val resolver = address(FastResolver)
+            val query = query()
             val forwarder =
                 DnsForwarder(
-                    protectSocket = { true },
+                    protectDatagramSocket = { true },
                     resolver =
                         DnsUpstreamResolver { _, _ ->
                             calls.incrementAndGet()
-                            byteArrayOf(1)
+                            response(query)
                         },
                     fallbackDnsServers = listOf(FastResolver),
                 )
 
-            forwarder.forward(byteArrayOf(1), listOf(resolver, resolver))
+            forwarder.forward(query, listOf(resolver, resolver))
 
             assertEquals(1, calls.get())
         }
@@ -76,10 +78,11 @@ class DnsForwarderTest {
     @Test
     fun `failed resolver does not cancel a valid resolver`() =
         runBlocking {
-            val expected = byteArrayOf(7)
+            val query = query()
+            val expected = response(query)
             val forwarder =
                 DnsForwarder(
-                    protectSocket = { true },
+                    protectDatagramSocket = { true },
                     resolver =
                         DnsUpstreamResolver { _, upstream ->
                             if (upstream.hostAddress == StalledResolver) error("resolver failed")
@@ -90,14 +93,89 @@ class DnsForwarderTest {
 
             val response =
                 forwarder.forward(
-                    payload = byteArrayOf(1),
+                    payload = query,
                     upstreamServers = listOf(address(StalledResolver), address(FastResolver)),
                 )
 
             assertContentEquals(expected, response)
         }
 
+    @Test
+    fun `SERVFAIL response does not win over a valid answer`() =
+        runBlocking {
+            val query = query()
+            val expected = response(query)
+            val forwarder =
+                DnsForwarder(
+                    protectDatagramSocket = { true },
+                    resolver =
+                        DnsUpstreamResolver { _, upstream ->
+                            if (upstream.hostAddress == StalledResolver) {
+                                response(query, responseCode = ServFail)
+                            } else {
+                                delay(FastResolverDelayMillis)
+                                expected
+                            }
+                        },
+                    fallbackDnsServers = emptyList(),
+                )
+
+            val actual =
+                forwarder.forward(
+                    payload = query,
+                    upstreamServers = listOf(address(StalledResolver), address(FastResolver)),
+                )
+
+            assertContentEquals(expected, actual)
+        }
+
+    @Test
+    fun `response with a different transaction id is rejected`() =
+        runBlocking {
+            val query = query()
+            val forwarder =
+                DnsForwarder(
+                    protectDatagramSocket = { true },
+                    resolver = DnsUpstreamResolver { _, _ -> response(query, transactionId = OtherTransactionId) },
+                    fallbackDnsServers = emptyList(),
+                )
+
+            val actual = forwarder.forward(query, listOf(address(FastResolver)))
+
+            assertEquals(null, actual)
+        }
+
+    @Test
+    fun `truncated UDP response is not usable as a final answer`() {
+        val query = query()
+        val truncated = response(query, truncated = true)
+
+        assertTrue(DnsWireResponseValidator.isTruncated(query, truncated))
+        assertTrue(!DnsWireResponseValidator.isUsable(query, truncated))
+    }
+
     private fun address(value: String): InetAddress = InetAddress.getByName(value)
+
+    private fun query(transactionId: Int = TransactionId): ByteArray =
+        ByteArray(DnsHeaderSize).apply {
+            this[0] = (transactionId ushr 8).toByte()
+            this[1] = transactionId.toByte()
+            this[2] = RecursionDesired.toByte()
+            this[5] = 1
+        }
+
+    private fun response(
+        query: ByteArray,
+        responseCode: Int = NoError,
+        truncated: Boolean = false,
+        transactionId: Int = TransactionId,
+    ): ByteArray =
+        query.copyOf().apply {
+            this[0] = (transactionId ushr 8).toByte()
+            this[1] = transactionId.toByte()
+            this[2] = (ResponseFlagsHigh or if (truncated) TruncatedFlag else 0).toByte()
+            this[3] = (RecursionAvailable or responseCode).toByte()
+        }
 
     private companion object {
         const val StalledResolver = "192.0.2.1"
@@ -105,5 +183,14 @@ class DnsForwarderTest {
         const val FastResolverDelayMillis = 25L
         const val QueryTimeoutMillis = 500L
         const val CancellationTimeoutMillis = 500L
+        const val DnsHeaderSize = 12
+        const val TransactionId = 0x1234
+        const val OtherTransactionId = 0x4321
+        const val RecursionDesired = 0x01
+        const val ResponseFlagsHigh = 0x81
+        const val RecursionAvailable = 0x80
+        const val TruncatedFlag = 0x02
+        const val NoError = 0
+        const val ServFail = 2
     }
 }

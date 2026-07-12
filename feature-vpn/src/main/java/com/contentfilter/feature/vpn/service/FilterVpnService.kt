@@ -49,6 +49,7 @@ import kotlinx.coroutines.withContext
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.net.InetAddress
+import java.net.Socket
 import javax.inject.Inject
 
 /**
@@ -72,7 +73,11 @@ class FilterVpnService : VpnService() {
 
     private val parser = DnsPacketParser()
     private val responseFactory = DnsResponseFactory()
-    private val dnsForwarder = DnsForwarder(protectSocket = { socket -> protect(socket) })
+    private val dnsForwarder =
+        DnsForwarder(
+            protectDatagramSocket = { socket -> protect(socket) },
+            protectTcpSocket = { socket: Socket -> protect(socket) },
+        )
     private var serviceScope: CoroutineScope? = null
     private var vpnInterface: ParcelFileDescriptor? = null
     private var readerJob: Job? = null
@@ -392,14 +397,24 @@ class FilterVpnService : VpnService() {
             val input = FileInputStream(interfaceDescriptor.fileDescriptor)
             val output = FileOutputStream(interfaceDescriptor.fileDescriptor)
             val outputMutex = Mutex()
+            val telemetryDispatcher =
+                BoundedDnsRequestDispatcher<suspend () -> Unit>(
+                    scope = this,
+                    workerCount = DnsTelemetryWorkerCount,
+                    queueCapacity = DnsTelemetryQueueCapacity,
+                    handler = { record -> record() },
+                    onFailure = { exception ->
+                        Log.w(LogTag, "DNS telemetry failed: ${exception.javaClass.simpleName}")
+                    },
+                )
             val requestDispatcher =
                 BoundedDnsRequestDispatcher<DnsQuestion>(
                     scope = this,
                     workerCount = DnsWorkerCount,
                     queueCapacity = DnsQueueCapacity,
-                    handler = { question -> handleDnsQuestion(question, output, outputMutex) },
+                    handler = { question -> handleDnsQuestion(question, output, outputMutex, telemetryDispatcher) },
                     onFailure = { exception ->
-                        telemetryReporter.recordError("DNS request failed: ${exception.javaClass.simpleName}")
+                        Log.w(LogTag, "DNS request failed: ${exception.javaClass.simpleName}")
                     },
                 )
             val buffer = ByteArray(PacketBufferSize)
@@ -407,11 +422,12 @@ class FilterVpnService : VpnService() {
                 while (isActive) {
                     val length = runCatching { input.read(buffer) }.getOrDefault(NoBytesRead)
                     if (length > 0) {
-                        enqueuePacket(buffer, length, requestDispatcher)
+                        enqueuePacket(buffer, length, requestDispatcher, telemetryDispatcher)
                     }
                 }
             } finally {
                 requestDispatcher.cancel()
+                telemetryDispatcher.cancel()
                 input.close()
                 output.close()
             }
@@ -421,14 +437,15 @@ class FilterVpnService : VpnService() {
         packet: ByteArray,
         length: Int,
         requestDispatcher: BoundedDnsRequestDispatcher<DnsQuestion>,
+        telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
         when (val parsed = parser.parse(packet, length)) {
             is DnsParseResult.Parsed -> {
-                maybeRecordParsedPacket(parser.inspect(packet, length))
+                maybeRecordParsedPacket(parser.inspect(packet, length), telemetryDispatcher)
                 requestDispatcher.submit(parsed.question)
             }
-            is DnsParseResult.Unsupported -> maybeRecordUnsupportedPacket(parsed.diagnostic)
+            is DnsParseResult.Unsupported -> maybeRecordUnsupportedPacket(parsed.diagnostic, telemetryDispatcher)
         }
     }
 
@@ -436,6 +453,7 @@ class FilterVpnService : VpnService() {
         question: DnsQuestion,
         output: FileOutputStream,
         outputMutex: Mutex,
+        telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (DevProtectionMode.isProtectionDisabled(this)) return
         val domain = question.domain.normalizedDomain()
@@ -446,12 +464,12 @@ class FilterVpnService : VpnService() {
                 searchEngine?.let { engine ->
                     SearchProtectionSignals.recordSearchEngine(engine.id, state.snapshot.version)
                 }
-                logSearchProtectionDnsLayer(domain, decision, state)
+                logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
                 Log.i(
                     LogTag,
                     "DNS decision=allow snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()} upstream=${upstreamDnsServers.safeAddresses()}",
                 )
-                telemetryReporter.recordDnsDecision(decision)
+                enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
                 val safeSearchTarget =
                     decision.safeSearchRequired.takeIf { it }
                         ?.let { SearchEngineCatalog.safeSearchDnsTarget(domain) }
@@ -460,51 +478,53 @@ class FilterVpnService : VpnService() {
                     reportSafeSearchApplied(
                         engineId = searchEngine?.id ?: "unknown",
                         policyRevision = state.snapshot.version,
+                        telemetryDispatcher = telemetryDispatcher,
                     )
                 } else {
                     forwardDns(question, output, outputMutex)
                 }
             }
             is PolicyDecision.GrantExtraTime -> {
-                logSearchProtectionDnsLayer(domain, decision, state)
+                logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
                 Log.i(
                     LogTag,
                     "DNS decision=grant snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
-                telemetryReporter.recordDnsDecision(decision)
+                enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
                 forwardDns(question, output, outputMutex)
             }
             is PolicyDecision.Block,
             is PolicyDecision.RequestAuthorization,
             -> {
-                logSearchProtectionDnsLayer(domain, decision, state)
+                logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
                 Log.i(
                     LogTag,
                     "DNS decision=block snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
-                telemetryReporter.recordDnsDecision(decision)
+                enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
                 writeResponse(output, outputMutex, responseFactory.nxdomainPacket(question))
             }
             is PolicyDecision.HealthWarning,
             is PolicyDecision.RequireActivation,
             is PolicyDecision.RequireUpdate,
             -> {
-                logSearchProtectionDnsLayer(domain, decision, state)
-                telemetryReporter.recordDnsDecision(decision)
+                logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
+                enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
                 forwardDns(question, output, outputMutex)
             }
             is PolicyDecision.Warn -> {
-                logSearchProtectionDnsLayer(domain, decision, state)
-                telemetryReporter.recordDnsDecision(decision)
+                logSearchProtectionDnsLayer(domain, decision, state, telemetryDispatcher)
+                enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
                 forwardDns(question, output, outputMutex)
             }
         }
     }
 
-    private suspend fun logSearchProtectionDnsLayer(
+    private fun logSearchProtectionDnsLayer(
         domain: String,
         decision: PolicyDecision,
         state: VpnPolicyState,
+        telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         if (!domain.isSearchProtectionDomain()) return
         val blockRules =
@@ -526,18 +546,20 @@ class FilterVpnService : VpnService() {
             "Search protection layer=vpn-dns domain=$domain decision=${decision.searchProtectionLabel()} snapshotVersion=${state.snapshot.version} strict=${state.strictWebBlockEnabled} allowRules=$allowRules blockRules=$blockRules totalRules=${state.snapshot.rules.size} reason=${decision.reasonLabel()}",
         )
         if (decision is PolicyDecision.Block) {
-            telemetryReporter.recordRecentDnsSearchBlock(domain)
+            enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordRecentDnsSearchBlock(domain) }
         }
-        telemetryReporter.recordSearchProtectionDnsDecision(
-            domainHost = domain,
-            decision = decision,
-            strictWebBlock = state.strictWebBlockEnabled,
-            allowRules = allowRules,
-            blockRules = blockRules,
-            totalRules = state.snapshot.rules.size,
-            snapshotVersion = state.snapshot.version,
-            reason = decision.reasonLabel(),
-        )
+        enqueueDnsTelemetry(telemetryDispatcher) {
+            telemetryReporter.recordSearchProtectionDnsDecision(
+                domainHost = domain,
+                decision = decision,
+                strictWebBlock = state.strictWebBlockEnabled,
+                allowRules = allowRules,
+                blockRules = blockRules,
+                totalRules = state.snapshot.rules.size,
+                snapshotVersion = state.snapshot.version,
+                reason = decision.reasonLabel(),
+            )
+        }
     }
 
     private suspend fun forwardDns(
@@ -567,34 +589,52 @@ class FilterVpnService : VpnService() {
         outputMutex.withLock { output.write(packet) }
     }
 
-    private suspend fun reportSafeSearchApplied(
+    private fun reportSafeSearchApplied(
         engineId: String,
         policyRevision: Long,
+        telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
     ) {
         Log.i(
             LogTag,
             "SafeSearch DNS mapping applied engine=$engineId policyRevision=$policyRevision",
         )
-        telemetryReporter.recordServiceState(
-            "SafeSearch mechanism=dns-cname engine=$engineId policyRevision=$policyRevision.",
-        )
+        enqueueDnsTelemetry(telemetryDispatcher) {
+            telemetryReporter.recordServiceState(
+                "SafeSearch mechanism=dns-cname engine=$engineId policyRevision=$policyRevision.",
+            )
+        }
     }
 
-    private suspend fun maybeRecordParsedPacket(diagnostic: VpnPacketDiagnostic) {
+    private fun maybeRecordParsedPacket(
+        diagnostic: VpnPacketDiagnostic,
+        telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
+    ) {
         val now = System.currentTimeMillis()
         if (now - lastParsedDnsPacketDiagnosticAt < PacketDiagnosticCooldownMillis) return
         lastParsedDnsPacketDiagnosticAt = now
-        telemetryReporter.recordParsedPacket(diagnostic)
+        enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordParsedPacket(diagnostic) }
     }
 
-    private suspend fun maybeRecordUnsupportedPacket(diagnostic: VpnPacketDiagnostic) {
+    private fun maybeRecordUnsupportedPacket(
+        diagnostic: VpnPacketDiagnostic,
+        telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
+    ) {
         val key =
             "${diagnostic.reason}:${diagnostic.ipVersion}:${diagnostic.protocol}:" +
                 "${diagnostic.sourcePort ?: "none"}:${diagnostic.destinationPort ?: "none"}"
         val now = System.currentTimeMillis()
         if (now - (lastUnsupportedPacketDiagnosticAt[key] ?: 0L) < PacketDiagnosticCooldownMillis) return
         lastUnsupportedPacketDiagnosticAt[key] = now
-        telemetryReporter.recordUnsupportedPacket(diagnostic)
+        enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordUnsupportedPacket(diagnostic) }
+    }
+
+    private fun enqueueDnsTelemetry(
+        dispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
+        record: suspend () -> Unit,
+    ) {
+        if (!dispatcher.trySubmit(record)) {
+            Log.w(LogTag, "DNS telemetry queue full; diagnostic dropped")
+        }
     }
 
     private fun cleanup(cancelConnectionInvalidation: Boolean = true) {
@@ -634,6 +674,8 @@ class FilterVpnService : VpnService() {
         private const val ConnectionInvalidationRetryMillis = 100L
         private const val DnsWorkerCount = 12
         private const val DnsQueueCapacity = 64
+        private const val DnsTelemetryWorkerCount = 1
+        private const val DnsTelemetryQueueCapacity = 128
         private const val PacketBufferSize = 32 * 1024
         private const val AllIpv4Route = "0.0.0.0"
         private const val AllIpv6Route = "::"
