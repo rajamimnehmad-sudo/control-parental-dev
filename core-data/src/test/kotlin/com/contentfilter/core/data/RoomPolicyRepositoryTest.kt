@@ -4,6 +4,7 @@ import com.contentfilter.core.database.entity.PolicyEntity
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import org.json.JSONObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -46,5 +47,34 @@ class RoomPolicyRepositoryTest {
         assertEquals(listOf("policies:policy-1", "policy_rules:rule-1"), operations.map { it.id })
         assertTrue(operations.all { it.requestId == "request-1" && it.revision == 200L })
         assertTrue(operations.first().priority > operations.last().priority)
+    }
+
+    @Test
+    fun `policy mutation explicitly queues a disabled web rule`() {
+        val operations =
+            buildPolicyOutboxOperations(
+                policy = PolicyEntity("policy-1", "device-1", 300L, true, 300L),
+                rules =
+                    listOf(
+                        PolicyRule(
+                            id = "web-rule",
+                            scope = RuleScope.Domain,
+                            target = "__web_navigation_blocked__",
+                            action = RuleAction.Block,
+                            priority = 5_000,
+                            enabled = false,
+                        ),
+                    ),
+                accountId = "account-1",
+                revision = 300L,
+                requestId = "allow-web",
+                deviceId = "device-1",
+            )
+
+        val rulePayload = JSONObject(operations.single { it.tableName == "policy_rules" }.payload)
+
+        assertEquals(false, rulePayload.getBoolean("enabled"))
+        assertEquals("allow-web", operations.last().requestId)
+        assertEquals(300L, operations.last().revision)
     }
 }

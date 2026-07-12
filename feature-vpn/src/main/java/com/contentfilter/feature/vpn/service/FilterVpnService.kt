@@ -1,11 +1,9 @@
 package com.contentfilter.feature.vpn.service
 
-import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.VpnService
-import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import com.contentfilter.core.domain.model.ComponentState
@@ -17,6 +15,8 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.sync.engine.EffectivePolicyApplicationTracker
+import com.contentfilter.core.sync.engine.PolicyConsumer
 import com.contentfilter.feature.vpn.dns.DnsForwarder
 import com.contentfilter.feature.vpn.dns.DnsPacketParser
 import com.contentfilter.feature.vpn.dns.DnsParseResult
@@ -24,8 +24,8 @@ import com.contentfilter.feature.vpn.dns.DnsQuestion
 import com.contentfilter.feature.vpn.dns.DnsResponseFactory
 import com.contentfilter.feature.vpn.dns.VpnPacketDiagnostic
 import com.contentfilter.feature.vpn.policy.VpnDomainPolicyEvaluator
-import com.contentfilter.feature.vpn.policy.VpnPolicyState
 import com.contentfilter.feature.vpn.policy.VpnPolicySnapshotProvider
+import com.contentfilter.feature.vpn.policy.VpnPolicyState
 import com.contentfilter.feature.vpn.search.SearchProtectionSignals
 import com.contentfilter.feature.vpn.telemetry.VpnTelemetryReporter
 import dagger.hilt.android.AndroidEntryPoint
@@ -35,8 +35,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -61,6 +59,8 @@ class FilterVpnService : VpnService() {
 
     @Inject lateinit var pushNotificationRepository: PushNotificationRepository
 
+    @Inject lateinit var applicationTracker: EffectivePolicyApplicationTracker
+
     private val parser = DnsPacketParser()
     private val responseFactory = DnsResponseFactory()
     private val dnsForwarder = DnsForwarder { socket -> protect(socket) }
@@ -69,6 +69,9 @@ class FilterVpnService : VpnService() {
     private var readerJob: Job? = null
     private var upstreamDnsServers: List<InetAddress> = emptyList()
     private var strictWebBlockMode = false
+    private var appliedVpnReconnectKey: String? = null
+    private var requestedVpnReconnectKey: String? = null
+    private var lastReportedPolicy: Pair<String, Long>? = null
     private val lastUnsupportedPacketDiagnosticAt = mutableMapOf<String, Long>()
     private var lastParsedDnsPacketDiagnosticAt: Long = 0L
 
@@ -79,7 +82,7 @@ class FilterVpnService : VpnService() {
     ): Int {
         when (intent?.action ?: ActionStart) {
             ActionStop -> stopVpn(StopReasonApp)
-            ActionReconnect -> reconnectVpn()
+            ActionReconnect -> reconnectVpn(intent?.getStringExtra(ExtraReconnectKey))
             else -> startVpn()
         }
         return START_STICKY
@@ -123,7 +126,11 @@ class FilterVpnService : VpnService() {
                         "VPN active upstream=${upstreamDnsServers.safeAddresses()} rules=${snapshotProvider.current().snapshot.rules.size} strictWebBlock=$strictWebBlockMode",
                     )
                     vpnInterface = establishVpn()
-                    observeVpnReconnectPolicy(scope, snapshotProvider.current().vpnReconnectKey)
+                    val appliedState = snapshotProvider.current()
+                    appliedVpnReconnectKey = appliedState.vpnReconnectKey
+                    requestedVpnReconnectKey = null
+                    reportVpnPolicyApplied(appliedState, source = "tunnel-established")
+                    observeVpnReconnectPolicy(scope)
                     VpnController.markStarted(this@FilterVpnService)
                     systemStatusRepository.updateVpnState(ComponentState.Enabled)
                     telemetryReporter.recordServiceState("VPN started.")
@@ -139,7 +146,17 @@ class FilterVpnService : VpnService() {
             }
     }
 
-    private fun reconnectVpn() {
+    private fun reconnectVpn(expectedKey: String?) {
+        val currentState = snapshotProvider.current()
+        if (expectedKey != null && expectedKey != currentState.vpnReconnectKey) {
+            Log.i(LogTag, "Ignoring stale VPN reconnect request")
+            return
+        }
+        if (vpnInterface != null && appliedVpnReconnectKey == currentState.vpnReconnectKey) {
+            requestedVpnReconnectKey = null
+            reportVpnPolicyApplied(currentState, source = "tunnel-already-current")
+            return
+        }
         cleanup()
         startVpn()
     }
@@ -203,33 +220,51 @@ class FilterVpnService : VpnService() {
             }
         }
 
-    private fun observeVpnReconnectPolicy(
-        scope: CoroutineScope,
-        initialKey: String,
-    ) {
+    private fun observeVpnReconnectPolicy(scope: CoroutineScope) {
         scope.launch {
-            var currentKey = initialKey
             snapshotProvider
                 .observe()
-                .map { it.vpnReconnectKey }
-                .distinctUntilChanged()
-                .collect { nextKey ->
-                    if (nextKey != currentKey) {
-                        Log.i(LogTag, "VPN domain policy changed; reconnecting tunnel")
+                .collect { state ->
+                    val nextKey = state.vpnReconnectKey
+                    if (nextKey == appliedVpnReconnectKey && vpnInterface != null) {
+                        requestedVpnReconnectKey = null
+                        reportVpnPolicyApplied(state, source = "snapshot-current")
+                    } else if (requestedVpnReconnectKey != nextKey) {
+                        requestedVpnReconnectKey = nextKey
+                        Log.i(
+                            LogTag,
+                            "VPN domain policy changed; reconnecting tunnel " +
+                                "revision=${state.snapshot.version} strict=${state.strictWebBlockEnabled}",
+                        )
                         telemetryReporter.recordReconnectApplied("vpnReconnectKey-changed")
-                        requestReconnectVpn()
+                        requestReconnectVpn(nextKey)
                     }
-                    currentKey = nextKey
                 }
         }
     }
 
-    private fun requestReconnectVpn() {
+    private fun requestReconnectVpn(expectedKey: String) {
         startService(
             Intent(this, FilterVpnService::class.java).apply {
                 action = ActionReconnect
+                putExtra(ExtraReconnectKey, expectedKey)
             },
         )
+    }
+
+    private fun reportVpnPolicyApplied(
+        state: VpnPolicyState,
+        source: String,
+    ) {
+        val appliedPolicy = state.snapshot.id to state.snapshot.version
+        if (lastReportedPolicy == appliedPolicy) return
+        lastReportedPolicy = appliedPolicy
+        Log.i(
+            LogTag,
+            "VPN effective policy applied source=$source policyId=${state.snapshot.id.take(8)} " +
+                "revision=${state.snapshot.version} strict=${state.strictWebBlockEnabled}",
+        )
+        applicationTracker.report(PolicyConsumer.Vpn, state.snapshot.id, state.snapshot.version)
     }
 
     private fun Builder.allowBrowserApps(): Builder =
@@ -424,6 +459,10 @@ class FilterVpnService : VpnService() {
         vpnInterface?.close()
         vpnInterface = null
         upstreamDnsServers = emptyList()
+        strictWebBlockMode = false
+        appliedVpnReconnectKey = null
+        requestedVpnReconnectKey = null
+        lastReportedPolicy = null
         serviceScope?.cancel()
         serviceScope = null
     }
@@ -432,6 +471,7 @@ class FilterVpnService : VpnService() {
         const val ActionStart = "com.contentfilter.feature.vpn.START"
         const val ActionStop = "com.contentfilter.feature.vpn.STOP"
         const val ActionReconnect = "com.contentfilter.feature.vpn.RECONNECT"
+        private const val ExtraReconnectKey = "vpn_reconnect_key"
 
         private const val DefaultMtu = 1500
         private const val LocalVpnAddress = "10.8.0.2"

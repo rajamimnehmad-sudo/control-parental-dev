@@ -349,6 +349,31 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
+    fun `newer allowed snapshot releases a previously blocked browser domain`() {
+        val mainRule =
+            domainRule(
+                target = WebNavigationPolicy.RuleTarget,
+                action = RuleAction.Block,
+                priority = WebNavigationPolicy.RulePriority,
+            )
+        val blocked =
+            policy(
+                rules = listOf(mainRule, domainRule(target = "google.com", action = RuleAction.Block)),
+            )
+        val allowed =
+            blocked.copy(
+                version = blocked.version + 1,
+                rules =
+                    blocked.rules.map { rule ->
+                        if (rule.target == WebNavigationPolicy.RuleTarget) rule.copy(enabled = false) else rule
+                    },
+            )
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(blocked, domainContext("google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(allowed, domainContext("google.com")))
+    }
+
+    @Test
     fun `approved domain exception wins over account block`() {
         val decision =
             engine.evaluateDomain(

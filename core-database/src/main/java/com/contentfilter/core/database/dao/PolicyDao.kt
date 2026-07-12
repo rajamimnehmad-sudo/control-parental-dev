@@ -102,6 +102,9 @@ interface PolicyDao {
     @Query("DELETE FROM policy_rules WHERE id = :ruleId")
     suspend fun deleteRuleById(ruleId: String)
 
+    @Query("DELETE FROM policy_rules WHERE policyId = :policyId")
+    suspend fun deleteRulesForPolicy(policyId: String)
+
     @Query("DELETE FROM policy_rules")
     suspend fun deleteAllRules()
 

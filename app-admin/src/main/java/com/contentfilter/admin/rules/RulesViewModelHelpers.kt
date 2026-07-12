@@ -282,6 +282,19 @@ internal fun List<PolicyRule>.webNavigationModeChanges(
         WebNavigationPolicy.UnsafeSearchDomains.forEach { domain ->
             plan(domain, RuleAction.Block, enabled = false, priority = SearchEngineBlockPriority)
         }
+        working
+            .asSequence()
+            .filter {
+                it.enabled &&
+                    it.scope == RuleScope.Domain &&
+                    it.action == RuleAction.Block &&
+                    it.target in LegacyWebAuxiliaryBlockTargets
+            }.map { it.target }
+            .distinct()
+            .forEach { target ->
+                val priority = working.filter { it.target == target }.maxOf { it.priority }
+                plan(target, RuleAction.Block, enabled = false, priority = priority)
+            }
     }
     return changes.values.toList()
 }
@@ -471,8 +484,20 @@ internal const val WebNavigationBlockPriority = WebNavigationPolicy.RulePriority
 internal const val MaxDiagnosticValueLength = 80
 internal const val LogTag = "RulesViewModel"
 internal val SearchEngineDomains = SearchEngineCatalog.searchEngineDomains
+internal val SearchSupportDomains = SearchEngineCatalog.searchSupportDomains
 internal val SecureDnsDomains = SearchEngineCatalog.secureDnsDomains
-internal val SearchProtectionDomains = (SearchEngineDomains + SecureDnsDomains).distinct()
+internal val SearchProtectionDomains = (SearchEngineDomains + SearchSupportDomains + SecureDnsDomains).distinct()
+internal val LegacyWebAuxiliaryBlockTargets =
+    (
+        SearchProtectionDomains +
+            WebNavigationPolicy.ImageDomains +
+            WebNavigationPolicy.UnsafeSearchDomains +
+            setOf(
+                DomainWildcard,
+                WebNavigationPolicy.RuleTarget,
+                WebNavigationPolicy.ImagesBlockedTarget,
+            )
+    ).toSet()
 internal val YouTubeWebDomains =
     listOf(
         "youtube.com",

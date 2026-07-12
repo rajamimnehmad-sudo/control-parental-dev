@@ -37,6 +37,15 @@ class RoomRemoteApplierTest {
         assertTrue(shouldApplyRemoteRule(rule(updatedAt = 200L), rule(updatedAt = 100L)))
     }
 
+    @Test
+    fun `newer disabled web rule replaces older enabled rule`() {
+        val blocked = rule(updatedAt = 100L)
+        val allowed = rule(updatedAt = 200L).copy(enabled = false)
+
+        assertTrue(shouldApplyRemoteRule(allowed, blocked))
+        assertFalse(shouldApplyRemoteRule(blocked, allowed))
+    }
+
     private fun policy(
         id: String = "policy",
         version: Long,

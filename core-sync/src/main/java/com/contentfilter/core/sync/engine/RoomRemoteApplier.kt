@@ -43,13 +43,49 @@ class RoomRemoteApplier
             groupApps: List<RemoteAppGroupAppDto>,
         ): Boolean =
             database.withTransaction {
-                applyPolicies(listOf(policy))
-                val stored = policyDao.policyById(policy.id)
-                if (stored == null || stored.version > policy.version) return@withTransaction false
+                if (rules.any { it.policyId != policy.id } || limits.any { it.policyId != policy.id }) {
+                    Log.w(
+                        LogTag,
+                        "Rejected inconsistent policy bundle policyId=${policy.id.take(8)} revision=${policy.version}",
+                    )
+                    return@withTransaction false
+                }
+                val incoming = policy.toEntity()
+                val currentById = policyDao.policyById(policy.id)
+                val currentActive =
+                    policy.deviceId?.let { policyDao.activePolicyForDevice(it) }
+                        ?: policyDao.activePolicy()
+                if (!shouldApplyRemotePolicy(incoming, currentById, currentActive)) {
+                    Log.i(
+                        LogTag,
+                        "Skipped stale policy bundle policyId=${policy.id.take(8)} revision=${policy.version} " +
+                            "localRevision=${currentById?.version ?: currentActive?.version}",
+                    )
+                    return@withTransaction false
+                }
+                if (policy.active && policy.deletedAt == null) {
+                    policy.deviceId?.let { policyDao.deactivateOtherPoliciesForDevice(policy.id, it) }
+                        ?: policyDao.deactivateOtherPoliciesWithoutDevice(policy.id)
+                }
+                policyDao.upsertPolicy(incoming)
+                policyDao.deleteRulesForPolicy(policy.id)
                 applyPolicyRules(rules)
                 applyDailyLimits(limits)
                 applyAppGroups(groups)
                 applyAppGroupApps(groupApps)
+                val webNavigationBlocked =
+                    rules.any {
+                        it.enabled &&
+                            it.deletedAt == null &&
+                            it.scope == "Domain" &&
+                            it.action == "Block" &&
+                            it.target == "__web_navigation_blocked__"
+                    }
+                Log.i(
+                    LogTag,
+                    "Applied complete policy bundle policyId=${policy.id.take(8)} revision=${policy.version} " +
+                        "rules=${rules.size} webNavigationBlocked=$webNavigationBlocked",
+                )
                 true
             }
 

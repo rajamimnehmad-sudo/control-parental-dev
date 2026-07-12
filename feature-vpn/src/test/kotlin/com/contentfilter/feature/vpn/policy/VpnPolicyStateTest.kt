@@ -57,6 +57,17 @@ class VpnPolicyStateTest {
     }
 
     @Test
+    fun `blocked to allowed changes tunnel key and disables strict routing`() {
+        val mainRule = rule(WebNavigationPolicy.RuleTarget, RuleAction.Block)
+        val blocked = state(mainRule)
+        val allowed = state(mainRule.copy(enabled = false))
+
+        assertTrue(blocked.strictWebBlockEnabled)
+        assertFalse(allowed.strictWebBlockEnabled)
+        assertNotEquals(blocked.vpnReconnectKey, allowed.vpnReconnectKey)
+    }
+
+    @Test
     fun `keeps dns mode for wildcard allow`() {
         val state =
             state(

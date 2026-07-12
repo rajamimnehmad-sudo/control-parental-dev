@@ -39,6 +39,7 @@ class RulesViewModelHelpersTest {
                 domainRule(WebNavigationPolicy.RuleTarget, RuleAction.Block, enabled = true),
                 domainRule(DomainWildcard, RuleAction.Block, enabled = true),
                 domainRule(SearchEngineDomains.first(), RuleAction.Block, enabled = true),
+                domainRule(SearchSupportDomains.first(), RuleAction.Block, enabled = true),
                 domainRule(SecureDnsDomains.first(), RuleAction.Block, enabled = true),
                 domainRule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block, enabled = true),
                 domainRule(WebNavigationPolicy.ImageDomains.first(), RuleAction.Block, enabled = true),
@@ -61,6 +62,36 @@ class RulesViewModelHelpersTest {
         assertFalse(
             result.any {
                 it.enabled && it.action == RuleAction.Block && WebNavigationPolicy.isImageDomain(it.target)
+            },
+        )
+    }
+
+    @Test
+    fun `web allow plan disables every duplicate main and legacy auxiliary block`() {
+        val current =
+            listOf(
+                domainRule(WebNavigationPolicy.RuleTarget, RuleAction.Block, enabled = true),
+                domainRule(
+                    WebNavigationPolicy.RuleTarget,
+                    RuleAction.Block,
+                    enabled = true,
+                ).copy(id = "main-duplicate"),
+                domainRule("clients4.google.com", RuleAction.Block, enabled = true),
+                domainRule("gstatic.com", RuleAction.Block, enabled = true),
+                domainRule("dns.google", RuleAction.Block, enabled = true),
+            )
+
+        val result =
+            current.webNavigationModeChanges(
+                blocked = false,
+                imagesBlocked = false,
+                safeSearchEnabled = false,
+            ).applyTo(current)
+
+        assertFalse(result.webNavigationBlocked())
+        assertFalse(
+            result.any {
+                it.enabled && it.action == RuleAction.Block && it.target in LegacyWebAuxiliaryBlockTargets
             },
         )
     }
