@@ -204,11 +204,45 @@ class VpnPolicyStateTest {
     @Test
     fun `activating Solo resultados requests a one-time connection invalidation`() {
         val open = state(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow))
-        val restricted = state(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false))
+        val restricted =
+            state(
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false),
+            )
 
         assertTrue(VpnPolicyState.requiresConnectionInvalidation(open.vpnReconnectKey, restricted))
         assertFalse(VpnPolicyState.requiresConnectionInvalidation(restricted.vpnReconnectKey, restricted))
         assertFalse(VpnPolicyState.requiresConnectionInvalidation(restricted.vpnReconnectKey, open))
+    }
+
+    @Test
+    fun `open to strict requires connection invalidation`() {
+        val open = state(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow))
+        val strict = state(rule(WebNavigationPolicy.RuleTarget, RuleAction.Block))
+
+        assertTrue(VpnPolicyState.requiresConnectionInvalidation(open.vpnReconnectKey, strict))
+    }
+
+    @Test
+    fun `already applied strict policy does not invalidate repeatedly`() {
+        val strict = state(rule(WebNavigationPolicy.RuleTarget, RuleAction.Block))
+
+        assertFalse(VpnPolicyState.requiresConnectionInvalidation(strict.vpnReconnectKey, strict))
+    }
+
+    @Test
+    fun `cold strict start establishes strict tunnel without transition barrier`() {
+        val strict = state(rule(WebNavigationPolicy.RuleTarget, RuleAction.Block))
+
+        assertTrue(strict.strictWebBlockEnabled)
+        assertFalse(VpnPolicyState.requiresConnectionInvalidation(appliedReconnectKey = null, next = strict))
+    }
+
+    @Test
+    fun `strict to open does not use strict transition barrier`() {
+        val strict = state(rule(WebNavigationPolicy.RuleTarget, RuleAction.Block))
+        val open = state(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow))
+
+        assertFalse(VpnPolicyState.requiresConnectionInvalidation(strict.vpnReconnectKey, open))
     }
 
     @Test

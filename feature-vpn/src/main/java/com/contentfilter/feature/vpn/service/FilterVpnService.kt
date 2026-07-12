@@ -105,9 +105,13 @@ class FilterVpnService : VpnService() {
         super.onDestroy()
     }
 
-    private fun startVpn() {
-        if (readerJob?.isActive == true) return
+    private fun startVpn(connectionBarrier: ParcelFileDescriptor? = null) {
+        if (readerJob?.isActive == true) {
+            connectionBarrier?.close()
+            return
+        }
         if (DevProtectionMode.isProtectionDisabled(this)) {
+            connectionBarrier?.close()
             updateVpnState(ComponentState.Disabled)
             VpnController.markStopped(this, StopReasonDevRescue)
             stopSelf()
@@ -136,6 +140,7 @@ class FilterVpnService : VpnService() {
                     )
                     val establishedInterface = requireNotNull(establishVpn()) { "VPN establish returned null." }
                     vpnInterface = establishedInterface
+                    connectionBarrier?.close()
                     appliedVpnReconnectKey = initialState.vpnReconnectKey
                     requestedVpnReconnectKey = null
                     reportVpnPolicyApplied(initialState, source = "tunnel-established")
@@ -145,8 +150,10 @@ class FilterVpnService : VpnService() {
                     telemetryReporter.recordServiceState("VPN started.")
                     readPackets(establishedInterface)
                 } catch (exception: CancellationException) {
+                    connectionBarrier?.close()
                     throw exception
                 } catch (exception: Throwable) {
+                    connectionBarrier?.close()
                     VpnController.markStopped(this@FilterVpnService, StopReasonFailed)
                     updateVpnState(ComponentState.Warning)
                     telemetryReporter.recordError("VPN failed: ${exception.javaClass.simpleName}")
@@ -183,23 +190,35 @@ class FilterVpnService : VpnService() {
         connectionInvalidationJob?.cancel()
         connectionInvalidationJob =
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
-                upstreamDnsServers = currentDnsServers()
-                strictWebBlockMode = true
-                encryptedDnsEnforcementMode = true
-                val barrier = establishVpn()
-                Log.i(
-                    LogTag,
-                    "VPN connection invalidation started revision=${state.snapshot.version} onlyResults=true",
-                )
-                delay(ConnectionInvalidationMillis)
-                barrier?.close()
-                strictWebBlockMode = false
-                encryptedDnsEnforcementMode = false
-                Log.i(
-                    LogTag,
-                    "VPN connection invalidation completed revision=${state.snapshot.version}",
-                )
-                startVpn()
+                var barrierHandedOff = false
+                val barrier =
+                    try {
+                        upstreamDnsServers = currentDnsServers()
+                        strictWebBlockMode = true
+                        encryptedDnsEnforcementMode = true
+                        establishVpn()
+                    } catch (exception: Throwable) {
+                        Log.w(LogTag, "VPN connection barrier failed: ${exception.javaClass.simpleName}")
+                        null
+                    }
+                if (barrier == null) {
+                    startVpn()
+                    return@launch
+                }
+                try {
+                    Log.i(
+                        LogTag,
+                        "VPN connection invalidation started revision=${state.snapshot.version} " +
+                            "strict=${state.strictWebBlockEnabled} onlyResults=${state.onlyResultsEnabled}",
+                    )
+                    delay(ConnectionInvalidationMillis)
+                    strictWebBlockMode = false
+                    encryptedDnsEnforcementMode = false
+                    barrierHandedOff = true
+                    startVpn(connectionBarrier = barrier)
+                } finally {
+                    if (!barrierHandedOff) barrier?.close()
+                }
             }
     }
 
