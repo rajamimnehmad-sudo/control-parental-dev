@@ -78,7 +78,7 @@ data class VpnPolicyState(
                 appliedReconnectKey == null -> false
                 next.strictWebBlockEnabled -> appliedReconnectKey != "strict=true"
                 next.onlyResultsEnabled -> appliedReconnectKey.contains("onlyResults=false")
-                else -> false
+                else -> appliedReconnectKey.contains("onlyResults=true")
             }
 
         private fun PolicySnapshot.isEmptyLocalDefault(): Boolean = id == LocalDefaultPolicyId && rules.isEmpty()

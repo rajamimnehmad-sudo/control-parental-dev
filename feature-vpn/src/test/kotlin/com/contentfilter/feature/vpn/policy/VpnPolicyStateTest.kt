@@ -203,7 +203,7 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `activating Solo resultados requests a one-time connection invalidation`() {
+    fun `changing Solo resultados in either direction requests one connection invalidation`() {
         val open =
             state(
                 rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
@@ -215,7 +215,9 @@ class VpnPolicyStateTest {
 
         assertTrue(VpnPolicyState.requiresConnectionInvalidation(open.vpnReconnectKey, restricted))
         assertFalse(VpnPolicyState.requiresConnectionInvalidation(restricted.vpnReconnectKey, restricted))
-        assertFalse(VpnPolicyState.requiresConnectionInvalidation(restricted.vpnReconnectKey, open))
+        assertTrue(VpnPolicyState.requiresConnectionInvalidation(restricted.vpnReconnectKey, open))
+        assertFalse(VpnPolicyState.requiresConnectionInvalidation(open.vpnReconnectKey, open))
+        assertFalse(VpnPolicyState.requiresConnectionInvalidation(appliedReconnectKey = null, next = open))
     }
 
     @Test
