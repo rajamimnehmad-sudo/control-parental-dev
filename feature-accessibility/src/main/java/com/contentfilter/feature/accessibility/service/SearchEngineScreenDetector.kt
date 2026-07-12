@@ -1,99 +1,118 @@
 package com.contentfilter.feature.accessibility.service
 
 import com.contentfilter.core.domain.model.PolicySnapshot
-import com.contentfilter.core.domain.model.RuleAction
-import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
-import com.contentfilter.core.domain.model.WebNavigationPolicy
-import com.contentfilter.core.domain.model.googleResultsAllowed
-import com.contentfilter.core.domain.model.safeSearchEnabled
-import com.contentfilter.core.domain.model.webImagesBlocked
+import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.webNavigationBlocked
+import java.net.URI
 
-class SearchEngineScreenDetector {
-    fun shouldLeaveSearchEngine(
-        packageName: String,
-        snapshot: PolicySnapshot,
-        visibleText: String,
-        recentDnsBlockHost: String? = null,
-    ): Boolean = diagnose(packageName, snapshot, visibleText, recentDnsBlockHost).shouldLeave
+class SearchEngineScreenDetector(
+    private val searchSessionWindowMillis: Long = DefaultSearchSessionWindowMillis,
+) {
+    private var searchOrigin: SearchOrigin? = null
 
     fun diagnose(
         packageName: String,
         snapshot: PolicySnapshot,
-        visibleText: String,
-        recentDnsBlockHost: String? = null,
+        currentHost: String?,
+        addressBarFocused: Boolean = false,
+        recentSearchEngineId: String? = null,
+        elapsedRealtimeMillis: Long = System.nanoTime() / NanosPerMillisecond,
     ): SearchEngineScreenDiagnosis {
         val packageCategory = packageName.searchSurfaceCategory()
         val webNavigationBlocked = snapshot.rules.webNavigationBlocked()
-        val blockRuleCount = snapshot.searchEngineBlockRuleCount()
+        val externalResultsAllowed = snapshot.rules.externalSearchResultsAllowed()
+        val detectedEngine = SearchEngineCatalog.engineForDomain(currentHost)
+        val origin = searchOrigin?.takeIf { elapsedRealtimeMillis - it.observedAtMillis <= searchSessionWindowMillis }
+        if (origin == null) searchOrigin = null
+
         if (packageCategory == SearchSurfaceCategory.NonBrowser) {
-            return SearchEngineScreenDiagnosis(
-                shouldLeave = false,
+            return diagnosis(
+                action = SearchNavigationAction.Allow,
                 reason = "non-browser",
-                webNavigationBlocked = webNavigationBlocked,
-                packageCategory = packageCategory.label,
-                recentDnsBlockHost = null,
-                searchBlockRules = blockRuleCount,
-                visibleTextLength = visibleText.length,
+                snapshot = snapshot,
+                packageCategory = packageCategory,
+                engineId = detectedEngine?.id,
             )
         }
         if (webNavigationBlocked) {
-            if (snapshot.rules.googleResultsAllowed() && packageCategory != SearchSurfaceCategory.NonBrowser) {
-                val normalizedText = visibleText.lowercase()
-                val recentHost = recentDnsBlockHost?.normalizedHost()
-                val imageBlocked =
-                    snapshot.rules.webImagesBlocked() &&
-                        (normalizedText.hasImageSignal() ||
-                            recentHost?.let(WebNavigationPolicy::isImageDomain) == true)
-                val unsafeSearchBlocked =
-                    snapshot.rules.safeSearchEnabled() &&
-                        recentHost?.let(WebNavigationPolicy::isUnsafeSearchDomain) == true
-                val onGoogleSearch =
-                    normalizedText.indicatesGoogleSearchScreen() ||
-                        recentHost?.let(WebNavigationPolicy::isGoogleSearchDomain) == true
-                val openedExternalResult =
-                    recentHost != null &&
-                        !WebNavigationPolicy.isGoogleSearchDomain(recentHost) &&
-                        !WebNavigationPolicy.isImageDomain(recentHost)
-                val shouldLeave = imageBlocked || unsafeSearchBlocked || openedExternalResult || !onGoogleSearch
-                return SearchEngineScreenDiagnosis(
-                    shouldLeave = shouldLeave,
-                    reason =
-                        when {
-                            imageBlocked -> "images-blocked"
-                            unsafeSearchBlocked -> "unsafe-search-blocked"
-                            openedExternalResult -> "google-result-opened"
-                            onGoogleSearch -> "google-results-allowed"
-                            else -> "web-blocked-not-google-results"
-                        },
-                    webNavigationBlocked = webNavigationBlocked,
-                    packageCategory = packageCategory.label,
-                    recentDnsBlockHost = recentDnsBlockHost,
-                    searchBlockRules = snapshot.searchEngineBlockRuleCount(),
-                    visibleTextLength = visibleText.length,
-                )
-            }
-            return SearchEngineScreenDiagnosis(
-                shouldLeave = true,
+            searchOrigin = null
+            return diagnosis(
+                action = SearchNavigationAction.GoHome,
                 reason = "web-navigation-blocked",
-                webNavigationBlocked = webNavigationBlocked,
-                packageCategory = packageCategory.label,
-                recentDnsBlockHost = recentDnsBlockHost,
-                searchBlockRules = snapshot.searchEngineBlockRuleCount(),
-                visibleTextLength = visibleText.length,
+                snapshot = snapshot,
+                packageCategory = packageCategory,
+                engineId = detectedEngine?.id ?: recentSearchEngineId,
             )
         }
-        return SearchEngineScreenDiagnosis(
-            shouldLeave = false,
-            reason = "web-navigation-open",
-            webNavigationBlocked = webNavigationBlocked,
-            packageCategory = packageCategory.label,
-            recentDnsBlockHost = null,
-            searchBlockRules = blockRuleCount,
-            visibleTextLength = visibleText.length,
+        if (externalResultsAllowed) {
+            searchOrigin = null
+            return diagnosis(
+                action = SearchNavigationAction.Allow,
+                reason = "external-results-allowed",
+                snapshot = snapshot,
+                packageCategory = packageCategory,
+                engineId = detectedEngine?.id,
+            )
+        }
+        if (addressBarFocused) {
+            searchOrigin = null
+            return diagnosis(
+                action = SearchNavigationAction.Allow,
+                reason = "address-bar-navigation",
+                snapshot = snapshot,
+                packageCategory = packageCategory,
+                engineId = detectedEngine?.id,
+            )
+        }
+        if (detectedEngine != null) {
+            searchOrigin = SearchOrigin(detectedEngine.id, elapsedRealtimeMillis)
+            return diagnosis(
+                action = SearchNavigationAction.Allow,
+                reason = "search-results-visible",
+                snapshot = snapshot,
+                packageCategory = packageCategory,
+                engineId = detectedEngine.id,
+            )
+        }
+        val effectiveOrigin =
+            origin
+                ?: recentSearchEngineId?.let { SearchOrigin(it, elapsedRealtimeMillis) }
+        if (effectiveOrigin != null) searchOrigin = effectiveOrigin
+        if (currentHost != null && effectiveOrigin != null) {
+            return diagnosis(
+                action = SearchNavigationAction.GoBack,
+                reason = "external-result-restricted",
+                snapshot = snapshot,
+                packageCategory = packageCategory,
+                engineId = effectiveOrigin.engineId,
+            )
+        }
+        return diagnosis(
+            action = SearchNavigationAction.Allow,
+            reason = "no-search-transition",
+            snapshot = snapshot,
+            packageCategory = packageCategory,
+            engineId = effectiveOrigin?.engineId,
         )
     }
+
+    private fun diagnosis(
+        action: SearchNavigationAction,
+        reason: String,
+        snapshot: PolicySnapshot,
+        packageCategory: SearchSurfaceCategory,
+        engineId: String?,
+    ): SearchEngineScreenDiagnosis =
+        SearchEngineScreenDiagnosis(
+            action = action,
+            reason = reason,
+            webNavigationBlocked = snapshot.rules.webNavigationBlocked(),
+            externalSearchResultsAllowed = snapshot.rules.externalSearchResultsAllowed(),
+            packageCategory = packageCategory.label,
+            searchEngineId = engineId,
+            policyRevision = snapshot.version,
+        )
 
     private fun String.searchSurfaceCategory(): SearchSurfaceCategory =
         when (this) {
@@ -102,34 +121,27 @@ class SearchEngineScreenDetector {
             else -> SearchSurfaceCategory.NonBrowser
         }
 
-    private fun PolicySnapshot.searchEngineBlockRuleCount(): Int =
-        rules.count {
-            it.enabled &&
-                it.scope == RuleScope.Domain &&
-                it.action == RuleAction.Block &&
-                it.target in SearchEngineCatalog.searchEngineDomains
+    private data class SearchOrigin(
+        val engineId: String,
+        val observedAtMillis: Long,
+    )
+
+    companion object {
+        fun hostFromAddressBarText(value: CharSequence?): String? {
+            val raw = value?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return null
+            if (raw.any(Char::isWhitespace) && "://" !in raw) return null
+            val candidate = if ("://" in raw) raw else "https://$raw"
+            return runCatching { URI(candidate).host }
+                .getOrNull()
+                ?.lowercase()
+                ?.removeSuffix(".")
+                ?.removePrefix("www.")
+                ?.takeIf { host -> host.contains('.') && host.none(Char::isWhitespace) }
         }
 
-    private fun String.indicatesGoogleSearchScreen(): Boolean =
-        contains("google") &&
-            (contains("search") ||
-                contains("buscar") ||
-                contains("resultados") ||
-                contains("resultados de búsqueda") ||
-                contains("resultados de busqueda"))
-
-    private fun String.hasImageSignal(): Boolean =
-        ImageSignals.any { it in this } || ImageExtensions.any { it in this }
-
-    private fun String.normalizedHost(): String =
-        lowercase()
-            .substringBefore("/")
-            .substringBefore("?")
-            .removeSuffix(".")
-            .removePrefix("www.")
-
-    private companion object {
-        val BrowserPackageNames =
+        private const val DefaultSearchSessionWindowMillis = 10 * 60 * 1_000L
+        private const val NanosPerMillisecond = 1_000_000L
+        private val BrowserPackageNames =
             setOf(
                 "com.android.chrome",
                 "com.sec.android.app.sbrowser",
@@ -145,43 +157,25 @@ class SearchEngineScreenDetector {
                 "com.UCMobile.intl",
                 "mark.via.gp",
             )
-
-        val SearchAppPackageNames =
-            setOf(
-                "com.google.android.googlequicksearchbox",
-            )
-
-        val ImageSignals =
-            setOf(
-                "google imágenes",
-                "google imagenes",
-                "images",
-                "imágenes",
-                "imagenes",
-            )
-
-        val ImageExtensions =
-            setOf(
-                ".jpg",
-                ".jpeg",
-                ".png",
-                ".webp",
-                ".gif",
-                ".bmp",
-                ".svg",
-            )
+        private val SearchAppPackageNames = setOf("com.google.android.googlequicksearchbox")
     }
 }
 
 data class SearchEngineScreenDiagnosis(
-    val shouldLeave: Boolean,
+    val action: SearchNavigationAction,
     val reason: String,
     val webNavigationBlocked: Boolean,
+    val externalSearchResultsAllowed: Boolean,
     val packageCategory: String,
-    val recentDnsBlockHost: String?,
-    val searchBlockRules: Int,
-    val visibleTextLength: Int,
+    val searchEngineId: String?,
+    val policyRevision: Long,
 )
+
+enum class SearchNavigationAction {
+    Allow,
+    GoBack,
+    GoHome,
+}
 
 private enum class SearchSurfaceCategory(val label: String) {
     Browser("browser"),

@@ -7,7 +7,7 @@ import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.UsageSession
-import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -146,9 +146,10 @@ class AccessibilityPolicySnapshotProvider
             val rules = value.snapshot.rules
             Log.i(
                 LogTag,
-                "webNavigation accessibility applied source=$source policy=${value.snapshot.id} " +
+                "webNavigation accessibility applied source=$source policy=${value.snapshot.id.take(8)} " +
                     "version=${value.snapshot.version} webNavigationBlocked=${rules.webNavigationBlocked()} " +
-                    "googleResultsAllowed=${rules.googleResultsAllowed()} blockImages=${rules.webImagesBlocked()} " +
+                    "externalSearchResultsAllowed=${rules.externalSearchResultsAllowed()} " +
+                    "blockImages=${rules.webImagesBlocked()} " +
                     "safeSearch=${rules.safeSearchEnabled()} " +
                     "mode=${if (rules.webNavigationBlocked()) "web-blocked" else "web-open"}",
             )

@@ -17,7 +17,7 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
-import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -81,31 +81,33 @@ class DefaultPolicyEngine : PolicyEngine {
     ): PolicyDecision {
         val normalizedContext = context.copy(domain = context.domain.normalizedDomain())
         deviceDecision(context.device)?.let { return it }
-        if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
-            return PolicyDecision.Allow()
-        }
         val webNavigationBlocked = snapshot.rules.webNavigationBlocked()
         if (webNavigationBlocked &&
             WebNavigationPolicy.isWebNavigationDomain(normalizedContext.domain)
         ) {
-            if (snapshot.rules.googleResultsAllowed() &&
-                WebNavigationPolicy.isGoogleSearchDomain(normalizedContext.domain)
-            ) {
-                return PolicyDecision.Allow(safeSearchRequired = snapshot.rules.safeSearchEnabled())
-            }
             return PolicyDecision.Block("Blocked by web navigation policy.")
         }
-        if (webNavigationBlocked &&
+        if (!webNavigationBlocked &&
+            normalizedContext.isTopLevelNavigation &&
+            !snapshot.rules.externalSearchResultsAllowed() &&
+            WebNavigationPolicy.isExternalSearchNavigation(
+                sourceDomain = normalizedContext.sourceDomain,
+                targetDomain = normalizedContext.domain,
+            )
+        ) {
+            return PolicyDecision.Block("External search result navigation is restricted.")
+        }
+        if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
+            return PolicyDecision.Allow()
+        }
+        if (!webNavigationBlocked && WebNavigationPolicy.isSearchEngineDomain(normalizedContext.domain)) {
+            return PolicyDecision.Allow(safeSearchRequired = snapshot.rules.safeSearchEnabled())
+        }
+        if (!webNavigationBlocked &&
             snapshot.rules.webImagesBlocked() &&
             WebNavigationPolicy.isImageDomain(normalizedContext.domain)
         ) {
             return PolicyDecision.Block("Blocked by image policy.")
-        }
-        if (webNavigationBlocked &&
-            snapshot.rules.safeSearchEnabled() &&
-            WebNavigationPolicy.isUnsafeSearchDomain(normalizedContext.domain)
-        ) {
-            return PolicyDecision.Block("Blocked by SafeSearch policy.")
         }
         activeGrant(
             snapshot.extraTimeGrants,

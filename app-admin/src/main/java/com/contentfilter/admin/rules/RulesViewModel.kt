@@ -15,7 +15,6 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
-import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
@@ -136,11 +135,11 @@ class RulesViewModel
                         LogTag,
                         "webNavigation admin state selectedDeviceId=$selectedDeviceId " +
                             "webNavigationBlocked=$savedInternetBlocked " +
-                            "googleResultsAllowed=${policy.rules.googleResultsAllowedForWeb()} " +
+                            "externalSearchResultsAllowed=${policy.rules.externalSearchResultsAllowedForWeb()} " +
                             "blockImages=${policy.rules.imagesBlockedForWeb()} " +
                             "safeSearch=${policy.rules.safeSearchEnabledForWeb()} " +
                             "pendingNavigation=${formState.pendingInternetBlocked} " +
-                            "pendingGoogle=${formState.pendingGoogleResultsAllowed} " +
+                            "pendingExternalResults=${formState.pendingExternalSearchResultsAllowed} " +
                             "pendingImages=${formState.pendingImagesBlocked} " +
                             "pendingSafeSearch=${formState.pendingSafeSearchEnabled} " +
                             "policyRevision=${policy.rules.webPolicyRevision()}",
@@ -162,9 +161,9 @@ class RulesViewModel
                     userDevices = userDevices,
                     selectedDeviceId = selectedDeviceId,
                     internetBlocked = formState.pendingInternetBlocked ?: savedInternetBlocked,
-                    searchEnginesAllowed = formState.pendingSearchEnginesAllowed ?: policy.rules.searchEnginesAllowed(),
-                    googleResultsAllowed =
-                        formState.pendingGoogleResultsAllowed ?: policy.rules.googleResultsAllowedForWeb(),
+                    externalSearchResultsAllowed =
+                        formState.pendingExternalSearchResultsAllowed
+                            ?: policy.rules.externalSearchResultsAllowedForWeb(),
                     imagesBlocked =
                         formState.pendingImagesBlocked ?: policy.rules.imagesBlockedForWeb(),
                     safeSearchEnabled =
@@ -410,8 +409,6 @@ class RulesViewModel
 
         fun createDomainLimit() = createLimit(PolicyTargetType.Domain)
 
-        fun setSearchEnginesAllowed(allowed: Boolean) = setGoogleResultsAllowed(allowed)
-
         fun saveAllowedDomainLimit() {
             val targetDeviceId = selectedDeviceIdForRules() ?: return
             val target = normalizeLimitTarget(PolicyTargetType.Domain, form.value.allowDomain)
@@ -493,7 +490,10 @@ class RulesViewModel
             Log.i(
                 LogTag,
                 "webNavigation admin requested requestId=$traceRequestId deviceId=${targetDeviceId.safeDeviceId()} " +
-                    "requestedBlocked=$blocked mainBefore=$previousRoom policyRevision=${currentState.rules.webPolicyRevision()}",
+                    "requestedBlocked=$blocked mainBefore=$previousRoom " +
+                    "externalSearchResultsAllowed=${currentState.externalSearchResultsAllowed} " +
+                    "safeSearchEnabled=${currentState.safeSearchEnabled} " +
+                    "policyRevision=${currentState.rules.webPolicyRevision()}",
             )
             form.update {
                 it.copy(
@@ -520,8 +520,8 @@ class RulesViewModel
                         val ruleChanges =
                             before.rules.webNavigationModeChanges(
                                 blocked = blocked,
-                                imagesBlocked = currentState.imagesBlocked,
-                                safeSearchEnabled = currentState.safeSearchEnabled,
+                                imagesBlocked = before.rules.imagesBlockedForWeb(),
+                                safeSearchEnabled = before.rules.safeSearchEnabledForWeb(),
                                 identitySeed = targetDeviceId,
                             )
                         val receipt = saveRule.saveAll(ruleChanges, targetDeviceId, traceRequestId)
@@ -549,6 +549,9 @@ class RulesViewModel
                         "mainAfter=$roomAfterSave roomConfirmed=${saved.isSuccess} " +
                         "policyRevision=${saved.getOrNull()?.revision ?: "none"} " +
                         "updatedAt=${saved.getOrNull()?.revision ?: "none"} " +
+                        "externalSearchResultsAllowed=" +
+                        "${saved.getOrNull()?.confirmedRules?.externalSearchResultsAllowedForWeb()} " +
+                        "safeSearchEnabled=${saved.getOrNull()?.confirmedRules?.safeSearchEnabledForWeb()} " +
                         "auxiliaryChanges=${saved.getOrNull()?.auxiliaryChanges ?: 0}",
                 )
                 if (saved.isSuccess) {
@@ -582,8 +585,6 @@ class RulesViewModel
                         it.copy(
                             internetSaving = false,
                             pendingInternetBlocked = null,
-                            pendingSearchEnginesAllowed = null,
-                            pendingGoogleResultsAllowed = null,
                             pendingImagesBlocked = null,
                             pendingSafeSearchEnabled = null,
                             message = "Guardado en este dispositivo. Sincronizando...",
@@ -658,8 +659,6 @@ class RulesViewModel
                             it.copy(
                                 internetSaving = false,
                                 pendingInternetBlocked = null,
-                                pendingSearchEnginesAllowed = null,
-                                pendingGoogleResultsAllowed = null,
                                 pendingImagesBlocked = null,
                                 pendingSafeSearchEnabled = null,
                                 message = "No se pudo cambiar el modo web. Intentá otra vez.",
@@ -677,113 +676,33 @@ class RulesViewModel
             }
         }
 
-        fun setGoogleResultsAllowed(allowed: Boolean) {
-            val targetDeviceId = selectedDeviceIdForRules() ?: return
-            val previousState = uiState.value.googleResultsAllowed
-            val intendedWebBlocked = uiState.value.internetBlocked
-            val requestId =
-                beginInternetSave(
-                    action = "google-results",
-                    deviceId = targetDeviceId,
-                    previousState = previousState.toString(),
-                    requestedState = allowed.toString(),
-                ) ?: return
-            val traceRequestId = "google-$requestId"
-            form.update {
-                it.copy(
-                    internetSaving = true,
-                    pendingGoogleResultsAllowed = allowed,
-                    message = "Guardando...",
-                )
-            }
-            viewModelScope.launch {
-                val saved =
-                    runCatching {
-                        refreshRemotePolicyBeforeWebMutation(targetDeviceId, traceRequestId)
-                        val before = policyRepository.getActivePolicy(targetDeviceId)
-                        val changes =
-                            before.rules.googleResultsModeChanges(
-                                allowed = allowed,
-                                webBlocked = intendedWebBlocked,
-                                deviceId = targetDeviceId,
-                            )
-                        val receipt = saveRule.saveAll(changes, targetDeviceId, traceRequestId)
-                        val confirmed =
-                            withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                                policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
-                                    snapshot.deviceId == targetDeviceId &&
-                                        snapshot.version >= receipt.revision &&
-                                        snapshot.rules.googleResultsAllowedForWeb() == allowed &&
-                                        (
-                                            intendedWebBlocked ||
-                                                snapshot.rules.webNavigationOpenWithoutAuxiliaryBlocks()
-                                        )
-                                }
-                            } ?: error("Room no confirmó resultados de Google.")
-                        if (BuildConfig.FLAVOR == "dev") {
-                            Log.i(
-                                LogTag,
-                                "googleResults room confirmed requestId=$traceRequestId " +
-                                    "deviceId=${targetDeviceId.safeDeviceId()} " +
-                                    "policyId=${receipt.policyId.take(8)} revision=${receipt.revision} " +
-                                    "webBlocked=${confirmed.rules.internetBlocked()} " +
-                                    "searchResultsAllowed=${confirmed.rules.googleResultsAllowedForWeb()} " +
-                                    "safeSearchEnabled=${confirmed.rules.safeSearchEnabledForWeb()} " +
-                                    "activeDomainBlocks=${confirmed.rules.activeDomainBlockCount()} " +
-                                    "activeAuxiliaryBlocks=${confirmed.rules.activeWebAuxiliaryBlockCount()}",
-                            )
-                        }
-                        receipt
-                    }
-                if (!isCurrentInternetSave(requestId)) return@launch
-                if (saved.isFailure) {
-                    form.update {
-                        it.copy(
-                            internetSaving = false,
-                            pendingGoogleResultsAllowed = null,
-                            message = "No se pudo guardar el cambio web.",
-                        )
-                    }
-                    return@launch
-                }
-                form.update {
-                    it.copy(
-                        internetSaving = false,
-                        pendingGoogleResultsAllowed = null,
-                        message = "Guardado en este dispositivo. Sincronizando...",
-                    )
-                }
-                syncScheduler.requestSync()
-                val syncResult =
-                    withContext(Dispatchers.IO) {
-                        syncEngine.syncPolicyChanges(saved.getOrThrow())
-                    }
-                if (!isCurrentInternetSave(requestId)) return@launch
-                form.update {
-                    it.copy(
-                        message =
-                            if (syncResult.serverConfirmed) {
-                                if (allowed) {
-                                    "Resultados de Google permitidos."
-                                } else {
-                                    "Resultados de Google bloqueados."
-                                }
-                            } else {
-                                "Guardado en este dispositivo. Pendiente por conexión."
-                            },
-                    )
-                }
-            }
+        fun setExternalSearchResultsAllowed(allowed: Boolean) {
+            setWebOption(
+                action = "external-search-results",
+                requestedState = allowed,
+                previousState = uiState.value.externalSearchResultsAllowed,
+                pending = { state -> state.copy(pendingExternalSearchResultsAllowed = allowed) },
+                clearPending = { state -> state.copy(pendingExternalSearchResultsAllowed = null) },
+                updatePreferences = { preferences ->
+                    preferences.copy(externalSearchResultsAllowed = allowed)
+                },
+                successMessage =
+                    if (allowed) {
+                        "Aplicado: se pueden abrir páginas desde buscadores."
+                    } else {
+                        "Aplicado: las páginas externas desde buscadores están restringidas."
+                    },
+            )
         }
 
         fun setImagesBlocked(blocked: Boolean) {
             setWebOption(
                 action = "images-blocked",
                 requestedState = blocked,
+                previousState = uiState.value.imagesBlocked,
                 pending = { state -> state.copy(pendingImagesBlocked = blocked) },
-                save = { deviceId -> setImagesBlockedRules(blocked, deviceId) },
-                confirmed = { rules -> rules.imagesBlockedForWeb() == blocked },
                 clearPending = { state -> state.copy(pendingImagesBlocked = null) },
+                updatePreferences = { preferences -> preferences.copy(imagesBlocked = blocked) },
                 successMessage =
                     if (blocked) {
                         "Fotos e imágenes bloqueadas."
@@ -797,10 +716,10 @@ class RulesViewModel
             setWebOption(
                 action = "safe-search",
                 requestedState = enabled,
+                previousState = uiState.value.safeSearchEnabled,
                 pending = { state -> state.copy(pendingSafeSearchEnabled = enabled) },
-                save = { deviceId -> setSafeSearchRules(enabled, deviceId) },
-                confirmed = { rules -> rules.safeSearchEnabledForWeb() == enabled },
                 clearPending = { state -> state.copy(pendingSafeSearchEnabled = null) },
+                updatePreferences = { preferences -> preferences.copy(safeSearchEnabled = enabled) },
                 successMessage =
                     if (enabled) {
                         "SafeSearch activado."
@@ -813,10 +732,10 @@ class RulesViewModel
         private fun setWebOption(
             action: String,
             requestedState: Boolean,
+            previousState: Boolean,
             pending: (RulesUiState) -> RulesUiState,
-            save: suspend (String) -> Unit,
-            confirmed: (List<PolicyRule>) -> Boolean,
             clearPending: (RulesUiState) -> RulesUiState,
+            updatePreferences: (WebPolicyPreferences) -> WebPolicyPreferences,
             successMessage: String,
         ) {
             val targetDeviceId = uiState.value.selectedDeviceId
@@ -828,28 +747,92 @@ class RulesViewModel
                 beginInternetSave(
                     action = action,
                     deviceId = targetDeviceId,
-                    previousState = "web-option",
+                    previousState = previousState.toString(),
                     requestedState = requestedState.toString(),
                 ) ?: return
+            val traceRequestId = "$action-$requestId"
             form.update { pending(it).copy(internetSaving = true, message = "Guardando...") }
             viewModelScope.launch {
                 val saved =
                     runCatching {
-                        save(targetDeviceId)
-                        withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                            policyRules.first { confirmed(it) }
-                        } ?: error("Room no confirmó $action.")
-                        syncScheduler.requestSync()
+                        refreshRemotePolicyBeforeWebMutation(targetDeviceId, traceRequestId)
+                        val before = policyRepository.getActivePolicy(targetDeviceId)
+                        val desired = updatePreferences(before.rules.webPolicyPreferences())
+                        val changes = before.rules.webPolicyChanges(desired, targetDeviceId)
+                        val receipt = saveRule.saveAll(changes, targetDeviceId, traceRequestId)
+                        val confirmed =
+                            withTimeoutOrNull(RoomConfirmTimeoutMillis) {
+                                policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
+                                    snapshot.deviceId == targetDeviceId &&
+                                        snapshot.version >= receipt.revision &&
+                                        snapshot.rules.webPolicyPreferences() == desired &&
+                                        snapshot.rules.activeWebAuxiliaryBlockCount() == 0
+                                }
+                            } ?: error("Room no confirmó $action.")
+                        if (BuildConfig.FLAVOR == "dev") {
+                            Log.i(
+                                LogTag,
+                                "web option room confirmed requestId=$traceRequestId " +
+                                    "deviceId=${targetDeviceId.safeDeviceId()} policyId=${receipt.policyId.take(8)} " +
+                                    "revision=${receipt.revision} webBlocked=${confirmed.rules.internetBlocked()} " +
+                                    "externalSearchResultsAllowed=${confirmed.rules.externalSearchResultsAllowedForWeb()} " +
+                                    "safeSearchEnabled=${confirmed.rules.safeSearchEnabledForWeb()} " +
+                                    "activeDomainBlocks=${confirmed.rules.activeDomainBlockCount()} " +
+                                    "activeAuxiliaryBlocks=${confirmed.rules.activeWebAuxiliaryBlockCount()} " +
+                                    "changes=${changes.size}",
+                            )
+                        }
+                        WebModeLocalSave(
+                            beforeBlocked = before.rules.internetBlocked(),
+                            confirmedRules = confirmed.rules,
+                            revision = confirmed.version,
+                            auxiliaryChanges = changes.size,
+                            receipt = receipt,
+                        )
                     }
                 if (!isCurrentInternetSave(requestId)) return@launch
+                if (saved.isFailure) {
+                    form.update {
+                        clearPending(it).copy(
+                            internetSaving = false,
+                            message = "No se pudo guardar el cambio web.",
+                        )
+                    }
+                    return@launch
+                }
                 form.update {
                     clearPending(it).copy(
                         internetSaving = false,
+                        message = "Guardado en este dispositivo. Sincronizando...",
+                    )
+                }
+                syncScheduler.requestSync()
+                val receipt = saved.getOrThrow().receipt
+                val syncResult = withContext(Dispatchers.IO) { syncEngine.syncPolicyChanges(receipt) }
+                if (!isCurrentInternetSave(requestId)) return@launch
+                if (!syncResult.serverConfirmed) {
+                    form.update {
+                        it.copy(message = "Guardado en este dispositivo. Pendiente por conexión.")
+                    }
+                    return@launch
+                }
+                form.update {
+                    it.copy(message = "Sincronizado con el servidor. Esperando dispositivo...")
+                }
+                val application =
+                    withContext(Dispatchers.IO) {
+                        syncEngine.waitForPolicyApplied(receipt, PolicyApplicationWaitMillis)
+                    }
+                if (!isCurrentInternetSave(requestId)) return@launch
+                form.update {
+                    it.copy(
                         message =
-                            if (saved.isSuccess) {
-                                successMessage
-                            } else {
-                                "No se pudo guardar el cambio web."
+                            when (application.state) {
+                                PolicyApplicationState.Applied -> successMessage
+                                PolicyApplicationState.Pending ->
+                                    "Sincronizado con el servidor. Dispositivo sin confirmar."
+                                PolicyApplicationState.Offline ->
+                                    "Sincronizado con el servidor. Dispositivo sin conexión."
                             },
                     )
                 }
@@ -1638,50 +1621,6 @@ class RulesViewModel
             } else {
                 null
             }
-
-        private suspend fun setImagesBlockedRules(
-            blocked: Boolean,
-            targetDeviceId: String,
-        ) {
-            setRulesForDomain(
-                target = WebNavigationPolicy.ImagesBlockedTarget,
-                action = RuleAction.Block,
-                enabled = blocked,
-                priority = WebNavigationBlockPriority + 20,
-                deviceId = targetDeviceId,
-            )
-            WebNavigationPolicy.ImageDomains.forEach { domain ->
-                setRulesForDomain(
-                    target = domain,
-                    action = RuleAction.Block,
-                    enabled = blocked,
-                    priority = SearchEngineBlockPriority + 10,
-                    deviceId = targetDeviceId,
-                )
-            }
-        }
-
-        private suspend fun setSafeSearchRules(
-            enabled: Boolean,
-            targetDeviceId: String,
-        ) {
-            setRulesForDomain(
-                target = WebNavigationPolicy.SafeSearchTarget,
-                action = RuleAction.Allow,
-                enabled = enabled,
-                priority = WebNavigationBlockPriority + 30,
-                deviceId = targetDeviceId,
-            )
-            WebNavigationPolicy.UnsafeSearchDomains.forEach { domain ->
-                setRulesForDomain(
-                    target = domain,
-                    action = RuleAction.Block,
-                    enabled = enabled,
-                    priority = SearchEngineBlockPriority,
-                    deviceId = targetDeviceId,
-                )
-            }
-        }
 
         private suspend fun setAllowedDomain(
             target: String,

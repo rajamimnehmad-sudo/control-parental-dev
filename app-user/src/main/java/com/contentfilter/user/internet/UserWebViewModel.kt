@@ -3,7 +3,7 @@ package com.contentfilter.user.internet
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -27,15 +27,15 @@ class UserWebViewModel
                     val blocked = snapshot.rules.webNavigationBlocked()
                     Log.i(
                         LogTag,
-                        "webNavigation user snapshot policy=${snapshot.id} version=${snapshot.version} " +
+                        "webNavigation user snapshot policy=${snapshot.id.take(8)} version=${snapshot.version} " +
                             "webNavigationBlocked=$blocked " +
-                            "googleResultsAllowed=${snapshot.rules.googleResultsAllowed()} " +
+                            "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
                             "blockImages=${snapshot.rules.webImagesBlocked()} " +
                             "safeSearch=${snapshot.rules.safeSearchEnabled()}",
                     )
                     UserWebUiState(
                         webNavigationBlocked = blocked,
-                        googleResultsAllowed = snapshot.rules.googleResultsAllowed(),
+                        externalSearchResultsAllowed = snapshot.rules.externalSearchResultsAllowed(),
                         imagesBlocked = snapshot.rules.webImagesBlocked(),
                         safeSearchEnabled = snapshot.rules.safeSearchEnabled(),
                     )
@@ -49,7 +49,7 @@ class UserWebViewModel
 
 data class UserWebUiState(
     val webNavigationBlocked: Boolean = false,
-    val googleResultsAllowed: Boolean = false,
+    val externalSearchResultsAllowed: Boolean = false,
     val imagesBlocked: Boolean = false,
     val safeSearchEnabled: Boolean = true,
 )

@@ -116,7 +116,7 @@ fun RulesRoute(
         onAppAllowedChanged = viewModel::setAppAllowed,
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
-        onGoogleResultsAllowedChanged = viewModel::setGoogleResultsAllowed,
+        onExternalSearchResultsAllowedChanged = viewModel::setExternalSearchResultsAllowed,
         onImagesBlockedChanged = viewModel::setImagesBlocked,
         onSafeSearchChanged = viewModel::setSafeSearchEnabled,
         onToggle = viewModel::toggle,
@@ -154,7 +154,7 @@ private fun RulesScreen(
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
-    onGoogleResultsAllowedChanged: (Boolean) -> Unit,
+    onExternalSearchResultsAllowedChanged: (Boolean) -> Unit,
     onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
@@ -205,7 +205,7 @@ private fun RulesScreen(
                 onAppAllowedChanged = onAppAllowedChanged,
                 onAppLimitSaved = onAppLimitSaved,
                 onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
-                onGoogleResultsAllowedChanged = onGoogleResultsAllowedChanged,
+                onExternalSearchResultsAllowedChanged = onExternalSearchResultsAllowedChanged,
                 onImagesBlockedChanged = onImagesBlockedChanged,
                 onSafeSearchChanged = onSafeSearchChanged,
                 onToggle = onToggle,
@@ -801,7 +801,7 @@ private fun UserDetailContent(
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
-    onGoogleResultsAllowedChanged: (Boolean) -> Unit,
+    onExternalSearchResultsAllowedChanged: (Boolean) -> Unit,
     onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
@@ -935,16 +935,16 @@ private fun UserDetailContent(
                     item {
                         WebNavigationPanel(
                             blocked = state.internetBlocked,
-                            googleResultsAllowed = state.googleResultsAllowed,
+                            externalSearchResultsAllowed = state.externalSearchResultsAllowed,
                             imagesBlocked = state.imagesBlocked,
                             safeSearchEnabled = state.safeSearchEnabled,
                             navigationSaving = state.pendingInternetBlocked != null,
-                            googleResultsSaving = state.pendingGoogleResultsAllowed != null,
+                            externalSearchResultsSaving = state.pendingExternalSearchResultsAllowed != null,
                             imagesSaving = state.pendingImagesBlocked != null,
                             safeSearchSaving = state.pendingSafeSearchEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
-                            onGoogleResultsAllowedChanged = onGoogleResultsAllowedChanged,
+                            onExternalSearchResultsAllowedChanged = onExternalSearchResultsAllowedChanged,
                             onImagesBlockedChanged = onImagesBlockedChanged,
                             onSafeSearchChanged = onSafeSearchChanged,
                         )
@@ -1070,16 +1070,16 @@ private fun AppsToolbar(
 @Composable
 private fun WebNavigationPanel(
     blocked: Boolean,
-    googleResultsAllowed: Boolean,
+    externalSearchResultsAllowed: Boolean,
     imagesBlocked: Boolean,
     safeSearchEnabled: Boolean,
     navigationSaving: Boolean,
-    googleResultsSaving: Boolean,
+    externalSearchResultsSaving: Boolean,
     imagesSaving: Boolean,
     safeSearchSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
-    onGoogleResultsAllowedChanged: (Boolean) -> Unit,
+    onExternalSearchResultsAllowedChanged: (Boolean) -> Unit,
     onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
 ) {
@@ -1092,33 +1092,38 @@ private fun WebNavigationPanel(
                         "Activado: navegación web bloqueada por el administrador."
                     } else {
                         "Desactivado: navegación web permitida."
-                },
+                    },
                 checked = blocked,
                 enabled = !navigationSaving,
                 saving = navigationSaving,
                 onCheckedChange = onBlockedChanged,
             )
             WebSwitchRow(
-                title = "Permitir resultados de Google",
-                description = "Chrome y Google pueden mostrar búsquedas, pero no abrir resultados.",
-                checked = googleResultsAllowed,
-                enabled = blocked && !googleResultsSaving,
-                saving = googleResultsSaving,
-                onCheckedChange = onGoogleResultsAllowedChanged,
+                title = "Permitir abrir páginas desde buscadores",
+                description =
+                    if (externalSearchResultsAllowed) {
+                        "Los resultados pueden abrir páginas externas cuando Web esté permitida."
+                    } else {
+                        "Las búsquedas muestran resultados, pero las páginas externas quedan restringidas."
+                    },
+                checked = externalSearchResultsAllowed,
+                enabled = !externalSearchResultsSaving,
+                saving = externalSearchResultsSaving,
+                onCheckedChange = onExternalSearchResultsAllowedChanged,
             )
             WebSwitchRow(
                 title = "Bloquear fotos/imágenes",
                 description = "Bloquea Google Imágenes y dominios obvios de galerías.",
                 checked = imagesBlocked,
-                enabled = blocked && !imagesSaving,
+                enabled = !imagesSaving,
                 saving = imagesSaving,
                 onCheckedChange = onImagesBlockedChanged,
             )
             WebSwitchRow(
                 title = "SafeSearch activado",
-                description = "Fuerza búsqueda segura cuando se puede y bloquea buscadores no asegurados.",
+                description = "Fuerza búsqueda segura en los buscadores compatibles cuando Web esté permitida.",
                 checked = safeSearchEnabled,
-                enabled = blocked && !safeSearchSaving,
+                enabled = !safeSearchSaving,
                 saving = safeSearchSaving,
                 onCheckedChange = onSafeSearchChanged,
             )

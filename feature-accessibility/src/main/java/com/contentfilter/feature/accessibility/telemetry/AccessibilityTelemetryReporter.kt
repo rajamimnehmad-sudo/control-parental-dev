@@ -36,20 +36,18 @@ class AccessibilityTelemetryReporter
             packageName: String,
             packageCategory: String,
             reason: String,
-            blockRules: Int,
-            recentDnsBlockHost: String?,
-            visibleTextLength: Int,
-            result: String,
+            searchEngineId: String?,
+            action: String,
+            policyRevision: Long,
         ) {
             val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
             record(
                 type = "search-protection",
                 message =
-                        "layer=accessibility deviceId=$deviceId action=search-screen event=$eventLabel " +
-                        "packageName=${packageName.take(MaxMessageLength)} browserCheck=$packageCategory result=$result " +
-                        "blockRules=$blockRules reason=${reason.take(MaxMessageLength)} " +
-                        "recentDnsSearchBlock=${recentDnsBlockHost?.sanitizeHost() ?: "none"} " +
-                        "visibleTextLength=$visibleTextLength",
+                    "layer=accessibility deviceId=$deviceId action=search-screen event=$eventLabel " +
+                        "packageName=${packageName.take(MaxMessageLength)} browserCheck=$packageCategory result=$action " +
+                        "searchEngine=${searchEngineId ?: "none"} decision=$action " +
+                        "policyRevision=$policyRevision reason=${reason.take(MaxMessageLength)}",
             )
         }
 
@@ -84,12 +82,6 @@ class AccessibilityTelemetryReporter
             }
 
         private fun String.safeDeviceId(): String = take(8)
-
-        private fun String.sanitizeHost(): String =
-            lowercase()
-                .substringBefore("/")
-                .substringBefore("?")
-                .take(MaxMessageLength)
 
         private companion object {
             const val MaxMessageLength = 120

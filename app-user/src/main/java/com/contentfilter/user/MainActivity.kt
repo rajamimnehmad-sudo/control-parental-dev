@@ -416,22 +416,26 @@ private fun UserWebTab(
                     "El usuario no puede modificar este estado."
                 } else {
                     "Sin bloqueo web activo desde el administrador."
-            },
+                },
             accent = ProductSky,
         )
         UserWebStatusCard(
-            title = "Resultados de Google",
+            title = "Abrir páginas desde buscadores",
             value =
-                if (blocked && state.googleResultsAllowed) {
-                    "Permitidos"
+                if (blocked && state.externalSearchResultsAllowed) {
+                    "Permitido al habilitar Web"
+                } else if (blocked) {
+                    "Restringido al habilitar Web"
+                } else if (state.externalSearchResultsAllowed) {
+                    "Permitido"
                 } else {
-                    "No permitidos"
+                    "Restringido"
                 },
         )
         UserWebStatusCard(
             title = "Fotos e imágenes",
             value =
-                if (blocked && state.imagesBlocked) {
+                if (state.imagesBlocked) {
                     "Bloqueadas"
                 } else {
                     "Permitidas"
@@ -441,6 +445,8 @@ private fun UserWebTab(
             title = "SafeSearch",
             value =
                 if (blocked && state.safeSearchEnabled) {
+                    "Activo al habilitar Web"
+                } else if (state.safeSearchEnabled) {
                     "Activo"
                 } else {
                     "Sin forzar"

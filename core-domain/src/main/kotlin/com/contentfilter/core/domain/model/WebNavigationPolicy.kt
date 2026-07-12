@@ -2,7 +2,8 @@ package com.contentfilter.core.domain.model
 
 object WebNavigationPolicy {
     const val RuleTarget = "__web_navigation_blocked__"
-    const val GoogleResultsAllowedTarget = "__web_google_results_allowed__"
+    const val ExternalSearchResultsAllowedTarget = "__web_external_search_results_allowed__"
+    const val LegacyGoogleResultsAllowedTarget = "__web_google_results_allowed__"
     const val ImagesBlockedTarget = "__web_images_blocked__"
     const val SafeSearchTarget = "__web_safe_search_enabled__"
     const val RulePriority = 5_000
@@ -63,6 +64,15 @@ object WebNavigationPolicy {
         return GoogleSearchDomains.any { normalized.matchesDomainTarget(it) }
     }
 
+    fun isSearchEngineDomain(domain: String): Boolean = SearchEngineCatalog.isSearchEngineDomain(domain)
+
+    fun isExternalSearchNavigation(
+        sourceDomain: String?,
+        targetDomain: String,
+    ): Boolean =
+        SearchEngineCatalog.isSearchEngineDomain(sourceDomain) &&
+            !SearchEngineCatalog.isSearchEngineDomain(targetDomain)
+
     fun isUnsafeSearchDomain(domain: String): Boolean {
         val normalized = domain.normalizedHost()
         return UnsafeSearchDomains.any { normalized.matchesDomainTarget(it) }
@@ -74,8 +84,10 @@ object WebNavigationPolicy {
     }
 
     private val WebNavigationDomains: Set<String> =
-        (SearchEngineCatalog.searchEngineDomains +
-            SearchEngineCatalog.secureDnsDomains)
+        (
+            SearchEngineCatalog.searchEngineDomains +
+                SearchEngineCatalog.secureDnsDomains
+        )
             .toSet()
 
     private fun String.normalizedHost(): String =
@@ -97,13 +109,21 @@ fun Iterable<PolicyRule>.webNavigationBlocked(): Boolean =
             it.target == WebNavigationPolicy.RuleTarget
     }
 
-fun Iterable<PolicyRule>.googleResultsAllowed(): Boolean =
-    any {
+fun Iterable<PolicyRule>.externalSearchResultsAllowed(): Boolean {
+    val canonicalRules =
+        filter {
+            it.scope == RuleScope.Domain &&
+                it.action == RuleAction.Allow &&
+                it.target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget
+        }
+    if (canonicalRules.any()) return canonicalRules.any { it.enabled }
+    return any {
         it.enabled &&
             it.scope == RuleScope.Domain &&
             it.action == RuleAction.Allow &&
-            it.target == WebNavigationPolicy.GoogleResultsAllowedTarget
+            it.target == WebNavigationPolicy.LegacyGoogleResultsAllowedTarget
     }
+}
 
 fun Iterable<PolicyRule>.webImagesBlocked(): Boolean =
     any {

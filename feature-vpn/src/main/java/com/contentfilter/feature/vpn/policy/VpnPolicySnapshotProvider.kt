@@ -2,7 +2,7 @@ package com.contentfilter.feature.vpn.policy
 
 import android.util.Log
 import com.contentfilter.core.domain.model.LicenseState
-import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -55,9 +55,9 @@ class VpnPolicySnapshotProvider
                         state.value = it
                         Log.i(
                             LogTag,
-                            "webNavigation vpn applied policy=${it.snapshot.id} version=${it.snapshot.version} " +
+                            "webNavigation vpn applied policy=${it.snapshot.id.take(8)} version=${it.snapshot.version} " +
                                 "webNavigationBlocked=${it.snapshot.rules.webNavigationBlocked()} " +
-                                "googleResultsAllowed=${it.snapshot.rules.googleResultsAllowed()} " +
+                                "externalSearchResultsAllowed=${it.snapshot.rules.externalSearchResultsAllowed()} " +
                                 "blockImages=${it.snapshot.rules.webImagesBlocked()} " +
                                 "safeSearch=${it.snapshot.rules.safeSearchEnabled()} " +
                                 "mode=${if (it.strictWebBlockEnabled) "web-blocked" else "web-open"}",
@@ -85,9 +85,10 @@ class VpnPolicySnapshotProvider
             )
             Log.i(
                 LogTag,
-                "webNavigation vpn applied policy=${state.value.snapshot.id} version=${state.value.snapshot.version} " +
+                "webNavigation vpn applied policy=${state.value.snapshot.id.take(8)} " +
+                    "version=${state.value.snapshot.version} " +
                     "webNavigationBlocked=${state.value.snapshot.rules.webNavigationBlocked()} " +
-                    "googleResultsAllowed=${state.value.snapshot.rules.googleResultsAllowed()} " +
+                    "externalSearchResultsAllowed=${state.value.snapshot.rules.externalSearchResultsAllowed()} " +
                     "blockImages=${state.value.snapshot.rules.webImagesBlocked()} " +
                     "safeSearch=${state.value.snapshot.rules.safeSearchEnabled()} " +
                     "mode=${if (state.value.strictWebBlockEnabled) "web-blocked" else "web-open"}",

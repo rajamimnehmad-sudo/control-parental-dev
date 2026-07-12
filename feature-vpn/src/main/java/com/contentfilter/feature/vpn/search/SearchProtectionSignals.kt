@@ -3,25 +3,33 @@ package com.contentfilter.feature.vpn.search
 import android.os.SystemClock
 
 object SearchProtectionSignals {
-    private var lastDnsBlock: RecentDnsSearchBlock? = null
+    @Volatile
+    private var lastSearchEngine: RecentSearchEngine? = null
 
-    fun recordDnsBlock(host: String) {
-        lastDnsBlock =
-            RecentDnsSearchBlock(
-                host = host.lowercase().substringBefore("/").substringBefore("?"),
+    fun recordSearchEngine(
+        engineId: String,
+        policyRevision: Long,
+    ) {
+        lastSearchEngine =
+            RecentSearchEngine(
+                engineId = engineId,
+                policyRevision = policyRevision,
                 elapsedRealtimeMillis = SystemClock.elapsedRealtime(),
             )
     }
 
-    fun recentDnsBlock(windowMillis: Long = RecentWindowMillis): RecentDnsSearchBlock? {
-        val block = lastDnsBlock ?: return null
-        return block.takeIf { SystemClock.elapsedRealtime() - it.elapsedRealtimeMillis <= windowMillis }
+    fun recentSearchEngine(windowMillis: Long = RecentWindowMillis): RecentSearchEngine? {
+        val observation = lastSearchEngine ?: return null
+        return observation.takeIf {
+            SystemClock.elapsedRealtime() - it.elapsedRealtimeMillis <= windowMillis
+        }
     }
 
     private const val RecentWindowMillis = 12_000L
 }
 
-data class RecentDnsSearchBlock(
-    val host: String,
+data class RecentSearchEngine(
+    val engineId: String,
+    val policyRevision: Long,
     val elapsedRealtimeMillis: Long,
 )

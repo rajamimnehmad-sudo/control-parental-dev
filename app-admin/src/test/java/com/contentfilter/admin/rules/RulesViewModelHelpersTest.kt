@@ -10,7 +10,6 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.WebNavigationPolicy
-import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -19,41 +18,40 @@ import kotlin.test.assertTrue
 
 class RulesViewModelHelpersTest {
     @Test
-    fun `web block plan writes the main rule first`() {
+    fun `web policy plan writes the main rule first with deterministic ids`() {
         val changes =
-            emptyList<PolicyRule>().webNavigationModeChanges(
-                blocked = true,
-                imagesBlocked = false,
-                safeSearchEnabled = true,
+            emptyList<PolicyRule>().webPolicyChanges(
+                desired = preferences(webBlocked = true),
+                deviceId = DeviceId,
             )
 
         assertEquals(WebNavigationPolicy.RuleTarget, changes.first().target)
         assertTrue(changes.first().enabled)
+        assertEquals(
+            webRuleId(DeviceId, WebNavigationPolicy.RuleTarget, RuleAction.Block),
+            changes.first().id,
+        )
         assertTrue(changes.applyTo(emptyList()).webNavigationBlocked())
     }
 
     @Test
-    fun `web main rule id is stable for the selected device`() {
+    fun `all canonical web rule ids are stable for the selected device`() {
         val first =
-            emptyList<PolicyRule>().webNavigationModeChanges(
-                blocked = true,
-                imagesBlocked = false,
-                safeSearchEnabled = false,
-                identitySeed = DeviceId,
+            emptyList<PolicyRule>().webPolicyChanges(
+                desired = preferences(webBlocked = true, externalResultsAllowed = true),
+                deviceId = DeviceId,
             )
         val second =
-            emptyList<PolicyRule>().webNavigationModeChanges(
-                blocked = false,
-                imagesBlocked = false,
-                safeSearchEnabled = false,
-                identitySeed = DeviceId,
+            emptyList<PolicyRule>().webPolicyChanges(
+                desired = preferences(webBlocked = false, externalResultsAllowed = false),
+                deviceId = DeviceId,
             )
 
-        assertEquals(first.first().id, second.first().id)
+        assertEquals(first.map { it.id }.take(4), second.map { it.id }.take(4))
     }
 
     @Test
-    fun `web allow plan disables stale wildcard search dns and image blocks`() {
+    fun `repair migrates legacy preference and disables wildcard search dns and image blocks`() {
         val current =
             listOf(
                 domainRule(WebNavigationPolicy.RuleTarget, RuleAction.Block, enabled = true),
@@ -64,30 +62,27 @@ class RulesViewModelHelpersTest {
                 domainRule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block, enabled = true),
                 domainRule(WebNavigationPolicy.ImageDomains.first(), RuleAction.Block, enabled = true),
                 domainRule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow, enabled = true),
+                domainRule(WebNavigationPolicy.LegacyGoogleResultsAllowedTarget, RuleAction.Allow, enabled = true),
             )
-
         val changes =
-            current.webNavigationModeChanges(
-                blocked = false,
-                imagesBlocked = true,
-                safeSearchEnabled = true,
+            current.webPolicyChanges(
+                desired = current.webPolicyPreferences().copy(webNavigationBlocked = false),
+                deviceId = DeviceId,
             )
         val result = changes.applyTo(current)
 
         assertEquals(WebNavigationPolicy.RuleTarget, changes.first().target)
         assertFalse(result.webNavigationBlocked())
-        assertFalse(result.webImagesBlocked())
+        assertTrue(result.externalSearchResultsAllowedForWeb())
+        assertTrue(result.imagesBlockedForWeb())
+        assertTrue(result.safeSearchEnabledForWeb())
         assertFalse(result.any { it.enabled && it.action == RuleAction.Block && it.target == DomainWildcard })
-        assertFalse(result.any { it.enabled && it.action == RuleAction.Block && it.target in SearchProtectionDomains })
-        assertFalse(
-            result.any {
-                it.enabled && it.action == RuleAction.Block && WebNavigationPolicy.isImageDomain(it.target)
-            },
-        )
+        assertEquals(0, result.activeWebAuxiliaryBlockCount())
+        assertFalse(result.any { it.enabled && it.target == WebNavigationPolicy.LegacyGoogleResultsAllowedTarget })
     }
 
     @Test
-    fun `web allow plan disables every duplicate main and legacy auxiliary block`() {
+    fun `repair disables every random duplicate and keeps one deterministic canonical rule`() {
         val current =
             listOf(
                 domainRule(WebNavigationPolicy.RuleTarget, RuleAction.Block, enabled = true),
@@ -100,136 +95,99 @@ class RulesViewModelHelpersTest {
                 domainRule("gstatic.com", RuleAction.Block, enabled = true),
                 domainRule("dns.google", RuleAction.Block, enabled = true),
             )
-
         val result =
-            current.webNavigationModeChanges(
-                blocked = false,
-                imagesBlocked = false,
-                safeSearchEnabled = false,
+            current.webPolicyChanges(
+                desired = preferences(webBlocked = false),
+                deviceId = DeviceId,
             ).applyTo(current)
 
         assertFalse(result.webNavigationBlocked())
-        assertFalse(
-            result.any {
-                it.enabled && it.action == RuleAction.Block && it.target in LegacyWebAuxiliaryBlockTargets
+        assertEquals(
+            1,
+            result.count {
+                it.id == webRuleId(DeviceId, WebNavigationPolicy.RuleTarget, RuleAction.Block)
             },
         )
-    }
-
-    @Test
-    fun `google results enabled while web is open cleans every blocking auxiliary`() {
-        val current = contaminatedOpenWebRules()
-        val changes =
-            current.googleResultsModeChanges(
-                allowed = true,
-                webBlocked = false,
-                deviceId = DeviceId,
-            )
-        val result = changes.applyTo(current)
-
-        assertTrue(result.googleResultsAllowedForWeb())
-        assertTrue(result.webNavigationOpenWithoutAuxiliaryBlocks())
         assertEquals(0, result.activeWebAuxiliaryBlockCount())
-        assertFalse(result.any { it.enabled && it.target == DomainWildcard && it.action == RuleAction.Block })
     }
 
     @Test
-    fun `google results disabled while web is open removes duplicate allows and blocking auxiliaries`() {
-        val current =
-            contaminatedOpenWebRules() +
-                domainRule(
-                    WebNavigationPolicy.GoogleResultsAllowedTarget,
-                    RuleAction.Allow,
-                    enabled = true,
-                ) +
-                domainRule("google.com", RuleAction.Allow, enabled = true).copy(id = "google-allow-duplicate")
-        val changes =
-            current.googleResultsModeChanges(
-                allowed = false,
-                webBlocked = false,
-                deviceId = DeviceId,
+    fun `complete preference matrix remains independent and has no auxiliary blocks`() {
+        val combinations =
+            listOf(
+                preferences(webBlocked = true, externalResultsAllowed = true, safeSearch = true),
+                preferences(webBlocked = true, externalResultsAllowed = false, safeSearch = false),
+                preferences(webBlocked = false, externalResultsAllowed = false, safeSearch = true),
+                preferences(webBlocked = false, externalResultsAllowed = true, safeSearch = false),
             )
-        val result = changes.applyTo(current)
 
-        assertFalse(result.googleResultsAllowedForWeb())
-        assertTrue(result.webNavigationOpenWithoutAuxiliaryBlocks())
-        assertFalse(
-            result.any {
-                it.enabled &&
-                    it.action == RuleAction.Allow &&
-                    (
-                        it.target == WebNavigationPolicy.GoogleResultsAllowedTarget ||
-                            it.target in WebNavigationPolicy.GoogleSearchDomains
-                    )
-            },
-        )
-    }
+        combinations.forEach { desired ->
+            val result =
+                contaminatedOpenWebRules()
+                    .webPolicyChanges(desired, DeviceId)
+                    .applyTo(contaminatedOpenWebRules())
 
-    @Test
-    fun `web keeps returning to open after repeated google block and unblock cycles`() {
-        var rules = contaminatedOpenWebRules()
-
-        repeat(5) {
-            rules =
-                rules.googleResultsModeChanges(
-                    allowed = it % 2 == 0,
-                    webBlocked = false,
-                    deviceId = DeviceId,
-                ).applyTo(rules)
-            rules =
-                rules.webNavigationModeChanges(
-                    blocked = true,
-                    imagesBlocked = false,
-                    safeSearchEnabled = true,
-                    identitySeed = DeviceId,
-                ).applyTo(rules)
-            assertTrue(rules.webNavigationBlocked())
-            rules =
-                rules.webNavigationModeChanges(
-                    blocked = false,
-                    imagesBlocked = false,
-                    safeSearchEnabled = true,
-                    identitySeed = DeviceId,
-                ).applyTo(rules)
-            assertTrue(rules.webNavigationOpenWithoutAuxiliaryBlocks())
+            assertEquals(desired, result.webPolicyPreferences())
+            assertEquals(0, result.activeWebAuxiliaryBlockCount())
         }
     }
 
     @Test
-    fun `does not confirm blocked search engines until all search protection domains are blocked`() {
-        val rules = SearchProtectionDomains.dropLast(1).map { domainRule(it, RuleAction.Block, enabled = true) }
+    fun `blocking and unblocking web preserves external results and SafeSearch preferences`() {
+        var rules =
+            emptyList<PolicyRule>()
+                .webPolicyChanges(
+                    preferences(webBlocked = false, externalResultsAllowed = false, safeSearch = true),
+                    DeviceId,
+                ).applyTo(emptyList())
 
-        assertFalse(rules.searchEnginesStateConfirmed(allowed = false))
+        rules =
+            rules.webNavigationModeChanges(
+                blocked = true,
+                imagesBlocked = rules.imagesBlockedForWeb(),
+                safeSearchEnabled = rules.safeSearchEnabledForWeb(),
+                identitySeed = DeviceId,
+            ).applyTo(rules)
+        assertTrue(rules.webNavigationBlocked())
+        assertFalse(rules.externalSearchResultsAllowedForWeb())
+        assertTrue(rules.safeSearchEnabledForWeb())
+
+        rules =
+            rules.webNavigationModeChanges(
+                blocked = false,
+                imagesBlocked = rules.imagesBlockedForWeb(),
+                safeSearchEnabled = rules.safeSearchEnabledForWeb(),
+                identitySeed = DeviceId,
+            ).applyTo(rules)
+        assertTrue(rules.webNavigationOpenWithoutAuxiliaryBlocks())
+        assertFalse(rules.externalSearchResultsAllowedForWeb())
+        assertTrue(rules.safeSearchEnabledForWeb())
     }
 
     @Test
-    fun `confirms blocked search engines only when search and secure dns domains are blocked without stale allows`() {
-        val rules = SearchProtectionDomains.map { domainRule(it, RuleAction.Block, enabled = true) }
+    fun `five full web cycles remain canonical and idempotent`() {
+        var rules = contaminatedOpenWebRules()
 
-        assertTrue(rules.searchEnginesStateConfirmed(allowed = false))
-    }
+        repeat(5) { cycle ->
+            val restricted =
+                preferences(
+                    webBlocked = false,
+                    externalResultsAllowed = false,
+                    safeSearch = cycle % 2 == 0,
+                )
+            rules = rules.webPolicyChanges(restricted, DeviceId).applyTo(rules)
+            assertEquals(restricted, rules.webPolicyPreferences())
 
-    @Test
-    fun `does not confirm blocked search engines while stale allow remains enabled`() {
-        val rules =
-            SearchProtectionDomains.map { domainRule(it, RuleAction.Block, enabled = true) } +
-                domainRule(SearchEngineDomains.first(), RuleAction.Allow, enabled = true)
-
-        assertFalse(rules.searchEnginesStateConfirmed(allowed = false))
-    }
-
-    @Test
-    fun `allowed search engines requires no active search protection block`() {
-        val rules = listOf(domainRule(SearchEngineDomains.first(), RuleAction.Block, enabled = true))
-
-        assertFalse(rules.searchEnginesStateConfirmed(allowed = true))
-    }
-
-    @Test
-    fun `visible search state includes secure dns protection blocks`() {
-        val rules = listOf(domainRule(SecureDnsDomains.first(), RuleAction.Block, enabled = true))
-
-        assertFalse(rules.searchEnginesAllowed())
+            val released = restricted.copy(externalSearchResultsAllowed = true)
+            rules = rules.webPolicyChanges(released, DeviceId).applyTo(rules)
+            val blocked = released.copy(webNavigationBlocked = true)
+            rules = rules.webPolicyChanges(blocked, DeviceId).applyTo(rules)
+            assertTrue(rules.webNavigationBlocked())
+            rules = rules.webPolicyChanges(released, DeviceId).applyTo(rules)
+            assertEquals(released, rules.webPolicyPreferences())
+            assertTrue(rules.webNavigationOpenWithoutAuxiliaryBlocks())
+            assertTrue(rules.webPolicyChanges(released, DeviceId).isEmpty())
+        }
     }
 
     @Test
@@ -367,6 +325,19 @@ class RulesViewModelHelpersTest {
             domainRule("google.com", RuleAction.Block, enabled = true),
             domainRule("gstatic.com", RuleAction.Block, enabled = true),
             domainRule("dns.google", RuleAction.Block, enabled = true),
+        )
+
+    private fun preferences(
+        webBlocked: Boolean,
+        externalResultsAllowed: Boolean = false,
+        imagesBlocked: Boolean = false,
+        safeSearch: Boolean = false,
+    ): WebPolicyPreferences =
+        WebPolicyPreferences(
+            webNavigationBlocked = webBlocked,
+            externalSearchResultsAllowed = externalResultsAllowed,
+            imagesBlocked = imagesBlocked,
+            safeSearchEnabled = safeSearch,
         )
 
     private fun appRule(

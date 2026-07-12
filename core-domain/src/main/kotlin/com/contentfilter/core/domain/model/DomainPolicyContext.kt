@@ -5,4 +5,6 @@ data class DomainPolicyContext(
     val category: String?,
     val time: TimePolicyContext,
     val device: DevicePolicyContext,
+    val sourceDomain: String? = null,
+    val isTopLevelNavigation: Boolean = false,
 )

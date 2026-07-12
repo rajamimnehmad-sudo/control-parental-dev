@@ -44,10 +44,10 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `google results option cannot enable strict routing while web is open`() {
+    fun `external results option cannot enable strict routing while web is open`() {
         val state =
             state(
-                rule(WebNavigationPolicy.GoogleResultsAllowedTarget, RuleAction.Allow),
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
                 rule("google.com", RuleAction.Block),
                 rule("dns.google", RuleAction.Block),
             )
@@ -139,31 +139,19 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `vpn reconnect key changes when search engine rule action changes`() {
-        val allowed =
+    fun `web preferences that do not change routing avoid a tunnel reconnect`() {
+        val restricted =
             state(
-                rule(
-                    target = "*",
-                    action = RuleAction.Block,
-                ),
-                rule(
-                    target = "google.com",
-                    action = RuleAction.Allow,
-                ),
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false),
+                rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow),
             )
-        val blocked =
+        val released =
             state(
-                rule(
-                    target = "*",
-                    action = RuleAction.Block,
-                ),
-                rule(
-                    target = "google.com",
-                    action = RuleAction.Block,
-                ),
+                rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
+                rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow).copy(enabled = false),
             )
 
-        assertNotEquals(allowed.vpnReconnectKey, blocked.vpnReconnectKey)
+        assertEquals(restricted.vpnReconnectKey, released.vpnReconnectKey)
     }
 
     @Test

@@ -324,18 +324,30 @@ class FilterVpnService : VpnService() {
             }
         val domain = question.domain.normalizedDomain()
         val state = snapshotProvider.current()
+        val searchEngine = SearchEngineCatalog.engineForDomain(domain)
         when (val decision = policyEvaluator.evaluate(domain, state.snapshot, state.health)) {
             is PolicyDecision.Allow -> {
+                searchEngine?.let { engine ->
+                    SearchProtectionSignals.recordSearchEngine(engine.id, state.snapshot.version)
+                }
                 logSearchProtectionDnsLayer(domain, decision, state)
                 Log.i(
                     LogTag,
                     "DNS decision=allow domain=$domain snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()} upstream=${upstreamDnsServers.safeAddresses()}",
                 )
                 telemetryReporter.recordDnsDecision(decision)
-                if (decision.safeSearchRequired) {
-                    reportSafeSearchExtensionPoint()
+                val safeSearchTarget =
+                    decision.safeSearchRequired.takeIf { it }
+                        ?.let { SearchEngineCatalog.safeSearchDnsTarget(domain) }
+                if (safeSearchTarget != null) {
+                    output.write(responseFactory.cnamePacket(question, safeSearchTarget))
+                    reportSafeSearchApplied(
+                        engineId = searchEngine?.id ?: "unknown",
+                        policyRevision = state.snapshot.version,
+                    )
+                } else {
+                    forwardDns(question, output)
                 }
-                forwardDns(question, output)
             }
             is PolicyDecision.GrantExtraTime -> {
                 logSearchProtectionDnsLayer(domain, decision, state)
@@ -398,7 +410,6 @@ class FilterVpnService : VpnService() {
             "Search protection layer=vpn-dns domain=$domain decision=${decision.searchProtectionLabel()} snapshotVersion=${state.snapshot.version} strict=${state.strictWebBlockEnabled} allowRules=$allowRules blockRules=$blockRules totalRules=${state.snapshot.rules.size} reason=${decision.reasonLabel()}",
         )
         if (decision is PolicyDecision.Block) {
-            SearchProtectionSignals.recordDnsBlock(domain)
             telemetryReporter.recordRecentDnsSearchBlock(domain)
         }
         telemetryReporter.recordSearchProtectionDnsDecision(
@@ -431,8 +442,17 @@ class FilterVpnService : VpnService() {
         }.onFailure { telemetryReporter.recordError("DNS forward failed: ${it.javaClass.simpleName}") }
     }
 
-    private suspend fun reportSafeSearchExtensionPoint() {
-        telemetryReporter.recordServiceState("SafeSearch extension point reached.")
+    private suspend fun reportSafeSearchApplied(
+        engineId: String,
+        policyRevision: Long,
+    ) {
+        Log.i(
+            LogTag,
+            "SafeSearch DNS mapping applied engine=$engineId policyRevision=$policyRevision",
+        )
+        telemetryReporter.recordServiceState(
+            "SafeSearch DNS mapping applied engine=$engineId policyRevision=$policyRevision.",
+        )
     }
 
     private suspend fun maybeRecordParsedPacket(diagnostic: VpnPacketDiagnostic) {

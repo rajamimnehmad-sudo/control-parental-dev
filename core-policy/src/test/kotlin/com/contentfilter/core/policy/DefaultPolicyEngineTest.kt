@@ -20,7 +20,9 @@ import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import kotlin.test.Test
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
+import kotlin.test.assertTrue
 
 class DefaultPolicyEngineTest {
     private val engine = DefaultPolicyEngine()
@@ -328,28 +330,125 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `web options do not block domains when web navigation is open`() {
+    fun `restricted search mode allows all catalog engines and marks SafeSearch`() {
         val snapshot =
             policy(
                 rules =
                     listOf(
                         domainRule(
-                            target = WebNavigationPolicy.GoogleResultsAllowedTarget,
+                            target = WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
                             action = RuleAction.Allow,
-                        ),
-                        domainRule(target = WebNavigationPolicy.ImagesBlockedTarget, action = RuleAction.Block),
+                        ).copy(enabled = false),
                         domainRule(target = WebNavigationPolicy.SafeSearchTarget, action = RuleAction.Allow),
-                        domainRule(target = "images.google.com", action = RuleAction.Block),
-                        domainRule(target = "duckduckgo.com", action = RuleAction.Block),
-                        domainRule(target = "dns.google", action = RuleAction.Block),
-                        domainRule(target = "*", action = RuleAction.Block),
                     ),
             )
 
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("images.google.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("duckduckgo.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("dns.google")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("example.com")))
+        listOf("google.com", "bing.com", "search.yahoo.com", "duckduckgo.com").forEach { domain ->
+            val decision = assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext(domain)))
+            assertTrue(decision.safeSearchRequired)
+        }
+    }
+
+    @Test
+    fun `restricted search mode blocks top level external navigation`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                            action = RuleAction.Allow,
+                        ).copy(enabled = false),
+                    ),
+            )
+
+        val decision =
+            engine.evaluateDomain(
+                snapshot,
+                domainContext("example.com", sourceDomain = "google.com", topLevelNavigation = true),
+            )
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `released search mode allows top level external navigation`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                            action = RuleAction.Allow,
+                        ),
+                    ),
+            )
+
+        val decision =
+            engine.evaluateDomain(
+                snapshot,
+                domainContext("example.com", sourceDomain = "duckduckgo.com", topLevelNavigation = true),
+            )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `SafeSearch remains independent from external result navigation`() {
+        val safeSearchOff =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.SafeSearchTarget,
+                            action = RuleAction.Allow,
+                        ).copy(enabled = false),
+                    ),
+            )
+        val decision = assertIs<PolicyDecision.Allow>(engine.evaluateDomain(safeSearchOff, domainContext("bing.com")))
+
+        assertFalse(decision.safeSearchRequired)
+        assertIs<PolicyDecision.Block>(
+            engine.evaluateDomain(
+                safeSearchOff,
+                domainContext("example.com", sourceDomain = "bing.com", topLevelNavigation = true),
+            ),
+        )
+    }
+
+    @Test
+    fun `image preference blocks known image hosts without blocking search pages`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.ImagesBlockedTarget,
+                            action = RuleAction.Block,
+                        ),
+                    ),
+            )
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("images.google.com")))
+        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+    }
+
+    @Test
+    fun `global web block wins over released results and SafeSearch preferences`() {
+        val snapshot =
+            policy(
+                rules =
+                    listOf(
+                        domainRule(target = WebNavigationPolicy.RuleTarget, action = RuleAction.Block),
+                        domainRule(
+                            target = WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                            action = RuleAction.Allow,
+                        ),
+                        domainRule(target = WebNavigationPolicy.SafeSearchTarget, action = RuleAction.Allow),
+                    ),
+            )
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com")))
     }
 
     @Test
@@ -571,12 +670,18 @@ class DefaultPolicyEngineTest {
             device = deviceContext(isActivated = isActivated, syncState = syncState),
         )
 
-    private fun domainContext(domain: String): DomainPolicyContext =
+    private fun domainContext(
+        domain: String,
+        sourceDomain: String? = null,
+        topLevelNavigation: Boolean = false,
+    ): DomainPolicyContext =
         DomainPolicyContext(
             domain = domain,
             category = null,
             time = TimePolicyContext(evaluatedAtEpochMillis = Now, minuteOfDay = 720),
             device = deviceContext(isActivated = true),
+            sourceDomain = sourceDomain,
+            isTopLevelNavigation = topLevelNavigation,
         )
 
     private fun deviceContext(

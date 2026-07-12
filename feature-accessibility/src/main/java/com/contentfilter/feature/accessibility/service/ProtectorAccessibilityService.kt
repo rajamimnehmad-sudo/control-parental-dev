@@ -10,7 +10,7 @@ import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.ProtectionAlertType
 import com.contentfilter.core.domain.model.UsageSession
-import com.contentfilter.core.domain.model.googleResultsAllowed
+import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
@@ -187,26 +187,31 @@ class ProtectorAccessibilityService : AccessibilityService() {
         packageName: String,
         eventType: Int,
     ): Boolean {
-        val visibleText = rootInActiveWindow.visibleText()
+        val page = rootInActiveWindow.browserPageObservation()
         val snapshot = snapshotProvider.current().snapshot
+        val recentSearchEngine =
+            SearchProtectionSignals
+                .recentSearchEngine()
+                ?.takeIf { it.policyRevision == snapshot.version }
         val diagnosis =
             searchEngineScreenDetector.diagnose(
                 packageName = packageName,
                 snapshot = snapshot,
-                visibleText = visibleText,
-                recentDnsBlockHost = SearchProtectionSignals.recentDnsBlock()?.host,
+                currentHost = page.host,
+                addressBarFocused = page.addressBarFocused,
+                recentSearchEngineId = recentSearchEngine?.engineId,
+                elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
             )
         Log.i(
             LogTag,
             "Search protection layer=accessibility event=${AccessibilityEventFilter.label(eventType)} " +
                 "package=$packageName policyVersion=${snapshot.version} " +
                 "webNavigationBlocked=${diagnosis.webNavigationBlocked} " +
-                "googleResultsAllowed=${snapshot.rules.googleResultsAllowed()} " +
+                "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
                 "blockImages=${snapshot.rules.webImagesBlocked()} " +
                 "safeSearch=${snapshot.rules.safeSearchEnabled()} " +
-                "mode=${if (diagnosis.shouldLeave) "web-blocked" else "web-open"} " +
-                "reason=${diagnosis.reason} blockRules=${diagnosis.searchBlockRules} " +
-                "visibleTextLength=${diagnosis.visibleTextLength}",
+                "searchEngine=${diagnosis.searchEngineId ?: "none"} " +
+                "action=${diagnosis.action} reason=${diagnosis.reason}",
         )
         serviceScope?.launch {
             telemetryReporter.recordSearchProtection(
@@ -214,49 +219,22 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 packageName = packageName,
                 packageCategory = diagnosis.packageCategory,
                 reason = diagnosis.reason,
-                blockRules = diagnosis.searchBlockRules,
-                recentDnsBlockHost = diagnosis.recentDnsBlockHost,
-                visibleTextLength = diagnosis.visibleTextLength,
-                result = if (diagnosis.shouldLeave) "blocked-search-screen" else "no-search-signal",
+                searchEngineId = diagnosis.searchEngineId,
+                action = diagnosis.action.name,
+                policyRevision = diagnosis.policyRevision,
             )
         }
-        if (!diagnosis.shouldLeave) return false
-        Log.i(
-            LogTag,
-            "search-block browser detected package=$packageName reason=${diagnosis.reason} recentDnsBlockHost=${diagnosis.recentDnsBlockHost ?: "none"} visibleTextLength=${diagnosis.visibleTextLength}",
-        )
-        leaveBlockedSearchScreen(packageName)
+        when (diagnosis.action) {
+            SearchNavigationAction.Allow -> return false
+            SearchNavigationAction.GoBack -> performGlobalAction(GLOBAL_ACTION_BACK)
+            SearchNavigationAction.GoHome -> performGlobalAction(GLOBAL_ACTION_HOME)
+        }
         serviceScope?.launch {
             telemetryReporter.recordServiceState(
-                "Search protection accessibility action: ${diagnosis.reason}.",
+                "Search protection action=${diagnosis.action} reason=${diagnosis.reason}.",
             )
         }
         return true
-    }
-
-    private fun leaveBlockedSearchScreen(packageName: String) {
-        performGlobalAction(GLOBAL_ACTION_HOME)
-        val scope = serviceScope ?: return
-        scope.launch {
-            repeat(SearchBlockHomeRetries) {
-                delay(SearchBlockRetryDelayMillis)
-                val root = rootInActiveWindow
-                if (root?.packageName?.toString() != packageName) return@launch
-                val diagnosis =
-                    searchEngineScreenDetector.diagnose(
-                        packageName = packageName,
-                        snapshot = snapshotProvider.current().snapshot,
-                        visibleText = root.visibleText(),
-                        recentDnsBlockHost = SearchProtectionSignals.recentDnsBlock()?.host,
-                    )
-                if (!diagnosis.shouldLeave) return@launch
-                Log.i(
-                    LogTag,
-                    "search-block browser detected retry=${it + 1} package=$packageName reason=${diagnosis.reason} recentDnsBlockHost=${diagnosis.recentDnsBlockHost ?: "none"} visibleTextLength=${diagnosis.visibleTextLength}",
-                )
-                performGlobalAction(GLOBAL_ACTION_HOME)
-            }
-        }
     }
 
     private fun evaluateForegroundApp(
@@ -506,8 +484,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 120L
         const val BlockHomeRetries = 2
-        const val SearchBlockRetryDelayMillis = 150L
-        const val SearchBlockHomeRetries = 2
         const val BackgroundPolicyRefreshMillis = 1_000L
         const val LogTag = "ProtectorAccessibility"
         val ExactAllowedPackageNames =
@@ -567,22 +543,49 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 is PolicyDecision.Warn -> "Warn"
             }
 
-        fun AccessibilityNodeInfo?.visibleText(): String {
-            if (this == null) return ""
-            val values = mutableListOf<String>()
+        fun AccessibilityNodeInfo?.browserPageObservation(): BrowserPageObservation {
+            if (this == null) return BrowserPageObservation()
+            var observation = BrowserPageObservation()
+            var visited = 0
+
             fun visit(node: AccessibilityNodeInfo?) {
-                if (node == null || values.size >= MaxVisibleTextNodes) return
-                node.text?.toString()?.takeIf { it.isNotBlank() }?.let(values::add)
-                node.contentDescription?.toString()?.takeIf { it.isNotBlank() }?.let(values::add)
+                if (node == null || visited >= MaxBrowserNodes) return
+                visited++
+                if (node.viewIdResourceName.isAddressBarViewId()) {
+                    val host =
+                        SearchEngineScreenDetector.hostFromAddressBarText(node.text)
+                            ?: SearchEngineScreenDetector.hostFromAddressBarText(node.contentDescription)
+                    if (host != null && (observation.host == null || node.isFocused)) {
+                        observation = BrowserPageObservation(host = host, addressBarFocused = node.isFocused)
+                    }
+                }
                 for (index in 0 until node.childCount) {
                     visit(node.getChild(index))
-                    if (values.size >= MaxVisibleTextNodes) return
+                    if (visited >= MaxBrowserNodes) return
                 }
             }
             visit(this)
-            return values.joinToString(" ")
+            return observation
         }
 
-        const val MaxVisibleTextNodes = 80
+        fun String?.isAddressBarViewId(): Boolean {
+            val value = this?.lowercase() ?: return false
+            return AddressBarViewIdParts.any { part -> value.endsWith("/id/$part") || value.endsWith(":id/$part") } ||
+                (("url" in value || "address" in value || "location" in value) && "bar" in value)
+        }
+
+        const val MaxBrowserNodes = 120
+        val AddressBarViewIdParts =
+            setOf(
+                "url_bar",
+                "location_bar_edit_text",
+                "address_bar",
+                "mozac_browser_toolbar_url_view",
+            )
     }
 }
+
+private data class BrowserPageObservation(
+    val host: String? = null,
+    val addressBarFocused: Boolean = false,
+)
