@@ -44,6 +44,18 @@ class VpnPolicyStateTest {
     }
 
     @Test
+    fun `google results option cannot enable strict routing while web is open`() {
+        val state =
+            state(
+                rule(WebNavigationPolicy.GoogleResultsAllowedTarget, RuleAction.Allow),
+                rule("google.com", RuleAction.Block),
+                rule("dns.google", RuleAction.Block),
+            )
+
+        assertFalse(state.strictWebBlockEnabled)
+    }
+
+    @Test
     fun `enables strict browser tunnel for web navigation block`() {
         val state =
             state(

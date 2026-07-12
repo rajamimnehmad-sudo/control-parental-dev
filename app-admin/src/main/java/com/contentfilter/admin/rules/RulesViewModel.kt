@@ -410,116 +410,7 @@ class RulesViewModel
 
         fun createDomainLimit() = createLimit(PolicyTargetType.Domain)
 
-        fun setSearchEnginesAllowed(allowed: Boolean) {
-            val targetDeviceId = selectedDeviceIdForRules() ?: return
-            val previousState = uiState.value.searchEnginesAllowed
-            val requestId =
-                beginInternetSave(
-                    action = "search-engines",
-                    deviceId = targetDeviceId,
-                    previousState = previousState.toString(),
-                    requestedState = allowed.toString(),
-                ) ?: return
-            form.update {
-                it.copy(
-                    internetSaving = true,
-                    pendingSearchEnginesAllowed = allowed,
-                    message = if (allowed) "Permitiendo buscadores..." else "Bloqueando buscadores...",
-                )
-            }
-            logSearchEngineSwitch(
-                stage = "tap",
-                allowed = allowed,
-                deviceId = targetDeviceId,
-                pending = allowed,
-                roomAllowed = uiState.value.rules.searchEnginesAllowed(),
-            )
-            viewModelScope.launch {
-                val saved =
-                    runCatching {
-                        setSearchEnginesAllowedRules(allowed, targetDeviceId)
-                        withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                            policyRules.first { it.searchEnginesStateConfirmed(allowed) }
-                        } ?: error("Room no confirmó buscadores.")
-                    }
-                if (saved.isFailure) {
-                    Log.e(
-                        LogTag,
-                        "searchEngineSwitch save failed requestId=$requestId allowed=$allowed deviceId=$targetDeviceId reason=${saved.exceptionOrNull()?.javaClass?.simpleName}",
-                        saved.exceptionOrNull(),
-                    )
-                    if (isCurrentInternetSave(requestId)) {
-                        recordAdminDiagnostic(
-                            action = "searchEngineSwitch",
-                            deviceId = targetDeviceId,
-                            requestId = requestId,
-                            previousState = previousState.toString(),
-                            requestedState = allowed.toString(),
-                            result = "save-failed",
-                            reason = saved.exceptionOrNull()?.javaClass?.simpleName ?: "unknown",
-                        )
-                        form.update {
-                            it.copy(
-                                internetSaving = false,
-                                pendingSearchEnginesAllowed = null,
-                                message = "No se pudo cambiar buscadores. Intentá otra vez.",
-                            )
-                        }
-                    }
-                    return@launch
-                }
-                logSearchEngineSwitch(
-                    stage = "room-confirmed",
-                    allowed = allowed,
-                    deviceId = targetDeviceId,
-                    pending = form.value.pendingSearchEnginesAllowed,
-                    roomAllowed = saved.getOrThrow().searchEnginesAllowed(),
-                )
-                val confirmedAllowed = saved.getOrThrow().searchEnginesAllowed()
-                syncScheduler.requestSync()
-                val synced = syncNowWithResult()
-                Log.i(
-                    LogTag,
-                    "searchEngineSwitch sync finished requestId=$requestId allowed=$allowed deviceId=$targetDeviceId success=${synced.success} message=${synced.message}",
-                )
-                recordAdminDiagnostic(
-                    action = "searchEngineSwitch",
-                    deviceId = targetDeviceId,
-                    requestId = requestId,
-                    previousState = previousState.toString(),
-                    requestedState = allowed.toString(),
-                    result = if (synced.success) "synced" else "local-only",
-                    reason = synced.message,
-                )
-                if (!isCurrentInternetSave(requestId)) {
-                    Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=search-engines")
-                    return@launch
-                }
-                form.update {
-                    it.copy(
-                        internetSaving = false,
-                        pendingSearchEnginesAllowed = null,
-                        message =
-                            if (synced.success) {
-                                if (confirmedAllowed) "Buscadores permitidos." else "Buscadores bloqueados."
-                            } else {
-                                if (confirmedAllowed) {
-                                    "Buscadores permitidos localmente. Se sincronizará cuando haya conexión."
-                                } else {
-                                    "Buscadores bloqueados localmente. Se sincronizará cuando haya conexión."
-                                }
-                            },
-                    )
-                }
-                logSearchEngineSwitch(
-                    stage = "ui-final",
-                    allowed = allowed,
-                    deviceId = targetDeviceId,
-                    pending = null,
-                    roomAllowed = uiState.value.rules.searchEnginesAllowed(),
-                )
-            }
-        }
+        fun setSearchEnginesAllowed(allowed: Boolean) = setGoogleResultsAllowed(allowed)
 
         fun saveAllowedDomainLimit() {
             val targetDeviceId = selectedDeviceIdForRules() ?: return
@@ -621,6 +512,7 @@ class RulesViewModel
             viewModelScope.launch {
                 val saved =
                     runCatching {
+                        refreshRemotePolicyBeforeWebMutation(targetDeviceId, traceRequestId)
                         val before = policyRepository.getActivePolicy(targetDeviceId)
                         check(before.deviceId == null || before.deviceId == targetDeviceId) {
                             "Room devolvió una policy de otro dispositivo."
@@ -630,6 +522,7 @@ class RulesViewModel
                                 blocked = blocked,
                                 imagesBlocked = currentState.imagesBlocked,
                                 safeSearchEnabled = currentState.safeSearchEnabled,
+                                identitySeed = targetDeviceId,
                             )
                         val receipt = saveRule.saveAll(ruleChanges, targetDeviceId, traceRequestId)
                         val confirmed =
@@ -785,20 +678,102 @@ class RulesViewModel
         }
 
         fun setGoogleResultsAllowed(allowed: Boolean) {
-            setWebOption(
-                action = "google-results",
-                requestedState = allowed,
-                pending = { state -> state.copy(pendingGoogleResultsAllowed = allowed) },
-                save = { deviceId -> setGoogleResultsAllowedRules(allowed, deviceId) },
-                confirmed = { rules -> rules.googleResultsAllowedForWeb() == allowed },
-                clearPending = { state -> state.copy(pendingGoogleResultsAllowed = null) },
-                successMessage =
-                    if (allowed) {
-                        "Resultados de Google permitidos."
-                    } else {
-                        "Resultados de Google bloqueados."
-                    },
-            )
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
+            val previousState = uiState.value.googleResultsAllowed
+            val intendedWebBlocked = uiState.value.internetBlocked
+            val requestId =
+                beginInternetSave(
+                    action = "google-results",
+                    deviceId = targetDeviceId,
+                    previousState = previousState.toString(),
+                    requestedState = allowed.toString(),
+                ) ?: return
+            val traceRequestId = "google-$requestId"
+            form.update {
+                it.copy(
+                    internetSaving = true,
+                    pendingGoogleResultsAllowed = allowed,
+                    message = "Guardando...",
+                )
+            }
+            viewModelScope.launch {
+                val saved =
+                    runCatching {
+                        refreshRemotePolicyBeforeWebMutation(targetDeviceId, traceRequestId)
+                        val before = policyRepository.getActivePolicy(targetDeviceId)
+                        val changes =
+                            before.rules.googleResultsModeChanges(
+                                allowed = allowed,
+                                webBlocked = intendedWebBlocked,
+                                deviceId = targetDeviceId,
+                            )
+                        val receipt = saveRule.saveAll(changes, targetDeviceId, traceRequestId)
+                        val confirmed =
+                            withTimeoutOrNull(RoomConfirmTimeoutMillis) {
+                                policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
+                                    snapshot.deviceId == targetDeviceId &&
+                                        snapshot.version >= receipt.revision &&
+                                        snapshot.rules.googleResultsAllowedForWeb() == allowed &&
+                                        (
+                                            intendedWebBlocked ||
+                                                snapshot.rules.webNavigationOpenWithoutAuxiliaryBlocks()
+                                        )
+                                }
+                            } ?: error("Room no confirmó resultados de Google.")
+                        if (BuildConfig.FLAVOR == "dev") {
+                            Log.i(
+                                LogTag,
+                                "googleResults room confirmed requestId=$traceRequestId " +
+                                    "deviceId=${targetDeviceId.safeDeviceId()} " +
+                                    "policyId=${receipt.policyId.take(8)} revision=${receipt.revision} " +
+                                    "webBlocked=${confirmed.rules.internetBlocked()} " +
+                                    "searchResultsAllowed=${confirmed.rules.googleResultsAllowedForWeb()} " +
+                                    "safeSearchEnabled=${confirmed.rules.safeSearchEnabledForWeb()} " +
+                                    "activeDomainBlocks=${confirmed.rules.activeDomainBlockCount()} " +
+                                    "activeAuxiliaryBlocks=${confirmed.rules.activeWebAuxiliaryBlockCount()}",
+                            )
+                        }
+                        receipt
+                    }
+                if (!isCurrentInternetSave(requestId)) return@launch
+                if (saved.isFailure) {
+                    form.update {
+                        it.copy(
+                            internetSaving = false,
+                            pendingGoogleResultsAllowed = null,
+                            message = "No se pudo guardar el cambio web.",
+                        )
+                    }
+                    return@launch
+                }
+                form.update {
+                    it.copy(
+                        internetSaving = false,
+                        pendingGoogleResultsAllowed = null,
+                        message = "Guardado en este dispositivo. Sincronizando...",
+                    )
+                }
+                syncScheduler.requestSync()
+                val syncResult =
+                    withContext(Dispatchers.IO) {
+                        syncEngine.syncPolicyChanges(saved.getOrThrow())
+                    }
+                if (!isCurrentInternetSave(requestId)) return@launch
+                form.update {
+                    it.copy(
+                        message =
+                            if (syncResult.serverConfirmed) {
+                                if (allowed) {
+                                    "Resultados de Google permitidos."
+                                } else {
+                                    "Resultados de Google bloqueados."
+                                }
+                            } else {
+                                "Guardado en este dispositivo. Pendiente por conexión."
+                            },
+                    )
+                }
+            }
         }
 
         fun setImagesBlocked(blocked: Boolean) {
@@ -1664,70 +1639,6 @@ class RulesViewModel
                 null
             }
 
-        private suspend fun setSearchEnginesAllowedRules(
-            allowed: Boolean,
-            targetDeviceId: String,
-        ) {
-            SearchEngineDomains.forEach { domain ->
-                setSearchEngineDomain(domain, allowed, targetDeviceId)
-            }
-            SecureDnsDomains.forEach { domain ->
-                setSecureDnsDomain(domain, blocked = !allowed, targetDeviceId)
-            }
-        }
-
-        private suspend fun clearSearchEngineRules(deviceId: String) {
-            (SearchEngineDomains + SecureDnsDomains).forEach { domain ->
-                setRulesForDomain(
-                    target = domain,
-                    action = RuleAction.Allow,
-                    enabled = false,
-                    priority = AllowDomainPriority,
-                    deviceId = deviceId,
-                )
-                setRulesForDomain(
-                    target = domain,
-                    action = RuleAction.Block,
-                    enabled = false,
-                    priority = SearchEngineBlockPriority,
-                    deviceId = deviceId,
-                )
-            }
-        }
-
-        private suspend fun setGoogleResultsAllowedRules(
-            allowed: Boolean,
-            targetDeviceId: String,
-        ) {
-            setRulesForDomain(
-                target = WebNavigationPolicy.GoogleResultsAllowedTarget,
-                action = RuleAction.Allow,
-                enabled = allowed,
-                priority = WebNavigationBlockPriority + 10,
-                deviceId = targetDeviceId,
-            )
-            WebNavigationPolicy.GoogleSearchDomains.forEach { domain ->
-                setRulesForDomain(
-                    target = domain,
-                    action = RuleAction.Allow,
-                    enabled = allowed,
-                    priority = AllowDomainPriority,
-                    deviceId = targetDeviceId,
-                )
-            }
-            if (allowed) {
-                WebNavigationPolicy.UnsafeSearchDomains.forEach { domain ->
-                    setRulesForDomain(
-                        target = domain,
-                        action = RuleAction.Block,
-                        enabled = uiState.value.safeSearchEnabled,
-                        priority = SearchEngineBlockPriority,
-                        deviceId = targetDeviceId,
-                    )
-                }
-            }
-        }
-
         private suspend fun setImagesBlockedRules(
             blocked: Boolean,
             targetDeviceId: String,
@@ -1770,48 +1681,6 @@ class RulesViewModel
                     deviceId = targetDeviceId,
                 )
             }
-        }
-
-        private suspend fun setSearchEngineDomain(
-            target: String,
-            allowed: Boolean,
-            deviceId: String,
-        ) {
-            setRulesForDomain(
-                target = target,
-                action = RuleAction.Allow,
-                enabled = allowed,
-                priority = AllowDomainPriority,
-                deviceId = deviceId,
-            )
-            setRulesForDomain(
-                target = target,
-                action = RuleAction.Block,
-                enabled = !allowed,
-                priority = SearchEngineBlockPriority,
-                deviceId = deviceId,
-            )
-        }
-
-        private suspend fun setSecureDnsDomain(
-            target: String,
-            blocked: Boolean,
-            deviceId: String,
-        ) {
-            setRulesForDomain(
-                target = target,
-                action = RuleAction.Allow,
-                enabled = false,
-                priority = AllowDomainPriority,
-                deviceId = deviceId,
-            )
-            setRulesForDomain(
-                target = target,
-                action = RuleAction.Block,
-                enabled = blocked,
-                priority = SearchEngineBlockPriority,
-                deviceId = deviceId,
-            )
         }
 
         private suspend fun setAllowedDomain(
@@ -1880,6 +1749,26 @@ class RulesViewModel
             return selectedDeviceId
         }
 
+        private suspend fun refreshRemotePolicyBeforeWebMutation(
+            deviceId: String,
+            requestId: String,
+        ) {
+            val result =
+                syncEngine.pullPolicyRevision(
+                    requestId = requestId,
+                    deviceId = deviceId,
+                    reason = "admin-web-preflight",
+                )
+            if (BuildConfig.FLAVOR == "dev") {
+                Log.i(
+                    LogTag,
+                    "web preflight requestId=$requestId deviceId=${deviceId.safeDeviceId()} " +
+                        "policyId=${result.policyId?.take(8) ?: "none"} revision=${result.revision ?: 0L} " +
+                        "roomApplied=${result.roomApplied} success=${result.success}",
+                )
+            }
+        }
+
         private suspend fun syncNow(): Boolean = syncNowWithResult().success
 
         private suspend fun syncNowWithResult(): SyncResult =
@@ -1918,21 +1807,6 @@ class RulesViewModel
         }
 
         private fun isCurrentInternetSave(requestId: Long): Boolean = requestId == internetSaveRequestId
-
-        private fun logSearchEngineSwitch(
-            stage: String,
-            allowed: Boolean,
-            deviceId: String,
-            pending: Boolean?,
-            roomAllowed: Boolean,
-        ) {
-            if (BuildConfig.DEBUG) {
-                Log.d(
-                    LogTag,
-                    "searchEngineSwitch stage=$stage allowed=$allowed deviceId=$deviceId pending=$pending roomAllowed=$roomAllowed",
-                )
-            }
-        }
 
         private fun logInternetSwitch(
             stage: String,

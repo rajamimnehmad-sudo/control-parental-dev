@@ -146,6 +146,7 @@ internal fun List<PolicyRule>.webNavigationModeChanges(
     blocked: Boolean,
     imagesBlocked: Boolean,
     safeSearchEnabled: Boolean,
+    identitySeed: String? = null,
 ): List<PolicyRule> {
     val working = toMutableList()
     val changes = linkedMapOf<String, PolicyRule>()
@@ -169,7 +170,7 @@ internal fun List<PolicyRule>.webNavigationModeChanges(
             existing.firstOrNull()
                 ?: if (enabled || createWhenDisabled) {
                     PolicyRule(
-                        id = UUID.randomUUID().toString(),
+                        id = webRuleId(identitySeed, target, action),
                         level = PolicyLevel.Account,
                         scope = RuleScope.Domain,
                         target = target,
@@ -299,6 +300,96 @@ internal fun List<PolicyRule>.webNavigationModeChanges(
     return changes.values.toList()
 }
 
+internal fun List<PolicyRule>.googleResultsModeChanges(
+    allowed: Boolean,
+    webBlocked: Boolean,
+    deviceId: String,
+): List<PolicyRule> {
+    val cleanupChanges =
+        if (webBlocked) {
+            emptyList()
+        } else {
+            webNavigationModeChanges(
+                blocked = false,
+                imagesBlocked = false,
+                safeSearchEnabled = safeSearchEnabled(),
+                identitySeed = deviceId,
+            )
+        }
+    val working = applyPolicyRuleChanges(cleanupChanges).toMutableList()
+    val changes = linkedMapOf<String, PolicyRule>()
+    cleanupChanges.forEach { changes[it.id] = it }
+
+    fun planAllow(
+        target: String,
+        enabled: Boolean,
+        priority: Int,
+        createWhenDisabled: Boolean = false,
+    ) {
+        val existing =
+            working
+                .filter { it.scope == RuleScope.Domain && it.target == target && it.action == RuleAction.Allow }
+                .sortedWith(
+                    compareByDescending<PolicyRule> { it.enabled }
+                        .thenByDescending { it.priority }
+                        .thenBy { it.id },
+                )
+        val canonical =
+            existing.firstOrNull()
+                ?: if (enabled || createWhenDisabled) {
+                    PolicyRule(
+                        id = webRuleId(deviceId, target, RuleAction.Allow),
+                        level = PolicyLevel.Account,
+                        scope = RuleScope.Domain,
+                        target = target,
+                        action = RuleAction.Allow,
+                        priority = priority,
+                        enabled = enabled,
+                    )
+                } else {
+                    return
+                }
+        val desired = canonical.copy(enabled = enabled, priority = priority)
+        if (canonical !in working) working += canonical
+        if (desired != canonical || existing.isEmpty()) {
+            working[working.indexOfFirst { it.id == canonical.id }] = desired
+            changes[desired.id] = desired
+        }
+        existing.drop(1).forEach { duplicate ->
+            if (duplicate.enabled || duplicate.priority != priority) {
+                val disabled = duplicate.copy(enabled = false, priority = priority)
+                working[working.indexOfFirst { it.id == duplicate.id }] = disabled
+                changes[disabled.id] = disabled
+            }
+        }
+    }
+
+    planAllow(
+        target = WebNavigationPolicy.GoogleResultsAllowedTarget,
+        enabled = allowed,
+        priority = WebNavigationBlockPriority + 10,
+        createWhenDisabled = true,
+    )
+    WebNavigationPolicy.GoogleSearchDomains.forEach { domain ->
+        planAllow(domain, enabled = allowed, priority = AllowDomainPriority)
+    }
+    return changes.values.toList()
+}
+
+private fun List<PolicyRule>.applyPolicyRuleChanges(changes: List<PolicyRule>): List<PolicyRule> {
+    val changesById = changes.associateBy { it.id }
+    return map { changesById[it.id] ?: it } + changes.filter { change -> none { it.id == change.id } }
+}
+
+private fun webRuleId(
+    identitySeed: String?,
+    target: String,
+    action: RuleAction,
+): String =
+    identitySeed
+        ?.let { seed -> UUID.nameUUIDFromBytes("web:$seed:$target:${action.name}".toByteArray()).toString() }
+        ?: UUID.randomUUID().toString()
+
 internal fun List<PolicyRule>.searchEnginesAllowed(): Boolean =
     SearchProtectionDomains.none { domain ->
         any {
@@ -336,6 +427,20 @@ internal fun List<PolicyRule>.searchEngineBlockRules(): List<PolicyRule> =
         it.scope == RuleScope.Domain &&
             it.target in SearchProtectionDomains &&
             it.action == RuleAction.Block
+    }
+
+internal fun List<PolicyRule>.webNavigationOpenWithoutAuxiliaryBlocks(): Boolean =
+    !webNavigationBlocked() && activeWebAuxiliaryBlockCount() == 0
+
+internal fun List<PolicyRule>.activeDomainBlockCount(): Int =
+    count { it.enabled && it.scope == RuleScope.Domain && it.action == RuleAction.Block }
+
+internal fun List<PolicyRule>.activeWebAuxiliaryBlockCount(): Int =
+    count {
+        it.enabled &&
+            it.scope == RuleScope.Domain &&
+            it.action == RuleAction.Block &&
+            it.target in LegacyWebAuxiliaryBlockTargets
     }
 
 internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDeviceUiState> {

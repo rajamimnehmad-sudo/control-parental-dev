@@ -333,6 +333,10 @@ class DefaultPolicyEngineTest {
             policy(
                 rules =
                     listOf(
+                        domainRule(
+                            target = WebNavigationPolicy.GoogleResultsAllowedTarget,
+                            action = RuleAction.Allow,
+                        ),
                         domainRule(target = WebNavigationPolicy.ImagesBlockedTarget, action = RuleAction.Block),
                         domainRule(target = WebNavigationPolicy.SafeSearchTarget, action = RuleAction.Allow),
                         domainRule(target = "images.google.com", action = RuleAction.Block),

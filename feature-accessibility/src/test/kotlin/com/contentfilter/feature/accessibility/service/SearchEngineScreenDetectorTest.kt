@@ -49,6 +49,25 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
+    fun `google results option never closes Chrome while web navigation is open`() {
+        val openRules =
+            listOf(
+                rule(WebNavigationPolicy.GoogleResultsAllowedTarget, RuleAction.Allow),
+                rule("google.com", RuleAction.Block),
+                rule("dns.google", RuleAction.Block),
+            )
+
+        assertFalse(
+            detector.shouldLeaveSearchEngine(
+                packageName = "com.android.chrome",
+                snapshot = snapshot(*openRules.toTypedArray()),
+                visibleText = "Nueva pestaña",
+                recentDnsBlockHost = "dns.google",
+            ),
+        )
+    }
+
+    @Test
     fun `does not leave Chrome when search engines are allowed`() {
         assertFalse(
             detector.shouldLeaveSearchEngine(

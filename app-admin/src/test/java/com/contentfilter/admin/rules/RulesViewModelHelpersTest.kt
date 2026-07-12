@@ -33,6 +33,26 @@ class RulesViewModelHelpersTest {
     }
 
     @Test
+    fun `web main rule id is stable for the selected device`() {
+        val first =
+            emptyList<PolicyRule>().webNavigationModeChanges(
+                blocked = true,
+                imagesBlocked = false,
+                safeSearchEnabled = false,
+                identitySeed = DeviceId,
+            )
+        val second =
+            emptyList<PolicyRule>().webNavigationModeChanges(
+                blocked = false,
+                imagesBlocked = false,
+                safeSearchEnabled = false,
+                identitySeed = DeviceId,
+            )
+
+        assertEquals(first.first().id, second.first().id)
+    }
+
+    @Test
     fun `web allow plan disables stale wildcard search dns and image blocks`() {
         val current =
             listOf(
@@ -94,6 +114,85 @@ class RulesViewModelHelpersTest {
                 it.enabled && it.action == RuleAction.Block && it.target in LegacyWebAuxiliaryBlockTargets
             },
         )
+    }
+
+    @Test
+    fun `google results enabled while web is open cleans every blocking auxiliary`() {
+        val current = contaminatedOpenWebRules()
+        val changes =
+            current.googleResultsModeChanges(
+                allowed = true,
+                webBlocked = false,
+                deviceId = DeviceId,
+            )
+        val result = changes.applyTo(current)
+
+        assertTrue(result.googleResultsAllowedForWeb())
+        assertTrue(result.webNavigationOpenWithoutAuxiliaryBlocks())
+        assertEquals(0, result.activeWebAuxiliaryBlockCount())
+        assertFalse(result.any { it.enabled && it.target == DomainWildcard && it.action == RuleAction.Block })
+    }
+
+    @Test
+    fun `google results disabled while web is open removes duplicate allows and blocking auxiliaries`() {
+        val current =
+            contaminatedOpenWebRules() +
+                domainRule(
+                    WebNavigationPolicy.GoogleResultsAllowedTarget,
+                    RuleAction.Allow,
+                    enabled = true,
+                ) +
+                domainRule("google.com", RuleAction.Allow, enabled = true).copy(id = "google-allow-duplicate")
+        val changes =
+            current.googleResultsModeChanges(
+                allowed = false,
+                webBlocked = false,
+                deviceId = DeviceId,
+            )
+        val result = changes.applyTo(current)
+
+        assertFalse(result.googleResultsAllowedForWeb())
+        assertTrue(result.webNavigationOpenWithoutAuxiliaryBlocks())
+        assertFalse(
+            result.any {
+                it.enabled &&
+                    it.action == RuleAction.Allow &&
+                    (
+                        it.target == WebNavigationPolicy.GoogleResultsAllowedTarget ||
+                            it.target in WebNavigationPolicy.GoogleSearchDomains
+                    )
+            },
+        )
+    }
+
+    @Test
+    fun `web keeps returning to open after repeated google block and unblock cycles`() {
+        var rules = contaminatedOpenWebRules()
+
+        repeat(5) {
+            rules =
+                rules.googleResultsModeChanges(
+                    allowed = it % 2 == 0,
+                    webBlocked = false,
+                    deviceId = DeviceId,
+                ).applyTo(rules)
+            rules =
+                rules.webNavigationModeChanges(
+                    blocked = true,
+                    imagesBlocked = false,
+                    safeSearchEnabled = true,
+                    identitySeed = DeviceId,
+                ).applyTo(rules)
+            assertTrue(rules.webNavigationBlocked())
+            rules =
+                rules.webNavigationModeChanges(
+                    blocked = false,
+                    imagesBlocked = false,
+                    safeSearchEnabled = true,
+                    identitySeed = DeviceId,
+                ).applyTo(rules)
+            assertTrue(rules.webNavigationOpenWithoutAuxiliaryBlocks())
+        }
     }
 
     @Test
@@ -258,6 +357,16 @@ class RulesViewModelHelpersTest {
             action = action,
             priority = 100,
             enabled = enabled,
+        )
+
+    private fun contaminatedOpenWebRules(): List<PolicyRule> =
+        listOf(
+            domainRule(WebNavigationPolicy.RuleTarget, RuleAction.Block, enabled = true),
+            domainRule(WebNavigationPolicy.RuleTarget, RuleAction.Block, enabled = true).copy(id = "main-duplicate"),
+            domainRule(DomainWildcard, RuleAction.Block, enabled = true),
+            domainRule("google.com", RuleAction.Block, enabled = true),
+            domainRule("gstatic.com", RuleAction.Block, enabled = true),
+            domainRule("dns.google", RuleAction.Block, enabled = true),
         )
 
     private fun appRule(
