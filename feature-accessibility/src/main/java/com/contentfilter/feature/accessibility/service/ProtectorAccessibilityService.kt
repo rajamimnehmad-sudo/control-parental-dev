@@ -19,7 +19,6 @@ import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
 import com.contentfilter.core.sync.SyncScheduler
-import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.feature.accessibility.policy.AccessibilityAppPolicyEvaluator
 import com.contentfilter.feature.accessibility.policy.AccessibilityClock
 import com.contentfilter.feature.accessibility.policy.AccessibilityPolicySnapshotProvider
@@ -59,8 +58,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     @Inject lateinit var syncScheduler: SyncScheduler
 
-    @Inject lateinit var syncEngine: SyncEngine
-
     private val usageTracker = AppUsageTracker()
     private val settingsProtectionPolicy = SettingsProtectionPolicy()
     private val searchEngineScreenDetector = SearchEngineScreenDetector()
@@ -70,14 +67,12 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var extraTimeExpiryJob: Job? = null
     private var extraTimeExpiryPackageName: String? = null
     private var extraTimeExpiryAtEpochMillis: Long? = null
-    private var policyRefreshJob: Job? = null
     private var foregroundWatchJob: Job? = null
     private var foregroundWatchPackageName: String? = null
     private var appLimitDeadlineJob: Job? = null
     private var appLimitDeadlinePackageName: String? = null
     private var blockRetryJob: Job? = null
     private var blockRetryPackageName: String? = null
-    private var lastPolicyRefreshAtElapsedMillis: Long = 0L
     private var lastExplicitSearchNoticeAt: Long = 0L
 
     override fun onServiceConnected() {
@@ -86,7 +81,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
         serviceScope = scope
         scope.launch {
             syncScheduler.requestSync()
-            refreshPolicies()
             snapshotProvider.refresh()
             snapshotProvider.start(scope)
             launch {
@@ -127,7 +121,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 usageTracker.reset()
             }
         }
-        maybeRefreshPolicies(elapsed)
         val transition = usageTracker.onForegroundApp(packageName, elapsed, now)
         if (transition != null) {
             serviceScope?.launch { saveTransition(transition) }
@@ -350,29 +343,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
         return false
     }
 
-    private fun maybeRefreshPolicies(elapsedRealtimeMillis: Long) {
-        if (elapsedRealtimeMillis - lastPolicyRefreshAtElapsedMillis < BackgroundPolicyRefreshMillis) return
-        if (policyRefreshJob?.isActive == true) return
-        val scope = serviceScope ?: return
-        policyRefreshJob =
-            scope.launch {
-                refreshPolicies()
-                snapshotProvider.refresh()
-            }
-    }
-
-    private suspend fun refreshPolicies() {
-        runCatching {
-            syncEngine.syncCoreDataFull()
-            syncEngine.syncRequestResultsFull()
-        }
-            .onSuccess { lastPolicyRefreshAtElapsedMillis = clock.elapsedRealtimeMillis() }
-            .onFailure {
-                Log.w(LogTag, "Policy refresh failed: ${it.javaClass.simpleName}")
-                telemetryReporter.recordError("Policy refresh failed: ${it.javaClass.simpleName}")
-            }
-    }
-
     private fun leaveBlockedApp(packageName: String) {
         if (blockRetryPackageName == packageName && blockRetryJob?.isActive == true) return
         Log.i(LogTag, "Blocking foreground app immediately package=$packageName")
@@ -551,7 +521,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 120L
         const val BlockHomeRetries = 2
-        const val BackgroundPolicyRefreshMillis = 1_000L
         const val PolicyChangedEventLabel = "POLICY_CHANGED"
         const val ExplicitSearchNoticeDebounceMillis = 2_000L
         const val GoogleSearchPackage = "com.google.android.googlequicksearchbox"
