@@ -62,12 +62,18 @@ class VpnDomainPolicyEvaluator
             if (webBlocked || (onlyResults && policyDecision !is PolicyDecision.Allow)) {
                 return policyDecision
             }
+            val technicalHostAllowed =
+                policyDecision is PolicyDecision.Allow && normalizedDomain.isTechnicalWebProtectionHost()
             val explicitDecision =
-                snapshot.rules.bestExplicitDomainRule(normalizedDomain, minuteOfDay)?.toDecision(normalizedDomain)
+                if (technicalHostAllowed) {
+                    null
+                } else {
+                    snapshot.rules.bestExplicitDomainRule(normalizedDomain, minuteOfDay)?.toDecision(normalizedDomain)
+                }
             if (explicitDecision != null && explicitDecision !is PolicyDecision.Allow) return explicitDecision
             if (policyDecision !is PolicyDecision.Allow) return policyDecision
             val finalDecision = explicitDecision ?: policyDecision
-            if (explicitDecision == null && !normalizedDomain.isTechnicalWebProtectionHost()) {
+            if (explicitDecision == null && !technicalHostAllowed) {
                 domainBlocklist.categoryFor(normalizedDomain)?.let { category ->
                     return PolicyDecision.Block("Blocked by local domain category: $category.")
                 }

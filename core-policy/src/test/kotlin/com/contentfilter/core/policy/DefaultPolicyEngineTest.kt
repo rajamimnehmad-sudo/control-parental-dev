@@ -446,6 +446,43 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
+    fun `open mode uses the canonical search technical allowlist`() {
+        val snapshot = policy()
+
+        listOf(
+            "google.com",
+            "google.com.ar",
+            "clients4.google.com",
+            "clientservices.googleapis.com",
+            "fonts.googleapis.com",
+            "www.gstatic.com",
+            "googleusercontent.com",
+            "forcesafesearch.google.com",
+            "bing.com",
+            "bing.net",
+            "search.yahoo.com",
+            "yimg.com",
+            "duckduckgo.com",
+            "duck.com",
+        ).forEach { host ->
+            assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext(host)), host)
+        }
+    }
+
+    @Test
+    fun `open mode forces SafeSearch only on supported search engines`() {
+        val snapshot = policy()
+
+        val google = assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+        val googleSupport =
+            assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("fonts.gstatic.com")))
+
+        assertTrue(google.safeSearchRequired)
+        assertTrue(!googleSupport.safeSearchRequired)
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("dns.google")))
+    }
+
+    @Test
     fun `released search mode allows top level external navigation`() {
         val snapshot =
             policy(

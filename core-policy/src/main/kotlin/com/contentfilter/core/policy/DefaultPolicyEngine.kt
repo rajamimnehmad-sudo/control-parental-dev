@@ -109,8 +109,12 @@ class DefaultPolicyEngine : PolicyEngine {
         if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
             return PolicyDecision.Allow()
         }
-        if (!webNavigationBlocked && WebNavigationPolicy.isSearchEngineDomain(normalizedContext.domain)) {
-            return PolicyDecision.Allow(safeSearchRequired = snapshot.rules.safeSearchEnabled())
+        if (!webNavigationBlocked && SearchEngineCatalog.isSearchResultsAllowedDomain(normalizedContext.domain)) {
+            return PolicyDecision.Allow(
+                safeSearchRequired =
+                    snapshot.rules.safeSearchEnabled() &&
+                        WebNavigationPolicy.isSearchEngineDomain(normalizedContext.domain),
+            )
         }
         activeGrant(
             snapshot.extraTimeGrants,

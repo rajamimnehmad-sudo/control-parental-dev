@@ -218,6 +218,7 @@ object SearchEngineCatalog {
     fun isSearchResultsAllowedDomain(domain: String?): Boolean {
         val normalized = domain.normalizedSearchHost() ?: return false
         return isSearchEngineDomain(normalized) ||
+            searchSupportDomains.any { normalized.matchesSearchTarget(it) } ||
             searchResultsTechnicalDomains.any { normalized.matchesSearchTarget(it) } ||
             safeSearchDnsTargets.any { normalized.matchesSearchTarget(it) }
     }

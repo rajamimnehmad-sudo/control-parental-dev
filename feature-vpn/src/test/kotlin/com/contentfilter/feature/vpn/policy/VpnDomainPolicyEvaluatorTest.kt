@@ -8,6 +8,7 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
@@ -90,11 +91,20 @@ class VpnDomainPolicyEvaluatorTest {
 
     @Test
     fun `technical Google host is allowed before local list`() {
-        domainBlocklist.blockedDomain = "gstatic.com"
+        domainBlocklist.blockedDomains +=
+            setOf(
+                "google.com",
+                "clients4.google.com",
+                "clientservices.googleapis.com",
+                "fonts.googleapis.com",
+                "gstatic.com",
+                "googleusercontent.com",
+                "forcesafesearch.google.com",
+            )
 
-        val decision = evaluator.evaluate("gstatic.com", snapshot(), activeHealth())
-
-        assertIs<PolicyDecision.Allow>(decision)
+        domainBlocklist.blockedDomains.forEach { host ->
+            assertIs<PolicyDecision.Allow>(evaluator.evaluate(host, snapshot(), activeHealth()), host)
+        }
     }
 
     @Test
@@ -112,15 +122,34 @@ class VpnDomainPolicyEvaluatorTest {
     }
 
     @Test
-    fun `explicit search host block wins over technical allowlist`() {
+    fun `manual external block keeps priority`() {
         val decision =
             evaluator.evaluate(
-                "google.com",
-                snapshot(rule("google.com", RuleAction.Block)),
+                "manual-block.example",
+                snapshot(rule("manual-block.example", RuleAction.Block)),
                 activeHealth(),
             )
 
         assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `open mode allows safe external domain and blocks UT1 adult and DEV canary`() {
+        domainBlocklist.blockedDomains += setOf("adult.example", "coca.com")
+
+        assertIs<PolicyDecision.Allow>(evaluator.evaluate("safe.example", snapshot(), activeHealth()))
+        assertIs<PolicyDecision.Block>(evaluator.evaluate("adult.example", snapshot(), activeHealth()))
+        assertIs<PolicyDecision.Block>(evaluator.evaluate("coca.com", snapshot(), activeHealth()))
+    }
+
+    @Test
+    fun `all supported engines keep SafeSearch in open mode`() {
+        SearchEngineCatalog.engines.forEach { engine ->
+            engine.domains.forEach { host ->
+                val decision = assertIs<PolicyDecision.Allow>(evaluator.evaluate(host, snapshot(), activeHealth()))
+                assertTrue(decision.safeSearchRequired, host)
+            }
+        }
     }
 
     @Test
@@ -187,9 +216,16 @@ class VpnDomainPolicyEvaluatorTest {
     }
 
     private class FakeDomainBlocklist : DynamicDomainBlocklist {
-        var blockedDomain: String? = null
+        val blockedDomains = mutableSetOf<String>()
 
-        override fun categoryFor(domain: String): String? = "adult".takeIf { domain == blockedDomain }
+        var blockedDomain: String?
+            get() = blockedDomains.firstOrNull()
+            set(value) {
+                blockedDomains.clear()
+                if (value != null) blockedDomains += value
+            }
+
+        override fun categoryFor(domain: String): String? = "adult".takeIf { domain in blockedDomains }
     }
 
     private companion object {
