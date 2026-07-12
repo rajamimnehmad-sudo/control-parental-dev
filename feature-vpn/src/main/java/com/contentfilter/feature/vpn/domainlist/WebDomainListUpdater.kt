@@ -42,23 +42,26 @@ class WebDomainListUpdater
                 val result =
                     runCatching { update() }
                         .onFailure { Log.w(LogTag, "Domain list update failed type=${it.javaClass.simpleName}") }
-                        .getOrElse { DomainListUpdateResult.Failed }
+                        .getOrElse { DomainListUpdateResult.Failed("verification-error") }
                 if (result is DomainListUpdateResult.Current || result is DomainListUpdateResult.Installed) {
                     preferences.edit().putLong(LastCheckKey, now).apply()
                 }
+                store.recordCheck(result)
                 result
             }
 
         private fun update(): DomainListUpdateResult {
-            val manifestBytes = fetch(environmentManifestUrl()) ?: return DomainListUpdateResult.Failed
+            val manifestBytes = fetch(environmentManifestUrl()) ?: return DomainListUpdateResult.Failed("manifest-download")
             val manifest = DomainListManifestVerifier().verifyAndParse(manifestBytes)
-            if (manifest.environment != environment()) return DomainListUpdateResult.Failed
+            if (manifest.environment != environment()) return DomainListUpdateResult.Failed("environment")
             if (manifest.version <= store.version) return DomainListUpdateResult.Current
-            val data = fetch(manifest.dataUrl) ?: return DomainListUpdateResult.Failed
-            if (data.size.toLong() != manifest.sizeBytes) return DomainListUpdateResult.Failed
-            if (!data.sha256().equals(manifest.sha256, ignoreCase = true)) return DomainListUpdateResult.Failed
+            val data = fetch(manifest.dataUrl) ?: return DomainListUpdateResult.Failed("data-download")
+            if (data.size.toLong() != manifest.sizeBytes) return DomainListUpdateResult.Failed("size")
+            if (!data.sha256().equals(manifest.sha256, ignoreCase = true)) {
+                return DomainListUpdateResult.Failed("checksum")
+            }
             if (!DomainListManifestVerifier().verifyData(data, manifest.dataSignature)) {
-                return DomainListUpdateResult.Failed
+                return DomainListUpdateResult.Failed("data-signature")
             }
             val installed = store.install(data, manifest.version)
             Log.i(
@@ -104,10 +107,19 @@ sealed interface DomainListUpdateResult {
 
     data object Current : DomainListUpdateResult
 
-    data object Failed : DomainListUpdateResult
+    data class Failed(val reason: String) : DomainListUpdateResult
 
     data class Installed(val version: Long) : DomainListUpdateResult
 }
+
+internal val DomainListUpdateResult.label: String
+    get() =
+        when (this) {
+            DomainListUpdateResult.NotDue -> "Comprobacion no necesaria"
+            DomainListUpdateResult.Current -> "La base ya estaba actualizada"
+            is DomainListUpdateResult.Failed -> "No se pudo comprobar la base"
+            is DomainListUpdateResult.Installed -> "Nueva version instalada"
+        }
 
 data class WebDomainListManifest(
     val version: Long,
@@ -132,7 +144,10 @@ class DomainListManifestVerifier(
         val payloadBytes = Base64.getDecoder().decode(envelope.getString("signedPayload"))
         require(verify(payloadBytes, envelope.getString("manifestSignature"))) { "Invalid manifest signature." }
         val payload = JSONObject(payloadBytes.decodeToString())
-        require(payload.getInt("formatVersion") == WebDomainList.FormatVersion)
+        require(
+            payload.getInt("formatVersion") in
+                WebDomainList.LegacyFormatVersion..WebDomainList.FormatVersion,
+        )
         require(payload.getString("signatureStatus") == "valid")
         return WebDomainListManifest(
             version = payload.getLong("version"),

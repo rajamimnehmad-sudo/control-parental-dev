@@ -26,6 +26,7 @@ import com.contentfilter.feature.vpn.dns.DnsParseResult
 import com.contentfilter.feature.vpn.dns.DnsQuestion
 import com.contentfilter.feature.vpn.dns.DnsResponseFactory
 import com.contentfilter.feature.vpn.dns.VpnPacketDiagnostic
+import com.contentfilter.feature.vpn.domainlist.WebDomainListStore
 import com.contentfilter.feature.vpn.policy.VpnDomainPolicyEvaluator
 import com.contentfilter.feature.vpn.policy.VpnPolicySnapshotProvider
 import com.contentfilter.feature.vpn.policy.VpnPolicyState
@@ -64,6 +65,8 @@ class FilterVpnService : VpnService() {
 
     @Inject lateinit var applicationTracker: EffectivePolicyApplicationTracker
 
+    @Inject lateinit var webDomainListStore: WebDomainListStore
+
     private val parser = DnsPacketParser()
     private val responseFactory = DnsResponseFactory()
     private val dnsForwarder = DnsForwarder { socket -> protect(socket) }
@@ -76,6 +79,7 @@ class FilterVpnService : VpnService() {
     private var encryptedDnsEnforcementMode = false
     private var appliedVpnReconnectKey: String? = null
     private var requestedVpnReconnectKey: String? = null
+    private var appliedDomainListVersion: Long? = null
     private var lastReportedPolicy: Pair<String, Long>? = null
     private val lastUnsupportedPacketDiagnosticAt = mutableMapOf<String, Long>()
     private var lastParsedDnsPacketDiagnosticAt: Long = 0L
@@ -142,9 +146,11 @@ class FilterVpnService : VpnService() {
                     vpnInterface = establishedInterface
                     connectionBarrier?.close()
                     appliedVpnReconnectKey = initialState.vpnReconnectKey
+                    appliedDomainListVersion = webDomainListStore.version
                     requestedVpnReconnectKey = null
                     reportVpnPolicyApplied(initialState, source = "tunnel-established")
                     observeVpnReconnectPolicy(scope)
+                    observeDomainListChanges(scope)
                     VpnController.markStarted(this@FilterVpnService)
                     systemStatusRepository.updateVpnState(ComponentState.Enabled)
                     telemetryReporter.recordServiceState("VPN started.")
@@ -179,14 +185,17 @@ class FilterVpnService : VpnService() {
                 next = currentState,
             )
         if (invalidateConnections) {
-            invalidateBrowserConnectionsThenStart(currentState)
+            invalidateBrowserConnectionsThenStart(currentState, reason = "policy")
         } else {
             cleanup()
             startVpn()
         }
     }
 
-    private fun invalidateBrowserConnectionsThenStart(state: VpnPolicyState) {
+    private fun invalidateBrowserConnectionsThenStart(
+        state: VpnPolicyState,
+        reason: String,
+    ) {
         connectionInvalidationJob?.cancel()
         connectionInvalidationJob =
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
@@ -215,7 +224,8 @@ class FilterVpnService : VpnService() {
                     Log.i(
                         LogTag,
                         "VPN connection invalidation started revision=${state.snapshot.version} " +
-                            "strict=${state.strictWebBlockEnabled} onlyResults=${state.onlyResultsEnabled}",
+                            "strict=${state.strictWebBlockEnabled} onlyResults=${state.onlyResultsEnabled} " +
+                            "reason=$reason domainListVersion=${webDomainListStore.version}",
                     )
                     delay(ConnectionInvalidationMillis)
                     strictWebBlockMode = false
@@ -312,6 +322,18 @@ class FilterVpnService : VpnService() {
                         requestReconnectVpn(nextKey)
                     }
                 }
+        }
+    }
+
+    private fun observeDomainListChanges(scope: CoroutineScope) {
+        scope.launch {
+            webDomainListStore.observeStatus().collect { status ->
+                if (requiresDomainListConnectionInvalidation(appliedDomainListVersion, status.version)) {
+                    Log.i(LogTag, "VPN domain list changed version=${status.version}; reconnecting tunnel")
+                    telemetryReporter.recordReconnectApplied("domain-list-version-changed")
+                    invalidateBrowserConnectionsThenStart(snapshotProvider.current(), reason = "domain-list")
+                }
+            }
         }
     }
 
@@ -562,6 +584,7 @@ class FilterVpnService : VpnService() {
         encryptedDnsEnforcementMode = false
         appliedVpnReconnectKey = null
         requestedVpnReconnectKey = null
+        appliedDomainListVersion = null
         lastReportedPolicy = null
         serviceScope?.cancel()
         serviceScope = null
@@ -679,3 +702,8 @@ class FilterVpnService : VpnService() {
             joinToString(",") { it.hostAddress.orEmpty() }.ifBlank { "none" }
     }
 }
+
+internal fun requiresDomainListConnectionInvalidation(
+    appliedVersion: Long?,
+    installedVersion: Long,
+): Boolean = appliedVersion != null && installedVersion > 0L && installedVersion != appliedVersion

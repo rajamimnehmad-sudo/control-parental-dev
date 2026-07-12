@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.feature.vpn.service.requiresDomainListConnectionInvalidation
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -230,6 +231,13 @@ class VpnPolicyStateTest {
         val strict = state(rule(WebNavigationPolicy.RuleTarget, RuleAction.Block))
 
         assertFalse(VpnPolicyState.requiresConnectionInvalidation(strict.vpnReconnectKey, strict))
+    }
+
+    @Test
+    fun `new domain list version invalidates connections once`() {
+        assertTrue(requiresDomainListConnectionInvalidation(appliedVersion = 10L, installedVersion = 11L))
+        assertFalse(requiresDomainListConnectionInvalidation(appliedVersion = 11L, installedVersion = 11L))
+        assertFalse(requiresDomainListConnectionInvalidation(appliedVersion = null, installedVersion = 11L))
     }
 
     @Test

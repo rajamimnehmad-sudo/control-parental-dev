@@ -4,6 +4,7 @@ import org.json.JSONObject
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.security.KeyPairGenerator
+import java.security.MessageDigest
 import java.security.Signature
 import java.util.Base64
 import kotlin.test.Test
@@ -40,6 +41,33 @@ class WebDomainListTest {
 
         assertEquals(WebDomainList.CategoryDevCanary, included.categoryFor("canary.example"))
         assertNull(removed.categoryFor("canary.example"))
+    }
+
+    @Test
+    fun `bloom positive without exact hash does not block`() {
+        val list =
+            WebDomainList.parse(
+                bundle(
+                    version = 5,
+                    adultBloom = setOf("false-positive.example"),
+                ),
+            )
+
+        assertNull(list.categoryFor("false-positive.example"))
+    }
+
+    @Test
+    fun `legacy bloom-only category match is not a definitive block`() {
+        val list =
+            WebDomainList.parse(
+                bundle(
+                    version = 6,
+                    formatVersion = WebDomainList.LegacyFormatVersion,
+                    adult = setOf("legacy.example"),
+                ),
+            )
+
+        assertNull(list.categoryFor("legacy.example"))
     }
 
     @Test
@@ -93,23 +121,62 @@ class WebDomainListTest {
 
     private fun bundle(
         version: Long,
+        formatVersion: Int = WebDomainList.FormatVersion,
         adult: Set<String> = emptySet(),
+        adultBloom: Set<String> = adult,
         mixed: Set<String> = emptySet(),
         exceptions: Set<String> = emptySet(),
         canaries: Set<String> = emptySet(),
     ): ByteArray {
         val bitCount = 1_024
-        val adultBits = bloom(adult, bitCount)
+        val adultBits = bloom(adultBloom, bitCount)
         val mixedBits = bloom(mixed, bitCount)
+        val adultExact = exactHashes(adult)
+        val mixedExact = exactHashes(mixed)
         val exceptionBytes = exceptions.joinToString("\n").encodeToByteArray()
         val canaryBytes = canaries.joinToString("\n").encodeToByteArray()
+        val headerSize =
+            if (formatVersion == WebDomainList.FormatVersion) {
+                WebDomainList.HeaderSize
+            } else {
+                WebDomainList.LegacyHeaderSize
+            }
+        val exactSize = if (formatVersion == WebDomainList.FormatVersion) adultExact.size + mixedExact.size else 0
         return ByteBuffer.allocate(
-            WebDomainList.HeaderSize + adultBits.size + mixedBits.size + exceptionBytes.size + canaryBytes.size,
+            headerSize + adultBits.size + mixedBits.size + exactSize +
+                exceptionBytes.size + canaryBytes.size,
         )
             .order(ByteOrder.BIG_ENDIAN)
-            .put(WebDomainList.Magic).putLong(version).putInt(1).putInt(7).putInt(bitCount).putInt(bitCount)
-            .putInt(adult.size).putInt(mixed.size).putInt(exceptionBytes.size).putInt(canaryBytes.size)
-            .put(adultBits).put(mixedBits).put(exceptionBytes).put(canaryBytes).array()
+            .put(WebDomainList.Magic).putLong(version).putInt(formatVersion).putInt(7)
+            .putInt(bitCount).putInt(bitCount).putInt(adult.size).putInt(mixed.size)
+            .apply {
+                if (formatVersion == WebDomainList.FormatVersion) {
+                    putInt(adultExact.size).putInt(mixedExact.size)
+                }
+            }
+            .putInt(exceptionBytes.size).putInt(canaryBytes.size)
+            .put(adultBits).put(mixedBits)
+            .apply {
+                if (formatVersion == WebDomainList.FormatVersion) put(adultExact).put(mixedExact)
+            }
+            .put(exceptionBytes).put(canaryBytes).array()
+    }
+
+    private fun exactHashes(values: Set<String>): ByteArray =
+        values
+            .map { MessageDigest.getInstance("SHA-256").digest(it.encodeToByteArray()).copyOf(8) }
+            .sortedWith { first, second -> compareUnsigned(first, second) }
+            .fold(ByteArray(0)) { result, hash -> result + hash }
+
+    private fun compareUnsigned(
+        first: ByteArray,
+        second: ByteArray,
+    ): Int {
+        repeat(first.size) { index ->
+            val comparison = (first[index].toInt() and 0xff) - (second[index].toInt() and 0xff)
+            if (comparison != 0) return comparison
+        }
+        return 0
     }
 
     private fun bloom(

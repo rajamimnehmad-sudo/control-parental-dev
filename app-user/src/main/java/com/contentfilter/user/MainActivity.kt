@@ -72,7 +72,6 @@ import com.contentfilter.feature.requests.RequestsRoute
 import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
-import com.contentfilter.user.BuildConfig
 import com.contentfilter.user.apps.MyAppsRoute
 import com.contentfilter.user.internet.UserWebViewModel
 import com.contentfilter.user.updates.UpdatesRoute
@@ -427,6 +426,37 @@ private fun UserWebTab(
         if (state.onlyResultsEnabled) {
             UserWebStatusCard(title = "Solo resultados", value = if (blocked) "Guardado" else "Activo")
         }
+        if (state.showDomainListDiagnostics) {
+            ProductCard {
+                Text("Base de proteccion Web", style = MaterialTheme.typography.titleMedium)
+                Text("Estado: ${state.domainList.status}", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Version instalada: ${state.domainList.version.takeIf { it > 0L } ?: "Sin base"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Fecha de instalacion: ${state.domainList.installedAtEpochMillis.devDateLabel()}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Ultima comprobacion: ${state.domainList.lastCheckResult}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                Text(
+                    "Canario incluido: ${if (state.domainList.canaryIncluded) "Si" else "No"}",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                state.domainList.lastError?.let { error ->
+                    Text("Ultimo error: $error", style = MaterialTheme.typography.bodyMedium)
+                }
+                Button(
+                    enabled = !state.domainList.isChecking,
+                    onClick = viewModel::checkDomainListNow,
+                ) {
+                    Text(if (state.domainList.isChecking) "Comprobando..." else "Comprobar actualizacion ahora")
+                }
+            }
+        }
         if (!accessibilityActive) {
             ProductCard {
                 Text("Accessibility apagado.", style = MaterialTheme.typography.bodyMedium)
@@ -447,6 +477,14 @@ private fun UserWebTab(
         }
     }
 }
+
+private fun Long.devDateLabel(): String =
+    if (this <= 0L) {
+        "Sin datos"
+    } else {
+        java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
+            .format(java.util.Date(this))
+    }
 
 @Composable
 private fun UserWebStatusCard(

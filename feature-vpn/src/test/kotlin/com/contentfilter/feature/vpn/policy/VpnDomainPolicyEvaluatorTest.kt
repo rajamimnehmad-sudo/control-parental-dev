@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
+import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.policy.DefaultPolicyEngine
 import com.contentfilter.feature.vpn.domainlist.DynamicDomainBlocklist
 import kotlin.test.Test
@@ -85,6 +86,62 @@ class VpnDomainPolicyEvaluatorTest {
         val decision = evaluator.evaluate("dynamic.example", snapshot(), activeHealth())
 
         assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `technical Google host is allowed before local list`() {
+        domainBlocklist.blockedDomain = "gstatic.com"
+
+        val decision = evaluator.evaluate("gstatic.com", snapshot(), activeHealth())
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `explicit allow rule wins over local list`() {
+        domainBlocklist.blockedDomain = "adult.example"
+
+        val decision =
+            evaluator.evaluate(
+                "adult.example",
+                snapshot(rule("adult.example", RuleAction.Allow)),
+                activeHealth(),
+            )
+
+        assertIs<PolicyDecision.Allow>(decision)
+    }
+
+    @Test
+    fun `explicit search host block wins over technical allowlist`() {
+        val decision =
+            evaluator.evaluate(
+                "google.com",
+                snapshot(rule("google.com", RuleAction.Block)),
+                activeHealth(),
+            )
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
+    fun `only results keeps search host allowed and external host blocked`() {
+        val onlyResultsRule =
+            rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false)
+
+        assertIs<PolicyDecision.Allow>(
+            evaluator.evaluate(
+                "google.com",
+                snapshot(onlyResultsRule),
+                activeHealth(),
+            ),
+        )
+        assertIs<PolicyDecision.Block>(
+            evaluator.evaluate(
+                "external.example",
+                snapshot(onlyResultsRule),
+                activeHealth(),
+            ),
+        )
     }
 
     private fun snapshot(vararg rules: PolicyRule): PolicySnapshot =

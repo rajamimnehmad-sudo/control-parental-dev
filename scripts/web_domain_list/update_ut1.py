@@ -26,10 +26,11 @@ PUBLISH_ENDPOINT = f"https://{PROJECT_REF}.supabase.co/functions/v1/update-web-d
 SOURCE_BASE = "https://dsi.ut-capitole.fr/blacklists/download"
 ENVIRONMENT = "DEV"
 CANARY = "coca.com"
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 HASH_COUNT = 7
-ADULT_BITS = 268_435_456
-MIXED_BITS = 1_048_576
+BITS_PER_ENTRY = 8
+MINIMUM_BITS = 1_024
+EXACT_HASH_BYTES = 8
 MAGIC = b"CFDL0001"
 
 
@@ -68,12 +69,16 @@ def main() -> None:
 def build_from_ut1(canary_included: bool) -> dict:
     with tempfile.TemporaryDirectory(prefix="ut1-domain-list-") as temporary:
         root = pathlib.Path(temporary)
-        adult, adult_count, adult_date = build_category("adult", ADULT_BITS, root)
-        mixed, mixed_count, mixed_date = build_category("mixed_adult", MIXED_BITS, root)
+        adult, adult_exact, adult_count, adult_bit_count, adult_date = build_category("adult", root)
+        mixed, mixed_exact, mixed_count, mixed_bit_count, mixed_date = build_category("mixed_adult", root)
         exceptions, _, education_date = exact_category("sexual_education", root)
     return {
         "adult_bits": adult,
         "mixed_bits": mixed,
+        "adult_exact": adult_exact,
+        "mixed_exact": mixed_exact,
+        "adult_bit_count": adult_bit_count,
+        "mixed_bit_count": mixed_bit_count,
         "adult_count": adult_count,
         "mixed_count": mixed_count,
         "educational_exceptions": exceptions,
@@ -82,18 +87,29 @@ def build_from_ut1(canary_included: bool) -> dict:
     }
 
 
-def build_category(category: str, bit_count: int, root: pathlib.Path) -> tuple[bytearray, int, str]:
+def build_category(category: str, root: pathlib.Path) -> tuple[bytearray, bytes, int, int, str]:
     normalized, source_date = normalized_category_file(category, root)
-    bits = bytearray((bit_count + 7) // 8)
-    count = 0
-    with normalized.open("r", encoding="ascii") as domains:
-        for line in domains:
-            domain = line.rstrip("\n")
-            add_bloom(bits, bit_count, domain)
-            count += 1
+    count = sum(1 for _ in normalized.open("r", encoding="ascii"))
     if count == 0:
         raise RuntimeError(f"UT1 category {category} is empty")
-    return bits, count, source_date
+    bit_count = max(MINIMUM_BITS, count * BITS_PER_ENTRY)
+    bit_count = ((bit_count + 7) // 8) * 8
+    bits = bytearray((bit_count + 7) // 8)
+    exact_text = root / f"{category}.hashes"
+    with normalized.open("r", encoding="ascii") as domains:
+        with exact_text.open("w", encoding="ascii") as hashes:
+            for line in domains:
+                domain = line.rstrip("\n")
+                add_bloom(bits, bit_count, domain)
+                hashes.write(hashlib.sha256(domain.encode("ascii")).digest()[:EXACT_HASH_BYTES].hex() + "\n")
+    subprocess.run(["sort", "-u", "-o", str(exact_text), str(exact_text)], check=True, env={**os.environ, "LC_ALL": "C"})
+    exact = bytearray()
+    with exact_text.open("r", encoding="ascii") as hashes:
+        for line in hashes:
+            exact.extend(bytes.fromhex(line.rstrip("\n")))
+    if len(exact) != count * EXACT_HASH_BYTES:
+        raise RuntimeError(f"UT1 category {category} has an exact-hash collision")
+    return bits, bytes(exact), count, bit_count, source_date
 
 
 def exact_category(category: str, root: pathlib.Path) -> tuple[list[str], int, str]:
@@ -161,18 +177,23 @@ def encode_bundle(version: int, source: dict) -> bytes:
     exceptions = "\n".join(source["educational_exceptions"]).encode("ascii")
     canaries = CANARY.encode("ascii") if source["canary_included"] else b""
     header = MAGIC + struct.pack(
-        ">qiiiiiiii",
+        ">qiiiiiiiiii",
         version,
         FORMAT_VERSION,
         HASH_COUNT,
-        len(source["adult_bits"]) * 8,
-        len(source["mixed_bits"]) * 8,
+        source["adult_bit_count"],
+        source["mixed_bit_count"],
         source["adult_count"],
         source["mixed_count"],
+        len(source["adult_exact"]),
+        len(source["mixed_exact"]),
         len(exceptions),
         len(canaries),
     )
-    return header + bytes(source["adult_bits"]) + bytes(source["mixed_bits"]) + exceptions + canaries
+    return (
+        header + bytes(source["adult_bits"]) + bytes(source["mixed_bits"]) +
+        source["adult_exact"] + source["mixed_exact"] + exceptions + canaries
+    )
 
 
 def read_existing_bundle(manifest: dict) -> dict:
@@ -183,16 +204,27 @@ def read_existing_bundle(manifest: dict) -> dict:
         raise RuntimeError("active data format is invalid")
     values = struct.unpack(">qiiiiiiii", data[8:48])
     _, fmt, hashes, adult_bit_count, mixed_bit_count, adult_count, mixed_count, exception_length, canary_length = values
-    if fmt != FORMAT_VERSION or hashes != HASH_COUNT:
+    if fmt != FORMAT_VERSION:
+        raise RuntimeError("active data must be refreshed before changing the DEV canary")
+    values = struct.unpack(">qiiiiiiiiii", data[8:56])
+    _, fmt, hashes, adult_bit_count, mixed_bit_count, adult_count, mixed_count, adult_exact_length, mixed_exact_length, exception_length, canary_length = values
+    if hashes != HASH_COUNT:
         raise RuntimeError("active data format is unsupported")
-    offset = 48
+    offset = 56
     adult_bytes, mixed_bytes = adult_bit_count // 8, mixed_bit_count // 8
     adult = bytearray(data[offset : offset + adult_bytes]); offset += adult_bytes
     mixed = bytearray(data[offset : offset + mixed_bytes]); offset += mixed_bytes
+    adult_exact = data[offset : offset + adult_exact_length]; offset += adult_exact_length
+    mixed_exact = data[offset : offset + mixed_exact_length]; offset += mixed_exact_length
     exceptions = data[offset : offset + exception_length].decode("ascii").splitlines(); offset += exception_length + canary_length
     if offset != len(data):
         raise RuntimeError("active data length is invalid")
-    return {"adult_bits": adult, "mixed_bits": mixed, "adult_count": adult_count, "mixed_count": mixed_count, "educational_exceptions": exceptions, "source_date": manifest["sourceDate"], "canary_included": False}
+    return {
+        "adult_bits": adult, "mixed_bits": mixed, "adult_exact": adult_exact, "mixed_exact": mixed_exact,
+        "adult_bit_count": adult_bit_count, "mixed_bit_count": mixed_bit_count,
+        "adult_count": adult_count, "mixed_count": mixed_count, "educational_exceptions": exceptions,
+        "source_date": manifest["sourceDate"], "canary_included": False,
+    }
 
 
 def publish(source: dict) -> dict:

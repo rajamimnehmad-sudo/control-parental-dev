@@ -3,10 +3,17 @@ package com.contentfilter.feature.vpn.policy
 import com.contentfilter.core.domain.model.DevicePolicyContext
 import com.contentfilter.core.domain.model.DomainPolicyContext
 import com.contentfilter.core.domain.model.PolicyDecision
+import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.RuleAction
+import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.TimePolicyContext
+import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.onlySearchResultsEnabled
+import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.policy.PolicyEngine
 import com.contentfilter.feature.vpn.domainlist.DynamicDomainBlocklist
 import javax.inject.Inject
@@ -31,9 +38,6 @@ class VpnDomainPolicyEvaluator
             val now = clock.nowEpochMillis()
             val minuteOfDay = clock.minuteOfDay(now)
             val normalizedDomain = domain.normalizedDomain()
-            domainBlocklist.categoryFor(normalizedDomain)?.let { category ->
-                return PolicyDecision.Block("Blocked by local domain category: $category.")
-            }
             val policyDecision =
                 policyEngine.evaluateDomain(
                     snapshot = snapshot,
@@ -53,6 +57,21 @@ class VpnDomainPolicyEvaluator
                                 ),
                         ),
                 )
+            val webBlocked = snapshot.rules.webNavigationBlocked()
+            val onlyResults = !webBlocked && snapshot.rules.onlySearchResultsEnabled()
+            if (webBlocked || (onlyResults && policyDecision !is PolicyDecision.Allow)) {
+                return policyDecision
+            }
+            val explicitDecision =
+                snapshot.rules.bestExplicitDomainRule(normalizedDomain, minuteOfDay)?.toDecision(normalizedDomain)
+            if (explicitDecision != null && explicitDecision !is PolicyDecision.Allow) return explicitDecision
+            if (policyDecision !is PolicyDecision.Allow) return policyDecision
+            val finalDecision = explicitDecision ?: policyDecision
+            if (explicitDecision == null && !normalizedDomain.isTechnicalWebProtectionHost()) {
+                domainBlocklist.categoryFor(normalizedDomain)?.let { category ->
+                    return PolicyDecision.Block("Blocked by local domain category: $category.")
+                }
+            }
             val limit =
                 snapshot.dailyLimits
                     .filter {
@@ -61,14 +80,44 @@ class VpnDomainPolicyEvaluator
                             normalizedDomain.matchesLimitTarget(it.target.normalizedDomain())
                     }
                     .minByOrNull { it.limitMinutes }
-            if (limit != null && policyDecision is PolicyDecision.Allow) {
+            if (limit != null) {
                 val observedMinutes = dnsUsageTracker.recordMinute(limit.target, now, minuteOfDay)
                 if (observedMinutes > limit.limitMinutes) {
                     return PolicyDecision.Block("Daily DNS event limit exceeded for ${limit.target}.")
                 }
             }
-            return policyDecision
+            return finalDecision
         }
+
+        private fun List<PolicyRule>.bestExplicitDomainRule(
+            domain: String,
+            minuteOfDay: Int,
+        ): PolicyRule? =
+            asSequence()
+                .filter { it.enabled && it.scope == RuleScope.Domain }
+                .filter { !it.target.startsWith("__") && it.target != "*" }
+                .filter { it.activeWindow?.contains(minuteOfDay) != false }
+                .filter { domain.matchesLimitTarget(it.target.normalizedDomain()) }
+                .sortedWith(
+                    compareByDescending<PolicyRule> { it.level.specificity }
+                        .thenByDescending { it.priority },
+                )
+                .firstOrNull()
+
+        private fun PolicyRule.toDecision(domain: String): PolicyDecision =
+            when (action) {
+                RuleAction.Allow ->
+                    PolicyDecision.Allow(
+                        safeSearchRequired = safeSearchRequired || WebNavigationPolicy.isSearchEngineDomain(domain),
+                    )
+                RuleAction.Block -> PolicyDecision.Block("Blocked by explicit domain policy.")
+                RuleAction.Warn -> PolicyDecision.Warn("Warning required by explicit domain policy.")
+                RuleAction.RequestAuthorization -> PolicyDecision.RequestAuthorization(domain)
+            }
+
+        private fun String.isTechnicalWebProtectionHost(): Boolean =
+            SearchEngineCatalog.isSearchResultsAllowedDomain(this) ||
+                TechnicalAllowedDomains.any { matchesLimitTarget(it) }
 
         private fun String.matchesLimitTarget(target: String): Boolean = this == target || endsWith(".$target")
 
@@ -77,4 +126,13 @@ class VpnDomainPolicyEvaluator
                 .lowercase()
                 .removeSuffix(".")
                 .removePrefix("www.")
+
+        private companion object {
+            val TechnicalAllowedDomains =
+                setOf(
+                    "supabase.co",
+                    "android.clients.google.com",
+                    "connectivitycheck.gstatic.com",
+                )
+        }
     }
