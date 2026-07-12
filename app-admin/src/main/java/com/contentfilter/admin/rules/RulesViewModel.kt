@@ -142,11 +142,9 @@ class RulesViewModel
                         "webNavigation admin state selectedDeviceId=$selectedDeviceId " +
                             "webNavigationBlocked=$savedInternetBlocked " +
                             "externalSearchResultsAllowed=${policy.rules.externalSearchResultsAllowedForWeb()} " +
-                            "blockImages=${policy.rules.imagesBlockedForWeb()} " +
                             "safeSearch=${policy.rules.safeSearchEnabledForWeb()} " +
                             "pendingNavigation=${formState.pendingInternetBlocked} " +
                             "pendingExternalResults=${formState.pendingExternalSearchResultsAllowed} " +
-                            "pendingImages=${formState.pendingImagesBlocked} " +
                             "pendingSafeSearch=${formState.pendingSafeSearchEnabled} " +
                             "policyRevision=${policy.rules.webPolicyRevision()}",
                     )
@@ -170,8 +168,6 @@ class RulesViewModel
                     externalSearchResultsAllowed =
                         formState.pendingExternalSearchResultsAllowed
                             ?: policy.rules.externalSearchResultsAllowedForWeb(),
-                    imagesBlocked =
-                        formState.pendingImagesBlocked ?: policy.rules.imagesBlockedForWeb(),
                     safeSearchEnabled =
                         formState.pendingSafeSearchEnabled ?: policy.rules.safeSearchEnabledForWeb(),
                     appControls =
@@ -502,21 +498,6 @@ class RulesViewModel
             )
         }
 
-        fun setImagesBlocked(blocked: Boolean) {
-            setWebOption(
-                preference = WebPolicyPreference.ImagesBlocked,
-                action = "images-blocked",
-                requestedState = blocked,
-                previousState = uiState.value.imagesBlocked,
-                successMessage =
-                    if (blocked) {
-                        "Fotos e imágenes bloqueadas."
-                    } else {
-                        "Fotos e imágenes permitidas."
-                    },
-            )
-        }
-
         fun setSafeSearchEnabled(enabled: Boolean) {
             setWebOption(
                 preference = WebPolicyPreference.SafeSearchEnabled,
@@ -594,7 +575,6 @@ class RulesViewModel
                                         "webBlocked=${confirmed.rules.internetBlocked()} " +
                                         "externalSearchResultsAllowed=" +
                                         "${confirmed.rules.externalSearchResultsAllowedForWeb()} " +
-                                        "imagesBlocked=${confirmed.rules.imagesBlockedForWeb()} " +
                                         "safeSearchEnabled=${confirmed.rules.safeSearchEnabledForWeb()} " +
                                         "activeDomainBlocks=${confirmed.rules.activeDomainBlockCount()} " +
                                         "activeAuxiliaryBlocks=${confirmed.rules.activeWebAuxiliaryBlockCount()} " +

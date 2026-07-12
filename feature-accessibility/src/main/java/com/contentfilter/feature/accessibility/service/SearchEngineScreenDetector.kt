@@ -2,10 +2,8 @@ package com.contentfilter.feature.accessibility.service
 
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.SearchEngineCatalog
-import com.contentfilter.core.domain.model.WebMediaCatalog
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.onlySearchResultsEnabled
-import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import java.net.URI
 
@@ -20,7 +18,6 @@ class SearchEngineScreenDetector(
         snapshot: PolicySnapshot,
         currentHost: String?,
         addressBarFocused: Boolean = false,
-        mediaSearchView: Boolean = false,
         recentSearchEngineId: String? = null,
         elapsedRealtimeMillis: Long = System.nanoTime() / NanosPerMillisecond,
     ): SearchEngineScreenDiagnosis {
@@ -56,7 +53,6 @@ class SearchEngineScreenDetector(
                 snapshot = snapshot,
                 packageCategory = packageCategory,
                 engineId = detectedEngine?.id,
-                mediaSearchView = mediaSearchView,
             )
         }
         if (webNavigationBlocked) {
@@ -67,7 +63,6 @@ class SearchEngineScreenDetector(
                 snapshot = snapshot,
                 packageCategory = packageCategory,
                 engineId = detectedEngine?.id ?: recentSearchEngineId,
-                mediaSearchView = mediaSearchView,
             )
         }
         if (detectedEngine != null) {
@@ -78,7 +73,6 @@ class SearchEngineScreenDetector(
                 snapshot = snapshot,
                 packageCategory = packageCategory,
                 engineId = detectedEngine.id,
-                mediaSearchView = mediaSearchView,
             )
         }
         if (externalResultsAllowed || !onlyResultsEnabled) {
@@ -88,7 +82,6 @@ class SearchEngineScreenDetector(
                 snapshot = snapshot,
                 packageCategory = packageCategory,
                 engineId = detectedEngine?.id,
-                mediaSearchView = mediaSearchView,
             )
         }
         val effectiveOrigin =
@@ -101,7 +94,7 @@ class SearchEngineScreenDetector(
                     when {
                         !onlyResultsJustActivated -> SearchNavigationAction.Allow
                         effectiveOrigin != null -> SearchNavigationAction.GoBack
-                        else -> SearchNavigationAction.OpenDefaultSearch
+                        else -> SearchNavigationAction.Allow
                     },
                 reason =
                     if (onlyResultsJustActivated) {
@@ -112,7 +105,6 @@ class SearchEngineScreenDetector(
                 snapshot = snapshot,
                 packageCategory = packageCategory,
                 engineId = effectiveOrigin?.engineId,
-                mediaSearchView = mediaSearchView,
             )
         }
         return diagnosis(
@@ -121,7 +113,6 @@ class SearchEngineScreenDetector(
             snapshot = snapshot,
             packageCategory = packageCategory,
             engineId = effectiveOrigin?.engineId,
-            mediaSearchView = mediaSearchView,
         )
     }
 
@@ -131,15 +122,12 @@ class SearchEngineScreenDetector(
         snapshot: PolicySnapshot,
         packageCategory: SearchSurfaceCategory,
         engineId: String?,
-        mediaSearchView: Boolean = false,
     ): SearchEngineScreenDiagnosis =
         SearchEngineScreenDiagnosis(
             action = action,
             reason = reason,
             webNavigationBlocked = snapshot.rules.webNavigationBlocked(),
             externalSearchResultsAllowed = snapshot.rules.externalSearchResultsAllowed(),
-            imagesBlocked = snapshot.rules.webImagesBlocked(),
-            mediaSearchView = mediaSearchView,
             packageCategory = packageCategory.label,
             searchEngineId = engineId,
             policyRevision = snapshot.version,
@@ -180,15 +168,7 @@ class SearchEngineScreenDetector(
                     ?.removePrefix("www.")
                     ?.takeIf { it.contains('.') && it.none(Char::isWhitespace) }
                     ?: return null
-            return BrowserAddressObservation(
-                host = host,
-                mediaSearchView =
-                    WebMediaCatalog.isMediaSearchView(
-                        domain = host,
-                        path = uri.path,
-                        rawQuery = uri.rawQuery,
-                    ),
-            )
+            return BrowserAddressObservation(host = host)
         }
 
         fun hostFromAddressBarText(value: CharSequence?): String? {
@@ -222,23 +202,17 @@ data class SearchEngineScreenDiagnosis(
     val reason: String,
     val webNavigationBlocked: Boolean,
     val externalSearchResultsAllowed: Boolean,
-    val imagesBlocked: Boolean,
-    val mediaSearchView: Boolean,
     val packageCategory: String,
     val searchEngineId: String?,
     val policyRevision: Long,
 )
 
-data class BrowserAddressObservation(
-    val host: String,
-    val mediaSearchView: Boolean,
-)
+data class BrowserAddressObservation(val host: String)
 
 enum class SearchNavigationAction {
     Allow,
     GoBack,
     GoHome,
-    OpenDefaultSearch,
 }
 
 private enum class SearchSurfaceCategory(val label: String) {

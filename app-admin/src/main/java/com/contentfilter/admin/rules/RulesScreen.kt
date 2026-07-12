@@ -121,7 +121,6 @@ fun RulesRoute(
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
         onOnlyResultsChanged = viewModel::setOnlyResultsEnabled,
-        onImagesBlockedChanged = viewModel::setImagesBlocked,
         onSafeSearchChanged = viewModel::setSafeSearchEnabled,
         onToggle = viewModel::toggle,
         onDelete = viewModel::delete,
@@ -159,7 +158,6 @@ private fun RulesScreen(
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
-    onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
@@ -210,7 +208,6 @@ private fun RulesScreen(
                 onAppLimitSaved = onAppLimitSaved,
                 onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
                 onOnlyResultsChanged = onOnlyResultsChanged,
-                onImagesBlockedChanged = onImagesBlockedChanged,
                 onSafeSearchChanged = onSafeSearchChanged,
                 onToggle = onToggle,
                 onDelete = onDelete,
@@ -806,7 +803,6 @@ private fun UserDetailContent(
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
-    onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
@@ -940,17 +936,14 @@ private fun UserDetailContent(
                         WebNavigationPanel(
                             blocked = state.internetBlocked,
                             onlyResultsEnabled = state.onlyResultsEnabled,
-                            imagesBlocked = state.imagesBlocked,
                             safeSearchEnabled = state.safeSearchEnabled,
                             presentation = state.webPanelPresentation(),
                             navigationSaving = state.pendingInternetBlocked != null,
                             onlyResultsSaving = state.pendingOnlyResultsEnabled != null,
-                            imagesSaving = state.pendingImagesBlocked != null,
                             safeSearchSaving = state.pendingSafeSearchEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
                             onOnlyResultsChanged = onOnlyResultsChanged,
-                            onImagesBlockedChanged = onImagesBlockedChanged,
                             onSafeSearchChanged = onSafeSearchChanged,
                         )
                     }
@@ -1076,17 +1069,14 @@ private fun AppsToolbar(
 private fun WebNavigationPanel(
     blocked: Boolean,
     onlyResultsEnabled: Boolean,
-    imagesBlocked: Boolean,
     safeSearchEnabled: Boolean,
     presentation: WebPanelPresentation,
     navigationSaving: Boolean,
     onlyResultsSaving: Boolean,
-    imagesSaving: Boolean,
     safeSearchSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
-    onImagesBlockedChanged: (Boolean) -> Unit,
     onSafeSearchChanged: (Boolean) -> Unit,
 ) {
     ProductCard {
@@ -1123,14 +1113,6 @@ private fun WebNavigationPanel(
                         enabled = !safeSearchSaving,
                         saving = safeSearchSaving,
                         onCheckedChange = onSafeSearchChanged,
-                    )
-                    WebSwitchRow(
-                        title = "Bloquear imágenes",
-                        description = "Cubre el contenido visual Web y bloquea hosts multimedia compatibles.",
-                        checked = imagesBlocked,
-                        enabled = !imagesSaving,
-                        saving = imagesSaving,
-                        onCheckedChange = onImagesBlockedChanged,
                     )
                     WebSwitchRow(
                         title = "Solo resultados",

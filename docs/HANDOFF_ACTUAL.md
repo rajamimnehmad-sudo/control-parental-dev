@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-10
+Fecha de corte: 2026-07-12
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -37,21 +37,12 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version historica al corte anterior:
+Version publicada real al 2026-07-12:
 
 ```text
-App Usuario versionCode 129
-App Admin versionCode 148
+App Usuario versionCode 177
+App Admin versionCode 177
 versionName 1.0.1-dev
-```
-
-Version publicada real al 2026-07-10:
-
-```text
-App Usuario versionCode 160
-App Admin versionCode 160
-versionName 1.0.1-dev
-Commit main: 4927a40 Add basic web control switches
 ```
 
 Manifiestos:
@@ -64,15 +55,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-177-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-177-debug.apk
 ```
 
 SHA-256:
 
 ```text
-Usuario DEV 160: 3ca050a96ab24fbc8a5503678f35c3b106a1fbeb6d0b5486f8f5b54484411f5c
-Admin DEV 160:   b56da30c7a9b9bbe2283221156b0e973b4f22d37df8fb8cb8e0d58584cc2b177
+Usuario DEV 177: 56fadc8bc281213fad5a4dd3cab6b5ef22777a4839f6107e324a1bd855f95c3d
+Admin DEV 177:   359f8eb7b0e9bf1d222e9c5eadb0047e3439caa199d04fdab79d69885d61bd6e
 ```
 
 ## Estado funcional
@@ -87,10 +78,10 @@ Admin DEV 160:   b56da30c7a9b9bbe2283221156b0e973b4f22d37df8fb8cb8e0d58584cc2b17
 - Bloqueo de apps por Accessibility funciona y cierra apps bloqueadas rapido.
 - VPN esta siempre activa en App Usuario cuando hay permiso; Admin cambia politica Web, no prende/apaga VPN.
 - Web Admin mantiene flujo real: Comunidad -> Web -> elegir usuario -> configurar Web.
-- Web Admin DEV 160 tiene switches: Bloquear navegacion web, Permitir resultados de Google, Bloquear fotos/imagenes, SafeSearch activado, Proteccion con IA deshabilitada como "Proximamente".
-- Web Usuario DEV 160 muestra estado simple de navegacion, Google, imagenes, SafeSearch e IA, sin permitir cambios.
+- Web Admin DEV 177 usa selector Internet abierto/bloqueado y dos capas independientes: SafeSearch y Solo resultados.
+- Web Usuario DEV 177 muestra esos mismos estados en modo solo lectura.
 - Bloqueo Web se representa con reglas internas de dominio en `WebNavigationPolicy`; no requiere migracion Room nueva.
-- VPN/DNS refuerza por dominio. Accessibility decide salir a Home en Chrome/Google cuando corresponde. Limitacion real: Chrome normal no permite tapar imagenes ni inspeccionar URL completa desde DNS.
+- VPN/DNS bloquea dominios externos en Solo resultados y fuerza una invalidacion puntual de conexiones al activar la capa. Accessibility no usa Atras/Home para navegaciones nuevas.
 - Solicitudes Admin se agrupan por usuario con indicador rojo.
 - En cada solicitud se ve icono de app y acciones: acceso completo, dar tiempo, rechazar.
 - Si Admin concede tiempo extra, Admin y Usuario muestran minutos restantes.

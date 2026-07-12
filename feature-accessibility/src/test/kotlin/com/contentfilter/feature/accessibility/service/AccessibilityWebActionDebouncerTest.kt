@@ -21,9 +21,6 @@ class AccessibilityWebActionDebouncerTest {
         assertTrue(debouncer.shouldPerform(Chrome, "one.example", 10L, SearchNavigationAction.GoBack, 100L))
         assertTrue(debouncer.shouldPerform(Chrome, "two.example", 10L, SearchNavigationAction.GoBack, 101L))
         assertTrue(debouncer.shouldPerform(Chrome, "two.example", 11L, SearchNavigationAction.GoBack, 102L))
-        assertTrue(
-            debouncer.shouldPerform(Chrome, "two.example", 11L, SearchNavigationAction.OpenDefaultSearch, 103L),
-        )
         assertFalse(debouncer.shouldPerform(Chrome, "one.example", 10L, SearchNavigationAction.GoBack, 104L))
     }
 

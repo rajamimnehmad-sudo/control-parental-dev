@@ -154,23 +154,13 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `SafeSearch and images reconnect open tunnel and enable encrypted DNS enforcement`() {
+    fun `SafeSearch reconnects open tunnel and enables encrypted DNS enforcement`() {
         val open = state()
         val safeSearch = state(rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow))
-        val images = state(rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block))
-        val both =
-            state(
-                rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow),
-                rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block),
-            )
 
         assertFalse(open.encryptedDnsEnforcementEnabled)
         assertTrue(safeSearch.encryptedDnsEnforcementEnabled)
-        assertTrue(images.encryptedDnsEnforcementEnabled)
-        assertTrue(both.encryptedDnsEnforcementEnabled)
         assertNotEquals(open.vpnReconnectKey, safeSearch.vpnReconnectKey)
-        assertNotEquals(open.vpnReconnectKey, images.vpnReconnectKey)
-        assertNotEquals(safeSearch.vpnReconnectKey, both.vpnReconnectKey)
     }
 
     @Test
@@ -181,7 +171,6 @@ class VpnPolicyStateTest {
             state(
                 main,
                 rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow),
-                rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block),
             )
 
         assertEquals(blocked.vpnReconnectKey, blockedWithSafeSearch.vpnReconnectKey)
@@ -190,27 +179,36 @@ class VpnPolicyStateTest {
 
     @Test
     fun `VPN state preserves the complete cumulative Web preference matrix`() {
-        repeat(16) { bits ->
+        repeat(8) { bits ->
             val webBlocked = bits and 1 != 0
             val onlyResultsEnabled = bits and 2 == 0
-            val imagesBlocked = bits and 4 != 0
-            val safeSearchEnabled = bits and 8 != 0
+            val safeSearchEnabled = bits and 4 != 0
             val state = state(*webRules(bits).toTypedArray())
 
             assertEquals(webBlocked, state.strictWebBlockEnabled)
             assertEquals(
-                !webBlocked && (onlyResultsEnabled || safeSearchEnabled || imagesBlocked),
+                !webBlocked && (onlyResultsEnabled || safeSearchEnabled),
                 state.encryptedDnsEnforcementEnabled,
             )
             if (webBlocked) {
                 assertEquals("strict=true", state.vpnReconnectKey)
             } else {
                 assertEquals(
-                    "strict=false;onlyResults=$onlyResultsEnabled;safeSearch=$safeSearchEnabled;images=$imagesBlocked",
+                    "strict=false;onlyResults=$onlyResultsEnabled;safeSearch=$safeSearchEnabled",
                     state.vpnReconnectKey,
                 )
             }
         }
+    }
+
+    @Test
+    fun `activating Solo resultados requests a one-time connection invalidation`() {
+        val open = state(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow))
+        val restricted = state(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow).copy(enabled = false))
+
+        assertTrue(VpnPolicyState.requiresConnectionInvalidation(open.vpnReconnectKey, restricted))
+        assertFalse(VpnPolicyState.requiresConnectionInvalidation(restricted.vpnReconnectKey, restricted))
+        assertFalse(VpnPolicyState.requiresConnectionInvalidation(restricted.vpnReconnectKey, open))
     }
 
     @Test
@@ -327,7 +325,6 @@ class VpnPolicyStateTest {
                 WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
                 RuleAction.Allow,
             ).copy(enabled = bits and 2 != 0),
-            rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block).copy(enabled = bits and 4 != 0),
-            rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow).copy(enabled = bits and 8 != 0),
+            rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow).copy(enabled = bits and 4 != 0),
         )
 }

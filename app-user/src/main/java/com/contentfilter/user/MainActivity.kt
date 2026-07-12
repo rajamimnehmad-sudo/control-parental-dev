@@ -426,9 +426,6 @@ private fun UserWebTab(
         if (state.safeSearchEnabled) {
             UserWebStatusCard(title = "Forzar SafeSearch", value = if (blocked) "Guardado" else "Activo")
         }
-        if (state.imagesBlocked) {
-            UserWebStatusCard(title = "Bloquear imágenes", value = if (blocked) "Guardado" else "Activo")
-        }
         if (state.onlyResultsEnabled) {
             UserWebStatusCard(title = "Solo resultados", value = if (blocked) "Guardado" else "Activo")
         }

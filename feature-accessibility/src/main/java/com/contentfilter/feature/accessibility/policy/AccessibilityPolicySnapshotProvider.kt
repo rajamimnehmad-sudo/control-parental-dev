@@ -10,7 +10,6 @@ import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
-import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DailyLimitRepository
@@ -155,7 +154,6 @@ class AccessibilityPolicySnapshotProvider
                     "version=${value.snapshot.version} webNavigationBlocked=${rules.webNavigationBlocked()} " +
                     "externalSearchResultsAllowed=${rules.externalSearchResultsAllowed()} " +
                     "onlyResults=${rules.onlySearchResultsEnabled()} " +
-                    "blockImages=${rules.webImagesBlocked()} " +
                     "safeSearch=${rules.safeSearchEnabled()} " +
                     "mode=${if (rules.webNavigationBlocked()) "web-blocked" else "web-open"}",
             )

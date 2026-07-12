@@ -29,6 +29,15 @@ class WebNavigationPolicyTest {
     }
 
     @Test
+    fun `missing result preference defaults to full navigation and ignores removed image fields`() {
+        val removedImageRule = rule("__web_images_blocked__", enabled = true).copy(action = RuleAction.Block)
+
+        assertTrue(listOf(removedImageRule).externalSearchResultsAllowed())
+        assertFalse(listOf(removedImageRule).onlySearchResultsEnabled())
+        assertFalse(listOf(removedImageRule).safeSearchEnabled())
+    }
+
+    @Test
     fun `Solo resultados conversion is explicit and reversible`() {
         assertTrue(WebProtectionSemantics.onlyResultsEnabled(externalSearchResultsAllowed = false))
         assertFalse(WebProtectionSemantics.onlyResultsEnabled(externalSearchResultsAllowed = true))

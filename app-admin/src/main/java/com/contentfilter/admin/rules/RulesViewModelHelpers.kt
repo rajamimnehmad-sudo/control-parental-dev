@@ -15,7 +15,6 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
-import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import java.time.Duration
 import java.time.Instant
@@ -123,8 +122,6 @@ internal fun List<PolicyRule>.internetBlocked(): Boolean = webNavigationBlocked(
 
 internal fun List<PolicyRule>.externalSearchResultsAllowedForWeb(): Boolean = externalSearchResultsAllowed()
 
-internal fun List<PolicyRule>.imagesBlockedForWeb(): Boolean = webImagesBlocked()
-
 internal fun List<PolicyRule>.safeSearchEnabledForWeb(): Boolean = safeSearchEnabled()
 
 internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
@@ -146,7 +143,6 @@ internal fun List<PolicyRule>.webPolicyPreferences(): WebPolicyPreferences =
     WebPolicyPreferences(
         webNavigationBlocked = webNavigationBlocked(),
         externalSearchResultsAllowed = externalSearchResultsAllowed(),
-        imagesBlocked = webImagesBlocked(),
         safeSearchEnabled = safeSearchEnabled(),
     )
 
@@ -204,16 +200,10 @@ internal fun List<PolicyRule>.webPolicyChanges(
         priority = WebNavigationBlockPriority + 10,
     )
     planCanonical(
-        target = WebNavigationPolicy.ImagesBlockedTarget,
-        action = RuleAction.Block,
-        enabled = desired.imagesBlocked,
-        priority = WebNavigationBlockPriority + 20,
-    )
-    planCanonical(
         target = WebNavigationPolicy.SafeSearchTarget,
         action = RuleAction.Allow,
         enabled = desired.safeSearchEnabled,
-        priority = WebNavigationBlockPriority + 30,
+        priority = WebNavigationBlockPriority + 20,
     )
 
     working
@@ -233,7 +223,6 @@ internal fun List<PolicyRule>.webPolicyChanges(
 private fun PolicyRule.isCanonicalWebPreference(): Boolean =
     (target == WebNavigationPolicy.RuleTarget && action == RuleAction.Block) ||
         (target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget && action == RuleAction.Allow) ||
-        (target == WebNavigationPolicy.ImagesBlockedTarget && action == RuleAction.Block) ||
         (target == WebNavigationPolicy.SafeSearchTarget && action == RuleAction.Allow)
 
 internal fun webRuleId(
@@ -245,14 +234,12 @@ internal fun webRuleId(
 internal data class WebPolicyPreferences(
     val webNavigationBlocked: Boolean,
     val externalSearchResultsAllowed: Boolean,
-    val imagesBlocked: Boolean,
     val safeSearchEnabled: Boolean,
 )
 
 internal enum class WebPolicyPreference {
     NavigationBlocked,
     ExternalSearchResultsAllowed,
-    ImagesBlocked,
     SafeSearchEnabled,
 }
 
@@ -263,7 +250,6 @@ internal fun WebPolicyPreferences.withPreference(
     when (preference) {
         WebPolicyPreference.NavigationBlocked -> copy(webNavigationBlocked = enabled)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(externalSearchResultsAllowed = enabled)
-        WebPolicyPreference.ImagesBlocked -> copy(imagesBlocked = enabled)
         WebPolicyPreference.SafeSearchEnabled -> copy(safeSearchEnabled = enabled)
     }
 
@@ -284,7 +270,6 @@ internal fun RulesUiState.withPendingWebPreference(
     when (preference) {
         WebPolicyPreference.NavigationBlocked -> copy(pendingInternetBlocked = enabled)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = enabled)
-        WebPolicyPreference.ImagesBlocked -> copy(pendingImagesBlocked = enabled)
         WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = enabled)
     }
 
@@ -292,7 +277,6 @@ internal fun RulesUiState.clearPendingWebPreference(preference: WebPolicyPrefere
     when (preference) {
         WebPolicyPreference.NavigationBlocked -> copy(pendingInternetBlocked = null)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = null)
-        WebPolicyPreference.ImagesBlocked -> copy(pendingImagesBlocked = null)
         WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = null)
     }
 
@@ -462,7 +446,6 @@ internal val SearchProtectionDomains = (SearchEngineDomains + SearchSupportDomai
 internal val LegacyWebGeneratedDomainTargets =
     (
         SearchProtectionDomains +
-            WebNavigationPolicy.ImageDomains +
             WebNavigationPolicy.UnsafeSearchDomains +
             setOf(DomainWildcard)
     ).toSet()
@@ -472,7 +455,6 @@ internal val LegacyWebGeneratedTargets =
             WebNavigationPolicy.RuleTarget,
             WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
             WebNavigationPolicy.LegacyGoogleResultsAllowedTarget,
-            WebNavigationPolicy.ImagesBlockedTarget,
             WebNavigationPolicy.SafeSearchTarget,
         )
 internal val LegacyWebAuxiliaryBlockTargets = LegacyWebGeneratedTargets

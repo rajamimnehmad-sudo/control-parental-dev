@@ -7,7 +7,6 @@ import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
-import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.policy.SearchProtectionPolicyDefaults
 
@@ -18,13 +17,15 @@ data class VpnPolicyState(
     val strictWebBlockEnabled: Boolean
         get() = snapshot.rules.webNavigationBlocked()
 
+    val onlyResultsEnabled: Boolean
+        get() = snapshot.rules.onlySearchResultsEnabled()
+
     val encryptedDnsEnforcementEnabled: Boolean
         get() =
             !strictWebBlockEnabled &&
                 (
-                    snapshot.rules.onlySearchResultsEnabled() ||
-                        snapshot.rules.safeSearchEnabled() ||
-                        snapshot.rules.webImagesBlocked()
+                    onlyResultsEnabled ||
+                        snapshot.rules.safeSearchEnabled()
                 )
 
     val vpnReconnectKey: String
@@ -32,8 +33,8 @@ data class VpnPolicyState(
             if (strictWebBlockEnabled) {
                 "strict=true"
             } else {
-                "strict=false;onlyResults=${snapshot.rules.onlySearchResultsEnabled()};" +
-                    "safeSearch=${snapshot.rules.safeSearchEnabled()};images=${snapshot.rules.webImagesBlocked()}"
+                "strict=false;onlyResults=$onlyResultsEnabled;" +
+                    "safeSearch=${snapshot.rules.safeSearchEnabled()}"
             }
 
     companion object {
@@ -68,6 +69,14 @@ data class VpnPolicyState(
                     current.id != SafeDefaultPolicyId -> current
                 else -> candidate
             }
+
+        fun requiresConnectionInvalidation(
+            appliedReconnectKey: String?,
+            next: VpnPolicyState,
+        ): Boolean =
+            !next.strictWebBlockEnabled &&
+                next.onlyResultsEnabled &&
+                appliedReconnectKey?.contains("onlyResults=false") == true
 
         private fun PolicySnapshot.isEmptyLocalDefault(): Boolean = id == LocalDefaultPolicyId && rules.isEmpty()
 

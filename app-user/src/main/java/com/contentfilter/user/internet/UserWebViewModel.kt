@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.WebProtectionSemantics
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
-import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.domain.repository.PolicyRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -31,13 +30,11 @@ class UserWebViewModel
                         "webNavigation user snapshot policy=${snapshot.id.take(8)} version=${snapshot.version} " +
                             "webNavigationBlocked=$blocked " +
                             "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
-                            "blockImages=${snapshot.rules.webImagesBlocked()} " +
                             "safeSearch=${snapshot.rules.safeSearchEnabled()}",
                     )
                     UserWebUiState(
                         webNavigationBlocked = blocked,
                         externalSearchResultsAllowed = snapshot.rules.externalSearchResultsAllowed(),
-                        imagesBlocked = snapshot.rules.webImagesBlocked(),
                         safeSearchEnabled = snapshot.rules.safeSearchEnabled(),
                     )
                 }
@@ -51,7 +48,6 @@ class UserWebViewModel
 data class UserWebUiState(
     val webNavigationBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = true,
-    val imagesBlocked: Boolean = false,
     val safeSearchEnabled: Boolean = false,
 ) {
     val onlyResultsEnabled: Boolean
@@ -61,7 +57,6 @@ data class UserWebUiState(
         get() =
             buildList {
                 if (safeSearchEnabled) add("SafeSearch")
-                if (imagesBlocked) add("Imágenes bloqueadas")
                 if (onlyResultsEnabled) add("Solo resultados")
             }
 }

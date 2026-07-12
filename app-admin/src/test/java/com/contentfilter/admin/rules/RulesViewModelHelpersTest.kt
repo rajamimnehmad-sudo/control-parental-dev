@@ -47,11 +47,11 @@ class RulesViewModelHelpersTest {
                 deviceId = DeviceId,
             )
 
-        assertEquals(first.map { it.id }.take(4), second.map { it.id }.take(4))
+        assertEquals(first.map { it.id }.take(3), second.map { it.id }.take(3))
     }
 
     @Test
-    fun `repair migrates legacy preference and disables wildcard search dns and image blocks`() {
+    fun `repair migrates legacy preference and disables wildcard search and dns blocks`() {
         val current =
             listOf(
                 domainRule(WebNavigationPolicy.RuleTarget, RuleAction.Block, enabled = true),
@@ -59,8 +59,6 @@ class RulesViewModelHelpersTest {
                 domainRule(SearchEngineDomains.first(), RuleAction.Block, enabled = true),
                 domainRule(SearchSupportDomains.first(), RuleAction.Block, enabled = true),
                 domainRule(SecureDnsDomains.first(), RuleAction.Block, enabled = true),
-                domainRule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block, enabled = true),
-                domainRule(WebNavigationPolicy.ImageDomains.first(), RuleAction.Block, enabled = true),
                 domainRule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow, enabled = true),
                 domainRule(WebNavigationPolicy.LegacyGoogleResultsAllowedTarget, RuleAction.Allow, enabled = true),
             )
@@ -74,7 +72,6 @@ class RulesViewModelHelpersTest {
         assertEquals(WebNavigationPolicy.RuleTarget, changes.first().target)
         assertFalse(result.webNavigationBlocked())
         assertTrue(result.externalSearchResultsAllowedForWeb())
-        assertTrue(result.imagesBlockedForWeb())
         assertTrue(result.safeSearchEnabledForWeb())
         assertFalse(result.any { it.enabled && it.action == RuleAction.Block && it.target == DomainWildcard })
         assertEquals(0, result.activeWebAuxiliaryBlockCount())
@@ -113,7 +110,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `complete preference matrix remains independent and has no auxiliary blocks`() {
-        val combinations = (0 until 16).map(::preferencesFromBits)
+        val combinations = (0 until 8).map(::preferencesFromBits)
 
         combinations.forEach { desired ->
             val result =
@@ -128,7 +125,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `every Web mutation changes only its selected preference`() {
-        (0 until 16).map(::preferencesFromBits).forEach { initial ->
+        (0 until 8).map(::preferencesFromBits).forEach { initial ->
             val initialRules =
                 emptyList<PolicyRule>()
                     .webPolicyChanges(initial, DeviceId)
@@ -149,6 +146,71 @@ class RulesViewModelHelpersTest {
     }
 
     @Test
+    fun `SafeSearch and Solo resultados persist independently`() {
+        var rules =
+            emptyList<PolicyRule>()
+                .webPolicyChanges(
+                    preferences(webBlocked = false, externalResultsAllowed = true, safeSearch = false),
+                    DeviceId,
+                ).applyTo(emptyList())
+
+        rules =
+            rules
+                .webPolicyPreferenceChanges(WebPolicyPreference.SafeSearchEnabled, true, DeviceId)
+                .applyTo(rules)
+        assertTrue(rules.safeSearchEnabledForWeb())
+        assertTrue(rules.externalSearchResultsAllowedForWeb())
+
+        rules =
+            rules
+                .webPolicyPreferenceChanges(WebPolicyPreference.ExternalSearchResultsAllowed, false, DeviceId)
+                .applyTo(rules)
+        assertTrue(rules.safeSearchEnabledForWeb())
+        assertFalse(rules.externalSearchResultsAllowedForWeb())
+
+        rules =
+            rules
+                .webPolicyPreferenceChanges(WebPolicyPreference.SafeSearchEnabled, false, DeviceId)
+                .applyTo(rules)
+        assertFalse(rules.safeSearchEnabledForWeb())
+        assertFalse(rules.externalSearchResultsAllowedForWeb())
+    }
+
+    @Test
+    fun `failed layer rollback clears only that pending state`() {
+        val bothPending =
+            RulesUiState(
+                pendingExternalSearchResultsAllowed = false,
+                pendingSafeSearchEnabled = true,
+            )
+
+        val safeSearchFailed = bothPending.clearPendingWebPreference(WebPolicyPreference.SafeSearchEnabled)
+        assertEquals(false, safeSearchFailed.pendingExternalSearchResultsAllowed)
+        assertEquals(null, safeSearchFailed.pendingSafeSearchEnabled)
+
+        val onlyResultsFailed = bothPending.clearPendingWebPreference(WebPolicyPreference.ExternalSearchResultsAllowed)
+        assertEquals(null, onlyResultsFailed.pendingExternalSearchResultsAllowed)
+        assertEquals(true, onlyResultsFailed.pendingSafeSearchEnabled)
+    }
+
+    @Test
+    fun `removed image rule is ignored without resetting valid Web preferences`() {
+        val oldImageRule = domainRule("__web_images_blocked__", RuleAction.Block, enabled = true)
+        val rules =
+            listOf(
+                oldImageRule,
+                domainRule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow, enabled = true),
+                domainRule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow, enabled = false),
+            )
+
+        assertEquals(
+            preferences(webBlocked = false, externalResultsAllowed = false, safeSearch = true),
+            rules.webPolicyPreferences(),
+        )
+        assertTrue(rules.webPolicyChanges(rules.webPolicyPreferences(), DeviceId).none { it.id == oldImageRule.id })
+    }
+
+    @Test
     fun `each Web pending state is isolated from the other switches`() {
         WebPolicyPreference.entries.forEach { preference ->
             val pending = RulesUiState().withPendingWebPreference(preference, true)
@@ -158,7 +220,6 @@ class RulesViewModelHelpersTest {
                 preference == WebPolicyPreference.ExternalSearchResultsAllowed,
                 pending.pendingExternalSearchResultsAllowed == true,
             )
-            assertEquals(preference == WebPolicyPreference.ImagesBlocked, pending.pendingImagesBlocked == true)
             assertEquals(preference == WebPolicyPreference.SafeSearchEnabled, pending.pendingSafeSearchEnabled == true)
             assertEquals(RulesUiState(), pending.clearPendingWebPreference(preference))
         }
@@ -170,7 +231,6 @@ class RulesViewModelHelpersTest {
             RulesUiState(
                 internetBlocked = false,
                 externalSearchResultsAllowed = false,
-                imagesBlocked = true,
                 safeSearchEnabled = true,
             )
         val blocked = open.copy(internetBlocked = true)
@@ -180,7 +240,6 @@ class RulesViewModelHelpersTest {
         assertTrue(open.webLayersVisible)
         assertFalse(blocked.webLayersVisible)
         assertTrue(blocked.onlyResultsEnabled)
-        assertTrue(blocked.imagesBlocked)
         assertTrue(blocked.safeSearchEnabled)
     }
 
@@ -190,14 +249,13 @@ class RulesViewModelHelpersTest {
         val protected =
             RulesUiState(
                 externalSearchResultsAllowed = false,
-                imagesBlocked = true,
                 safeSearchEnabled = true,
             ).webPanelPresentation()
-        val blocked = RulesUiState(internetBlocked = true, imagesBlocked = true).webPanelPresentation()
+        val blocked = RulesUiState(internetBlocked = true, safeSearchEnabled = true).webPanelPresentation()
 
         assertEquals("Internet totalmente abierto", fullyOpen.headline)
         assertEquals("Internet abierto con protecciones", protected.headline)
-        assertEquals(listOf("SafeSearch", "Imágenes", "Solo resultados"), protected.activeLayers)
+        assertEquals(listOf("SafeSearch", "Solo resultados"), protected.activeLayers)
         assertTrue(protected.showLayers)
         assertEquals("Internet bloqueado", blocked.headline)
         assertFalse(blocked.showLayers)
@@ -211,7 +269,6 @@ class RulesViewModelHelpersTest {
                     preferences(
                         webBlocked = false,
                         externalResultsAllowed = false,
-                        imagesBlocked = true,
                         safeSearch = true,
                     ),
                     DeviceId,
@@ -223,7 +280,6 @@ class RulesViewModelHelpersTest {
                 .applyTo(rules)
         assertTrue(rules.webNavigationBlocked())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
-        assertTrue(rules.imagesBlockedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
 
         rules =
@@ -232,7 +288,6 @@ class RulesViewModelHelpersTest {
                 .applyTo(rules)
         assertTrue(rules.webNavigationOpenWithoutAuxiliaryBlocks())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
-        assertTrue(rules.imagesBlockedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
     }
 
@@ -245,7 +300,6 @@ class RulesViewModelHelpersTest {
                 preferences(
                     webBlocked = false,
                     externalResultsAllowed = false,
-                    imagesBlocked = cycle % 2 != 0,
                     safeSearch = cycle % 2 == 0,
                 )
             rules = rules.webPolicyChanges(restricted, DeviceId).applyTo(rules)
@@ -403,13 +457,11 @@ class RulesViewModelHelpersTest {
     private fun preferences(
         webBlocked: Boolean,
         externalResultsAllowed: Boolean = false,
-        imagesBlocked: Boolean = false,
         safeSearch: Boolean = false,
     ): WebPolicyPreferences =
         WebPolicyPreferences(
             webNavigationBlocked = webBlocked,
             externalSearchResultsAllowed = externalResultsAllowed,
-            imagesBlocked = imagesBlocked,
             safeSearchEnabled = safeSearch,
         )
 
@@ -417,8 +469,7 @@ class RulesViewModelHelpersTest {
         preferences(
             webBlocked = bits and 1 != 0,
             externalResultsAllowed = bits and 2 != 0,
-            imagesBlocked = bits and 4 != 0,
-            safeSearch = bits and 8 != 0,
+            safeSearch = bits and 4 != 0,
         )
 
     private fun appRule(

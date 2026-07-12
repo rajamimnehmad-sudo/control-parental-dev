@@ -116,66 +116,6 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
-    fun `image filtering uses overlays without Back or Home`() {
-        val diagnosis =
-            SearchEngineScreenDetector().diagnose(
-                packageName = Chrome,
-                snapshot =
-                    snapshot(
-                        rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block),
-                        rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow),
-                    ),
-                currentHost = "google.com",
-                mediaSearchView = true,
-                elapsedRealtimeMillis = 100L,
-            )
-
-        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
-        assertEquals("external-results-allowed", diagnosis.reason)
-        assertTrue(diagnosis.imagesBlocked)
-        assertTrue(diagnosis.mediaSearchView)
-    }
-
-    @Test
-    fun `image search remains available when image filtering is off`() {
-        val diagnosis =
-            SearchEngineScreenDetector().diagnose(
-                packageName = Chrome,
-                snapshot = snapshot(rule(WebNavigationPolicy.ExternalSearchResultsAllowedTarget, RuleAction.Allow)),
-                currentHost = "bing.com",
-                mediaSearchView = true,
-                elapsedRealtimeMillis = 100L,
-            )
-
-        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
-        assertFalse(diagnosis.imagesBlocked)
-    }
-
-    @Test
-    fun `private Chrome session receives the same image and web decisions`() {
-        val policy = snapshot(rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block))
-        val normal =
-            SearchEngineScreenDetector().diagnose(
-                packageName = Chrome,
-                snapshot = policy,
-                currentHost = "duckduckgo.com",
-                mediaSearchView = true,
-                elapsedRealtimeMillis = 100L,
-            )
-        val private =
-            SearchEngineScreenDetector().diagnose(
-                packageName = Chrome,
-                snapshot = policy,
-                currentHost = "duckduckgo.com",
-                mediaSearchView = true,
-                elapsedRealtimeMillis = 101L,
-            )
-
-        assertEquals(normal.action, private.action)
-        assertEquals(normal.reason, private.reason)
-    }
-
-    @Test
     fun `recent search signal does not trigger repeated Back for a new blocked request`() {
         val diagnosis =
             SearchEngineScreenDetector().diagnose(
@@ -216,7 +156,7 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
-    fun `activating Solo resultados without a search origin opens default search once`() {
+    fun `activating Solo resultados without a search origin performs no Accessibility navigation`() {
         val detector = SearchEngineScreenDetector()
         val released =
             snapshot(
@@ -233,7 +173,7 @@ class SearchEngineScreenDetectorTest {
         val diagnosis =
             detector.diagnose(Chrome, restricted, currentHost = "example.com", elapsedRealtimeMillis = 101L)
 
-        assertEquals(SearchNavigationAction.OpenDefaultSearch, diagnosis.action)
+        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
     }
 
     @Test
@@ -283,10 +223,9 @@ class SearchEngineScreenDetectorTest {
 
     @Test
     fun `Accessibility honors every cumulative Web protection combination`() {
-        repeat(16) { bits ->
+        repeat(8) { bits ->
             val webBlocked = bits and 1 != 0
             val externalResultsAllowed = bits and 2 != 0
-            val imagesBlocked = bits and 4 != 0
             val policy = snapshot(*webRules(bits).toTypedArray())
             val detector = SearchEngineScreenDetector()
 
@@ -297,7 +236,6 @@ class SearchEngineScreenDetectorTest {
                             packageName = Chrome,
                             snapshot = policy,
                             currentHost = "google.com",
-                            mediaSearchView = true,
                             elapsedRealtimeMillis = 100L,
                         )
                     else -> {
@@ -314,7 +252,6 @@ class SearchEngineScreenDetectorTest {
             assertEquals(expected, diagnosis.action)
             assertEquals(webBlocked, diagnosis.webNavigationBlocked)
             assertEquals(externalResultsAllowed, diagnosis.externalSearchResultsAllowed)
-            assertEquals(imagesBlocked, diagnosis.imagesBlocked)
         }
     }
 
@@ -329,29 +266,12 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
-    fun `address parser retains only host and media classification`() {
+    fun `address parser retains only the normalized host`() {
         val google =
             SearchEngineScreenDetector.addressObservationFromAddressBarText(
                 "https://www.google.com/search?q=private&tbm=isch",
             )
-        val bing =
-            SearchEngineScreenDetector.addressObservationFromAddressBarText(
-                "https://www.bing.com/videos/search?q=private",
-            )
-        val yahoo =
-            SearchEngineScreenDetector.addressObservationFromAddressBarText(
-                "https://images.search.yahoo.com/search/images?p=private",
-            )
-        val duckDuckGo =
-            SearchEngineScreenDetector.addressObservationFromAddressBarText(
-                "https://duckduckgo.com/?q=private&ia=images",
-            )
-
         assertEquals("google.com", google?.host)
-        assertTrue(google?.mediaSearchView == true)
-        assertTrue(bing?.mediaSearchView == true)
-        assertTrue(yahoo?.mediaSearchView == true)
-        assertTrue(duckDuckGo?.mediaSearchView == true)
         assertFalse(google.toString().contains("private"))
     }
 
@@ -397,8 +317,7 @@ class SearchEngineScreenDetectorTest {
                 WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
                 RuleAction.Allow,
             ).copy(enabled = bits and 2 != 0),
-            rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block).copy(enabled = bits and 4 != 0),
-            rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow).copy(enabled = bits and 8 != 0),
+            rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow).copy(enabled = bits and 4 != 0),
         )
 
     private companion object {

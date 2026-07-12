@@ -13,10 +13,8 @@ import com.contentfilter.core.domain.model.ProtectionAlertType
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
-import com.contentfilter.core.domain.model.WebMediaCatalog
 import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
-import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.sync.engine.EffectivePolicyApplicationTracker
@@ -40,6 +38,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,6 +70,7 @@ class FilterVpnService : VpnService() {
     private var serviceScope: CoroutineScope? = null
     private var vpnInterface: ParcelFileDescriptor? = null
     private var readerJob: Job? = null
+    private var connectionInvalidationJob: Job? = null
     private var upstreamDnsServers: List<InetAddress> = emptyList()
     private var strictWebBlockMode = false
     private var encryptedDnsEnforcementMode = false
@@ -166,8 +166,41 @@ class FilterVpnService : VpnService() {
             reportVpnPolicyApplied(currentState, source = "tunnel-already-current")
             return
         }
+        val invalidateConnections =
+            VpnPolicyState.requiresConnectionInvalidation(
+                appliedReconnectKey = appliedVpnReconnectKey,
+                next = currentState,
+            )
         cleanup()
-        startVpn()
+        if (invalidateConnections) {
+            invalidateBrowserConnectionsThenStart(currentState)
+        } else {
+            startVpn()
+        }
+    }
+
+    private fun invalidateBrowserConnectionsThenStart(state: VpnPolicyState) {
+        connectionInvalidationJob?.cancel()
+        connectionInvalidationJob =
+            CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+                upstreamDnsServers = currentDnsServers()
+                strictWebBlockMode = true
+                encryptedDnsEnforcementMode = true
+                val barrier = establishVpn()
+                Log.i(
+                    LogTag,
+                    "VPN connection invalidation started revision=${state.snapshot.version} onlyResults=true",
+                )
+                delay(ConnectionInvalidationMillis)
+                barrier?.close()
+                strictWebBlockMode = false
+                encryptedDnsEnforcementMode = false
+                Log.i(
+                    LogTag,
+                    "VPN connection invalidation completed revision=${state.snapshot.version}",
+                )
+                startVpn()
+            }
     }
 
     private fun stopVpn(reason: String) {
@@ -279,7 +312,6 @@ class FilterVpnService : VpnService() {
                 "revision=${state.snapshot.version} strict=${state.strictWebBlockEnabled} " +
                 "onlyResults=${state.snapshot.rules.onlySearchResultsEnabled()} " +
                 "safeSearch=${state.snapshot.rules.safeSearchEnabled()} " +
-                "images=${state.snapshot.rules.webImagesBlocked()} " +
                 "encryptedDnsEnforced=${state.encryptedDnsEnforcementEnabled}",
         )
         applicationTracker.report(PolicyConsumer.Vpn, state.snapshot.id, state.snapshot.version)
@@ -491,6 +523,8 @@ class FilterVpnService : VpnService() {
     }
 
     private fun cleanup() {
+        connectionInvalidationJob?.cancel()
+        connectionInvalidationJob = null
         readerJob?.cancel()
         readerJob = null
         snapshotProvider.stop()
@@ -518,6 +552,7 @@ class FilterVpnService : VpnService() {
         private const val LocalVpnIpv6Address = "fd00:1:fd00:1::2"
         private const val LocalVpnIpv6PrefixLength = 128
         private const val NoBytesRead = -1
+        private const val ConnectionInvalidationMillis = 400L
         private const val PacketBufferSize = 32 * 1024
         private const val AllIpv4Route = "0.0.0.0"
         private const val AllIpv6Route = "::"
@@ -585,8 +620,7 @@ class FilterVpnService : VpnService() {
             val domain = normalizedDomain()
             return SearchEngineCatalog.searchEngineDomains.any { domain.matchesRuleTarget(it) } ||
                 SearchEngineCatalog.searchSupportDomains.any { domain.matchesRuleTarget(it) } ||
-                SearchEngineCatalog.secureDnsDomains.any { domain.matchesRuleTarget(it) } ||
-                WebMediaCatalog.isImageAssetHost(domain)
+                SearchEngineCatalog.secureDnsDomains.any { domain.matchesRuleTarget(it) }
         }
 
         private fun PolicyDecision.searchProtectionLabel(): String =

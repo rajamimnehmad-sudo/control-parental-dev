@@ -19,7 +19,6 @@ import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
-import com.contentfilter.core.domain.model.webImagesBlocked
 import com.contentfilter.core.domain.model.webNavigationBlocked
 
 /**
@@ -92,9 +91,6 @@ class DefaultPolicyEngine : PolicyEngine {
             if (SearchEngineCatalog.isSecureDnsProviderDomain(normalizedContext.domain)) {
                 return PolicyDecision.Block("Encrypted DNS bypass is disabled by search-only protection.")
             }
-            if (snapshot.rules.webImagesBlocked() && WebNavigationPolicy.isImageDomain(normalizedContext.domain)) {
-                return PolicyDecision.Block("Blocked by image policy.")
-            }
             if (WebNavigationPolicy.isSearchResultsAllowedDomain(normalizedContext.domain)) {
                 return PolicyDecision.Allow(
                     safeSearchRequired =
@@ -105,7 +101,7 @@ class DefaultPolicyEngine : PolicyEngine {
             return PolicyDecision.Block("Blocked by search-only protection.")
         }
         if (!webNavigationBlocked &&
-            (snapshot.rules.safeSearchEnabled() || snapshot.rules.webImagesBlocked()) &&
+            snapshot.rules.safeSearchEnabled() &&
             SearchEngineCatalog.isSecureDnsProviderDomain(normalizedContext.domain)
         ) {
             return PolicyDecision.Block("Encrypted DNS bypass is disabled by web protection.")
@@ -115,12 +111,6 @@ class DefaultPolicyEngine : PolicyEngine {
         }
         if (!webNavigationBlocked && WebNavigationPolicy.isSearchEngineDomain(normalizedContext.domain)) {
             return PolicyDecision.Allow(safeSearchRequired = snapshot.rules.safeSearchEnabled())
-        }
-        if (!webNavigationBlocked &&
-            snapshot.rules.webImagesBlocked() &&
-            WebNavigationPolicy.isImageDomain(normalizedContext.domain)
-        ) {
-            return PolicyDecision.Block("Blocked by image policy.")
         }
         activeGrant(
             snapshot.extraTimeGrants,
@@ -322,12 +312,10 @@ class DefaultPolicyEngine : PolicyEngine {
             val normalizedTarget = target.normalizedDomain()
             return normalizedTarget == DomainWildcard ||
                 normalizedTarget == WebNavigationPolicy.RuleTarget ||
-                normalizedTarget == WebNavigationPolicy.ImagesBlockedTarget ||
                 normalizedTarget == WebNavigationPolicy.SafeSearchTarget ||
                 normalizedTarget.isSearchProtectionRuleTarget() ||
                 WebNavigationPolicy.isGoogleSearchDomain(normalizedTarget) ||
-                WebNavigationPolicy.isUnsafeSearchDomain(normalizedTarget) ||
-                WebNavigationPolicy.isImageDomain(normalizedTarget)
+                WebNavigationPolicy.isUnsafeSearchDomain(normalizedTarget)
         }
     }
 }

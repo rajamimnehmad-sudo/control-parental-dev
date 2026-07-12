@@ -4,7 +4,6 @@ object WebNavigationPolicy {
     const val RuleTarget = "__web_navigation_blocked__"
     const val ExternalSearchResultsAllowedTarget = "__web_external_search_results_allowed__"
     const val LegacyGoogleResultsAllowedTarget = "__web_google_results_allowed__"
-    const val ImagesBlockedTarget = "__web_images_blocked__"
     const val SafeSearchTarget = "__web_safe_search_enabled__"
     const val RulePriority = 5_000
 
@@ -36,8 +35,6 @@ object WebNavigationPolicy {
             "duckduckgo.com",
         )
 
-    val ImageDomains: Set<String> = WebMediaCatalog.legacyImageRuleTargets
-
     fun isWebNavigationDomain(domain: String): Boolean {
         val normalized = domain.normalizedHost()
         return WebNavigationDomains.any { normalized.matchesDomainTarget(it) }
@@ -62,10 +59,6 @@ object WebNavigationPolicy {
     fun isUnsafeSearchDomain(domain: String): Boolean {
         val normalized = domain.normalizedHost()
         return UnsafeSearchDomains.any { normalized.matchesDomainTarget(it) }
-    }
-
-    fun isImageDomain(domain: String): Boolean {
-        return WebMediaCatalog.isImageAssetHost(domain)
     }
 
     private val WebNavigationDomains: Set<String> =
@@ -102,12 +95,13 @@ fun Iterable<PolicyRule>.externalSearchResultsAllowed(): Boolean {
                 it.target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget
         }
     if (canonicalRules.any()) return canonicalRules.any { it.enabled }
-    return any {
-        it.enabled &&
+    val legacyRules =
+        filter {
             it.scope == RuleScope.Domain &&
-            it.action == RuleAction.Allow &&
-            it.target == WebNavigationPolicy.LegacyGoogleResultsAllowedTarget
-    }
+                it.action == RuleAction.Allow &&
+                it.target == WebNavigationPolicy.LegacyGoogleResultsAllowedTarget
+        }
+    return legacyRules.none() || legacyRules.any { it.enabled }
 }
 
 fun Iterable<PolicyRule>.onlySearchResultsEnabled(): Boolean {
@@ -129,14 +123,6 @@ object WebProtectionSemantics {
 
     fun externalSearchResultsAllowed(onlyResultsEnabled: Boolean): Boolean = !onlyResultsEnabled
 }
-
-fun Iterable<PolicyRule>.webImagesBlocked(): Boolean =
-    any {
-        it.enabled &&
-            it.scope == RuleScope.Domain &&
-            it.action == RuleAction.Block &&
-            it.target == WebNavigationPolicy.ImagesBlockedTarget
-    }
 
 fun Iterable<PolicyRule>.safeSearchEnabled(): Boolean =
     any {

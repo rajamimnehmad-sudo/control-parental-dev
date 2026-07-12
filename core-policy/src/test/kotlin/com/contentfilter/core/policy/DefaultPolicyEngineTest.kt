@@ -367,7 +367,7 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `SafeSearch and image filtering block known encrypted DNS bootstrap hosts`() {
+    fun `SafeSearch blocks known encrypted DNS bootstrap hosts`() {
         val safeSearch =
             policy(
                 rules =
@@ -375,17 +375,8 @@ class DefaultPolicyEngineTest {
                         domainRule(target = WebNavigationPolicy.SafeSearchTarget, action = RuleAction.Allow),
                     ),
             )
-        val images =
-            policy(
-                rules =
-                    listOf(
-                        domainRule(target = WebNavigationPolicy.ImagesBlockedTarget, action = RuleAction.Block),
-                    ),
-            )
-
         listOf("dns.google", "chrome.cloudflare-dns.com", "dns9.quad9.net").forEach { host ->
             assertIs<PolicyDecision.Block>(engine.evaluateDomain(safeSearch, domainContext(host)))
-            assertIs<PolicyDecision.Block>(engine.evaluateDomain(images, domainContext(host)))
         }
         assertIs<PolicyDecision.Allow>(engine.evaluateDomain(safeSearch, domainContext("example.com")))
     }
@@ -505,25 +496,6 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `image preference blocks known image hosts without blocking search pages`() {
-        val snapshot =
-            policy(
-                rules =
-                    listOf(
-                        domainRule(
-                            target = WebNavigationPolicy.ImagesBlockedTarget,
-                            action = RuleAction.Block,
-                        ),
-                    ),
-            )
-
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("encrypted-tbn8.gstatic.com")))
-        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("tse2.mm.bing.net")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("images.google.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
-    }
-
-    @Test
     fun `global web block wins over released results and SafeSearch preferences`() {
         val snapshot =
             policy(
@@ -543,11 +515,10 @@ class DefaultPolicyEngineTest {
 
     @Test
     fun `all Web protection layers remain cumulative across the complete matrix`() {
-        repeat(16) { bits ->
+        repeat(8) { bits ->
             val webBlocked = bits and 1 != 0
             val externalResultsAllowed = bits and 2 != 0
-            val imagesBlocked = bits and 4 != 0
-            val safeSearchEnabled = bits and 8 != 0
+            val safeSearchEnabled = bits and 4 != 0
             val snapshot = policy(rules = webRules(bits))
 
             val searchDecision = engine.evaluateDomain(snapshot, domainContext("google.com"))
@@ -570,15 +541,8 @@ class DefaultPolicyEngineTest {
                 assertIs<PolicyDecision.Block>(externalDecision)
             }
 
-            val imageDecision = engine.evaluateDomain(snapshot, domainContext("encrypted-tbn8.gstatic.com"))
-            if (imagesBlocked) {
-                assertIs<PolicyDecision.Block>(imageDecision)
-            } else {
-                assertIs<PolicyDecision.Allow>(imageDecision)
-            }
-
             val encryptedDnsDecision = engine.evaluateDomain(snapshot, domainContext("dns.google"))
-            if (!externalResultsAllowed || safeSearchEnabled || imagesBlocked) {
+            if (!externalResultsAllowed || safeSearchEnabled) {
                 assertIs<PolicyDecision.Block>(encryptedDnsDecision)
             } else {
                 assertIs<PolicyDecision.Allow>(encryptedDnsDecision)
@@ -778,15 +742,10 @@ class DefaultPolicyEngineTest {
                 action = RuleAction.Allow,
             ).copy(enabled = bits and 2 != 0),
             domainRule(
-                id = "images",
-                target = WebNavigationPolicy.ImagesBlockedTarget,
-                action = RuleAction.Block,
-            ).copy(enabled = bits and 4 != 0),
-            domainRule(
                 id = "safe-search",
                 target = WebNavigationPolicy.SafeSearchTarget,
                 action = RuleAction.Allow,
-            ).copy(enabled = bits and 8 != 0),
+            ).copy(enabled = bits and 4 != 0),
         )
 
     private fun limit(

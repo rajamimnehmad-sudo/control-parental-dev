@@ -19,12 +19,10 @@ data class RulesUiState(
     val allowDomainMinutes: String = "",
     val internetBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = true,
-    val imagesBlocked: Boolean = false,
     val safeSearchEnabled: Boolean = false,
     val internetSaving: Boolean = false,
     val pendingInternetBlocked: Boolean? = null,
     val pendingExternalSearchResultsAllowed: Boolean? = null,
-    val pendingImagesBlocked: Boolean? = null,
     val pendingSafeSearchEnabled: Boolean? = null,
     val limitPackageName: String = "",
     val limitMinutes: String = "",
@@ -86,7 +84,6 @@ internal fun RulesUiState.webPanelPresentation(): WebPanelPresentation {
     val layers =
         buildList {
             if (safeSearchEnabled) add("SafeSearch")
-            if (imagesBlocked) add("Imágenes")
             if (onlyResultsEnabled) add("Solo resultados")
         }
     return WebPanelPresentation(
