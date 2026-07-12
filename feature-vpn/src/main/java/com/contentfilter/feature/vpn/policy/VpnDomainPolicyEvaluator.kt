@@ -65,11 +65,7 @@ class VpnDomainPolicyEvaluator
             val technicalHostAllowed =
                 policyDecision is PolicyDecision.Allow && normalizedDomain.isTechnicalWebProtectionHost()
             val explicitDecision =
-                if (technicalHostAllowed) {
-                    null
-                } else {
-                    snapshot.rules.bestExplicitDomainRule(normalizedDomain, minuteOfDay)?.toDecision(normalizedDomain)
-                }
+                snapshot.rules.bestExplicitDomainRule(normalizedDomain, minuteOfDay)?.toDecision(normalizedDomain)
             if (explicitDecision != null && explicitDecision !is PolicyDecision.Allow) return explicitDecision
             if (policyDecision !is PolicyDecision.Allow) return policyDecision
             val finalDecision = explicitDecision ?: policyDecision
@@ -101,6 +97,7 @@ class VpnDomainPolicyEvaluator
         ): PolicyRule? =
             asSequence()
                 .filter { it.enabled && it.scope == RuleScope.Domain }
+                .filterNot { it.id.startsWith("safe-default-") }
                 .filter { !it.target.startsWith("__") && it.target != "*" }
                 .filter { it.activeWindow?.contains(minuteOfDay) != false }
                 .filter { domain.matchesLimitTarget(it.target.normalizedDomain()) }

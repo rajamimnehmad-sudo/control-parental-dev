@@ -43,7 +43,6 @@ object SearchEngineCatalog {
                         "clients4.google.com",
                         "clientservices.googleapis.com",
                         "gstatic.com",
-                        "googleapis.com",
                         "googleusercontent.com",
                     ),
                 safeSearchDnsTarget = "forcesafesearch.google.com",

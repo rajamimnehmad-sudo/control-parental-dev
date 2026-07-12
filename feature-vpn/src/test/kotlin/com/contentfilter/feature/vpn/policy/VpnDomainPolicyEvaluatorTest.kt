@@ -134,6 +134,18 @@ class VpnDomainPolicyEvaluatorTest {
     }
 
     @Test
+    fun `manual search host block keeps priority over technical allowlist`() {
+        val decision =
+            evaluator.evaluate(
+                "google.com",
+                snapshot(rule("google.com", RuleAction.Block)),
+                activeHealth(),
+            )
+
+        assertIs<PolicyDecision.Block>(decision)
+    }
+
+    @Test
     fun `open mode allows safe external domain and blocks UT1 adult and DEV canary`() {
         domainBlocklist.blockedDomains += setOf("adult.example", "coca.com")
 

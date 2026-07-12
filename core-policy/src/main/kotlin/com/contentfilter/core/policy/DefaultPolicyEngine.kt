@@ -92,6 +92,10 @@ class DefaultPolicyEngine : PolicyEngine {
                 return PolicyDecision.Block("Encrypted DNS bypass is disabled by search-only protection.")
             }
             if (WebNavigationPolicy.isSearchResultsAllowedDomain(normalizedContext.domain)) {
+                snapshot.rules
+                    .bestExplicitDomainRule(normalizedContext)
+                    ?.takeUnless { it.action == RuleAction.Allow }
+                    ?.let { return it.toDecision(normalizedContext.domain) }
                 return PolicyDecision.Allow(
                     safeSearchRequired =
                         snapshot.rules.safeSearchEnabled() &&
@@ -109,13 +113,6 @@ class DefaultPolicyEngine : PolicyEngine {
         if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
             return PolicyDecision.Allow()
         }
-        if (!webNavigationBlocked && SearchEngineCatalog.isSearchResultsAllowedDomain(normalizedContext.domain)) {
-            return PolicyDecision.Allow(
-                safeSearchRequired =
-                    snapshot.rules.safeSearchEnabled() &&
-                        WebNavigationPolicy.isSearchEngineDomain(normalizedContext.domain),
-            )
-        }
         activeGrant(
             snapshot.extraTimeGrants,
             PolicyTargetType.Global,
@@ -123,6 +120,16 @@ class DefaultPolicyEngine : PolicyEngine {
             normalizedContext.time,
         )?.let {
             return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
+        }
+        snapshot.rules.bestExplicitDomainRule(normalizedContext)?.let { explicitRule ->
+            return explicitRule.toDecision(normalizedContext.domain)
+        }
+        if (!webNavigationBlocked && SearchEngineCatalog.isSearchResultsAllowedDomain(normalizedContext.domain)) {
+            return PolicyDecision.Allow(
+                safeSearchRequired =
+                    snapshot.rules.safeSearchEnabled() &&
+                        WebNavigationPolicy.isSearchEngineDomain(normalizedContext.domain),
+            )
         }
         val rule =
             snapshot.rules.bestMatchingRule(
@@ -214,6 +221,16 @@ class DefaultPolicyEngine : PolicyEngine {
                 ignoreWebAuxiliaryBlocks &&
                     it.isWebAuxiliaryBlockRule()
             }
+            .sortedWith(ruleComparator)
+            .firstOrNull()
+
+    private fun List<PolicyRule>.bestExplicitDomainRule(context: DomainPolicyContext): PolicyRule? =
+        asSequence()
+            .filter { it.enabled && it.scope == RuleScope.Domain }
+            .filterNot { it.id.startsWith("safe-default-") }
+            .filter { !it.target.startsWith("__") && it.target != DomainWildcard }
+            .filter { it.isActiveAt(context.time) }
+            .filter { context.domain.matchesDomainTarget(it.target.normalizedDomain()) }
             .sortedWith(ruleComparator)
             .firstOrNull()
 

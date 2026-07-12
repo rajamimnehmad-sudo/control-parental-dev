@@ -161,22 +161,22 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `stale google web rule does not block when web navigation is open`() {
+    fun `manual google block wins when web navigation is open`() {
         val snapshot = policy(rules = listOf(domainRule(target = "google.com", action = RuleAction.Block)))
 
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.google.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("search.google.com")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("search.google.com")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("clients4.google.com")))
     }
 
     @Test
-    fun `stale google argentina web rule does not block when web navigation is open`() {
+    fun `manual regional google block wins when web navigation is open`() {
         val snapshot = policy(rules = listOf(domainRule(target = "google.com.ar", action = RuleAction.Block)))
 
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("google.com.ar")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("www.google.com.ar")))
-        assertIs<PolicyDecision.Allow>(engine.evaluateDomain(snapshot, domainContext("search.google.com.ar")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("google.com.ar")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("www.google.com.ar")))
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(snapshot, domainContext("search.google.com.ar")))
     }
 
     @Test
@@ -603,7 +603,11 @@ class DefaultPolicyEngineTest {
                 version = blocked.version + 1,
                 rules =
                     blocked.rules.map { rule ->
-                        if (rule.target == WebNavigationPolicy.RuleTarget) rule.copy(enabled = false) else rule
+                        if (rule.target == WebNavigationPolicy.RuleTarget || rule.target == "google.com") {
+                            rule.copy(enabled = false)
+                        } else {
+                            rule
+                        }
                     },
             )
 
