@@ -244,6 +244,11 @@ class DefaultSyncEngineFastPathTest {
             health: SystemHealthSnapshot?,
         ) = RemoteResult.Success(Unit)
 
+        override suspend fun updateAppVersion(
+            deviceId: String,
+            appVersionCode: Int,
+        ) = RemoteResult.Success(Unit)
+
         override suspend fun acknowledgePolicyApplied(
             deviceId: String,
             policyId: String,

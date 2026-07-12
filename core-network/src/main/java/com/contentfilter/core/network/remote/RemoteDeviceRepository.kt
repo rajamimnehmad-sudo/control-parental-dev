@@ -13,6 +13,11 @@ interface RemoteDeviceRepository {
         health: SystemHealthSnapshot?,
     ): RemoteResult<Unit>
 
+    suspend fun updateAppVersion(
+        deviceId: String,
+        appVersionCode: Int,
+    ): RemoteResult<Unit>
+
     suspend fun acknowledgePolicyApplied(
         deviceId: String,
         policyId: String,

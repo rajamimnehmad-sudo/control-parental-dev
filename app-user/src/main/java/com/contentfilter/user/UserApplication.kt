@@ -1,12 +1,16 @@
 package com.contentfilter.user
 
 import android.app.Application
+import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
+import com.contentfilter.core.network.remote.RemoteDeviceRepository
+import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
+import com.contentfilter.feature.activation.InstalledAppVersionProvider
 import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
@@ -50,6 +54,12 @@ class UserApplication :
     @Inject
     lateinit var webDomainListUpdater: WebDomainListUpdater
 
+    @Inject
+    lateinit var remoteDeviceRepository: RemoteDeviceRepository
+
+    @Inject
+    lateinit var installedAppVersionProvider: InstalledAppVersionProvider
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -61,26 +71,35 @@ class UserApplication :
     override fun onCreate() {
         super.onCreate()
         runCatching { VpnController.enableDevProtection(this) }
+            .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }
+            .logFailure("periodic-sync-schedule")
         appScope.launch {
-            webDomainListUpdater.refreshIfDue(force = true)
+            runCatching { webDomainListUpdater.refreshIfDue() }
+                .logFailure("domain-list-refresh")
             while (true) {
                 delay(WebDomainListRefreshIntervalMillis)
-                webDomainListUpdater.refreshIfDue()
+                runCatching { webDomainListUpdater.refreshIfDue() }
+                    .logFailure("domain-list-refresh")
             }
         }
         appScope.launch {
             runCatching { localDataRepair.repairIfNeeded() }
+                .logFailure("local-data-repair")
             val activation = deviceActivationRepository.currentActivation()
             if (activation != null) {
+                runCatching { reportInstalledVersion(activation.deviceId) }
+                    .logFailure("app-version-report")
                 runCatching { realtimeSyncCoordinator.start() }
+                    .logFailure("realtime-start")
                 runCatching {
                     targetedPolicySyncCoordinator.refresh(
                         deviceId = activation.deviceId,
                         reason = "process-start",
                     )
-                }
+                }.logFailure("targeted-policy-refresh")
                 runCatching { syncScheduler.requestSync() }
+                    .logFailure("sync-request")
             }
         }
         appScope.launch {
@@ -91,19 +110,24 @@ class UserApplication :
                 .collect {
                     val activation = deviceActivationRepository.currentActivation()
                     if (activation != null) {
+                        runCatching { reportInstalledVersion(activation.deviceId) }
+                            .logFailure("activation-version-report")
                         runCatching { localDataRepair.clearStaleDataAfterActivation(activation) }
+                            .logFailure("activation-data-repair")
                         runCatching { installedAppPublisher.publish(activation) }
+                            .logFailure("installed-app-publish")
                         runCatching {
                             realtimeSyncCoordinator.stop()
                             realtimeSyncCoordinator.start()
-                        }
+                        }.logFailure("realtime-restart")
                         runCatching {
                             targetedPolicySyncCoordinator.refresh(
                                 deviceId = activation.deviceId,
                                 reason = "activation",
                             )
-                        }
+                        }.logFailure("activation-policy-refresh")
                         runCatching { syncScheduler.requestSync() }
+                            .logFailure("activation-sync-request")
                     }
                 }
         }
@@ -112,12 +136,31 @@ class UserApplication :
                 delay(DeviceLicenseValidationIntervalMillis)
                 if (deviceActivationRepository.currentActivation() != null) {
                     runCatching { localDataRepair.repairIfNeeded() }
+                        .logFailure("periodic-local-data-repair")
                 }
             }
         }
     }
 
+    private suspend fun reportInstalledVersion(deviceId: String) {
+        when (
+            remoteDeviceRepository.updateAppVersion(
+                deviceId = deviceId,
+                appVersionCode = installedAppVersionProvider.versionCode(),
+            )
+        ) {
+            is RemoteResult.Success -> Unit
+            is RemoteResult.Failure -> Log.w(LogTag, "Startup step=app-version-report failed type=remote")
+        }
+    }
+
+    private fun <T> Result<T>.logFailure(step: String): Result<T> =
+        onFailure { error ->
+            Log.w(LogTag, "Startup step=$step failed type=${error.javaClass.simpleName}")
+        }
+
     private companion object {
+        const val LogTag = "UserApplication"
         const val DeviceLicenseValidationIntervalMillis = 60_000L
         const val WebDomainListRefreshIntervalMillis = 6 * 60 * 60 * 1_000L
     }

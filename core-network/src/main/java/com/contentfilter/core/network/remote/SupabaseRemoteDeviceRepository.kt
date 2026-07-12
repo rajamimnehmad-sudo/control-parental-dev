@@ -31,6 +31,21 @@ class SupabaseRemoteDeviceRepository
             return client.patchById(SupabaseTable.Devices, deviceId, client.deviceSeenJson())
         }
 
+        override suspend fun updateAppVersion(
+            deviceId: String,
+            appVersionCode: Int,
+        ): RemoteResult<Unit> {
+            val now = Instant.now().toString()
+            return client.patchById(
+                table = SupabaseTable.Devices,
+                id = deviceId,
+                json =
+                    JSONObject()
+                        .put("device_app_version_code", appVersionCode)
+                        .put("updated_at", now),
+            )
+        }
+
         override suspend fun acknowledgePolicyApplied(
             deviceId: String,
             policyId: String,

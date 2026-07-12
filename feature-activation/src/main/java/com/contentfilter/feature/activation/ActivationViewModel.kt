@@ -28,6 +28,7 @@ class ActivationViewModel
         private val syncScheduler: SyncScheduler,
         private val targetedPolicySyncCoordinator: TargetedPolicySyncCoordinator,
         private val realtimeSyncCoordinator: RealtimeSyncCoordinator,
+        private val installedAppVersionProvider: InstalledAppVersionProvider,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ActivationUiState())
         val uiState: StateFlow<ActivationUiState> = mutableState.asStateFlow()
@@ -86,7 +87,7 @@ class ActivationViewModel
                                 password = "",
                                 activationCode = token.code,
                                 deviceDisplayName = deviceDisplayName,
-                                appVersionCode = 1,
+                                appVersionCode = installedAppVersionProvider.versionCode(),
                             ),
                         )
                     }.getOrElse { exception ->
