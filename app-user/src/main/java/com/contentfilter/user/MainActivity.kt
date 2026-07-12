@@ -435,7 +435,9 @@ private fun UserWebTab(
         UserWebStatusCard(
             title = "Fotos e imágenes",
             value =
-                if (state.imagesBlocked) {
+                if (blocked && state.imagesBlocked) {
+                    "Filtrado al habilitar Web"
+                } else if (state.imagesBlocked) {
                     "Filtrado activo"
                 } else {
                     "Permitidas"

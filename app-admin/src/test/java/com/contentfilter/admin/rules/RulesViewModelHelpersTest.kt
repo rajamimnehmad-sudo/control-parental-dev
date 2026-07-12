@@ -113,13 +113,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `complete preference matrix remains independent and has no auxiliary blocks`() {
-        val combinations =
-            listOf(
-                preferences(webBlocked = true, externalResultsAllowed = true, safeSearch = true),
-                preferences(webBlocked = true, externalResultsAllowed = false, safeSearch = false),
-                preferences(webBlocked = false, externalResultsAllowed = false, safeSearch = true),
-                preferences(webBlocked = false, externalResultsAllowed = true, safeSearch = false),
-            )
+        val combinations = (0 until 16).map(::preferencesFromBits)
 
         combinations.forEach { desired ->
             val result =
@@ -133,34 +127,73 @@ class RulesViewModelHelpersTest {
     }
 
     @Test
-    fun `blocking and unblocking web preserves external results and SafeSearch preferences`() {
+    fun `every Web mutation changes only its selected preference`() {
+        (0 until 16).map(::preferencesFromBits).forEach { initial ->
+            val initialRules =
+                emptyList<PolicyRule>()
+                    .webPolicyChanges(initial, DeviceId)
+                    .applyTo(emptyList())
+
+            WebPolicyPreference.entries.forEach { preference ->
+                listOf(false, true).forEach { enabled ->
+                    val result =
+                        initialRules
+                            .webPolicyPreferenceChanges(preference, enabled, DeviceId)
+                            .applyTo(initialRules)
+
+                    assertEquals(initial.withPreference(preference, enabled), result.webPolicyPreferences())
+                    assertEquals(0, result.activeWebAuxiliaryBlockCount())
+                }
+            }
+        }
+    }
+
+    @Test
+    fun `each Web pending state is isolated from the other switches`() {
+        WebPolicyPreference.entries.forEach { preference ->
+            val pending = RulesUiState().withPendingWebPreference(preference, true)
+
+            assertEquals(preference == WebPolicyPreference.NavigationBlocked, pending.pendingInternetBlocked == true)
+            assertEquals(
+                preference == WebPolicyPreference.ExternalSearchResultsAllowed,
+                pending.pendingExternalSearchResultsAllowed == true,
+            )
+            assertEquals(preference == WebPolicyPreference.ImagesBlocked, pending.pendingImagesBlocked == true)
+            assertEquals(preference == WebPolicyPreference.SafeSearchEnabled, pending.pendingSafeSearchEnabled == true)
+            assertEquals(RulesUiState(), pending.clearPendingWebPreference(preference))
+        }
+    }
+
+    @Test
+    fun `blocking and unblocking web preserves every secondary preference`() {
         var rules =
             emptyList<PolicyRule>()
                 .webPolicyChanges(
-                    preferences(webBlocked = false, externalResultsAllowed = false, safeSearch = true),
+                    preferences(
+                        webBlocked = false,
+                        externalResultsAllowed = false,
+                        imagesBlocked = true,
+                        safeSearch = true,
+                    ),
                     DeviceId,
                 ).applyTo(emptyList())
 
         rules =
-            rules.webNavigationModeChanges(
-                blocked = true,
-                imagesBlocked = rules.imagesBlockedForWeb(),
-                safeSearchEnabled = rules.safeSearchEnabledForWeb(),
-                identitySeed = DeviceId,
-            ).applyTo(rules)
+            rules
+                .webPolicyPreferenceChanges(WebPolicyPreference.NavigationBlocked, true, DeviceId)
+                .applyTo(rules)
         assertTrue(rules.webNavigationBlocked())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
+        assertTrue(rules.imagesBlockedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
 
         rules =
-            rules.webNavigationModeChanges(
-                blocked = false,
-                imagesBlocked = rules.imagesBlockedForWeb(),
-                safeSearchEnabled = rules.safeSearchEnabledForWeb(),
-                identitySeed = DeviceId,
-            ).applyTo(rules)
+            rules
+                .webPolicyPreferenceChanges(WebPolicyPreference.NavigationBlocked, false, DeviceId)
+                .applyTo(rules)
         assertTrue(rules.webNavigationOpenWithoutAuxiliaryBlocks())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
+        assertTrue(rules.imagesBlockedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
     }
 
@@ -339,6 +372,14 @@ class RulesViewModelHelpersTest {
             externalSearchResultsAllowed = externalResultsAllowed,
             imagesBlocked = imagesBlocked,
             safeSearchEnabled = safeSearch,
+        )
+
+    private fun preferencesFromBits(bits: Int): WebPolicyPreferences =
+        preferences(
+            webBlocked = bits and 1 != 0,
+            externalResultsAllowed = bits and 2 != 0,
+            imagesBlocked = bits and 4 != 0,
+            safeSearch = bits and 8 != 0,
         )
 
     private fun appRule(

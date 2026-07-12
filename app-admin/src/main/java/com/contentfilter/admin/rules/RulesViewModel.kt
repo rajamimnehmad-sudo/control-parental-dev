@@ -9,7 +9,6 @@ import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
-import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
@@ -51,6 +50,8 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
@@ -91,6 +92,10 @@ class RulesViewModel
                 initialValue = emptyList(),
             )
         private var internetSaveRequestId = 0L
+        private var webPreferenceSaveRequestId = 0L
+        private var latestWebPreferenceMessageRequestId = 0L
+        private val latestWebPreferenceRequestIds = mutableMapOf<WebPolicyPreference, Long>()
+        private val webPreferenceMutationMutex = Mutex()
         private val selectedPolicyDeviceId = form.map { it.selectedDeviceId }.distinctUntilChanged()
         private val policyRules = selectedPolicyDeviceId.flatMapLatest { observePolicyRules(it) }
         private val dailyLimits = selectedPolicyDeviceId.flatMapLatest { observeDailyLimits(it) }
@@ -465,227 +470,26 @@ class RulesViewModel
         }
 
         fun setInternetBlocked(blocked: Boolean) {
-            val targetDeviceId = uiState.value.selectedDeviceId
-            if (targetDeviceId == null) {
-                form.update { it.copy(message = "Seleccioná un dispositivo.") }
-                return
-            }
-            val currentState = uiState.value
-            val previousRoom = currentState.rules.internetBlocked()
-            val requestId =
-                beginInternetSave(
-                    action = "internet-mode",
-                    deviceId = targetDeviceId,
-                    previousState = previousRoom.toString(),
-                    requestedState = blocked.toString(),
-                ) ?: return
-            val traceRequestId = "web-$requestId"
-            logInternetSwitch(
-                stage = "tap",
-                touched = blocked,
-                pending = form.value.pendingInternetBlocked,
-                room = previousRoom,
-                ui = currentState.internetBlocked,
+            setWebOption(
+                preference = WebPolicyPreference.NavigationBlocked,
+                action = "internet-mode",
+                requestedState = blocked,
+                previousState = uiState.value.internetBlocked,
+                successMessage =
+                    if (blocked) {
+                        "Navegación web bloqueada."
+                    } else {
+                        "Navegación web permitida."
+                    },
             )
-            Log.i(
-                LogTag,
-                "webNavigation admin requested requestId=$traceRequestId deviceId=${targetDeviceId.safeDeviceId()} " +
-                    "requestedBlocked=$blocked mainBefore=$previousRoom " +
-                    "externalSearchResultsAllowed=${currentState.externalSearchResultsAllowed} " +
-                    "safeSearchEnabled=${currentState.safeSearchEnabled} " +
-                    "policyRevision=${currentState.rules.webPolicyRevision()}",
-            )
-            form.update {
-                it.copy(
-                    internetSaving = true,
-                    pendingInternetBlocked = previousRoom,
-                    message = "Guardando...",
-                )
-            }
-            logInternetSwitch(
-                stage = "pending",
-                touched = blocked,
-                pending = previousRoom,
-                room = previousRoom,
-                ui = previousRoom,
-            )
-            viewModelScope.launch {
-                val saved =
-                    runCatching {
-                        refreshRemotePolicyBeforeWebMutation(targetDeviceId, traceRequestId)
-                        val before = policyRepository.getActivePolicy(targetDeviceId)
-                        check(before.deviceId == null || before.deviceId == targetDeviceId) {
-                            "Room devolvió una policy de otro dispositivo."
-                        }
-                        val ruleChanges =
-                            before.rules.webNavigationModeChanges(
-                                blocked = blocked,
-                                imagesBlocked = before.rules.imagesBlockedForWeb(),
-                                safeSearchEnabled = before.rules.safeSearchEnabledForWeb(),
-                                identitySeed = targetDeviceId,
-                            )
-                        val receipt = saveRule.saveAll(ruleChanges, targetDeviceId, traceRequestId)
-                        val confirmed =
-                            withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                                policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
-                                    snapshot.deviceId == targetDeviceId &&
-                                        snapshot.version >= receipt.revision &&
-                                        snapshot.rules.internetBlocked() == blocked
-                                }
-                            } ?: error("Room no confirmó la regla principal de Internet.")
-                        WebModeLocalSave(
-                            beforeBlocked = before.rules.internetBlocked(),
-                            confirmedRules = confirmed.rules,
-                            revision = confirmed.version,
-                            auxiliaryChanges = ruleChanges.drop(1).size,
-                            receipt = receipt,
-                        )
-                    }
-                val roomAfterSave = saved.getOrNull()?.confirmedRules?.internetBlocked() ?: previousRoom
-                Log.i(
-                    LogTag,
-                    "webNavigation admin room result requestId=$traceRequestId deviceId=${targetDeviceId.safeDeviceId()} " +
-                        "requestedBlocked=$blocked mainBefore=${saved.getOrNull()?.beforeBlocked ?: previousRoom} " +
-                        "mainAfter=$roomAfterSave roomConfirmed=${saved.isSuccess} " +
-                        "policyRevision=${saved.getOrNull()?.revision ?: "none"} " +
-                        "updatedAt=${saved.getOrNull()?.revision ?: "none"} " +
-                        "externalSearchResultsAllowed=" +
-                        "${saved.getOrNull()?.confirmedRules?.externalSearchResultsAllowedForWeb()} " +
-                        "safeSearchEnabled=${saved.getOrNull()?.confirmedRules?.safeSearchEnabledForWeb()} " +
-                        "auxiliaryChanges=${saved.getOrNull()?.auxiliaryChanges ?: 0}",
-                )
-                if (saved.isSuccess) {
-                    logInternetSwitch(
-                        stage = "room-confirmed",
-                        touched = blocked,
-                        pending = form.value.pendingInternetBlocked,
-                        room = roomAfterSave,
-                        ui = uiState.value.internetBlocked,
-                    )
-                    syncScheduler.requestSync()
-                    Log.i(
-                        LogTag,
-                        "webNavigation admin sync requested requestId=$traceRequestId deviceId=${targetDeviceId.safeDeviceId()} " +
-                            "requestedBlocked=$blocked stored=$roomAfterSave policyRevision=${saved.getOrThrow().revision}",
-                    )
-                    recordAdminDiagnostic(
-                        action = "internetSave",
-                        deviceId = targetDeviceId,
-                        requestId = requestId,
-                        previousState = previousRoom.toString(),
-                        requestedState = blocked.toString(),
-                        result = "local-confirmed",
-                        reason = "internet-mode",
-                    )
-                    if (!isCurrentInternetSave(requestId)) {
-                        Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=internet-mode")
-                        return@launch
-                    }
-                    form.update {
-                        it.copy(
-                            internetSaving = false,
-                            pendingInternetBlocked = null,
-                            pendingImagesBlocked = null,
-                            pendingSafeSearchEnabled = null,
-                            message = "Guardado en este dispositivo. Sincronizando...",
-                        )
-                    }
-                    logInternetSwitch(
-                        stage = "ui-final",
-                        touched = blocked,
-                        pending = null,
-                        room = roomAfterSave,
-                        ui = blocked,
-                    )
-                    val receipt = saved.getOrThrow().receipt
-                    val syncResult =
-                        withContext(Dispatchers.IO) {
-                            syncEngine.syncPolicyChanges(receipt)
-                        }
-                    Log.i(
-                        LogTag,
-                        "webNavigation admin sync finished requestId=$traceRequestId " +
-                            "deviceId=${targetDeviceId.safeDeviceId()} requestedBlocked=$blocked " +
-                            "serverConfirmed=${syncResult.serverConfirmed} revision=${syncResult.revision} " +
-                            "pending=${syncResult.pendingOperationIds.size} error=${syncResult.error}",
-                    )
-                    if (!isCurrentInternetSave(requestId)) {
-                        Log.i(
-                            LogTag,
-                            "internetSave stale response ignored requestId=$requestId action=internet-mode-sync",
-                        )
-                        return@launch
-                    }
-                    form.update {
-                        it.copy(
-                            message =
-                                if (syncResult.serverConfirmed) {
-                                    "Sincronizado con el servidor. Esperando dispositivo..."
-                                } else {
-                                    "Guardado en este dispositivo. Pendiente por conexión."
-                                },
-                        )
-                    }
-                    if (!syncResult.serverConfirmed) return@launch
-                    val application =
-                        withContext(Dispatchers.IO) {
-                            syncEngine.waitForPolicyApplied(receipt, PolicyApplicationWaitMillis)
-                        }
-                    if (!isCurrentInternetSave(requestId)) return@launch
-                    form.update {
-                        it.copy(
-                            message =
-                                when (application.state) {
-                                    PolicyApplicationState.Applied -> "Aplicado en el dispositivo Usuario."
-                                    PolicyApplicationState.Pending ->
-                                        "Sincronizado con el servidor. Dispositivo sin confirmar."
-                                    PolicyApplicationState.Offline ->
-                                        "Sincronizado con el servidor. Dispositivo sin conexión."
-                                },
-                        )
-                    }
-                } else {
-                    if (isCurrentInternetSave(requestId)) {
-                        recordAdminDiagnostic(
-                            action = "internetSave",
-                            deviceId = targetDeviceId,
-                            requestId = requestId,
-                            previousState = previousRoom.toString(),
-                            requestedState = blocked.toString(),
-                            result = "save-failed",
-                            reason = saved.exceptionOrNull()?.javaClass?.simpleName ?: "unknown",
-                        )
-                        form.update {
-                            it.copy(
-                                internetSaving = false,
-                                pendingInternetBlocked = null,
-                                pendingImagesBlocked = null,
-                                pendingSafeSearchEnabled = null,
-                                message = "No se pudo cambiar el modo web. Intentá otra vez.",
-                            )
-                        }
-                    }
-                    logInternetSwitch(
-                        stage = "save-failed",
-                        touched = blocked,
-                        pending = null,
-                        room = previousRoom,
-                        ui = previousRoom,
-                    )
-                }
-            }
         }
 
         fun setExternalSearchResultsAllowed(allowed: Boolean) {
             setWebOption(
+                preference = WebPolicyPreference.ExternalSearchResultsAllowed,
                 action = "external-search-results",
                 requestedState = allowed,
                 previousState = uiState.value.externalSearchResultsAllowed,
-                pending = { state -> state.copy(pendingExternalSearchResultsAllowed = allowed) },
-                clearPending = { state -> state.copy(pendingExternalSearchResultsAllowed = null) },
-                updatePreferences = { preferences ->
-                    preferences.copy(externalSearchResultsAllowed = allowed)
-                },
                 successMessage =
                     if (allowed) {
                         "Aplicado: se pueden abrir páginas desde buscadores."
@@ -697,12 +501,10 @@ class RulesViewModel
 
         fun setImagesBlocked(blocked: Boolean) {
             setWebOption(
+                preference = WebPolicyPreference.ImagesBlocked,
                 action = "images-blocked",
                 requestedState = blocked,
                 previousState = uiState.value.imagesBlocked,
-                pending = { state -> state.copy(pendingImagesBlocked = blocked) },
-                clearPending = { state -> state.copy(pendingImagesBlocked = null) },
-                updatePreferences = { preferences -> preferences.copy(imagesBlocked = blocked) },
                 successMessage =
                     if (blocked) {
                         "Fotos e imágenes bloqueadas."
@@ -714,12 +516,10 @@ class RulesViewModel
 
         fun setSafeSearchEnabled(enabled: Boolean) {
             setWebOption(
+                preference = WebPolicyPreference.SafeSearchEnabled,
                 action = "safe-search",
                 requestedState = enabled,
                 previousState = uiState.value.safeSearchEnabled,
-                pending = { state -> state.copy(pendingSafeSearchEnabled = enabled) },
-                clearPending = { state -> state.copy(pendingSafeSearchEnabled = null) },
-                updatePreferences = { preferences -> preferences.copy(safeSearchEnabled = enabled) },
                 successMessage =
                     if (enabled) {
                         "SafeSearch activado."
@@ -730,12 +530,10 @@ class RulesViewModel
         }
 
         private fun setWebOption(
+            preference: WebPolicyPreference,
             action: String,
             requestedState: Boolean,
             previousState: Boolean,
-            pending: (RulesUiState) -> RulesUiState,
-            clearPending: (RulesUiState) -> RulesUiState,
-            updatePreferences: (WebPolicyPreferences) -> WebPolicyPreferences,
             successMessage: String,
         ) {
             val targetDeviceId = uiState.value.selectedDeviceId
@@ -744,72 +542,119 @@ class RulesViewModel
                 return
             }
             val requestId =
-                beginInternetSave(
+                beginWebPreferenceSave(
+                    preference = preference,
                     action = action,
                     deviceId = targetDeviceId,
-                    previousState = previousState.toString(),
-                    requestedState = requestedState.toString(),
-                ) ?: return
+                    previousState = previousState,
+                    requestedState = requestedState,
+                )
             val traceRequestId = "$action-$requestId"
-            form.update { pending(it).copy(internetSaving = true, message = "Guardando...") }
+            form.update {
+                it.withPendingWebPreference(preference, requestedState).copy(message = "Guardando...")
+            }
             viewModelScope.launch {
                 val saved =
-                    runCatching {
-                        refreshRemotePolicyBeforeWebMutation(targetDeviceId, traceRequestId)
-                        val before = policyRepository.getActivePolicy(targetDeviceId)
-                        val desired = updatePreferences(before.rules.webPolicyPreferences())
-                        val changes = before.rules.webPolicyChanges(desired, targetDeviceId)
-                        val receipt = saveRule.saveAll(changes, targetDeviceId, traceRequestId)
-                        val confirmed =
-                            withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                                policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
-                                    snapshot.deviceId == targetDeviceId &&
-                                        snapshot.version >= receipt.revision &&
-                                        snapshot.rules.webPolicyPreferences() == desired &&
-                                        snapshot.rules.activeWebAuxiliaryBlockCount() == 0
-                                }
-                            } ?: error("Room no confirmó $action.")
-                        if (BuildConfig.FLAVOR == "dev") {
-                            Log.i(
-                                LogTag,
-                                "web option room confirmed requestId=$traceRequestId " +
-                                    "deviceId=${targetDeviceId.safeDeviceId()} policyId=${receipt.policyId.take(8)} " +
-                                    "revision=${receipt.revision} webBlocked=${confirmed.rules.internetBlocked()} " +
-                                    "externalSearchResultsAllowed=${confirmed.rules.externalSearchResultsAllowedForWeb()} " +
-                                    "safeSearchEnabled=${confirmed.rules.safeSearchEnabledForWeb()} " +
-                                    "activeDomainBlocks=${confirmed.rules.activeDomainBlockCount()} " +
-                                    "activeAuxiliaryBlocks=${confirmed.rules.activeWebAuxiliaryBlockCount()} " +
-                                    "changes=${changes.size}",
-                            )
+                    webPreferenceMutationMutex.withLock {
+                        runCatching {
+                            refreshRemotePolicyBeforeWebMutation(targetDeviceId, traceRequestId)
+                            val before = policyRepository.getActivePolicy(targetDeviceId)
+                            check(before.deviceId == null || before.deviceId == targetDeviceId) {
+                                "Room devolvió una policy de otro dispositivo."
+                            }
+                            val desired =
+                                before.rules
+                                    .webPolicyPreferences()
+                                    .withPreference(preference, requestedState)
+                            val changes =
+                                before.rules.webPolicyPreferenceChanges(
+                                    preference = preference,
+                                    enabled = requestedState,
+                                    deviceId = targetDeviceId,
+                                )
+                            val receipt = saveRule.saveAll(changes, targetDeviceId, traceRequestId)
+                            val confirmed =
+                                withTimeoutOrNull(RoomConfirmTimeoutMillis) {
+                                    policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
+                                        snapshot.deviceId == targetDeviceId &&
+                                            snapshot.version >= receipt.revision &&
+                                            snapshot.rules.webPolicyPreferences() == desired &&
+                                            snapshot.rules.activeWebAuxiliaryBlockCount() == 0
+                                    }
+                                } ?: error("Room no confirmó $action.")
+                            if (BuildConfig.FLAVOR == "dev") {
+                                Log.i(
+                                    LogTag,
+                                    "web option room confirmed requestId=$traceRequestId " +
+                                        "deviceId=${targetDeviceId.safeDeviceId()} policyId=${receipt.policyId.take(8)} " +
+                                        "revision=${receipt.revision} changed=${preference.name} " +
+                                        "webBlocked=${confirmed.rules.internetBlocked()} " +
+                                        "externalSearchResultsAllowed=" +
+                                        "${confirmed.rules.externalSearchResultsAllowedForWeb()} " +
+                                        "imagesBlocked=${confirmed.rules.imagesBlockedForWeb()} " +
+                                        "safeSearchEnabled=${confirmed.rules.safeSearchEnabledForWeb()} " +
+                                        "activeDomainBlocks=${confirmed.rules.activeDomainBlockCount()} " +
+                                        "activeAuxiliaryBlocks=${confirmed.rules.activeWebAuxiliaryBlockCount()} " +
+                                        "changes=${changes.size}",
+                                )
+                            }
+                            receipt
                         }
-                        WebModeLocalSave(
-                            beforeBlocked = before.rules.internetBlocked(),
-                            confirmedRules = confirmed.rules,
-                            revision = confirmed.version,
-                            auxiliaryChanges = changes.size,
-                            receipt = receipt,
-                        )
                     }
-                if (!isCurrentInternetSave(requestId)) return@launch
                 if (saved.isFailure) {
-                    form.update {
-                        clearPending(it).copy(
-                            internetSaving = false,
-                            message = "No se pudo guardar el cambio web.",
-                        )
+                    recordAdminDiagnostic(
+                        action = action,
+                        deviceId = targetDeviceId,
+                        requestId = requestId,
+                        previousState = previousState.toString(),
+                        requestedState = requestedState.toString(),
+                        result = "save-failed",
+                        reason = saved.exceptionOrNull()?.javaClass?.simpleName ?: "unknown",
+                    )
+                    if (isCurrentWebPreferenceSave(preference, requestId)) {
+                        form.update { state ->
+                            val cleared = state.clearPendingWebPreference(preference)
+                            if (isLatestWebPreferenceMessage(requestId)) {
+                                cleared.copy(message = "No se pudo guardar el cambio web.")
+                            } else {
+                                cleared
+                            }
+                        }
                     }
                     return@launch
                 }
-                form.update {
-                    clearPending(it).copy(
-                        internetSaving = false,
-                        message = "Guardado en este dispositivo. Sincronizando...",
-                    )
+                recordAdminDiagnostic(
+                    action = action,
+                    deviceId = targetDeviceId,
+                    requestId = requestId,
+                    previousState = previousState.toString(),
+                    requestedState = requestedState.toString(),
+                    result = "local-confirmed",
+                    reason = preference.name,
+                )
+                if (isCurrentWebPreferenceSave(preference, requestId)) {
+                    form.update { state ->
+                        val cleared = state.clearPendingWebPreference(preference)
+                        if (isLatestWebPreferenceMessage(requestId)) {
+                            cleared.copy(message = "Guardado en este dispositivo. Sincronizando...")
+                        } else {
+                            cleared
+                        }
+                    }
                 }
                 syncScheduler.requestSync()
-                val receipt = saved.getOrThrow().receipt
+                val receipt = saved.getOrThrow()
                 val syncResult = withContext(Dispatchers.IO) { syncEngine.syncPolicyChanges(receipt) }
-                if (!isCurrentInternetSave(requestId)) return@launch
+                if (BuildConfig.FLAVOR == "dev") {
+                    Log.i(
+                        LogTag,
+                        "web option sync finished requestId=$traceRequestId " +
+                            "deviceId=${targetDeviceId.safeDeviceId()} revision=${receipt.revision} " +
+                            "serverConfirmed=${syncResult.serverConfirmed} pending=${syncResult.pendingOperationIds.size} " +
+                            "error=${syncResult.error}",
+                    )
+                }
+                if (!isLatestWebPreferenceMessage(requestId)) return@launch
                 if (!syncResult.serverConfirmed) {
                     form.update {
                         it.copy(message = "Guardado en este dispositivo. Pendiente por conexión.")
@@ -823,7 +668,7 @@ class RulesViewModel
                     withContext(Dispatchers.IO) {
                         syncEngine.waitForPolicyApplied(receipt, PolicyApplicationWaitMillis)
                     }
-                if (!isCurrentInternetSave(requestId)) return@launch
+                if (!isLatestWebPreferenceMessage(requestId)) return@launch
                 form.update {
                     it.copy(
                         message =
@@ -1713,6 +1558,42 @@ class RulesViewModel
         private suspend fun syncNowWithResult(): SyncResult =
             withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull() }
 
+        private fun beginWebPreferenceSave(
+            preference: WebPolicyPreference,
+            action: String,
+            deviceId: String,
+            previousState: Boolean,
+            requestedState: Boolean,
+        ): Long {
+            val requestId = ++webPreferenceSaveRequestId
+            latestWebPreferenceRequestIds[preference] = requestId
+            latestWebPreferenceMessageRequestId = requestId
+            Log.i(
+                LogTag,
+                "webPreferenceSave start requestId=$requestId action=$action " +
+                    "deviceId=${deviceId.safeDeviceId()} changed=${preference.name} " +
+                    "previousState=$previousState requestedState=$requestedState",
+            )
+            recordAdminDiagnostic(
+                action = action,
+                deviceId = deviceId,
+                requestId = requestId,
+                previousState = previousState.toString(),
+                requestedState = requestedState.toString(),
+                result = "start",
+                reason = preference.name,
+            )
+            return requestId
+        }
+
+        private fun isCurrentWebPreferenceSave(
+            preference: WebPolicyPreference,
+            requestId: Long,
+        ): Boolean = latestWebPreferenceRequestIds[preference] == requestId
+
+        private fun isLatestWebPreferenceMessage(requestId: Long): Boolean =
+            latestWebPreferenceMessageRequestId == requestId
+
         private fun beginInternetSave(
             action: String,
             deviceId: String,
@@ -1747,21 +1628,6 @@ class RulesViewModel
 
         private fun isCurrentInternetSave(requestId: Long): Boolean = requestId == internetSaveRequestId
 
-        private fun logInternetSwitch(
-            stage: String,
-            touched: Boolean,
-            pending: Boolean?,
-            room: Boolean,
-            ui: Boolean,
-        ) {
-            if (BuildConfig.DEBUG) {
-                Log.d(
-                    LogTag,
-                    "internetSwitch stage=$stage touched=$touched pending=$pending room=$room uiFinal=$ui",
-                )
-            }
-        }
-
         private fun recordAdminDiagnostic(
             action: String,
             deviceId: String,
@@ -1794,14 +1660,6 @@ class RulesViewModel
             val appGroups: List<AppGroup>,
             val grants: List<ExtraTimeGrant>,
             val nowEpochMillis: Long,
-        )
-
-        private data class WebModeLocalSave(
-            val beforeBlocked: Boolean,
-            val confirmedRules: List<PolicyRule>,
-            val revision: Long,
-            val auxiliaryChanges: Int,
-            val receipt: PolicyMutationReceipt,
         )
 
         private fun String.safeDeviceId(): String = take(8)

@@ -188,6 +188,30 @@ class VpnPolicyStateTest {
     }
 
     @Test
+    fun `VPN state preserves the complete cumulative Web preference matrix`() {
+        repeat(16) { bits ->
+            val webBlocked = bits and 1 != 0
+            val imagesBlocked = bits and 4 != 0
+            val safeSearchEnabled = bits and 8 != 0
+            val state = state(*webRules(bits).toTypedArray())
+
+            assertEquals(webBlocked, state.strictWebBlockEnabled)
+            assertEquals(
+                !webBlocked && (safeSearchEnabled || imagesBlocked),
+                state.encryptedDnsEnforcementEnabled,
+            )
+            if (webBlocked) {
+                assertEquals("strict=true", state.vpnReconnectKey)
+            } else {
+                assertEquals(
+                    "strict=false;safeSearch=$safeSearchEnabled;images=$imagesBlocked",
+                    state.vpnReconnectKey,
+                )
+            }
+        }
+    }
+
+    @Test
     fun `initial state uses safe default search blocking rules`() {
         val state = VpnPolicyState.initial()
 
@@ -235,14 +259,14 @@ class VpnPolicyStateTest {
     }
 
     @Test
-    fun `older revision cannot disable newer SafeSearch policy`() {
+    fun `older revision cannot erase newer cumulative Web preferences`() {
         val current =
             PolicySnapshot(
                 id = "remote-policy",
                 version = 3L,
-                rules = listOf(rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow)),
+                rules = webRules(14),
             )
-        val stale = current.copy(version = 2L, rules = current.rules.map { it.copy(enabled = false) })
+        val stale = current.copy(version = 2L, rules = webRules(1))
 
         val resolved = VpnPolicyState.resolveSnapshot(current = current, candidate = stale)
 
@@ -292,5 +316,16 @@ class VpnPolicyStateTest {
             action = action,
             priority = 0,
             enabled = true,
+        )
+
+    private fun webRules(bits: Int): List<PolicyRule> =
+        listOf(
+            rule(WebNavigationPolicy.RuleTarget, RuleAction.Block).copy(enabled = bits and 1 != 0),
+            rule(
+                WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                RuleAction.Allow,
+            ).copy(enabled = bits and 2 != 0),
+            rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block).copy(enabled = bits and 4 != 0),
+            rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow).copy(enabled = bits and 8 != 0),
         )
 }

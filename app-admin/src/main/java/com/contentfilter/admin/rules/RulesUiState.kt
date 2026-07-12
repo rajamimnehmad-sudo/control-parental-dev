@@ -19,7 +19,7 @@ data class RulesUiState(
     val internetBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = false,
     val imagesBlocked: Boolean = false,
-    val safeSearchEnabled: Boolean = true,
+    val safeSearchEnabled: Boolean = false,
     val internetSaving: Boolean = false,
     val pendingInternetBlocked: Boolean? = null,
     val pendingExternalSearchResultsAllowed: Boolean? = null,

@@ -20,6 +20,7 @@ import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
@@ -494,6 +495,51 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
+    fun `all Web protection layers remain cumulative across the complete matrix`() {
+        repeat(16) { bits ->
+            val webBlocked = bits and 1 != 0
+            val externalResultsAllowed = bits and 2 != 0
+            val imagesBlocked = bits and 4 != 0
+            val safeSearchEnabled = bits and 8 != 0
+            val snapshot = policy(rules = webRules(bits))
+
+            val searchDecision = engine.evaluateDomain(snapshot, domainContext("google.com"))
+            if (webBlocked) {
+                assertIs<PolicyDecision.Block>(searchDecision)
+                return@repeat
+            }
+
+            val searchAllowed = assertIs<PolicyDecision.Allow>(searchDecision)
+            assertEquals(safeSearchEnabled, searchAllowed.safeSearchRequired)
+
+            val externalDecision =
+                engine.evaluateDomain(
+                    snapshot,
+                    domainContext("example.com", sourceDomain = "google.com", topLevelNavigation = true),
+                )
+            if (externalResultsAllowed) {
+                assertIs<PolicyDecision.Allow>(externalDecision)
+            } else {
+                assertIs<PolicyDecision.Block>(externalDecision)
+            }
+
+            val imageDecision = engine.evaluateDomain(snapshot, domainContext("encrypted-tbn8.gstatic.com"))
+            if (imagesBlocked) {
+                assertIs<PolicyDecision.Block>(imageDecision)
+            } else {
+                assertIs<PolicyDecision.Allow>(imageDecision)
+            }
+
+            val encryptedDnsDecision = engine.evaluateDomain(snapshot, domainContext("dns.google"))
+            if (safeSearchEnabled || imagesBlocked) {
+                assertIs<PolicyDecision.Block>(encryptedDnsDecision)
+            } else {
+                assertIs<PolicyDecision.Allow>(encryptedDnsDecision)
+            }
+        }
+    }
+
+    @Test
     fun `newer allowed snapshot releases a previously blocked browser domain`() {
         val mainRule =
             domainRule(
@@ -671,6 +717,30 @@ class DefaultPolicyEngineTest {
         action: RuleAction,
         priority: Int = 0,
     ): PolicyRule = rule(id = id, scope = RuleScope.Domain, target = target, action = action, priority = priority)
+
+    private fun webRules(bits: Int): List<PolicyRule> =
+        listOf(
+            domainRule(
+                id = "web-blocked",
+                target = WebNavigationPolicy.RuleTarget,
+                action = RuleAction.Block,
+            ).copy(enabled = bits and 1 != 0),
+            domainRule(
+                id = "external-results",
+                target = WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                action = RuleAction.Allow,
+            ).copy(enabled = bits and 2 != 0),
+            domainRule(
+                id = "images",
+                target = WebNavigationPolicy.ImagesBlockedTarget,
+                action = RuleAction.Block,
+            ).copy(enabled = bits and 4 != 0),
+            domainRule(
+                id = "safe-search",
+                target = WebNavigationPolicy.SafeSearchTarget,
+                action = RuleAction.Allow,
+            ).copy(enabled = bits and 8 != 0),
+        )
 
     private fun limit(
         target: String,

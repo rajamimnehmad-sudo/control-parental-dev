@@ -216,6 +216,53 @@ class SearchEngineScreenDetectorTest {
     }
 
     @Test
+    fun `Accessibility honors every cumulative Web protection combination`() {
+        repeat(16) { bits ->
+            val webBlocked = bits and 1 != 0
+            val externalResultsAllowed = bits and 2 != 0
+            val imagesBlocked = bits and 4 != 0
+            val policy = snapshot(*webRules(bits).toTypedArray())
+            val detector = SearchEngineScreenDetector()
+
+            val diagnosis =
+                when {
+                    webBlocked ->
+                        detector.diagnose(
+                            packageName = Chrome,
+                            snapshot = policy,
+                            currentHost = "google.com",
+                            mediaSearchView = true,
+                            elapsedRealtimeMillis = 100L,
+                        )
+                    imagesBlocked ->
+                        detector.diagnose(
+                            packageName = Chrome,
+                            snapshot = policy,
+                            currentHost = "google.com",
+                            mediaSearchView = true,
+                            elapsedRealtimeMillis = 100L,
+                        )
+                    else -> {
+                        detector.diagnose(Chrome, policy, currentHost = "google.com", elapsedRealtimeMillis = 100L)
+                        detector.diagnose(Chrome, policy, currentHost = "example.com", elapsedRealtimeMillis = 101L)
+                    }
+                }
+
+            val expected =
+                when {
+                    webBlocked -> SearchNavigationAction.GoHome
+                    imagesBlocked -> SearchNavigationAction.GoBack
+                    externalResultsAllowed -> SearchNavigationAction.Allow
+                    else -> SearchNavigationAction.GoBack
+                }
+            assertEquals(expected, diagnosis.action)
+            assertEquals(webBlocked, diagnosis.webNavigationBlocked)
+            assertEquals(externalResultsAllowed, diagnosis.externalSearchResultsAllowed)
+            assertEquals(imagesBlocked, diagnosis.imagesBlocked)
+        }
+    }
+
+    @Test
     fun `address parser extracts host without retaining path or query`() {
         assertEquals(
             "google.com",
@@ -271,6 +318,17 @@ class SearchEngineScreenDetectorTest {
             action = action,
             priority = 0,
             enabled = true,
+        )
+
+    private fun webRules(bits: Int): List<PolicyRule> =
+        listOf(
+            rule(WebNavigationPolicy.RuleTarget, RuleAction.Block).copy(enabled = bits and 1 != 0),
+            rule(
+                WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
+                RuleAction.Allow,
+            ).copy(enabled = bits and 2 != 0),
+            rule(WebNavigationPolicy.ImagesBlockedTarget, RuleAction.Block).copy(enabled = bits and 4 != 0),
+            rule(WebNavigationPolicy.SafeSearchTarget, RuleAction.Allow).copy(enabled = bits and 8 != 0),
         )
 
     private companion object {

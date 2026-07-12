@@ -1085,6 +1085,19 @@ private fun WebNavigationPanel(
 ) {
     ProductCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text(
+                text =
+                    buildList {
+                        add(if (blocked) "Internet bloqueado" else "Internet abierto")
+                        if (!externalSearchResultsAllowed) {
+                            add(if (blocked) "Solo resultados al habilitar Web" else "Solo resultados")
+                        }
+                        if (safeSearchEnabled) add("SafeSearch activo")
+                        if (imagesBlocked) add("Imágenes bloqueadas")
+                    }.joinToString(" · "),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
             WebSwitchRow(
                 title = "Bloquear navegación web",
                 description =

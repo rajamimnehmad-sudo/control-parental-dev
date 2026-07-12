@@ -51,7 +51,7 @@ data class UserWebUiState(
     val webNavigationBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = false,
     val imagesBlocked: Boolean = false,
-    val safeSearchEnabled: Boolean = true,
+    val safeSearchEnabled: Boolean = false,
 )
 
 private const val LogTag = "UserWebViewModel"

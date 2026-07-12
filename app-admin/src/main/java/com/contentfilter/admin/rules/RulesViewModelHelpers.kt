@@ -142,24 +142,6 @@ internal fun List<PolicyRule>.webPolicyRevision(): Int =
         .joinToString("|")
         .hashCode()
 
-internal fun List<PolicyRule>.webNavigationModeChanges(
-    blocked: Boolean,
-    externalSearchResultsAllowed: Boolean = externalSearchResultsAllowed(),
-    imagesBlocked: Boolean,
-    safeSearchEnabled: Boolean,
-    identitySeed: String,
-): List<PolicyRule> =
-    webPolicyChanges(
-        desired =
-            webPolicyPreferences().copy(
-                webNavigationBlocked = blocked,
-                externalSearchResultsAllowed = externalSearchResultsAllowed,
-                imagesBlocked = imagesBlocked,
-                safeSearchEnabled = safeSearchEnabled,
-            ),
-        deviceId = identitySeed,
-    )
-
 internal fun List<PolicyRule>.webPolicyPreferences(): WebPolicyPreferences =
     WebPolicyPreferences(
         webNavigationBlocked = webNavigationBlocked(),
@@ -266,6 +248,53 @@ internal data class WebPolicyPreferences(
     val imagesBlocked: Boolean,
     val safeSearchEnabled: Boolean,
 )
+
+internal enum class WebPolicyPreference {
+    NavigationBlocked,
+    ExternalSearchResultsAllowed,
+    ImagesBlocked,
+    SafeSearchEnabled,
+}
+
+internal fun WebPolicyPreferences.withPreference(
+    preference: WebPolicyPreference,
+    enabled: Boolean,
+): WebPolicyPreferences =
+    when (preference) {
+        WebPolicyPreference.NavigationBlocked -> copy(webNavigationBlocked = enabled)
+        WebPolicyPreference.ExternalSearchResultsAllowed -> copy(externalSearchResultsAllowed = enabled)
+        WebPolicyPreference.ImagesBlocked -> copy(imagesBlocked = enabled)
+        WebPolicyPreference.SafeSearchEnabled -> copy(safeSearchEnabled = enabled)
+    }
+
+internal fun List<PolicyRule>.webPolicyPreferenceChanges(
+    preference: WebPolicyPreference,
+    enabled: Boolean,
+    deviceId: String,
+): List<PolicyRule> =
+    webPolicyChanges(
+        desired = webPolicyPreferences().withPreference(preference, enabled),
+        deviceId = deviceId,
+    )
+
+internal fun RulesUiState.withPendingWebPreference(
+    preference: WebPolicyPreference,
+    enabled: Boolean,
+): RulesUiState =
+    when (preference) {
+        WebPolicyPreference.NavigationBlocked -> copy(pendingInternetBlocked = enabled)
+        WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = enabled)
+        WebPolicyPreference.ImagesBlocked -> copy(pendingImagesBlocked = enabled)
+        WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = enabled)
+    }
+
+internal fun RulesUiState.clearPendingWebPreference(preference: WebPolicyPreference): RulesUiState =
+    when (preference) {
+        WebPolicyPreference.NavigationBlocked -> copy(pendingInternetBlocked = null)
+        WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = null)
+        WebPolicyPreference.ImagesBlocked -> copy(pendingImagesBlocked = null)
+        WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = null)
+    }
 
 internal fun List<PolicyRule>.webNavigationOpenWithoutAuxiliaryBlocks(): Boolean =
     !webNavigationBlocked() && activeWebAuxiliaryBlockCount() == 0
