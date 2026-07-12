@@ -60,7 +60,7 @@ class UserApplication :
 
     override fun onCreate() {
         super.onCreate()
-        runCatching { VpnController.disableDevProtection(this) }
+        runCatching { VpnController.enableDevProtection(this) }
         runCatching { syncScheduler.schedulePeriodicSync() }
         appScope.launch {
             webDomainListUpdater.refreshIfDue(force = true)
