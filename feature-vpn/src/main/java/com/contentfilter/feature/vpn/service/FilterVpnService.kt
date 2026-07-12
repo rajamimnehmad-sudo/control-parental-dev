@@ -178,10 +178,10 @@ class FilterVpnService : VpnService() {
                 appliedReconnectKey = appliedVpnReconnectKey,
                 next = currentState,
             )
-        cleanup()
         if (invalidateConnections) {
             invalidateBrowserConnectionsThenStart(currentState)
         } else {
+            cleanup()
             startVpn()
         }
     }
@@ -202,9 +202,15 @@ class FilterVpnService : VpnService() {
                         null
                     }
                 if (barrier == null) {
-                    startVpn()
+                    Log.w(
+                        LogTag,
+                        "VPN connection invalidation unavailable revision=${state.snapshot.version}; retrying",
+                    )
+                    delay(ConnectionInvalidationRetryMillis)
+                    requestReconnectVpn(state.vpnReconnectKey)
                     return@launch
                 }
+                cleanup(cancelConnectionInvalidation = false)
                 try {
                     Log.i(
                         LogTag,
@@ -541,9 +547,11 @@ class FilterVpnService : VpnService() {
         telemetryReporter.recordUnsupportedPacket(diagnostic)
     }
 
-    private fun cleanup() {
-        connectionInvalidationJob?.cancel()
-        connectionInvalidationJob = null
+    private fun cleanup(cancelConnectionInvalidation: Boolean = true) {
+        if (cancelConnectionInvalidation) {
+            connectionInvalidationJob?.cancel()
+            connectionInvalidationJob = null
+        }
         readerJob?.cancel()
         readerJob = null
         snapshotProvider.stop()
@@ -572,6 +580,7 @@ class FilterVpnService : VpnService() {
         private const val LocalVpnIpv6PrefixLength = 128
         private const val NoBytesRead = -1
         private const val ConnectionInvalidationMillis = 400L
+        private const val ConnectionInvalidationRetryMillis = 100L
         private const val PacketBufferSize = 32 * 1024
         private const val AllIpv4Route = "0.0.0.0"
         private const val AllIpv6Route = "::"
