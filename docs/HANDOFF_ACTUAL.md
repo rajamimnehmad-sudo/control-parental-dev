@@ -40,8 +40,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-12:
 
 ```text
-App Usuario versionCode 177
-App Admin versionCode 177
+App Usuario versionCode 185
+App Admin versionCode 181
 versionName 1.0.1-dev
 ```
 
@@ -55,15 +55,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-177-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-177-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-185-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-181-debug.apk
 ```
 
 SHA-256:
 
 ```text
-Usuario DEV 177: 56fadc8bc281213fad5a4dd3cab6b5ef22777a4839f6107e324a1bd855f95c3d
-Admin DEV 177:   359f8eb7b0e9bf1d222e9c5eadb0047e3439caa199d04fdab79d69885d61bd6e
+Usuario DEV 185: 3a86cb20e466c9fe75d3acc83c23223b7263632b9422b50eb8f3bd7fbc988730
+Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c616
 ```
 
 ## Estado funcional
@@ -78,8 +78,8 @@ Admin DEV 177:   359f8eb7b0e9bf1d222e9c5eadb0047e3439caa199d04fdab79d69885d61bd6
 - Bloqueo de apps por Accessibility funciona y cierra apps bloqueadas rapido.
 - VPN esta siempre activa en App Usuario cuando hay permiso; Admin cambia politica Web, no prende/apaga VPN.
 - Web Admin mantiene flujo real: Comunidad -> Web -> elegir usuario -> configurar Web.
-- Web Admin DEV 177 usa selector Internet abierto/bloqueado y dos capas independientes: SafeSearch y Solo resultados.
-- Web Usuario DEV 177 muestra esos mismos estados en modo solo lectura.
+- Web Admin usa selector Internet abierto/bloqueado y dos capas independientes: SafeSearch y Solo resultados.
+- Web Usuario muestra esos mismos estados en modo solo lectura.
 - Bloqueo Web se representa con reglas internas de dominio en `WebNavigationPolicy`; no requiere migracion Room nueva.
 - VPN/DNS bloquea dominios externos en Solo resultados y fuerza una invalidacion puntual de conexiones al activar la capa. Accessibility no usa Atras/Home para navegaciones nuevas.
 - Solicitudes Admin se agrupan por usuario con indicador rojo.
@@ -121,7 +121,19 @@ Verificacion ejecutada:
 scripts/publicar_dev.sh
 ```
 
-Resultado: build/tests OK, App Usuario DEV 129 publicada y App Admin DEV 148 publicada.
+Resultado actual: suite completa y builds DEV OK, App Usuario DEV 185 y App Admin DEV 181 publicadas.
+
+## Cierre 2026-07-12 - estabilidad VPN/DNS
+
+- DNS de navegadores ya no espera escrituras Room de telemetria; la cola de diagnostico es acotada y best-effort.
+- Respuestas DNS upstream se validan por transaccion/opcode/estado y las respuestas truncadas usan fallback TCP.
+- App Usuario conserva la proteccion VPN al iniciar un proceso, en lugar de deshabilitarla transitoriamente.
+- Accessibility dejo de disparar full sync cada segundo; conserva observacion Room y solicitud programada.
+- La allowlist tecnica de buscadores dejo de incluir el sufijo amplio `googleapis.com`; reglas manuales explicitas mantienen prioridad.
+- Activacion y dispositivos ya vinculados reportan el versionCode instalado real.
+- La lista dinamica respeta la comprobacion diaria; el boton DEV conserva la comprobacion forzada manual.
+- Supabase DEV tiene 15 indices nuevos para claves foraneas y `anon` ya no ejecuta `revoke_device` ni `create_admin_pairing_code`.
+- Commits funcionales del cierre: `29398af`, `9259d95`, `26f4452`, `983f263`, `4611fa6`, `f489780`, `758b5da`.
 
 Publicacion DEV recomendada por app:
 
