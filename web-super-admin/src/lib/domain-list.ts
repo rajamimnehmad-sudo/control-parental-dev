@@ -5,7 +5,7 @@ const publicKeyBase64 = "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEEoTJncb+tUn3p8KtQtX
 
 export type DomainListPayload = {
   source: "UT1"; version: number; sourceDate: string; generatedAt: string; categories: string[];
-  countByCategory: { adult: number; porn?: number; mixed_adult: number }; educationalExceptionCount: number;
+  countByCategory: { adult: number; mixed_adult: number }; educationalExceptionCount: number;
   totalCount: number; sizeBytes: number; sha256: string; signatureStatus: string;
   lastSuccessfulRun: string; lastError: string | null; devCanary: string; canaryIncluded: boolean;
   environment: "DEV"; nextScheduledAt: string;

@@ -69,20 +69,7 @@ def main() -> None:
 def build_from_ut1(canary_included: bool) -> dict:
     with tempfile.TemporaryDirectory(prefix="ut1-domain-list-") as temporary:
         root = pathlib.Path(temporary)
-        adult_file, adult_date = normalized_category_file("adult", root)
-        porn_file, porn_date = normalized_category_file("porn", root)
-        adult_count = line_count(adult_file)
-        porn_count = line_count(porn_file)
-        combined_adult = root / "adult-and-porn.normalized"
-        subprocess.run(
-            ["sort", "-u", "-o", str(combined_adult), str(adult_file), str(porn_file)],
-            check=True,
-            env={**os.environ, "LC_ALL": "C"},
-        )
-        adult, adult_exact, combined_adult_count, adult_bit_count = build_category_file(
-            "adult-and-porn",
-            combined_adult,
-        )
+        adult, adult_exact, adult_count, adult_bit_count, adult_date = build_category("adult", root)
         mixed, mixed_exact, mixed_count, mixed_bit_count, mixed_date = build_category("mixed_adult", root)
         exceptions, _, education_date = exact_category("sexual_education", root)
     return {
@@ -92,11 +79,11 @@ def build_from_ut1(canary_included: bool) -> dict:
         "mixed_exact": mixed_exact,
         "adult_bit_count": adult_bit_count,
         "mixed_bit_count": mixed_bit_count,
-        "adult_count": combined_adult_count,
+        "adult_count": adult_count,
         "mixed_count": mixed_count,
-        "category_counts": {"adult": adult_count, "porn": porn_count, "mixed_adult": mixed_count},
+        "category_counts": {"adult": adult_count, "mixed_adult": mixed_count},
         "educational_exceptions": exceptions,
-        "source_date": max(adult_date, porn_date, mixed_date, education_date),
+        "source_date": max(adult_date, mixed_date, education_date),
         "canary_included": canary_included,
     }
 
@@ -249,7 +236,7 @@ def read_existing_bundle(manifest: dict) -> dict:
         "adult_count": adult_count, "mixed_count": mixed_count,
         "category_counts": manifest.get(
             "countByCategory",
-            {"adult": adult_count, "porn": 0, "mixed_adult": mixed_count},
+            {"adult": adult_count, "mixed_adult": mixed_count},
         ),
         "educational_exceptions": exceptions,
         "source_date": manifest["sourceDate"], "canary_included": False,
@@ -269,7 +256,7 @@ def publish(source: dict) -> dict:
         data_url = f"{PUBLIC_BASE}/versions/{version}.bin"
         payload = {
             "source": "UT1", "version": version, "sourceDate": source["source_date"], "generatedAt": generated_at,
-            "categories": ["adult", "porn", "mixed_adult"],
+            "categories": ["adult", "mixed_adult"],
             "countByCategory": source["category_counts"],
             "educationalExceptionCount": len(source["educational_exceptions"]),
             "totalCount": sum(source["category_counts"].values()), "sizeBytes": len(data), "sha256": sha256,
