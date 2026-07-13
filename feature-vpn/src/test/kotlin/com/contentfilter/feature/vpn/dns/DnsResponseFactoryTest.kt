@@ -77,7 +77,13 @@ class DnsResponseFactoryTest {
 
         assertEquals(1, readUInt16(packet, dnsOffset + AnswerCountOffset))
         assertEquals(DnsTypeA, readUInt16(packet, answerOffset + 2))
-        assertTrue(packet.copyOfRange(answerOffset + AnswerFixedSize, answerOffset + AnswerFixedSize + 4).contentEquals(address))
+        assertTrue(
+            packet
+                .copyOfRange(
+                    answerOffset + AnswerFixedSize,
+                    answerOffset + AnswerFixedSize + 4,
+                ).contentEquals(address),
+        )
     }
 
     private fun question(

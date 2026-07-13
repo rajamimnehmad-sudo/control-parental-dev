@@ -29,10 +29,11 @@ class SafeSearchAddressResolverTest {
     @Test
     fun `HTTPS query does not trigger address lookup`() {
         var lookupCalled = false
-        val resolver = SafeSearchAddressResolver {
-            lookupCalled = true
-            emptyList()
-        }
+        val resolver =
+            SafeSearchAddressResolver {
+                lookupCalled = true
+                emptyList()
+            }
 
         assertEquals(emptyList(), resolver.resolve("safe.example", queryType = 65))
         assertEquals(false, lookupCalled)
