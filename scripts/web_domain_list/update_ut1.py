@@ -114,7 +114,7 @@ def build_category_file(category: str, normalized: pathlib.Path) -> tuple[bytear
     bit_count = max(MINIMUM_BITS, count * BITS_PER_ENTRY)
     bit_count = ((bit_count + 7) // 8) * 8
     bits = bytearray((bit_count + 7) // 8)
-    exact_text = root / f"{category}.hashes"
+    exact_text = normalized.parent / f"{category}.hashes"
     with normalized.open("r", encoding="ascii") as domains:
         with exact_text.open("w", encoding="ascii") as hashes:
             for line in domains:
