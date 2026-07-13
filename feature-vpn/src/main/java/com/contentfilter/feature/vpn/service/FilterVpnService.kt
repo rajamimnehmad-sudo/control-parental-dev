@@ -568,11 +568,9 @@ class FilterVpnService : VpnService() {
                 )
             }.getOrDefault(emptyList())
         if (addresses.isEmpty()) {
-            Log.w(LogTag, "SafeSearch DNS target resolution failed engine=$engineId type=${question.type}")
-            writeResponse(output, outputMutex, responseFactory.servfailPacket(question))
-            return
+            Log.w(LogTag, "SafeSearch DNS target address unavailable engine=$engineId type=${question.type}")
         }
-        writeResponse(output, outputMutex, responseFactory.addressPacket(question, addresses))
+        writeResponse(output, outputMutex, responseFactory.safeSearchAddressPacket(question, addresses))
         reportSafeSearchApplied(engineId, policyRevision, telemetryDispatcher)
     }
 

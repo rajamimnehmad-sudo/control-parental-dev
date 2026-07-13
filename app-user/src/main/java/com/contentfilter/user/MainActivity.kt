@@ -137,8 +137,8 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     LaunchedEffect(destination) {
         showAccessibilityDialog = !AccessibilityController.isEnabled(context)
     }
-    LaunchedEffect(rootState.needsActivation, statusState.isVpnActive) {
-        if (!rootState.needsActivation && !statusState.isVpnActive) {
+    LaunchedEffect(rootState.needsActivation) {
+        if (!rootState.needsActivation) {
             val permissionIntent = VpnController.prepareIntent(context)
             if (permissionIntent == null) {
                 VpnController.start(context)

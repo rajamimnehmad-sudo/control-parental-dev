@@ -4,6 +4,16 @@ package com.contentfilter.feature.vpn.dns
  * Builds DNS payloads for simple local responses.
  */
 class DnsResponseFactory {
+    fun safeSearchAddressPacket(
+        question: DnsQuestion,
+        addresses: List<ByteArray>,
+    ): ByteArray =
+        if (addresses.isEmpty()) {
+            noDataPacket(question)
+        } else {
+            addressPacket(question, addresses)
+        }
+
     fun addressPacket(
         question: DnsQuestion,
         addresses: List<ByteArray>,

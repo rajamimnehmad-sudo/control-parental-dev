@@ -66,6 +66,20 @@ class DnsResponseFactoryTest {
         val dnsOffset = Ipv4HeaderSize + UdpHeaderSize
 
         assertEquals(0, readUInt16(packet, dnsOffset + AnswerCountOffset))
+        assertEquals(0, packet[dnsOffset + FlagsLowOffset].toInt() and ResponseCodeMask)
+    }
+
+    @Test
+    fun `SafeSearch no data response prevents stale fallback without reporting server failure`() {
+        val packet =
+            DnsResponseFactory().safeSearchAddressPacket(
+                question = question(domain = "google.com", type = DnsTypeAaaa),
+                addresses = emptyList(),
+            )
+        val dnsOffset = Ipv4HeaderSize + UdpHeaderSize
+
+        assertEquals(0, readUInt16(packet, dnsOffset + AnswerCountOffset))
+        assertEquals(0, packet[dnsOffset + FlagsLowOffset].toInt() and ResponseCodeMask)
     }
 
     @Test
@@ -157,10 +171,13 @@ class DnsResponseFactoryTest {
         const val AnswerFixedSize = 12
         const val DnsHeaderSize = 12
         const val DnsTypeA = 1
+        const val DnsTypeAaaa = 28
         const val DnsTypeCname = 5
         const val DnsTypeHttps = 65
+        const val FlagsLowOffset = 3
         const val Ipv4HeaderSize = 20
         const val QuestionTrailerSize = 4
+        const val ResponseCodeMask = 0x0F
         const val UdpHeaderSize = 8
     }
 }

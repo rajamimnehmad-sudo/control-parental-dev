@@ -174,7 +174,7 @@ internal class BloomFilter(
     }
 
     companion object {
-        const val FirstSeed = -2_126_354_547
+        const val FirstSeed = -2_128_831_035
         const val SecondSeed = 16_777_619
 
         fun indexes(

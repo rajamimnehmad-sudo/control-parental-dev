@@ -15,6 +15,14 @@ import kotlin.test.assertTrue
 
 class WebDomainListTest {
     @Test
+    fun `bloom indexes match publisher FNV golden vector`() {
+        assertTrue(
+            BloomFilter.indexes("example.com", bitCount = 1_024, hashCount = 7)
+                .contentEquals(intArrayOf(806, 323, 864, 381, 922, 439, 980)),
+        )
+    }
+
+    @Test
     fun `categorizes adult mixed and dev canary while educational exception wins`() {
         val list =
             WebDomainList.parse(
