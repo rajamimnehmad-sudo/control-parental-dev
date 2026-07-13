@@ -124,7 +124,10 @@ class ActivationViewModel
                         )
                     }
                 } else if (result is ActivationResult.Failed) {
-                    Log.e(LogTag, "Activation failed. rpcResult=failure rpcErrorCode=${result.reason.ifBlank { "<blank reason>" }}")
+                    Log.e(
+                        LogTag,
+                        "Activation failed. rpcResult=failure rpcErrorCode=${result.reason.ifBlank { "<blank reason>" }}",
+                    )
                 }
                 mutableState.update {
                     val navigationTarget =
@@ -172,12 +175,19 @@ class ActivationViewModel
                 fun from(rawValue: String): PairingToken {
                     val trimmed = rawValue.trim()
                     val directCode = trimmed.normalizedPairingCodeOrNull()
-                    if (directCode != null) return PairingToken(code = directCode, displayName = null, mode = TokenMode.Plain)
+                    if (directCode != null) {
+                        return PairingToken(
+                            code = directCode,
+                            displayName = null,
+                            mode = TokenMode.Plain,
+                        )
+                    }
 
                     val parts = trimmed.split(Regex("[^A-Za-z0-9]+")).filter { it.isNotBlank() }
-                    val code = parts.lastOrNull { it.normalizedPairingCodeOrNull() != null }
-                        ?.normalizedPairingCodeOrNull()
-                        .orEmpty()
+                    val code =
+                        parts.lastOrNull { it.normalizedPairingCodeOrNull() != null }
+                            ?.normalizedPairingCodeOrNull()
+                            .orEmpty()
                     if (code.isBlank()) return PairingToken(code = "", displayName = null, mode = TokenMode.PastedText)
 
                     val name =
@@ -217,7 +227,6 @@ class ActivationViewModel
             const val OfflineMessage = "Sin conexión. Mostrando datos guardados."
             const val DefaultDeviceDisplayName = "Dispositivo protegido"
 
-            fun String.maskForLog(): String =
-                if (length <= 4) "****" else "${take(2)}***${takeLast(2)}"
+            fun String.maskForLog(): String = if (length <= 4) "****" else "${take(2)}***${takeLast(2)}"
         }
     }

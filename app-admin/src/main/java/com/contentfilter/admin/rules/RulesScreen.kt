@@ -77,12 +77,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.ui.ActionButtonTone
-import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
-import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.ProductCard
-import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.ProductSectionHeader
+import com.contentfilter.core.ui.ProductSky
+import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
+import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
 @Composable
 fun RulesRoute(
@@ -176,37 +176,38 @@ private fun RulesScreen(
             onPairingUserNameChanged = onPairingUserNameChanged,
             onGeneratePairingCode = onGeneratePairingCode,
             onPairingCodeCopied = onPairingCodeCopied,
-            onDeviceSelected = if (entryMode == RulesEntryMode.ManageUsers) {
-                {}
-            } else {
-                onDeviceSelected
-            },
+            onDeviceSelected =
+                if (entryMode == RulesEntryMode.ManageUsers) {
+                    {}
+                } else {
+                    onDeviceSelected
+                },
             onDeviceDeleted = onDeviceDeleted,
         )
     } else {
         UserDetailContent(
-                state = state,
-                selectedDevice = selectedDevice,
-                entryMode = entryMode,
-                selectedPanel = effectivePanel,
-                otherRules = otherRules,
-                onBack = onDeviceCleared,
-                onPanelSelected = { selectedPanel = it },
-                onRefreshApps = onRefreshApps,
-                onAppSearchChanged = onAppSearchChanged,
-                onGroupNameChanged = onGroupNameChanged,
-                onGroupMinutesChanged = onGroupMinutesChanged,
-                onGroupAppToggled = onGroupAppToggled,
-                onSaveAppGroup = onSaveAppGroup,
-                onEditAppGroup = onEditAppGroup,
-                onCancelAppGroupEdit = onCancelAppGroupEdit,
-                onDeleteAppGroup = onDeleteAppGroup,
-                onAppAllowedChanged = onAppAllowedChanged,
-                onAppLimitSaved = onAppLimitSaved,
-                onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
-                onOnlyResultsChanged = onOnlyResultsChanged,
-                onToggle = onToggle,
-                onDelete = onDelete,
+            state = state,
+            selectedDevice = selectedDevice,
+            entryMode = entryMode,
+            selectedPanel = effectivePanel,
+            otherRules = otherRules,
+            onBack = onDeviceCleared,
+            onPanelSelected = { selectedPanel = it },
+            onRefreshApps = onRefreshApps,
+            onAppSearchChanged = onAppSearchChanged,
+            onGroupNameChanged = onGroupNameChanged,
+            onGroupMinutesChanged = onGroupMinutesChanged,
+            onGroupAppToggled = onGroupAppToggled,
+            onSaveAppGroup = onSaveAppGroup,
+            onEditAppGroup = onEditAppGroup,
+            onCancelAppGroupEdit = onCancelAppGroupEdit,
+            onDeleteAppGroup = onDeleteAppGroup,
+            onAppAllowedChanged = onAppAllowedChanged,
+            onAppLimitSaved = onAppLimitSaved,
+            onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
+            onOnlyResultsChanged = onOnlyResultsChanged,
+            onToggle = onToggle,
+            onDelete = onDelete,
         )
     }
 }
@@ -266,12 +267,13 @@ private fun UsersListContent(
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(12.dp),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(
-                start = 16.dp,
-                top = 0.dp,
-                end = 16.dp,
-                bottom = 18.dp,
-            ),
+            contentPadding =
+                androidx.compose.foundation.layout.PaddingValues(
+                    start = 16.dp,
+                    top = 0.dp,
+                    end = 16.dp,
+                    bottom = 18.dp,
+                ),
         ) {
             if (state.offlineMode) {
                 item {
@@ -1445,118 +1447,124 @@ private fun AppGroupsPanel(
             .flatMap { group -> group.appPackages.map { packageName -> packageName to group.name } }
             .toMap()
     ProductCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Apps en grupo", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "Tiempo compartido por grupo · reinicia 12 PM",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Apps en grupo", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "Tiempo compartido por grupo · reinicia 12 PM",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            StatusChip("${state.appGroups.size}", MaterialTheme.colorScheme.primary)
+        }
+        if (state.appGroups.isNotEmpty()) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.appGroups.forEach { group ->
+                    AppGroupSummaryCard(
+                        group = group,
+                        deleting = group.id in state.pendingAppGroupDeleteIds,
+                        onEdit = { onEditAppGroup(group.id) },
+                        onDelete = { onDeleteAppGroup(group.id) },
                     )
                 }
-                StatusChip("${state.appGroups.size}", MaterialTheme.colorScheme.primary)
             }
-            if (state.appGroups.isNotEmpty()) {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    state.appGroups.forEach { group ->
-                        AppGroupSummaryCard(
-                            group = group,
-                            deleting = group.id in state.pendingAppGroupDeleteIds,
-                            onEdit = { onEditAppGroup(group.id) },
-                            onDelete = { onDeleteAppGroup(group.id) },
-                        )
-                    }
+        }
+        HorizontalDivider()
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = if (editingGroupId == null) "Nuevo grupo" else "Editando grupo",
+                style = MaterialTheme.typography.labelLarge,
+            )
+            if (editingGroupId != null) {
+                OutlinedButton(onClick = onCancelAppGroupEdit) {
+                    Text("Cancelar")
                 }
             }
-            HorizontalDivider()
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+        }
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = state.groupName,
+            onValueChange = onGroupNameChanged,
+            label = { Text("Nombre del grupo") },
+            placeholder = { Text("Entretenimiento") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = state.groupMinutes,
+            onValueChange = onGroupMinutesChanged,
+            label = { Text("Tiempo total diario") },
+            placeholder = { Text("240 minutos") },
+            singleLine = true,
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
+        )
+        Text("Apps disponibles", style = MaterialTheme.typography.labelLarge)
+        val selectedPackages = state.groupSelectedPackages
+        val selectedApps = state.appControls.filter { it.packageName in selectedPackages }
+        val selectableApps = state.appControls.filter { it.packageName !in selectedPackages }.take(10)
+        if (state.appControls.isEmpty()) {
+            Text(
+                "Actualizá apps o buscá el usuario para armar el grupo.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                selectableApps.forEach { app ->
+                    val usedByGroup = usedPackages[app.packageName]
+                    GroupAppPickerRow(
+                        app = app,
+                        actionText = if (usedByGroup == null) "+" else "En grupo",
+                        helperText = usedByGroup?.let { "Ya está en $it" },
+                        enabled = usedByGroup == null,
+                        onClick = { onGroupAppToggled(app.packageName, true) },
+                    )
+                }
+            }
+        }
+        Text("Cajón de apps (${selectedApps.size})", style = MaterialTheme.typography.labelLarge)
+        if (selectedApps.isEmpty()) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f))
+                        .padding(12.dp),
             ) {
                 Text(
-                    text = if (editingGroupId == null) "Nuevo grupo" else "Editando grupo",
-                    style = MaterialTheme.typography.labelLarge,
+                    "Agregá apps con +. Todas compartirán el tiempo total diario.",
+                    style = MaterialTheme.typography.bodySmall,
                 )
-                if (editingGroupId != null) {
-                    OutlinedButton(onClick = onCancelAppGroupEdit) {
-                        Text("Cancelar")
-                    }
+            }
+        } else {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                selectedApps.forEach { app ->
+                    GroupAppPickerRow(
+                        app = app,
+                        actionText = "x",
+                        helperText = null,
+                        onClick = { onGroupAppToggled(app.packageName, false) },
+                    )
                 }
             }
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = state.groupName,
-                onValueChange = onGroupNameChanged,
-                label = { Text("Nombre del grupo") },
-                placeholder = { Text("Entretenimiento") },
-                singleLine = true,
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = state.groupMinutes,
-                onValueChange = onGroupMinutesChanged,
-                label = { Text("Tiempo total diario") },
-                placeholder = { Text("240 minutos") },
-                singleLine = true,
-                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-            )
-            Text("Apps disponibles", style = MaterialTheme.typography.labelLarge)
-            val selectedPackages = state.groupSelectedPackages
-            val selectedApps = state.appControls.filter { it.packageName in selectedPackages }
-            val selectableApps = state.appControls.filter { it.packageName !in selectedPackages }.take(10)
-            if (state.appControls.isEmpty()) {
-                Text("Actualizá apps o buscá el usuario para armar el grupo.", style = MaterialTheme.typography.bodySmall)
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    selectableApps.forEach { app ->
-                        val usedByGroup = usedPackages[app.packageName]
-                        GroupAppPickerRow(
-                            app = app,
-                            actionText = if (usedByGroup == null) "+" else "En grupo",
-                            helperText = usedByGroup?.let { "Ya está en $it" },
-                            enabled = usedByGroup == null,
-                            onClick = { onGroupAppToggled(app.packageName, true) },
-                        )
-                    }
-                }
-            }
-            Text("Cajón de apps (${selectedApps.size})", style = MaterialTheme.typography.labelLarge)
-            if (selectedApps.isEmpty()) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f))
-                            .padding(12.dp),
-                ) {
-                    Text("Agregá apps con +. Todas compartirán el tiempo total diario.", style = MaterialTheme.typography.bodySmall)
-                }
-            } else {
-                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    selectedApps.forEach { app ->
-                        GroupAppPickerRow(
-                            app = app,
-                            actionText = "x",
-                            helperText = null,
-                            onClick = { onGroupAppToggled(app.packageName, false) },
-                        )
-                    }
-                }
-            }
-            ProgressActionButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onSaveAppGroup,
-                loading = state.groupSaving,
-                loadingText = if (editingGroupId == null) "Guardando..." else "Actualizando...",
-                successText = if (editingGroupId == null) "Grupo guardado" else "Grupo actualizado",
-                text = if (editingGroupId == null) "Guardar grupo" else "Actualizar grupo",
-            )
+        }
+        ProgressActionButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onSaveAppGroup,
+            loading = state.groupSaving,
+            loadingText = if (editingGroupId == null) "Guardando..." else "Actualizando...",
+            successText = if (editingGroupId == null) "Grupo guardado" else "Grupo actualizado",
+            text = if (editingGroupId == null) "Guardar grupo" else "Actualizar grupo",
+        )
     }
 }
 
@@ -1616,7 +1624,10 @@ private fun AppGroupSummaryCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(group.name, style = MaterialTheme.typography.titleSmall)
-                Text("${group.appPackages.size} apps · ${group.limitMinutes} min · ${group.resetLabel}", style = MaterialTheme.typography.bodySmall)
+                Text(
+                    "${group.appPackages.size} apps · ${group.limitMinutes} min · ${group.resetLabel}",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 OutlinedButton(

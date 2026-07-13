@@ -44,10 +44,10 @@ fun UsageScreen(
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 state.items.forEach { item ->
                     ProductCard {
-                    Text(
-                        text = "${item.packageName}: ${item.usedMinutes} min",
-                        style = MaterialTheme.typography.bodyLarge,
-                    )
+                        Text(
+                            text = "${item.packageName}: ${item.usedMinutes} min",
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
                     }
                 }
             }

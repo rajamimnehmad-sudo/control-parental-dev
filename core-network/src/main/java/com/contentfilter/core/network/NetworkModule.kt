@@ -1,23 +1,23 @@
 package com.contentfilter.core.network
 
+import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.network.config.BuildConfigSupabaseConfigProvider
 import com.contentfilter.core.network.config.SupabaseConfigProvider
 import com.contentfilter.core.network.realtime.RealtimeSubscription
 import com.contentfilter.core.network.realtime.SupabaseRealtimeSubscription
-import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteAccountRepository
+import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
-import com.contentfilter.core.domain.repository.PushNotificationRepository
-import com.contentfilter.core.network.remote.SupabaseRemoteDeviceRepository
+import com.contentfilter.core.network.remote.SupabasePushNotificationRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteAccountRepository
+import com.contentfilter.core.network.remote.SupabaseRemoteDeviceRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteLimitRepository
 import com.contentfilter.core.network.remote.SupabaseRemotePolicyRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteRequestRepository
-import com.contentfilter.core.network.remote.SupabasePushNotificationRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -53,7 +53,9 @@ abstract class NetworkModule {
     abstract fun bindRemoteRequestRepository(repository: SupabaseRemoteRequestRepository): RemoteRequestRepository
 
     @Binds
-    abstract fun bindPushNotificationRepository(repository: SupabasePushNotificationRepository): PushNotificationRepository
+    abstract fun bindPushNotificationRepository(
+        repository: SupabasePushNotificationRepository,
+    ): PushNotificationRepository
 
     @Binds
     abstract fun bindRealtimeSubscription(subscription: SupabaseRealtimeSubscription): RealtimeSubscription

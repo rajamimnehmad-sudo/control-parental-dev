@@ -3,13 +3,13 @@ package com.contentfilter.admin.updates
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.contentfilter.admin.auth.AdminLocalDataResetter
 import com.contentfilter.admin.BuildConfig
+import com.contentfilter.admin.auth.AdminLocalDataResetter
+import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import com.contentfilter.core.update.install.ApkInstaller
 import com.contentfilter.core.update.model.UpdateCheckResult
 import com.contentfilter.core.update.model.UpdateDownloadResult
 import com.contentfilter.core.update.repository.ApkUpdateRepository
-import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -148,9 +148,7 @@ class AdminUpdatesViewModel
             }
         }
 
-        private suspend fun downloadAndMaybeInstall(
-            manifest: com.contentfilter.core.update.model.UpdateManifest,
-        ) {
+        private suspend fun downloadAndMaybeInstall(manifest: com.contentfilter.core.update.model.UpdateManifest) {
             when (
                 val result =
                     updateRepository.download(manifest) { progress ->
@@ -158,17 +156,37 @@ class AdminUpdatesViewModel
                     }
             ) {
                 UpdateDownloadResult.DownloadError -> {
-                    _uiState.update { it.copy(status = AdminUpdatesStatus.DownloadFailed, downloadProgressPercent = null) }
+                    _uiState.update {
+                        it.copy(
+                            status = AdminUpdatesStatus.DownloadFailed,
+                            downloadProgressPercent = null,
+                        )
+                    }
                 }
                 UpdateDownloadResult.InvalidChecksum -> {
-                    _uiState.update { it.copy(status = AdminUpdatesStatus.ChecksumFailed, downloadProgressPercent = null) }
+                    _uiState.update {
+                        it.copy(
+                            status = AdminUpdatesStatus.ChecksumFailed,
+                            downloadProgressPercent = null,
+                        )
+                    }
                 }
                 is UpdateDownloadResult.Success -> {
                     downloadedApk = result.apk
                     if (apkInstaller.canRequestPackageInstalls()) {
-                        _uiState.update { it.copy(status = AdminUpdatesStatus.ReadyToInstall, downloadProgressPercent = 100) }
+                        _uiState.update {
+                            it.copy(
+                                status = AdminUpdatesStatus.ReadyToInstall,
+                                downloadProgressPercent = 100,
+                            )
+                        }
                     } else {
-                        _uiState.update { it.copy(status = AdminUpdatesStatus.NeedsInstallPermission, downloadProgressPercent = 100) }
+                        _uiState.update {
+                            it.copy(
+                                status = AdminUpdatesStatus.NeedsInstallPermission,
+                                downloadProgressPercent = 100,
+                            )
+                        }
                     }
                 }
             }

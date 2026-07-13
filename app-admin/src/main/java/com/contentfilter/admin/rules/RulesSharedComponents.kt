@@ -25,13 +25,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.contentfilter.core.ui.ActionButtonTone
-import com.contentfilter.core.ui.ProgressActionButton
-import com.contentfilter.core.ui.ProductCard
-import com.contentfilter.core.ui.StatusChip
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
+import com.contentfilter.core.ui.ActionButtonTone
+import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProgressActionButton
+import com.contentfilter.core.ui.StatusChip
 
 internal enum class DevicePanel {
     Apps,
@@ -47,45 +47,45 @@ internal fun SelectedDeviceHeader(
     onBack: () -> Unit,
 ) {
     ProductCard {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(device.name, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        text = "${device.lastSeenLabel} · ${device.appCount} apps",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(device.name, style = MaterialTheme.typography.titleMedium)
+                Text(
+                    text = "${device.lastSeenLabel} · ${device.appCount} apps",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            OutlinedButton(onClick = onBack) {
+                Text("Volver")
+            }
+        }
+        StatusChip(device.status.label, device.status.color())
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (selectedPanel == DevicePanel.Apps) {
+                Button(onClick = { }) {
+                    Text("Aplicaciones")
                 }
-                OutlinedButton(onClick = onBack) {
-                    Text("Volver")
+            } else {
+                OutlinedButton(onClick = { onPanelSelected(DevicePanel.Apps) }) {
+                    Text("Aplicaciones")
                 }
             }
-            StatusChip(device.status.label, device.status.color())
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (selectedPanel == DevicePanel.Apps) {
-                    Button(onClick = { }) {
-                        Text("Aplicaciones")
-                    }
-                } else {
-                    OutlinedButton(onClick = { onPanelSelected(DevicePanel.Apps) }) {
-                        Text("Aplicaciones")
-                    }
+            if (selectedPanel == DevicePanel.AppGroups) {
+                Button(onClick = { }) {
+                    Text("Apps en grupo")
                 }
-                if (selectedPanel == DevicePanel.AppGroups) {
-                    Button(onClick = { }) {
-                        Text("Apps en grupo")
-                    }
-                } else {
-                    OutlinedButton(onClick = { onPanelSelected(DevicePanel.AppGroups) }) {
+            } else {
+                OutlinedButton(onClick = { onPanelSelected(DevicePanel.AppGroups) }) {
                     Text("Apps en grupo")
                 }
             }
+        }
     }
-}
 }
 
 @Composable

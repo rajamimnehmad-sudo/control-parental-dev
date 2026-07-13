@@ -264,10 +264,8 @@ class SupabaseActivationClient
             const val LogTag = "SupabaseActivation"
             val JsonMediaType = "application/json".toMediaType()
 
-            fun String.normalizedPairingCodeForRpc(): String =
-                filter { it.isLetterOrDigit() }.uppercase()
+            fun String.normalizedPairingCodeForRpc(): String = filter { it.isLetterOrDigit() }.uppercase()
 
-            fun String.maskForLog(): String =
-                if (length <= 4) "****" else "${take(2)}***${takeLast(2)}"
+            fun String.maskForLog(): String = if (length <= 4) "****" else "${take(2)}***${takeLast(2)}"
         }
     }

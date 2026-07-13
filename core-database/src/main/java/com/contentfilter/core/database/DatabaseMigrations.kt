@@ -68,7 +68,9 @@ object DatabaseMigrations {
         object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE accounts ADD COLUMN communityId TEXT")
-                db.execSQL("ALTER TABLE accounts ADD COLUMN communityName TEXT NOT NULL DEFAULT 'Comunidad Primero Año'")
+                db.execSQL(
+                    "ALTER TABLE accounts ADD COLUMN communityName TEXT NOT NULL DEFAULT 'Comunidad Primero Año'",
+                )
                 db.execSQL("ALTER TABLE accounts ADD COLUMN guideName TEXT NOT NULL DEFAULT 'Equipo de guías'")
             }
         }

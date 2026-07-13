@@ -4,8 +4,8 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.AccessRequest
-import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.AccessRequestType
+import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.DailyAppUsage
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.ExtraTimeGrant
@@ -351,7 +351,10 @@ class MyAppsViewModel
             return LocalDay(
                 localDate = startDate.toString(),
                 startEpochMillis = startDate.atTime(java.time.LocalTime.NOON).atZone(zone).toInstant().toEpochMilli(),
-                endEpochMillis = startDate.plusDays(1).atTime(java.time.LocalTime.NOON).atZone(zone).toInstant().toEpochMilli(),
+                endEpochMillis =
+                    startDate.plusDays(
+                        1,
+                    ).atTime(java.time.LocalTime.NOON).atZone(zone).toInstant().toEpochMilli(),
             )
         }
 

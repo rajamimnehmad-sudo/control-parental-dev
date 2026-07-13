@@ -12,12 +12,12 @@ data class RemotePolicyDto(
     val deletedAt: String?,
 ) {
     fun toJson(): JSONObject =
-            JSONObject()
-                .put("id", id)
-                .put("account_id", accountId)
-                .put("device_id", deviceId)
-                .put("version", version)
-                .put("active", active)
+        JSONObject()
+            .put("id", id)
+            .put("account_id", accountId)
+            .put("device_id", deviceId)
+            .put("version", version)
+            .put("active", active)
             .put("updated_at", updatedAt)
 
     companion object {

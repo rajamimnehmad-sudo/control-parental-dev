@@ -42,26 +42,32 @@ class DefaultActivationRepository
                             "Existing local activation will be replaced by token relink. oldDeviceId=${activation.deviceId}",
                         )
                     } else {
-                    if (credentials.email.isNotBlank() && credentials.password.isNotBlank()) {
-                        val session =
-                            when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
-                                is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
-                                is RemoteResult.Success -> result.value
-                            }
-                        sessionStore.save(
-                            AuthSession(
-                                accessToken = session.accessToken,
-                                refreshToken = session.refreshToken,
-                                expiresAtEpochMillis = System.currentTimeMillis() + session.expiresInSeconds * 1000,
-                            ),
+                        if (credentials.email.isNotBlank() && credentials.password.isNotBlank()) {
+                            val session =
+                                when (
+                                    val result =
+                                        authClient.signInWithPassword(
+                                            credentials.email,
+                                            credentials.password,
+                                        )
+                                ) {
+                                    is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
+                                    is RemoteResult.Success -> result.value
+                                }
+                            sessionStore.save(
+                                AuthSession(
+                                    accessToken = session.accessToken,
+                                    refreshToken = session.refreshToken,
+                                    expiresAtEpochMillis = System.currentTimeMillis() + session.expiresInSeconds * 1000,
+                                ),
+                            )
+                        }
+                        systemStatusRepository.updateLicenseState(LicenseState.Active)
+                        Log.i(
+                            LogTag,
+                            "Activation skipped; local device is already activated deviceId=${activation.deviceId}",
                         )
-                    }
-                    systemStatusRepository.updateLicenseState(LicenseState.Active)
-                    Log.i(
-                        LogTag,
-                        "Activation skipped; local device is already activated deviceId=${activation.deviceId}",
-                    )
-                    return@withContext ActivationResult.Activated(activation)
+                        return@withContext ActivationResult.Activated(activation)
                     }
                 }
                 val activation =
@@ -89,10 +95,11 @@ class DefaultActivationRepository
                                         dto.deviceToken?.let(deviceTokenProvider::saveDeviceToken)
                                     }
                             }
-                        val session = existingSession ?: when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
-                            is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
-                            is RemoteResult.Success -> result.value
-                        }
+                        val session =
+                            existingSession ?: when (val result = authClient.signInWithPassword(credentials.email, credentials.password)) {
+                                is RemoteResult.Failure -> return@withContext ActivationResult.Failed(result.reason)
+                                is RemoteResult.Success -> result.value
+                            }
                         sessionStore.save(
                             AuthSession(
                                 accessToken = session.accessToken,

@@ -4,9 +4,9 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.Animatable
@@ -48,13 +48,13 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -87,7 +87,6 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.contentfilter.admin.BuildConfig
 import com.contentfilter.admin.auth.AdminAuthRoute
 import com.contentfilter.admin.dashboard.DashboardRoute
 import com.contentfilter.admin.push.AdminPushViewModel
@@ -193,7 +192,11 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
                     }
                 AdminSection.Apps -> RulesRoute(entryMode = RulesEntryMode.Apps, onBack = { section = null })
                 AdminSection.Web -> RulesRoute(entryMode = RulesEntryMode.Web, onBack = { section = null })
-                AdminSection.ManageUsers -> RulesRoute(entryMode = RulesEntryMode.ManageUsers, onBack = { section = null })
+                AdminSection.ManageUsers ->
+                    RulesRoute(
+                        entryMode = RulesEntryMode.ManageUsers,
+                        onBack = { section = null },
+                    )
                 AdminSection.Requests ->
                     SectionContainer(
                         title = "Solicitudes",
@@ -476,6 +479,7 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
     val tapMotion = remember { Animatable(0f) }
     val splash = remember { Animatable(0f) }
     val scope = rememberCoroutineScope()
+
     fun playTap() {
         scope.launch {
             tapMotion.snapTo(0f)
@@ -570,10 +574,20 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
         ) {
             val w = size.width
             val h = size.height
+
             fun sx(value: Float) = w * value / 1024f
+
             fun sy(value: Float) = h * value / 1024f
-            fun point(x: Float, y: Float) = Offset(sx(x), sy(y))
-            fun ovalSize(rx: Float, ry: Float) = Size(sx(rx * 2f), sy(ry * 2f))
+
+            fun point(
+                x: Float,
+                y: Float,
+            ) = Offset(sx(x), sy(y))
+
+            fun ovalSize(
+                rx: Float,
+                ry: Float,
+            ) = Size(sx(rx * 2f), sy(ry * 2f))
 
             val finBrush =
                 Brush.linearGradient(
@@ -598,14 +612,15 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
             val ink = Color(0xFF071329)
 
             rotate(tailSway + tap * 6f, pivot = point(778f, 516f)) {
-                val tail = Path().apply {
-                    moveTo(sx(760f), sy(514f))
-                    cubicTo(sx(826f), sy(384f), sx(972f), sy(386f), sx(970f), sy(488f))
-                    cubicTo(sx(969f), sy(533f), sx(928f), sy(551f), sx(880f), sy(558f))
-                    cubicTo(sx(925f), sy(577f), sx(970f), sy(640f), sx(927f), sy(700f))
-                    cubicTo(sx(873f), sy(776f), sx(792f), sy(668f), sx(760f), sy(514f))
-                    close()
-                }
+                val tail =
+                    Path().apply {
+                        moveTo(sx(760f), sy(514f))
+                        cubicTo(sx(826f), sy(384f), sx(972f), sy(386f), sx(970f), sy(488f))
+                        cubicTo(sx(969f), sy(533f), sx(928f), sy(551f), sx(880f), sy(558f))
+                        cubicTo(sx(925f), sy(577f), sx(970f), sy(640f), sx(927f), sy(700f))
+                        cubicTo(sx(873f), sy(776f), sx(792f), sy(668f), sx(760f), sy(514f))
+                        close()
+                    }
                 drawPath(path = tail, brush = finBrush)
                 drawPath(
                     color = finShadow,
@@ -630,13 +645,14 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
             }
 
             rotate(-finSway * 0.34f, pivot = point(548f, 286f)) {
-                val topFin = Path().apply {
-                    moveTo(sx(426f), sy(318f))
-                    cubicTo(sx(468f), sy(170f), sx(650f), sy(127f), sx(744f), sy(210f))
-                    cubicTo(sx(798f), sy(258f), sx(811f), sy(347f), sx(768f), sy(392f))
-                    cubicTo(sx(672f), sy(339f), sx(544f), sy(307f), sx(426f), sy(318f))
-                    close()
-                }
+                val topFin =
+                    Path().apply {
+                        moveTo(sx(426f), sy(318f))
+                        cubicTo(sx(468f), sy(170f), sx(650f), sy(127f), sx(744f), sy(210f))
+                        cubicTo(sx(798f), sy(258f), sx(811f), sy(347f), sx(768f), sy(392f))
+                        cubicTo(sx(672f), sy(339f), sx(544f), sy(307f), sx(426f), sy(318f))
+                        close()
+                    }
                 drawPath(path = topFin, brush = finBrush)
                 drawPath(
                     color = finShadow,
@@ -661,13 +677,14 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
             }
 
             rotate(-10f - finSway * 0.82f, pivot = point(543f, 760f)) {
-                val bottomFin = Path().apply {
-                    moveTo(sx(486f), sy(748f))
-                    cubicTo(sx(552f), sy(766f), sx(607f), sy(817f), sx(590f), sy(862f))
-                    cubicTo(sx(570f), sy(915f), sx(467f), sy(871f), sx(450f), sy(791f))
-                    cubicTo(sx(445f), sy(761f), sx(459f), sy(748f), sx(486f), sy(748f))
-                    close()
-                }
+                val bottomFin =
+                    Path().apply {
+                        moveTo(sx(486f), sy(748f))
+                        cubicTo(sx(552f), sy(766f), sx(607f), sy(817f), sx(590f), sy(862f))
+                        cubicTo(sx(570f), sy(915f), sx(467f), sy(871f), sx(450f), sy(791f))
+                        cubicTo(sx(445f), sy(761f), sx(459f), sy(748f), sx(486f), sy(748f))
+                        close()
+                    }
                 drawPath(path = bottomFin, brush = finBrush)
                 drawPath(
                     color = finShadow,
@@ -682,13 +699,14 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
             }
 
             rotate(-finSway * 1.05f - tap * 16f, pivot = point(170f, 575f)) {
-                val leftFin = Path().apply {
-                    moveTo(sx(157f), sy(563f))
-                    cubicTo(sx(77f), sy(557f), sx(55f), sy(621f), sx(104f), sy(661f))
-                    cubicTo(sx(155f), sy(701f), sx(224f), sy(651f), sx(235f), sy(594f))
-                    cubicTo(sx(241f), sy(561f), sx(201f), sy(552f), sx(157f), sy(563f))
-                    close()
-                }
+                val leftFin =
+                    Path().apply {
+                        moveTo(sx(157f), sy(563f))
+                        cubicTo(sx(77f), sy(557f), sx(55f), sy(621f), sx(104f), sy(661f))
+                        cubicTo(sx(155f), sy(701f), sx(224f), sy(651f), sx(235f), sy(594f))
+                        cubicTo(sx(241f), sy(561f), sx(201f), sy(552f), sx(157f), sy(563f))
+                        close()
+                    }
                 drawPath(path = leftFin, brush = finBrush)
                 drawPath(
                     color = finShadow,
@@ -712,14 +730,15 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
                 )
             }
 
-            val body = Path().apply {
-                moveTo(sx(150f), sy(536f))
-                cubicTo(sx(150f), sy(344f), sx(301f), sy(248f), sx(516f), sy(260f))
-                cubicTo(sx(701f), sy(271f), sx(839f), sy(374f), sx(853f), sy(538f))
-                cubicTo(sx(870f), sy(724f), sx(718f), sy(817f), sx(487f), sy(804f))
-                cubicTo(sx(275f), sy(792f), sx(150f), sy(710f), sx(150f), sy(536f))
-                close()
-            }
+            val body =
+                Path().apply {
+                    moveTo(sx(150f), sy(536f))
+                    cubicTo(sx(150f), sy(344f), sx(301f), sy(248f), sx(516f), sy(260f))
+                    cubicTo(sx(701f), sy(271f), sx(839f), sy(374f), sx(853f), sy(538f))
+                    cubicTo(sx(870f), sy(724f), sx(718f), sy(817f), sx(487f), sy(804f))
+                    cubicTo(sx(275f), sy(792f), sx(150f), sy(710f), sx(150f), sy(536f))
+                    close()
+                }
             drawPath(
                 color = Color(0xFF178C95).copy(alpha = 0.17f),
                 path = body,
@@ -761,17 +780,26 @@ private fun FishHomeImage(modifier: Modifier = Modifier) {
                 )
             }
             drawCircle(color = Color(0xFF4ACBBF).copy(alpha = 0.28f), radius = sx(15f), center = point(773f, 532f))
-            drawOval(color = Color(0xFF6EDDD0).copy(alpha = 0.46f), topLeft = point(235f, 576f), size = ovalSize(41f, 24f))
-            drawOval(color = Color(0xFF6EDDD0).copy(alpha = 0.42f), topLeft = point(538f, 578f), size = ovalSize(42f, 25f))
+            drawOval(
+                color = Color(0xFF6EDDD0).copy(alpha = 0.46f),
+                topLeft = point(235f, 576f),
+                size = ovalSize(41f, 24f),
+            )
+            drawOval(
+                color = Color(0xFF6EDDD0).copy(alpha = 0.42f),
+                topLeft = point(538f, 578f),
+                size = ovalSize(42f, 25f),
+            )
 
             rotate(finSway * 1.15f + tap * 20f, pivot = point(651f, 592f)) {
-                val rightFin = Path().apply {
-                    moveTo(sx(630f), sy(578f))
-                    cubicTo(sx(717f), sy(537f), sx(798f), sy(573f), sx(793f), sy(635f))
-                    cubicTo(sx(788f), sy(700f), sx(685f), sy(713f), sx(626f), sy(655f))
-                    cubicTo(sx(593f), sy(621f), sx(596f), sy(594f), sx(630f), sy(578f))
-                    close()
-                }
+                val rightFin =
+                    Path().apply {
+                        moveTo(sx(630f), sy(578f))
+                        cubicTo(sx(717f), sy(537f), sx(798f), sy(573f), sx(793f), sy(635f))
+                        cubicTo(sx(788f), sy(700f), sx(685f), sy(713f), sx(626f), sy(655f))
+                        cubicTo(sx(593f), sy(621f), sx(596f), sy(594f), sx(630f), sy(578f))
+                        close()
+                    }
                 drawPath(path = rightFin, brush = finBrush)
                 drawPath(
                     color = finShadow,

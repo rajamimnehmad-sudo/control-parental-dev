@@ -138,7 +138,11 @@ class AdminAuthViewModel
                 return
             }
             if (state.password.length < 8) {
-                _uiState.update { it.copy(message = activationFailureMessage("La contraseña debe tener al menos 8 caracteres.")) }
+                _uiState.update {
+                    it.copy(
+                        message = activationFailureMessage("La contraseña debe tener al menos 8 caracteres."),
+                    )
+                }
                 return
             }
             if (state.password != state.confirmPassword) {

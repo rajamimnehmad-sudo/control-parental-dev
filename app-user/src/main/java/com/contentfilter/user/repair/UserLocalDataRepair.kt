@@ -118,9 +118,9 @@ class UserLocalDataRepair
             deviceTokenProvider.clearDeviceToken()
             val editor =
                 preferences.edit()
-                .remove(LastAccountIdKey)
-                .remove(LastDeviceIdKey)
-                .remove(LastActivationCleanupKey)
+                    .remove(LastAccountIdKey)
+                    .remove(LastDeviceIdKey)
+                    .remove(LastActivationCleanupKey)
             if (reason != "missing-local-activation") {
                 editor.putBoolean(RevokedLicenseNoticeKey, true)
             }
@@ -183,7 +183,10 @@ class UserLocalDataRepair
         private fun clearOldVersionCacheIfNeeded() {
             val lastVersion = preferences.getInt(LastVersionCodeKey, MissingVersionCode)
             if (lastVersion != BuildConfig.VERSION_CODE) {
-                Log.i(LogTag, "Clearing old cache after version change. from=$lastVersion to=${BuildConfig.VERSION_CODE}")
+                Log.i(
+                    LogTag,
+                    "Clearing old cache after version change. from=$lastVersion to=${BuildConfig.VERSION_CODE}",
+                )
                 clearCacheDir()
                 preferences.edit()
                     .putInt(LastVersionCodeKey, BuildConfig.VERSION_CODE)

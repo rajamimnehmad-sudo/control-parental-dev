@@ -10,7 +10,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
-import kotlin.test.assertTrue
 
 class SearchEngineScreenDetectorTest {
     @Test

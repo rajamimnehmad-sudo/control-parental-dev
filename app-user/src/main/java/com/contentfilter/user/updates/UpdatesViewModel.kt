@@ -112,9 +112,7 @@ class UpdatesViewModel
             }
         }
 
-        private suspend fun downloadAndMaybeInstall(
-            manifest: com.contentfilter.core.update.model.UpdateManifest,
-        ) {
+        private suspend fun downloadAndMaybeInstall(manifest: com.contentfilter.core.update.model.UpdateManifest) {
             when (
                 val result =
                     updateRepository.download(manifest) { progress ->
@@ -130,9 +128,19 @@ class UpdatesViewModel
                 is UpdateDownloadResult.Success -> {
                     downloadedApk = result.apk
                     if (apkInstaller.canRequestPackageInstalls()) {
-                        _uiState.update { it.copy(status = UpdatesStatus.ReadyToInstall, downloadProgressPercent = 100) }
+                        _uiState.update {
+                            it.copy(
+                                status = UpdatesStatus.ReadyToInstall,
+                                downloadProgressPercent = 100,
+                            )
+                        }
                     } else {
-                        _uiState.update { it.copy(status = UpdatesStatus.NeedsInstallPermission, downloadProgressPercent = 100) }
+                        _uiState.update {
+                            it.copy(
+                                status = UpdatesStatus.NeedsInstallPermission,
+                                downloadProgressPercent = 100,
+                            )
+                        }
                     }
                 }
             }

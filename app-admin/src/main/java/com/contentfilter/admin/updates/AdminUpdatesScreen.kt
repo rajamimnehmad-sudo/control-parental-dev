@@ -58,7 +58,11 @@ private fun AdminUpdatesScreen(
         AlertDialog(
             onDismissRequest = onDismissReset,
             title = { Text("Cambiar administrador") },
-            text = { Text("Se borrará el admin guardado solo en este teléfono. Después podrás ingresar un token nuevo desde Login.") },
+            text = {
+                Text(
+                    "Se borrará el admin guardado solo en este teléfono. Después podrás ingresar un token nuevo desde Login.",
+                )
+            },
             confirmButton = {
                 Button(onClick = onConfirmReset) {
                     Text("Resetear")

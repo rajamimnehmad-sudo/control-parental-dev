@@ -7,12 +7,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
-import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductTeal
 import com.contentfilter.core.ui.ProductVisualPage
+import com.contentfilter.core.ui.ProgressActionButton
+import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
 @Composable
 fun ActivationRoute(

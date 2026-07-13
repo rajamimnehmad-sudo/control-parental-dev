@@ -13,6 +13,7 @@ import com.contentfilter.feature.accessibility.service.AccessibilityController
 import com.contentfilter.feature.vpn.service.VpnController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
@@ -20,7 +21,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.ExperimentalCoroutinesApi
 import javax.inject.Inject
 
 @HiltViewModel

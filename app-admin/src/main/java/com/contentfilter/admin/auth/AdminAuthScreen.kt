@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -22,10 +21,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ActionButtonTone
-import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
-import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductHeader
+import com.contentfilter.core.ui.ProgressActionButton
+import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
 @Composable
 fun AdminAuthRoute(viewModel: AdminAuthViewModel = hiltViewModel()) {

@@ -5,8 +5,8 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -23,8 +23,8 @@ import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductMint
 import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.ProductStatCard
-import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.core.ui.ProductViolet
+import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.user.BuildConfig
 
 @Composable
@@ -120,10 +120,16 @@ private fun UpdatesScreen(
             if (guideName.isNotBlank()) {
                 Text("Guía: $guideName", style = MaterialTheme.typography.bodyMedium)
             }
-            Text("Accesibilidad: ${accessibilityState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Accesibilidad: ${accessibilityState.ifBlank { "Desconocida" }}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Text("VPN: ${vpnState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
             Text("Sincronización: ${syncState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
-            Text("Activación: ${activationState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "Activación: ${activationState.ifBlank { "Desconocida" }}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
         ProductLargeFeatureCard(
             title = "Actualizaciones",

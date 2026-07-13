@@ -55,9 +55,7 @@ class RoomAccessRequestRepository
             Log.i(LOG_TAG, "Updated access request id=$requestId status=$status outboxId=${operation.id}")
         }
 
-        private fun AccessRequest.toOutboxOperation(
-            activation: DeviceActivationEntity?,
-        ): OutboxOperationEntity {
+        private fun AccessRequest.toOutboxOperation(activation: DeviceActivationEntity?): OutboxOperationEntity {
             val now = System.currentTimeMillis()
             return OutboxOperationEntity(
                 id = UUID.randomUUID().toString(),
@@ -71,9 +69,7 @@ class RoomAccessRequestRepository
             )
         }
 
-        private fun AccessRequest.toRemoteJson(
-            activation: DeviceActivationEntity?,
-        ): JSONObject =
+        private fun AccessRequest.toRemoteJson(activation: DeviceActivationEntity?): JSONObject =
             activation.let {
                 if (activation == null) {
                     Log.w(LOG_TAG, "Access request id=$id enqueued without local activation.")

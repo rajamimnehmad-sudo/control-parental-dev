@@ -12,10 +12,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -52,16 +52,16 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.Lifecycle
-import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
+import androidx.lifecycle.compose.LifecycleEventEffect
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ProductAppBackground
-import com.contentfilter.core.ui.ProductPageHeader
-import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductPageHeader
 import com.contentfilter.core.ui.ProductSectionHeader
+import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
+import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
 @Composable
 fun MyAppsRoute(
@@ -95,7 +95,8 @@ private fun MyAppsScreen(
     var quickFilter by remember { mutableStateOf(MyAppsQuickFilter.All) }
     var searchExpanded by remember { mutableStateOf(state.searchQuery.isNotBlank()) }
     val groupedPackages = remember(state.appGroups) { state.appGroups.flatMap { it.packageNames }.toSet() }
-    val ungroupedApps = remember(state.apps, groupedPackages) { state.apps.filter { it.packageName !in groupedPackages } }
+    val ungroupedApps =
+        remember(state.apps, groupedPackages) { state.apps.filter { it.packageName !in groupedPackages } }
     val visibleApps =
         remember(ungroupedApps, quickFilter) {
             ungroupedApps.filter { app ->
@@ -238,7 +239,12 @@ private fun AppsToolbar(
                 )
             }
             ToolbarCircleButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
-                Icon(Icons.Filled.Search, contentDescription = "Buscar app", tint = UserInk, modifier = Modifier.size(22.dp))
+                Icon(
+                    Icons.Filled.Search,
+                    contentDescription = "Buscar app",
+                    tint = UserInk,
+                    modifier = Modifier.size(22.dp),
+                )
             }
         }
         if (!searchExpanded) {
@@ -320,7 +326,10 @@ private fun AppFilterBanner(
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     filter.label,
-                    style = MaterialTheme.typography.labelLarge.copy(fontSize = if (filter == MyAppsQuickFilter.InGroup) 12.sp else 14.sp),
+                    style =
+                        MaterialTheme.typography.labelLarge.copy(
+                            fontSize = if (filter == MyAppsQuickFilter.InGroup) 12.sp else 14.sp,
+                        ),
                     color = UserInk,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,

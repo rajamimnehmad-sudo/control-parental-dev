@@ -3,11 +3,11 @@ package com.contentfilter.user
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -17,8 +17,8 @@ import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,8 +38,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -111,9 +111,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun UserAppRoot(
-    modifier: Modifier = Modifier,
-) {
+private fun UserAppRoot(modifier: Modifier = Modifier) {
     var destination by rememberSaveable { mutableStateOf(UserDestination.Home) }
     var backStack by rememberSaveable { mutableStateOf<List<UserDestination>>(emptyList()) }
     var showAccessibilityDialog by rememberSaveable { mutableStateOf(false) }
@@ -159,11 +157,13 @@ private fun UserAppRoot(
         ActivationRoute(modifier = modifier, notice = rootState.activationNotice)
         return
     }
+
     fun navigateTo(target: UserDestination) {
         if (target == destination) return
         backStack = backStack + destination
         destination = target
     }
+
     fun goBack() {
         val previous = backStack.lastOrNull() ?: UserDestination.Home
         backStack = backStack.dropLast(1)

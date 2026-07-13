@@ -19,7 +19,10 @@ class ExplicitSearchClassifier {
         val tokens = normalized.split(' ').filter(String::isNotBlank)
         val score =
             ModelBias +
-                tokens.sumOf { token -> ExplicitWeights.entries.firstOrNull { token.startsWith(it.key) }?.value ?: 0.0 } +
+                tokens.sumOf {
+                        token ->
+                    ExplicitWeights.entries.firstOrNull { token.startsWith(it.key) }?.value ?: 0.0
+                } +
                 tokens.sumOf { token -> ContextWeights[token] ?: 0.0 }
         val probability = 1.0 / (1.0 + exp(-score))
         return when {
@@ -39,7 +42,15 @@ class ExplicitSearchClassifier {
         val AllowedContexts =
             setOf("educacion sexual", "salud sexual", "sexual education", "sexual health", "prevencion de abuso")
         val ExplicitWeights =
-            mapOf("porn" to 5.4, "porno" to 5.4, "xxx" to 5.1, "hentai" to 4.7, "desnud" to 3.8, "nude" to 3.8, "erotic" to 3.5)
+            mapOf(
+                "porn" to 5.4,
+                "porno" to 5.4,
+                "xxx" to 5.1,
+                "hentai" to 4.7,
+                "desnud" to 3.8,
+                "nude" to 3.8,
+                "erotic" to 3.5,
+            )
         val ContextWeights = mapOf("video" to 0.5, "videos" to 0.5, "foto" to 0.4, "fotos" to 0.4, "gratis" to 0.3)
     }
 }

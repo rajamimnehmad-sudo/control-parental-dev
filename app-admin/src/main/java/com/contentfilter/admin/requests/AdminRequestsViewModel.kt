@@ -80,26 +80,26 @@ class AdminRequestsViewModel
                 observeDevices(),
                 localState,
             ) { requests, devices, local ->
-                    val pendingRequests =
-                        requests.filter {
-                            it.status.isPending() && it.requestType != AccessRequestType.DOMAIN_ACCESS
-                        }
-                    val users = pendingRequests.toUserItems(devices)
-                    val resolvedSelected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
-                    AdminRequestsUiState(
-                        requests =
-                            resolvedSelected?.let { selectedId ->
-                                pendingRequests.filter { it.deviceGroupId == selectedId }
-                                    .toRequestItems(local.apps)
-                            }.orEmpty(),
-                        users = users,
-                        selectedDeviceId = resolvedSelected,
-                        offlineMode = false,
-                        lastSyncMessage = local.message,
-                        isLoading = local.loading,
-                        pendingActionIds = local.pendingActionIds,
-                    )
-                }
+                val pendingRequests =
+                    requests.filter {
+                        it.status.isPending() && it.requestType != AccessRequestType.DOMAIN_ACCESS
+                    }
+                val users = pendingRequests.toUserItems(devices)
+                val resolvedSelected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
+                AdminRequestsUiState(
+                    requests =
+                        resolvedSelected?.let { selectedId ->
+                            pendingRequests.filter { it.deviceGroupId == selectedId }
+                                .toRequestItems(local.apps)
+                        }.orEmpty(),
+                    users = users,
+                    selectedDeviceId = resolvedSelected,
+                    offlineMode = false,
+                    lastSyncMessage = local.message,
+                    isLoading = local.loading,
+                    pendingActionIds = local.pendingActionIds,
+                )
+            }
                 .stateIn(
                     scope = viewModelScope,
                     started = SharingStarted.WhileSubscribed(5_000),
