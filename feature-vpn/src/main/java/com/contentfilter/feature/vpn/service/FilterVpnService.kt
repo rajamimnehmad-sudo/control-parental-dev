@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.util.Log
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
@@ -42,7 +43,10 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -93,7 +97,13 @@ class FilterVpnService : VpnService() {
     private var requestedVpnReconnectKey: String? = null
     private var appliedDomainListVersion: Long? = null
     private var lastReportedPolicy: Pair<String, Long>? = null
+
+    @Volatile
+    private var lastBlockedDestinationInvalidationAtMillis: Long? = null
+
     private val blockedDestinationRoutes = BlockedDestinationRouteStore()
+    private val blockedDestinationPreparations =
+        BlockedDestinationPreparationQueue<BlockedDestinationPreparation>()
     private val lastUnsupportedPacketDiagnosticAt = mutableMapOf<String, Long>()
     private var lastParsedDnsPacketDiagnosticAt: Long = 0L
 
@@ -198,6 +208,7 @@ class FilterVpnService : VpnService() {
                 next = currentState,
             )
         if (invalidateConnections) {
+            abandonBlockedDestinationPreparations()
             blockedDestinationRoutes.clear()
             invalidateBrowserConnectionsThenStart(currentState, reason = "policy")
         } else {
@@ -211,11 +222,16 @@ class FilterVpnService : VpnService() {
         state: VpnPolicyState,
         reason: String,
         prepareOpenTunnel: suspend () -> Unit = {},
+        onUnavailable: () -> Unit = {},
+        startDelayMillis: Long = 0L,
+        onStarting: () -> Unit = {},
     ) {
         connectionInvalidationJob?.cancel()
         connectionInvalidationJob =
             CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
                 var barrierHandedOff = false
+                delay(startDelayMillis)
+                onStarting()
                 val barrier =
                     try {
                         upstreamDnsServers = currentDnsServers()
@@ -227,6 +243,7 @@ class FilterVpnService : VpnService() {
                         null
                     }
                 if (barrier == null) {
+                    onUnavailable()
                     Log.w(
                         LogTag,
                         "VPN connection invalidation unavailable revision=${state.snapshot.version}; retrying",
@@ -245,6 +262,7 @@ class FilterVpnService : VpnService() {
                     )
                     runCatching { prepareOpenTunnel() }
                         .onFailure {
+                            onUnavailable()
                             Log.w(LogTag, "VPN route preparation failed: ${it.javaClass.simpleName}")
                         }
                     delay(ConnectionInvalidationMillis)
@@ -351,6 +369,7 @@ class FilterVpnService : VpnService() {
         scope.launch {
             webDomainListStore.observeStatus().collect { status ->
                 if (requiresDomainListConnectionInvalidation(appliedDomainListVersion, status.version)) {
+                    abandonBlockedDestinationPreparations()
                     blockedDestinationRoutes.clear()
                     Log.i(LogTag, "VPN domain list changed version=${status.version}; reconnecting tunnel")
                     telemetryReporter.recordReconnectApplied("domain-list-version-changed")
@@ -521,12 +540,7 @@ class FilterVpnService : VpnService() {
                 )
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
                 if (decision is PolicyDecision.Block && blockedDestinationRoutes.beginPreparation(domain)) {
-                    val resolvers = upstreamDnsServers
-                    invalidateBrowserConnectionsThenStart(
-                        state = state,
-                        reason = "blocked-destination",
-                        prepareOpenTunnel = { discoverBlockedDestinationRoutes(domain, question, resolvers) },
-                    )
+                    scheduleBlockedDestinationPreparation(domain, question, state)
                 }
                 writeResponse(output, outputMutex, responseFactory.nxdomainPacket(question))
             }
@@ -655,6 +669,81 @@ class FilterVpnService : VpnService() {
         )
     }
 
+    private fun scheduleBlockedDestinationPreparation(
+        domain: String,
+        question: DnsQuestion,
+        state: VpnPolicyState,
+    ) {
+        val preparation =
+            BlockedDestinationPreparation(
+                domain = domain,
+                question = question,
+                resolvers = upstreamDnsServers.toList(),
+            )
+        when (blockedDestinationPreparations.offer(domain, preparation)) {
+            BlockedDestinationPreparationQueue.OfferResult.StartWorker -> {
+                val now = SystemClock.elapsedRealtime()
+                val startDelay =
+                    blockedDestinationInvalidationDelayMillis(
+                        lastStartedAtMillis = lastBlockedDestinationInvalidationAtMillis,
+                        nowMillis = now,
+                        minimumIntervalMillis = BlockedDestinationInvalidationMinimumIntervalMillis,
+                    )
+                invalidateBrowserConnectionsThenStart(
+                    state = state,
+                    reason = "blocked-destination-batch",
+                    prepareOpenTunnel = ::prepareBlockedDestinationRoutes,
+                    onUnavailable = ::abandonBlockedDestinationPreparations,
+                    startDelayMillis = startDelay,
+                    onStarting = {
+                        lastBlockedDestinationInvalidationAtMillis = SystemClock.elapsedRealtime()
+                    },
+                )
+            }
+            BlockedDestinationPreparationQueue.OfferResult.Queued -> Unit
+            BlockedDestinationPreparationQueue.OfferResult.Rejected -> {
+                blockedDestinationRoutes.forgetDomain(domain)
+                Log.w(LogTag, "Blocked destination preparation queue full; route deferred")
+            }
+        }
+    }
+
+    private suspend fun prepareBlockedDestinationRoutes() {
+        delay(BlockedDestinationBatchWindowMillis)
+        while (true) {
+            blockedDestinationPreparations
+                .drain()
+                .chunked(BlockedDestinationPreparationParallelism)
+                .forEach { chunk ->
+                    coroutineScope {
+                        chunk
+                            .map { preparation ->
+                                async {
+                                    runCatching {
+                                        discoverBlockedDestinationRoutes(
+                                            domain = preparation.domain,
+                                            question = preparation.question,
+                                            resolvers = preparation.resolvers,
+                                        )
+                                    }.onFailure {
+                                        blockedDestinationRoutes.forgetDomain(preparation.domain)
+                                    }
+                                }
+                            }.awaitAll()
+                    }
+                }
+            delay(BlockedDestinationBatchWindowMillis)
+            if (blockedDestinationPreparations.markIdleIfEmpty()) return
+        }
+    }
+
+    private fun abandonBlockedDestinationPreparations() {
+        lastBlockedDestinationInvalidationAtMillis = null
+        blockedDestinationPreparations.clear().forEach { preparation ->
+            blockedDestinationRoutes.forgetDomain(preparation.domain)
+        }
+    }
+
     private suspend fun writeResponse(
         output: FileOutputStream,
         outputMutex: Mutex,
@@ -715,6 +804,7 @@ class FilterVpnService : VpnService() {
         if (cancelConnectionInvalidation) {
             connectionInvalidationJob?.cancel()
             connectionInvalidationJob = null
+            abandonBlockedDestinationPreparations()
         }
         readerJob?.cancel()
         readerJob = null
@@ -746,6 +836,9 @@ class FilterVpnService : VpnService() {
         private const val NoBytesRead = -1
         private const val ConnectionInvalidationMillis = 400L
         private const val ConnectionInvalidationRetryMillis = 100L
+        private const val BlockedDestinationBatchWindowMillis = 50L
+        private const val BlockedDestinationInvalidationMinimumIntervalMillis = 1_500L
+        private const val BlockedDestinationPreparationParallelism = 8
         private const val DnsWorkerCount = 12
         private const val DnsQueueCapacity = 64
         private const val DnsTelemetryWorkerCount = 1
@@ -847,6 +940,12 @@ class FilterVpnService : VpnService() {
         private fun List<InetAddress>.safeAddresses(): String =
             joinToString(",") { it.hostAddress.orEmpty() }.ifBlank { "none" }
     }
+
+    private data class BlockedDestinationPreparation(
+        val domain: String,
+        val question: DnsQuestion,
+        val resolvers: List<InetAddress>,
+    )
 }
 
 internal fun requiresDomainListConnectionInvalidation(
