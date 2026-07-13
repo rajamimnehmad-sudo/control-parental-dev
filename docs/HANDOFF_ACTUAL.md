@@ -40,7 +40,7 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-12:
 
 ```text
-App Usuario versionCode 185
+App Usuario versionCode 186
 App Admin versionCode 181
 versionName 1.0.1-dev
 ```
@@ -55,14 +55,14 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-185-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-186-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-181-debug.apk
 ```
 
 SHA-256:
 
 ```text
-Usuario DEV 185: 3a86cb20e466c9fe75d3acc83c23223b7263632b9422b50eb8f3bd7fbc988730
+Usuario DEV 186: 839b2653cb9878fe962777390dac580464e98d155ee2e09d48ec18f6c637124d
 Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c616
 ```
 
@@ -121,10 +121,12 @@ Verificacion ejecutada:
 scripts/publicar_dev.sh
 ```
 
-Resultado actual: suite completa y builds DEV OK, App Usuario DEV 185 y App Admin DEV 181 publicadas.
+Resultado actual: suite completa y builds DEV OK, App Usuario DEV 186 y App Admin DEV 181 publicadas.
 
 ## Cierre 2026-07-12 - estabilidad VPN/DNS
 
+- SafeSearch ya no responde a Chrome con un CNAME sintetizado que Android rechazaba con `ERR_NAME_NOT_RESOLVED`; responde A/AAAA directos del destino seguro y NODATA para HTTPS/SVCB.
+- Validacion fisica en Samsung SM-S908E: busqueda Google `clima` cargo resultados y `example.com` abrio con Internet abierto y Solo resultados desactivado.
 - DNS de navegadores ya no espera escrituras Room de telemetria; la cola de diagnostico es acotada y best-effort.
 - Respuestas DNS upstream se validan por transaccion/opcode/estado y las respuestas truncadas usan fallback TCP.
 - App Usuario conserva la proteccion VPN al iniciar un proceso, en lugar de deshabilitarla transitoriamente.
