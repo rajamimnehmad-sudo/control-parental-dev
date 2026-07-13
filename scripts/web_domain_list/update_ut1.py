@@ -24,12 +24,23 @@ BASE_PATH = "web-domain-list/dev"
 PUBLIC_BASE = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/public/{BUCKET}/{BASE_PATH}"
 PUBLISH_ENDPOINT = f"https://{PROJECT_REF}.supabase.co/functions/v1/update-web-domain-list"
 SOURCE_BASE = "https://dsi.ut-capitole.fr/blacklists/download"
-BLOCKLIST_PROJECT_PORN_URL = "https://blocklistproject.github.io/Lists/alt-version/porn-nl.txt"
-BLOCKLIST_PROJECT_MINIMUM_ENTRIES = 100_000
-BLOCKLIST_PROJECT_MAXIMUM_ENTRIES = 2_000_000
+BLOCKLIST_PROJECT_SOURCES = {
+    "adult": ("https://blocklistproject.github.io/Lists/alt-version/porn-nl.txt", 100_000, 2_000_000),
+    "gambling": ("https://blocklistproject.github.io/Lists/alt-version/gambling-nl.txt", 100_000, 1_000_000),
+    "drugs": ("https://blocklistproject.github.io/Lists/alt-version/drugs-nl.txt", 100, 100_000),
+    "piracy": ("https://blocklistproject.github.io/Lists/alt-version/piracy-nl.txt", 500, 200_000),
+    "torrent": ("https://blocklistproject.github.io/Lists/alt-version/torrent-nl.txt", 1_000, 200_000),
+}
+UT1_CATEGORIES = {
+    "adult": "adult",
+    "mixed_adult": "mixed_adult",
+    "gambling": "gambling",
+    "drugs": "drogue",
+    "piracy_torrents": "warez",
+}
 ENVIRONMENT = "DEV"
 CANARY = "coca.com"
-FORMAT_VERSION = 2
+FORMAT_VERSION = 3
 HASH_COUNT = 7
 BITS_PER_ENTRY = 8
 MINIMUM_BITS = 1_024
@@ -72,37 +83,64 @@ def main() -> None:
 def build_from_sources(canary_included: bool) -> dict:
     with tempfile.TemporaryDirectory(prefix="web-domain-list-") as temporary:
         root = pathlib.Path(temporary)
-        ut1_adult, adult_date = normalized_category_file("adult", root)
-        ut1_mixed, mixed_date = normalized_category_file("mixed_adult", root)
-        supplemental, supplemental_date = normalized_plain_domain_file(
-            BLOCKLIST_PROJECT_PORN_URL,
-            root / "blocklist-project-porn.normalized",
-        )
-        supplemental_count = line_count(supplemental)
-        if not BLOCKLIST_PROJECT_MINIMUM_ENTRIES <= supplemental_count <= BLOCKLIST_PROJECT_MAXIMUM_ENTRIES:
-            raise RuntimeError("Block List Project porn source count is outside the safety range")
+        ut1_files = {}
+        source_dates = []
+        for output_category, ut1_category in UT1_CATEGORIES.items():
+            ut1_files[output_category], source_date = normalized_category_file(ut1_category, root)
+            source_dates.append(source_date)
+        supplemental_files = {}
+        supplemental_input_count = 0
+        for source_id, (url, minimum, maximum) in BLOCKLIST_PROJECT_SOURCES.items():
+            path, source_date = normalized_plain_domain_file(url, root / f"blocklist-project-{source_id}.normalized")
+            count = line_count(path)
+            if not minimum <= count <= maximum:
+                raise RuntimeError(f"Block List Project {source_id} source count is outside the safety range")
+            supplemental_files[source_id] = path
+            supplemental_input_count += count
+            source_dates.append(source_date)
 
-        ut1_all = merge_sorted_files((ut1_adult, ut1_mixed), root / "ut1-all.normalized")
-        adult_file = merge_sorted_files((ut1_adult, supplemental), root / "adult.combined.normalized")
-        mixed_file = subtract_sorted_file(ut1_mixed, adult_file, root / "mixed-adult.unique.normalized")
-        supplemental_unique = subtract_sorted_file(supplemental, ut1_all, root / "supplemental.unique.normalized")
+        raw_categories = {
+            "adult": merge_sorted_files((ut1_files["adult"], supplemental_files["adult"]), root / "adult.combined"),
+            "mixed_adult": ut1_files["mixed_adult"],
+            "gambling": merge_sorted_files((ut1_files["gambling"], supplemental_files["gambling"]), root / "gambling.combined"),
+            "drugs": merge_sorted_files((ut1_files["drugs"], supplemental_files["drugs"]), root / "drugs.combined"),
+            "piracy_torrents": merge_sorted_files(
+                (ut1_files["piracy_torrents"], supplemental_files["piracy"], supplemental_files["torrent"]),
+                root / "piracy-torrents.combined",
+            ),
+        }
+        unique_categories = {}
+        accumulated = None
+        for category, source_file in raw_categories.items():
+            if accumulated is None:
+                unique_categories[category] = source_file
+                accumulated = source_file
+            else:
+                unique_categories[category] = subtract_sorted_file(source_file, accumulated, root / f"{category}.unique")
+                accumulated = merge_sorted_files((accumulated, source_file), root / f"through-{category}.all")
 
-        adult, adult_exact, adult_count, adult_bit_count = build_category_file("adult", adult_file)
-        mixed, mixed_exact, mixed_count, mixed_bit_count = build_category_file("mixed_adult", mixed_file)
+        categories = {}
+        category_counts = {}
+        for category, source_file in unique_categories.items():
+            bits, exact, count, bit_count = build_category_file(category, source_file)
+            categories[category] = {"bits": bits, "exact": exact, "count": count, "bit_count": bit_count}
+            category_counts[category] = count
         exceptions, _, education_date = exact_category("sexual_education", root)
+        source_dates.append(education_date)
+        ut1_all = merge_sorted_files(tuple(ut1_files.values()), root / "ut1-all.normalized")
+        supplemental_all = merge_sorted_files(tuple(supplemental_files.values()), root / "supplemental-all.normalized")
+        supplemental_unique = subtract_sorted_file(supplemental_all, ut1_all, root / "supplemental.unique.normalized")
         ut1_count = line_count(ut1_all)
         supplemental_unique_count = line_count(supplemental_unique)
     return {
-        "adult_bits": adult,
-        "mixed_bits": mixed,
-        "adult_exact": adult_exact,
-        "mixed_exact": mixed_exact,
-        "adult_bit_count": adult_bit_count,
-        "mixed_bit_count": mixed_bit_count,
-        "adult_count": adult_count,
-        "mixed_count": mixed_count,
-        "category_counts": {"adult": adult_count, "mixed_adult": mixed_count},
-        "category_aliases": {"adult": ["adult", "porn"]},
+        "categories": categories,
+        "category_counts": category_counts,
+        "category_aliases": {
+            "adult": ["adult", "porn"],
+            "gambling": ["gambling", "betting"],
+            "drugs": ["drugs", "drogue"],
+            "piracy_torrents": ["piracy", "torrent", "torrents", "warez"],
+        },
         "source_counts": {
             "UT1": ut1_count,
             "BlockListProject": supplemental_unique_count,
@@ -113,22 +151,22 @@ def build_from_sources(canary_included: bool) -> dict:
                 "name": "UT1 Toulouse",
                 "license": "Creative Commons (see upstream LICENSE.pdf)",
                 "url": f"{SOURCE_BASE}/",
-                "sourceDate": max(adult_date, mixed_date, education_date),
+                "sourceDate": max(source_dates),
                 "inputCount": ut1_count,
                 "uniqueContribution": ut1_count,
             },
             {
-                "id": "blocklist-project-porn",
-                "name": "The Block List Project - Porn",
+                "id": "blocklist-project",
+                "name": "The Block List Project",
                 "license": "Unlicense / public domain dedication",
-                "url": BLOCKLIST_PROJECT_PORN_URL,
-                "sourceDate": supplemental_date,
-                "inputCount": supplemental_count,
+                "url": "https://blocklistproject.github.io/Lists/",
+                "sourceDate": max(source_dates),
+                "inputCount": supplemental_input_count,
                 "uniqueContribution": supplemental_unique_count,
             },
         ],
         "educational_exceptions": exceptions,
-        "source_date": max(adult_date, mixed_date, education_date, supplemental_date),
+        "source_date": max(source_dates),
         "canary_included": canary_included,
     }
 
@@ -280,24 +318,25 @@ def fnv1a(data: bytes, seed: int) -> int:
 def encode_bundle(version: int, source: dict) -> bytes:
     exceptions = "\n".join(source["educational_exceptions"]).encode("ascii")
     canaries = CANARY.encode("ascii") if source["canary_included"] else b""
+    categories = source["categories"]
     header = MAGIC + struct.pack(
-        ">qiiiiiiiiii",
+        ">qiiiii",
         version,
         FORMAT_VERSION,
         HASH_COUNT,
-        source["adult_bit_count"],
-        source["mixed_bit_count"],
-        source["adult_count"],
-        source["mixed_count"],
-        len(source["adult_exact"]),
-        len(source["mixed_exact"]),
+        len(categories),
         len(exceptions),
         len(canaries),
     )
-    return (
-        header + bytes(source["adult_bits"]) + bytes(source["mixed_bits"]) +
-        source["adult_exact"] + source["mixed_exact"] + exceptions + canaries
+    descriptors = b"".join(
+        struct.pack(">iiii", len(name.encode("ascii")), category["bit_count"], category["count"], len(category["exact"]))
+        for name, category in categories.items()
     )
+    payload = b"".join(
+        name.encode("ascii") + bytes(category["bits"]) + category["exact"]
+        for name, category in categories.items()
+    )
+    return header + descriptors + payload + exceptions + canaries
 
 
 def read_existing_bundle(manifest: dict) -> dict:
@@ -306,33 +345,36 @@ def read_existing_bundle(manifest: dict) -> dict:
         raise RuntimeError("active data checksum is invalid")
     if data[:8] != MAGIC:
         raise RuntimeError("active data format is invalid")
-    values = struct.unpack(">qiiiiiiii", data[8:48])
-    _, fmt, hashes, adult_bit_count, mixed_bit_count, adult_count, mixed_count, exception_length, canary_length = values
+    _, fmt = struct.unpack(">qi", data[8:20])
     if fmt != FORMAT_VERSION:
         raise RuntimeError("active data must be refreshed before changing the DEV canary")
-    values = struct.unpack(">qiiiiiiiiii", data[8:56])
-    _, fmt, hashes, adult_bit_count, mixed_bit_count, adult_count, mixed_count, adult_exact_length, mixed_exact_length, exception_length, canary_length = values
+    _, _, hashes, category_count, exception_length, canary_length = struct.unpack(">qiiiii", data[8:36])
     if hashes != HASH_COUNT:
         raise RuntimeError("active data format is unsupported")
-    offset = 56
-    adult_bytes, mixed_bytes = adult_bit_count // 8, mixed_bit_count // 8
-    adult = bytearray(data[offset : offset + adult_bytes]); offset += adult_bytes
-    mixed = bytearray(data[offset : offset + mixed_bytes]); offset += mixed_bytes
-    adult_exact = data[offset : offset + adult_exact_length]; offset += adult_exact_length
-    mixed_exact = data[offset : offset + mixed_exact_length]; offset += mixed_exact_length
-    exceptions = data[offset : offset + exception_length].decode("ascii").splitlines(); offset += exception_length + canary_length
+    if not 1 <= category_count <= 16:
+        raise RuntimeError("active data category count is invalid")
+    offset = 36
+    descriptors = []
+    for _ in range(category_count):
+        descriptors.append(struct.unpack(">iiii", data[offset:offset + 16]))
+        offset += 16
+    categories = {}
+    for name_length, bit_count, count, exact_length in descriptors:
+        name = data[offset:offset + name_length].decode("ascii"); offset += name_length
+        bloom_length = (bit_count + 7) // 8
+        bits = bytearray(data[offset:offset + bloom_length]); offset += bloom_length
+        exact = data[offset:offset + exact_length]; offset += exact_length
+        if exact_length != count * EXACT_HASH_BYTES:
+            raise RuntimeError("active data exact index is invalid")
+        categories[name] = {"bits": bits, "exact": exact, "count": count, "bit_count": bit_count}
+    exceptions = data[offset:offset + exception_length].decode("ascii").splitlines(); offset += exception_length + canary_length
     if offset != len(data):
         raise RuntimeError("active data length is invalid")
     return {
-        "adult_bits": adult, "mixed_bits": mixed, "adult_exact": adult_exact, "mixed_exact": mixed_exact,
-        "adult_bit_count": adult_bit_count, "mixed_bit_count": mixed_bit_count,
-        "adult_count": adult_count, "mixed_count": mixed_count,
-        "category_counts": manifest.get(
-            "countByCategory",
-            {"adult": adult_count, "mixed_adult": mixed_count},
-        ),
+        "categories": categories,
+        "category_counts": manifest.get("countByCategory", {name: value["count"] for name, value in categories.items()}),
         "category_aliases": manifest.get("categoryAliases", {"adult": ["adult", "porn"]}),
-        "source_counts": manifest.get("countBySource", {manifest.get("source", "UT1"): adult_count + mixed_count}),
+        "source_counts": manifest.get("countBySource", {manifest.get("source", "UT1"): sum(c["count"] for c in categories.values())}),
         "sources": manifest.get("sources", []),
         "educational_exceptions": exceptions,
         "source_date": manifest["sourceDate"], "canary_included": False,
@@ -353,7 +395,7 @@ def publish(source: dict) -> dict:
         payload = {
             "source": "UT1+BlockListProject", "version": version,
             "sourceDate": source["source_date"], "generatedAt": generated_at,
-            "categories": ["adult", "mixed_adult"],
+            "categories": list(source["categories"]),
             "countByCategory": source["category_counts"],
             "categoryAliases": source["category_aliases"],
             "countBySource": source["source_counts"],

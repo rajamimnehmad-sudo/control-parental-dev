@@ -1,4 +1,5 @@
 import pathlib
+import struct
 import tempfile
 import unittest
 
@@ -33,6 +34,23 @@ class DomainListPublisherTest(unittest.TestCase):
             unique_mixed = update_ut1.subtract_sorted_file(mixed, adult, root / "unique-mixed")
 
             self.assertEqual(["mixed.example"], unique_mixed.read_text().splitlines())
+
+    def test_current_bundle_has_extensible_category_table(self) -> None:
+        source = {
+            "categories": {
+                "adult": {"bits": bytearray(128), "exact": bytes(8), "count": 1, "bit_count": 1024},
+                "gambling": {"bits": bytearray(128), "exact": bytes(8), "count": 1, "bit_count": 1024},
+            },
+            "educational_exceptions": [],
+            "canary_included": False,
+        }
+
+        encoded = update_ut1.encode_bundle(42, source)
+        version, format_version, hashes, categories, exceptions, canaries = struct.unpack(
+            ">qiiiii", encoded[8:36]
+        )
+
+        self.assertEqual((42, 3, 7, 2, 0, 0), (version, format_version, hashes, categories, exceptions, canaries))
 
     @staticmethod
     def _write(path: pathlib.Path, content: str) -> pathlib.Path:

@@ -10,10 +10,7 @@ interface DynamicDomainBlocklist {
 
 class WebDomainList private constructor(
     val version: Long,
-    private val adult: BloomFilter,
-    private val mixedAdult: BloomFilter,
-    private val exactAdult: ExactHashIndex?,
-    private val exactMixedAdult: ExactHashIndex?,
+    private val categories: List<CategoryIndex>,
     private val educationalExceptions: Set<String>,
     private val devCanaries: Set<String>,
 ) : DynamicDomainBlocklist {
@@ -24,55 +21,112 @@ class WebDomainList private constructor(
         val candidates = domain.normalizedDomainCandidates()
         if (candidates.any(educationalExceptions::contains)) return null
         if (candidates.any(devCanaries::contains)) return CategoryDevCanary
-        if (candidates.any { mixedAdult.mightContain(it) && exactMixedAdult?.contains(it) == true }) {
-            return CategoryMixedAdult
+        categories.forEach { category ->
+            if (candidates.any { category.bloom.mightContain(it) && category.exact?.contains(it) == true }) {
+                return category.name
+            }
         }
-        if (candidates.any { adult.mightContain(it) && exactAdult?.contains(it) == true }) return CategoryAdult
         return null
     }
 
     companion object {
         const val CategoryAdult = "adult"
         const val CategoryMixedAdult = "mixed_adult"
+        const val CategoryGambling = "gambling"
+        const val CategoryDrugs = "drugs"
+        const val CategoryPiracyTorrents = "piracy_torrents"
         const val CategoryDevCanary = "dev_test_blocked"
-        const val FormatVersion = 2
+        const val FormatVersion = 3
+        const val ExactFormatVersion = 2
         const val LegacyFormatVersion = 1
         const val LegacyHeaderSize = 48
-        const val HeaderSize = 56
+        const val ExactHeaderSize = 56
+        const val HeaderSize = 36
+        const val CategoryDescriptorSize = 16
         const val ExactHashSize = 8
         val Magic = "CFDL0001".encodeToByteArray()
 
         fun parse(bytes: ByteArray): WebDomainList {
-            require(bytes.size >= LegacyHeaderSize) { "Domain list header is incomplete." }
+            require(bytes.size >= HeaderSize) { "Domain list header is incomplete." }
             val header = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN)
             val magic = ByteArray(Magic.size).also(header::get)
             require(magic.contentEquals(Magic)) { "Unsupported domain list magic." }
             val version = header.long
             val formatVersion = header.int
-            require(formatVersion == LegacyFormatVersion || formatVersion == FormatVersion) {
+            require(formatVersion in LegacyFormatVersion..FormatVersion) {
                 "Unsupported domain list format."
             }
+            return if (formatVersion == FormatVersion) {
+                parseCurrent(bytes, header, version)
+            } else {
+                require(formatVersion == LegacyFormatVersion || formatVersion == ExactFormatVersion) {
+                    "Unsupported domain list format."
+                }
+                parseLegacy(bytes, header, version, formatVersion)
+            }
+        }
+
+        private fun parseCurrent(bytes: ByteArray, header: ByteBuffer, version: Long): WebDomainList {
+            require(bytes.size >= HeaderSize) { "Domain list header is incomplete." }
+            val hashCount = header.int
+            val categoryCount = header.int
+            val exceptionLength = header.int
+            val canaryLength = header.int
+            require(hashCount in 1..16 && categoryCount in 1..16 && exceptionLength >= 0 && canaryLength >= 0)
+            require(bytes.size >= HeaderSize + categoryCount * CategoryDescriptorSize)
+            val descriptors =
+                List(categoryCount) {
+                    CategoryDescriptor(header.int, header.int, header.int, header.int)
+                }
+            descriptors.forEach {
+                require(it.nameLength in 1..64 && it.bitCount in 1..500_000_000 && it.entryCount >= 0)
+                require(it.exactLength.toLong() == it.entryCount.toLong() * ExactHashSize)
+            }
+            val expectedSize =
+                HeaderSize.toLong() + categoryCount.toLong() * CategoryDescriptorSize +
+                    descriptors.sumOf { it.nameLength.toLong() + it.bitCount.bytesForBits().toLong() + it.exactLength } +
+                    exceptionLength + canaryLength
+            require(expectedSize == bytes.size.toLong()) { "Domain list size does not match its header." }
+            var offset = HeaderSize + categoryCount * CategoryDescriptorSize
+            val categories = descriptors.map { descriptor ->
+                val name = bytes.decodeToString(offset, offset + descriptor.nameLength)
+                require(name in SupportedCategories) { "Unsupported domain list category." }
+                offset += descriptor.nameLength
+                val bloomLength = descriptor.bitCount.bytesForBits()
+                val bloom = BloomFilter(bytes.copyOfRange(offset, offset + bloomLength), descriptor.bitCount, hashCount)
+                offset += bloomLength
+                val exact = ExactHashIndex(bytes.copyOfRange(offset, offset + descriptor.exactLength))
+                offset += descriptor.exactLength
+                CategoryIndex(name, bloom, exact)
+            }
+            require(categories.map { it.name }.distinct().size == categories.size)
+            val exceptions = bytes.decodeLines(offset, exceptionLength)
+            offset += exceptionLength
+            val canaries = bytes.decodeLines(offset, canaryLength)
+            return WebDomainList(version, categories, exceptions, canaries)
+        }
+
+        private fun parseLegacy(bytes: ByteArray, header: ByteBuffer, version: Long, formatVersion: Int): WebDomainList {
             val hashCount = header.int
             val adultBitCount = header.int
             val mixedBitCount = header.int
             val adultCount = header.int
             val mixedCount = header.int
-            val adultExactLength = if (formatVersion == FormatVersion) header.int else 0
-            val mixedExactLength = if (formatVersion == FormatVersion) header.int else 0
+            val adultExactLength = if (formatVersion == ExactFormatVersion) header.int else 0
+            val mixedExactLength = if (formatVersion == ExactFormatVersion) header.int else 0
             val exceptionLength = header.int
             val canaryLength = header.int
             require(hashCount in 1..16 && adultBitCount > 0 && mixedBitCount > 0)
             val adultByteCount = adultBitCount.bytesForBits()
             val mixedByteCount = mixedBitCount.bytesForBits()
-            if (formatVersion == FormatVersion) {
+            if (formatVersion == ExactFormatVersion) {
                 require(adultExactLength == adultCount * ExactHashSize)
                 require(mixedExactLength == mixedCount * ExactHashSize)
             }
-            val headerSize = if (formatVersion == FormatVersion) HeaderSize else LegacyHeaderSize
-            val expectedSize =
-                headerSize + adultByteCount + mixedByteCount + adultExactLength + mixedExactLength +
-                    exceptionLength + canaryLength
-            require(expectedSize == bytes.size) { "Domain list size does not match its header." }
+            val headerSize = if (formatVersion == ExactFormatVersion) ExactHeaderSize else LegacyHeaderSize
+            val expectedSize = headerSize.toLong() + adultByteCount + mixedByteCount + adultExactLength +
+                mixedExactLength + exceptionLength + canaryLength
+            require(expectedSize == bytes.size.toLong()) { "Domain list size does not match its header." }
             var offset = headerSize
             val adultBits = bytes.copyOfRange(offset, offset + adultByteCount)
             offset += adultByteCount
@@ -91,16 +145,19 @@ class WebDomainList private constructor(
             val canaries = bytes.decodeLines(offset, canaryLength)
             return WebDomainList(
                 version = version,
-                adult = BloomFilter(adultBits, adultBitCount, hashCount),
-                mixedAdult = BloomFilter(mixedBits, mixedBitCount, hashCount),
-                exactAdult = exactAdult,
-                exactMixedAdult = exactMixed,
+                categories = listOf(
+                    CategoryIndex(CategoryMixedAdult, BloomFilter(mixedBits, mixedBitCount, hashCount), exactMixed),
+                    CategoryIndex(CategoryAdult, BloomFilter(adultBits, adultBitCount, hashCount), exactAdult),
+                ),
                 educationalExceptions = exceptions,
                 devCanaries = canaries,
             )
         }
 
         private fun Int.bytesForBits(): Int = (this + 7) / 8
+
+        private val SupportedCategories =
+            setOf(CategoryAdult, CategoryMixedAdult, CategoryGambling, CategoryDrugs, CategoryPiracyTorrents)
 
         private fun ByteArray.decodeLines(
             offset: Int,
@@ -117,6 +174,10 @@ class WebDomainList private constructor(
             }
     }
 }
+
+private data class CategoryDescriptor(val nameLength: Int, val bitCount: Int, val entryCount: Int, val exactLength: Int)
+
+private data class CategoryIndex(val name: String, val bloom: BloomFilter, val exact: ExactHashIndex?)
 
 internal class ExactHashIndex(
     private val hashes: ByteArray,

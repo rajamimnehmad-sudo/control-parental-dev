@@ -43,6 +43,29 @@ class WebDomainListTest {
     }
 
     @Test
+    fun `current format categorizes every sensitive topic`() {
+        val list =
+            WebDomainList.parse(
+                currentBundle(
+                    version = 7,
+                    categories = linkedMapOf(
+                        WebDomainList.CategoryAdult to setOf("adult.example"),
+                        WebDomainList.CategoryMixedAdult to setOf("mixed.example"),
+                        WebDomainList.CategoryGambling to setOf("gambling.example"),
+                        WebDomainList.CategoryDrugs to setOf("drugs.example"),
+                        WebDomainList.CategoryPiracyTorrents to setOf("piracy.example"),
+                    ),
+                ),
+            )
+
+        assertEquals(WebDomainList.CategoryAdult, list.categoryFor("sub.adult.example"))
+        assertEquals(WebDomainList.CategoryMixedAdult, list.categoryFor("mixed.example"))
+        assertEquals(WebDomainList.CategoryGambling, list.categoryFor("gambling.example"))
+        assertEquals(WebDomainList.CategoryDrugs, list.categoryFor("drugs.example"))
+        assertEquals(WebDomainList.CategoryPiracyTorrents, list.categoryFor("piracy.example"))
+    }
+
+    @Test
     fun `removing canary changes decision without application code`() {
         val included = WebDomainList.parse(bundle(version = 1, canaries = setOf("canary.example")))
         val removed = WebDomainList.parse(bundle(version = 2))
@@ -129,7 +152,7 @@ class WebDomainListTest {
 
     private fun bundle(
         version: Long,
-        formatVersion: Int = WebDomainList.FormatVersion,
+        formatVersion: Int = WebDomainList.ExactFormatVersion,
         adult: Set<String> = emptySet(),
         adultBloom: Set<String> = adult,
         mixed: Set<String> = emptySet(),
@@ -144,12 +167,12 @@ class WebDomainListTest {
         val exceptionBytes = exceptions.joinToString("\n").encodeToByteArray()
         val canaryBytes = canaries.joinToString("\n").encodeToByteArray()
         val headerSize =
-            if (formatVersion == WebDomainList.FormatVersion) {
-                WebDomainList.HeaderSize
+            if (formatVersion == WebDomainList.ExactFormatVersion) {
+                WebDomainList.ExactHeaderSize
             } else {
                 WebDomainList.LegacyHeaderSize
             }
-        val exactSize = if (formatVersion == WebDomainList.FormatVersion) adultExact.size + mixedExact.size else 0
+        val exactSize = if (formatVersion == WebDomainList.ExactFormatVersion) adultExact.size + mixedExact.size else 0
         return ByteBuffer.allocate(
             headerSize + adultBits.size + mixedBits.size + exactSize +
                 exceptionBytes.size + canaryBytes.size,
@@ -158,16 +181,37 @@ class WebDomainListTest {
             .put(WebDomainList.Magic).putLong(version).putInt(formatVersion).putInt(7)
             .putInt(bitCount).putInt(bitCount).putInt(adult.size).putInt(mixed.size)
             .apply {
-                if (formatVersion == WebDomainList.FormatVersion) {
+                if (formatVersion == WebDomainList.ExactFormatVersion) {
                     putInt(adultExact.size).putInt(mixedExact.size)
                 }
             }
             .putInt(exceptionBytes.size).putInt(canaryBytes.size)
             .put(adultBits).put(mixedBits)
             .apply {
-                if (formatVersion == WebDomainList.FormatVersion) put(adultExact).put(mixedExact)
+                if (formatVersion == WebDomainList.ExactFormatVersion) put(adultExact).put(mixedExact)
             }
             .put(exceptionBytes).put(canaryBytes).array()
+    }
+
+    private fun currentBundle(version: Long, categories: LinkedHashMap<String, Set<String>>): ByteArray {
+        val bitCount = 1_024
+        val exceptionBytes = ByteArray(0)
+        val canaryBytes = ByteArray(0)
+        val encoded = categories.map { (name, values) ->
+            Triple(name.encodeToByteArray(), bloom(values, bitCount), exactHashes(values))
+        }
+        val descriptorsSize = encoded.size * WebDomainList.CategoryDescriptorSize
+        val payloadSize = encoded.sumOf { it.first.size + it.second.size + it.third.size }
+        return ByteBuffer.allocate(WebDomainList.HeaderSize + descriptorsSize + payloadSize)
+            .order(ByteOrder.BIG_ENDIAN)
+            .put(WebDomainList.Magic).putLong(version).putInt(WebDomainList.FormatVersion).putInt(7)
+            .putInt(encoded.size).putInt(exceptionBytes.size).putInt(canaryBytes.size)
+            .apply {
+                encoded.forEachIndexed { index, (name, _, exact) ->
+                    putInt(name.size).putInt(bitCount).putInt(categories.values.elementAt(index).size).putInt(exact.size)
+                }
+                encoded.forEach { (name, bits, exact) -> put(name).put(bits).put(exact) }
+            }.array()
     }
 
     private fun exactHashes(values: Set<String>): ByteArray =
