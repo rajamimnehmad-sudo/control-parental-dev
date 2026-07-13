@@ -4,6 +4,13 @@ package com.contentfilter.feature.vpn.dns
  * Builds DNS payloads for simple local responses.
  */
 class DnsResponseFactory {
+    fun addressPacket(
+        question: DnsQuestion,
+        addresses: List<ByteArray>,
+    ): ByteArray = responsePacket(question, addressPayload(question, addresses))
+
+    fun noDataPacket(question: DnsQuestion): ByteArray = responsePacket(question, noDataPayload(question))
+
     fun cnamePacket(
         question: DnsQuestion,
         canonicalName: String,
@@ -88,12 +95,12 @@ class DnsResponseFactory {
         question: DnsQuestion,
         canonicalName: String,
     ): ByteArray {
-        val questionName = encodeDomain(question.domain)
+        val originalQuestion = question.originalQuestionBytes()
         val targetName = encodeDomain(canonicalName)
         val payload =
             ByteArray(
                 DNS_HEADER_SIZE +
-                    questionName.size + QUESTION_TRAILER_SIZE +
+                    originalQuestion.size +
                     ANSWER_FIXED_SIZE + targetName.size,
             )
         writeUInt16(payload, TRANSACTION_ID_OFFSET, question.transactionId)
@@ -101,12 +108,11 @@ class DnsResponseFactory {
         payload[FLAGS_OFFSET + 1] = NOERROR_FLAGS_LOW.toByte()
         writeUInt16(payload, QUESTION_COUNT_OFFSET, 1)
         writeUInt16(payload, ANSWER_COUNT_OFFSET, 1)
+        writeUInt16(payload, AUTHORITY_COUNT_OFFSET, 0)
+        writeUInt16(payload, ADDITIONAL_COUNT_OFFSET, 0)
         var offset = DNS_HEADER_SIZE
-        questionName.copyInto(payload, offset)
-        offset += questionName.size
-        writeUInt16(payload, offset, question.type)
-        writeUInt16(payload, offset + SHORT_SIZE_BYTES, DNS_CLASS_IN)
-        offset += QUESTION_TRAILER_SIZE
+        originalQuestion.copyInto(payload, offset)
+        offset += originalQuestion.size
         writeUInt16(payload, offset, QUESTION_NAME_POINTER)
         writeUInt16(payload, offset + SHORT_SIZE_BYTES, DNS_TYPE_CNAME)
         writeUInt16(payload, offset + SHORT_SIZE_BYTES * 2, DNS_CLASS_IN)
@@ -114,6 +120,88 @@ class DnsResponseFactory {
         writeUInt16(payload, offset + SHORT_SIZE_BYTES * 5, targetName.size)
         targetName.copyInto(payload, offset + ANSWER_FIXED_SIZE)
         return payload
+    }
+
+    private fun addressPayload(
+        question: DnsQuestion,
+        addresses: List<ByteArray>,
+    ): ByteArray {
+        val expectedAddressSize =
+            when (question.type) {
+                DNS_TYPE_A -> IPV4_ADDRESS_SIZE
+                DNS_TYPE_AAAA -> IPV6_ADDRESS_SIZE
+                else -> error("Address response requires an A or AAAA question.")
+            }
+        require(addresses.isNotEmpty() && addresses.all { it.size == expectedAddressSize })
+        val originalQuestion = question.originalQuestionBytes()
+        val payload =
+            ByteArray(
+                DNS_HEADER_SIZE + originalQuestion.size +
+                    addresses.sumOf { ANSWER_FIXED_SIZE + it.size },
+            )
+        prepareResponseHeader(payload, question, addresses.size)
+        var offset = DNS_HEADER_SIZE
+        originalQuestion.copyInto(payload, offset)
+        offset += originalQuestion.size
+        addresses.forEach { address ->
+            writeUInt16(payload, offset, QUESTION_NAME_POINTER)
+            writeUInt16(payload, offset + SHORT_SIZE_BYTES, question.type)
+            writeUInt16(payload, offset + SHORT_SIZE_BYTES * 2, DNS_CLASS_IN)
+            writeUInt32(payload, offset + SHORT_SIZE_BYTES * 3, ADDRESS_TTL_SECONDS)
+            writeUInt16(payload, offset + SHORT_SIZE_BYTES * 5, address.size)
+            address.copyInto(payload, offset + ANSWER_FIXED_SIZE)
+            offset += ANSWER_FIXED_SIZE + address.size
+        }
+        return payload
+    }
+
+    private fun noDataPayload(question: DnsQuestion): ByteArray {
+        val originalQuestion = question.originalQuestionBytes()
+        return ByteArray(DNS_HEADER_SIZE + originalQuestion.size).also { payload ->
+            prepareResponseHeader(payload, question, answerCount = 0)
+            originalQuestion.copyInto(payload, DNS_HEADER_SIZE)
+        }
+    }
+
+    private fun prepareResponseHeader(
+        payload: ByteArray,
+        question: DnsQuestion,
+        answerCount: Int,
+    ) {
+        writeUInt16(payload, TRANSACTION_ID_OFFSET, question.transactionId)
+        payload[FLAGS_OFFSET] = RESPONSE_FLAGS_HIGH.toByte()
+        payload[FLAGS_OFFSET + 1] = NOERROR_FLAGS_LOW.toByte()
+        writeUInt16(payload, QUESTION_COUNT_OFFSET, 1)
+        writeUInt16(payload, ANSWER_COUNT_OFFSET, answerCount)
+        writeUInt16(payload, AUTHORITY_COUNT_OFFSET, 0)
+        writeUInt16(payload, ADDITIONAL_COUNT_OFFSET, 0)
+    }
+
+    private fun DnsQuestion.originalQuestionBytes(): ByteArray {
+        val payload = queryPayload
+        if (payload.size >= DNS_HEADER_SIZE + QUESTION_TRAILER_SIZE) {
+            var cursor = DNS_HEADER_SIZE
+            while (cursor < payload.size) {
+                val labelLength = payload[cursor].toInt() and BYTE_MASK
+                cursor += 1
+                if (labelLength == 0) {
+                    val questionEnd = cursor + QUESTION_TRAILER_SIZE
+                    if (questionEnd <= payload.size) {
+                        return payload.copyOfRange(DNS_HEADER_SIZE, questionEnd)
+                    }
+                    break
+                }
+                if (labelLength > MAX_DNS_LABEL_LENGTH || cursor + labelLength > payload.size) break
+                cursor += labelLength
+            }
+        }
+        return encodeDomain(domain) +
+            byteArrayOf(
+                (type ushr BYTE_SIZE_BITS).toByte(),
+                type.toByte(),
+                0,
+                DNS_CLASS_IN.toByte(),
+            )
     }
 
     private fun encodeDomain(domain: String): ByteArray {
@@ -233,13 +321,17 @@ class DnsResponseFactory {
         const val BYTE_SIZE_BITS = 8
         const val DEFAULT_TTL = 64
         const val CNAME_TTL_SECONDS = 60
+        const val ADDRESS_TTL_SECONDS = 60
         const val DNS_CLASS_IN = 1
+        const val DNS_TYPE_A = 1
+        const val DNS_TYPE_AAAA = 28
         const val DNS_HEADER_SIZE = 12
         const val DNS_TYPE_CNAME = 5
         const val FLAGS_OFFSET = 2
         const val IP_DESTINATION_OFFSET = 16
         const val IP_SOURCE_OFFSET = 12
         const val IPV6_ADDRESS_SIZE = 16
+        const val IPV4_ADDRESS_SIZE = 4
         const val IPV6_DESTINATION_OFFSET = 24
         const val IPV6_HEADER_SIZE = 40
         const val IPV6_HOP_LIMIT_OFFSET = 7

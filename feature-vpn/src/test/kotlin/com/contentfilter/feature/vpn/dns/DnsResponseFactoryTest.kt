@@ -3,6 +3,7 @@ package com.contentfilter.feature.vpn.dns
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertTrue
 
 class DnsResponseFactoryTest {
     @Test
@@ -24,6 +25,25 @@ class DnsResponseFactoryTest {
     }
 
     @Test
+    fun `SafeSearch response preserves randomized DNS question casing`() {
+        val domain = "wWw.GoOgLe.CoM"
+        val packet =
+            DnsResponseFactory().cnamePacket(
+                question = question(domain = domain),
+                canonicalName = "forcesafesearch.google.com",
+            )
+        val dnsOffset = Ipv4HeaderSize + UdpHeaderSize
+        val originalQuestion = dnsQuery(domain).copyOfRange(DnsHeaderSize, dnsQuery(domain).size)
+        val responseQuestion =
+            packet.copyOfRange(
+                dnsOffset + DnsHeaderSize,
+                dnsOffset + DnsHeaderSize + originalQuestion.size,
+            )
+
+        assertTrue(originalQuestion.contentEquals(responseQuestion))
+    }
+
+    @Test
     fun `Google Bing and DuckDuckGo use their strict DNS targets`() {
         mapOf(
             "google.com" to "forcesafesearch.google.com",
@@ -42,15 +62,22 @@ class DnsResponseFactoryTest {
 
     @Test
     fun `SafeSearch rewrite also answers Chromium HTTPS DNS records`() {
-        val packet =
-            DnsResponseFactory().cnamePacket(
-                question = question(domain = "google.com", type = DnsTypeHttps),
-                canonicalName = "forcesafesearch.google.com",
-            )
+        val packet = DnsResponseFactory().noDataPacket(question(domain = "google.com", type = DnsTypeHttps))
         val dnsOffset = Ipv4HeaderSize + UdpHeaderSize
-        val typeOffset = dnsOffset + DnsHeaderSize + encodedNameSize("google.com")
 
-        assertEquals(DnsTypeHttps, readUInt16(packet, typeOffset))
+        assertEquals(0, readUInt16(packet, dnsOffset + AnswerCountOffset))
+    }
+
+    @Test
+    fun `SafeSearch address response returns the strict target address for original host`() {
+        val address = byteArrayOf(216.toByte(), 239.toByte(), 38, 120)
+        val packet = DnsResponseFactory().addressPacket(question("google.com"), listOf(address))
+        val dnsOffset = Ipv4HeaderSize + UdpHeaderSize
+        val answerOffset = dnsOffset + DnsHeaderSize + encodedNameSize("google.com") + QuestionTrailerSize
+
+        assertEquals(1, readUInt16(packet, dnsOffset + AnswerCountOffset))
+        assertEquals(DnsTypeA, readUInt16(packet, answerOffset + 2))
+        assertTrue(packet.copyOfRange(answerOffset + AnswerFixedSize, answerOffset + AnswerFixedSize + 4).contentEquals(address))
     }
 
     private fun question(
@@ -65,8 +92,38 @@ class DnsResponseFactoryTest {
             destinationAddress = byteArrayOf(8, 8, 8, 8),
             sourcePort = 53_000,
             destinationPort = 53,
-            queryPayload = byteArrayOf(),
+            queryPayload = dnsQuery(domain, type),
         )
+
+    private fun dnsQuery(
+        domain: String,
+        type: Int = DnsTypeA,
+    ): ByteArray {
+        val name = encodeName(domain)
+        return ByteArray(DnsHeaderSize + name.size + QuestionTrailerSize).also { payload ->
+            payload[0] = 0x12
+            payload[1] = 0x34
+            payload[2] = 0x01
+            payload[5] = 0x01
+            name.copyInto(payload, DnsHeaderSize)
+            val typeOffset = DnsHeaderSize + name.size
+            payload[typeOffset] = (type ushr 8).toByte()
+            payload[typeOffset + 1] = type.toByte()
+            payload[typeOffset + 3] = 0x01
+        }
+    }
+
+    private fun encodeName(domain: String): ByteArray {
+        val labels = domain.removeSuffix(".").split('.')
+        return ByteArray(labels.sumOf { it.length + 1 } + 1).also { encoded ->
+            var offset = 0
+            labels.forEach { label ->
+                encoded[offset++] = label.length.toByte()
+                label.encodeToByteArray().copyInto(encoded, offset)
+                offset += label.length
+            }
+        }
+    }
 
     private fun encodedNameSize(domain: String): Int = domain.split('.').sumOf { it.length + 1 } + 1
 

@@ -26,6 +26,7 @@ import com.contentfilter.feature.vpn.dns.DnsPacketParser
 import com.contentfilter.feature.vpn.dns.DnsParseResult
 import com.contentfilter.feature.vpn.dns.DnsQuestion
 import com.contentfilter.feature.vpn.dns.DnsResponseFactory
+import com.contentfilter.feature.vpn.dns.SafeSearchAddressResolver
 import com.contentfilter.feature.vpn.dns.VpnPacketDiagnostic
 import com.contentfilter.feature.vpn.domainlist.WebDomainListStore
 import com.contentfilter.feature.vpn.policy.VpnDomainPolicyEvaluator
@@ -73,6 +74,7 @@ class FilterVpnService : VpnService() {
 
     private val parser = DnsPacketParser()
     private val responseFactory = DnsResponseFactory()
+    private val safeSearchAddressResolver = SafeSearchAddressResolver()
     private val dnsForwarder =
         DnsForwarder(
             protectDatagramSocket = { socket -> protect(socket) },
@@ -474,10 +476,13 @@ class FilterVpnService : VpnService() {
                     decision.safeSearchRequired.takeIf { it }
                         ?.let { SearchEngineCatalog.safeSearchDnsTarget(domain) }
                 if (safeSearchTarget != null) {
-                    writeResponse(output, outputMutex, responseFactory.cnamePacket(question, safeSearchTarget))
-                    reportSafeSearchApplied(
+                    applySafeSearchDns(
+                        question = question,
+                        target = safeSearchTarget,
                         engineId = searchEngine?.id ?: "unknown",
                         policyRevision = state.snapshot.version,
+                        output = output,
+                        outputMutex = outputMutex,
                         telemetryDispatcher = telemetryDispatcher,
                     )
                 } else {
@@ -518,6 +523,30 @@ class FilterVpnService : VpnService() {
                 forwardDns(question, output, outputMutex)
             }
         }
+    }
+
+    private suspend fun applySafeSearchDns(
+        question: DnsQuestion,
+        target: String,
+        engineId: String,
+        policyRevision: Long,
+        output: FileOutputStream,
+        outputMutex: Mutex,
+        telemetryDispatcher: BoundedDnsRequestDispatcher<suspend () -> Unit>,
+    ) {
+        if (!safeSearchAddressResolver.supports(question.type)) {
+            writeResponse(output, outputMutex, responseFactory.noDataPacket(question))
+            reportSafeSearchApplied(engineId, policyRevision, telemetryDispatcher)
+            return
+        }
+        val addresses = runCatching { safeSearchAddressResolver.resolve(target, question.type) }.getOrDefault(emptyList())
+        if (addresses.isEmpty()) {
+            Log.w(LogTag, "SafeSearch DNS target resolution failed engine=$engineId type=${question.type}")
+            writeResponse(output, outputMutex, responseFactory.servfailPacket(question))
+            return
+        }
+        writeResponse(output, outputMutex, responseFactory.addressPacket(question, addresses))
+        reportSafeSearchApplied(engineId, policyRevision, telemetryDispatcher)
     }
 
     private fun logSearchProtectionDnsLayer(
