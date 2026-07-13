@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
+import android.os.SystemClock
 import android.util.Log
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
@@ -91,6 +92,7 @@ class FilterVpnService : VpnService() {
     private var requestedVpnReconnectKey: String? = null
     private var appliedDomainListVersion: Long? = null
     private var lastReportedPolicy: Pair<String, Long>? = null
+    private val blockedConnectionInvalidationGate = BlockedConnectionInvalidationGate()
     private val lastUnsupportedPacketDiagnosticAt = mutableMapOf<String, Long>()
     private var lastParsedDnsPacketDiagnosticAt: Long = 0L
 
@@ -508,6 +510,12 @@ class FilterVpnService : VpnService() {
                 )
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
                 writeResponse(output, outputMutex, responseFactory.nxdomainPacket(question))
+                if (
+                    decision is PolicyDecision.Block &&
+                    blockedConnectionInvalidationGate.tryAcquire(SystemClock.elapsedRealtime())
+                ) {
+                    invalidateBrowserConnectionsThenStart(state, reason = "blocked-domain")
+                }
             }
             is PolicyDecision.HealthWarning,
             is PolicyDecision.RequireActivation,
@@ -801,6 +809,19 @@ class FilterVpnService : VpnService() {
 
         private fun List<InetAddress>.safeAddresses(): String =
             joinToString(",") { it.hostAddress.orEmpty() }.ifBlank { "none" }
+    }
+}
+
+internal class BlockedConnectionInvalidationGate(
+    private val cooldownMillis: Long = 30_000L,
+) {
+    private var lastInvalidationAt = Long.MIN_VALUE
+
+    @Synchronized
+    fun tryAcquire(nowMillis: Long): Boolean {
+        if (lastInvalidationAt != Long.MIN_VALUE && nowMillis - lastInvalidationAt < cooldownMillis) return false
+        lastInvalidationAt = nowMillis
+        return true
     }
 }
 
