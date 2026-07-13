@@ -4,6 +4,12 @@ Fecha de corte: 2026-07-13
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
+## Baseline estable actual
+
+- Tag: `stable/dev-191-web-protection`.
+- Alcance y recuperacion: `docs/BASELINES.md`.
+- Para volver a este comportamiento desde una version futura, usar el codigo del tag y publicar con un `versionCode` superior; no desinstalar ni borrar datos.
+
 ## Carpeta oficial
 
 Usar solo:
