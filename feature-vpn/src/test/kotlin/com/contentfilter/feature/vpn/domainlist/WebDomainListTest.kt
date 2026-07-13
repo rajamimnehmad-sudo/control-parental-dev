@@ -48,13 +48,14 @@ class WebDomainListTest {
             WebDomainList.parse(
                 currentBundle(
                     version = 7,
-                    categories = linkedMapOf(
-                        WebDomainList.CategoryAdult to setOf("adult.example"),
-                        WebDomainList.CategoryMixedAdult to setOf("mixed.example"),
-                        WebDomainList.CategoryGambling to setOf("gambling.example"),
-                        WebDomainList.CategoryDrugs to setOf("drugs.example"),
-                        WebDomainList.CategoryPiracyTorrents to setOf("piracy.example"),
-                    ),
+                    categories =
+                        linkedMapOf(
+                            WebDomainList.CategoryAdult to setOf("adult.example"),
+                            WebDomainList.CategoryMixedAdult to setOf("mixed.example"),
+                            WebDomainList.CategoryGambling to setOf("gambling.example"),
+                            WebDomainList.CategoryDrugs to setOf("drugs.example"),
+                            WebDomainList.CategoryPiracyTorrents to setOf("piracy.example"),
+                        ),
                 ),
             )
 
@@ -193,13 +194,17 @@ class WebDomainListTest {
             .put(exceptionBytes).put(canaryBytes).array()
     }
 
-    private fun currentBundle(version: Long, categories: LinkedHashMap<String, Set<String>>): ByteArray {
+    private fun currentBundle(
+        version: Long,
+        categories: LinkedHashMap<String, Set<String>>,
+    ): ByteArray {
         val bitCount = 1_024
         val exceptionBytes = ByteArray(0)
         val canaryBytes = ByteArray(0)
-        val encoded = categories.map { (name, values) ->
-            Triple(name.encodeToByteArray(), bloom(values, bitCount), exactHashes(values))
-        }
+        val encoded =
+            categories.map { (name, values) ->
+                Triple(name.encodeToByteArray(), bloom(values, bitCount), exactHashes(values))
+            }
         val descriptorsSize = encoded.size * WebDomainList.CategoryDescriptorSize
         val payloadSize = encoded.sumOf { it.first.size + it.second.size + it.third.size }
         return ByteBuffer.allocate(WebDomainList.HeaderSize + descriptorsSize + payloadSize)
@@ -208,7 +213,9 @@ class WebDomainListTest {
             .putInt(encoded.size).putInt(exceptionBytes.size).putInt(canaryBytes.size)
             .apply {
                 encoded.forEachIndexed { index, (name, _, exact) ->
-                    putInt(name.size).putInt(bitCount).putInt(categories.values.elementAt(index).size).putInt(exact.size)
+                    putInt(
+                        name.size,
+                    ).putInt(bitCount).putInt(categories.values.elementAt(index).size).putInt(exact.size)
                 }
                 encoded.forEach { (name, bits, exact) -> put(name).put(bits).put(exact) }
             }.array()
