@@ -129,6 +129,19 @@ scripts/publicar_usuario_dev.sh
 
 Resultado actual: tests y build del area VPN OK, App Usuario DEV 191 publicada y App Admin DEV 181 sin cambios.
 
+## Cierre 2026-07-13 - Ticket 2 cobertura complementaria de listas
+
+- La base Web DEV combina UT1 con la categoria `porn` de The Block List Project. `adult` y `porn` se publican como aliases de una unica categoria interna `adult`; no existe categoria ni estadistica paralela.
+- The Block List Project publica el repositorio bajo Unlicense / dedicacion al dominio publico y declara compilacion automatizada, validacion y actualizaciones regulares. Las fuentes, licencias y limites quedan documentados en `docs/WEB_DOMAIN_LIST_SOURCES.md`.
+- El publicador normaliza y deduplica las dos fuentes. Tambien elimina de `mixed_adult` cualquier dominio ya presente en `adult`, y calcula contribuciones unicas reales por fuente.
+- La fuente complementaria incorporo 342.912 entradas que no estaban en las categorias UT1 usadas. La version DEV activa contiene 4.942.201 entradas `adult`, 119 `mixed_adult` y 4.942.320 en total.
+- Se conservan excepciones educativas, confirmacion exacta despues del Bloom Filter, archivo y manifiesto firmados, publicacion atomica del puntero y rollback local a la version anterior.
+- Se agregaron pruebas del normalizador y de la deduplicacion entre fuentes, aliases y categorias. `python3 -m unittest discover -s scripts/web_domain_list -p 'test_*.py' -v`, `py_compile`, construccion completa real y `git diff --check` OK.
+- Workflow `Actualizar base Web DEV` `29286087157` publico la version `1783977933114`. Manifiesto y archivo descargados: firmas ECDSA validas, tamano `44.481.260` bytes y SHA-256 `ef3c7574071d6c57b0eef425a66fdc83a0b09f49125918824cd993fc3af51b71`. El canario DEV permanece incluido.
+- Commit funcional: `d22bc4a`.
+- No cambio Android: App Usuario permanece en DEV 191 y App Admin en DEV 181; no se compilo ni publico APK.
+- Limitacion real: cada version nueva descarga la base completa, ahora de aproximadamente 44,5 MB. No agregar mas fuentes ni aumentar frecuencia sin medir datos/bateria; si el costo resulta alto, el siguiente trabajo de infraestructura debe ser fragmentacion o deltas.
+
 ## Cierre 2026-07-13 - optimizacion de invalidaciones VPN
 
 - Causa raiz: una pagina bloqueada puede consultar muchos subdominios en una rafaga. Cada primer bloqueo por dominio iniciaba `invalidateBrowserConnectionsThenStart`, que cancelaba y reemplazaba la invalidacion anterior. El resultado era una sucesion de reconstrucciones del tunel aunque todas pertenecieran a la misma navegacion.
