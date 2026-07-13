@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-12
+Fecha de corte: 2026-07-13
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -37,10 +37,10 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-12:
+Version publicada real al 2026-07-13:
 
 ```text
-App Usuario versionCode 187
+App Usuario versionCode 188
 App Admin versionCode 181
 versionName 1.0.1-dev
 ```
@@ -55,14 +55,14 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-187-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-188-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-181-debug.apk
 ```
 
 SHA-256:
 
 ```text
-Usuario DEV 187: a0c3eee9f66cab667e2261f2abcb5e136486257240d511c8c0633950e937b620
+Usuario DEV 188: 145e78cce91fe336d41ac808cd73b3392f0febcf96727f4329a203e3a781cd2f
 Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c616
 ```
 
@@ -121,7 +121,25 @@ Verificacion ejecutada:
 scripts/publicar_dev.sh
 ```
 
-Resultado actual: suite completa y builds DEV OK, App Usuario DEV 187 y App Admin DEV 181 publicadas.
+Resultado actual: suite completa y builds DEV OK, App Usuario DEV 188 y App Admin DEV 181 publicadas.
+
+## Cierre 2026-07-13 - Ticket 3 modelo comun de decisiones
+
+- Se agrego `WebPolicyDecision`, contrato inmutable y sin dominio, URL, consulta ni contenido visible.
+- Los resultados soportados son `Allow`, `Block`, `Uncertain` y `RequireReview`; todos exigen categoria, confianza, fuente, version, motivo tecnico, momento de evaluacion y vencimiento cuando corresponde.
+- `WebPolicyDecisionResolver` aplica prioridades explicitas: politica de plataforma, regla del administrador, allowlist tecnica, lista firmada, clasificador local de dominios, clasificador local de busquedas y politica por defecto.
+- El resolvedor selecciona una decision completa sin mezclar ni modificar datos de otra capa. Dentro de una misma fuente, una version vieja no reemplaza una nueva; decisiones vencidas se descartan y un conflicto con igual frescura prefiere revision.
+- Alcance deliberado: el modelo queda listo para los tickets siguientes, pero no activa IA, fuentes complementarias, cache, reportes ni revision humana. `PolicyDecision` conserva el enforcement actual de licencia, salud, tiempo extra y VPN.
+- Tests/build: `:core-domain:test`, `:core-policy:test`, ktlint y detekt de ambos modulos, `:app-user:testDevDebugUnitTest` y `:app-user:assembleDevDebug` OK.
+- Validacion fisica en Samsung SM-S908E: actualizacion in-place a DEV 188 sin borrar datos; Android restauro la VPN siempre activa y `FilterVpnService` quedo en primer plano.
+- Commit funcional: `7997d00`. Android CI `29248420096` completo build, tests, ktlint, lint y detekt.
+- App Usuario DEV 188 publicada y descarga verificada con SHA-256 `145e78cce91fe336d41ac808cd73b3392f0febcf96727f4329a203e3a781cd2f`. App Admin permanecio en DEV 181.
+
+## Saneamiento CI 2026-07-13
+
+- `ktlintFormat` normalizo mecanicamente 33 archivos con deuda de formato previa, sin cambios funcionales ni de datos.
+- Commit `68812db`; Android CI `29242948770` completo build, tests, ktlint, lint y detekt.
+- Los workflows automaticos de publicacion fueron cancelados; el saneamiento no genero releases.
 
 ## Cierre 2026-07-13 - Ticket 1 bypass incógnito y DNS
 
