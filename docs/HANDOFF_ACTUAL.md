@@ -40,7 +40,7 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-13:
 
 ```text
-App Usuario versionCode 188
+App Usuario versionCode 190
 App Admin versionCode 181
 versionName 1.0.1-dev
 ```
@@ -55,14 +55,14 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-188-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-190-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-181-debug.apk
 ```
 
 SHA-256:
 
 ```text
-Usuario DEV 188: 145e78cce91fe336d41ac808cd73b3392f0febcf96727f4329a203e3a781cd2f
+Usuario DEV 190: e7a4a9dfb8a7cdc101a98ab68137ac89e3b6d1ce375f692320df15324c8c1425
 Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c616
 ```
 
@@ -121,7 +121,7 @@ Verificacion ejecutada:
 scripts/publicar_dev.sh
 ```
 
-Resultado actual: suite completa y builds DEV OK, App Usuario DEV 188 y App Admin DEV 181 publicadas.
+Resultado actual: suite completa y builds DEV OK, App Usuario DEV 190 y App Admin DEV 181 publicadas.
 
 ## Cierre 2026-07-13 - Ticket 3 modelo comun de decisiones
 
@@ -143,15 +143,22 @@ Resultado actual: suite completa y builds DEV OK, App Usuario DEV 188 y App Admi
 
 ## Cierre 2026-07-13 - Ticket 1 bypass incógnito y DNS
 
-- Causa raíz: en Internet abierto la VPN enruta DNS y resolvers cifrados conocidos, no las IP finales. Chrome podía recibir correctamente un bloqueo DNS de UT1 y aun así mostrar el sitio mediante un socket HTTP/2, HTTP/3 o QUIC previamente resuelto y reutilizado.
-- No era una falla de cobertura, firma, parser ni `VpnDomainPolicyEvaluator`: Logcat confirmó decisiones `Block` de la lista local para el canario DEV. Private DNS del sistema estaba desactivado.
-- Al producirse una decisión DNS `Block`, `FilterVpnService` aplica una invalidación puntual de conexiones del navegador mediante la barrera de túnel completo existente. Un cooldown monotónico de 30 segundos agrupa reintentos sin polling agresivo.
+- Hubo dos causas independientes. En Internet abierto la VPN enruta DNS y resolvers cifrados conocidos, no las IP finales; Chrome podía reutilizar una IP y un socket HTTP/2, HTTP/3 o QUIC ya resuelto después de recibir un bloqueo DNS. Además, Android usaba un valor incorrecto para el primer seed FNV-1a del Bloom UT1: el dominio autorizado estaba en el índice exacto firmado, pero fallaba el precheck Bloom y llegaba como `Allow / no-blocking-rule`.
+- Normal e incógnito no usan una política distinta. Sus cachés DNS y pools de conexiones son independientes, por eso el mismo defecto podía verse en un modo y no en el otro. `DnsPacketParser`, `VpnDomainPolicyEvaluator` y `WebDomainListStore` sí recibían tráfico tradicional; Private DNS no tenía proveedor configurado y DoH/DoT no fueron la causa observada.
+- La corrección inicial de DEV 187 era incompleta: levantaba una barrera de túnel completo durante 400 ms y luego volvía al túnel DNS. Chrome toleraba la pausa y podía reanudar el socket anterior; por eso DEV 188 mostró bloqueo intermitente tanto en normal como en incógnito.
+- DEV 189 agregó rutas host persistentes y acotadas para cortar conexiones reutilizadas, pero seguía sin cubrir dominios UT1 afectados por el seed incorrecto. DEV 190 alinea el seed Bloom con el publicador y agrega un golden vector compartido por tests.
+- Ante el primer `Block`, `FilterVpnService` mantiene la barrera estricta mientras resuelve A y AAAA por sockets protegidos, agrega rutas host para las IP bloqueadas y recién entonces restaura el túnel abierto. Las rutas permanecen hasta cambio de política/lista, reinicio del servicio o expulsión por el límite de 128 rutas.
+- Los reintentos se deduplican con una huella SHA-256 sólo en memoria; no se conservan ni registran consultas o dominios. No hay polling.
 - La VPN continúa limitada a navegadores; no corta Wi-Fi, datos ni otras aplicaciones. Chrome permanece abierto.
-- Validación física en Samsung SM-S908E con App Usuario DEV 187: `coca.com` bloqueó en Chrome normal e incógnito; Google con SafeSearch y `example.com` continuaron funcionando.
-- Tests/build: `:feature-vpn:test`, `:core-policy:test`, `:app-user:assembleDevDebug` y `:app-user:testDevDebugUnitTest` OK.
-- Commit funcional: `af2f87f`.
-- App Usuario DEV 187 publicada. App Admin permaneció en DEV 181.
-- Limitación real: la invalidación se dispara cuando existe una decisión DNS bloqueante. Navegación directa por IP o un resolver cifrado desconocido que no atraviese las rutas de enforcement requiere el anti-evasión avanzado del Ticket 12; no se amplió ese alcance en este ticket.
+- SafeSearch tenía otra degradación observable: cuando el destino estricto no devolvía AAAA en el teléfono, la VPN respondía `SERVFAIL`, lo que permitía fallback a una respuesta IPv6 vieja. DEV 190 responde `NOERROR/NODATA`, conserva la respuesta A estricta y evita una barrera general. Google cargó sin errores y los sockets filtrados de Chrome confirmaron QUIC activo contra la IP del destino estricto.
+- Una actualización in-place podía matar `FilterVpnService` dejando una marca local `Activa` obsoleta. DEV 190 reinicia idempotentemente al abrir la app y registra receptores acotados para `MY_PACKAGE_REPLACED` y `BOOT_COMPLETED`; la reinstalación física confirmó que la VPN volvió sola, foreground y con la política cargada sin abrir la app.
+- Validación física automatizada y redactada en Samsung SM-S908E: `example.com` cargó en normal e incógnito y siguió cargando después del bloqueo; `coca.com` produjo decisiones `Block` en ambos modos y una ruta persistente; Google cargó/recargó con SafeSearch estricto. El usuario confirmó manualmente `ERR_TIMED_OUT` para el dominio autorizado presente en UT1 en incógnito. Ese dominio sólo se comprobó offline contra la lista y no se abrió automáticamente.
+- Logs redactados confirmaron decisiones DNS, invalidación/ruta acotada, ausencia de fallos VPN y reactivación en frío. No se capturaron consultas, URL completas, títulos, HTML, contenido ni historial.
+- Tests/build: `:feature-vpn:test`, `:feature-vpn:ktlintCheck`, `:feature-vpn:detekt`, `:core-policy:test`, `:app-user:assembleDevDebug` y `:app-user:testDevDebugUnitTest` OK.
+- Commit funcional final: `1a83d6f`.
+- Android CI `29261643262` completó build, unit tests, ktlint, Android lint y detekt. El workflow automático general `29261643256` se canceló para no publicar App Admin.
+- App Usuario DEV 190 publicada en `https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-190-debug.apk`; manifiesto y descarga verificados con SHA-256 `e7a4a9dfb8a7cdc101a98ab68137ac89e3b6d1ce375f692320df15324c8c1425`. App Admin permaneció en DEV 181.
+- Limitaciones reales: una navegación directa por una IP nunca resuelta por la VPN y un resolver cifrado desconocido fuera de las rutas conocidas siguen perteneciendo al Ticket 12. Una IP compartida con un dominio bloqueado puede afectar temporalmente otro sitio de ese navegador; el límite de 128 evita crecimiento sin cota. La opción visual de SafeSearch puede seguir apareciendo en Google, pero la conexión de red quedó comprobada contra el destino estricto.
 
 ## Cierre 2026-07-12 - estabilidad VPN/DNS
 
