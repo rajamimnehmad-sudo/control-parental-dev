@@ -40,7 +40,7 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-13:
 
 ```text
-App Usuario versionCode 190
+App Usuario versionCode 191
 App Admin versionCode 181
 versionName 1.0.1-dev
 ```
@@ -55,14 +55,14 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-190-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-191-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-181-debug.apk
 ```
 
 SHA-256:
 
 ```text
-Usuario DEV 190: e7a4a9dfb8a7cdc101a98ab68137ac89e3b6d1ce375f692320df15324c8c1425
+Usuario DEV 191: c408e45e1f892d17d94018a4044b28a8a032aace7ae26b3c94c4e73091f4f3db
 Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c616
 ```
 
@@ -117,11 +117,24 @@ Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c61
 Verificacion ejecutada:
 
 ```bash
-./gradlew :app-admin:testDevDebugUnitTest :app-admin:compileDevDebugKotlin :app-user:compileDevDebugKotlin
-scripts/publicar_dev.sh
+./gradlew --no-daemon :feature-vpn:test :feature-vpn:ktlintCheck :feature-vpn:detekt :core-policy:test :app-user:testDevDebugUnitTest :app-user:assembleDevDebug
+scripts/publicar_usuario_dev.sh
 ```
 
-Resultado actual: suite completa y builds DEV OK, App Usuario DEV 190 y App Admin DEV 181 publicadas.
+Resultado actual: tests y build del area VPN OK, App Usuario DEV 191 publicada y App Admin DEV 181 sin cambios.
+
+## Cierre 2026-07-13 - optimizacion de invalidaciones VPN
+
+- Causa raiz: una pagina bloqueada puede consultar muchos subdominios en una rafaga. Cada primer bloqueo por dominio iniciaba `invalidateBrowserConnectionsThenStart`, que cancelaba y reemplazaba la invalidacion anterior. El resultado era una sucesion de reconstrucciones del tunel aunque todas pertenecieran a la misma navegacion.
+- DEV 191 agrega una cola acotada y deduplicada de preparaciones de destinos bloqueados. Reune la rafaga, resuelve como maximo ocho destinos en paralelo y conserva una sola barrera estricta por lote.
+- La primera invalidacion sigue siendo inmediata. Las olas posteriores respetan un intervalo minimo de 1,5 segundos para agrupar trabajo sin polling agresivo. La cola admite hasta 128 destinos; ante saturacion, error, cambio de policy o cambio de lista se libera el estado para permitir un reintento seguro.
+- La optimizacion no cambia las decisiones de UT1, SafeSearch ni Solo resultados. `example.com` bloqueado bajo Solo resultados demuestra esa policy, no pertenencia a UT1.
+- Privacidad: la cola existe solo en memoria y no agrega consultas, URL, titulos, HTML, contenido ni historial a logs o almacenamiento.
+- Tests/build: `:feature-vpn:test`, `:feature-vpn:ktlintCheck`, `:feature-vpn:detekt`, `:core-policy:test`, `:app-user:testDevDebugUnitTest` y `:app-user:assembleDevDebug` OK; 517 tareas sin fallos.
+- Validacion fisica en Samsung SM-A235M con DEV 191 instalada sin borrar datos: VPN foreground activa; el usuario confirmo busqueda Google funcional y bloqueo de resultados externos. La comprobacion automatizada final con `example.com` mantuvo decisiones de bloqueo y redujo la rafaga controlada a una sola invalidacion en 12 segundos.
+- Commit funcional: `1347bdf`. Android CI `29275226239` completo build, tests, ktlint, Android lint y detekt. El workflow general de ambas apps se cancelo para no publicar App Admin.
+- App Usuario DEV 191 publicada en `https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-191-debug.apk`; manifiesto y descarga verificados con SHA-256 `c408e45e1f892d17d94018a4044b28a8a032aace7ae26b3c94c4e73091f4f3db`. App Admin permanecio en DEV 181.
+- Limitaciones: una pagina ausente de UT1 no queda bloqueada por esa fuente en Internet abierto; eso es falta de cobertura y no bypass. Navegacion directa por una IP nunca resuelta y resolvers cifrados desconocidos siguen reservados para el Ticket 12.
 
 ## Cierre 2026-07-13 - Ticket 3 modelo comun de decisiones
 
