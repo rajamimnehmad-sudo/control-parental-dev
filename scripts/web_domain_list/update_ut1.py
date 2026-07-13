@@ -24,6 +24,9 @@ BASE_PATH = "web-domain-list/dev"
 PUBLIC_BASE = f"https://{PROJECT_REF}.supabase.co/storage/v1/object/public/{BUCKET}/{BASE_PATH}"
 PUBLISH_ENDPOINT = f"https://{PROJECT_REF}.supabase.co/functions/v1/update-web-domain-list"
 SOURCE_BASE = "https://dsi.ut-capitole.fr/blacklists/download"
+BLOCKLIST_PROJECT_PORN_URL = "https://blocklistproject.github.io/Lists/alt-version/porn-nl.txt"
+BLOCKLIST_PROJECT_MINIMUM_ENTRIES = 100_000
+BLOCKLIST_PROJECT_MAXIMUM_ENTRIES = 2_000_000
 ENVIRONMENT = "DEV"
 CANARY = "coca.com"
 FORMAT_VERSION = 2
@@ -53,7 +56,7 @@ def main() -> None:
             request_time = pending.get("requestedAt")
         if action == "refresh":
             current = fetch_current_manifest(required=False)
-            source = build_from_ut1(bool(current and current.get("canaryIncluded")))
+            source = build_from_sources(bool(current and current.get("canaryIncluded")))
         else:
             current = fetch_current_manifest(required=True)
             source = read_existing_bundle(current)
@@ -66,12 +69,29 @@ def main() -> None:
         raise
 
 
-def build_from_ut1(canary_included: bool) -> dict:
-    with tempfile.TemporaryDirectory(prefix="ut1-domain-list-") as temporary:
+def build_from_sources(canary_included: bool) -> dict:
+    with tempfile.TemporaryDirectory(prefix="web-domain-list-") as temporary:
         root = pathlib.Path(temporary)
-        adult, adult_exact, adult_count, adult_bit_count, adult_date = build_category("adult", root)
-        mixed, mixed_exact, mixed_count, mixed_bit_count, mixed_date = build_category("mixed_adult", root)
+        ut1_adult, adult_date = normalized_category_file("adult", root)
+        ut1_mixed, mixed_date = normalized_category_file("mixed_adult", root)
+        supplemental, supplemental_date = normalized_plain_domain_file(
+            BLOCKLIST_PROJECT_PORN_URL,
+            root / "blocklist-project-porn.normalized",
+        )
+        supplemental_count = line_count(supplemental)
+        if not BLOCKLIST_PROJECT_MINIMUM_ENTRIES <= supplemental_count <= BLOCKLIST_PROJECT_MAXIMUM_ENTRIES:
+            raise RuntimeError("Block List Project porn source count is outside the safety range")
+
+        ut1_all = merge_sorted_files((ut1_adult, ut1_mixed), root / "ut1-all.normalized")
+        adult_file = merge_sorted_files((ut1_adult, supplemental), root / "adult.combined.normalized")
+        mixed_file = subtract_sorted_file(ut1_mixed, adult_file, root / "mixed-adult.unique.normalized")
+        supplemental_unique = subtract_sorted_file(supplemental, ut1_all, root / "supplemental.unique.normalized")
+
+        adult, adult_exact, adult_count, adult_bit_count = build_category_file("adult", adult_file)
+        mixed, mixed_exact, mixed_count, mixed_bit_count = build_category_file("mixed_adult", mixed_file)
         exceptions, _, education_date = exact_category("sexual_education", root)
+        ut1_count = line_count(ut1_all)
+        supplemental_unique_count = line_count(supplemental_unique)
     return {
         "adult_bits": adult,
         "mixed_bits": mixed,
@@ -82,8 +102,33 @@ def build_from_ut1(canary_included: bool) -> dict:
         "adult_count": adult_count,
         "mixed_count": mixed_count,
         "category_counts": {"adult": adult_count, "mixed_adult": mixed_count},
+        "category_aliases": {"adult": ["adult", "porn"]},
+        "source_counts": {
+            "UT1": ut1_count,
+            "BlockListProject": supplemental_unique_count,
+        },
+        "sources": [
+            {
+                "id": "ut1",
+                "name": "UT1 Toulouse",
+                "license": "Creative Commons (see upstream LICENSE.pdf)",
+                "url": f"{SOURCE_BASE}/",
+                "sourceDate": max(adult_date, mixed_date, education_date),
+                "inputCount": ut1_count,
+                "uniqueContribution": ut1_count,
+            },
+            {
+                "id": "blocklist-project-porn",
+                "name": "The Block List Project - Porn",
+                "license": "Unlicense / public domain dedication",
+                "url": BLOCKLIST_PROJECT_PORN_URL,
+                "sourceDate": supplemental_date,
+                "inputCount": supplemental_count,
+                "uniqueContribution": supplemental_unique_count,
+            },
+        ],
         "educational_exceptions": exceptions,
-        "source_date": max(adult_date, mixed_date, education_date),
+        "source_date": max(adult_date, mixed_date, education_date, supplemental_date),
         "canary_included": canary_included,
     }
 
@@ -97,7 +142,7 @@ def build_category(category: str, root: pathlib.Path) -> tuple[bytearray, bytes,
 def build_category_file(category: str, normalized: pathlib.Path) -> tuple[bytearray, bytes, int, int]:
     count = line_count(normalized)
     if count == 0:
-        raise RuntimeError(f"UT1 category {category} is empty")
+        raise RuntimeError(f"Web domain category {category} is empty")
     bit_count = max(MINIMUM_BITS, count * BITS_PER_ENTRY)
     bit_count = ((bit_count + 7) // 8) * 8
     bits = bytearray((bit_count + 7) // 8)
@@ -114,7 +159,7 @@ def build_category_file(category: str, normalized: pathlib.Path) -> tuple[bytear
         for line in hashes:
             exact.extend(bytes.fromhex(line.rstrip("\n")))
     if len(exact) != count * EXACT_HASH_BYTES:
-        raise RuntimeError(f"UT1 category {category} has an exact-hash collision")
+        raise RuntimeError(f"Web domain category {category} has an exact-hash collision")
     return bits, bytes(exact), count, bit_count
 
 
@@ -154,6 +199,54 @@ def normalized_category_file(category: str, root: pathlib.Path) -> tuple[pathlib
         raise RuntimeError(f"UT1 archive {category} has no domains entry")
     subprocess.run(["sort", "-u", "-o", str(unsorted), str(unsorted)], check=True, env={**os.environ, "LC_ALL": "C"})
     return unsorted, source_date
+
+
+def normalized_plain_domain_file(url: str, destination: pathlib.Path) -> tuple[pathlib.Path, str]:
+    request = urllib.request.Request(url, headers={"User-Agent": "ContentFilter-Domain-List-Updater/1"})
+    source_date = now_iso()
+    with urllib.request.urlopen(request, timeout=180) as response, destination.open("w", encoding="ascii") as output:
+        source_date = http_date_iso(response.headers.get("Last-Modified"))
+        for raw in response:
+            line = raw.decode("utf-8", errors="ignore").strip()
+            if not line or line.startswith("#"):
+                continue
+            domain = normalize_domain(line)
+            if domain:
+                output.write(domain + "\n")
+    sort_unique(destination)
+    return destination, source_date
+
+
+def merge_sorted_files(inputs: tuple[pathlib.Path, ...], destination: pathlib.Path) -> pathlib.Path:
+    subprocess.run(
+        ["sort", "-u", "-o", str(destination), *(str(path) for path in inputs)],
+        check=True,
+        env={**os.environ, "LC_ALL": "C"},
+    )
+    return destination
+
+
+def subtract_sorted_file(
+    source: pathlib.Path,
+    excluded: pathlib.Path,
+    destination: pathlib.Path,
+) -> pathlib.Path:
+    with destination.open("wb") as output:
+        subprocess.run(
+            ["comm", "-23", str(source), str(excluded)],
+            check=True,
+            stdout=output,
+            env={**os.environ, "LC_ALL": "C"},
+        )
+    return destination
+
+
+def sort_unique(path: pathlib.Path) -> None:
+    subprocess.run(
+        ["sort", "-u", "-o", str(path), str(path)],
+        check=True,
+        env={**os.environ, "LC_ALL": "C"},
+    )
 
 
 def normalize_domain(raw: str) -> str | None:
@@ -238,6 +331,9 @@ def read_existing_bundle(manifest: dict) -> dict:
             "countByCategory",
             {"adult": adult_count, "mixed_adult": mixed_count},
         ),
+        "category_aliases": manifest.get("categoryAliases", {"adult": ["adult", "porn"]}),
+        "source_counts": manifest.get("countBySource", {manifest.get("source", "UT1"): adult_count + mixed_count}),
+        "sources": manifest.get("sources", []),
         "educational_exceptions": exceptions,
         "source_date": manifest["sourceDate"], "canary_included": False,
     }
@@ -255,9 +351,13 @@ def publish(source: dict) -> dict:
         data_signature = sign_file(data_file, root)
         data_url = f"{PUBLIC_BASE}/versions/{version}.bin"
         payload = {
-            "source": "UT1", "version": version, "sourceDate": source["source_date"], "generatedAt": generated_at,
+            "source": "UT1+BlockListProject", "version": version,
+            "sourceDate": source["source_date"], "generatedAt": generated_at,
             "categories": ["adult", "mixed_adult"],
             "countByCategory": source["category_counts"],
+            "categoryAliases": source["category_aliases"],
+            "countBySource": source["source_counts"],
+            "sources": source["sources"],
             "educationalExceptionCount": len(source["educational_exceptions"]),
             "totalCount": sum(source["category_counts"].values()), "sizeBytes": len(data), "sha256": sha256,
             "formatVersion": FORMAT_VERSION, "signatureStatus": "valid", "lastSuccessfulRun": generated_at,
