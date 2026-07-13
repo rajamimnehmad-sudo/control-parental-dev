@@ -14,6 +14,7 @@ internal object DnsEnforcementRoutePlanner {
     fun hostRoutes(
         upstreamDnsServers: List<InetAddress>,
         includeEncryptedDnsResolvers: Boolean,
+        blockedDestinations: List<InetAddress> = emptyList(),
     ): List<DnsEnforcementRoute> {
         val addresses =
             buildList {
@@ -23,6 +24,7 @@ internal object DnsEnforcementRoutePlanner {
                         runCatching { InetAddress.getByName(address) }.getOrNull()?.let(::add)
                     }
                 }
+                addAll(blockedDestinations)
             }
         return addresses
             .distinct()

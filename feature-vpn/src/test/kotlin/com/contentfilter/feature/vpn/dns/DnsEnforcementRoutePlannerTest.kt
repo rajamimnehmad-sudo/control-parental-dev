@@ -56,6 +56,21 @@ class DnsEnforcementRoutePlannerTest {
         }
     }
 
+    @Test
+    fun `open mode keeps blocked destination host routes`() {
+        val blocked = InetAddress.getByName("192.0.2.80")
+
+        val routes =
+            DnsEnforcementRoutePlanner.hostRoutes(
+                upstreamDnsServers = emptyList(),
+                includeEncryptedDnsResolvers = false,
+                blockedDestinations = listOf(blocked),
+            )
+
+        assertTrue(routes.hasAddress("192.0.2.80"))
+        assertEquals(32, routes.single().prefixLength)
+    }
+
     private fun List<DnsEnforcementRoute>.hasAddress(address: String): Boolean {
         val expected = InetAddress.getByName(address)
         return any { it.address == expected }

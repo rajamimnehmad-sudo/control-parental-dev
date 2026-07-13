@@ -5,7 +5,6 @@ import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.VpnService
 import android.os.ParcelFileDescriptor
-import android.os.SystemClock
 import android.util.Log
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
@@ -21,10 +20,12 @@ import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.sync.engine.EffectivePolicyApplicationTracker
 import com.contentfilter.core.sync.engine.PolicyConsumer
 import com.contentfilter.feature.vpn.dns.BoundedDnsRequestDispatcher
+import com.contentfilter.feature.vpn.dns.DnsAnswerAddressParser
 import com.contentfilter.feature.vpn.dns.DnsEnforcementRoutePlanner
 import com.contentfilter.feature.vpn.dns.DnsForwarder
 import com.contentfilter.feature.vpn.dns.DnsPacketParser
 import com.contentfilter.feature.vpn.dns.DnsParseResult
+import com.contentfilter.feature.vpn.dns.DnsQueryAddressVariants
 import com.contentfilter.feature.vpn.dns.DnsQuestion
 import com.contentfilter.feature.vpn.dns.DnsResponseFactory
 import com.contentfilter.feature.vpn.dns.SafeSearchAddressResolver
@@ -92,7 +93,7 @@ class FilterVpnService : VpnService() {
     private var requestedVpnReconnectKey: String? = null
     private var appliedDomainListVersion: Long? = null
     private var lastReportedPolicy: Pair<String, Long>? = null
-    private val blockedConnectionInvalidationGate = BlockedConnectionInvalidationGate()
+    private val blockedDestinationRoutes = BlockedDestinationRouteStore()
     private val lastUnsupportedPacketDiagnosticAt = mutableMapOf<String, Long>()
     private var lastParsedDnsPacketDiagnosticAt: Long = 0L
 
@@ -197,6 +198,7 @@ class FilterVpnService : VpnService() {
                 next = currentState,
             )
         if (invalidateConnections) {
+            blockedDestinationRoutes.clear()
             invalidateBrowserConnectionsThenStart(currentState, reason = "policy")
         } else {
             cleanup()
@@ -204,9 +206,11 @@ class FilterVpnService : VpnService() {
         }
     }
 
+    @Synchronized
     private fun invalidateBrowserConnectionsThenStart(
         state: VpnPolicyState,
         reason: String,
+        prepareOpenTunnel: suspend () -> Unit = {},
     ) {
         connectionInvalidationJob?.cancel()
         connectionInvalidationJob =
@@ -239,6 +243,10 @@ class FilterVpnService : VpnService() {
                             "strict=${state.strictWebBlockEnabled} onlyResults=${state.onlyResultsEnabled} " +
                             "reason=$reason domainListVersion=${webDomainListStore.version}",
                     )
+                    runCatching { prepareOpenTunnel() }
+                        .onFailure {
+                            Log.w(LogTag, "VPN route preparation failed: ${it.javaClass.simpleName}")
+                        }
                     delay(ConnectionInvalidationMillis)
                     strictWebBlockMode = false
                     encryptedDnsEnforcementMode = false
@@ -287,6 +295,7 @@ class FilterVpnService : VpnService() {
                 upstreamServers = upstreamDnsServers,
                 strictWebBlock = strictWebBlockMode,
                 enforceEncryptedDns = encryptedDnsEnforcementMode,
+                blockedDestinations = blockedDestinationRoutes.activeRoutes(),
             )
             .allowBrowserApps()
             .setMtu(DefaultMtu)
@@ -297,6 +306,7 @@ class FilterVpnService : VpnService() {
         upstreamServers: List<InetAddress>,
         strictWebBlock: Boolean,
         enforceEncryptedDns: Boolean,
+        blockedDestinations: List<InetAddress>,
     ): Builder =
         apply {
             if (strictWebBlock) {
@@ -308,7 +318,7 @@ class FilterVpnService : VpnService() {
                     .distinctBy { it.hostAddress }
                     .forEach { server -> addDnsServer(server) }
                 DnsEnforcementRoutePlanner
-                    .hostRoutes(upstreamServers, enforceEncryptedDns)
+                    .hostRoutes(upstreamServers, enforceEncryptedDns, blockedDestinations)
                     .forEach { route -> addRoute(route.address, route.prefixLength) }
             }
         }
@@ -341,6 +351,7 @@ class FilterVpnService : VpnService() {
         scope.launch {
             webDomainListStore.observeStatus().collect { status ->
                 if (requiresDomainListConnectionInvalidation(appliedDomainListVersion, status.version)) {
+                    blockedDestinationRoutes.clear()
                     Log.i(LogTag, "VPN domain list changed version=${status.version}; reconnecting tunnel")
                     telemetryReporter.recordReconnectApplied("domain-list-version-changed")
                     invalidateBrowserConnectionsThenStart(snapshotProvider.current(), reason = "domain-list")
@@ -509,13 +520,15 @@ class FilterVpnService : VpnService() {
                     "DNS decision=block snapshotVersion=${state.snapshot.version} rules=${state.snapshot.rules.size} limits=${state.snapshot.dailyLimits.size} reason=${decision.reasonLabel()}",
                 )
                 enqueueDnsTelemetry(telemetryDispatcher) { telemetryReporter.recordDnsDecision(decision) }
-                writeResponse(output, outputMutex, responseFactory.nxdomainPacket(question))
-                if (
-                    decision is PolicyDecision.Block &&
-                    blockedConnectionInvalidationGate.tryAcquire(SystemClock.elapsedRealtime())
-                ) {
-                    invalidateBrowserConnectionsThenStart(state, reason = "blocked-domain")
+                if (decision is PolicyDecision.Block && blockedDestinationRoutes.beginPreparation(domain)) {
+                    val resolvers = upstreamDnsServers
+                    invalidateBrowserConnectionsThenStart(
+                        state = state,
+                        reason = "blocked-destination",
+                        prepareOpenTunnel = { discoverBlockedDestinationRoutes(domain, question, resolvers) },
+                    )
                 }
+                writeResponse(output, outputMutex, responseFactory.nxdomainPacket(question))
             }
             is PolicyDecision.HealthWarning,
             is PolicyDecision.RequireActivation,
@@ -622,6 +635,26 @@ class FilterVpnService : VpnService() {
                 writeResponse(output, outputMutex, responseFactory.servfailPacket(question))
             }
         }.onFailure { telemetryReporter.recordError("DNS forward failed: ${it.javaClass.simpleName}") }
+    }
+
+    private suspend fun discoverBlockedDestinationRoutes(
+        domain: String,
+        question: DnsQuestion,
+        resolvers: List<InetAddress>,
+    ) {
+        var resolved = false
+        DnsQueryAddressVariants.from(question.queryPayload).forEach { query ->
+            val response = runCatching { dnsForwarder.forward(query, resolvers) }.getOrNull()
+            response?.let(DnsAnswerAddressParser::parse)?.let { answers ->
+                blockedDestinationRoutes.add(domain, answers)
+                resolved = true
+            }
+        }
+        if (!resolved) blockedDestinationRoutes.forgetDomain(domain)
+        Log.i(
+            LogTag,
+            "Blocked destination routes ready count=${blockedDestinationRoutes.activeRoutes().size}",
+        )
     }
 
     private suspend fun writeResponse(
@@ -815,19 +848,6 @@ class FilterVpnService : VpnService() {
 
         private fun List<InetAddress>.safeAddresses(): String =
             joinToString(",") { it.hostAddress.orEmpty() }.ifBlank { "none" }
-    }
-}
-
-internal class BlockedConnectionInvalidationGate(
-    private val cooldownMillis: Long = 30_000L,
-) {
-    private var lastInvalidationAt = Long.MIN_VALUE
-
-    @Synchronized
-    fun tryAcquire(nowMillis: Long): Boolean {
-        if (lastInvalidationAt != Long.MIN_VALUE && nowMillis - lastInvalidationAt < cooldownMillis) return false
-        lastInvalidationAt = nowMillis
-        return true
     }
 }
 
