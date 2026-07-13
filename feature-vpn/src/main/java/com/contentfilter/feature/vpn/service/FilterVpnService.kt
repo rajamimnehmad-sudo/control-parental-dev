@@ -547,7 +547,13 @@ class FilterVpnService : VpnService() {
             reportSafeSearchApplied(engineId, policyRevision, telemetryDispatcher)
             return
         }
-        val addresses = runCatching { safeSearchAddressResolver.resolve(target, question.type) }.getOrDefault(emptyList())
+        val addresses =
+            runCatching {
+                safeSearchAddressResolver.resolve(
+                    target,
+                    question.type,
+                )
+            }.getOrDefault(emptyList())
         if (addresses.isEmpty()) {
             Log.w(LogTag, "SafeSearch DNS target resolution failed engine=$engineId type=${question.type}")
             writeResponse(output, outputMutex, responseFactory.servfailPacket(question))

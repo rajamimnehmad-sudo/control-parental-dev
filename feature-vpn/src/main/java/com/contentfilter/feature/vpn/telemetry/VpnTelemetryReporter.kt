@@ -56,7 +56,9 @@ class VpnTelemetryReporter
             val deviceId = deviceActivationRepository.currentActivation()?.deviceId?.safeDeviceId() ?: "none"
             record(
                 type = "search-protection",
-                message = "layer=reconnect deviceId=$deviceId action=reconnect result=applied reason=${reason.take(MaxMessageLength)}",
+                message = "layer=reconnect deviceId=$deviceId action=reconnect result=applied reason=${reason.take(
+                    MaxMessageLength,
+                )}",
             )
         }
 

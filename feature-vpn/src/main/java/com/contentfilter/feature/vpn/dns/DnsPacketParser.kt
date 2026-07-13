@@ -48,7 +48,11 @@ class DnsPacketParser {
             dnsOffset = udpOffset + UDP_HEADER_SIZE,
             dnsLength = udpCheck.udpLength - UDP_HEADER_SIZE,
             sourceAddress = packet.copyOfRange(IPV4_SOURCE_OFFSET, IPV4_SOURCE_OFFSET + IPV4_ADDRESS_SIZE),
-            destinationAddress = packet.copyOfRange(IPV4_DESTINATION_OFFSET, IPV4_DESTINATION_OFFSET + IPV4_ADDRESS_SIZE),
+            destinationAddress =
+                packet.copyOfRange(
+                    IPV4_DESTINATION_OFFSET,
+                    IPV4_DESTINATION_OFFSET + IPV4_ADDRESS_SIZE,
+                ),
             sourcePort = udpCheck.sourcePort,
             destinationPort = udpCheck.destinationPort,
         )
@@ -76,7 +80,11 @@ class DnsPacketParser {
             dnsOffset = udpOffset + UDP_HEADER_SIZE,
             dnsLength = udpCheck.udpLength - UDP_HEADER_SIZE,
             sourceAddress = packet.copyOfRange(IPV6_SOURCE_OFFSET, IPV6_SOURCE_OFFSET + IPV6_ADDRESS_SIZE),
-            destinationAddress = packet.copyOfRange(IPV6_DESTINATION_OFFSET, IPV6_DESTINATION_OFFSET + IPV6_ADDRESS_SIZE),
+            destinationAddress =
+                packet.copyOfRange(
+                    IPV6_DESTINATION_OFFSET,
+                    IPV6_DESTINATION_OFFSET + IPV6_ADDRESS_SIZE,
+                ),
             sourcePort = udpCheck.sourcePort,
             destinationPort = udpCheck.destinationPort,
         )
@@ -120,7 +128,13 @@ class DnsPacketParser {
                 cursor += 1
                 break
             }
-            if (labelLength and DNS_POINTER_MASK == DNS_POINTER_MASK) return unsupported("dns-compressed-question", packet, length)
+            if (labelLength and DNS_POINTER_MASK == DNS_POINTER_MASK) {
+                return unsupported(
+                    "dns-compressed-question",
+                    packet,
+                    length,
+                )
+            }
             if (labelLength > MAX_LABEL_LENGTH || cursor + 1 + labelLength > length) {
                 return unsupported("dns-invalid-label", packet, length)
             }
@@ -132,7 +146,13 @@ class DnsPacketParser {
         }
 
         val dnsEnd = dnsOffset + dnsLength
-        if (labels.isEmpty() || cursor + QUESTION_TRAILER_SIZE > dnsEnd) return unsupported("dns-invalid-question", packet, length)
+        if (labels.isEmpty() || cursor + QUESTION_TRAILER_SIZE > dnsEnd) {
+            return unsupported(
+                "dns-invalid-question",
+                packet,
+                length,
+            )
+        }
         val domain = labels.joinToString(".")
         if (!domain.isValidDomain()) return unsupported("dns-invalid-domain", packet, length)
 
