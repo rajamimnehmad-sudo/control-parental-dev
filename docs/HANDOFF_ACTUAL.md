@@ -40,7 +40,7 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-12:
 
 ```text
-App Usuario versionCode 186
+App Usuario versionCode 187
 App Admin versionCode 181
 versionName 1.0.1-dev
 ```
@@ -55,14 +55,14 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-186-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-187-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-181-debug.apk
 ```
 
 SHA-256:
 
 ```text
-Usuario DEV 186: 839b2653cb9878fe962777390dac580464e98d155ee2e09d48ec18f6c637124d
+Usuario DEV 187: a0c3eee9f66cab667e2261f2abcb5e136486257240d511c8c0633950e937b620
 Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c616
 ```
 
@@ -121,7 +121,19 @@ Verificacion ejecutada:
 scripts/publicar_dev.sh
 ```
 
-Resultado actual: suite completa y builds DEV OK, App Usuario DEV 186 y App Admin DEV 181 publicadas.
+Resultado actual: suite completa y builds DEV OK, App Usuario DEV 187 y App Admin DEV 181 publicadas.
+
+## Cierre 2026-07-13 - Ticket 1 bypass incógnito y DNS
+
+- Causa raíz: en Internet abierto la VPN enruta DNS y resolvers cifrados conocidos, no las IP finales. Chrome podía recibir correctamente un bloqueo DNS de UT1 y aun así mostrar el sitio mediante un socket HTTP/2, HTTP/3 o QUIC previamente resuelto y reutilizado.
+- No era una falla de cobertura, firma, parser ni `VpnDomainPolicyEvaluator`: Logcat confirmó decisiones `Block` de la lista local para el canario DEV. Private DNS del sistema estaba desactivado.
+- Al producirse una decisión DNS `Block`, `FilterVpnService` aplica una invalidación puntual de conexiones del navegador mediante la barrera de túnel completo existente. Un cooldown monotónico de 30 segundos agrupa reintentos sin polling agresivo.
+- La VPN continúa limitada a navegadores; no corta Wi-Fi, datos ni otras aplicaciones. Chrome permanece abierto.
+- Validación física en Samsung SM-S908E con App Usuario DEV 187: `coca.com` bloqueó en Chrome normal e incógnito; Google con SafeSearch y `example.com` continuaron funcionando.
+- Tests/build: `:feature-vpn:test`, `:core-policy:test`, `:app-user:assembleDevDebug` y `:app-user:testDevDebugUnitTest` OK.
+- Commit funcional: `af2f87f`.
+- App Usuario DEV 187 publicada. App Admin permaneció en DEV 181.
+- Limitación real: la invalidación se dispara cuando existe una decisión DNS bloqueante. Navegación directa por IP o un resolver cifrado desconocido que no atraviese las rutas de enforcement requiere el anti-evasión avanzado del Ticket 12; no se amplió ese alcance en este ticket.
 
 ## Cierre 2026-07-12 - estabilidad VPN/DNS
 
