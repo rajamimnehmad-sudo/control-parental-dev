@@ -23,7 +23,8 @@ export default async function DomainListPage() {
       <Metric label="Fecha de la fuente" value={data ? formatDate(data.sourceDate) : "-"} /><Metric label="Ultima actualizacion" value={data ? formatDate(data.lastSuccessfulRun) : "-"} />
       <Metric label="Proxima programada" value={data ? formatDate(data.nextScheduledAt) : "-"} /><Metric label="Antiguedad" value={ageDays === null ? "-" : `${ageDays} dias`} />
       <Metric label="Cantidad total UT1" value={data ? compactNumber(data.totalCount) : "-"} /><Metric label="adult" value={data ? compactNumber(data.countByCategory.adult) : "-"} />
-      <Metric label="mixed_adult" value={data ? compactNumber(data.countByCategory.mixed_adult) : "-"} /><Metric label="Excepciones educativas" value={data ? compactNumber(data.educationalExceptionCount) : "-"} />
+      <Metric label="porn" value={data ? compactNumber(data.countByCategory.porn ?? 0) : "-"} /><Metric label="mixed_adult" value={data ? compactNumber(data.countByCategory.mixed_adult) : "-"} />
+      <Metric label="Excepciones educativas" value={data ? compactNumber(data.educationalExceptionCount) : "-"} />
       <Metric label="Tamano descargable" value={data ? formatBytes(data.sizeBytes) : "-"} /><Metric label="SHA-256" value={data ? `${data.sha256.slice(0, 12)}...` : "-"} mono />
       <Metric label="Dominio canario" value={data?.devCanary ?? "coca.com"} mono /><Metric label="Estado del canario" value={data?.canaryIncluded ? "Incluido" : "Ausente"} />
     </section>
