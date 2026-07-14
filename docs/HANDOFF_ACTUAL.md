@@ -92,7 +92,8 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 - El panel se actualiza cada 10 segundos y agrupa por comunidad y dispositivo. Conserva el consumo del mes aunque DAG se cierre luego; nunca muestra ni recibe consultas, URLs, resultados o historial.
 - El Super Admin puede cambiar el cupo mensual por comunidad entre 1 y 100.000. El valor inicial y vigente para Yeshurun Tora es 100.
 - Seguridad verificada: `anon` recibe HTTP 401 al invocar el resumen; `anon` y `authenticated` no pueden leer la tabla de uso; las RPC de lectura/escritura exigen sesion autenticada y `require_super_admin()`.
-- Validacion: resumen DEV devuelve Yeshurun Tora con 1 dispositivo DAG activo, 0/100 usadas; TypeScript, ESLint sobre `src`, build Next y bundle Cloudflare exitosos. Queda publicar Super Web y la prueba fisica final del navegador.
+- Validacion: resumen DEV devuelve Yeshurun Tora con 1 dispositivo DAG activo, 0/100 usadas; TypeScript, ESLint sobre `src`, build Next y bundle Cloudflare exitosos.
+- Super Web Sites version 3 fue publicada en modo privado en `https://super-admin-content-filter.ramnehmad.chatgpt.site`. La prueba fisica final del navegador sigue pendiente por decision del usuario.
 
 ## Cierre 2026-07-14 - DAG-FOUNDATION-01 entrada, control y atajo
 

@@ -169,11 +169,11 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ### DAG-USAGE-01 - Contador mensual en Super Web
 
-- Estado: `Implementado en DEV`; aprobado por el usuario el 2026-07-14.
+- Estado: `Completado y publicado`; aprobado por el usuario el 2026-07-14.
 - Objetivo: mostrar en Super Web el consumo mensual de DAG casi en tiempo real, con usados, limite y restantes por comunidad y dispositivo, total general, costo Brave estimado y alertas al 80% y 100%.
 - Privacidad: no exponer consultas, URLs, resultados ni historial. Super Web consulta un agregado autorizado; la tabla de contadores permanece inaccesible para clientes comunes.
 - Implementacion: refresco seguro cada 10 segundos, cupo configurable por comunidad, proyeccion mensual y costo estimado luego del credito Brave global. El piloto comercial aprobado es USD 1 con 100 busquedas por dispositivo/mes.
-- Aceptacion tecnica: migracion DEV aplicada, Edge Function actualizada, RPCs Super Admin aisladas de `anon`, tabla sin lectura de clientes y builds Web exitosos. La prueba fisica completa de DAG permanece como ultimo paso de `DAG-BROWSER-01A`.
+- Aceptacion tecnica: migracion DEV aplicada, Edge Function actualizada, RPCs Super Admin aisladas de `anon`, tabla sin lectura de clientes, builds Web exitosos y Super Web Sites version 3 publicada en modo privado. La prueba fisica completa de DAG permanece como ultimo paso de `DAG-BROWSER-01A`.
 
 ### Otros tickets de roadmap
 
