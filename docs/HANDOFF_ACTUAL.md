@@ -4,6 +4,13 @@ Fecha de corte: 2026-07-14
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
+## Fuentes oficiales
+
+- Este archivo es la verdad tecnica de lo implementado, probado y publicado.
+- `docs/BACKLOG_PRODUCTO.md` es la fuente canonica de ideas, prioridades y tickets propuestos/aprobados.
+- El Google Doc `Backlog Codex - Control Parental` es una bandeja de entrada historica, no una segunda verdad tecnica.
+- Al cerrar un ticket, sincronizar handoff y backlog en el mismo commit cuando cambie el estado del producto.
+
 ## Baseline estable actual
 
 - Tag: `stable/dev-191-web-protection`.

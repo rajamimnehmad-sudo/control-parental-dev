@@ -11,6 +11,12 @@ Antes de cualquier tarea en este repositorio:
 7. Modificar la menor cantidad posible de archivos.
 8. Si solo cambian docs, no compilar, no incrementar versionCode y no publicar APK.
 
+Para planificacion, captura de ideas o seleccion de tickets:
+
+- Leer `docs/BACKLOG_PRODUCTO.md`.
+- Tratar `docs/HANDOFF_ACTUAL.md` como verdad tecnica y el backlog como verdad de producto.
+- No escribir codigo hasta que el usuario apruebe explicitamente el ticket.
+
 ## Ticket Android autorizado por el usuario (2026-07-14)
 
 - Area: `feature-accessibility`, barrera antimanipulacion tipo Rimon.

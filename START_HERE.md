@@ -7,6 +7,7 @@ Antes de cualquier tarea leer:
 - `docs/AREAS.md`
 - `docs/DEV_FLOW.md`
 - `docs/HANDOFF_ACTUAL.md`
+- `docs/BACKLOG_PRODUCTO.md`
 
 Reglas de trabajo:
 
