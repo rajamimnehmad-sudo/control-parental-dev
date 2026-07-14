@@ -46,8 +46,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 200
-App Admin versionCode 200
+App Usuario versionCode 201
+App Admin versionCode 201
 versionName 1.0.1-dev
 ```
 
@@ -61,8 +61,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-200-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-200-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-201-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-201-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
@@ -115,16 +115,18 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 
 ## Build y publicacion
 
-Verificacion ejecutada para DEV 200:
+Verificacion ejecutada para DEV 201:
 
 ```bash
 ./gradlew --no-daemon --console=plain :app-user:testDevDebugUnitTest :app-admin:testDevDebugUnitTest :app-user:ktlintCheck :app-admin:ktlintCheck :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
 ```
 
-Resultado actual: tests, ktlint y build de ambas apps OK. DEV 200 preparada para publicacion por GitHub Actions para Usuario y Admin.
+Resultado actual: tests, ktlint y build de ambas apps OK. DEV 201 preparada para publicacion por GitHub Actions para Usuario y Admin.
 
 ## Cierre 2026-07-14 - barrera reforzada tipo Rimon sin MDM
 
+- DEV 201 resuelve dinamicamente en cada Android el paquete que maneja la desinstalacion de Content Filter y reconoce los controles peligrosos de App Info por IDs estables y etiquetas ES/EN. Esto amplia cobertura OEM de Desinstalar, Desactivar y Forzar detencion sin bloquear la ficha de otras apps.
+- Validacion fisica in-place de DEV 201 en Samsung SM-S908E: diez aperturas de App Info y diez intentos de desinstalacion directa terminaron en Launcher; la app continuo instalada, Device Admin y Accessibility activos y el tunel VPN real conectado.
 - DEV 200 agrega un watchdog local cada 30 segundos. Contrasta el tunel VPN real con su estado persistido, Accessibility y Administrador del dispositivo; corrige el heartbeat, emite una alerta por componente caido y reinicia la VPN si el permiso sigue vigente y no existe una desactivacion intencional autorizada.
 - Validacion fisica in-place de DEV 200 en Samsung SM-S908E, sin borrar datos: version instalada 200, Device Admin y Accessibility conservaron sus permisos y el tunel VPN real siguio conectado despues de un ciclo completo del watchdog, sin crash.
 - DEV 199 bloquea las pantallas criticas de detalle de Accessibility y configuracion VPN desde el primer evento de ventana, sin esperar a que Android termine de dibujar el nombre de Content Filter. El permiso temporal de mantenimiento sigue habilitandolas de forma controlada.

@@ -1,6 +1,8 @@
 package com.contentfilter.feature.accessibility.service
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -82,6 +84,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var observedWindowClassName: String? = null
     private var lastExplicitSearchNoticeAt: Long = 0L
     private var lastTamperAlertAt: Long = 0L
+    private val ownUninstallerPackages by lazy { resolveOwnUninstallerPackages() }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -238,11 +241,14 @@ class ProtectorAccessibilityService : AccessibilityService() {
     ): Boolean {
         val ownAppIdentityVisible =
             rootInActiveWindow.containsOwnAppIdentity() || eventContainsOwnAppIdentity(event)
+        val dangerousSettingsActionVisible = rootInActiveWindow.containsDangerousSettingsAction()
         if (
             !settingsProtectionPolicy.shouldLeaveProtectedScreen(
                 packageName = packageName,
                 className = className,
                 ownAppIdentityVisible = ownAppIdentityVisible,
+                resolvedOwnUninstaller = packageName in ownUninstallerPackages,
+                dangerousSettingsActionVisible = dangerousSettingsActionVisible,
                 deviceAdminEnabled = DeviceAdminController.isEnabled(this),
                 armed = protectionStateStore.isArmed(),
                 settingsAuthorized =
@@ -298,6 +304,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
             packageName = packageName,
             className = className,
             ownAppIdentityVisible = root.containsOwnAppIdentity(),
+            resolvedOwnUninstaller = packageName in ownUninstallerPackages,
+            dangerousSettingsActionVisible = root.containsDangerousSettingsAction(),
             deviceAdminEnabled = DeviceAdminController.isEnabled(this),
             armed = protectionStateStore.isArmed(),
             settingsAuthorized =
@@ -348,6 +356,39 @@ class ProtectorAccessibilityService : AccessibilityService() {
         }
         return false
     }
+
+    private fun AccessibilityNodeInfo?.containsDangerousSettingsAction(): Boolean {
+        val root = this ?: return false
+        val pending = ArrayDeque<AccessibilityNodeInfo>()
+        pending.add(root)
+        var visited = 0
+        while (pending.isNotEmpty() && visited < MaxIdentityNodes) {
+            val node = pending.removeFirst()
+            visited += 1
+            if (
+                isDangerousSettingsAction(
+                    viewId = node.viewIdResourceName,
+                    label = node.text?.toString() ?: node.contentDescription?.toString(),
+                    clickable = node.isClickable,
+                )
+            ) {
+                return true
+            }
+            repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
+        }
+        return false
+    }
+
+    @Suppress("DEPRECATION")
+    private fun resolveOwnUninstallerPackages(): Set<String> =
+        listOf(Intent.ACTION_DELETE, Intent.ACTION_UNINSTALL_PACKAGE)
+            .flatMap { action ->
+                packageManager.queryIntentActivities(
+                    Intent(action, Uri.parse("package:$packageName")),
+                    android.content.pm.PackageManager.MATCH_DEFAULT_ONLY,
+                )
+            }.mapNotNull { it.activityInfo?.packageName }
+            .toSet()
 
     private fun eventContainsOwnAppIdentity(event: AccessibilityEvent): Boolean {
         val appLabel = applicationInfo.loadLabel(packageManager).toString()

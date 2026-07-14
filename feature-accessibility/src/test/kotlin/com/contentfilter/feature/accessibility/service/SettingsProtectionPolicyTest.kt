@@ -27,6 +27,62 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun resolvedOemUninstallerIsProtected() {
+        assertTrue(
+            decide(
+                packageName = "com.vendor.securitycenter",
+                className = "com.vendor.app.DeletePackageActivity",
+                resolvedOwnUninstaller = true,
+            ),
+        )
+    }
+
+    @Test
+    fun unrelatedPackageWithDeleteClassIsNotProtected() {
+        assertFalse(
+            decide(
+                packageName = "com.example.app",
+                className = "com.example.DeletePackageActivity",
+                resolvedOwnUninstaller = false,
+            ),
+        )
+    }
+
+    @Test
+    fun dangerousActionProtectsUnknownOemAppInfoClass() {
+        assertTrue(
+            decide(
+                className = "com.vendor.settings.ApplicationDetails",
+                dangerousSettingsActionVisible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun dangerousActionForAnotherAppDoesNotBlockSettings() {
+        assertFalse(
+            decide(
+                className = "com.vendor.settings.ApplicationDetails",
+                ownAppIdentityVisible = false,
+                dangerousSettingsActionVisible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun dangerousSettingsActionMatchesStableIdsAndClickableLabels() {
+        assertTrue(
+            isDangerousSettingsAction(
+                viewId = "com.android.settings:id/force_stop_button",
+                label = null,
+                clickable = false,
+            ),
+        )
+        assertTrue(isDangerousSettingsAction(viewId = null, label = "Desinstalar", clickable = true))
+        assertFalse(isDangerousSettingsAction(viewId = null, label = "Desinstalar", clickable = false))
+    }
+
+    @Test
     fun removalAuthorizationAllowsOwnAppInfo() {
         assertFalse(
             decide(
@@ -181,6 +237,8 @@ class SettingsProtectionPolicyTest {
         packageName: String = "com.android.settings",
         className: String,
         ownAppIdentityVisible: Boolean = true,
+        resolvedOwnUninstaller: Boolean = false,
+        dangerousSettingsActionVisible: Boolean = false,
         deviceAdminEnabled: Boolean = true,
         armed: Boolean = true,
         settingsAuthorized: Boolean = false,
@@ -190,6 +248,8 @@ class SettingsProtectionPolicyTest {
             packageName = packageName,
             className = className,
             ownAppIdentityVisible = ownAppIdentityVisible,
+            resolvedOwnUninstaller = resolvedOwnUninstaller,
+            dangerousSettingsActionVisible = dangerousSettingsActionVisible,
             deviceAdminEnabled = deviceAdminEnabled,
             armed = armed,
             settingsAuthorized = settingsAuthorized,
@@ -202,6 +262,8 @@ class SettingsProtectionPolicyTest {
             packageName = "com.android.settings",
             className = "com.samsung.android.settings.applications.specialaccess.SecDeviceAdminAdd",
             ownAppIdentityVisible = false,
+            resolvedOwnUninstaller = false,
+            dangerousSettingsActionVisible = false,
             deviceAdminEnabled = true,
             armed = false,
             settingsAuthorized = false,

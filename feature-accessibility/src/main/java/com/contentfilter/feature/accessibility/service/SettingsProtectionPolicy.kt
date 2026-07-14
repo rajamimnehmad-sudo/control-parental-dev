@@ -7,13 +7,21 @@ class SettingsProtectionPolicy {
         packageName: String,
         className: String?,
         ownAppIdentityVisible: Boolean,
+        resolvedOwnUninstaller: Boolean,
+        dangerousSettingsActionVisible: Boolean,
         deviceAdminEnabled: Boolean,
         armed: Boolean,
         settingsAuthorized: Boolean,
         removalAuthorized: Boolean,
         elapsedRealtimeMillis: Long,
     ): Boolean {
-        val requiredScope = protectedScope(packageName, className) ?: return false
+        val requiredScope =
+            protectedScope(
+                packageName = packageName,
+                className = className,
+                resolvedOwnUninstaller = resolvedOwnUninstaller,
+                dangerousSettingsActionVisible = dangerousSettingsActionVisible,
+            ) ?: return false
         if (!armed && !deviceAdminEnabled) return false
         val deviceAdminRemovalScreen = isDeviceAdminRemovalScreen(packageName, className)
         val criticalSettingsScreen = isCriticalSettingsScreen(packageName, className)
@@ -44,12 +52,18 @@ class SettingsProtectionPolicy {
     private fun protectedScope(
         packageName: String,
         className: String?,
+        resolvedOwnUninstaller: Boolean,
+        dangerousSettingsActionVisible: Boolean,
     ): ProtectionAuthorizationScope? {
         val normalizedClass = className.orEmpty()
-        if (packageName in PackageInstallerPackages && UninstallClassHints.any { normalizedClass.contains(it, true) }) {
+        if (
+            (packageName in PackageInstallerPackages || resolvedOwnUninstaller) &&
+            UninstallClassHints.any { normalizedClass.contains(it, true) }
+        ) {
             return ProtectionAuthorizationScope.Removal
         }
         if (packageName != AndroidSettingsPackage) return null
+        if (dangerousSettingsActionVisible) return ProtectionAuthorizationScope.Removal
         if (RemovalClassHints.any { normalizedClass.contains(it, true) }) return ProtectionAuthorizationScope.Removal
         if (SettingsClassHints.any { normalizedClass.contains(it, true) }) return ProtectionAuthorizationScope.Settings
         return null
@@ -96,6 +110,34 @@ class SettingsProtectionPolicy {
                 )
     }
 }
+
+internal fun isDangerousSettingsAction(
+    viewId: String?,
+    label: String?,
+    clickable: Boolean,
+): Boolean {
+    if (DangerousActionIdHints.any { viewId.orEmpty().contains(it, ignoreCase = true) }) return true
+    if (!clickable) return false
+    return DangerousActionLabels.any { label.orEmpty().trim().equals(it, ignoreCase = true) }
+}
+
+private val DangerousActionIdHints =
+    listOf(
+        "force_stop_button",
+        "uninstall_button",
+        "disable_button",
+    )
+
+private val DangerousActionLabels =
+    listOf(
+        "force stop",
+        "uninstall",
+        "disable",
+        "forzar detención",
+        "forzar detencion",
+        "desinstalar",
+        "desactivar",
+    )
 
 internal enum class SettingsEscapeAction {
     Back,
