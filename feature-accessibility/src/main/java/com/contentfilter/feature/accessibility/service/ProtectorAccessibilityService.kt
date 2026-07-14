@@ -277,8 +277,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             val values = listOf(node.text?.toString(), node.contentDescription?.toString(), node.viewIdResourceName)
             if (
                 values.any { value ->
-                    value?.contains(ownPackage, ignoreCase = true) == true ||
-                        value?.equals(appLabel, ignoreCase = true) == true
+                    value.matchesOwnAppIdentity(ownPackage, appLabel)
                 }
             ) {
                 return true
@@ -292,10 +291,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val appLabel = applicationInfo.loadLabel(packageManager).toString()
         val ownPackage = applicationContext.packageName
         val values = event.text.map(CharSequence::toString) + listOfNotNull(event.contentDescription?.toString())
-        return values.any { value ->
-            value.contains(ownPackage, ignoreCase = true) ||
-                value.equals(appLabel, ignoreCase = true)
-        }
+        return values.any { value -> value.matchesOwnAppIdentity(ownPackage, appLabel) }
     }
 
     private fun handleSearchEngineProtection(

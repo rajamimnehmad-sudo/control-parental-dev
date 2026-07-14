@@ -72,6 +72,31 @@ class SettingsProtectionPolicyTest {
         assertTrue(decide(className = "com.android.settings.DeviceAdminAdd"))
     }
 
+    @Test
+    fun samsungDeviceAdminListIsBlockedWhileAdminIsEnabled() {
+        assertTrue(decide(className = "com.android.settings.Settings\$DeviceAdminSettingsActivity"))
+    }
+
+    @Test
+    fun samsungAdminLabelIdentifiesOwnApp() {
+        assertTrue(
+            "Protección de Content Filter".matchesOwnAppIdentity(
+                ownPackage = "com.contentfilter.user.dev",
+                appLabel = "Content Filter",
+            ),
+        )
+    }
+
+    @Test
+    fun unrelatedAdminLabelDoesNotIdentifyOwnApp() {
+        assertFalse(
+            "Enlace a Windows".matchesOwnAppIdentity(
+                ownPackage = "com.contentfilter.user.dev",
+                appLabel = "Content Filter",
+            ),
+        )
+    }
+
     private fun decide(
         packageName: String = "com.android.settings",
         className: String,

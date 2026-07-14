@@ -56,6 +56,7 @@ class SettingsProtectionPolicy {
                 "AppInfoDashboard",
                 "AppInfoActivity",
                 "DeviceAdminAdd",
+                "DeviceAdminSettings",
                 "DeviceAdminWarning",
             )
         val SettingsClassHints =
@@ -69,4 +70,13 @@ class SettingsProtectionPolicy {
                 "SpecialAccessDetails",
             )
     }
+}
+
+internal fun String?.matchesOwnAppIdentity(
+    ownPackage: String,
+    appLabel: String,
+): Boolean {
+    val value = this ?: return false
+    return value.contains(ownPackage, ignoreCase = true) ||
+        (appLabel.isNotBlank() && value.contains(appLabel, ignoreCase = true))
 }
