@@ -77,6 +77,7 @@ import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.MyAppsRoute
 import com.contentfilter.user.internet.UserWebViewModel
+import com.contentfilter.user.protection.BatteryOptimizationController
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.protection.ProtectionViewModel
 import com.contentfilter.user.updates.UpdatesRoute
@@ -126,7 +127,11 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     var showAccessibilityDialog by rememberSaveable { mutableStateOf(false) }
     var showVpnDialog by rememberSaveable { mutableStateOf(false) }
     var showDeviceAdminDialog by rememberSaveable { mutableStateOf(false) }
+    var showBatteryOptimizationDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
+    var batteryOptimizationExempt by rememberSaveable {
+        mutableStateOf(BatteryOptimizationController.isExempt(context))
+    }
     val vpnPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (VpnController.prepareIntent(context) == null) {
@@ -136,6 +141,11 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     val deviceAdminLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             showDeviceAdminDialog = false
+        }
+    val batteryOptimizationLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            batteryOptimizationExempt = BatteryOptimizationController.isExempt(context)
+            showBatteryOptimizationDialog = false
         }
     val rootViewModel: UserRootViewModel = hiltViewModel()
     val rootState by rootViewModel.uiState.collectAsStateWithLifecycle()
@@ -166,6 +176,12 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     LaunchedEffect(rootState.recentlyActivated) {
         if (rootState.recentlyActivated && !DeviceAdminController.isEnabled(context)) {
             showDeviceAdminDialog = true
+        }
+    }
+    LaunchedEffect(rootState.needsActivation) {
+        if (!rootState.needsActivation && BatteryOptimizationController.shouldPrompt(context)) {
+            BatteryOptimizationController.markPromptShown(context)
+            showBatteryOptimizationDialog = true
         }
     }
     if (rootState.checkingActivation) {
@@ -246,6 +262,7 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                         deviceAdminState = statusState.deviceAdminState,
                         syncState = statusState.syncState,
                         activationState = statusState.activationState,
+                        batteryOptimizationExempt = batteryOptimizationExempt,
                         protectionArmed = protectionState.armed,
                         settingsAuthorized = protectionState.remoteSettingsAuthorized,
                         removalAuthorized = protectionState.removalAuthorized,
@@ -255,6 +272,9 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                         protectionRefreshing = protectionState.refreshing,
                         onActivateDeviceAdmin = {
                             deviceAdminLauncher.launch(DeviceAdminController.activationIntent(context))
+                        },
+                        onRequestBatteryOptimizationExemption = {
+                            batteryOptimizationLauncher.launch(BatteryOptimizationController.requestIntent(context))
                         },
                         onProtectionRefresh = protectionViewModel::refresh,
                         onRequestMaintenance = protectionViewModel::requestMaintenance,
@@ -378,6 +398,30 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
             },
             dismissButton = {
                 OutlinedButton(onClick = { showVpnDialog = false }) {
+                    Text("Luego")
+                }
+            },
+        )
+    } else if (showBatteryOptimizationDialog && !batteryOptimizationExempt) {
+        AlertDialog(
+            onDismissRequest = { showBatteryOptimizationDialog = false },
+            title = { Text("Funcionamiento continuo") },
+            text = {
+                Text(
+                    "Permití que Content Filter funcione sin optimización de batería para que Android no pause la protección.",
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        batteryOptimizationLauncher.launch(BatteryOptimizationController.requestIntent(context))
+                    },
+                ) {
+                    Text("Permitir")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showBatteryOptimizationDialog = false }) {
                     Text("Luego")
                 }
             },

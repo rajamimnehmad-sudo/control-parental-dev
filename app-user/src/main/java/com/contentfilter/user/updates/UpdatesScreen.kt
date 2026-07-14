@@ -39,6 +39,7 @@ fun UpdatesRoute(
     deviceAdminState: String = "",
     syncState: String = "",
     activationState: String = "",
+    batteryOptimizationExempt: Boolean = false,
     protectionArmed: Boolean = false,
     settingsAuthorized: Boolean = false,
     removalAuthorized: Boolean = false,
@@ -47,6 +48,7 @@ fun UpdatesRoute(
     protectionMessage: String = "",
     protectionRefreshing: Boolean = false,
     onActivateDeviceAdmin: () -> Unit = {},
+    onRequestBatteryOptimizationExemption: () -> Unit = {},
     onProtectionRefresh: () -> Unit = {},
     onRequestMaintenance: () -> Unit = {},
     onRecoveryCodeChanged: (String) -> Unit = {},
@@ -76,6 +78,7 @@ fun UpdatesRoute(
         deviceAdminState = deviceAdminState,
         syncState = syncState,
         activationState = activationState,
+        batteryOptimizationExempt = batteryOptimizationExempt,
         protectionArmed = protectionArmed,
         settingsAuthorized = settingsAuthorized,
         removalAuthorized = removalAuthorized,
@@ -84,6 +87,7 @@ fun UpdatesRoute(
         protectionMessage = protectionMessage,
         protectionRefreshing = protectionRefreshing,
         onActivateDeviceAdmin = onActivateDeviceAdmin,
+        onRequestBatteryOptimizationExemption = onRequestBatteryOptimizationExemption,
         onProtectionRefresh = onProtectionRefresh,
         onRequestMaintenance = onRequestMaintenance,
         onRecoveryCodeChanged = onRecoveryCodeChanged,
@@ -109,6 +113,7 @@ private fun UpdatesScreen(
     deviceAdminState: String,
     syncState: String,
     activationState: String,
+    batteryOptimizationExempt: Boolean,
     protectionArmed: Boolean,
     settingsAuthorized: Boolean,
     removalAuthorized: Boolean,
@@ -117,6 +122,7 @@ private fun UpdatesScreen(
     protectionMessage: String,
     protectionRefreshing: Boolean,
     onActivateDeviceAdmin: () -> Unit,
+    onRequestBatteryOptimizationExemption: () -> Unit,
     onProtectionRefresh: () -> Unit,
     onRequestMaintenance: () -> Unit,
     onRecoveryCodeChanged: (String) -> Unit,
@@ -189,6 +195,10 @@ private fun UpdatesScreen(
                 "Control reforzado: ${if (protectionArmed) "Activo" else "Pendiente"}",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Text(
+                "Batería: ${if (batteryOptimizationExempt) "Sin restricciones" else "Optimizada"}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
             if (settingsAuthorized) {
                 Text(
                     "Mantenimiento temporal autorizado",
@@ -201,6 +211,14 @@ private fun UpdatesScreen(
             if (deviceAdminState != "Activa") {
                 Button(modifier = Modifier.fillMaxWidth(), onClick = onActivateDeviceAdmin) {
                     Text("Activar protección contra desinstalación")
+                }
+            }
+            if (!batteryOptimizationExempt) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onRequestBatteryOptimizationExemption,
+                ) {
+                    Text("Permitir funcionamiento continuo")
                 }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
