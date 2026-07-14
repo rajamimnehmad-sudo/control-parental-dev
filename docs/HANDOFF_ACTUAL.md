@@ -46,8 +46,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 199
-App Admin versionCode 199
+App Usuario versionCode 200
+App Admin versionCode 200
 versionName 1.0.1-dev
 ```
 
@@ -61,8 +61,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-199-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-199-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-200-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-200-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
@@ -115,17 +115,18 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 
 ## Build y publicacion
 
-Verificacion ejecutada para DEV 194:
+Verificacion ejecutada para DEV 200:
 
 ```bash
-./gradlew --no-daemon --console=plain :core-security:testDebugUnitTest :feature-accessibility:testDebugUnitTest :app-user:testDevDebugUnitTest :app-admin:testDevDebugUnitTest :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
-./gradlew --no-daemon --console=plain :core-security:ktlintCheck :feature-accessibility:ktlintCheck :app-user:ktlintCheck :app-admin:ktlintCheck
+./gradlew --no-daemon --console=plain :app-user:testDevDebugUnitTest :app-admin:testDevDebugUnitTest :app-user:ktlintCheck :app-admin:ktlintCheck :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
 ```
 
-Resultado actual: tests, ktlint y build de ambas apps OK. DEV 194 publicada por GitHub Actions para Usuario y Admin.
+Resultado actual: tests, ktlint y build de ambas apps OK. DEV 200 preparada para publicacion por GitHub Actions para Usuario y Admin.
 
 ## Cierre 2026-07-14 - barrera reforzada tipo Rimon sin MDM
 
+- DEV 200 agrega un watchdog local cada 30 segundos. Contrasta el tunel VPN real con su estado persistido, Accessibility y Administrador del dispositivo; corrige el heartbeat, emite una alerta por componente caido y reinicia la VPN si el permiso sigue vigente y no existe una desactivacion intencional autorizada.
+- Validacion fisica in-place de DEV 200 en Samsung SM-S908E, sin borrar datos: version instalada 200, Device Admin y Accessibility conservaron sus permisos y el tunel VPN real siguio conectado despues de un ciclo completo del watchdog, sin crash.
 - DEV 199 bloquea las pantallas criticas de detalle de Accessibility y configuracion VPN desde el primer evento de ventana, sin esperar a que Android termine de dibujar el nombre de Content Filter. El permiso temporal de mantenimiento sigue habilitandolas de forma controlada.
 - DEV 198 reemplaza la salida directa a Home por una secuencia segura: Atras inmediato, nueva comprobacion, segundo Atras y Home solo como ultimo respaldo si la pantalla protegida continua visible.
 - La comprobacion diferida conserva la clase real de la ventana observada para distinguir una pantalla peligrosa de la pantalla anterior normal de Ajustes.

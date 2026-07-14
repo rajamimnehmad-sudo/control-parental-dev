@@ -15,6 +15,7 @@ import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
 import com.contentfilter.user.protection.ProtectionControlCoordinator
+import com.contentfilter.user.protection.ProtectionHealthMonitor
 import com.contentfilter.user.repair.UserLocalDataRepair
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -63,6 +64,9 @@ class UserApplication :
 
     @Inject
     lateinit var protectionControlCoordinator: ProtectionControlCoordinator
+
+    @Inject
+    lateinit var protectionHealthMonitor: ProtectionHealthMonitor
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -155,6 +159,13 @@ class UserApplication :
                     .logFailure("periodic-protection-refresh")
             }
         }
+        appScope.launch {
+            while (true) {
+                delay(ProtectionHealthCheckIntervalMillis)
+                runCatching { protectionHealthMonitor.checkNow() }
+                    .logFailure("protection-health-check")
+            }
+        }
     }
 
     private suspend fun reportInstalledVersion(deviceId: String) {
@@ -179,5 +190,6 @@ class UserApplication :
         const val DeviceLicenseValidationIntervalMillis = 60_000L
         const val WebDomainListRefreshIntervalMillis = 6 * 60 * 60 * 1_000L
         const val ProtectionControlRefreshIntervalMillis = 60_000L
+        const val ProtectionHealthCheckIntervalMillis = 30_000L
     }
 }
