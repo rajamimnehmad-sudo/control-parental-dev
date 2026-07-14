@@ -89,7 +89,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.auth.AdminAuthRoute
 import com.contentfilter.admin.dashboard.DashboardRoute
+import com.contentfilter.admin.push.AdminProtectionAlertPayload
 import com.contentfilter.admin.push.AdminPushViewModel
+import com.contentfilter.admin.push.AlertTypeKey
+import com.contentfilter.admin.push.DataTypeKey
+import com.contentfilter.admin.push.DeviceIdKey
+import com.contentfilter.admin.push.DeviceNameKey
+import com.contentfilter.admin.push.EventIdKey
+import com.contentfilter.admin.push.parseAdminProtectionAlertPayload
 import com.contentfilter.admin.requests.AdminRequestsRoute
 import com.contentfilter.admin.rules.RulesEntryMode
 import com.contentfilter.admin.rules.RulesRoute
@@ -102,18 +109,44 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private var protectionAlertPayload by mutableStateOf<AdminProtectionAlertPayload?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        protectionAlertPayload = intent.adminProtectionAlertPayload()
         setContent {
             ContentFilterTheme {
-                AdminAppRoot(modifier = Modifier.fillMaxSize())
+                AdminAppRoot(
+                    modifier = Modifier.fillMaxSize(),
+                    protectionAlertPayload = protectionAlertPayload,
+                )
             }
         }
     }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        protectionAlertPayload = intent.adminProtectionAlertPayload()
+    }
+
+    private fun android.content.Intent.adminProtectionAlertPayload(): AdminProtectionAlertPayload? =
+        parseAdminProtectionAlertPayload(
+            mapOf(
+                DataTypeKey to getStringExtra(DataTypeKey).orEmpty(),
+                EventIdKey to getStringExtra(EventIdKey).orEmpty(),
+                DeviceIdKey to getStringExtra(DeviceIdKey).orEmpty(),
+                DeviceNameKey to getStringExtra(DeviceNameKey).orEmpty(),
+                AlertTypeKey to getStringExtra(AlertTypeKey).orEmpty(),
+            ),
+        )
 }
 
 @Composable
-private fun AdminAppRoot(modifier: Modifier = Modifier) {
+private fun AdminAppRoot(
+    modifier: Modifier = Modifier,
+    protectionAlertPayload: AdminProtectionAlertPayload? = null,
+) {
     var tab by rememberSaveable { mutableStateOf(AdminTab.Home) }
     var section by rememberSaveable { mutableStateOf<AdminSection?>(null) }
     var requestsRefreshKey by rememberSaveable { mutableStateOf(0) }
@@ -139,6 +172,12 @@ private fun AdminAppRoot(modifier: Modifier = Modifier) {
             } else {
                 pushViewModel.registerIfReady()
             }
+        }
+    }
+    LaunchedEffect(rootState.activated, protectionAlertPayload?.eventId) {
+        if (rootState.activated && protectionAlertPayload != null) {
+            tab = AdminTab.Community
+            section = AdminSection.Apps
         }
     }
     LaunchedEffect(rootState.activated) {

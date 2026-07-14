@@ -71,7 +71,9 @@ Deno.serve(async (request) => {
   }
 
   const uniqueTokens = Array.from(new Set((tokens ?? []).map((item: PushToken) => item.fcm_token).filter(Boolean)));
-  const results = await Promise.all(uniqueTokens.map((token) => sendFcm(token, event)));
+  const results = await Promise.all(uniqueTokens.map((token) =>
+    sendFcm(token, event, payload.device_id!, payload.alert_type!)
+  ));
 
   return json({
     event_id: event.event_id,
@@ -80,7 +82,12 @@ Deno.serve(async (request) => {
   });
 });
 
-async function sendFcm(token: string, event: AlertEvent): Promise<{ ok: boolean; status: number; body: string }> {
+async function sendFcm(
+  token: string,
+  event: AlertEvent,
+  deviceId: string,
+  alertType: string,
+): Promise<{ ok: boolean; status: number; body: string }> {
   const projectId = requiredEnv("FCM_PROJECT_ID");
   const accessToken = await fcmAccessToken();
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
@@ -92,22 +99,17 @@ async function sendFcm(token: string, event: AlertEvent): Promise<{ ok: boolean;
     body: JSON.stringify({
       message: {
         token,
-        notification: {
-          title: event.title,
-          body: event.body,
-        },
         android: {
           priority: "high",
-          notification: {
-            channel_id: "urgent_protection_alerts",
-            priority: "PRIORITY_HIGH",
-            visibility: "PUBLIC",
-          },
         },
         data: {
           type: "protection_alert",
           event_id: event.event_id,
+          device_id: deviceId,
           device_name: event.device_name,
+          alert_type: alertType,
+          title: event.title,
+          body: event.body,
         },
       },
     }),

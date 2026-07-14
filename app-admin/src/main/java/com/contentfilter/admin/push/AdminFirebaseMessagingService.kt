@@ -1,11 +1,15 @@
 package com.contentfilter.admin.push
 
 import android.Manifest
+import android.app.Notification
 import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.contentfilter.admin.MainActivity
 import com.contentfilter.admin.R
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.google.firebase.messaging.FirebaseMessagingService
@@ -31,8 +35,22 @@ class AdminFirebaseMessagingService : FirebaseMessagingService() {
     override fun onMessageReceived(message: RemoteMessage) {
         if (!notificationsAllowed()) return
         AdminPushNotificationChannels.ensureUrgentProtectionChannel(this)
-        val title = message.notification?.title ?: "Protección incompleta"
-        val body = message.notification?.body ?: "Un dispositivo necesita atención."
+        val title = message.data[TitleKey] ?: message.notification?.title ?: "Protección incompleta"
+        val body = message.data[BodyKey] ?: message.notification?.body ?: "Un dispositivo necesita atención."
+        val payload = parseAdminProtectionAlertPayload(message.data)
+        val notificationId = notificationId(payload?.eventId ?: message.messageId)
+        val openAdminIntent =
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+                message.data.forEach { (key, value) -> putExtra(key, value) }
+            }
+        val contentIntent =
+            PendingIntent.getActivity(
+                this,
+                notificationId,
+                openAdminIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
         val notification =
             NotificationCompat.Builder(
                 this,
@@ -43,10 +61,14 @@ class AdminFirebaseMessagingService : FirebaseMessagingService() {
                 .setContentText(body)
                 .setStyle(NotificationCompat.BigTextStyle().bigText(body))
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(Notification.CATEGORY_ALARM)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setGroup(ProtectionAlertNotificationGroup)
+                .setContentIntent(contentIntent)
                 .setAutoCancel(true)
                 .build()
         getSystemService(NotificationManager::class.java)
-            ?.notify(ProtectionAlertNotificationId, notification)
+            ?.notify(notificationId, notification)
     }
 
     private fun notificationsAllowed(): Boolean =
@@ -55,6 +77,14 @@ class AdminFirebaseMessagingService : FirebaseMessagingService() {
             PackageManager.PERMISSION_GRANTED
 
     private companion object {
-        const val ProtectionAlertNotificationId = 7001
+        const val ProtectionAlertNotificationGroup = "device_protection_alerts"
+
+        fun notificationId(value: String?): Int =
+            value
+                ?.takeIf(String::isNotBlank)
+                ?.hashCode()
+                ?.and(Int.MAX_VALUE)
+                ?.takeIf { it != 0 }
+                ?: 7001
     }
 }
