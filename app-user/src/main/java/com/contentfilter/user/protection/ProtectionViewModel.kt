@@ -35,7 +35,7 @@ class ProtectionViewModel
             viewModelScope.launch(Dispatchers.IO) {
                 while (true) {
                     delay(30_000)
-                    refreshInternal(showProgress = false)
+                    updateFromStore()
                 }
             }
         }

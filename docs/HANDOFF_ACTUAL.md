@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 202
-App Admin versionCode 202
+App Usuario versionCode 203
+App Admin versionCode 203
 versionName 1.0.1-dev
 ```
 
@@ -68,11 +68,20 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-202-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-202-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-203-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-203-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
+
+## Cierre 2026-07-14 - USER-PERF-01 fluidez y acciones de proteccion
+
+- DEV 203 limita las suscripciones Compose de solicitudes, estado y proteccion a la pantalla que realmente las usa; ya no recomponen la raiz completa mientras otra seccion esta visible.
+- `ProtectionViewModel` conserva la lectura local cada 30 segundos para reflejar autorizaciones, pero deja de duplicar el refresh remoto que ya ejecuta `UserApplication`.
+- Ajustes reemplaza `Actualizar permisos` y `Pedir mantenimiento` por una sola accion contextual: `Solicitar acceso temporal` cuando todos los componentes estan sanos o `Reparar proteccion` cuando alguno esta degradado.
+- Medicion fisica repetida con el mismo recorrido en Samsung SM-A235M: Home paso de 2,99 % a 0,26 % de frames lentos modernos despues de calentamiento; Ajustes paso de 0,66 % a 0,43 %. Home mantuvo percentil 90 de 22 ms y no registro frames mayores a 24 ms en la pasada final.
+- Validacion defensiva: cinco aperturas de App Info y cinco intentos directos de desinstalacion fueron expulsados; la app continuo instalada, Accessibility enlazado, Device Admin activo y el proceso vivo.
+- La instalacion de laboratorio por ADB desde DEV 194 activo la restriccion de Android para APKs no verificados y requirio habilitar `ACCESS_RESTRICTED_SETTINGS` antes de reautorizar Accessibility por la UI normal. Esta condicion pertenece al metodo de instalacion ADB y no se conto como validacion del actualizador interno.
 
 ## Estado funcional
 

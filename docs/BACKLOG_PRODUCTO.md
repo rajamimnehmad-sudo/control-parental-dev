@@ -35,16 +35,16 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 202 y App Admin DEV 202, `1.0.1-dev`.
+- Estado preparado para publicacion: App Usuario DEV 203 y App Admin DEV 203, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
-## Proximo ticket propuesto
+## Ultimo ticket resuelto
 
 ### USER-PERF-01 - Rendimiento y simplificacion de App Usuario
 
-- Estado: `Propuesto` (todavia no aprobado para codigo).
+- Estado: `Resuelto` el 2026-07-14 en DEV 203.
 - Tipo: rendimiento y UX.
 - Prioridad: P1.
 - Evidencia: scroll percibido como lento o trabado en el Samsung fisico; la pantalla principal usa contenido vertical eager, observa varios flujos globales y tiene refrescos periodicos. `Mis apps` ya usa lista lazy con claves estables.
@@ -71,7 +71,6 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario, solo con confirmacion destructiva separada | L | Muy alto |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
-| USER-PERF-01 | Propuesto | P1 | Rendimiento y simplificacion de App Usuario | M | Medio |
 | REQUESTS-UX-01 | Idea | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERADMIN-TOKEN-01 | Idea | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Idea | P2 | Consistencia visual y accesibilidad de ambas apps | M | Bajo |
@@ -149,6 +148,7 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
 | PUSH-REAL-01 | 2026-07-14, DEV 202 | FCM real con tokens seguros y credenciales servidor dedicadas; alerta fisica con Admin cerrado y apertura correcta en Apps |
+| USER-PERF-01 | 2026-07-14, DEV 203 | Suscripciones aisladas por pantalla, refresco remoto duplicado eliminado y una unica accion contextual; Home 2,99 % -> 0,26 % y Ajustes 0,66 % -> 0,43 % de frames lentos en SM-A235M |
 | BARRIER-ANDROID-01 | DEV 198-202 | Barrera reforzada, navegacion defensiva, recuperacion y alertas; alcance real documentado en el handoff |
 | WEB-LISTS-A | 2026-07-13 | The Block List Project agregado, deduplicado, firmado, publicado atomicamente y validado |
 | WEB-SENSITIVE-A1 | DEV 192 | Adulto, apuestas, drogas y pirateria/torrents en formato extensible firmado y con validacion fisica |

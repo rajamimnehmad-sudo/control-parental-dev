@@ -221,16 +221,28 @@ private fun UpdatesScreen(
                     Text("Permitir funcionamiento continuo")
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(
-                    modifier = Modifier.weight(1f),
+            val primaryAction =
+                protectionPrimaryAction(
+                    protectionArmed = protectionArmed,
+                    vpnState = vpnState,
+                    accessibilityState = accessibilityState,
+                    deviceAdminState = deviceAdminState,
+                    batteryOptimizationExempt = batteryOptimizationExempt,
+                )
+            if (primaryAction == ProtectionPrimaryAction.Repair) {
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
                     enabled = !protectionRefreshing,
                     onClick = onProtectionRefresh,
                 ) {
-                    Text(if (protectionRefreshing) "Actualizando..." else "Actualizar permisos")
+                    Text(if (protectionRefreshing) "Revisando protección..." else "Reparar protección")
                 }
-                OutlinedButton(modifier = Modifier.weight(1f), onClick = onRequestMaintenance) {
-                    Text("Pedir mantenimiento")
+            } else {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = onRequestMaintenance,
+                ) {
+                    Text("Solicitar acceso temporal")
                 }
             }
             if (recoveryAvailable) {
@@ -348,6 +360,30 @@ private fun UpdatesScreen(
         }
     }
 }
+
+internal enum class ProtectionPrimaryAction {
+    Repair,
+    RequestTemporaryAccess,
+}
+
+internal fun protectionPrimaryAction(
+    protectionArmed: Boolean,
+    vpnState: String,
+    accessibilityState: String,
+    deviceAdminState: String,
+    batteryOptimizationExempt: Boolean,
+): ProtectionPrimaryAction =
+    if (
+        protectionArmed &&
+        vpnState == "Activa" &&
+        accessibilityState == "Activa" &&
+        deviceAdminState == "Activa" &&
+        batteryOptimizationExempt
+    ) {
+        ProtectionPrimaryAction.RequestTemporaryAccess
+    } else {
+        ProtectionPrimaryAction.Repair
+    }
 
 private fun UpdatesStatus.message(): String =
     when (this) {

@@ -151,12 +151,6 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     val rootState by rootViewModel.uiState.collectAsStateWithLifecycle()
     val updatesViewModel: UpdatesViewModel = hiltViewModel()
     val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
-    val requestsViewModel: RequestsViewModel = hiltViewModel()
-    val requestsState by requestsViewModel.uiState.collectAsStateWithLifecycle()
-    val statusViewModel: SystemStatusViewModel = hiltViewModel()
-    val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
-    val protectionViewModel: ProtectionViewModel = hiltViewModel()
-    val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         updatesViewModel.autoCheckAndDownload()
     }
@@ -227,9 +221,7 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
         Box(modifier = Modifier.padding(padding)) {
             when (destination) {
                 UserDestination.Home ->
-                    UserHomeTab(
-                        pendingRequests = requestsState.pendingCount,
-                        latestRequestLabel = requestsState.requests.firstOrNull()?.requestType?.name.orEmpty(),
+                    UserHomeRoute(
                         onApps = { navigateTo(UserDestination.MyApps) },
                         onRequests = { navigateTo(UserDestination.Requests) },
                         onWeb = { navigateTo(UserDestination.Web) },
@@ -237,7 +229,9 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                     )
                 UserDestination.MyApps -> MyAppsRoute(onBack = ::goBack)
                 UserDestination.Requests -> RequestsRoute(onBack = ::goBack)
-                UserDestination.Web ->
+                UserDestination.Web -> {
+                    val statusViewModel: SystemStatusViewModel = hiltViewModel()
+                    val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
                     UserWebTab(
                         onBack = ::goBack,
                         vpnActive = statusState.isVpnActive,
@@ -251,7 +245,12 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                             }
                         },
                     )
-                UserDestination.Updates ->
+                }
+                UserDestination.Updates -> {
+                    val statusViewModel: SystemStatusViewModel = hiltViewModel()
+                    val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
+                    val protectionViewModel: ProtectionViewModel = hiltViewModel()
+                    val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
                     UpdatesRoute(
                         onBack = ::goBack,
                         protectionSummary = statusState.summary,
@@ -292,6 +291,7 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                             }
                         },
                     )
+                }
             }
         }
     }
@@ -376,7 +376,7 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                 }
             },
         )
-    } else if (showVpnDialog && !statusState.isVpnActive) {
+    } else if (showVpnDialog && !VpnController.isRunning(context)) {
         AlertDialog(
             onDismissRequest = { showVpnDialog = false },
             title = { Text("Protección web apagada") },
@@ -427,6 +427,25 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
             },
         )
     }
+}
+
+@Composable
+private fun UserHomeRoute(
+    onApps: () -> Unit,
+    onRequests: () -> Unit,
+    onWeb: () -> Unit,
+    onUpdates: () -> Unit,
+    viewModel: RequestsViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    UserHomeTab(
+        pendingRequests = state.pendingCount,
+        latestRequestLabel = state.requests.firstOrNull()?.requestType?.name.orEmpty(),
+        onApps = onApps,
+        onRequests = onRequests,
+        onWeb = onWeb,
+        onUpdates = onUpdates,
+    )
 }
 
 @Composable
