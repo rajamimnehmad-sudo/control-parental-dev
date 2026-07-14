@@ -68,7 +68,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
 | SEC-LICENSE-01 | Idea | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
-| DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario, solo con confirmacion destructiva separada | L | Muy alto |
+| DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Idea | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
@@ -77,6 +77,47 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | USER-RESILIENCE-01 | Idea | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | SUPERADMIN-MSG-01 | Idea | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Idea | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
+| ADMIN-ALERTS-UX-01 | Idea | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
+
+### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
+
+- Estado: `Idea`; no aprobado para diagnostico tecnico, codigo ni pruebas destructivas.
+- Tipo: bug, ciclo de vida de datos y seguridad.
+- Prioridad: P0.
+- Problema: App Admin muestra la opcion de borrar usuario, pero al usarla el banner informa `No se pudo borrar al usuario` y el usuario permanece visible.
+- Solucion propuesta: diagnosticar el flujo actual y definir un borrado definitivo, consistente y auditable, con confirmacion destructiva separada.
+- Evidencia: el usuario reporta el 2026-07-14 que el fallo ocurre con todos los usuarios probados y que ninguno se elimina.
+- Esfuerzo: L.
+- Riesgo: muy alto por perdida irreversible, relaciones entre entidades y posible inconsistencia entre datos locales y remotos.
+- Dependencias: definicion exacta de que datos asociados se eliminan o conservan; permisos y flujo remoto; integridad de dispositivos, reglas, grupos, solicitudes y tokens; confirmacion especifica antes de borrar o probar con datos reales.
+- Duplicados y relacion: consolida el fallo observado dentro del item existente `DATA-DELETE-01`; no se crea un ticket duplicado.
+- Criterios de aceptacion propuestos:
+  - la accion informa con claridad que datos se eliminaran y exige confirmacion destructiva explicita;
+  - el resultado es consistente en App Admin y en las fuentes de datos aplicables;
+  - los fallos no dejan eliminaciones parciales ni muestran exito incorrecto;
+  - existe evidencia auditable sin exponer secretos;
+  - las pruebas destructivas usan datos autorizados expresamente por el usuario.
+- Decisiones pendientes: borrado completo, desvinculacion o desactivacion previa; alcance sobre dispositivos y datos asociados; retencion de auditoria; estrategia de prueba segura.
+
+### ADMIN-ALERTS-UX-01 - Campanita de alertas de seguridad en App Admin
+
+- Estado: `Idea`; las preferencias se definiran cuando el usuario pida preparar el ticket.
+- Tipo: seguridad, notificaciones y UX de App Admin.
+- Prioridad: P2.
+- Problema: las alertas de proteccion no tienen una bandeja visual dedicada y persistente dentro de App Admin.
+- Solucion propuesta: agregar un boton de campanita con leyendas para eventos como intentos de desinstalacion y otros cambios de proteccion. Las solicitudes de acceso permanecen en la ubicacion actual y no se mezclan con esta bandeja.
+- Evidencia: necesidad expresada por el usuario el 2026-07-14. El handoff confirma que DEV 202 ya entrega alertas urgentes de proteccion a App Admin; esta idea cambia su organizacion visual dentro de la app.
+- Esfuerzo: M.
+- Riesgo: medio; debe evitar duplicados, perdida de alertas importantes, exceso de ruido y confusion con Solicitudes.
+- Dependencias: eventos y FCM ya implementados; modelo de lectura e historial; navegacion y permisos de App Admin.
+- Duplicados y relacion: no duplica `REQUESTS-UX-01` porque las solicitudes seguiran en su seccion actual. Extiende la experiencia resuelta tecnicamente por `PUSH-REAL-01` sin reabrir su mecanismo de entrega.
+- Criterios de aceptacion propuestos:
+  - App Admin ofrece una campanita identificable para consultar alertas de seguridad;
+  - la bandeja distingue con leyendas claras los tipos de intento de manipulacion;
+  - las solicitudes permanecen en la ubicacion y flujo actuales;
+  - una misma alerta no aparece duplicada por reintentos de entrega;
+  - la experiencia no debilita las notificaciones urgentes ya existentes.
+- Decisiones pendientes para la entrevista del ticket: ubicacion exacta de la campanita; punto o contador; tipos de eventos; destino al tocar; estados leida/no leida; historial, retencion, filtros y agrupacion.
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 
