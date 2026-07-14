@@ -120,6 +120,11 @@ fun RulesRoute(
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
         onOnlyResultsChanged = viewModel::setOnlyResultsEnabled,
+        onProtectionArmedChanged = viewModel::setProtectionArmed,
+        onAuthorizeSettings = viewModel::authorizeSettings,
+        onAuthorizeRemoval = viewModel::authorizeRemoval,
+        onGenerateRecoveryCode = viewModel::generateRecoveryCode,
+        onRecoveryCodeCopied = viewModel::clearRecoveryCode,
         onToggle = viewModel::toggle,
         onDelete = viewModel::delete,
     )
@@ -156,6 +161,11 @@ private fun RulesScreen(
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
+    onProtectionArmedChanged: (String, Boolean) -> Unit,
+    onAuthorizeSettings: (String) -> Unit,
+    onAuthorizeRemoval: (String) -> Unit,
+    onGenerateRecoveryCode: (String) -> Unit,
+    onRecoveryCodeCopied: () -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -206,6 +216,11 @@ private fun RulesScreen(
             onAppLimitSaved = onAppLimitSaved,
             onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
             onOnlyResultsChanged = onOnlyResultsChanged,
+            onProtectionArmedChanged = onProtectionArmedChanged,
+            onAuthorizeSettings = onAuthorizeSettings,
+            onAuthorizeRemoval = onAuthorizeRemoval,
+            onGenerateRecoveryCode = onGenerateRecoveryCode,
+            onRecoveryCodeCopied = onRecoveryCodeCopied,
             onToggle = onToggle,
             onDelete = onDelete,
         )
@@ -607,6 +622,10 @@ private fun ProtectedUserCard(
             ) {
                 Text(device.name, style = MaterialTheme.typography.titleMedium, color = HeaderInk)
                 StatusChip(device.status.label, statusColor)
+                StatusChip(
+                    if (device.protectionComplete) "Protección completa" else "Protección incompleta",
+                    if (device.protectionComplete) ActiveGreen else MaterialTheme.colorScheme.error,
+                )
                 Text(
                     text = "${device.appCount} apps · ${device.lastSeenLabel}",
                     style = MaterialTheme.typography.bodySmall,
@@ -801,6 +820,11 @@ private fun UserDetailContent(
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
+    onProtectionArmedChanged: (String, Boolean) -> Unit,
+    onAuthorizeSettings: (String) -> Unit,
+    onAuthorizeRemoval: (String) -> Unit,
+    onGenerateRecoveryCode: (String) -> Unit,
+    onRecoveryCodeCopied: () -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -939,6 +963,20 @@ private fun UserDetailContent(
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
                             onOnlyResultsChanged = onOnlyResultsChanged,
+                        )
+                    }
+                }
+                DevicePanel.Protection -> {
+                    item {
+                        ProtectionPanel(
+                            state = state,
+                            device = selectedDevice,
+                            clipboardManager = LocalClipboardManager.current,
+                            onArmedChanged = { armed -> onProtectionArmedChanged(selectedDevice.id, armed) },
+                            onAuthorizeSettings = { onAuthorizeSettings(selectedDevice.id) },
+                            onAuthorizeRemoval = { onAuthorizeRemoval(selectedDevice.id) },
+                            onGenerateRecoveryCode = { onGenerateRecoveryCode(selectedDevice.id) },
+                            onRecoveryCodeCopied = onRecoveryCodeCopied,
                         )
                     }
                 }
@@ -1386,7 +1424,7 @@ private fun UserDetailHeader(
         }
         if (entryMode == RulesEntryMode.Apps) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -1424,6 +1462,104 @@ private fun UserDetailHeader(
                         Text("Apps en grupo")
                     }
                 }
+                if (selectedPanel == DevicePanel.Protection) {
+                    Button(
+                        onClick = { },
+                        shape = RoundedCornerShape(tabShape),
+                    ) {
+                        Text("Protección")
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { onPanelSelected(DevicePanel.Protection) },
+                        shape = RoundedCornerShape(tabShape),
+                    ) {
+                        Text("Protección")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProtectionPanel(
+    state: RulesUiState,
+    device: UserDeviceUiState,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    onArmedChanged: (Boolean) -> Unit,
+    onAuthorizeSettings: () -> Unit,
+    onAuthorizeRemoval: () -> Unit,
+    onGenerateRecoveryCode: () -> Unit,
+    onRecoveryCodeCopied: () -> Unit,
+) {
+    val control = state.protectionControls[device.id]
+    val loading = device.id in state.protectionLoadingDeviceIds
+    ProductCard {
+        Text("Estado de conexión", style = MaterialTheme.typography.titleMedium)
+        Text("Última conexión: ${device.lastSeenLabel}", style = MaterialTheme.typography.bodyMedium)
+        Text("VPN: ${device.vpnState}", style = MaterialTheme.typography.bodyMedium)
+        Text("Accesibilidad: ${device.accessibilityState}", style = MaterialTheme.typography.bodyMedium)
+        Text("Administrador del dispositivo: ${device.deviceAdminState}", style = MaterialTheme.typography.bodyMedium)
+    }
+    ProductCard {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text("Barrera reforzada", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    if (control?.armed == true) "Armada" else "Pendiente",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Switch(
+                checked = control?.armed == true,
+                enabled = !loading,
+                onCheckedChange = onArmedChanged,
+            )
+        }
+        if (control == null) {
+            Text("El control se creará al activar la barrera.", style = MaterialTheme.typography.bodySmall)
+        } else {
+            Text(
+                "Aplicación: revisión ${control.appliedRevision} de ${control.commandRevision}",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+    ProductCard {
+        Text("Permisos temporales", style = MaterialTheme.typography.titleMedium)
+        Text("Cada permiso vence automáticamente a los 10 minutos.", style = MaterialTheme.typography.bodyMedium)
+        Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeSettings) {
+            Text("Permitir ajustes protegidos")
+        }
+        OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
+            Text("Autorizar desinstalación")
+        }
+    }
+    ProductCard {
+        Text("Recuperación sin conexión", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Genera un código de un solo uso. En DEV sólo se guarda su verificador.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (state.recoveryCode.isBlank()) {
+            OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onGenerateRecoveryCode) {
+                Text("Generar código de recuperación")
+            }
+        } else {
+            Text(state.recoveryCode, style = MaterialTheme.typography.headlineSmall)
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(state.recoveryCode))
+                    onRecoveryCodeCopied()
+                },
+            ) {
+                Text("Copiar y ocultar")
             }
         }
     }

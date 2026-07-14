@@ -72,7 +72,12 @@ class SupabaseRemoteDeviceRepository
                 .put("updated_at", now)
                 .put("vpn_state", vpnState.name)
                 .put("accessibility_state", accessibilityState.name)
-                .put("protection_alert", DeviceProtectionAlert.fromStates(vpnState, accessibilityState))
+                .put("device_admin_state", deviceAdminState.name)
+                .put(
+                    "protection_alert",
+                    DeviceProtectionAlert.fromStates(vpnState, accessibilityState, deviceAdminState)
+                        ?: JSONObject.NULL,
+                )
                 .put("protection_updated_at", now)
         }
     }

@@ -11,6 +11,7 @@ data class SystemStatusUiState(
     val summary: String,
     val vpnState: String,
     val accessibilityState: String,
+    val deviceAdminState: String,
     val syncState: String,
     val activationState: String,
     val appVersion: String,
@@ -42,9 +43,12 @@ data class SystemStatusUiState(
             SystemStatusUiState(
                 title = "Estado del sistema",
                 protectionLevel = snapshot.protectionLevel,
-                summary = "VPN ${snapshot.vpnState.displayName()}, Accesibilidad ${snapshot.accessibilityState.displayName()}",
+                summary =
+                    "VPN ${snapshot.vpnState.displayName()}, Accesibilidad ${snapshot.accessibilityState.displayName()}, " +
+                        "Desinstalación ${snapshot.deviceAdminState.displayName()}",
                 vpnState = snapshot.vpnState.displayName(),
                 accessibilityState = snapshot.accessibilityState.displayName(),
+                deviceAdminState = snapshot.deviceAdminState.displayName(),
                 syncState = snapshot.syncState.displayName(),
                 activationState = snapshot.licenseState.displayName(),
                 appVersion = "1.0.0",

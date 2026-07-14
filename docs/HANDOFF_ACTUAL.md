@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-13
+Fecha de corte: 2026-07-14
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -43,11 +43,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-13:
+Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 192
-App Admin versionCode 181
+App Usuario versionCode 193
+App Admin versionCode 193
 versionName 1.0.1-dev
 ```
 
@@ -61,16 +61,11 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-192-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-181-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-193-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-193-debug.apk
 ```
 
-SHA-256:
-
-```text
-Usuario DEV 192: bee58c2822e67fd8aad6064048aa1980c9410bda6f1b66f74a09ae
-Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c616
-```
+Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 
 ## Estado funcional
 
@@ -120,14 +115,27 @@ Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c61
 
 ## Build y publicacion
 
-Verificacion ejecutada:
+Verificacion ejecutada para DEV 193:
 
 ```bash
-./gradlew --no-daemon :feature-vpn:test :feature-vpn:ktlintCheck :feature-vpn:detekt :core-policy:test :app-user:testDevDebugUnitTest :app-user:assembleDevDebug
-scripts/publicar_usuario_dev.sh
+./gradlew --no-daemon --console=plain :core-security:testDebugUnitTest :feature-accessibility:testDebugUnitTest :app-user:testDevDebugUnitTest :app-admin:testDevDebugUnitTest :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
+./gradlew --no-daemon --console=plain :core-security:ktlintCheck :feature-accessibility:ktlintCheck :app-user:ktlintCheck :app-admin:ktlintCheck
 ```
 
-Resultado actual: tests y build del area VPN OK, App Usuario DEV 192 publicada y App Admin DEV 181 sin cambios.
+Resultado actual: tests, ktlint y build de ambas apps OK. DEV 193 publicada por GitHub Actions para Usuario y Admin.
+
+## Cierre 2026-07-14 - barrera reforzada tipo Rimon sin MDM
+
+- La barrera funciona en Android normal, sin restablecimiento de fabrica ni Device Owner. Es una defensa por capas: Administrador del dispositivo, Accessibility, VPN, control remoto y recuperacion de emergencia; no promete la imposibilidad absoluta de desinstalar que solo ofrece Device Owner/MDM.
+- App Usuario registra `ProtectionDeviceAdminReceiver`, reporta su estado en el heartbeat y conserva las claves locales sensibles cifradas con Android Keystore AES-GCM.
+- Con la barrera armada, Accessibility bloquea solo las pantallas de Ajustes que permiten detener, deshabilitar, quitar permisos o desinstalar la propia App Usuario. Ajustes normales siguen disponibles.
+- Un intento de manipulacion vuelve a Home, muestra aviso local y crea una alerta remota deduplicada. La App Admin separa estado de conexion, componentes de proteccion y revision aplicada.
+- App Admin puede armar/desarmar, permitir Ajustes protegidos por 10 minutos, autorizar desinstalacion por 10 minutos y generar un codigo de recuperacion de un solo uso. Supabase DEV guarda unicamente salt y verificador; el codigo no se persiste ni se documenta.
+- La recuperacion offline limita cinco intentos, bloquea nuevos intentos durante 15 minutos y puede cancelarse desde App Usuario. Consumirla incrementa la revision consumida para impedir reutilizacion.
+- Supabase DEV incorpora `device_protection_controls` con RLS, revisiones de comando/aplicacion, autorizaciones temporales, recuperacion y provision automatica para nuevos dispositivos Usuario. No se borraron datos.
+- `send-protection-alert` fue desplegada solo en el proyecto DEV `syeycayasyufedwoprea`. La Service Role Key permanece exclusivamente del lado servidor y no existe en Android.
+- Validacion fisica in-place en Samsung SM-A235M: DEV 192 -> 193 sin borrar datos; token y Room preservados; Device Admin activo y no `testOnly`; VPN y Accessibility activas; heartbeat actualizado; armado remoto reconocido; bloqueo de App Info comprobado; Ajustes normales accesibles; alerta de manipulacion deduplicada; permiso remoto de retiro, revocacion y recuperacion offline de un solo uso comprobados. El telefono quedo armado y sin autorizacion local de retiro.
+- Room queda en schema 11 con migracion in-place. No desinstalar ni borrar datos para actualizar.
 
 ## Cierre 2026-07-13 - Temas sensibles obligatorios
 

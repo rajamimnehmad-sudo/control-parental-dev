@@ -14,6 +14,7 @@ import com.contentfilter.feature.activation.InstalledAppVersionProvider
 import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
+import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.repair.UserLocalDataRepair
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -60,6 +61,9 @@ class UserApplication :
     @Inject
     lateinit var installedAppVersionProvider: InstalledAppVersionProvider
 
+    @Inject
+    lateinit var protectionControlCoordinator: ProtectionControlCoordinator
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -100,6 +104,8 @@ class UserApplication :
                 }.logFailure("targeted-policy-refresh")
                 runCatching { syncScheduler.requestSync() }
                     .logFailure("sync-request")
+                runCatching { protectionControlCoordinator.refresh() }
+                    .logFailure("protection-control-refresh")
             }
         }
         appScope.launch {
@@ -128,6 +134,8 @@ class UserApplication :
                         }.logFailure("activation-policy-refresh")
                         runCatching { syncScheduler.requestSync() }
                             .logFailure("activation-sync-request")
+                        runCatching { protectionControlCoordinator.refresh() }
+                            .logFailure("activation-protection-refresh")
                     }
                 }
         }
@@ -138,6 +146,13 @@ class UserApplication :
                     runCatching { localDataRepair.repairIfNeeded() }
                         .logFailure("periodic-local-data-repair")
                 }
+            }
+        }
+        appScope.launch {
+            while (true) {
+                delay(ProtectionControlRefreshIntervalMillis)
+                runCatching { protectionControlCoordinator.refresh() }
+                    .logFailure("periodic-protection-refresh")
             }
         }
     }
@@ -163,5 +178,6 @@ class UserApplication :
         const val LogTag = "UserApplication"
         const val DeviceLicenseValidationIntervalMillis = 60_000L
         const val WebDomainListRefreshIntervalMillis = 6 * 60 * 60 * 1_000L
+        const val ProtectionControlRefreshIntervalMillis = 60_000L
     }
 }

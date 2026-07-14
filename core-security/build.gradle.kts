@@ -20,4 +20,5 @@ dependencies {
     implementation(project(":core-network"))
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
+    testImplementation(libs.kotlin.test)
 }

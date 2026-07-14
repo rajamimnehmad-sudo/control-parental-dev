@@ -10,6 +10,7 @@ internal fun SystemHealthEntity.toDomain(): SystemHealthSnapshot =
     SystemHealthSnapshot(
         vpnState = enumValueOrDefault(vpnState, ComponentState.Unknown),
         accessibilityState = enumValueOrDefault(accessibilityState, ComponentState.Unknown),
+        deviceAdminState = enumValueOrDefault(deviceAdminState, ComponentState.Unknown),
         syncState = enumValueOrDefault(syncState, ComponentState.Unknown),
         integrityState = enumValueOrDefault(integrityState, ComponentState.Unknown),
         databaseState = enumValueOrDefault(databaseState, ComponentState.Warning),
@@ -22,6 +23,7 @@ internal fun defaultHealthSnapshot(nowEpochMillis: Long): SystemHealthSnapshot =
     SystemHealthSnapshot(
         vpnState = ComponentState.Unknown,
         accessibilityState = ComponentState.Unknown,
+        deviceAdminState = ComponentState.Unknown,
         syncState = ComponentState.Unknown,
         integrityState = ComponentState.Unknown,
         databaseState = ComponentState.Enabled,
@@ -34,6 +36,7 @@ internal fun SystemHealthSnapshot.toEntity(): SystemHealthEntity =
     SystemHealthEntity(
         vpnState = vpnState.name,
         accessibilityState = accessibilityState.name,
+        deviceAdminState = deviceAdminState.name,
         syncState = syncState.name,
         integrityState = integrityState.name,
         databaseState = databaseState.name,

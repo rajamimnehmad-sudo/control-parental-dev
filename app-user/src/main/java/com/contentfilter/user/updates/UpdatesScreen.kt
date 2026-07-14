@@ -9,6 +9,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,8 +36,23 @@ fun UpdatesRoute(
     guideName: String = "",
     vpnState: String = "",
     accessibilityState: String = "",
+    deviceAdminState: String = "",
     syncState: String = "",
     activationState: String = "",
+    protectionArmed: Boolean = false,
+    settingsAuthorized: Boolean = false,
+    removalAuthorized: Boolean = false,
+    recoveryAvailable: Boolean = false,
+    recoveryCode: String = "",
+    protectionMessage: String = "",
+    protectionRefreshing: Boolean = false,
+    onActivateDeviceAdmin: () -> Unit = {},
+    onProtectionRefresh: () -> Unit = {},
+    onRequestMaintenance: () -> Unit = {},
+    onRecoveryCodeChanged: (String) -> Unit = {},
+    onSubmitRecoveryCode: () -> Unit = {},
+    onCancelRemovalAuthorization: () -> Unit = {},
+    onAuthorizedRemoval: () -> Unit = {},
     viewModel: UpdatesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -57,8 +73,23 @@ fun UpdatesRoute(
         guideName = guideName,
         vpnState = vpnState,
         accessibilityState = accessibilityState,
+        deviceAdminState = deviceAdminState,
         syncState = syncState,
         activationState = activationState,
+        protectionArmed = protectionArmed,
+        settingsAuthorized = settingsAuthorized,
+        removalAuthorized = removalAuthorized,
+        recoveryAvailable = recoveryAvailable,
+        recoveryCode = recoveryCode,
+        protectionMessage = protectionMessage,
+        protectionRefreshing = protectionRefreshing,
+        onActivateDeviceAdmin = onActivateDeviceAdmin,
+        onProtectionRefresh = onProtectionRefresh,
+        onRequestMaintenance = onRequestMaintenance,
+        onRecoveryCodeChanged = onRecoveryCodeChanged,
+        onSubmitRecoveryCode = onSubmitRecoveryCode,
+        onCancelRemovalAuthorization = onCancelRemovalAuthorization,
+        onAuthorizedRemoval = onAuthorizedRemoval,
     )
 }
 
@@ -75,8 +106,23 @@ private fun UpdatesScreen(
     guideName: String,
     vpnState: String,
     accessibilityState: String,
+    deviceAdminState: String,
     syncState: String,
     activationState: String,
+    protectionArmed: Boolean,
+    settingsAuthorized: Boolean,
+    removalAuthorized: Boolean,
+    recoveryAvailable: Boolean,
+    recoveryCode: String,
+    protectionMessage: String,
+    protectionRefreshing: Boolean,
+    onActivateDeviceAdmin: () -> Unit,
+    onProtectionRefresh: () -> Unit,
+    onRequestMaintenance: () -> Unit,
+    onRecoveryCodeChanged: (String) -> Unit,
+    onSubmitRecoveryCode: () -> Unit,
+    onCancelRemovalAuthorization: () -> Unit,
+    onAuthorizedRemoval: () -> Unit,
 ) {
     ProductVisualPage(
         title = "Ajustes",
@@ -109,7 +155,12 @@ private fun UpdatesScreen(
         }
         ProductLargeFeatureCard(
             title = "Protección",
-            subtitle = protectionSummary.ifBlank { "Resumen del dispositivo protegido." },
+            subtitle =
+                if (protectionArmed) {
+                    "Protección reforzada activa. ${protectionSummary.ifBlank { "Componentes verificados." }}"
+                } else {
+                    "Protección reforzada pendiente. ${protectionSummary.ifBlank { "Completá las barreras del dispositivo." }}"
+                },
             accent = ProductSky,
         )
         ProductCard {
@@ -124,12 +175,73 @@ private fun UpdatesScreen(
                 "Accesibilidad: ${accessibilityState.ifBlank { "Desconocida" }}",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Text(
+                "Protección contra desinstalación: ${deviceAdminState.ifBlank { "Desconocida" }}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
             Text("VPN: ${vpnState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
             Text("Sincronización: ${syncState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
             Text(
                 "Activación: ${activationState.ifBlank { "Desconocida" }}",
                 style = MaterialTheme.typography.bodyMedium,
             )
+            Text(
+                "Control reforzado: ${if (protectionArmed) "Activo" else "Pendiente"}",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (settingsAuthorized) {
+                Text(
+                    "Mantenimiento temporal autorizado",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
+        ProductCard {
+            Text("Mantenimiento y recuperación", style = MaterialTheme.typography.titleMedium)
+            if (deviceAdminState != "Activa") {
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onActivateDeviceAdmin) {
+                    Text("Activar protección contra desinstalación")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedButton(
+                    modifier = Modifier.weight(1f),
+                    enabled = !protectionRefreshing,
+                    onClick = onProtectionRefresh,
+                ) {
+                    Text(if (protectionRefreshing) "Actualizando..." else "Actualizar permisos")
+                }
+                OutlinedButton(modifier = Modifier.weight(1f), onClick = onRequestMaintenance) {
+                    Text("Pedir mantenimiento")
+                }
+            }
+            if (recoveryAvailable) {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = recoveryCode,
+                    onValueChange = onRecoveryCodeChanged,
+                    label = { Text("Código de recuperación") },
+                    singleLine = true,
+                )
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = recoveryCode.isNotBlank(),
+                    onClick = onSubmitRecoveryCode,
+                ) {
+                    Text("Validar código")
+                }
+            }
+            if (removalAuthorized) {
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onAuthorizedRemoval) {
+                    Text("Desinstalar con autorización")
+                }
+                OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCancelRemovalAuthorization) {
+                    Text("Cancelar autorización")
+                }
+            }
+            if (protectionMessage.isNotBlank()) {
+                Text(protectionMessage, style = MaterialTheme.typography.bodyMedium)
+            }
         }
         ProductLargeFeatureCard(
             title = "Actualizaciones",

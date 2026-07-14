@@ -1,6 +1,7 @@
 package com.contentfilter.admin.rules
 
 import com.contentfilter.core.domain.model.DailyLimit
+import com.contentfilter.core.domain.model.DeviceProtectionControl
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.WebProtectionSemantics
@@ -40,6 +41,9 @@ data class RulesUiState(
     val pairingCode: String = "",
     val pairingExpiresAt: String = "",
     val pairingLoading: Boolean = false,
+    val protectionControls: Map<String, DeviceProtectionControl> = emptyMap(),
+    val protectionLoadingDeviceIds: Set<String> = emptySet(),
+    val recoveryCode: String = "",
     val offlineMode: Boolean = true,
     val message: String = "",
 ) {
@@ -103,11 +107,16 @@ data class AppGroupUiState(
 
 data class UserDeviceUiState(
     val id: String,
+    val accountId: String,
     val name: String,
     val status: UserDeviceStatus,
     val lastSeenLabel: String,
     val appCount: Int,
     val protectionAlert: String? = null,
+    val protectionComplete: Boolean = false,
+    val vpnState: String = "Desconocida",
+    val accessibilityState: String = "Desconocida",
+    val deviceAdminState: String = "Desconocida",
     val userLabel: String = "Usuario",
 )
 

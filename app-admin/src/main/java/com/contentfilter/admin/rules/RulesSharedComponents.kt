@@ -37,6 +37,7 @@ internal enum class DevicePanel {
     Apps,
     AppGroups,
     Web,
+    Protection,
 }
 
 @Composable

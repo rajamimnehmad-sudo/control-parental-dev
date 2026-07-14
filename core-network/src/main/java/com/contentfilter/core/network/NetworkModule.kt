@@ -1,5 +1,6 @@
 package com.contentfilter.core.network
 
+import com.contentfilter.core.domain.repository.ProtectionControlRepository
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.network.config.BuildConfigSupabaseConfigProvider
 import com.contentfilter.core.network.config.SupabaseConfigProvider
@@ -11,6 +12,7 @@ import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
+import com.contentfilter.core.network.remote.SupabaseProtectionControlRepository
 import com.contentfilter.core.network.remote.SupabasePushNotificationRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteAccountRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteDeviceRepository
@@ -56,6 +58,11 @@ abstract class NetworkModule {
     abstract fun bindPushNotificationRepository(
         repository: SupabasePushNotificationRepository,
     ): PushNotificationRepository
+
+    @Binds
+    abstract fun bindProtectionControlRepository(
+        repository: SupabaseProtectionControlRepository,
+    ): ProtectionControlRepository
 
     @Binds
     abstract fun bindRealtimeSubscription(subscription: SupabaseRealtimeSubscription): RealtimeSubscription

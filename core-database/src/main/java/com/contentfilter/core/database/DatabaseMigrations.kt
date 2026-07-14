@@ -182,6 +182,14 @@ object DatabaseMigrations {
             }
         }
 
+    val Migration10To11: Migration =
+        object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE system_health ADD COLUMN deviceAdminState TEXT NOT NULL DEFAULT 'Unknown'")
+                db.execSQL("ALTER TABLE devices ADD COLUMN deviceAdminState TEXT NOT NULL DEFAULT 'Unknown'")
+            }
+        }
+
     val All: Array<Migration> =
         arrayOf(
             Migration1To2,
@@ -193,5 +201,6 @@ object DatabaseMigrations {
             Migration7To8,
             Migration8To9,
             Migration9To10,
+            Migration10To11,
         )
 }

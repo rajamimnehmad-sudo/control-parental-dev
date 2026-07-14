@@ -11,6 +11,7 @@ import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
@@ -20,6 +21,7 @@ import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.InstalledAppRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
+import com.contentfilter.core.domain.repository.ProtectionControlRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
@@ -32,6 +34,7 @@ import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseActivationClient
+import com.contentfilter.core.security.RecoveryCodeHasher
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.PolicyApplicationState
 import com.contentfilter.core.sync.engine.SyncEngine
@@ -81,6 +84,8 @@ class RulesViewModel
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
         private val telemetryRepository: TelemetryRepository,
+        private val protectionControlRepository: ProtectionControlRepository,
+        private val recoveryCodeHasher: RecoveryCodeHasher,
     ) : ViewModel() {
         private val form =
             MutableStateFlow(
@@ -102,6 +107,12 @@ class RulesViewModel
         private val dailyLimits = selectedPolicyDeviceId.flatMapLatest { observeDailyLimits(it) }
         private val appGroups = selectedPolicyDeviceId.flatMapLatest { appGroupRepository.observeGroups(it) }
         private val extraTimeGrants = grantRepository.observeGrants()
+        private val devices =
+            observeDevices().stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.Eagerly,
+                initialValue = emptyList(),
+            )
         private val nowTicks =
             flow {
                 while (true) {
@@ -129,7 +140,7 @@ class RulesViewModel
         val uiState =
             combine(
                 policyState,
-                observeDevices(),
+                devices,
                 installedApps,
                 form,
             ) { policy, devices, apps, formState ->
@@ -194,6 +205,12 @@ class RulesViewModel
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = form.value,
             )
+
+        init {
+            viewModelScope.launch(Dispatchers.IO) {
+                devices.collect { values -> refreshProtectionControls(values.map { it.id }) }
+            }
+        }
 
         fun onAppPackageChanged(value: String) {
             form.update { it.copy(appPackageName = value, message = "") }
@@ -290,10 +307,129 @@ class RulesViewModel
             form.update { it.copy(message = "Actualizando dispositivos...") }
             viewModelScope.launch(Dispatchers.IO) {
                 val devicesResult = syncEngine.syncDevicesFull()
+                refreshProtectionControls(devices.value.map { it.id })
                 refreshInstalledApps(forceFull = false)
                 form.update {
                     it.copy(message = devicesResult.message.takeIf { message -> message.isNotBlank() }.orEmpty())
                 }
+            }
+        }
+
+        fun setProtectionArmed(
+            deviceId: String,
+            armed: Boolean,
+        ) = mutateProtection(deviceId, if (armed) "Activando protección..." else "Desarmando protección...") { device ->
+            protectionControlRepository.setArmed(device.accountId, device.id, armed)
+        }
+
+        fun authorizeSettings(deviceId: String) =
+            mutateProtection(deviceId, "Autorizando mantenimiento...") { device ->
+                protectionControlRepository.authorize(
+                    accountId = device.accountId,
+                    deviceId = device.id,
+                    scope = ProtectionAuthorizationScope.Settings,
+                    durationMinutes = 10,
+                )
+            }
+
+        fun authorizeRemoval(deviceId: String) =
+            mutateProtection(deviceId, "Autorizando retiro...") { device ->
+                protectionControlRepository.authorize(
+                    accountId = device.accountId,
+                    deviceId = device.id,
+                    scope = ProtectionAuthorizationScope.Removal,
+                    durationMinutes = 10,
+                )
+            }
+
+        fun generateRecoveryCode(deviceId: String) {
+            val material = recoveryCodeHasher.generate()
+            val device = uiState.value.userDevices.firstOrNull { it.id == deviceId }
+            if (device == null) {
+                form.update { it.copy(message = "Dispositivo no disponible.") }
+                return
+            }
+            form.update {
+                it.copy(
+                    protectionLoadingDeviceIds = it.protectionLoadingDeviceIds + deviceId,
+                    message = "Generando código de recuperación...",
+                    recoveryCode = "",
+                )
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                protectionControlRepository
+                    .rotateRecovery(
+                        accountId = device.accountId,
+                        deviceId = device.id,
+                        salt = material.salt,
+                        verifier = material.verifier,
+                    ).onSuccess { control ->
+                        form.update {
+                            it.copy(
+                                protectionControls = it.protectionControls + (deviceId to control),
+                                protectionLoadingDeviceIds = it.protectionLoadingDeviceIds - deviceId,
+                                recoveryCode = material.code,
+                                message = "Código listo. Guardalo antes de cerrar.",
+                            )
+                        }
+                    }.onFailure {
+                        form.update {
+                            it.copy(
+                                protectionLoadingDeviceIds = it.protectionLoadingDeviceIds - deviceId,
+                                message = "No se pudo generar el código.",
+                            )
+                        }
+                    }
+            }
+        }
+
+        fun clearRecoveryCode() {
+            form.update { it.copy(recoveryCode = "", message = "Código ocultado.") }
+        }
+
+        private fun mutateProtection(
+            deviceId: String,
+            progressMessage: String,
+            action: suspend (UserDeviceUiState) -> Result<com.contentfilter.core.domain.model.DeviceProtectionControl>,
+        ): kotlinx.coroutines.Job {
+            val device =
+                uiState.value.userDevices.firstOrNull { it.id == deviceId }
+                    ?: return viewModelScope.launch { form.update { it.copy(message = "Dispositivo no disponible.") } }
+            form.update {
+                it.copy(
+                    protectionLoadingDeviceIds = it.protectionLoadingDeviceIds + deviceId,
+                    message = progressMessage,
+                    recoveryCode = "",
+                )
+            }
+            return viewModelScope.launch(Dispatchers.IO) {
+                action(device)
+                    .onSuccess { control ->
+                        form.update {
+                            it.copy(
+                                protectionControls = it.protectionControls + (deviceId to control),
+                                protectionLoadingDeviceIds = it.protectionLoadingDeviceIds - deviceId,
+                                message = "Protección actualizada. El teléfono la aplicará al sincronizar.",
+                            )
+                        }
+                    }.onFailure {
+                        form.update {
+                            it.copy(
+                                protectionLoadingDeviceIds = it.protectionLoadingDeviceIds - deviceId,
+                                message = "No se pudo actualizar la protección.",
+                            )
+                        }
+                    }
+            }
+        }
+
+        private suspend fun refreshProtectionControls(deviceIds: List<String>) {
+            val refreshed =
+                deviceIds.distinct().mapNotNull { deviceId ->
+                    protectionControlRepository.get(deviceId).getOrNull()?.let { deviceId to it }
+                }.toMap()
+            if (refreshed.isNotEmpty()) {
+                form.update { it.copy(protectionControls = it.protectionControls + refreshed) }
             }
         }
 

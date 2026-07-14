@@ -17,6 +17,8 @@ interface SystemStatusRepository {
 
     suspend fun updateAccessibilityState(state: ComponentState)
 
+    suspend fun updateDeviceAdminState(state: ComponentState)
+
     suspend fun updateSyncState(state: ComponentState)
 
     suspend fun updateLicenseState(state: LicenseState)

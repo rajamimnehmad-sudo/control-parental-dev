@@ -6,6 +6,7 @@ package com.contentfilter.core.domain.model
 data class SystemHealthSnapshot(
     val vpnState: ComponentState,
     val accessibilityState: ComponentState,
+    val deviceAdminState: ComponentState = ComponentState.Unknown,
     val syncState: ComponentState,
     val integrityState: ComponentState,
     val databaseState: ComponentState,
@@ -18,6 +19,7 @@ data class SystemHealthSnapshot(
             when {
                 vpnState == ComponentState.Disabled ||
                     accessibilityState == ComponentState.Disabled ||
+                    deviceAdminState == ComponentState.Disabled ||
                     databaseState == ComponentState.Disabled -> ProtectionLevel.Unprotected
                 hasWarningState() -> ProtectionLevel.Warning
                 else -> ProtectionLevel.Protected
@@ -26,6 +28,7 @@ data class SystemHealthSnapshot(
     private fun hasWarningState(): Boolean =
         vpnState != ComponentState.Enabled ||
             accessibilityState != ComponentState.Enabled ||
+            deviceAdminState != ComponentState.Enabled ||
             syncState == ComponentState.Warning ||
             integrityState == ComponentState.Warning ||
             databaseState == ComponentState.Warning ||

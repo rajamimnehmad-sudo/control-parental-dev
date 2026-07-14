@@ -1,6 +1,8 @@
 package com.contentfilter.user
 
+import android.app.admin.DevicePolicyManager
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -67,6 +69,7 @@ import com.contentfilter.core.ui.ProductTeal
 import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.feature.accessibility.service.AccessibilityController
+import com.contentfilter.feature.accessibility.service.DeviceAdminController
 import com.contentfilter.feature.activation.ActivationRoute
 import com.contentfilter.feature.requests.RequestsRoute
 import com.contentfilter.feature.requests.RequestsViewModel
@@ -74,6 +77,8 @@ import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.MyAppsRoute
 import com.contentfilter.user.internet.UserWebViewModel
+import com.contentfilter.user.protection.ProtectionControlCoordinator
+import com.contentfilter.user.protection.ProtectionViewModel
 import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
@@ -88,6 +93,9 @@ class MainActivity : ComponentActivity() {
 
     @javax.inject.Inject
     lateinit var targetedPolicySyncCoordinator: TargetedPolicySyncCoordinator
+
+    @javax.inject.Inject
+    lateinit var protectionControlCoordinator: ProtectionControlCoordinator
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -106,6 +114,7 @@ class MainActivity : ComponentActivity() {
                 deviceId = activation.deviceId,
                 reason = "foreground",
             )
+            protectionControlCoordinator.refresh()
         }
     }
 }
@@ -116,12 +125,17 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     var backStack by rememberSaveable { mutableStateOf<List<UserDestination>>(emptyList()) }
     var showAccessibilityDialog by rememberSaveable { mutableStateOf(false) }
     var showVpnDialog by rememberSaveable { mutableStateOf(false) }
+    var showDeviceAdminDialog by rememberSaveable { mutableStateOf(false) }
     val context = LocalContext.current
     val vpnPermissionLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
             if (VpnController.prepareIntent(context) == null) {
                 VpnController.start(context)
             }
+        }
+    val deviceAdminLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) {
+            showDeviceAdminDialog = false
         }
     val rootViewModel: UserRootViewModel = hiltViewModel()
     val rootState by rootViewModel.uiState.collectAsStateWithLifecycle()
@@ -131,6 +145,8 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     val requestsState by requestsViewModel.uiState.collectAsStateWithLifecycle()
     val statusViewModel: SystemStatusViewModel = hiltViewModel()
     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
+    val protectionViewModel: ProtectionViewModel = hiltViewModel()
+    val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         updatesViewModel.autoCheckAndDownload()
     }
@@ -145,6 +161,11 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
             } else {
                 showVpnDialog = true
             }
+        }
+    }
+    LaunchedEffect(rootState.recentlyActivated) {
+        if (rootState.recentlyActivated && !DeviceAdminController.isEnabled(context)) {
+            showDeviceAdminDialog = true
         }
     }
     if (rootState.checkingActivation) {
@@ -222,8 +243,34 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                         guideName = statusState.guideName,
                         vpnState = statusState.vpnState,
                         accessibilityState = statusState.accessibilityState,
+                        deviceAdminState = statusState.deviceAdminState,
                         syncState = statusState.syncState,
                         activationState = statusState.activationState,
+                        protectionArmed = protectionState.armed,
+                        settingsAuthorized = protectionState.remoteSettingsAuthorized,
+                        removalAuthorized = protectionState.removalAuthorized,
+                        recoveryAvailable = protectionState.recoveryAvailable,
+                        recoveryCode = protectionState.recoveryCode,
+                        protectionMessage = protectionState.message,
+                        protectionRefreshing = protectionState.refreshing,
+                        onActivateDeviceAdmin = {
+                            deviceAdminLauncher.launch(DeviceAdminController.activationIntent(context))
+                        },
+                        onProtectionRefresh = protectionViewModel::refresh,
+                        onRequestMaintenance = protectionViewModel::requestMaintenance,
+                        onRecoveryCodeChanged = protectionViewModel::onRecoveryCodeChanged,
+                        onSubmitRecoveryCode = protectionViewModel::submitRecoveryCode,
+                        onCancelRemovalAuthorization = protectionViewModel::cancelRemovalAuthorization,
+                        onAuthorizedRemoval = {
+                            if (protectionState.removalAuthorized) {
+                                context
+                                    .getSystemService(DevicePolicyManager::class.java)
+                                    .removeActiveAdmin(DeviceAdminController.component(context))
+                                context.startActivity(
+                                    Intent(Intent.ACTION_DELETE, Uri.parse("package:${context.packageName}")),
+                                )
+                            }
+                        },
                     )
             }
         }
@@ -257,6 +304,30 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
             dismissButton = {
                 OutlinedButton(onClick = { navigateTo(UserDestination.Updates) }) {
                     Text("Ver")
+                }
+            },
+        )
+    } else if (showDeviceAdminDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeviceAdminDialog = false },
+            title = { Text("Protección contra desinstalación") },
+            text = {
+                Text(
+                    "Activá la protección de Android para que Content Filter no pueda quitarse sin una confirmación adicional.",
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        deviceAdminLauncher.launch(DeviceAdminController.activationIntent(context))
+                    },
+                ) {
+                    Text("Activar protección")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { showDeviceAdminDialog = false }) {
+                    Text("Luego")
                 }
             },
         )

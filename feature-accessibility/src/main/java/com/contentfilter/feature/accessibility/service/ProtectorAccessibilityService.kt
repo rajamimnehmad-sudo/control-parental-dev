@@ -11,10 +11,12 @@ import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.ProtectionAlertType
+import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
+import com.contentfilter.core.domain.repository.ProtectionStateStore
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
@@ -54,6 +56,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     @Inject lateinit var pushNotificationRepository: PushNotificationRepository
 
+    @Inject lateinit var protectionStateStore: ProtectionStateStore
+
     @Inject lateinit var usageSessionRepository: UsageSessionRepository
 
     @Inject lateinit var syncScheduler: SyncScheduler
@@ -74,6 +78,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var blockRetryJob: Job? = null
     private var blockRetryPackageName: String? = null
     private var lastExplicitSearchNoticeAt: Long = 0L
+    private var lastTamperAlertAt: Long = 0L
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -104,12 +109,12 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (blockExplicitSearchIfNeeded(event, packageName)) return
         val elapsed = clock.elapsedRealtimeMillis()
         val now = clock.nowEpochMillis()
+        if (handleSettingsProtection(packageName, event.className?.toString(), elapsed, now)) return
         if (packageName.isAlwaysAllowedPackage()) {
             handleAlwaysAllowedForeground(packageName, elapsed, now)
             return
         }
         if (blockRetryPackageName != packageName) clearBlockRetry()
-        if (handleSettingsProtection(packageName, event.className?.toString(), elapsed)) return
         if (handleSearchEngineProtection(packageName, AccessibilityEventFilter.label(event.eventType))) return
 
         serviceScope?.launch { systemStatusRepository.updateAccessibilityState(ComponentState.Enabled) }
@@ -220,11 +225,64 @@ class ProtectorAccessibilityService : AccessibilityService() {
         packageName: String,
         className: String?,
         elapsedRealtimeMillis: Long,
+        nowEpochMillis: Long,
     ): Boolean {
-        if (!settingsProtectionPolicy.shouldLeaveSettings(packageName, className, elapsedRealtimeMillis)) return false
+        val ownAppIdentityVisible = rootInActiveWindow.containsOwnAppIdentity()
+        if (
+            !settingsProtectionPolicy.shouldLeaveProtectedScreen(
+                packageName = packageName,
+                className = className,
+                ownAppIdentityVisible = ownAppIdentityVisible,
+                armed = protectionStateStore.isArmed(),
+                settingsAuthorized =
+                    protectionStateStore.isAuthorized(
+                        ProtectionAuthorizationScope.Settings,
+                        nowEpochMillis,
+                    ),
+                removalAuthorized =
+                    protectionStateStore.isAuthorized(
+                        ProtectionAuthorizationScope.Removal,
+                        nowEpochMillis,
+                    ),
+                elapsedRealtimeMillis = elapsedRealtimeMillis,
+            )
+        ) {
+            return false
+        }
         performGlobalAction(GLOBAL_ACTION_HOME)
-        serviceScope?.launch { telemetryReporter.recordSettingsProtection() }
+        Toast.makeText(this, "Este ajuste está protegido", Toast.LENGTH_SHORT).show()
+        serviceScope?.launch {
+            telemetryReporter.recordSettingsProtection()
+            if (lastTamperAlertAt == 0L || elapsedRealtimeMillis - lastTamperAlertAt >= TamperAlertDebounceMillis) {
+                lastTamperAlertAt = elapsedRealtimeMillis
+                pushNotificationRepository.reportProtectionAlert(ProtectionAlertType.TamperAttempt)
+            }
+        }
         return true
+    }
+
+    private fun AccessibilityNodeInfo?.containsOwnAppIdentity(): Boolean {
+        val root = this ?: return false
+        val appLabel = applicationInfo.loadLabel(packageManager).toString()
+        val ownPackage = applicationContext.packageName
+        val pending = ArrayDeque<AccessibilityNodeInfo>()
+        pending.add(root)
+        var visited = 0
+        while (pending.isNotEmpty() && visited < MaxIdentityNodes) {
+            val node = pending.removeFirst()
+            visited += 1
+            val values = listOf(node.text?.toString(), node.contentDescription?.toString(), node.viewIdResourceName)
+            if (
+                values.any { value ->
+                    value?.contains(ownPackage, ignoreCase = true) == true ||
+                        value?.equals(appLabel, ignoreCase = true) == true
+                }
+            ) {
+                return true
+            }
+            repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
+        }
+        return false
     }
 
     private fun handleSearchEngineProtection(
@@ -523,6 +581,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val BlockHomeRetries = 2
         const val PolicyChangedEventLabel = "POLICY_CHANGED"
         const val ExplicitSearchNoticeDebounceMillis = 2_000L
+        const val TamperAlertDebounceMillis = 5 * 60_000L
+        const val MaxIdentityNodes = 200
         const val GoogleSearchPackage = "com.google.android.googlequicksearchbox"
         const val LogTag = "ProtectorAccessibility"
         val ExplicitSearchPackages = setOf("com.android.chrome", GoogleSearchPackage)

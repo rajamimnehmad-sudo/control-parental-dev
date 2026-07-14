@@ -30,6 +30,10 @@ class RoomSystemStatusRepository
             updateHealth { it.copy(accessibilityState = state) }
         }
 
+        override suspend fun updateDeviceAdminState(state: ComponentState) {
+            updateHealth { it.copy(deviceAdminState = state) }
+        }
+
         override suspend fun updateSyncState(state: ComponentState) {
             updateHealth { it.copy(syncState = state) }
         }

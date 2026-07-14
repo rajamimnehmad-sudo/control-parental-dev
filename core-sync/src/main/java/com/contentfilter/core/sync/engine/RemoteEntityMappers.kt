@@ -36,6 +36,7 @@ internal fun RemoteDeviceDto.toEntity(): DeviceEntity =
         lastSeenAtEpochMillis = lastSeenAt?.toEpochMillis(),
         vpnState = vpnState.toComponentStateName(),
         accessibilityState = accessibilityState.toComponentStateName(),
+        deviceAdminState = deviceAdminState.toComponentStateName(),
         protectionAlert = protectionAlert,
         protectionUpdatedAtEpochMillis = protectionUpdatedAt?.toEpochMillis(),
         appliedPolicyId = appliedPolicyId,

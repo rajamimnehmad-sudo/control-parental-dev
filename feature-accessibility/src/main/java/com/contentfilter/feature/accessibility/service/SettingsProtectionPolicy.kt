@@ -1,18 +1,38 @@
 package com.contentfilter.feature.accessibility.service
 
+import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
+
 class SettingsProtectionPolicy {
-    fun shouldLeaveSettings(
+    fun shouldLeaveProtectedScreen(
         packageName: String,
         className: String?,
+        ownAppIdentityVisible: Boolean,
+        armed: Boolean,
+        settingsAuthorized: Boolean,
+        removalAuthorized: Boolean,
         elapsedRealtimeMillis: Long,
     ): Boolean {
-        if (packageName != AndroidSettingsPackage) return false
+        if (!armed || !ownAppIdentityVisible) return false
+        val requiredScope = protectedScope(packageName, className) ?: return false
+        if (requiredScope == ProtectionAuthorizationScope.Settings && settingsAuthorized) return false
+        if (requiredScope == ProtectionAuthorizationScope.Removal && removalAuthorized) return false
         if (elapsedRealtimeMillis - lastActionAtElapsedMillis < MinActionIntervalMillis) return false
-        val normalizedClass = className.orEmpty()
-        val protectedScreen = ProtectedSettingsClassHints.any { normalizedClass.contains(it, ignoreCase = true) }
-        if (!protectedScreen) return false
         lastActionAtElapsedMillis = elapsedRealtimeMillis
         return true
+    }
+
+    private fun protectedScope(
+        packageName: String,
+        className: String?,
+    ): ProtectionAuthorizationScope? {
+        val normalizedClass = className.orEmpty()
+        if (packageName in PackageInstallerPackages && UninstallClassHints.any { normalizedClass.contains(it, true) }) {
+            return ProtectionAuthorizationScope.Removal
+        }
+        if (packageName != AndroidSettingsPackage) return null
+        if (RemovalClassHints.any { normalizedClass.contains(it, true) }) return ProtectionAuthorizationScope.Removal
+        if (SettingsClassHints.any { normalizedClass.contains(it, true) }) return ProtectionAuthorizationScope.Settings
+        return null
     }
 
     private var lastActionAtElapsedMillis: Long = -MinActionIntervalMillis
@@ -20,12 +40,31 @@ class SettingsProtectionPolicy {
     private companion object {
         const val AndroidSettingsPackage = "com.android.settings"
         const val MinActionIntervalMillis = 2_000L
-        val ProtectedSettingsClassHints =
+        val PackageInstallerPackages =
+            setOf(
+                "com.android.packageinstaller",
+                "com.google.android.packageinstaller",
+                "com.android.permissioncontroller",
+                "com.google.android.permissioncontroller",
+            )
+        val UninstallClassHints = listOf("Uninstall", "DeletePackage")
+        val RemovalClassHints =
             listOf(
-                "Accessibility",
-                "Vpn",
-                "DeviceAdmin",
-                "SpecialAccess",
+                "InstalledAppDetails",
+                "AppInfoDashboard",
+                "AppInfoActivity",
+                "DeviceAdminAdd",
+                "DeviceAdminWarning",
+            )
+        val SettingsClassHints =
+            listOf(
+                "AccessibilityDetails",
+                "ToggleAccessibility",
+                "AccessibilityServiceWarning",
+                "VpnProfile",
+                "VpnSettings",
+                "ManageExternalSources",
+                "SpecialAccessDetails",
             )
     }
 }

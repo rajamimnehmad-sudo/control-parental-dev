@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="device_admin_label">Protección de Content Filter</string>
+    <string name="device_admin_description">Agrega una confirmación del sistema antes de quitar Content Filter.</string>
     <string name="accessibility_service_description">Proteccion local para aplicar reglas de uso de aplicaciones.</string>
 </resources>

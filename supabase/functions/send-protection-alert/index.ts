@@ -11,6 +11,7 @@ type AlertEvent = {
   device_name: string;
   title: string;
   body: string;
+  should_send: boolean;
 };
 
 type PushToken = {
@@ -42,7 +43,7 @@ Deno.serve(async (request) => {
     },
   });
 
-  const { data: eventRows, error: eventError } = await anonClient.rpc("create_protection_alert_event", {
+  const { data: eventRows, error: eventError } = await anonClient.rpc("create_reinforced_protection_alert_event", {
     p_device_id: payload.device_id,
     p_alert_type: payload.alert_type,
   });
@@ -53,6 +54,9 @@ Deno.serve(async (request) => {
   const event = (eventRows?.[0] ?? null) as AlertEvent | null;
   if (!event) {
     return json({ error: "Event not created" }, 500);
+  }
+  if (!event.should_send) {
+    return json({ event_id: event.event_id, sent: 0, failed: 0, deduplicated: true });
   }
 
   const serviceClient = createClient(supabaseUrl, serviceRoleKey);

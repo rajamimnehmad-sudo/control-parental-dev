@@ -8,6 +8,7 @@ data class SystemHealthEntity(
     @PrimaryKey val id: String = CURRENT_HEALTH_ID,
     val vpnState: String,
     val accessibilityState: String,
+    val deviceAdminState: String = "Unknown",
     val syncState: String,
     val integrityState: String,
     val databaseState: String,

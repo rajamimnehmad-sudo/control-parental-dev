@@ -16,6 +16,7 @@ data class DeviceEntity(
     val lastSeenAtEpochMillis: Long? = null,
     val vpnState: String = "Unknown",
     val accessibilityState: String = "Unknown",
+    val deviceAdminState: String = "Unknown",
     val protectionAlert: String? = null,
     val protectionUpdatedAtEpochMillis: Long? = null,
     val appliedPolicyId: String? = null,

@@ -1,6 +1,7 @@
 package com.contentfilter.core.security
 
 import com.contentfilter.core.domain.repository.ActivationRepository
+import com.contentfilter.core.domain.repository.ProtectionStateStore
 import com.contentfilter.core.network.config.AuthTokenProvider
 import com.contentfilter.core.network.config.DeviceTokenProvider
 import dagger.Binds
@@ -22,4 +23,7 @@ abstract class SecurityModule {
 
     @Binds
     abstract fun bindActivationRepository(repository: DefaultActivationRepository): ActivationRepository
+
+    @Binds
+    abstract fun bindProtectionStateStore(store: EncryptedProtectionStateStore): ProtectionStateStore
 }

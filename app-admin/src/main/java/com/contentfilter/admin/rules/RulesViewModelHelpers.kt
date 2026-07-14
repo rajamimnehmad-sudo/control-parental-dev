@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
+import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
@@ -316,19 +317,33 @@ internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDevi
             val lastSeen = device?.lastSeenAtEpochMillis ?: newestAppSeen
             val status =
                 when {
-                    device?.vpnState == ComponentState.Disabled ||
-                        device?.accessibilityState == ComponentState.Disabled -> UserDeviceStatus.Unprotected
                     lastSeen == null -> UserDeviceStatus.Unknown
                     System.currentTimeMillis() - lastSeen <= ActiveDeviceWindowMillis -> UserDeviceStatus.Active
                     else -> UserDeviceStatus.Inactive
                 }
+            val protectionComplete =
+                device?.vpnState == ComponentState.Enabled &&
+                    device.accessibilityState == ComponentState.Enabled &&
+                    device.deviceAdminState == ComponentState.Enabled
             UserDeviceUiState(
                 id = deviceId,
+                accountId = device?.accountId.orEmpty(),
                 name = device?.displayName ?: "Usuario",
                 status = status,
                 lastSeenLabel = lastSeen.toLastSeenLabel(),
                 appCount = appsByDevice[deviceId]?.distinctBy { it.packageName }?.size ?: 0,
-                protectionAlert = device?.protectionAlert,
+                protectionAlert =
+                    device?.let {
+                        DeviceProtectionAlert.fromStates(
+                            it.vpnState,
+                            it.accessibilityState,
+                            it.deviceAdminState,
+                        )
+                    },
+                protectionComplete = protectionComplete,
+                vpnState = device?.vpnState.displayName(),
+                accessibilityState = device?.accessibilityState.displayName(),
+                deviceAdminState = device?.deviceAdminState.displayName(),
                 userLabel = "Usuario",
             )
         }.sortedWith(
@@ -337,6 +352,14 @@ internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDevi
                 .thenBy { it.name.lowercase() },
         )
 }
+
+private fun ComponentState?.displayName(): String =
+    when (this) {
+        ComponentState.Enabled -> "Activa"
+        ComponentState.Disabled -> "Inactiva"
+        ComponentState.Warning -> "Con advertencias"
+        ComponentState.Unknown, null -> "Desconocida"
+    }
 
 private fun List<Device>.userDeviceIds(): List<String> = filter { device -> device.appRole != "admin" }.map { it.id }
 

@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.repository.AccountRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.feature.accessibility.service.AccessibilityController
+import com.contentfilter.feature.accessibility.service.DeviceAdminController
 import com.contentfilter.feature.vpn.service.VpnController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -57,16 +58,24 @@ class SystemStatusViewModel
                     } else {
                         ComponentState.Disabled
                     }
+                val deviceAdminState =
+                    if (DeviceAdminController.isEnabled(context)) {
+                        ComponentState.Enabled
+                    } else {
+                        ComponentState.Disabled
+                    }
                 val licenseState = if (activation != null) LicenseState.Active else health.licenseState
                 NormalizedStatus(
                     snapshot =
                         health.copy(
                             vpnState = vpnState,
                             accessibilityState = accessibilityState,
+                            deviceAdminState = deviceAdminState,
                             licenseState = licenseState,
                         ),
                     shouldPersistVpn = health.vpnState != vpnState,
                     shouldPersistAccessibility = health.accessibilityState != accessibilityState,
+                    shouldPersistDeviceAdmin = health.deviceAdminState != deviceAdminState,
                     shouldPersistLicense = health.licenseState != licenseState,
                     communityName = account?.communityName.orEmpty(),
                     guideName = account?.guideName.orEmpty(),
@@ -78,6 +87,9 @@ class SystemStatusViewModel
                     }
                     if (status.shouldPersistAccessibility) {
                         repository.updateAccessibilityState(status.snapshot.accessibilityState)
+                    }
+                    if (status.shouldPersistDeviceAdmin) {
+                        repository.updateDeviceAdminState(status.snapshot.deviceAdminState)
                     }
                     if (status.shouldPersistLicense) {
                         repository.updateLicenseState(status.snapshot.licenseState)
@@ -94,6 +106,7 @@ class SystemStatusViewModel
                             summary = "Verificando proteccion local",
                             vpnState = "Desconocida",
                             accessibilityState = "Desconocida",
+                            deviceAdminState = "Desconocida",
                             syncState = "Desconocida",
                             activationState = "PendingActivation",
                             appVersion = "1.0.0",
@@ -107,6 +120,7 @@ class SystemStatusViewModel
             val snapshot: SystemHealthSnapshot,
             val shouldPersistVpn: Boolean,
             val shouldPersistAccessibility: Boolean,
+            val shouldPersistDeviceAdmin: Boolean,
             val shouldPersistLicense: Boolean,
             val communityName: String,
             val guideName: String,

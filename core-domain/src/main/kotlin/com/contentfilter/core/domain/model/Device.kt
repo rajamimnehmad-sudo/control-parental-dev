@@ -8,6 +8,7 @@ data class Device(
     val lastSeenAtEpochMillis: Long? = null,
     val vpnState: ComponentState = ComponentState.Unknown,
     val accessibilityState: ComponentState = ComponentState.Unknown,
+    val deviceAdminState: ComponentState = ComponentState.Unknown,
     val protectionAlert: String? = null,
     val protectionUpdatedAtEpochMillis: Long? = null,
     val appliedPolicyId: String? = null,

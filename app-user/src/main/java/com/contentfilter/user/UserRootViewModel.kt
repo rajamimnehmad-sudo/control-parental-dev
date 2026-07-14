@@ -37,6 +37,9 @@ class UserRootViewModel
                         it.copy(
                             checkingActivation = false,
                             needsActivation = activation == null,
+                            recentlyActivated =
+                                activation != null &&
+                                    System.currentTimeMillis() - activation.activatedAtEpochMillis <= RecentActivationWindowMillis,
                             activationNotice =
                                 if (activation == null && localDataRepair.hasRevokedLicenseNotice()) {
                                     RevokedLicenseMessage
@@ -73,6 +76,7 @@ class UserRootViewModel
 
         private companion object {
             const val DeviceLicenseValidationIntervalMillis = 30_000L
+            const val RecentActivationWindowMillis = 5 * 60_000L
             const val RevokedLicenseMessage =
                 "Este dispositivo ya no tiene protección activa. Pedí un nuevo token al administrador."
         }
@@ -81,5 +85,6 @@ class UserRootViewModel
 data class UserRootUiState(
     val checkingActivation: Boolean = true,
     val needsActivation: Boolean = true,
+    val recentlyActivated: Boolean = false,
     val activationNotice: String = "",
 )
