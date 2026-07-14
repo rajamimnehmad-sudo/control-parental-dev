@@ -81,6 +81,7 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 - La pantalla fundacional es preventiva: no ejecuta busquedas, no abre paginas y no muestra imagenes ni videos. La fuente de resultados, clasificacion local y revision de sitios inciertos quedan para tickets posteriores.
 - El estado reutiliza `PolicyRule`, Room, outbox y sincronizacion DEV existentes. No se agrego tabla, migracion, borrado de datos ni credencial; no existe Service Role Key en Android.
 - Tests de dominio, Admin y Usuario verifican cerrado por defecto, apertura solo explicita, revocacion e independencia respecto de las demas preferencias Web. Ktlint y compilacion de ambas apps pasan.
+- Validacion fisica final en Samsung SM-A235M con la comunidad DEV `Yeshurun Tora`: Admin y Usuario quedaron enlazados, el control por dispositivo abrio DAG, la pantalla preventiva no mostro contenido, Android fijo el atajo, el atajo abrio DAG y luego reflejo `DAG esta cerrado` tras la revocacion. Se dejo DAG cerrado para los dos usuarios visibles; VPN, Accessibility y proteccion contra desinstalacion quedaron activas.
 
 ## Cierre 2026-07-14 - USER-PERF-01 fluidez y acciones de proteccion
 
