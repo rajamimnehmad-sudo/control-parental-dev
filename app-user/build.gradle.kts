@@ -24,7 +24,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 204
+            versionCode = 205
             versionNameSuffix = "-dev"
         }
         create("beta") {
@@ -71,4 +71,5 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
+    testImplementation("org.json:json:20240303")
 }

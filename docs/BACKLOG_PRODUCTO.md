@@ -150,18 +150,30 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 - Aceptacion cumplida: DAG solo abre con una regla `Allow` explicita; cerrar revoca el acceso; otros cambios Web no alteran su estado; tests de dominio, Admin y Usuario cubren el valor por defecto y la independencia de preferencias.
 - Validacion fisica: ciclo Admin abierto -> Usuario Web -> pantalla preventiva -> atajo Android -> Admin cerrado -> atajo cerrado aprobado en Samsung SM-A235M; DAG quedo cerrado y las protecciones del dispositivo activas.
 
-### DAG-SEARCH-01 - Primera fase del buscador propio
+### DAG-BROWSER-01A - Navegador protegido funcional
 
-- Estado: `Propuesto`; requiere aprobar el siguiente ticket antes de escribir codigo.
+- Estado: `En progreso`; aprobado explicitamente por el usuario el 2026-07-14.
 - Prioridad: P1. Esfuerzo: XL. Riesgo: alto.
-- Vision acordada: buscador propio muy kosher para usuarios con Internet bloqueado o que necesitan mayor proteccion, con sitios, imagenes y video clasificados antes de mostrarse.
-- La consulta se procesa localmente en memoria, no se guarda ni se transmite para clasificarla.
-- Salidas iniciales: `Permitida`, `Bloqueada` o `Incierta`, con categoria, confianza y version del modelo.
-- Debe distinguir intencion explicita de contextos medicos, educativos, religiosos o ambiguos.
-- La revision humana del administrador se reserva para sitios que la IA marque como inciertos; no se revisan individualmente consultas, imagenes ni videos.
-- Antes de implementar hay que definir fuente de resultados, tratamiento tecnico de imagen y video, experiencia ante `Incierta`, idiomas iniciales, amenazas y metricas de falsos positivos, latencia, memoria, APK y bateria.
-- Limite honesto: no prometer lectura confiable de consultas escritas en todos los navegadores externos; HTTPS y Android lo impiden. Esos navegadores siguen bajo reglas, SafeSearch, listas, DNS, IP y politica de red.
-- Fuera de alcance: analisis continuo de pantalla, inspeccion de otros navegadores y chats sensibles.
+- Vision acordada: primer corte util del navegador propio DAG, con experiencia cotidiana parecida a Chrome pero conservadora y cerrada por defecto.
+- Alcance aprobado: barra combinada para buscar o escribir URL; resultados reales; navegacion interna; atras, adelante, recargar e inicio; una pestaña; formularios e inicio de sesion.
+- Privacidad: historial cifrado solo en el telefono con busquedas, paginas, titulo y fecha. Solo el usuario puede verlo y borrar elementos o todo el historial. No se sincroniza, no entra en backups y no se envia al administrador.
+- Clasificacion: consulta y contenido textual se procesan localmente en espanol, hebreo e ingles. Salidas `Permitida`, `Bloqueada` o `Incierta`; ante error, modelo ausente o baja confianza se bloquea.
+- Fuente: solo una consulta permitida puede llegar a Brave Search mediante una Edge Function autenticada en Supabase DEV. La credencial de Brave queda como secreto servidor y Android conserva solo credenciales publicas y su sesion/dispositivo.
+- Modelo comercial en revision: el usuario evalua ofrecer DAG por USD 1 mensual con un cupo inicial candidato de 100 busquedas por dispositivo y navegacion directa ilimitada. El despliegue actual conserva temporalmente el limite tecnico de 200 y no tiene sobreconsumo automatico.
+- Costos y privacidad: Supabase conserva solo `device_id`, mes y contador para aplicar el cupo; no guarda consultas, resultados ni historial. Brave aplica USD 5 de credito global mensual a la cuenta; no es un credito por usuario.
+- Revision humana: un sitio incierto puede generar una solicitud de dominio. La consulta y el historial no se incluyen; el administrador recibe solo dominio, titulo y motivo.
+- Seguridad inicial: imagenes, video, descargas, popups, camara, microfono, ubicacion, archivos e intents externos permanecen bloqueados. El contenido no se hace visible antes de la evaluacion local.
+- Revocacion: cerrar DAG desde App Admin impide buscar o navegar, incluso al entrar desde el atajo fijado.
+- Fuera de alcance de este corte: imagenes y video clasificados, multiples pestanas, descargas, historial remoto, inspeccion de navegadores externos y analisis continuo de pantalla.
+- Aceptacion: pruebas de dominio/UI/red, ausencia de consultas en logs, aislamiento del secreto, fallo cerrado, borrado local de historial, revocacion remota y validacion fisica completa en el Samsung conectado.
+
+### DAG-USAGE-01 - Contador mensual en Super Web
+
+- Estado: `Implementado en DEV`; aprobado por el usuario el 2026-07-14.
+- Objetivo: mostrar en Super Web el consumo mensual de DAG casi en tiempo real, con usados, limite y restantes por comunidad y dispositivo, total general, costo Brave estimado y alertas al 80% y 100%.
+- Privacidad: no exponer consultas, URLs, resultados ni historial. Super Web consulta un agregado autorizado; la tabla de contadores permanece inaccesible para clientes comunes.
+- Implementacion: refresco seguro cada 10 segundos, cupo configurable por comunidad, proyeccion mensual y costo estimado luego del credito Brave global. El piloto comercial aprobado es USD 1 con 100 busquedas por dispositivo/mes.
+- Aceptacion tecnica: migracion DEV aplicada, Edge Function actualizada, RPCs Super Admin aisladas de `anon`, tabla sin lectura de clientes y builds Web exitosos. La prueba fisica completa de DAG permanece como ultimo paso de `DAG-BROWSER-01A`.
 
 ### Otros tickets de roadmap
 

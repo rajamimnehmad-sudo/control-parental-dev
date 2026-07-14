@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 204
-App Admin versionCode 204
+App Usuario versionCode 205
+App Admin versionCode 205
 versionName 1.0.1-dev
 ```
 
@@ -68,11 +68,31 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-204-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-204-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-205-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-205-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
+
+## En progreso 2026-07-14 - DAG-BROWSER-01A navegador protegido
+
+- DEV 205 esta publicado para Usuario y Admin. App Usuario incorpora barra combinada, resultados, navegador interno de una pestana, atras/adelante/recargar/inicio e historial local cifrado; App Admin muestra y puede aprobar solicitudes de dominio incierto.
+- Consulta, resultado y texto de pagina pasan por un clasificador local conservador en espanol, hebreo e ingles. Imagenes, video, descargas, popups, camara, microfono, ubicacion, archivos, HTTP e intents externos permanecen bloqueados.
+- Solo una consulta localmente permitida puede llegar a `dag-search`. La Edge Function y dos migraciones quedaron desplegadas exclusivamente en Supabase DEV; autorizan por token de dispositivo y regla DAG activa, aplican 20 consultas por minuto y 200 por dispositivo/mes.
+- Supabase guarda solo `device_id`, mes y contador. No guarda consultas, resultados ni historial; la tabla no es legible por `anon` ni `authenticated`. Android no contiene Brave API key ni Service Role Key.
+- El plan Search de Brave quedo activo y `BRAVE_SEARCH_API_KEY` esta guardada solo como secreto de Supabase DEV. Una prueba directa devolvio HTTP 200 y resultados Web reales; la clave no se guarda en el repositorio, Android, logs ni documentacion.
+- Modelo comercial aprobado para el piloto: USD 1 mensual con 100 busquedas por dispositivo y navegacion directa ilimitada. El cupo queda configurable por comunidad desde Super Web.
+- Pendiente antes de cerrar: validacion fisica final de busqueda, bloqueo, revision, historial y revocacion en un Android con DAG abierto. El Samsung conectado quedo actualizado a DEV 205 pero su politica DAG permanece cerrada.
+- Validacion automatica actual: unit tests Usuario/Admin/red, ktlint, detekt informativo y ensamblado DEV exitosos. El asesor Supabase confirma que los auxiliares no son ejecutables por clientes; solo la RPC protegida queda expuesta y valida el token de dispositivo.
+
+## Cierre tecnico 2026-07-14 - DAG-USAGE-01 contador mensual Super Web
+
+- La migracion DEV `20260714231026_dag_usage_super_admin.sql` cambia el cupo inicial a 100 por dispositivo/mes, lo lee desde la licencia de cada comunidad y mantiene el incremento atomico. La Edge Function `dag-search` quedo activa en version 5 con mensaje de cupo generico.
+- Super Web incorpora `/dag-usage` y acceso `Uso DAG` en la navegacion. Muestra consultas usadas, restantes, dispositivos activos, costo Brave neto estimado luego del credito global de USD 5 y proyeccion al cierre del mes.
+- El panel se actualiza cada 10 segundos y agrupa por comunidad y dispositivo. Conserva el consumo del mes aunque DAG se cierre luego; nunca muestra ni recibe consultas, URLs, resultados o historial.
+- El Super Admin puede cambiar el cupo mensual por comunidad entre 1 y 100.000. El valor inicial y vigente para Yeshurun Tora es 100.
+- Seguridad verificada: `anon` recibe HTTP 401 al invocar el resumen; `anon` y `authenticated` no pueden leer la tabla de uso; las RPC de lectura/escritura exigen sesion autenticada y `require_super_admin()`.
+- Validacion: resumen DEV devuelve Yeshurun Tora con 1 dispositivo DAG activo, 0/100 usadas; TypeScript, ESLint sobre `src`, build Next y bundle Cloudflare exitosos. Queda publicar Super Web y la prueba fisica final del navegador.
 
 ## Cierre 2026-07-14 - DAG-FOUNDATION-01 entrada, control y atajo
 
@@ -106,7 +126,7 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 - Web Admin mantiene flujo real: Comunidad -> Web -> elegir usuario -> configurar Web.
 - Web Admin usa selector Internet abierto/bloqueado y dos capas independientes: SafeSearch y Solo resultados.
 - Web Usuario muestra esos mismos estados en modo solo lectura.
-- DAG tiene control por dispositivo en Admin y entrada/atajo en Usuario; DEV 204 contiene solo la base segura, sin buscador ni contenido todavia.
+- DAG tiene control por dispositivo en Admin y entrada/atajo en Usuario. DEV 205 contiene el navegador protegido y Brave ya esta configurado en Supabase DEV; queda pendiente la validacion fisica final.
 - Bloqueo Web se representa con reglas internas de dominio en `WebNavigationPolicy`; no requiere migracion Room nueva.
 - VPN/DNS bloquea dominios externos en Solo resultados y fuerza una invalidacion puntual de conexiones al activar la capa. Accessibility no usa Atras/Home para navegaciones nuevas.
 - Solicitudes Admin se agrupan por usuario con indicador rojo.

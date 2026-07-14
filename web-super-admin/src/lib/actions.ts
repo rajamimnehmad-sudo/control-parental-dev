@@ -29,6 +29,11 @@ const licenseSchema = z.object({
   internalNotes: z.string().trim().optional(),
 });
 
+const dagLimitSchema = z.object({
+  communityId: z.string().uuid(),
+  monthlyLimit: z.coerce.number().int().min(1).max(100000),
+});
+
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
@@ -132,4 +137,25 @@ export async function updateLicenseAction(_prevState: ActionState, formData: For
   revalidatePath(`/communities/${parsed.data.communityId}`);
   revalidatePath("/communities");
   return { ok: true, message: "Licencia actualizada" };
+}
+
+export async function updateDagLimitAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = dagLimitSchema.safeParse({
+    communityId: formValue(formData, "communityId"),
+    monthlyLimit: formValue(formData, "monthlyLimit"),
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: "El cupo debe estar entre 1 y 100.000 búsquedas" };
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("super_admin_set_dag_search_monthly_limit", {
+    target_community_id: parsed.data.communityId,
+    new_monthly_limit: parsed.data.monthlyLimit,
+  });
+
+  if (error) return errorState(error);
+  revalidatePath("/dag-usage");
+  return { ok: true, message: "Cupo actualizado" };
 }

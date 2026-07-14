@@ -80,10 +80,7 @@ class AdminRequestsViewModel
                 observeDevices(),
                 localState,
             ) { requests, devices, local ->
-                val pendingRequests =
-                    requests.filter {
-                        it.status.isPending() && it.requestType != AccessRequestType.DOMAIN_ACCESS
-                    }
+                val pendingRequests = requests.filter { it.status.isPending() }
                 val users = pendingRequests.toUserItems(devices)
                 val resolvedSelected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
                 AdminRequestsUiState(
@@ -297,12 +294,21 @@ private fun List<AccessRequest>.toRequestItems(apps: List<RemoteInstalledAppDto>
     return map { request ->
         val packageName = request.targetPackageName ?: request.target
         val app =
-            request.deviceId
-                ?.let { deviceId -> appsByDeviceAndPackage["$deviceId:$packageName"] }
-                ?: appsByPackage[packageName]
+            if (request.requestType == AccessRequestType.DOMAIN_ACCESS) {
+                null
+            } else {
+                request.deviceId
+                    ?.let { deviceId -> appsByDeviceAndPackage["$deviceId:$packageName"] }
+                    ?: appsByPackage[packageName]
+            }
         AdminAccessRequestUiState(
             request = request,
-            appName = app?.appName?.takeIf { it.isNotBlank() } ?: packageName,
+            appName =
+                if (request.requestType == AccessRequestType.DOMAIN_ACCESS) {
+                    request.targetDomain ?: request.target
+                } else {
+                    app?.appName?.takeIf { it.isNotBlank() } ?: packageName
+                },
             iconBase64 = app?.iconBase64,
         )
     }

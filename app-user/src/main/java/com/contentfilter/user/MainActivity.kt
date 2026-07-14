@@ -77,6 +77,7 @@ import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.MyAppsRoute
+import com.contentfilter.user.dag.DagBrowserRoute
 import com.contentfilter.user.dag.DagShortcutController
 import com.contentfilter.user.internet.UserWebViewModel
 import com.contentfilter.user.protection.BatteryOptimizationController
@@ -286,7 +287,7 @@ private fun UserAppRoot(
                         },
                     )
                 }
-                UserDestination.Dag -> DagFoundationRoute(onBack = ::goBack)
+                UserDestination.Dag -> DagBrowserRoute(onBack = ::goBack)
                 UserDestination.Updates -> {
                     val statusViewModel: SystemStatusViewModel = hiltViewModel()
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
@@ -669,37 +670,6 @@ private fun UserWebTab(
             ProductCard {
                 Text("Protección web no activa.", style = MaterialTheme.typography.bodyMedium)
             }
-        }
-    }
-}
-
-@Composable
-private fun DagFoundationRoute(
-    onBack: () -> Unit,
-    viewModel: UserWebViewModel = hiltViewModel(),
-) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ProductVisualPage(
-        title = "DAG",
-        subtitle = "Buscador protegido",
-        onBack = onBack,
-    ) {
-        ProductLargeFeatureCard(
-            title = if (state.dagEnabled) "DAG está abierto" else "DAG está cerrado",
-            subtitle =
-                if (state.dagEnabled) {
-                    "La base segura está activa. Las búsquedas seguirán cerradas hasta incorporar clasificación y resultados filtrados."
-                } else {
-                    "El administrador debe habilitar DAG para este dispositivo."
-                },
-            accent = if (state.dagEnabled) ProductMint else ProductViolet,
-        )
-        ProductCard {
-            Text("Protección preventiva", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Esta primera versión no abre páginas, imágenes ni videos.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
         }
     }
 }

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
@@ -188,19 +189,24 @@ private fun RequestCard(
                 }
                 StatusChip("Pendiente", MaterialTheme.colorScheme.primary)
             }
+            if (request.reason.isNotBlank()) {
+                Text(request.reason, style = MaterialTheme.typography.bodySmall)
+            }
             if (request.status.isPending()) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        value = grantMinutes,
-                        onValueChange = { grantMinutes = it.filter(Char::isDigit) },
-                        label = { Text("Minutos") },
-                        singleLine = true,
-                        keyboardOptions =
-                            androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = KeyboardType.Number,
-                            ),
-                    )
+                    if (request.requestType != AccessRequestType.DOMAIN_ACCESS) {
+                        OutlinedTextField(
+                            modifier = Modifier.fillMaxWidth(),
+                            value = grantMinutes,
+                            onValueChange = { grantMinutes = it.filter(Char::isDigit) },
+                            label = { Text("Minutos") },
+                            singleLine = true,
+                            keyboardOptions =
+                                androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = KeyboardType.Number,
+                                ),
+                        )
+                    }
                     ProgressActionButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = onApprove,
@@ -208,17 +214,19 @@ private fun RequestCard(
                         loading = approveLoading,
                         loadingText = "Aprobando...",
                         successText = "Aprobada",
-                        text = "Acceso completo",
+                        text = if (request.requestType == AccessRequestType.DOMAIN_ACCESS) "Permitir sitio" else "Acceso completo",
                     )
-                    ProgressActionButton(
-                        modifier = Modifier.fillMaxWidth(),
-                        onClick = { onGrant(grantMinutes) },
-                        enabled = !actionLoading,
-                        loading = grantLoading,
-                        loadingText = "Guardando...",
-                        successText = "Tiempo dado",
-                        text = "Dar tiempo",
-                    )
+                    if (request.requestType != AccessRequestType.DOMAIN_ACCESS) {
+                        ProgressActionButton(
+                            modifier = Modifier.fillMaxWidth(),
+                            onClick = { onGrant(grantMinutes) },
+                            enabled = !actionLoading,
+                            loading = grantLoading,
+                            loadingText = "Guardando...",
+                            successText = "Tiempo dado",
+                            text = "Dar tiempo",
+                        )
+                    }
                     ProgressActionButton(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = onReject,

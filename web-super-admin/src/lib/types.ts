@@ -67,3 +67,26 @@ export type ProtectedUser = {
   last_seen_at: string | null;
   updated_at: string;
 };
+
+export type DagUsageSummary = {
+  community_id: string;
+  community_name: string;
+  monthly_limit: number;
+  active_dag_devices: number;
+  request_count: number;
+  total_capacity: number;
+  remaining_count: number;
+  last_usage_at: string | null;
+};
+
+export type DagUsageDevice = {
+  community_id: string;
+  device_id: string;
+  display_name: string;
+  dag_enabled: boolean;
+  monthly_limit: number;
+  request_count: number;
+  remaining_count: number;
+  last_usage_at: string | null;
+  last_seen_at: string | null;
+};
