@@ -140,8 +140,8 @@ Resultado actual: tests y build del area VPN OK, App Usuario DEV 192 publicada y
 - App Usuario DEV 192: `https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-192-debug.apk`, SHA-256 `bee58c2822e67fd8aad6064048aa1980c9410bda6f1b66fdf4e6bd66f74a09ae`. App Admin permanecio en DEV 181.
 - Commits: `d25ccf2` funcional y `dc1f17e` formato. Android CI `29291439108` exitoso. Workflow de base `29291351239` exitoso.
 - El workflow general de APKs falla deliberadamente al exigir aumento simultaneo de Admin; Usuario se publico por separado con staging atomico. No se modifico ni publico Admin.
-- Validacion fisica parcial en el SM-A235M: Usuario 192 y base v3 activas; el tunel VPN real se restauro al volver a primer plano y una navegacion incognito nueva al canario no mostro contenido durante mas de 35 segundos. La pestaña normal conservaba contenido cargado mientras el tunel estaba detenido por un `force-stop` diagnostico.
-- Ese dispositivo tiene policy Admin `Internet bloqueado`, por lo que Google tambien queda bloqueado y no permite validar en la misma sesion `Google funciona + categorias sensibles bloquean`. La validacion final en Internet abierto/Solo resultados continua en el segundo telefono del usuario.
+- Validacion fisica final en el SM-A235M: Usuario 192 y base v3 activas, tunel VPN real conectado y policy Admin actualizada a Internet abierto. Google abre correctamente.
+- El canario normalizado `www.coca.com` bloquea con `DNS_PROBE_FINISHED_NXDOMAIN` tanto en Chrome normal como incognito, antes de mostrar contenido util. Chrome permanece abierto.
 - Limitacion Android confirmada: despues de `force-stop` no hay proteccion hasta reabrir la app; no usar `force-stop` como estado operativo ni inferir VPN activa desde una preferencia persistida. Verificar siempre el tunel real.
 - Proxima fase: buscador propio `DAG`, 100 % kosher, sin fotos ni videos y con IA local para intencion. No fue implementado en este cierre.
 
