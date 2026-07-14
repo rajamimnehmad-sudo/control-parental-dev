@@ -78,6 +78,23 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun samsungDeviceAdminScreenDoesNotWaitForOwnIdentity() {
+        assertTrue(
+            decide(
+                className = "com.samsung.android.settings.applications.specialaccess.SecDeviceAdminAdd",
+                ownAppIdentityVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun repeatedEventsNeverCreateAProtectionBypass() {
+        val policy = SettingsProtectionPolicy()
+        assertTrue(policy.decideAt(elapsedRealtimeMillis = 10_000))
+        assertTrue(policy.decideAt(elapsedRealtimeMillis = 10_050))
+    }
+
+    @Test
     fun samsungAdminLabelIdentifiesOwnApp() {
         assertTrue(
             "Protección de Content Filter".matchesOwnAppIdentity(
@@ -115,5 +132,17 @@ class SettingsProtectionPolicyTest {
             settingsAuthorized = settingsAuthorized,
             removalAuthorized = removalAuthorized,
             elapsedRealtimeMillis = 10_000,
+        )
+
+    private fun SettingsProtectionPolicy.decideAt(elapsedRealtimeMillis: Long): Boolean =
+        shouldLeaveProtectedScreen(
+            packageName = "com.android.settings",
+            className = "com.samsung.android.settings.applications.specialaccess.SecDeviceAdminAdd",
+            ownAppIdentityVisible = false,
+            deviceAdminEnabled = true,
+            armed = false,
+            settingsAuthorized = false,
+            removalAuthorized = false,
+            elapsedRealtimeMillis = elapsedRealtimeMillis,
         )
 }

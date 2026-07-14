@@ -13,15 +13,25 @@ class SettingsProtectionPolicy {
         removalAuthorized: Boolean,
         elapsedRealtimeMillis: Long,
     ): Boolean {
-        if ((!armed && !deviceAdminEnabled) || !ownAppIdentityVisible) return false
-        if (!deviceAdminEnabled && className.orEmpty().contains("DeviceAdminAdd", ignoreCase = true)) return false
         val requiredScope = protectedScope(packageName, className) ?: return false
+        if (!armed && !deviceAdminEnabled) return false
+        val deviceAdminRemovalScreen = isDeviceAdminRemovalScreen(packageName, className)
+        if (deviceAdminRemovalScreen && !deviceAdminEnabled) return false
+        if (!deviceAdminRemovalScreen && !ownAppIdentityVisible) return false
         if (requiredScope == ProtectionAuthorizationScope.Settings && settingsAuthorized) return false
         if (requiredScope == ProtectionAuthorizationScope.Removal && removalAuthorized) return false
-        if (elapsedRealtimeMillis - lastActionAtElapsedMillis < MinActionIntervalMillis) return false
-        lastActionAtElapsedMillis = elapsedRealtimeMillis
+        if (elapsedRealtimeMillis - lastActionAtElapsedMillis >= MinActionIntervalMillis) {
+            lastActionAtElapsedMillis = elapsedRealtimeMillis
+        }
         return true
     }
+
+    private fun isDeviceAdminRemovalScreen(
+        packageName: String,
+        className: String?,
+    ): Boolean =
+        packageName == AndroidSettingsPackage &&
+            DeviceAdminClassHints.any { className.orEmpty().contains(it, ignoreCase = true) }
 
     private fun protectedScope(
         packageName: String,
@@ -50,15 +60,18 @@ class SettingsProtectionPolicy {
                 "com.google.android.permissioncontroller",
             )
         val UninstallClassHints = listOf("Uninstall", "DeletePackage")
+        val DeviceAdminClassHints =
+            listOf(
+                "DeviceAdminAdd",
+                "DeviceAdminSettings",
+                "DeviceAdminWarning",
+            )
         val RemovalClassHints =
             listOf(
                 "InstalledAppDetails",
                 "AppInfoDashboard",
                 "AppInfoActivity",
-                "DeviceAdminAdd",
-                "DeviceAdminSettings",
-                "DeviceAdminWarning",
-            )
+            ) + DeviceAdminClassHints
         val SettingsClassHints =
             listOf(
                 "AccessibilityDetails",
