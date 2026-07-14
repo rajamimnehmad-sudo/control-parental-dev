@@ -142,6 +142,7 @@ Resultado actual: tests y build del area VPN OK, App Usuario DEV 192 publicada y
 - El workflow general de APKs falla deliberadamente al exigir aumento simultaneo de Admin; Usuario se publico por separado con staging atomico. No se modifico ni publico Admin.
 - Validacion fisica final en el SM-A235M: Usuario 192 y base v3 activas, tunel VPN real conectado y policy Admin actualizada a Internet abierto. Google abre correctamente.
 - El canario normalizado `www.coca.com` bloquea con `DNS_PROBE_FINISHED_NXDOMAIN` tanto en Chrome normal como incognito, antes de mostrar contenido util. Chrome permanece abierto.
+- Validacion adicional en Samsung SM-S908E: inicialmente abria apuestas porque conservaba la base anterior `1783965909719` dentro del intervalo de seis horas entre comprobaciones. No era bypass ni falla del parser. La actualizacion manual instalo `1783983396358`; luego `betway.com` y `betway.es` bloquearon con `DNS_PROBE_FINISHED_NXDOMAIN`, y `betway.com` tambien bloqueo en incognito.
 - Limitacion Android confirmada: despues de `force-stop` no hay proteccion hasta reabrir la app; no usar `force-stop` como estado operativo ni inferir VPN activa desde una preferencia persistida. Verificar siempre el tunel real.
 - Proxima fase: buscador propio `DAG`, 100 % kosher, sin fotos ni videos y con IA local para intencion. No fue implementado en este cierre.
 
