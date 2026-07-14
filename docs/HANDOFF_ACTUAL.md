@@ -46,8 +46,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 194
-App Admin versionCode 194
+App Usuario versionCode 198
+App Admin versionCode 198
 versionName 1.0.1-dev
 ```
 
@@ -61,8 +61,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-194-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-194-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-198-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-198-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
@@ -125,6 +125,11 @@ Verificacion ejecutada para DEV 194:
 Resultado actual: tests, ktlint y build de ambas apps OK. DEV 194 publicada por GitHub Actions para Usuario y Admin.
 
 ## Cierre 2026-07-14 - barrera reforzada tipo Rimon sin MDM
+
+- DEV 198 reemplaza la salida directa a Home por una secuencia segura: Atras inmediato, nueva comprobacion, segundo Atras y Home solo como ultimo respaldo si la pantalla protegida continua visible.
+- La comprobacion diferida conserva la clase real de la ventana observada para distinguir una pantalla peligrosa de la pantalla anterior normal de Ajustes.
+- Validacion fisica in-place en Samsung SM-S908E: diez aperturas rapidas de Administrador del dispositivo y diez intentos directos de desinstalacion volvieron a `Settings/SubSettings`; la app permanecio instalada y Device Admin y Accessibility siguieron activos.
+- Tests de `feature-accessibility`, tests Usuario/Admin, ktlint y build de ambas apps OK.
 
 - La barrera funciona en Android normal, sin restablecimiento de fabrica ni Device Owner. Es una defensa por capas: Administrador del dispositivo, Accessibility, VPN, control remoto y recuperacion de emergencia; no promete la imposibilidad absoluta de desinstalar que solo ofrece Device Owner/MDM.
 - App Usuario registra `ProtectionDeviceAdminReceiver`, reporta su estado en el heartbeat y conserva las claves locales sensibles cifradas con Android Keystore AES-GCM.

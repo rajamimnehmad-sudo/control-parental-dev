@@ -1,6 +1,7 @@
 package com.contentfilter.feature.accessibility.service
 
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -92,6 +93,13 @@ class SettingsProtectionPolicyTest {
         val policy = SettingsProtectionPolicy()
         assertTrue(policy.decideAt(elapsedRealtimeMillis = 10_000))
         assertTrue(policy.decideAt(elapsedRealtimeMillis = 10_050))
+    }
+
+    @Test
+    fun protectedSettingsGoBackBeforeFallingBackHome() {
+        assertEquals(SettingsEscapeAction.Back, SettingsEscapeStrategy.actionForAttempt(0))
+        assertEquals(SettingsEscapeAction.Back, SettingsEscapeStrategy.actionForAttempt(1))
+        assertEquals(SettingsEscapeAction.Home, SettingsEscapeStrategy.actionForAttempt(2))
     }
 
     @Test

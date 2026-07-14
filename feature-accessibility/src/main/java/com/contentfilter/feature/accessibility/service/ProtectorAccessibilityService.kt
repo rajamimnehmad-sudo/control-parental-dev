@@ -77,6 +77,9 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var appLimitDeadlinePackageName: String? = null
     private var blockRetryJob: Job? = null
     private var blockRetryPackageName: String? = null
+    private var settingsEscapeJob: Job? = null
+    private var observedWindowPackageName: String? = null
+    private var observedWindowClassName: String? = null
     private var lastExplicitSearchNoticeAt: Long = 0L
     private var lastTamperAlertAt: Long = 0L
 
@@ -106,6 +109,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            observedWindowPackageName = packageName
+            observedWindowClassName = event.className?.toString()
+        }
         if (blockExplicitSearchIfNeeded(event, packageName)) return
         val elapsed = clock.elapsedRealtimeMillis()
         val now = clock.nowEpochMillis()
@@ -194,6 +201,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         webActionDebouncer.clear()
+        clearSettingsEscape()
         val elapsed = clock.elapsedRealtimeMillis()
         val now = clock.nowEpochMillis()
         val transition = usageTracker.finishCurrent(elapsed, now)
@@ -252,7 +260,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         ) {
             return false
         }
-        performGlobalAction(GLOBAL_ACTION_HOME)
+        leaveProtectedSettings()
         Toast.makeText(this, "Este ajuste está protegido", Toast.LENGTH_SHORT).show()
         serviceScope?.launch {
             telemetryReporter.recordSettingsProtection()
@@ -262,6 +270,60 @@ class ProtectorAccessibilityService : AccessibilityService() {
             }
         }
         return true
+    }
+
+    private fun leaveProtectedSettings() {
+        performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0))
+        if (settingsEscapeJob?.isActive == true) return
+        val scope = serviceScope ?: return
+        settingsEscapeJob =
+            scope.launch {
+                for (attempt in 1..SettingsEscapeFallbackAttempt) {
+                    delay(SettingsEscapeRecheckDelayMillis)
+                    if (!isProtectedSettingsStillVisible()) break
+                    performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt))
+                }
+                settingsEscapeJob = null
+            }
+    }
+
+    private fun isProtectedSettingsStillVisible(): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val packageName = root.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return false
+        val className =
+            observedWindowClassName.takeIf {
+                observedWindowPackageName == packageName
+            } ?: root.className?.toString()
+        return settingsProtectionPolicy.shouldLeaveProtectedScreen(
+            packageName = packageName,
+            className = className,
+            ownAppIdentityVisible = root.containsOwnAppIdentity(),
+            deviceAdminEnabled = DeviceAdminController.isEnabled(this),
+            armed = protectionStateStore.isArmed(),
+            settingsAuthorized =
+                protectionStateStore.isAuthorized(
+                    ProtectionAuthorizationScope.Settings,
+                    clock.nowEpochMillis(),
+                ),
+            removalAuthorized =
+                protectionStateStore.isAuthorized(
+                    ProtectionAuthorizationScope.Removal,
+                    clock.nowEpochMillis(),
+                ),
+            elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
+        )
+    }
+
+    private fun performSettingsEscapeAction(action: SettingsEscapeAction) {
+        when (action) {
+            SettingsEscapeAction.Back -> performGlobalAction(GLOBAL_ACTION_BACK)
+            SettingsEscapeAction.Home -> performGlobalAction(GLOBAL_ACTION_HOME)
+        }
+    }
+
+    private fun clearSettingsEscape() {
+        settingsEscapeJob?.cancel()
+        settingsEscapeJob = null
     }
 
     private fun AccessibilityNodeInfo?.containsOwnAppIdentity(): Boolean {
@@ -588,6 +650,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 120L
         const val BlockHomeRetries = 2
+        const val SettingsEscapeRecheckDelayMillis = 120L
+        const val SettingsEscapeFallbackAttempt = 2
         const val PolicyChangedEventLabel = "POLICY_CHANGED"
         const val ExplicitSearchNoticeDebounceMillis = 2_000L
         const val TamperAlertDebounceMillis = 5 * 60_000L

@@ -11,7 +11,10 @@ Antes de cualquier tarea en este repositorio:
 7. Modificar la menor cantidad posible de archivos.
 8. Si solo cambian docs, no compilar, no incrementar versionCode y no publicar APK.
 
-No tocar Android.
-No tocar Supabase.
-No publicar APK.
-No incrementar versionCode.
+## Ticket Android autorizado por el usuario (2026-07-14)
+
+- Area: `feature-accessibility`, barrera antimanipulacion tipo Rimon.
+- Implementar en tickets pequenos, empezando por navegacion segura desde Ajustes protegidos.
+- Se permite modificar Android, ejecutar tests/builds, incrementar ambos `versionCode`, hacer commit/push y publicar APKs solo en DEV.
+- Para alertas remotas se permite usar exclusivamente Supabase DEV `syeycayasyufedwoprea`.
+- No tocar Production, no borrar datos y no incluir Service Role Key en Android.

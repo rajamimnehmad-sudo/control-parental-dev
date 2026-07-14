@@ -85,6 +85,22 @@ class SettingsProtectionPolicy {
     }
 }
 
+internal enum class SettingsEscapeAction {
+    Back,
+    Home,
+}
+
+internal object SettingsEscapeStrategy {
+    fun actionForAttempt(attempt: Int): SettingsEscapeAction =
+        if (attempt < BackAttemptsBeforeHome) {
+            SettingsEscapeAction.Back
+        } else {
+            SettingsEscapeAction.Home
+        }
+
+    private const val BackAttemptsBeforeHome = 2
+}
+
 internal fun String?.matchesOwnAppIdentity(
     ownPackage: String,
     appLabel: String,
