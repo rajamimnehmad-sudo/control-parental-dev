@@ -71,14 +71,34 @@ Deno.serve(async (request) => {
   }
 
   const uniqueTokens = Array.from(new Set((tokens ?? []).map((item: PushToken) => item.fcm_token).filter(Boolean)));
-  const results = await Promise.all(uniqueTokens.map((token) =>
-    sendFcm(token, event, payload.device_id!, payload.alert_type!)
-  ));
+  if (uniqueTokens.length === 0) {
+    return json({ event_id: event.event_id, sent: 0, failed: 0 });
+  }
+  let results: Array<{ ok: boolean; status: number; body: string }>;
+  try {
+    const projectId = requiredEnv("FCM_PROJECT_ID");
+    const accessToken = await fcmAccessToken();
+    results = await Promise.all(uniqueTokens.map((token) =>
+      sendFcm(token, event, payload.device_id!, payload.alert_type!, projectId, accessToken)
+    ));
+  } catch (error) {
+    const diagnostic = safeErrorMessage(error);
+    console.error("FCM delivery setup failed", diagnostic);
+    return json({ error: "Push delivery unavailable", diagnostic }, 500);
+  }
+
+  const failures = results.filter((result) => !result.ok);
+  if (failures.length > 0) {
+    console.error(
+      "FCM delivery rejected",
+      failures.map((result) => ({ status: result.status, error: safeFcmError(result.body) })),
+    );
+  }
 
   return json({
     event_id: event.event_id,
     sent: results.filter((result) => result.ok).length,
-    failed: results.filter((result) => !result.ok).length,
+    failed: failures.length,
   });
 });
 
@@ -87,9 +107,9 @@ async function sendFcm(
   event: AlertEvent,
   deviceId: string,
   alertType: string,
+  projectId: string,
+  accessToken: string,
 ): Promise<{ ok: boolean; status: number; body: string }> {
-  const projectId = requiredEnv("FCM_PROJECT_ID");
-  const accessToken = await fcmAccessToken();
   const response = await fetch(`https://fcm.googleapis.com/v1/projects/${projectId}/messages:send`, {
     method: "POST",
     headers: {
@@ -118,7 +138,15 @@ async function sendFcm(
 }
 
 async function fcmAccessToken(): Promise<string> {
-  const serviceAccount = JSON.parse(requiredEnv("FCM_SERVICE_ACCOUNT_JSON"));
+  let serviceAccount: { client_email?: string; private_key?: string };
+  try {
+    serviceAccount = JSON.parse(requiredEnv("FCM_SERVICE_ACCOUNT_JSON"));
+  } catch {
+    throw new Error("FCM service account JSON is invalid");
+  }
+  if (!serviceAccount.client_email || !serviceAccount.private_key) {
+    throw new Error("FCM service account is missing required fields");
+  }
   const now = Math.floor(Date.now() / 1000);
   const jwtHeader = base64Url(JSON.stringify({ alg: "RS256", typ: "JWT" }));
   const jwtClaim = base64Url(JSON.stringify({
@@ -148,9 +176,23 @@ async function fcmAccessToken(): Promise<string> {
   });
   const body = await response.json();
   if (!response.ok || !body.access_token) {
-    throw new Error("Could not obtain FCM access token");
+    const reason = typeof body?.error === "string" ? body.error : `HTTP ${response.status}`;
+    throw new Error(`Could not obtain FCM access token: ${reason}`);
   }
   return body.access_token;
+}
+
+function safeErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Unknown error";
+}
+
+function safeFcmError(body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    return parsed?.error?.status ?? parsed?.error?.message ?? "Unknown FCM error";
+  } catch {
+    return "Unreadable FCM response";
+  }
 }
 
 function requiredEnv(name: string): string {

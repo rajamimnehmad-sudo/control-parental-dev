@@ -72,7 +72,7 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 - App Usuario y App Admin usan activacion real con Supabase DEV.
 - App Admin se activa por token de administrador.
 - App Usuario se activa solo con token generado desde Admin.
-- Comunidad DEV activa actual de pruebas: `Ajdut`.
+- Comunidad DEV activa actual de pruebas: `Mm`.
 - Codigos numericos legacy 1-100 reemplazados por tokens aleatorios.
 - Usuarios es la entrada unica del Admin para usuarios protegidos, aplicaciones y grupos de apps.
 - La seccion separada Reglas ya no esta en navegacion.
@@ -118,16 +118,20 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 Verificacion ejecutada para DEV 202:
 
 ```bash
-./gradlew --no-daemon --console=plain :app-user:testDevDebugUnitTest :app-admin:testDevDebugUnitTest :app-user:ktlintCheck :app-admin:ktlintCheck :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
+./gradlew --no-daemon --console=plain :feature-accessibility:testDebugUnitTest :core-network:test :app-user:testDevDebugUnitTest :app-admin:testDevDebugUnitTest :feature-accessibility:ktlintCheck :core-network:ktlintCheck :app-user:ktlintCheck :app-admin:ktlintCheck :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
 ```
 
-Resultado actual: tests, ktlint y build de ambas apps OK. DEV 202 preparada para publicacion por GitHub Actions para Usuario y Admin.
+Resultado actual: tests, ktlint y build de ambas apps OK. DEV 202 publicada por GitHub Actions para Usuario y Admin.
 
 ## Cierre 2026-07-14 - barrera reforzada tipo Rimon sin MDM
 
 - DEV 202 solicita una sola vez la exclusion de optimizacion de bateria, muestra el estado Bateria en Ajustes y conserva un boton para corregirlo. Esta capa reduce pausas agresivas del fabricante; no reemplaza Device Admin, Accessibility ni la VPN foreground.
 - Validacion fisica in-place de DEV 202 en Samsung SM-S908E: se mostro la explicacion de la app y la confirmacion nativa de Samsung; la exclusion quedo en la whitelist del sistema y Device Admin, Accessibility y VPN continuaron activos.
 - DEV 202 mejora las alertas Admin: usa mensajes FCM data-only de prioridad alta, conserva alertas simultaneas con IDs por evento y al tocarlas abre Comunidad -> Aplicaciones. El payload incluye event_id, device_id, device_name y alert_type; la Service Role Key sigue exclusivamente en la Edge Function DEV.
+- Firebase DEV usa el proyecto `teacher-7b888` y la app Android `com.contentfilter.admin.dev`. La configuracion publica de Firebase se inyecta en CI mediante `FIREBASE_APPLICATION_ID`, `FIREBASE_API_KEY` y `FIREBASE_PROJECT_ID`; `google-services.json` permanece ignorado y no se guarda en Git.
+- El emisor servidor usa la cuenta tecnica dedicada `content-filter-push@teacher-7b888.iam.gserviceaccount.com` con el rol acotado `roles/firebasecloudmessaging.admin`. La credencial privada existe solo como `FCM_SERVICE_ACCOUNT_JSON` en secretos de Supabase DEV; `FCM_PROJECT_ID` tambien es secreto DEV. Ninguna clave privada ni Service Role Key entra en Android.
+- El registro del token FCM Admin ya no permite escrituras directas desde Android a `device_push_tokens`. La funcion `register_admin_push_token` identifica el dispositivo Admin exclusivamente por `x-device-token`, valida el token y hace el upsert del lado servidor; `anon` y `authenticated` no conservan permisos directos de INSERT/UPDATE sobre la tabla. Migracion DEV: `20260714122000_secure_admin_push_registration.sql`. No se borraron datos.
+- Validacion fisica completa en Samsung SM-S908E con Usuario y Admin DEV 202 instaladas in-place: se abrio la ficha protegida de Content Filter, Accessibility la cerro, Supabase DEV creo el evento, Firebase entrego la alerta urgente `Intento de cambio bloqueado` y al tocarla se abrio Admin -> Apps. El canal `urgent_protection_alerts` quedo con importancia alta y la notificacion fue independiente por event ID.
 - DEV 201 resuelve dinamicamente en cada Android el paquete que maneja la desinstalacion de Content Filter y reconoce los controles peligrosos de App Info por IDs estables y etiquetas ES/EN. Esto amplia cobertura OEM de Desinstalar, Desactivar y Forzar detencion sin bloquear la ficha de otras apps.
 - Validacion fisica in-place de DEV 201 en Samsung SM-S908E: diez aperturas de App Info y diez intentos de desinstalacion directa terminaron en Launcher; la app continuo instalada, Device Admin y Accessibility activos y el tunel VPN real conectado.
 - DEV 200 agrega un watchdog local cada 30 segundos. Contrasta el tunel VPN real con su estado persistido, Accessibility y Administrador del dispositivo; corrige el heartbeat, emite una alerta por componente caido y reinicia la VPN si el permiso sigue vigente y no existe una desactivacion intencional autorizada.

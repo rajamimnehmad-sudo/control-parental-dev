@@ -36,6 +36,9 @@ jobs:
           SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           UPDATE_MANIFEST_URL_USER: ${{ secrets.UPDATE_MANIFEST_URL_USER }}
           UPDATE_MANIFEST_URL_ADMIN: ${{ secrets.UPDATE_MANIFEST_URL_ADMIN }}
+          FIREBASE_APPLICATION_ID: ${{ secrets.FIREBASE_APPLICATION_ID }}
+          FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
         run: |
           set -euo pipefail
           if [[ -z "${SUPABASE_URL:-}" ]]; then
@@ -46,12 +49,21 @@ jobs:
             echo "Falta secret SUPABASE_ANON_KEY" >&2
             exit 1
           fi
+          for firebase_secret in FIREBASE_APPLICATION_ID FIREBASE_API_KEY FIREBASE_PROJECT_ID; do
+            if [[ -z "${!firebase_secret:-}" ]]; then
+              echo "Falta secret $firebase_secret" >&2
+              exit 1
+            fi
+          done
           {
             echo "SUPABASE_URL=$SUPABASE_URL"
             echo "SUPABASE_ANON_KEY=$SUPABASE_ANON_KEY"
             echo "UPDATE_MANIFEST_URL_USER=${UPDATE_MANIFEST_URL_USER:-}"
             echo "UPDATE_MANIFEST_URL_ADMIN=${UPDATE_MANIFEST_URL_ADMIN:-}"
             echo "UPDATE_MANIFEST_URL="
+            echo "FIREBASE_APPLICATION_ID=$FIREBASE_APPLICATION_ID"
+            echo "FIREBASE_API_KEY=$FIREBASE_API_KEY"
+            echo "FIREBASE_PROJECT_ID=$FIREBASE_PROJECT_ID"
           } > .env
 
       - name: Autenticar Supabase CLI

@@ -1,10 +1,12 @@
 .gradle/
 .gradle-home/
+.codex-tmp/
 .kotlin/
 build/
 */build/
 local.properties
 .env
+google-services.json
 supabase/.temp/
 .DS_Store
 *.apk
