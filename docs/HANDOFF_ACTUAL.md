@@ -46,8 +46,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 193
-App Admin versionCode 193
+App Usuario versionCode 194
+App Admin versionCode 194
 versionName 1.0.1-dev
 ```
 
@@ -61,8 +61,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-193-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-193-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-194-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-194-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
@@ -115,14 +115,14 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 
 ## Build y publicacion
 
-Verificacion ejecutada para DEV 193:
+Verificacion ejecutada para DEV 194:
 
 ```bash
 ./gradlew --no-daemon --console=plain :core-security:testDebugUnitTest :feature-accessibility:testDebugUnitTest :app-user:testDevDebugUnitTest :app-admin:testDevDebugUnitTest :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
 ./gradlew --no-daemon --console=plain :core-security:ktlintCheck :feature-accessibility:ktlintCheck :app-user:ktlintCheck :app-admin:ktlintCheck
 ```
 
-Resultado actual: tests, ktlint y build de ambas apps OK. DEV 193 publicada por GitHub Actions para Usuario y Admin.
+Resultado actual: tests, ktlint y build de ambas apps OK. DEV 194 publicada por GitHub Actions para Usuario y Admin.
 
 ## Cierre 2026-07-14 - barrera reforzada tipo Rimon sin MDM
 
@@ -134,7 +134,7 @@ Resultado actual: tests, ktlint y build de ambas apps OK. DEV 193 publicada por 
 - La recuperacion offline limita cinco intentos, bloquea nuevos intentos durante 15 minutos y puede cancelarse desde App Usuario. Consumirla incrementa la revision consumida para impedir reutilizacion.
 - Supabase DEV incorpora `device_protection_controls` con RLS, revisiones de comando/aplicacion, autorizaciones temporales, recuperacion y provision automatica para nuevos dispositivos Usuario. No se borraron datos.
 - `send-protection-alert` fue desplegada solo en el proyecto DEV `syeycayasyufedwoprea`. La Service Role Key permanece exclusivamente del lado servidor y no existe en Android.
-- Validacion fisica in-place en Samsung SM-A235M: DEV 192 -> 193 sin borrar datos; token y Room preservados; Device Admin activo y no `testOnly`; VPN y Accessibility activas; heartbeat actualizado; armado remoto reconocido; bloqueo de App Info comprobado; Ajustes normales accesibles; alerta de manipulacion deduplicada; permiso remoto de retiro, revocacion y recuperacion offline de un solo uso comprobados. El telefono quedo armado y sin autorizacion local de retiro.
+- Validacion fisica in-place en Samsung SM-A235M: DEV 192 -> 194 sin borrar datos; token y Room preservados; Device Admin activo y no `testOnly`; VPN y Accessibility activas; heartbeat y version instalada actualizados; armado remoto reconocido; bloqueo de App Info comprobado; Ajustes normales accesibles; alerta de manipulacion deduplicada; permiso remoto de retiro, revocacion y recuperacion offline de un solo uso comprobados. El telefono quedo armado y sin autorizacion local de retiro.
 - Room queda en schema 11 con migracion in-place. No desinstalar ni borrar datos para actualizar.
 
 ## Cierre 2026-07-13 - Temas sensibles obligatorios

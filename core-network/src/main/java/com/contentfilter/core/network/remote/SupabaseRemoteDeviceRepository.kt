@@ -41,7 +41,7 @@ class SupabaseRemoteDeviceRepository
                 id = deviceId,
                 json =
                     JSONObject()
-                        .put("device_app_version_code", appVersionCode)
+                        .put("app_version_code", appVersionCode)
                         .put("updated_at", now),
             )
         }
