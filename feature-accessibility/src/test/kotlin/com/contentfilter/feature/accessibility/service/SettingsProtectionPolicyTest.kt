@@ -41,14 +41,42 @@ class SettingsProtectionPolicyTest {
             decide(
                 className = "com.android.settings.applications.InstalledAppDetails",
                 armed = false,
+                deviceAdminEnabled = false,
             ),
         )
+    }
+
+    @Test
+    fun enabledDeviceAdminProtectsRemovalWhileRemoteControlIsPending() {
+        assertTrue(
+            decide(
+                className = "com.android.settings.applications.InstalledAppDetails",
+                armed = false,
+                deviceAdminEnabled = true,
+            ),
+        )
+    }
+
+    @Test
+    fun deviceAdminActivationIsAllowedWhileAdminIsDisabled() {
+        assertFalse(
+            decide(
+                className = "com.android.settings.DeviceAdminAdd",
+                deviceAdminEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun deviceAdminDeactivationIsBlockedWhileAdminIsEnabled() {
+        assertTrue(decide(className = "com.android.settings.DeviceAdminAdd"))
     }
 
     private fun decide(
         packageName: String = "com.android.settings",
         className: String,
         ownAppIdentityVisible: Boolean = true,
+        deviceAdminEnabled: Boolean = true,
         armed: Boolean = true,
         settingsAuthorized: Boolean = false,
         removalAuthorized: Boolean = false,
@@ -57,6 +85,7 @@ class SettingsProtectionPolicyTest {
             packageName = packageName,
             className = className,
             ownAppIdentityVisible = ownAppIdentityVisible,
+            deviceAdminEnabled = deviceAdminEnabled,
             armed = armed,
             settingsAuthorized = settingsAuthorized,
             removalAuthorized = removalAuthorized,

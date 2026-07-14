@@ -109,7 +109,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (blockExplicitSearchIfNeeded(event, packageName)) return
         val elapsed = clock.elapsedRealtimeMillis()
         val now = clock.nowEpochMillis()
-        if (handleSettingsProtection(packageName, event.className?.toString(), elapsed, now)) return
+        if (handleSettingsProtection(event, packageName, event.className?.toString(), elapsed, now)) return
         if (packageName.isAlwaysAllowedPackage()) {
             handleAlwaysAllowedForeground(packageName, elapsed, now)
             return
@@ -222,17 +222,20 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     private fun handleSettingsProtection(
+        event: AccessibilityEvent,
         packageName: String,
         className: String?,
         elapsedRealtimeMillis: Long,
         nowEpochMillis: Long,
     ): Boolean {
-        val ownAppIdentityVisible = rootInActiveWindow.containsOwnAppIdentity()
+        val ownAppIdentityVisible =
+            rootInActiveWindow.containsOwnAppIdentity() || eventContainsOwnAppIdentity(event)
         if (
             !settingsProtectionPolicy.shouldLeaveProtectedScreen(
                 packageName = packageName,
                 className = className,
                 ownAppIdentityVisible = ownAppIdentityVisible,
+                deviceAdminEnabled = DeviceAdminController.isEnabled(this),
                 armed = protectionStateStore.isArmed(),
                 settingsAuthorized =
                     protectionStateStore.isAuthorized(
@@ -283,6 +286,16 @@ class ProtectorAccessibilityService : AccessibilityService() {
             repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
         }
         return false
+    }
+
+    private fun eventContainsOwnAppIdentity(event: AccessibilityEvent): Boolean {
+        val appLabel = applicationInfo.loadLabel(packageManager).toString()
+        val ownPackage = applicationContext.packageName
+        val values = event.text.map(CharSequence::toString) + listOfNotNull(event.contentDescription?.toString())
+        return values.any { value ->
+            value.contains(ownPackage, ignoreCase = true) ||
+                value.equals(appLabel, ignoreCase = true)
+        }
     }
 
     private fun handleSearchEngineProtection(

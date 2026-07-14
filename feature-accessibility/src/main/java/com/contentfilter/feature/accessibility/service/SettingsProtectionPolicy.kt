@@ -7,12 +7,14 @@ class SettingsProtectionPolicy {
         packageName: String,
         className: String?,
         ownAppIdentityVisible: Boolean,
+        deviceAdminEnabled: Boolean,
         armed: Boolean,
         settingsAuthorized: Boolean,
         removalAuthorized: Boolean,
         elapsedRealtimeMillis: Long,
     ): Boolean {
-        if (!armed || !ownAppIdentityVisible) return false
+        if ((!armed && !deviceAdminEnabled) || !ownAppIdentityVisible) return false
+        if (!deviceAdminEnabled && className.orEmpty().contains("DeviceAdminAdd", ignoreCase = true)) return false
         val requiredScope = protectedScope(packageName, className) ?: return false
         if (requiredScope == ProtectionAuthorizationScope.Settings && settingsAuthorized) return false
         if (requiredScope == ProtectionAuthorizationScope.Removal && removalAuthorized) return false

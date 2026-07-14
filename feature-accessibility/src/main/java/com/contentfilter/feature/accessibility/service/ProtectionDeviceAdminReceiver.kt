@@ -40,6 +40,12 @@ class ProtectionDeviceAdminReceiver : DeviceAdminReceiver() {
         persistState(ComponentState.Disabled, reportDisabled = true)
     }
 
+    override fun onDisableRequested(
+        context: Context,
+        intent: Intent,
+    ): CharSequence =
+        "Content Filter protege este dispositivo. Desactivarlo permitirá quitar la protección y desinstalar la app. Volvé atrás y solicitá autorización al administrador."
+
     private fun persistState(
         state: ComponentState,
         reportDisabled: Boolean,
