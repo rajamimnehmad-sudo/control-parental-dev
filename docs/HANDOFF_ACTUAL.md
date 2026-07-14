@@ -46,7 +46,7 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-13:
 
 ```text
-App Usuario versionCode 191
+App Usuario versionCode 192
 App Admin versionCode 181
 versionName 1.0.1-dev
 ```
@@ -61,14 +61,14 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-191-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-192-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-181-debug.apk
 ```
 
 SHA-256:
 
 ```text
-Usuario DEV 191: c408e45e1f892d17d94018a4044b28a8a032aace7ae26b3c94c4e73091f4f3db
+Usuario DEV 192: bee58c2822e67fd8aad6064048aa1980c9410bda6f1b66f74a09ae
 Admin DEV 181:   327e0c65ea18412e0eef34f09bd2b7efa073ab46a44ab928b028867ec7f7c616
 ```
 
@@ -127,7 +127,23 @@ Verificacion ejecutada:
 scripts/publicar_usuario_dev.sh
 ```
 
-Resultado actual: tests y build del area VPN OK, App Usuario DEV 191 publicada y App Admin DEV 181 sin cambios.
+Resultado actual: tests y build del area VPN OK, App Usuario DEV 192 publicada y App Admin DEV 181 sin cambios.
+
+## Cierre 2026-07-13 - Temas sensibles obligatorios
+
+- Grupo de producto: adulto, apuestas, drogas y pirateria/torrents. Internamente `adult` y `mixed_adult` preservan los indices existentes; `adult`/`porn` y `piracy`/`torrent` son aliases y no duplican estadisticas.
+- Fuentes: UT1 `adult`, `mixed_adult`, `gambling`, `drogue` y `warez`; The Block List Project `porn`, `gambling`, `drugs`, `piracy` y `torrent`.
+- El formato binario 3 usa una tabla extensible de categorias y mantiene lectura compatible de los formatos 1 y 2. Cada coincidencia Bloom exige confirmacion exacta.
+- Base firmada DEV `1783983396358`: 5.261.295 entradas, 47.352.139 bytes, checksum verificado y canario incluido. El Samsung SM-A235M adopto esa version sin borrar datos.
+- Conteos: `adult` 4.942.201, `mixed_adult` 119, `gambling` 294.192, `drugs` 19.743 y `piracy_torrents` 5.040.
+- Tests: 4 pruebas Python del publicador, `:feature-vpn:testDebugUnitTest`, `:core-policy:test`, `:feature-vpn:ktlintCheck`, `:app-user:assembleDevDebug`, `py_compile` y construccion completa con fuentes reales OK.
+- App Usuario DEV 192: `https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-192-debug.apk`, SHA-256 `bee58c2822e67fd8aad6064048aa1980c9410bda6f1b66fdf4e6bd66f74a09ae`. App Admin permanecio en DEV 181.
+- Commits: `d25ccf2` funcional y `dc1f17e` formato. Android CI `29291439108` exitoso. Workflow de base `29291351239` exitoso.
+- El workflow general de APKs falla deliberadamente al exigir aumento simultaneo de Admin; Usuario se publico por separado con staging atomico. No se modifico ni publico Admin.
+- Validacion fisica parcial en el SM-A235M: Usuario 192 y base v3 activas; el tunel VPN real se restauro al volver a primer plano y una navegacion incognito nueva al canario no mostro contenido durante mas de 35 segundos. La pestaña normal conservaba contenido cargado mientras el tunel estaba detenido por un `force-stop` diagnostico.
+- Ese dispositivo tiene policy Admin `Internet bloqueado`, por lo que Google tambien queda bloqueado y no permite validar en la misma sesion `Google funciona + categorias sensibles bloquean`. La validacion final en Internet abierto/Solo resultados continua en el segundo telefono del usuario.
+- Limitacion Android confirmada: despues de `force-stop` no hay proteccion hasta reabrir la app; no usar `force-stop` como estado operativo ni inferir VPN activa desde una preferencia persistida. Verificar siempre el tunel real.
+- Proxima fase: buscador propio `DAG`, 100 % kosher, sin fotos ni videos y con IA local para intencion. No fue implementado en este cierre.
 
 ## Cierre 2026-07-13 - Ticket 2 cobertura complementaria de listas
 
