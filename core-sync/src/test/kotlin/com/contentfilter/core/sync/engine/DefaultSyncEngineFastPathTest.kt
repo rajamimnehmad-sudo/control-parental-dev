@@ -314,6 +314,8 @@ class DefaultSyncEngineFastPathTest {
 
         override suspend fun updateAccessibilityState(state: ComponentState) = Unit
 
+        override suspend fun updateDeviceAdminState(state: ComponentState) = Unit
+
         override suspend fun updateSyncState(state: ComponentState) = Unit
 
         override suspend fun updateLicenseState(state: LicenseState) = Unit
