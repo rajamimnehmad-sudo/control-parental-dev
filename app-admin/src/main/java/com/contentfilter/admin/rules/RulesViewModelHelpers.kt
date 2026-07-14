@@ -14,6 +14,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.dagEnabled
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -145,6 +146,7 @@ internal fun List<PolicyRule>.webPolicyPreferences(): WebPolicyPreferences =
         webNavigationBlocked = webNavigationBlocked(),
         externalSearchResultsAllowed = externalSearchResultsAllowed(),
         safeSearchEnabled = safeSearchEnabled(),
+        dagEnabled = dagEnabled(),
     )
 
 internal fun List<PolicyRule>.webPolicyChanges(
@@ -206,6 +208,12 @@ internal fun List<PolicyRule>.webPolicyChanges(
         enabled = true,
         priority = WebNavigationBlockPriority + 20,
     )
+    planCanonical(
+        target = WebNavigationPolicy.DagEnabledTarget,
+        action = RuleAction.Allow,
+        enabled = desired.dagEnabled,
+        priority = WebNavigationBlockPriority + 30,
+    )
 
     working
         .filter { rule ->
@@ -224,7 +232,8 @@ internal fun List<PolicyRule>.webPolicyChanges(
 private fun PolicyRule.isCanonicalWebPreference(): Boolean =
     (target == WebNavigationPolicy.RuleTarget && action == RuleAction.Block) ||
         (target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget && action == RuleAction.Allow) ||
-        (target == WebNavigationPolicy.SafeSearchTarget && action == RuleAction.Allow)
+        (target == WebNavigationPolicy.SafeSearchTarget && action == RuleAction.Allow) ||
+        (target == WebNavigationPolicy.DagEnabledTarget && action == RuleAction.Allow)
 
 internal fun webRuleId(
     deviceId: String,
@@ -236,12 +245,14 @@ internal data class WebPolicyPreferences(
     val webNavigationBlocked: Boolean,
     val externalSearchResultsAllowed: Boolean,
     val safeSearchEnabled: Boolean,
+    val dagEnabled: Boolean,
 )
 
 internal enum class WebPolicyPreference {
     NavigationBlocked,
     ExternalSearchResultsAllowed,
     SafeSearchEnabled,
+    DagEnabled,
 }
 
 internal fun WebPolicyPreferences.withPreference(
@@ -252,6 +263,7 @@ internal fun WebPolicyPreferences.withPreference(
         WebPolicyPreference.NavigationBlocked -> copy(webNavigationBlocked = enabled)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(externalSearchResultsAllowed = enabled)
         WebPolicyPreference.SafeSearchEnabled -> copy(safeSearchEnabled = true)
+        WebPolicyPreference.DagEnabled -> copy(dagEnabled = enabled)
     }
 
 internal fun List<PolicyRule>.webPolicyPreferenceChanges(
@@ -272,6 +284,7 @@ internal fun RulesUiState.withPendingWebPreference(
         WebPolicyPreference.NavigationBlocked -> copy(pendingInternetBlocked = enabled)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = enabled)
         WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = enabled)
+        WebPolicyPreference.DagEnabled -> copy(pendingDagEnabled = enabled)
     }
 
 internal fun RulesUiState.clearPendingWebPreference(preference: WebPolicyPreference): RulesUiState =
@@ -279,6 +292,7 @@ internal fun RulesUiState.clearPendingWebPreference(preference: WebPolicyPrefere
         WebPolicyPreference.NavigationBlocked -> copy(pendingInternetBlocked = null)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = null)
         WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = null)
+        WebPolicyPreference.DagEnabled -> copy(pendingDagEnabled = null)
     }
 
 internal fun List<PolicyRule>.webNavigationOpenWithoutAuxiliaryBlocks(): Boolean =
@@ -479,6 +493,7 @@ internal val LegacyWebGeneratedTargets =
             WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
             WebNavigationPolicy.LegacyGoogleResultsAllowedTarget,
             WebNavigationPolicy.SafeSearchTarget,
+            WebNavigationPolicy.DagEnabledTarget,
         )
 internal val LegacyWebAuxiliaryBlockTargets = LegacyWebGeneratedTargets
 internal val YouTubeWebDomains =

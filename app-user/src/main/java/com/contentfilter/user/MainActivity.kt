@@ -5,6 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -76,6 +77,7 @@ import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.MyAppsRoute
+import com.contentfilter.user.dag.DagShortcutController
 import com.contentfilter.user.internet.UserWebViewModel
 import com.contentfilter.user.protection.BatteryOptimizationController
 import com.contentfilter.user.protection.ProtectionControlCoordinator
@@ -85,10 +87,13 @@ import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private val dagLaunchRequests = MutableStateFlow(0)
+
     @javax.inject.Inject
     lateinit var activationRepository: DeviceActivationRepository
 
@@ -100,11 +105,22 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        recordDagLaunch(intent)
         setContent {
             ContentFilterTheme {
-                UserAppRoot(modifier = Modifier.fillMaxSize())
+                val dagLaunchRequest by dagLaunchRequests.collectAsStateWithLifecycle()
+                UserAppRoot(
+                    modifier = Modifier.fillMaxSize(),
+                    dagLaunchRequest = dagLaunchRequest,
+                )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        recordDagLaunch(intent)
     }
 
     override fun onStart() {
@@ -118,10 +134,19 @@ class MainActivity : ComponentActivity() {
             protectionControlCoordinator.refresh()
         }
     }
+
+    private fun recordDagLaunch(intent: Intent?) {
+        if (intent?.action == DagShortcutController.OpenDagAction) {
+            dagLaunchRequests.value += 1
+        }
+    }
 }
 
 @Composable
-private fun UserAppRoot(modifier: Modifier = Modifier) {
+private fun UserAppRoot(
+    modifier: Modifier = Modifier,
+    dagLaunchRequest: Int = 0,
+) {
     var destination by rememberSaveable { mutableStateOf(UserDestination.Home) }
     var backStack by rememberSaveable { mutableStateOf<List<UserDestination>>(emptyList()) }
     var showAccessibilityDialog by rememberSaveable { mutableStateOf(false) }
@@ -153,6 +178,12 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
     val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         updatesViewModel.autoCheckAndDownload()
+    }
+    LaunchedEffect(dagLaunchRequest) {
+        if (dagLaunchRequest > 0) {
+            backStack = listOf(UserDestination.Web)
+            destination = UserDestination.Dag
+        }
     }
     LaunchedEffect(destination) {
         showAccessibilityDialog = !AccessibilityController.isEnabled(context)
@@ -234,6 +265,15 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
                     UserWebTab(
                         onBack = ::goBack,
+                        onOpenDag = { navigateTo(UserDestination.Dag) },
+                        onCreateDagShortcut = {
+                            val requested = DagShortcutController.requestPin(context)
+                            Toast.makeText(
+                                context,
+                                if (requested) "Confirmá el atajo DAG." else "Este inicio no admite atajos.",
+                                Toast.LENGTH_SHORT,
+                            ).show()
+                        },
                         vpnActive = statusState.isVpnActive,
                         accessibilityActive = statusState.accessibilityState == "Activa",
                         onActivateWebProtection = {
@@ -246,6 +286,7 @@ private fun UserAppRoot(modifier: Modifier = Modifier) {
                         },
                     )
                 }
+                UserDestination.Dag -> DagFoundationRoute(onBack = ::goBack)
                 UserDestination.Updates -> {
                     val statusViewModel: SystemStatusViewModel = hiltViewModel()
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
@@ -524,6 +565,8 @@ private fun UserHomeTab(
 @Composable
 private fun UserWebTab(
     onBack: () -> Unit,
+    onOpenDag: () -> Unit,
+    onCreateDagShortcut: () -> Unit,
     vpnActive: Boolean,
     accessibilityActive: Boolean,
     onActivateWebProtection: () -> Unit,
@@ -559,6 +602,24 @@ private fun UserWebTab(
         UserWebStatusCard(title = "SafeSearch", value = if (blocked) "Automatico" else "Activo")
         if (state.onlyResultsEnabled) {
             UserWebStatusCard(title = "Solo resultados", value = if (blocked) "Guardado" else "Activo")
+        }
+        ProductLargeFeatureCard(
+            title = "DAG",
+            subtitle =
+                if (state.dagEnabled) {
+                    "Buscador protegido habilitado por el administrador."
+                } else {
+                    "El administrador mantiene DAG cerrado."
+                },
+            accent = ProductMint,
+        )
+        if (state.dagEnabled) {
+            Button(modifier = Modifier.fillMaxWidth(), onClick = onOpenDag) {
+                Text("Abrir DAG")
+            }
+            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCreateDagShortcut) {
+                Text("Crear atajo DAG")
+            }
         }
         if (state.showDomainListDiagnostics) {
             ProductCard {
@@ -608,6 +669,37 @@ private fun UserWebTab(
             ProductCard {
                 Text("Protección web no activa.", style = MaterialTheme.typography.bodyMedium)
             }
+        }
+    }
+}
+
+@Composable
+private fun DagFoundationRoute(
+    onBack: () -> Unit,
+    viewModel: UserWebViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    ProductVisualPage(
+        title = "DAG",
+        subtitle = "Buscador protegido",
+        onBack = onBack,
+    ) {
+        ProductLargeFeatureCard(
+            title = if (state.dagEnabled) "DAG está abierto" else "DAG está cerrado",
+            subtitle =
+                if (state.dagEnabled) {
+                    "La base segura está activa. Las búsquedas seguirán cerradas hasta incorporar clasificación y resultados filtrados."
+                } else {
+                    "El administrador debe habilitar DAG para este dispositivo."
+                },
+            accent = if (state.dagEnabled) ProductMint else ProductViolet,
+        )
+        ProductCard {
+            Text("Protección preventiva", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Esta primera versión no abre páginas, imágenes ni videos.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
         }
     }
 }
@@ -734,6 +826,7 @@ private enum class UserDestination(
     Home("Home", ProductIcon.Home),
     MyApps("Mis apps", ProductIcon.Search),
     Web("Web", ProductIcon.Web),
+    Dag("DAG", ProductIcon.Search, showInNav = false),
     Requests("Solicitudes", ProductIcon.Bell, showInNav = false),
     Updates("Ajustes", ProductIcon.Settings),
 }

@@ -110,7 +110,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `complete preference matrix remains independent and has no auxiliary blocks`() {
-        val combinations = (0 until 4).map(::preferencesFromBits)
+        val combinations = (0 until 8).map(::preferencesFromBits)
 
         combinations.forEach { desired ->
             val result =
@@ -125,7 +125,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `every Web mutation changes only its selected preference`() {
-        (0 until 4).map(::preferencesFromBits).forEach { initial ->
+        (0 until 8).map(::preferencesFromBits).forEach { initial ->
             val initialRules =
                 emptyList<PolicyRule>()
                     .webPolicyChanges(initial, DeviceId)
@@ -134,6 +134,7 @@ class RulesViewModelHelpersTest {
             listOf(
                 WebPolicyPreference.NavigationBlocked,
                 WebPolicyPreference.ExternalSearchResultsAllowed,
+                WebPolicyPreference.DagEnabled,
             ).forEach { preference ->
                 listOf(false, true).forEach { enabled ->
                     val result =
@@ -224,6 +225,7 @@ class RulesViewModelHelpersTest {
                 pending.pendingExternalSearchResultsAllowed == true,
             )
             assertEquals(preference == WebPolicyPreference.SafeSearchEnabled, pending.pendingSafeSearchEnabled == true)
+            assertEquals(preference == WebPolicyPreference.DagEnabled, pending.pendingDagEnabled == true)
             assertEquals(RulesUiState(), pending.clearPendingWebPreference(preference))
         }
     }
@@ -274,6 +276,7 @@ class RulesViewModelHelpersTest {
                         webBlocked = false,
                         externalResultsAllowed = false,
                         safeSearch = true,
+                        dagEnabled = true,
                     ),
                     DeviceId,
                 ).applyTo(emptyList())
@@ -285,6 +288,7 @@ class RulesViewModelHelpersTest {
         assertTrue(rules.webNavigationBlocked())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
+        assertTrue(rules.webPolicyPreferences().dagEnabled)
 
         rules =
             rules
@@ -293,6 +297,7 @@ class RulesViewModelHelpersTest {
         assertTrue(rules.webNavigationOpenWithoutAuxiliaryBlocks())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
+        assertTrue(rules.webPolicyPreferences().dagEnabled)
     }
 
     @Test
@@ -462,11 +467,13 @@ class RulesViewModelHelpersTest {
         webBlocked: Boolean,
         externalResultsAllowed: Boolean = false,
         safeSearch: Boolean = true,
+        dagEnabled: Boolean = false,
     ): WebPolicyPreferences =
         WebPolicyPreferences(
             webNavigationBlocked = webBlocked,
             externalSearchResultsAllowed = externalResultsAllowed,
             safeSearchEnabled = true,
+            dagEnabled = dagEnabled,
         )
 
     private fun preferencesFromBits(bits: Int): WebPolicyPreferences =
@@ -474,6 +481,7 @@ class RulesViewModelHelpersTest {
             webBlocked = bits and 1 != 0,
             externalResultsAllowed = bits and 2 != 0,
             safeSearch = true,
+            dagEnabled = bits and 4 != 0,
         )
 
     private fun appRule(

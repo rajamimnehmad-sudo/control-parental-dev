@@ -16,6 +16,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.model.WebProtectionSemantics
+import com.contentfilter.core.domain.model.dagEnabled
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
@@ -181,6 +182,7 @@ class RulesViewModel
                             ?: policy.rules.externalSearchResultsAllowedForWeb(),
                     safeSearchEnabled =
                         formState.pendingSafeSearchEnabled ?: policy.rules.safeSearchEnabledForWeb(),
+                    dagEnabled = formState.pendingDagEnabled ?: policy.rules.dagEnabled(),
                     appControls =
                         if (selectedDeviceId == null) {
                             emptyList()
@@ -646,6 +648,16 @@ class RulesViewModel
                     } else {
                         "SafeSearch desactivado."
                     },
+            )
+        }
+
+        fun setDagEnabled(enabled: Boolean) {
+            setWebOption(
+                preference = WebPolicyPreference.DagEnabled,
+                action = "dag-enabled",
+                requestedState = enabled,
+                previousState = uiState.value.dagEnabled,
+                successMessage = if (enabled) "DAG abierto." else "DAG cerrado.",
             )
         }
 

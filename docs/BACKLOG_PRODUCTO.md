@@ -35,7 +35,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Ancla tecnica actual
 
-- Estado preparado para publicacion: App Usuario DEV 203 y App Admin DEV 203, `1.0.1-dev`.
+- Estado preparado para publicacion: App Usuario DEV 204 y App Admin DEV 204, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -140,17 +140,27 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Roadmap DAG, Web e IA local
 
+### DAG-FOUNDATION-01 - Entrada, control y atajo seguro
+
+- Estado: `Resuelto` el 2026-07-14 en DEV 204.
+- Tipo: arquitectura y UX. Prioridad: P1. Esfuerzo: S. Riesgo: bajo.
+- Alcance cerrado: control `Abierto/Cerrado` por dispositivo desde App Admin; entrada en Web de App Usuario; pantalla propia cerrada por defecto; atajo opcional fijado por Android que abre DAG dentro de la misma app.
+- Seguridad: esta base no ejecuta busquedas, no abre sitios y no muestra imagenes ni videos. No incorpora WebView, fuente de resultados, modelo de IA ni revision humana.
+- Persistencia: reutiliza las reglas de politica y la sincronizacion DEV existentes; no agrega tabla, migracion ni credencial nueva.
+- Aceptacion cumplida: DAG solo abre con una regla `Allow` explicita; cerrar revoca el acceso; otros cambios Web no alteran su estado; tests de dominio, Admin y Usuario cubren el valor por defecto y la independencia de preferencias.
+
 ### DAG-SEARCH-01 - Primera fase del buscador propio
 
-- Estado: `Propuesto`; requiere entrevista especifica antes de aprobar el primer ticket.
+- Estado: `Propuesto`; requiere aprobar el siguiente ticket antes de escribir codigo.
 - Prioridad: P1. Esfuerzo: XL. Riesgo: alto.
-- Vision acordada: buscador propio 100 % kosher, inicialmente sin fotos ni videos y con resultados muy filtrados.
+- Vision acordada: buscador propio muy kosher para usuarios con Internet bloqueado o que necesitan mayor proteccion, con sitios, imagenes y video clasificados antes de mostrarse.
 - La consulta se procesa localmente en memoria, no se guarda ni se transmite para clasificarla.
 - Salidas iniciales: `Permitida`, `Bloqueada` o `Incierta`, con categoria, confianza y version del modelo.
 - Debe distinguir intencion explicita de contextos medicos, educativos, religiosos o ambiguos.
-- Antes de implementar hay que definir fuente de resultados, experiencia ante `Incierta`, autorizaciones, idiomas iniciales, amenazas y metricas de falsos positivos, latencia, memoria, APK y bateria.
+- La revision humana del administrador se reserva para sitios que la IA marque como inciertos; no se revisan individualmente consultas, imagenes ni videos.
+- Antes de implementar hay que definir fuente de resultados, tratamiento tecnico de imagen y video, experiencia ante `Incierta`, idiomas iniciales, amenazas y metricas de falsos positivos, latencia, memoria, APK y bateria.
 - Limite honesto: no prometer lectura confiable de consultas escritas en todos los navegadores externos; HTTPS y Android lo impiden. Esos navegadores siguen bajo reglas, SafeSearch, listas, DNS, IP y politica de red.
-- Fuera de la primera fase: multiples modelos, IA visual, analisis continuo de pantalla y chats sensibles.
+- Fuera de alcance: analisis continuo de pantalla, inspeccion de otros navegadores y chats sensibles.
 
 ### Otros tickets de roadmap
 
@@ -188,6 +198,7 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-FOUNDATION-01 | 2026-07-14, DEV 204 | Control por dispositivo, entrada Usuario, pantalla cerrada por defecto y atajo Android; sin abrir contenido ni agregar esquema |
 | PUSH-REAL-01 | 2026-07-14, DEV 202 | FCM real con tokens seguros y credenciales servidor dedicadas; alerta fisica con Admin cerrado y apertura correcta en Apps |
 | USER-PERF-01 | 2026-07-14, DEV 203 | Suscripciones aisladas por pantalla, refresco remoto duplicado eliminado y una unica accion contextual; Home 2,99 % -> 0,26 % y Ajustes 0,66 % -> 0,43 % de frames lentos en SM-A235M |
 | BARRIER-ANDROID-01 | DEV 198-202 | Barrera reforzada, navegacion defensiva, recuperacion y alertas; alcance real documentado en el handoff |

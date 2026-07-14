@@ -21,10 +21,12 @@ data class RulesUiState(
     val internetBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = true,
     val safeSearchEnabled: Boolean = true,
+    val dagEnabled: Boolean = false,
     val internetSaving: Boolean = false,
     val pendingInternetBlocked: Boolean? = null,
     val pendingExternalSearchResultsAllowed: Boolean? = null,
     val pendingSafeSearchEnabled: Boolean? = null,
+    val pendingDagEnabled: Boolean? = null,
     val limitPackageName: String = "",
     val limitMinutes: String = "",
     val appSearchQuery: String = "",
@@ -89,6 +91,7 @@ internal fun RulesUiState.webPanelPresentation(): WebPanelPresentation {
         buildList {
             if (safeSearchEnabled) add("SafeSearch")
             if (onlyResultsEnabled) add("Solo resultados")
+            if (dagEnabled) add("DAG")
         }
     return WebPanelPresentation(
         headline = if (layers.isEmpty()) "Internet totalmente abierto" else "Internet abierto con protecciones",

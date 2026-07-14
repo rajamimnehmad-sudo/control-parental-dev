@@ -4,9 +4,20 @@ import com.contentfilter.feature.vpn.domainlist.WebDomainListState
 import com.contentfilter.feature.vpn.domainlist.WebDomainListStatus
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class UserWebViewModelTest {
+    @Test
+    fun `DAG is closed in the initial state and appears only when enabled`() {
+        val closed = UserWebUiState()
+        val open = closed.copy(dagEnabled = true)
+
+        assertFalse(closed.dagEnabled)
+        assertFalse("DAG" in closed.activeLayers)
+        assertTrue("DAG" in open.activeLayers)
+    }
+
     @Test
     fun `domain list UI exposes the installed version and active canary`() {
         val state =

@@ -55,6 +55,18 @@ class WebNavigationPolicyTest {
         )
     }
 
+    @Test
+    fun `DAG is closed by default and opens only with its enabled allow rule`() {
+        assertFalse(emptyList<PolicyRule>().dagEnabled())
+        assertFalse(listOf(rule(WebNavigationPolicy.DagEnabledTarget, enabled = false)).dagEnabled())
+        assertFalse(
+            listOf(
+                rule(WebNavigationPolicy.DagEnabledTarget, enabled = true).copy(action = RuleAction.Block),
+            ).dagEnabled(),
+        )
+        assertTrue(listOf(rule(WebNavigationPolicy.DagEnabledTarget, enabled = true)).dagEnabled())
+    }
+
     private fun rule(
         target: String,
         enabled: Boolean,

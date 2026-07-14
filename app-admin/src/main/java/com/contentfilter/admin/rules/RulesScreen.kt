@@ -120,6 +120,7 @@ fun RulesRoute(
         onAppLimitSaved = viewModel::saveAppControlLimit,
         onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
         onOnlyResultsChanged = viewModel::setOnlyResultsEnabled,
+        onDagEnabledChanged = viewModel::setDagEnabled,
         onProtectionArmedChanged = viewModel::setProtectionArmed,
         onAuthorizeSettings = viewModel::authorizeSettings,
         onAuthorizeRemoval = viewModel::authorizeRemoval,
@@ -161,6 +162,7 @@ private fun RulesScreen(
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
+    onDagEnabledChanged: (Boolean) -> Unit,
     onProtectionArmedChanged: (String, Boolean) -> Unit,
     onAuthorizeSettings: (String) -> Unit,
     onAuthorizeRemoval: (String) -> Unit,
@@ -216,6 +218,7 @@ private fun RulesScreen(
             onAppLimitSaved = onAppLimitSaved,
             onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
             onOnlyResultsChanged = onOnlyResultsChanged,
+            onDagEnabledChanged = onDagEnabledChanged,
             onProtectionArmedChanged = onProtectionArmedChanged,
             onAuthorizeSettings = onAuthorizeSettings,
             onAuthorizeRemoval = onAuthorizeRemoval,
@@ -820,6 +823,7 @@ private fun UserDetailContent(
     onAppLimitSaved: (String, String) -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
+    onDagEnabledChanged: (Boolean) -> Unit,
     onProtectionArmedChanged: (String, Boolean) -> Unit,
     onAuthorizeSettings: (String) -> Unit,
     onAuthorizeRemoval: (String) -> Unit,
@@ -960,9 +964,12 @@ private fun UserDetailContent(
                             presentation = state.webPanelPresentation(),
                             navigationSaving = state.pendingInternetBlocked != null,
                             onlyResultsSaving = state.pendingOnlyResultsEnabled != null,
+                            dagEnabled = state.dagEnabled,
+                            dagSaving = state.pendingDagEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
                             onOnlyResultsChanged = onOnlyResultsChanged,
+                            onDagEnabledChanged = onDagEnabledChanged,
                         )
                     }
                 }
@@ -1104,9 +1111,12 @@ private fun WebNavigationPanel(
     presentation: WebPanelPresentation,
     navigationSaving: Boolean,
     onlyResultsSaving: Boolean,
+    dagEnabled: Boolean,
+    dagSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
+    onDagEnabledChanged: (Boolean) -> Unit,
 ) {
     ProductCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1150,6 +1160,14 @@ private fun WebNavigationPanel(
                     )
                 }
             }
+            WebSwitchRow(
+                title = "Buscador DAG",
+                description = "Habilita el acceso al buscador protegido desde la App Usuario.",
+                checked = dagEnabled,
+                enabled = !dagSaving,
+                saving = dagSaving,
+                onCheckedChange = onDagEnabledChanged,
+            )
             if (blocked && !protectionActive) {
                 FeedbackBanner(
                     "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",

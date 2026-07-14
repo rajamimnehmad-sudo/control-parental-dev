@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.WebProtectionSemantics
+import com.contentfilter.core.domain.model.dagEnabled
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -45,12 +46,14 @@ class UserWebViewModel
                     "webNavigation user snapshot policy=${snapshot.id.take(8)} version=${snapshot.version} " +
                         "webNavigationBlocked=$blocked " +
                         "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
-                        "safeSearch=${snapshot.rules.safeSearchEnabled()}",
+                        "safeSearch=${snapshot.rules.safeSearchEnabled()} " +
+                        "dagEnabled=${snapshot.rules.dagEnabled()}",
                 )
                 UserWebUiState(
                     webNavigationBlocked = blocked,
                     externalSearchResultsAllowed = snapshot.rules.externalSearchResultsAllowed(),
                     safeSearchEnabled = snapshot.rules.safeSearchEnabled(),
+                    dagEnabled = snapshot.rules.dagEnabled(),
                     showDomainListDiagnostics = context.packageName.endsWith(".dev"),
                     domainList = domainListStatus.toUiState(isCheckingDomainList),
                 )
@@ -78,6 +81,7 @@ data class UserWebUiState(
     val webNavigationBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = true,
     val safeSearchEnabled: Boolean = true,
+    val dagEnabled: Boolean = false,
     val showDomainListDiagnostics: Boolean = false,
     val domainList: DomainListUiState = DomainListUiState(),
 ) {
@@ -89,6 +93,7 @@ data class UserWebUiState(
             buildList {
                 if (safeSearchEnabled) add("SafeSearch")
                 if (onlyResultsEnabled) add("Solo resultados")
+                if (dagEnabled) add("DAG")
             }
 }
 

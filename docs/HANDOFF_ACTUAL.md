@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 203
-App Admin versionCode 203
+App Usuario versionCode 204
+App Admin versionCode 204
 versionName 1.0.1-dev
 ```
 
@@ -68,11 +68,19 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-203-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-203-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-204-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-204-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
+
+## Cierre 2026-07-14 - DAG-FOUNDATION-01 entrada, control y atajo
+
+- DEV 204 agrega un control `Buscador DAG` por dispositivo en Comunidad -> Web de App Admin. DAG permanece cerrado salvo que exista una regla `Allow` explicita para `__dag_enabled__`.
+- App Usuario muestra el estado en Web. Cuando DAG esta abierto permite entrar a una pantalla propia y solicitar a Android un atajo fijado; el atajo abre esa misma pantalla dentro de App Usuario y no instala una segunda app.
+- La pantalla fundacional es preventiva: no ejecuta busquedas, no abre paginas y no muestra imagenes ni videos. La fuente de resultados, clasificacion local y revision de sitios inciertos quedan para tickets posteriores.
+- El estado reutiliza `PolicyRule`, Room, outbox y sincronizacion DEV existentes. No se agrego tabla, migracion, borrado de datos ni credencial; no existe Service Role Key en Android.
+- Tests de dominio, Admin y Usuario verifican cerrado por defecto, apertura solo explicita, revocacion e independencia respecto de las demas preferencias Web. Ktlint y compilacion de ambas apps pasan.
 
 ## Cierre 2026-07-14 - USER-PERF-01 fluidez y acciones de proteccion
 
@@ -97,6 +105,7 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 - Web Admin mantiene flujo real: Comunidad -> Web -> elegir usuario -> configurar Web.
 - Web Admin usa selector Internet abierto/bloqueado y dos capas independientes: SafeSearch y Solo resultados.
 - Web Usuario muestra esos mismos estados en modo solo lectura.
+- DAG tiene control por dispositivo en Admin y entrada/atajo en Usuario; DEV 204 contiene solo la base segura, sin buscador ni contenido todavia.
 - Bloqueo Web se representa con reglas internas de dominio en `WebNavigationPolicy`; no requiere migracion Room nueva.
 - VPN/DNS bloquea dominios externos en Solo resultados y fuerza una invalidacion puntual de conexiones al activar la capa. Accessibility no usa Atras/Home para navegaciones nuevas.
 - Solicitudes Admin se agrupan por usuario con indicador rojo.
