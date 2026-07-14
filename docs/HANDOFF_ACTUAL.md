@@ -46,8 +46,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-14:
 
 ```text
-App Usuario versionCode 198
-App Admin versionCode 198
+App Usuario versionCode 199
+App Admin versionCode 199
 versionName 1.0.1-dev
 ```
 
@@ -61,8 +61,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-198-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-198-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-199-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-199-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
@@ -126,6 +126,7 @@ Resultado actual: tests, ktlint y build de ambas apps OK. DEV 194 publicada por 
 
 ## Cierre 2026-07-14 - barrera reforzada tipo Rimon sin MDM
 
+- DEV 199 bloquea las pantallas criticas de detalle de Accessibility y configuracion VPN desde el primer evento de ventana, sin esperar a que Android termine de dibujar el nombre de Content Filter. El permiso temporal de mantenimiento sigue habilitandolas de forma controlada.
 - DEV 198 reemplaza la salida directa a Home por una secuencia segura: Atras inmediato, nueva comprobacion, segundo Atras y Home solo como ultimo respaldo si la pantalla protegida continua visible.
 - La comprobacion diferida conserva la clase real de la ventana observada para distinguir una pantalla peligrosa de la pantalla anterior normal de Ajustes.
 - Validacion fisica in-place en Samsung SM-S908E: diez aperturas rapidas de Administrador del dispositivo y diez intentos directos de desinstalacion volvieron a `Settings/SubSettings`; la app permanecio instalada y Device Admin y Accessibility siguieron activos.

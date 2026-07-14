@@ -16,8 +16,9 @@ class SettingsProtectionPolicy {
         val requiredScope = protectedScope(packageName, className) ?: return false
         if (!armed && !deviceAdminEnabled) return false
         val deviceAdminRemovalScreen = isDeviceAdminRemovalScreen(packageName, className)
+        val criticalSettingsScreen = isCriticalSettingsScreen(packageName, className)
         if (deviceAdminRemovalScreen && !deviceAdminEnabled) return false
-        if (!deviceAdminRemovalScreen && !ownAppIdentityVisible) return false
+        if (!deviceAdminRemovalScreen && !criticalSettingsScreen && !ownAppIdentityVisible) return false
         if (requiredScope == ProtectionAuthorizationScope.Settings && settingsAuthorized) return false
         if (requiredScope == ProtectionAuthorizationScope.Removal && removalAuthorized) return false
         if (elapsedRealtimeMillis - lastActionAtElapsedMillis >= MinActionIntervalMillis) {
@@ -32,6 +33,13 @@ class SettingsProtectionPolicy {
     ): Boolean =
         packageName == AndroidSettingsPackage &&
             DeviceAdminClassHints.any { className.orEmpty().contains(it, ignoreCase = true) }
+
+    private fun isCriticalSettingsScreen(
+        packageName: String,
+        className: String?,
+    ): Boolean =
+        packageName == AndroidSettingsPackage &&
+            CriticalSettingsClassHints.any { className.orEmpty().contains(it, ignoreCase = true) }
 
     private fun protectedScope(
         packageName: String,
@@ -66,6 +74,14 @@ class SettingsProtectionPolicy {
                 "DeviceAdminSettings",
                 "DeviceAdminWarning",
             )
+        val CriticalSettingsClassHints =
+            listOf(
+                "AccessibilityDetails",
+                "ToggleAccessibility",
+                "AccessibilityServiceWarning",
+                "VpnProfile",
+                "VpnSettings",
+            )
         val RemovalClassHints =
             listOf(
                 "InstalledAppDetails",
@@ -73,15 +89,11 @@ class SettingsProtectionPolicy {
                 "AppInfoActivity",
             ) + DeviceAdminClassHints
         val SettingsClassHints =
-            listOf(
-                "AccessibilityDetails",
-                "ToggleAccessibility",
-                "AccessibilityServiceWarning",
-                "VpnProfile",
-                "VpnSettings",
-                "ManageExternalSources",
-                "SpecialAccessDetails",
-            )
+            CriticalSettingsClassHints +
+                listOf(
+                    "ManageExternalSources",
+                    "SpecialAccessDetails",
+                )
     }
 }
 

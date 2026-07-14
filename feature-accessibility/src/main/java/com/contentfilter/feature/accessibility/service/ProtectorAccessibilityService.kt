@@ -273,8 +273,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     }
 
     private fun leaveProtectedSettings() {
-        performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0))
         if (settingsEscapeJob?.isActive == true) return
+        performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0))
         val scope = serviceScope ?: return
         settingsEscapeJob =
             scope.launch {
@@ -650,7 +650,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 120L
         const val BlockHomeRetries = 2
-        const val SettingsEscapeRecheckDelayMillis = 120L
+        const val SettingsEscapeRecheckDelayMillis = 200L
         const val SettingsEscapeFallbackAttempt = 2
         const val PolicyChangedEventLabel = "POLICY_CHANGED"
         const val ExplicitSearchNoticeDebounceMillis = 2_000L

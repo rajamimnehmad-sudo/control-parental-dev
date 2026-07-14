@@ -96,6 +96,61 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun accessibilityDetailsDoNotWaitForOwnIdentityWhenArmed() {
+        assertTrue(
+            decide(
+                className = "com.android.settings.Settings\$AccessibilityDetailsSettingsActivity",
+                ownAppIdentityVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun vpnSettingsDoNotWaitForOwnIdentityWhenArmed() {
+        assertTrue(
+            decide(
+                className = "com.android.settings.Settings\$VpnSettingsActivity",
+                ownAppIdentityVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun criticalSettingsRemainAvailableWhileGuardIsDisarmed() {
+        assertFalse(
+            decide(
+                className = "com.android.settings.Settings\$AccessibilityDetailsSettingsActivity",
+                ownAppIdentityVisible = false,
+                armed = false,
+                deviceAdminEnabled = false,
+            ),
+        )
+    }
+
+    @Test
+    fun enabledDeviceAdminKeepsCriticalSettingsProtectedWhileRemoteControlIsPending() {
+        assertTrue(
+            decide(
+                className = "com.android.settings.Settings\$VpnSettingsActivity",
+                ownAppIdentityVisible = false,
+                armed = false,
+                deviceAdminEnabled = true,
+            ),
+        )
+    }
+
+    @Test
+    fun maintenanceAuthorizationAllowsCriticalSettings() {
+        assertFalse(
+            decide(
+                className = "com.android.settings.Settings\$VpnSettingsActivity",
+                ownAppIdentityVisible = false,
+                settingsAuthorized = true,
+            ),
+        )
+    }
+
+    @Test
     fun protectedSettingsGoBackBeforeFallingBackHome() {
         assertEquals(SettingsEscapeAction.Back, SettingsEscapeStrategy.actionForAttempt(0))
         assertEquals(SettingsEscapeAction.Back, SettingsEscapeStrategy.actionForAttempt(1))
