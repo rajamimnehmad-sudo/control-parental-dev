@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 211
-App Admin versionCode 211
+App Usuario versionCode 212
+App Admin versionCode 212
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,27 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-211-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-211-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-212-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-212-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 37ed27b5a5493df05e6c71ec96e0681b99f89207952a0fa2130c2573744da8ad
-Admin   26409393b703fbda64976ed504bff2caefcc96610739a53755907a2df9e925e5
+Usuario dd5251b2d51c3c9032026e7057dc17b466e611bc526b51829238119160d54c1c
+Admin   e4ec89b5362d3bcc0482b188b8a28491de408e9c02fdaa1391016e335e76f1f0
 ```
+
+## Publicacion 2026-07-15 - AI-SEARCH-01A pendiente de prueba fisica
+
+- DEV 212 agrega a DAG un clasificador estadistico de intencion que corre enteramente en el telefono sobre consultas, metadatos de resultados y texto de paginas. Las reglas explicitas, la lista dinamica de dominios y las barreras de plataforma conservan prioridad; el modelo solo endurece la decision restante.
+- No es un LLM ni un transformer: usa un modelo lineal compacto sobre n-gramas de caracteres, palabras y pares de palabras. El artefacto propio pesa 114.736 bytes, SHA-256 `bf75e837708793412060abda5eb56ef9b1adba8ef6b58a19986e45854a54a9c1`, y se reproduce con `scripts/dag_text_model/train_model.py` sin dependencias Python externas.
+- Cobertura inicial: espanol, ingles y hebreo; categorias sexual, citas, apuestas, drogas, violencia, contexto sensible y uso general. Confianza riesgosa alta bloquea, la zona media o el contexto medico/educativo/religioso quedan inciertos y un modelo ausente, corrupto o invalido falla cerrado.
+- El corpus controlado actual contiene 557 ejemplos de entrenamiento y 34 controles separados. Incluye negativos cotidianos de tramites, compras, correo, resultados deportivos, imagenes comunes y Tora. Es un primer corte conservador: reduce evasiones y sinonimos simples, pero no equivale a comprension humana ni garantiza 100 % de precision.
+- Privacidad y costo: el modelo, sus scores y las decisiones permanecen locales; no agrega API, secreto, consulta Brave, escritura Supabase ni telemetria de contenido. La navegacion directa sigue sin consumir busquedas.
+- Validacion local: 885 tareas Gradle correctas con tests Usuario/Admin, ktlint, Android lint, detekt informativo y ensamblado optimizado de ambos APK. Pruebas dirigidas cubren tres idiomas, contexto sensible, prioridad de dominios bloqueados, separacion entre galeria comun y contenido riesgoso y fallo cerrado del artefacto.
+- Commit funcional `76bb7ed`; workflow `Publicar APKs DEV` `29430743977` y Android CI `29430747856` exitosos. Manifiestos DEV 212 y ambas descargas publicas se verificaron por SHA-256. Falta instalar DEV 212 en el telefono personal y medir busquedas seguras/riesgosas y fluidez antes de cerrar el ticket.
+- No se toco Production, no se borraron datos, no se modifico el esquema de Supabase DEV y no se agregaron secretos ni Service Role Key a Android.
 
 ## Publicacion 2026-07-15 - DAG-SAFETY-01 pendiente de prueba final
 

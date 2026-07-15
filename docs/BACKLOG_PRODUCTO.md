@@ -35,12 +35,21 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 211 y App Admin DEV 211, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 212 y App Admin DEV 212, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
-## Ultimo ticket resuelto
+## Ultimos tickets trabajados
+
+### AI-SEARCH-01A - Intencion semantica local compacta
+
+- Estado: `En progreso`; aprobado por la continuacion explicita de IA local el 2026-07-15. DEV 212 publicado y verificado; falta prueba fisica en el celular personal.
+- Tipo: IA local, seguridad Web, privacidad y rendimiento. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Alcance implementado: segundo clasificador estadistico local para consultas, resultados y paginas en espanol, ingles y hebreo. Detecta sinonimos y evasiones simples de sexual, citas, apuestas, drogas y violencia; contexto sensible queda incierto y un artefacto ausente/corrupto falla cerrado.
+- Arquitectura: modelo lineal propio de 112 KiB sobre n-gramas; 557 ejemplos de entrenamiento y 34 controles separados; reglas explicitas y dominios bloqueados siguen antes del modelo y ninguna salida semantica habilita una decision bloqueada por otra capa.
+- Privacidad y costo: cero servicios o secretos nuevos; texto, scores y decisiones no salen del telefono; no cambia el consumo Brave ni guarda consultas en Supabase.
+- Evidencia: pruebas en tres idiomas, contexto, negativos cotidianos, modelo corrupto y prioridad de bloqueos; 885 tareas Gradle correctas; commit `76bb7ed`; workflow DEV `29430743977` y Android CI `29430747856` exitosos; manifiestos y APK DEV 212 verificados por SHA-256. No se marca resuelto hasta validar calidad y fluidez fisicas.
 
 ### DAG-SAFETY-01 - Correcciones de imagenes, revisiones y navegacion
 
@@ -255,6 +264,15 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 - Evidencia: pruebas unitarias de politica/red, validacion Gradle integral y carga fisica de fotos seguras en SM-A235M con APK publico DEV 210. Actualizacion in-place con Device Admin, Accessibility y VPN preservados; cero consultas Brave.
 - Limitacion explicita: el modelo es probabilistico y no puede garantizar 100 % de aciertos. Clasificar video requiere `DAG-VIDEO-01`, aun no aprobado.
 
+### AI-SEARCH-01A - Intencion semantica local compacta
+
+- Estado: `En progreso` en DEV 212; aprobado por el usuario al pedir continuar con IA local. Falta prueba fisica.
+- Objetivo implementado: sumar comprension estadistica local de sinonimos y evasiones simples sin reemplazar las reglas duras ni enviar contenido fuera del telefono.
+- Modelo: clasificador lineal propio de 112 KiB sobre n-gramas de caracteres y palabras, con siete categorias y cobertura inicial espanol/ingles/hebreo. No es un LLM ni un transformer y no promete comprension humana.
+- Decision: una categoria riesgosa con confianza alta bloquea; confianza media o contexto sensible quedan inciertos; general permite solo si ninguna capa anterior bloqueo. Modelo ausente o invalido falla cerrado.
+- Datos y costo: 557 ejemplos controlados, 34 casos separados de verificacion, entrenamiento reproducible sin dependencias externas y cero costo/API adicional. Consultas, texto, scores y decisiones permanecen locales.
+- Aceptacion tecnica cumplida: pruebas dirigidas, build/test/lint local integral, publicacion DEV 212 y hashes publicos verificados. Aceptacion fisica pendiente: calidad en busquedas cotidianas/riesgosas, ausencia de falsos positivos graves y fluidez en el Samsung personal.
+
 ### DAG-USAGE-01 - Contador mensual en Super Web
 
 - Estado: `Completado y publicado`; aprobado por el usuario el 2026-07-14.
@@ -270,7 +288,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | WEB-SOURCES-01 | Idea | P1 | Evaluar nuevas fuentes Web con licencia, calidad, deduplicacion, firma y rollback |
 | WEB-CACHE-01 | Idea | P1 | Cache local acotada de reputacion sin URL ni historial |
 | AI-DOMAIN-01 | Idea | P1 | Clasificador local de dominios desconocidos sin descargar paginas |
-| AI-SEARCH-01 | Idea | P1 | Clasificador local medido para intencion y evasiones de busqueda |
+| AI-SEARCH-01B | Idea | P1 | Ampliar y medir el clasificador local con corpus revisado, precision/recall y calibracion por idioma |
 | NET-EVASION-01 | Idea | P2 | DoH/DoT desconocido, IP directa, proxies y VPN externas |
 | AI-VISUAL-01 | Idea | P3 | Evaluacion puntual de regiones visibles, sujeta a privacidad, bateria y politicas |
 | AI-SENSITIVE-01 | Idea | P3 | Riesgos sensibles en chats como proyecto separado legal y de privacidad |
