@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-14
+Ultima sincronizacion: 2026-07-15
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -35,12 +35,21 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Ancla tecnica actual
 
-- Estado preparado para publicacion: App Usuario DEV 207 y App Admin DEV 207, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 208 y App Admin DEV 208, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimo ticket resuelto
+
+### DAG-BROWSER-01A - Navegador protegido funcional
+
+- Estado: `Resuelto` el 2026-07-15 en DEV 208.
+- Tipo: producto, seguridad Web y UX. Prioridad: P1. Esfuerzo: XL. Riesgo: alto.
+- Resultado: busqueda Web real mediante Brave del lado servidor, navegacion interna de una pestana, clasificacion local conservadora de consultas/resultados/paginas, historial local cifrado, revision de dominios inciertos y revocacion por dispositivo.
+- Evidencia fisica SM-A235M: bloqueo local sin consumir Brave; una unica busqueda permitida; pagina incierta cerrada; solicitud recibida y rechazada por Admin sin consulta ni historial; historial local y borrado del elemento de prueba; consulta ausente de Logcat; cierre y reapertura remotos.
+- Seguimiento DEV 208: al cerrar o reabrir DAG se limpia la sesion visual retenida sin borrar el historial. El ciclo final reabre en Inicio sin mensaje ni candidato obsoletos.
+- Publicacion: commit funcional `4f2886a`, Android CI `29409620735` y workflow DEV `29409620788`, con hashes publicos verificados. Device Admin, Accessibility y VPN foreground permanecieron activos.
 
 ### USER-PERF-01 - Rendimiento y simplificacion de App Usuario
 
@@ -82,6 +91,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | --- | --- | --- | --- | --- | --- |
 | SEC-LICENSE-01 | Idea | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
+| DAG-STANDALONE-01 | Propuesto | P1 | Navegador DAG con icono y tarea independientes, compartiendo seguridad con App Usuario | L | Medio |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Idea | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
@@ -165,20 +175,38 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ### DAG-BROWSER-01A - Navegador protegido funcional
 
-- Estado: `En progreso`; aprobado explicitamente por el usuario el 2026-07-14.
+- Estado: `Resuelto` el 2026-07-15 en DEV 208; aprobado explicitamente por el usuario el 2026-07-14.
 - Prioridad: P1. Esfuerzo: XL. Riesgo: alto.
 - Vision acordada: primer corte util del navegador propio DAG, con experiencia cotidiana parecida a Chrome pero conservadora y cerrada por defecto.
 - Alcance aprobado: barra combinada para buscar o escribir URL; resultados reales; navegacion interna; atras, adelante, recargar e inicio; una pestaña; formularios e inicio de sesion.
 - Privacidad: historial cifrado solo en el telefono con busquedas, paginas, titulo y fecha. Solo el usuario puede verlo y borrar elementos o todo el historial. No se sincroniza, no entra en backups y no se envia al administrador.
 - Clasificacion: consulta y contenido textual se procesan localmente en espanol, hebreo e ingles. Salidas `Permitida`, `Bloqueada` o `Incierta`; ante error, modelo ausente o baja confianza se bloquea.
 - Fuente: solo una consulta permitida puede llegar a Brave Search mediante una Edge Function autenticada en Supabase DEV. La credencial de Brave queda como secreto servidor y Android conserva solo credenciales publicas y su sesion/dispositivo.
-- Modelo comercial en revision: el usuario evalua ofrecer DAG por USD 1 mensual con un cupo inicial candidato de 100 busquedas por dispositivo y navegacion directa ilimitada. El despliegue actual conserva temporalmente el limite tecnico de 200 y no tiene sobreconsumo automatico.
+- Modelo comercial del piloto: USD 1 mensual con 100 busquedas por dispositivo y navegacion directa ilimitada. El cupo queda configurable por comunidad y no existe sobreconsumo automatico.
 - Costos y privacidad: Supabase conserva solo `device_id`, mes y contador para aplicar el cupo; no guarda consultas, resultados ni historial. Brave aplica USD 5 de credito global mensual a la cuenta; no es un credito por usuario.
 - Revision humana: un sitio incierto puede generar una solicitud de dominio. La consulta y el historial no se incluyen; el administrador recibe solo dominio, titulo y motivo.
 - Seguridad inicial: imagenes, video, descargas, popups, camara, microfono, ubicacion, archivos e intents externos permanecen bloqueados. El contenido no se hace visible antes de la evaluacion local.
 - Revocacion: cerrar DAG desde App Admin impide buscar o navegar, incluso al entrar desde el atajo fijado.
 - Fuera de alcance de este corte: imagenes y video clasificados, multiples pestanas, descargas, historial remoto, inspeccion de navegadores externos y analisis continuo de pantalla.
-- Aceptacion: pruebas de dominio/UI/red, ausencia de consultas en logs, aislamiento del secreto, fallo cerrado, borrado local de historial, revocacion remota y validacion fisica completa en el Samsung conectado.
+- Aceptacion cumplida: pruebas de dominio/UI/red, ausencia de consultas en logs, aislamiento del secreto, fallo cerrado, borrado local de historial, revision sin consulta ni historial, revocacion remota y validacion fisica completa en el Samsung conectado.
+
+### DAG-STANDALONE-01 - Experiencia de navegador independiente
+
+- Estado: `Propuesto`; requisito expresado por el usuario el 2026-07-15. No autoriza codigo hasta completar la entrevista y aprobar el ticket.
+- Tipo: arquitectura Android y UX. Prioridad: P1. Esfuerzo: L. Riesgo: medio.
+- Objetivo: que DAG se perciba y funcione como un navegador independiente, con icono propio en el launcher, tarea propia en Recientes y apertura directa, en lugar de sentirse como una pantalla mas de App Usuario.
+- Arquitectura elegida por el usuario el 2026-07-15: un launcher y una tarea independientes dentro del mismo APK firmado de App Usuario. DAG comparte activacion, actualizacion, historial cifrado, regla por dispositivo, revocacion y barrera sin exigir instalar ni activar una segunda aplicacion.
+- Alternativa descartada para este ticket: un APK y paquete Android separados. No se duplicaran instalacion, activacion, actualizaciones, comunicacion segura ni resistencia a desinstalacion.
+- Alcance propuesto: icono DAG propio; identidad visual de navegador; apertura directa desde launcher/atajo; tarea separada en Recientes; flujo para agregar o retirar el acceso desde App Usuario; cierre remoto inmediato; una sola fuente segura de politica e historial; sin duplicar consumo Brave.
+- Fuera de alcance hasta otro ticket aprobado: habilitar imagenes o video, multiples pestanas, descargas y debilitar cualquiera de los bloqueos actuales.
+- Criterios de aceptacion propuestos:
+  - DAG puede iniciarse desde su propio icono y aparece como experiencia separada en Recientes;
+  - no requiere una segunda instalacion o activacion ni duplica credenciales;
+  - cerrar DAG desde Admin bloquea tambien la entrada independiente sin demora ni estado obsoleto;
+  - actualizacion in-place conserva activacion, historial, Device Admin, Accessibility y VPN;
+  - el usuario reconoce visualmente Inicio, barra de direccion, historial y estado cerrado como partes de un navegador;
+  - no aumenta el consumo Brave por relanzar, recargar o alternar entre App Usuario y DAG.
+- Decisiones pendientes para la entrevista: nombre e icono; si App Usuario conserva una entrada Web ademas del icono; comportamiento de Atras/Recientes; creacion automatica o voluntaria del icono; propiedad del historial y tratamiento visual del estado cerrado.
 
 ### DAG-USAGE-01 - Contador mensual en Super Web
 
@@ -186,7 +214,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 - Objetivo: mostrar en Super Web el consumo mensual de DAG casi en tiempo real, con usados, limite y restantes por comunidad y dispositivo, total general, costo Brave estimado y alertas al 80% y 100%.
 - Privacidad: no exponer consultas, URLs, resultados ni historial. Super Web consulta un agregado autorizado; la tabla de contadores permanece inaccesible para clientes comunes.
 - Implementacion: refresco seguro cada 10 segundos, cupo configurable por comunidad, proyeccion mensual y costo estimado luego del credito Brave global. El piloto comercial aprobado es USD 1 con 100 busquedas por dispositivo/mes.
-- Aceptacion tecnica: migracion DEV aplicada, Edge Function actualizada, RPCs Super Admin aisladas de `anon`, tabla sin lectura de clientes, builds Web exitosos y Super Web Sites version 3 publicada en modo privado. La prueba fisica completa de DAG permanece como ultimo paso de `DAG-BROWSER-01A`.
+- Aceptacion tecnica: migracion DEV aplicada, Edge Function actualizada, RPCs Super Admin aisladas de `anon`, tabla sin lectura de clientes, builds Web exitosos y Super Web Sites version 3 publicada en modo privado. La prueba fisica completa de `DAG-BROWSER-01A` se cerro en DEV 208.
 
 ### Otros tickets de roadmap
 
@@ -200,7 +228,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | AI-VISUAL-01 | Idea | P3 | Evaluacion puntual de regiones visibles, sujeta a privacidad, bateria y politicas |
 | AI-SENSITIVE-01 | Idea | P3 | Riesgos sensibles en chats como proyecto separado legal y de privacidad |
 
-Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambiguedad; explicaciones y autorizacion; sugerencias sin aplicacion automatica; navegador propio futuro; revision humana y publicacion comunitaria firmada; alertas agregadas sin historial de navegacion.
+Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambiguedad; explicaciones y autorizacion; sugerencias sin aplicacion automatica; revision humana y publicacion comunitaria firmada; alertas agregadas sin historial de navegacion. La experiencia de navegador independiente se normalizo como `DAG-STANDALONE-01`.
 
 ## Decisiones de producto vigentes
 
@@ -224,6 +252,7 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-BROWSER-01A | 2026-07-15, DEV 208 | Busqueda y navegacion protegidas, historial local cifrado, revision incierta y revocacion remota; ciclo fisico completo y reapertura limpia |
 | DAG-FOUNDATION-01 | 2026-07-14, DEV 204 | Control por dispositivo, entrada Usuario, pantalla cerrada por defecto y atajo Android; sin abrir contenido ni agregar esquema |
 | PUSH-REAL-01 | 2026-07-14, DEV 202 | FCM real con tokens seguros y credenciales servidor dedicadas; alerta fisica con Admin cerrado y apertura correcta en Apps |
 | USER-PERF-01 | 2026-07-14, DEV 203 | Suscripciones aisladas por pantalla, refresco remoto duplicado eliminado y una unica accion contextual; Home 2,99 % -> 0,26 % y Ajustes 0,66 % -> 0,43 % de frames lentos en SM-A235M |

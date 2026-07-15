@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-14
+Fecha de corte: 2026-07-15
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -50,11 +50,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-14:
+Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 207
-App Admin versionCode 207
+App Usuario versionCode 208
+App Admin versionCode 208
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-207-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-207-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-208-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-208-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 9c48ad73bceac207e1782d1a14649f9ad10ecfb5b486cb1157c6d0d7f8827240
-Admin   8b1786f068b387eafca738a89fa36e4b76b603f7e51a046c14f096c5bef092c1
+Usuario 46b4c1770061160bcf32feb28fe06eae8dd2456c0af60b072694e985abe12ffe
+Admin   9166c711ce8ef67eac7f9804fed3d567cce9cd8568e1d56173d5a9d5f7e8d340
 ```
 
 ## Cierre 2026-07-14 - DEV 207 rendimiento y barrera Android
@@ -101,16 +101,21 @@ Admin   8b1786f068b387eafca738a89fa36e4b76b603f7e51a046c14f096c5bef092c1
 - Pruebas: unit tests de App Usuario, ktlint de App Usuario/core-ui y build Usuario/Admin DEV exitosos. Instalacion in-place preserva datos y activacion.
 - No cambio Supabase, Production, datos, secretos, VPN, Accessibility ni la barrera antimanipulacion.
 
-## En progreso 2026-07-14 - DAG-BROWSER-01A navegador protegido
+## Cierre 2026-07-15 - DAG-BROWSER-01A navegador protegido
 
-- DEV 205 esta publicado para Usuario y Admin. App Usuario incorpora barra combinada, resultados, navegador interno de una pestana, atras/adelante/recargar/inicio e historial local cifrado; App Admin muestra y puede aprobar solicitudes de dominio incierto.
+- DEV 208 esta publicado para Usuario y Admin. App Usuario incorpora barra combinada, resultados, navegador interno de una pestana, atras/adelante/recargar/inicio e historial local cifrado; App Admin muestra, aprueba o rechaza solicitudes de dominio incierto.
 - Consulta, resultado y texto de pagina pasan por un clasificador local conservador en espanol, hebreo e ingles. Imagenes, video, descargas, popups, camara, microfono, ubicacion, archivos, HTTP e intents externos permanecen bloqueados.
-- Solo una consulta localmente permitida puede llegar a `dag-search`. La Edge Function y dos migraciones quedaron desplegadas exclusivamente en Supabase DEV; autorizan por token de dispositivo y regla DAG activa, aplican 20 consultas por minuto y 200 por dispositivo/mes.
+- Solo una consulta localmente permitida puede llegar a `dag-search`. La Edge Function y sus migraciones quedaron desplegadas exclusivamente en Supabase DEV; autorizan por token de dispositivo y regla DAG activa, aplican 20 consultas por minuto y el cupo configurable de la comunidad, actualmente 100 por dispositivo/mes para Yeshurun Tora.
 - Supabase guarda solo `device_id`, mes y contador. No guarda consultas, resultados ni historial; la tabla no es legible por `anon` ni `authenticated`. Android no contiene Brave API key ni Service Role Key.
 - El plan Search de Brave quedo activo y `BRAVE_SEARCH_API_KEY` esta guardada solo como secreto de Supabase DEV. Una prueba directa devolvio HTTP 200 y resultados Web reales; la clave no se guarda en el repositorio, Android, logs ni documentacion.
 - Modelo comercial aprobado para el piloto: USD 1 mensual con 100 busquedas por dispositivo y navegacion directa ilimitada. El cupo queda configurable por comunidad desde Super Web.
-- Pendiente antes de cerrar: validacion fisica final de busqueda, bloqueo, revision, historial y revocacion en un Android con DAG abierto. El Samsung conectado quedo actualizado a DEV 205 pero su politica DAG permanece cerrada.
-- Validacion automatica actual: unit tests Usuario/Admin/red, ktlint, detekt informativo y ensamblado DEV exitosos. El asesor Supabase confirma que los auxiliares no son ejecutables por clientes; solo la RPC protegida queda expuesta y valida el token de dispositivo.
+- Validacion fisica final en Samsung SM-A235M: una consulta bloqueada localmente no llego a Brave; una unica consulta permitida devolvio resultados Web reales; la pagina elegida quedo oculta al resultar incierta y ofrecio revision; una URL incierta genero en Admin una solicitud con dominio, titulo, categoria y modelo, sin consulta ni historial, y la solicitud de prueba fue rechazada.
+- El historial local cifrado registro la unica busqueda permitida con fecha y permitio borrar solo ese elemento creado por la prueba. El texto de la consulta no aparecio en Logcat. No se realizaron mas consultas Brave.
+- La revocacion remota cerro DAG en Usuario. El ciclo fisico detecto que DEV 207 conservaba el mensaje y candidato anteriores al reabrir con el mismo ViewModel; DEV 208 limpia la sesion visual al cerrar o reabrir, preserva el historial y tiene pruebas unitarias especificas. El ciclo final cerrar -> Usuario cerrado -> abrir -> inicio limpio paso en el dispositivo.
+- Actualizacion in-place a DEV 208 verificada: Usuario y Admin conservan activacion; Device Admin sigue activo, Accessibility esta habilitado y enlazado y `FilterVpnService` permanece en primer plano. DAG quedo abierto.
+- Commit funcional `4f2886a`. Android CI `29409620735` y `Publicar APKs DEV` `29409620788` finalizaron correctamente. Tests unitarios Usuario, ktlint y build Usuario/Admin pasaron localmente; los APK publicos descargados coinciden con los SHA-256 declarados arriba.
+- No se toco Production, no se borraron datos remotos o preexistentes, no se agregaron secretos al repositorio ni Service Role Key a Android. Solo se elimino del historial local el elemento creado por esta validacion.
+- Requisito siguiente, todavia no implementado: experiencia DAG independiente con icono y tarea propios. El usuario eligio que viva dentro del mismo APK de App Usuario para compartir instalacion, activacion, proteccion y actualizaciones; el alcance restante de `DAG-STANDALONE-01` debe entrevistarse y aprobarse antes de escribir codigo.
 
 ## Cierre tecnico 2026-07-14 - DAG-USAGE-01 contador mensual Super Web
 
@@ -145,7 +150,7 @@ Admin   8b1786f068b387eafca738a89fa36e4b76b603f7e51a046c14f096c5bef092c1
 - App Usuario y App Admin usan activacion real con Supabase DEV.
 - App Admin se activa por token de administrador.
 - App Usuario se activa solo con token generado desde Admin.
-- Comunidad DEV activa actual de pruebas: `Mm`.
+- Comunidad DEV activa actual de pruebas: `Yeshurun Tora`.
 - Codigos numericos legacy 1-100 reemplazados por tokens aleatorios.
 - Usuarios es la entrada unica del Admin para usuarios protegidos, aplicaciones y grupos de apps.
 - La seccion separada Reglas ya no esta en navegacion.
@@ -154,7 +159,7 @@ Admin   8b1786f068b387eafca738a89fa36e4b76b603f7e51a046c14f096c5bef092c1
 - Web Admin mantiene flujo real: Comunidad -> Web -> elegir usuario -> configurar Web.
 - Web Admin usa selector Internet abierto/bloqueado y dos capas independientes: SafeSearch y Solo resultados.
 - Web Usuario muestra esos mismos estados en modo solo lectura.
-- DAG tiene control por dispositivo en Admin y entrada/atajo en Usuario. DEV 205 contiene el navegador protegido y Brave ya esta configurado en Supabase DEV; queda pendiente la validacion fisica final.
+- DAG tiene control por dispositivo en Admin, entrada/atajo en Usuario, navegador protegido e historial local cifrado. DEV 208 y Brave en Supabase DEV quedaron validados fisicamente de principio a fin.
 - Bloqueo Web se representa con reglas internas de dominio en `WebNavigationPolicy`; no requiere migracion Room nueva.
 - VPN/DNS bloquea dominios externos en Solo resultados y fuerza una invalidacion puntual de conexiones al activar la capa. Accessibility no usa Atras/Home para navegaciones nuevas.
 - Solicitudes Admin se agrupan por usuario con indicador rojo.
