@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario a8b5d4d1ed5fa9da66a17e44ad57d1799ca9775fd8b7e606c8f54ca74f41d06f
+Admin   1c28257031cf2e77801fc92358668a3be7c155e5e23c475098d4c6045b0c1fc6
 ```
 
 ## Implementacion 2026-07-15 - DEV 223 compatibilidad visual en sitios densos
