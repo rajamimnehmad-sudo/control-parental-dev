@@ -50,7 +50,7 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version preparada para publicacion al 2026-07-14:
+Version publicada real al 2026-07-14:
 
 ```text
 App Usuario versionCode 206
@@ -72,7 +72,12 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-206-debug.apk
 ```
 
-Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
+SHA-256 publicados:
+
+```text
+Usuario 9be5bfa32b6008c59e8fb76c96c073d23d4c9d94904087262188ebe26f0d928f
+Admin   82e1b020335b782eec026ad900196f2da30eed7638258140683c0ba75e5c1599
+```
 
 ## Cierre 2026-07-14 - DAG-PERF-02 fluidez DAG y App Usuario
 
