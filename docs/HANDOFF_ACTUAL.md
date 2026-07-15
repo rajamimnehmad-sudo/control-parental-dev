@@ -81,7 +81,7 @@ Admin   26409393b703fbda64976ed504bff2caefcc96610739a53755907a2df9e925e5
 
 ## Publicacion 2026-07-15 - DAG-SAFETY-01 pendiente de prueba final
 
-- DEV 211 esta publicado para Usuario y Admin en Supabase DEV. Ambos manifiestos y descargas se verificaron por SHA-256. Commit funcional `06c306c`; workflow `Publicar APKs DEV` `29426319592` exitoso. Android CI `29426319513` seguia en curso al escribir esta linea.
+- DEV 211 esta publicado para Usuario y Admin en Supabase DEV. Ambos manifiestos y descargas se verificaron por SHA-256. Commit funcional `06c306c`; workflow `Publicar APKs DEV` `29426319592` y Android CI `29426319513` exitosos.
 - Corrige la sincronizacion de reglas al abrir DAG y comprueba automaticamente durante dos minutos una solicitud recien enviada. Supabase DEV confirma que la aprobacion de `easy.com.ar` y su regla `Allow` por dispositivo existian correctamente; el fallo estaba en el refresco del cliente.
 - Las aprobaciones futuras reutilizan una regla `Allow` existente en vez de crear otro duplicado. No se borraron las reglas duplicadas preexistentes de YouTube ni ningun otro dato.
 - Las imagenes lazy con origen HTTPS y AVIF estatico en Android 12+ pasan por el mismo clasificador local. La decision de pagina incorpora el balance de imagenes seguras, bloqueadas e inciertas; SVG, GIF, animacion, `data:` y `blob:` siguen cerrados.
