@@ -75,15 +75,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario 58584384a1af9609879cf9acf35cedd30e17dc7705eebe978f0ebd2eb0111861
+Admin   3d948d0a22a47fc526785dd6779790672ab2dc4b3ef920fe2d5635131d606b57
 ```
 
 ## Implementacion 2026-07-15 - DEV 219 descarga de actualizaciones resiliente
 
 - El APK 218 público fue comprobado externamente: HTTP 200, `Content-Length 40.429.875`, rangos habilitados y primer MiB descargado correctamente. El 0 % observado ocurre después de obtener el manifiesto y antes de recibir bytes en Android.
 - El cliente de actualización queda aislado en HTTP/1.1, fuerza cuerpo sin compresión, evita caché intermedia, reintenta fallos de conexión y conserva reanudación por `Range`. Los timeouts pasan a 60 segundos por operación y 10 minutos por descarga completa para conexiones móviles/VPN lentas.
-- Validación local: ktlint y módulo `core-update`, build optimizado DEV Usuario y Admin correctos. No hay teléfono conectado para reproducir la ruta exacta de red; DEV 219 requiere instalación directa inicial y luego prueba del siguiente chequeo interno.
+- Validación local: ktlint y módulo `core-update`, build optimizado DEV Usuario y Admin correctos. Ambos APK 219 fueron publicados atomicamente en Supabase DEV y verificados por manifiesto/hash. No hay teléfono conectado para reproducir la ruta exacta de red; DEV 219 requiere instalación directa inicial y luego prueba del siguiente chequeo interno.
 
 ## Implementacion 2026-07-15 - DAG DEV 218 WebView resiliente y cierre de buscadores
 
