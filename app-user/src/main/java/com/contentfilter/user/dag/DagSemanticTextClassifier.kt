@@ -16,6 +16,8 @@ import kotlin.math.sqrt
 internal data class DagSemanticPrediction(
     val category: String,
     val confidence: Float,
+    val margin: Float,
+    val modelVersion: String,
 )
 
 @Singleton
@@ -58,10 +60,14 @@ private class DagSemanticLinearModel(
             val exponentials = DoubleArray(logits.size) { exp((logits[it] - maximum).toDouble()) }
             val total = exponentials.sum()
             total.takeIf { it.isFinite() && it > 0.0 }?.let { validTotal ->
-                val bestIndex = exponentials.indices.maxBy { exponentials[it] }
+                val ranking = exponentials.indices.sortedByDescending { exponentials[it] }
+                val bestIndex = ranking.first()
+                val secondIndex = ranking.getOrElse(1) { bestIndex }
                 DagSemanticPrediction(
                     category = Categories[bestIndex],
                     confidence = (exponentials[bestIndex] / validTotal).toFloat(),
+                    margin = ((exponentials[bestIndex] - exponentials[secondIndex]) / validTotal).toFloat(),
+                    modelVersion = "dag-local-text-2",
                 )
             }
         }

@@ -12,6 +12,9 @@ class DagContentClassifier
         private val domainBlocklist: DynamicDomainBlocklist,
         private val semanticClassifier: DagSemanticTextClassifier,
     ) {
+        @Inject
+        lateinit var neuralClassifier: DagNeuralTextClassifier
+
         fun classifyQuery(text: String): DagClassificationResult = classify(text, directUrl = false)
 
         fun classifyResult(
@@ -106,45 +109,56 @@ class DagContentClassifier
         }
 
         private fun classifySemantically(rawText: String): DagClassificationResult {
-            val semantic = semanticClassifier.classify(rawText.take(MaxSemanticCharacters))
+            val semantic =
+                neuralClassifierOrNull()?.classify(rawText.take(MaxNeuralCharacters))
+                    ?: semanticClassifier.classify(rawText.take(MaxSemanticCharacters))
             return when {
                 semantic == null -> uncertain("model_unavailable", confidence = 1f)
                 semantic.category == "sensitive_context" ->
-                    uncertain("semantic_sensitive_context", semantic.confidence)
-                semantic.category in SemanticUnsafeCategories && semantic.confidence >= SemanticBlockThreshold ->
-                    blocked("semantic_${semantic.category}", semantic.confidence)
+                    uncertain("semantic_sensitive_context", semantic.confidence, semantic.modelVersion)
+                semantic.category in SemanticUnsafeCategories &&
+                    semantic.confidence >= SemanticBlockThreshold &&
+                    semantic.margin >= SemanticBlockMargin ->
+                    blocked("semantic_${semantic.category}", semantic.confidence, semantic.modelVersion)
                 semantic.category in SemanticUnsafeCategories && semantic.confidence >= SemanticReviewThreshold ->
-                    uncertain("semantic_${semantic.category}", semantic.confidence)
-                else -> allowed()
+                    uncertain("semantic_${semantic.category}", semantic.confidence, semantic.modelVersion)
+                else -> allowed(semantic.modelVersion)
             }
         }
 
-        private fun allowed() =
+        private fun neuralClassifierOrNull(): DagNeuralTextClassifier? =
+            if (::neuralClassifier.isInitialized) neuralClassifier else null
+
+        private fun allowed(modelVersion: String = ModelVersion) =
             DagClassificationResult(
                 decision = DagClassification.Allowed,
                 category = "general",
                 confidence = 0.82f,
-                modelVersion = ModelVersion,
+                modelVersion = modelVersion,
             )
 
         private fun blocked(
             category: String,
             confidence: Float,
-        ) = DagClassificationResult(DagClassification.Blocked, category, confidence, ModelVersion)
+            modelVersion: String = ModelVersion,
+        ) = DagClassificationResult(DagClassification.Blocked, category, confidence, modelVersion)
 
         private fun uncertain(
             category: String,
             confidence: Float,
-        ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, ModelVersion)
+            modelVersion: String = ModelVersion,
+        ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, modelVersion)
 
         companion object {
             const val ModelVersion = "dag-local-text-2"
             const val MaxPageCharacters = 24_000
             private const val MaxSemanticCharacters = 4_000
+            private const val MaxNeuralCharacters = 2_000
             private const val MinimumRiskyImages = 3
             private const val MinimumUncertainImages = 4
-            private const val SemanticBlockThreshold = 0.35f
-            private const val SemanticReviewThreshold = 0.24f
+            private const val SemanticBlockThreshold = 0.55f
+            private const val SemanticBlockMargin = 0.15f
+            private const val SemanticReviewThreshold = 0.30f
 
             private val SemanticUnsafeCategories = setOf("sexual", "dating", "gambling", "drugs", "violence")
 

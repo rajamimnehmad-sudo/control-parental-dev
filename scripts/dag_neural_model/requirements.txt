@@ -1,0 +1,8 @@
+numpy==2.0.2
+onnx==1.19.1
+onnxruntime==1.19.2
+onnxruntime_extensions==0.13.0
+scikit-learn==1.6.1
+sentencepiece==0.2.2
+tokenizers==0.22.2
+transformers==4.57.6

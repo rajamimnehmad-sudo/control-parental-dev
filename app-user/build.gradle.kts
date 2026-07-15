@@ -29,16 +29,23 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 212
+            versionCode = 213
             versionNameSuffix = "-dev"
+            buildConfigField(
+                "String",
+                "DAG_NEURAL_MODEL_URL",
+                "\"https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/dag-models/\"",
+            )
         }
         create("beta") {
             dimension = "distribution"
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
+            buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
         }
         create("prod") {
             dimension = "distribution"
+            buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
         }
     }
 
@@ -51,6 +58,7 @@ android {
             isMinifyEnabled = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
             )
         }
     }
@@ -93,6 +101,8 @@ dependencies {
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.hilt.android)
     implementation(libs.okhttp)
+    implementation(libs.onnxruntime.android)
+    implementation(libs.onnxruntime.extensions.android)
     implementation(libs.tflite)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)

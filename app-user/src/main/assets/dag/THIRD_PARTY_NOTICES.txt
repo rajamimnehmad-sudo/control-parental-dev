@@ -35,3 +35,27 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 The Android conversion project identifies its implementation as Apache License
 2.0. LiteRT itself is distributed by Google under Apache License 2.0; its license
 and third-party notices are included by the dependency in the APK.
+
+---
+
+DAG multilingual neural text model
+
+The optional on-device text classifier derives its multilingual transformer from:
+
+sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+https://huggingface.co/sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2
+
+The upstream model is distributed under the Apache License 2.0. DAG adds a
+product-specific classification head and packages tokenization, inference and
+post-processing into a quantized ONNX graph. The resulting model is downloaded
+only from the pinned DEV artifact path and is accepted only after SHA-256
+verification.
+
+Copyright 2019-2026 Sentence Transformers authors and contributors.
+
+Apache License 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
+
+ONNX Runtime and ONNX Runtime Extensions are distributed by Microsoft under the
+MIT License. Their notices and native libraries are included by the pinned
+Android dependencies.

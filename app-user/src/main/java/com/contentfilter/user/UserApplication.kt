@@ -15,6 +15,7 @@ import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
 import com.contentfilter.user.dag.DagLauncherController
+import com.contentfilter.user.dag.DagNeuralTextClassifier
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.protection.ProtectionHealthMonitor
 import com.contentfilter.user.repair.UserLocalDataRepair
@@ -72,6 +73,9 @@ class UserApplication :
     @Inject
     lateinit var dagLauncherController: DagLauncherController
 
+    @Inject
+    lateinit var dagNeuralTextClassifier: DagNeuralTextClassifier
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -89,6 +93,10 @@ class UserApplication :
         appScope.launch {
             runCatching { dagLauncherController.monitorAvailability() }
                 .logFailure("dag-launcher-monitor")
+        }
+        appScope.launch {
+            runCatching { dagNeuralTextClassifier.prepare() }
+                .logFailure("dag-neural-model-prepare")
         }
         appScope.launch {
             runCatching { webDomainListUpdater.refreshIfDue() }
