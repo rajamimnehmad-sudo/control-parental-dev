@@ -53,14 +53,7 @@ class DagBrowserViewModel
                 policyRepository.observeActivePolicy().collect { snapshot ->
                     activeRules = snapshot.rules
                     val enabled = snapshot.rules.dagEnabled()
-                    mutableState.update { state ->
-                        state.copy(
-                            dagEnabled = enabled,
-                            message = if (!enabled) "El administrador mantiene DAG cerrado." else state.message,
-                            pageStatus = if (!enabled) DagPageStatus.Idle else state.pageStatus,
-                            requestedUrl = if (!enabled) null else state.requestedUrl,
-                        )
-                    }
+                    mutableState.update { state -> state.withDagAvailability(enabled) }
                 }
             }
             viewModelScope.launch {
@@ -487,4 +480,33 @@ class DagBrowserViewModel
         private companion object {
             const val MaxAddressCharacters = 400
         }
+    }
+
+internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowserUiState =
+    when {
+        !enabled ->
+            copy(
+                dagEnabled = false,
+                address = "",
+                view = DagView.Start,
+                pageStatus = DagPageStatus.Idle,
+                results = emptyList(),
+                requestedUrl = null,
+                loading = false,
+                message = "El administrador mantiene DAG cerrado.",
+                reviewCandidate = null,
+            )
+        dagEnabled -> this
+        else ->
+            copy(
+                dagEnabled = true,
+                address = "",
+                view = DagView.Start,
+                pageStatus = DagPageStatus.Idle,
+                results = emptyList(),
+                requestedUrl = null,
+                loading = false,
+                message = "",
+                reviewCandidate = null,
+            )
     }
