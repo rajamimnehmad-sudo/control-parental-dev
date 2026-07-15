@@ -70,6 +70,21 @@ android {
     androidResources {
         noCompress += "tflite"
     }
+
+    packaging {
+        jniLibs {
+            // Keep the app and the existing TFLite image model compatible with
+            // ARM32. The much larger neural text runtime is ARM64-only; ARM32
+            // devices safely retain the compact local text classifier.
+            excludes +=
+                setOf(
+                    "lib/armeabi-v7a/libonnxruntime.so",
+                    "lib/armeabi-v7a/libonnxruntime4j_jni.so",
+                    "lib/armeabi-v7a/libonnxruntime_extensions4j_jni.so",
+                    "lib/armeabi-v7a/libortextensions.so",
+                )
+        }
+    }
 }
 
 dependencies {
