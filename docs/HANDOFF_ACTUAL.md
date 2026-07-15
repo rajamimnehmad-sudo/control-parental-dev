@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 208
-App Admin versionCode 208
+App Usuario versionCode 209
+App Admin versionCode 209
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,27 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-208-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-208-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-209-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-209-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 46b4c1770061160bcf32feb28fe06eae8dd2456c0af60b072694e985abe12ffe
-Admin   9166c711ce8ef67eac7f9804fed3d567cce9cd8568e1d56173d5a9d5f7e8d340
+Usuario 4749ae7c45ecf775a8a296ff78ee381051184f5dfccb902ec483a14853c2a87e
+Admin   f65ce832c13c2b39b670d25e7b92024a891efd316972d8e1c1e0e6fffae2eb8d
 ```
+
+## Cierre 2026-07-15 - DAG-STANDALONE-01 navegador independiente
+
+- DEV 209 convierte DAG en una experiencia independiente para el usuario sin crear otro APK: `DagActivity` tiene nombre e icono propios, afinidad de tarea separada y una tarjeta distinta de Content Filter en Recientes. Comparte proceso, firma, activacion, actualizacion, politica e historial cifrado con App Usuario.
+- El inicio es minimalista: barra combinada, accion Ir y menu para Inicio/Historial. El aspecto usa identidad DAG propia inspirada en navegadores modernos. Atras recorre el WebView; sin pagina anterior vuelve a Inicio y desde Inicio cierra la tarea DAG.
+- App Usuario conserva la entrada Web, pero `Abrir DAG` abre la tarea independiente. Ya no ofrece crear nuevos atajos fijados. El identificador del atajo historico DEV 204-208 se conserva solo para que los atajos ya fijados no queden rotos; Android no permite a una app eliminar silenciosamente un atajo fijado por el usuario.
+- `DagLauncherController` combina activacion local y regla DAG. El componente launcher esta deshabilitado por defecto, aparece automaticamente en el cajon de apps solo cuando ambos estados permiten DAG y se deshabilita al cerrar. `DagActivity` tambien retira su tarea si la revocacion llega mientras esta abierta.
+- Validacion fisica Samsung SM-A235M: App Usuario y DAG aparecieron como dos tareas con afinidades diferentes; el icono nuevo `DAG` aparecio en el cajon Samsung; cerrar desde Admin elimino el icono, deshabilito el lanzamiento explicito y retiro la tarea; reabrir hizo reaparecer el icono y permitio iniciar DAG sin reinstalar ni reactivar.
+- Actualizacion in-place a los APK publicos DEV 209: activacion preservada, DAG abierto, Accessibility habilitado, Device Admin activo y `FilterVpnService` en primer plano. No se realizaron busquedas Brave durante este ticket.
+- Tests: nueva matriz de disponibilidad del launcher, ciclo de disponibilidad del navegador, unit tests Usuario/Admin, ktlint, Android lint, detekt y builds DEV Usuario/Admin exitosos. Commit funcional `0aecea6`; `Publicar APKs DEV` `29412273313` exitoso y hashes publicos verificados. Android CI `29412201877` completo todas sus etapas tecnicas correctamente.
+- No se toco Production, no se borro ningun dato, no se cambio Supabase y no se agregaron secretos ni Service Role Key a Android.
 
 ## Cierre 2026-07-14 - DEV 207 rendimiento y barrera Android
 
@@ -115,7 +126,7 @@ Admin   9166c711ce8ef67eac7f9804fed3d567cce9cd8568e1d56173d5a9d5f7e8d340
 - Actualizacion in-place a DEV 208 verificada: Usuario y Admin conservan activacion; Device Admin sigue activo, Accessibility esta habilitado y enlazado y `FilterVpnService` permanece en primer plano. DAG quedo abierto.
 - Commit funcional `4f2886a`. Android CI `29409620735` y `Publicar APKs DEV` `29409620788` finalizaron correctamente. Tests unitarios Usuario, ktlint y build Usuario/Admin pasaron localmente; los APK publicos descargados coinciden con los SHA-256 declarados arriba.
 - No se toco Production, no se borraron datos remotos o preexistentes, no se agregaron secretos al repositorio ni Service Role Key a Android. Solo se elimino del historial local el elemento creado por esta validacion.
-- Requisito siguiente, todavia no implementado: experiencia DAG independiente con icono y tarea propios. El usuario eligio que viva dentro del mismo APK de App Usuario para compartir instalacion, activacion, proteccion y actualizaciones; el alcance restante de `DAG-STANDALONE-01` debe entrevistarse y aprobarse antes de escribir codigo.
+- La experiencia DAG independiente se implemento y valido en `DAG-STANDALONE-01` con DEV 209.
 
 ## Cierre tecnico 2026-07-14 - DAG-USAGE-01 contador mensual Super Web
 

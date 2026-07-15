@@ -35,12 +35,20 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 208 y App Admin DEV 208, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 209 y App Admin DEV 209, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimo ticket resuelto
+
+### DAG-STANDALONE-01 - Experiencia de navegador independiente
+
+- Estado: `Resuelto` el 2026-07-15 en DEV 209.
+- Resultado: DAG tiene icono, nombre y tarea propios dentro del mismo APK de App Usuario; comparte activacion, proteccion, actualizacion e historial cifrado.
+- Control remoto: la regla DAG habilita o deshabilita el componente launcher. Al cerrar desaparece del cajon de apps y se retira cualquier tarea DAG abierta; al reabrir reaparece sin reinstalar.
+- Evidencia fisica SM-A235M: dos afinidades/tareas separadas; icono visible con DAG abierto y ausente con DAG cerrado; lanzamiento bloqueado al cerrar; reaparicion y apertura correctas al habilitar; inicio minimalista y regreso a Content Filter al cerrar la tarea.
+- Publicacion: commit `0aecea6`, Android CI `29412201877` y workflow DEV `29412273313`; APKs publicos DEV 209 verificados e instalados in-place con las protecciones preservadas.
 
 ### DAG-BROWSER-01A - Navegador protegido funcional
 
@@ -91,7 +99,6 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | --- | --- | --- | --- | --- | --- |
 | SEC-LICENSE-01 | Idea | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
-| DAG-STANDALONE-01 | Propuesto | P1 | Navegador DAG con icono y tarea independientes, compartiendo seguridad con App Usuario | L | Medio |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Idea | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
@@ -192,7 +199,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ### DAG-STANDALONE-01 - Experiencia de navegador independiente
 
-- Estado: `Propuesto`, con entrevista de producto completada el 2026-07-15. No autoriza codigo hasta que el usuario apruebe explicitamente este alcance cerrado.
+- Estado: `Resuelto` el 2026-07-15 en DEV 209; entrevista completada y ticket aprobado explicitamente por el usuario.
 - Tipo: arquitectura Android y UX. Prioridad: P1. Esfuerzo: L. Riesgo: medio.
 - Objetivo: que DAG se perciba y funcione como un navegador independiente, con icono propio en el launcher, tarea propia en Recientes y apertura directa, en lugar de sentirse como una pantalla mas de App Usuario.
 - Arquitectura elegida por el usuario el 2026-07-15: un launcher y una tarea independientes dentro del mismo APK firmado de App Usuario. DAG comparte activacion, actualizacion, historial cifrado, regla por dispositivo, revocacion y barrera sin exigir instalar ni activar una segunda aplicacion.
@@ -207,9 +214,9 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
   - DAG aparece como tarjeta propia en Recientes, separada de App Usuario;
   - ambas entradas comparten el mismo historial local cifrado;
   - la apariencia se inspira en Chrome, sin copiar su marca, y usa colores e identidad DAG.
-- Alcance propuesto cerrado: icono DAG propio; identidad visual de navegador; apertura directa desde launcher; tarea separada en Recientes; acceso adicional desde App Usuario; visibilidad del icono ligada a la regla remota; cierre remoto inmediato; una sola fuente segura de politica e historial; sin duplicar consumo Brave.
+- Alcance implementado: icono DAG propio; identidad visual de navegador; apertura directa desde launcher; tarea separada en Recientes; acceso adicional desde App Usuario; visibilidad del icono ligada a la regla remota; cierre remoto inmediato; una sola fuente segura de politica e historial; sin duplicar consumo Brave.
 - Fuera de alcance hasta otro ticket aprobado: habilitar imagenes o video, multiples pestanas, descargas y debilitar cualquiera de los bloqueos actuales.
-- Criterios de aceptacion propuestos:
+- Criterios de aceptacion cumplidos:
   - DAG puede iniciarse desde su propio icono y aparece como experiencia separada en Recientes;
   - no requiere una segunda instalacion o activacion ni duplica credenciales;
   - cerrar DAG desde Admin bloquea tambien la entrada independiente sin demora ni estado obsoleto;
@@ -217,7 +224,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
   - actualizacion in-place conserva activacion, historial, Device Admin, Accessibility y VPN;
   - el usuario reconoce visualmente Inicio, barra de direccion, historial y estado cerrado como partes de un navegador;
   - no aumenta el consumo Brave por relanzar, recargar o alternar entre App Usuario y DAG.
-- Pendiente unicamente: aprobacion explicita del ticket para comenzar codigo. La implementacion debe comprobar en el Samsung real el tiempo de actualizacion del icono que aplica el launcher de Samsung y documentar cualquier demora propia del sistema.
+- Validacion fisica: Samsung actualizo el icono dentro del ciclo remoto probado; al cerrar desaparecio del cajon, el lanzamiento explicito quedo deshabilitado y la tarea abierta se retiro. Al reabrir reaparecio sin reinstalacion. Un atajo fijado manualmente en DEV 204-208 puede permanecer en la pantalla de inicio porque Android reserva su eliminacion al usuario; ya no se crean atajos nuevos y el acceso historico conserva fallo cerrado.
 
 ### DAG-USAGE-01 - Contador mensual en Super Web
 
@@ -263,6 +270,7 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-STANDALONE-01 | 2026-07-15, DEV 209 | Icono y tarea DAG propios dentro del mismo APK; cierre remoto oculta launcher y retira tarea; reapertura fisica sin reinstalar |
 | DAG-BROWSER-01A | 2026-07-15, DEV 208 | Busqueda y navegacion protegidas, historial local cifrado, revision incierta y revocacion remota; ciclo fisico completo y reapertura limpia |
 | DAG-FOUNDATION-01 | 2026-07-14, DEV 204 | Control por dispositivo, entrada Usuario, pantalla cerrada por defecto y atajo Android; sin abrir contenido ni agregar esquema |
 | PUSH-REAL-01 | 2026-07-14, DEV 202 | FCM real con tokens seguros y credenciales servidor dedicadas; alerta fisica con Admin cerrado y apertura correcta en Apps |
