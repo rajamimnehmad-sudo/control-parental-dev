@@ -19,6 +19,7 @@ class DagContentClassifier
             url: String,
         ): DagClassificationResult {
             val domain = domainFrom(url)
+            blockedVisualPlatform(domain)?.let { return it }
             domainBlocklist.categoryFor(domain)?.let { category ->
                 return DagClassificationResult(
                     decision = DagClassification.Blocked,
@@ -30,12 +31,14 @@ class DagContentClassifier
             return classify("$domain $title $description", directUrl = false)
         }
 
-        fun classifyPage(
+        internal fun classifyPage(
             url: String,
             title: String,
             text: String,
+            images: DagImagePageSummary = DagImagePageSummary(0, 0, 0),
         ): DagClassificationResult {
             val domain = domainFrom(url)
+            blockedVisualPlatform(domain)?.let { return it }
             domainBlocklist.categoryFor(domain)?.let { category ->
                 return DagClassificationResult(
                     decision = DagClassification.Blocked,
@@ -44,11 +47,20 @@ class DagContentClassifier
                     modelVersion = ModelVersion,
                 )
             }
-            return classify("$domain $title ${text.take(MaxPageCharacters)}", directUrl = false)
+            val textResult = classify("$domain $title ${text.take(MaxPageCharacters)}", directUrl = false)
+            if (textResult.decision != DagClassification.Allowed) return textResult
+            return when {
+                images.blocked >= MinimumRiskyImages && images.blocked * 2 >= images.classified ->
+                    blocked("unsafe_images", confidence = 0.95f)
+                images.uncertain >= MinimumUncertainImages && images.allowed == 0 ->
+                    uncertain("unreadable_images", confidence = 0.85f)
+                else -> textResult
+            }
         }
 
         fun classifyDirectUrl(url: String): DagClassificationResult {
             val domain = domainFrom(url)
+            blockedVisualPlatform(domain)?.let { return it }
             domainBlocklist.categoryFor(domain)?.let { category ->
                 return DagClassificationResult(
                     decision = DagClassification.Blocked,
@@ -59,6 +71,11 @@ class DagContentClassifier
             }
             return classify(domain, directUrl = true)
         }
+
+        private fun blockedVisualPlatform(domain: String): DagClassificationResult? =
+            NonOverridableVisualDomains
+                .firstOrNull { domain == it || domain.endsWith(".$it") }
+                ?.let { blocked("unsafe_visual_platform", confidence = 1f) }
 
         private fun classify(
             rawText: String,
@@ -105,6 +122,11 @@ class DagContentClassifier
         companion object {
             const val ModelVersion = "dag-local-text-1"
             const val MaxPageCharacters = 24_000
+            private const val MinimumRiskyImages = 3
+            private const val MinimumUncertainImages = 4
+
+            val NonOverridableCategories = setOf("unsafe_visual_platform")
+            private val NonOverridableVisualDomains = setOf("imgsrc.ru")
 
             private val CombiningMarksPattern = Regex("\\p{M}+")
             private val InvalidCharactersPattern = Regex("[^\\p{L}\\p{N}.]+")

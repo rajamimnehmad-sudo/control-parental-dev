@@ -23,11 +23,14 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -53,6 +56,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -69,6 +74,7 @@ import java.text.DateFormat
 import java.util.Date
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun DagBrowserRoute(
     modifier: Modifier = Modifier,
     onBack: () -> Unit,
@@ -76,6 +82,8 @@ fun DagBrowserRoute(
     viewModel: DagBrowserViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val focusManager = LocalFocusManager.current
+    val keyboardController = LocalSoftwareKeyboardController.current
     if (!state.dagAvailabilityKnown) {
         Box(modifier = modifier.background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -190,6 +198,11 @@ fun DagBrowserRoute(
                 )
         }
     }
+
+    BackHandler(enabled = WindowInsets.isImeVisible) {
+        focusManager.clearFocus()
+        keyboardController?.hide()
+    }
 }
 
 @Composable
@@ -214,6 +227,7 @@ private fun DagResultsContent(
                         onClick = {
                             onReview(
                                 DagReviewCandidate(
+                                    url = result.url,
                                     domain = result.domain,
                                     title = result.title,
                                     category = result.classification.category,
@@ -293,7 +307,7 @@ private fun DagWebContent(
     onBackFromBrowser: () -> Unit,
     onNavigate: (String, String) -> Unit,
     onPageStarted: (String) -> Boolean,
-    onPageTextReady: (String, String, String?) -> Unit,
+    onPageTextReady: (String, String, String?, DagImagePageSummary) -> Unit,
     onBlockedAction: (String) -> Unit,
     onPageBlocked: (String) -> Unit,
     onHome: () -> Unit,
@@ -366,7 +380,7 @@ private fun DagWebContent(
                                 if (inspectedUrl != url) {
                                     inspectedUrl = url
                                     view.sanitizeAndExtractVisibleText { text ->
-                                        onPageTextReady(url, view.title.orEmpty(), text)
+                                        onPageTextReady(url, view.title.orEmpty(), text, imageLoader.pageSummary())
                                     }
                                 }
                             },
@@ -556,6 +570,26 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
     evaluateJavascript(
         """
         (function() {
+          function dagHttpsImageSource(image) {
+            var candidates = [
+              image.currentSrc,
+              image.getAttribute('src'),
+              image.getAttribute('data-src'),
+              image.getAttribute('data-lazy-src'),
+              image.getAttribute('data-original'),
+              image.getAttribute('data-srcset')
+            ];
+            for (var index = 0; index < candidates.length; index++) {
+              var raw = candidates[index] || '';
+              var firstCandidate = raw.split(',')[0].trim().split(/\s+/)[0];
+              if (!firstCandidate) continue;
+              try {
+                var resolved = new URL(firstCandidate, document.baseURI);
+                if (resolved.protocol === 'https:') return resolved.href;
+              } catch (_) {}
+            }
+            return '';
+          }
           function dagSecureNode(node) {
             if (!node || node.nodeType !== 1) return;
             var tag = node.tagName ? node.tagName.toLowerCase() : '';
@@ -564,13 +598,20 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
               return;
             }
             if (tag === 'img') {
-              var source = node.currentSrc || node.src || '';
-              if (!source.toLowerCase().startsWith('https://')) node.remove();
+              var source = dagHttpsImageSource(node);
+              if (!source) {
+                node.remove();
+                return;
+              }
+              if (!(node.currentSrc || '').toLowerCase().startsWith('https://')) {
+                node.removeAttribute('srcset');
+                node.removeAttribute('data-srcset');
+                if (node.getAttribute('src') !== source) node.src = source;
+              }
             }
             node.querySelectorAll && node.querySelectorAll('video,audio,source,canvas,iframe').forEach(function(child) { child.remove(); });
             node.querySelectorAll && node.querySelectorAll('img').forEach(function(image) {
-              var source = image.currentSrc || image.src || '';
-              if (!source.toLowerCase().startsWith('https://')) image.remove();
+              dagSecureNode(image);
             });
           }
           dagSecureNode(document.documentElement);

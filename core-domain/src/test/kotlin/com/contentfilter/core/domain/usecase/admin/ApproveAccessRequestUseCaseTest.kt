@@ -108,6 +108,35 @@ class ApproveAccessRequestUseCaseTest {
             assertEquals(RequestStatus.Approved, requestRepository.updatedStatus)
         }
 
+    @Test
+    fun `domain approval reuses an existing allow rule`() =
+        runBlocking {
+            val requestRepository = FakeAccessRequestRepository()
+            val existingRule =
+                PolicyRule(
+                    id = "existing-domain-allow",
+                    level = PolicyLevel.Account,
+                    scope = RuleScope.Domain,
+                    target = "example.com",
+                    action = RuleAction.Allow,
+                    priority = 10,
+                    enabled = false,
+                )
+            val policyRepository =
+                FakePolicyRepository(
+                    emptyPolicy().copy(rules = listOf(existingRule)),
+                )
+            val useCase =
+                ApproveAccessRequestUseCase(requestRepository, policyRepository, FakeDailyLimitRepository(emptyList()))
+
+            useCase(domainAccessRequest(target = "example.com"))
+
+            assertEquals(1, policyRepository.savedRules.size)
+            assertEquals("existing-domain-allow", policyRepository.savedRules.single().id)
+            assertTrue(policyRepository.savedRules.single().enabled)
+            assertEquals(1_000, policyRepository.savedRules.single().priority)
+        }
+
     private fun appAccessRequest(): AccessRequest =
         AccessRequest(
             id = "request-1",
@@ -124,14 +153,14 @@ class ApproveAccessRequestUseCaseTest {
             deviceId = "device-1",
         )
 
-    private fun domainAccessRequest(): AccessRequest =
+    private fun domainAccessRequest(target: String = "airbnb.com"): AccessRequest =
         AccessRequest(
             id = "request-2",
             requestType = AccessRequestType.DOMAIN_ACCESS,
             targetType = PolicyTargetType.Domain,
-            target = "airbnb.com",
+            target = target,
             targetPackageName = null,
-            targetDomain = "airbnb.com",
+            targetDomain = target,
             reason = "",
             requestedMinutes = null,
             status = RequestStatus.PendingRemote,

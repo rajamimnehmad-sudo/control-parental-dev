@@ -13,6 +13,7 @@ import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import kotlinx.coroutines.flow.first
 import java.util.UUID
+import kotlin.math.max
 
 class ApproveAccessRequestUseCase(
     private val requestRepository: AccessRequestRepository,
@@ -20,8 +21,9 @@ class ApproveAccessRequestUseCase(
     private val dailyLimitRepository: DailyLimitRepository,
 ) {
     suspend operator fun invoke(request: AccessRequest) {
+        val policy = policyRepository.getActivePolicy(request.deviceId)
         request.allowTarget()?.let { target ->
-            policyRepository.getActivePolicy(request.deviceId).rules
+            policy.rules
                 .filter {
                     it.enabled &&
                         it.scope == RuleScope.App &&
@@ -36,7 +38,19 @@ class ApproveAccessRequestUseCase(
                 )
             }
         }
-        request.toAllowRule()?.let { rule ->
+        request.toAllowRule()?.let { generatedRule ->
+            val existingRule =
+                policy.rules
+                    .filter {
+                        it.scope == generatedRule.scope &&
+                            it.target == generatedRule.target &&
+                            it.action == RuleAction.Allow
+                    }.maxByOrNull(PolicyRule::priority)
+            val rule =
+                existingRule?.copy(
+                    priority = max(existingRule.priority, APPROVED_REQUEST_PRIORITY),
+                    enabled = true,
+                ) ?: generatedRule
             policyRepository.saveRule(rule, request.deviceId)
         }
         requestRepository.updateStatus(request.id, RequestStatus.Approved)

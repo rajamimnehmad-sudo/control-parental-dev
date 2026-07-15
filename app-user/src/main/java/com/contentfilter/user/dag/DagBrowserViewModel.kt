@@ -18,6 +18,8 @@ import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -34,7 +36,7 @@ import javax.inject.Inject
 class DagBrowserViewModel
     @Inject
     constructor(
-        policyRepository: PolicyRepository,
+        private val policyRepository: PolicyRepository,
         private val activationRepository: DeviceActivationRepository,
         private val accessRequestRepository: AccessRequestRepository,
         private val searchRepository: DagSearchRepository,
@@ -48,8 +50,13 @@ class DagBrowserViewModel
 
         @Volatile
         private var activeRules: List<PolicyRule> = emptyList()
+        private var approvalPollingJob: Job? = null
 
         init {
+            viewModelScope.launch {
+                syncScheduler.requestSync()
+                withContext(Dispatchers.IO) { runCatching { syncEngine.syncOnce() } }
+            }
             viewModelScope.launch {
                 combine(
                     policyRepository.observeActivePolicy(),
@@ -191,6 +198,7 @@ class DagBrowserViewModel
                         it.copy(
                             reviewCandidate =
                                 DagReviewCandidate(
+                                    url = result.url,
                                     domain = result.domain,
                                     title = result.title,
                                     category = result.classification.category,
@@ -231,6 +239,7 @@ class DagBrowserViewModel
                             message = "Este sitio necesita revisión del administrador.",
                             reviewCandidate =
                                 DagReviewCandidate(
+                                    url = url,
                                     domain = domain,
                                     title = title.ifBlank { domain },
                                     category = classification.category,
@@ -253,10 +262,11 @@ class DagBrowserViewModel
             }
         }
 
-        fun onPageTextReady(
+        internal fun onPageTextReady(
             url: String,
             title: String,
             text: String?,
+            images: DagImagePageSummary,
         ) {
             if (!mutableState.value.dagEnabled || url != mutableState.value.requestedUrl) return
             if (text == null || text.isBlank()) {
@@ -265,7 +275,7 @@ class DagBrowserViewModel
             }
             viewModelScope.launch(Dispatchers.Default) {
                 val domain = DagContentClassifier.domainFrom(url)
-                val result = applyExplicitRule(domain, classifier.classifyPage(url, title, text))
+                val result = applyExplicitRule(domain, classifier.classifyPage(url, title, text, images))
                 if (result.decision == DagClassification.Allowed) {
                     withContext(Dispatchers.IO) { historyStore.addPage(url, title) }
                 }
@@ -333,6 +343,7 @@ class DagBrowserViewModel
                     message = "DAG no mostró la página porque necesita revisión.",
                     reviewCandidate =
                         DagReviewCandidate(
+                            url = url,
                             domain = domain,
                             title = title.ifBlank { domain },
                             category = category,
@@ -373,10 +384,38 @@ class DagBrowserViewModel
                 mutableState.update {
                     it.copy(
                         reviewCandidate = null,
-                        message = "Solicitud de sitio enviada al administrador.",
+                        message = "Solicitud enviada. DAG abrirá el sitio cuando el administrador lo apruebe.",
                     )
                 }
+                waitForApproval(candidate, activation.deviceId)
             }
+        }
+
+        private fun waitForApproval(
+            candidate: DagReviewCandidate,
+            deviceId: String,
+        ) {
+            approvalPollingJob?.cancel()
+            approvalPollingJob =
+                viewModelScope.launch {
+                    repeat(ApprovalPollingAttempts) {
+                        delay(ApprovalPollingIntervalMillis)
+                        val approved =
+                            withContext(Dispatchers.IO) {
+                                runCatching { syncEngine.syncOnce() }
+                                val rules = runCatching { policyRepository.getActivePolicy(deviceId).rules }.getOrDefault(activeRules)
+                                activeRules = rules
+                                rules.hasAllowRule(candidate.domain)
+                            }
+                        if (approved) {
+                            requestNavigation(candidate.url, candidate.title)
+                            return@launch
+                        }
+                    }
+                    mutableState.update {
+                        it.copy(message = "La solicitud sigue pendiente. Volvé a intentar cuando el administrador la apruebe.")
+                    }
+                }
         }
 
         fun showHistory() {
@@ -445,7 +484,7 @@ class DagBrowserViewModel
                         confidence = 1f,
                     )
                 RuleAction.Allow ->
-                    if (result.decision == DagClassification.Uncertain) {
+                    if (result.category !in DagContentClassifier.NonOverridableCategories) {
                         result.copy(decision = DagClassification.Allowed, category = "admin_allow", confidence = 1f)
                     } else {
                         result
@@ -484,8 +523,16 @@ class DagBrowserViewModel
 
         private companion object {
             const val MaxAddressCharacters = 400
+            const val ApprovalPollingIntervalMillis = 5_000L
+            const val ApprovalPollingAttempts = 24
         }
     }
+
+private fun List<PolicyRule>.hasAllowRule(domain: String): Boolean =
+    asSequence()
+        .filter { it.enabled && it.scope == RuleScope.Domain && it.action == RuleAction.Allow }
+        .map { it.target.lowercase(Locale.ROOT).removePrefix("www.").removeSuffix(".") }
+        .any { target -> target == "*" || domain == target || domain.endsWith(".$target") }
 
 internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowserUiState =
     when {

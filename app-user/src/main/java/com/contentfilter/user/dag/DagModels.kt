@@ -36,6 +36,7 @@ data class DagHistoryEntry(
 )
 
 data class DagReviewCandidate(
+    val url: String,
     val domain: String,
     val title: String,
     val category: String,

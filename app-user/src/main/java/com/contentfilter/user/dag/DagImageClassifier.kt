@@ -144,6 +144,7 @@ internal class DagImageClassifier(
             bytes.isJpeg() -> "image/jpeg"
             bytes.isPng() -> "image/png"
             bytes.isWebP() -> "image/webp"
+            bytes.isStaticAvif() -> "image/avif"
             else -> null
         }
     }
@@ -160,6 +161,13 @@ internal class DagImageClassifier(
 
     private fun ByteArray.isWebP(): Boolean =
         size >= 12 && startsWithAscii("RIFF") && copyOfRange(8, 12).startsWithAscii("WEBP")
+
+    private fun ByteArray.isStaticAvif(): Boolean =
+        android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S &&
+            size >= 12 &&
+            copyOfRange(4, 8).startsWithAscii("ftyp") &&
+            containsAscii("avif") &&
+            !containsAscii("avis")
 
     private fun ByteArray.startsWithAscii(value: String): Boolean =
         size >= value.length && value.indices.all { index -> this[index].toInt() and 0xff == value[index].code }

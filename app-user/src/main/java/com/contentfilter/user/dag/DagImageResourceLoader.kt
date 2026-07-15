@@ -33,10 +33,23 @@ internal class DagImageResourceLoader(
             .build(),
 ) {
     private val imageCount = AtomicInteger(0)
+    private val allowedCount = AtomicInteger(0)
+    private val blockedCount = AtomicInteger(0)
+    private val uncertainCount = AtomicInteger(0)
 
     fun resetPage() {
         imageCount.set(0)
+        allowedCount.set(0)
+        blockedCount.set(0)
+        uncertainCount.set(0)
     }
+
+    fun pageSummary(): DagImagePageSummary =
+        DagImagePageSummary(
+            allowed = allowedCount.get(),
+            blocked = blockedCount.get(),
+            uncertain = uncertainCount.get(),
+        )
 
     fun intercept(request: WebResourceRequest): WebResourceResponse? {
         if (request.isForMainFrame) return null
@@ -44,7 +57,10 @@ internal class DagImageResourceLoader(
         if (!isProbableImageRequest(request.url.toString(), request.requestHeaders)) return null
         if (request.url.scheme != "https" || imageCount.incrementAndGet() > MaximumImagesPerPage) return blockedResource()
 
-        return runCatching { loadClassifiedImage(request) }.getOrElse { blockedResource() }
+        return runCatching { loadClassifiedImage(request) }.getOrElse {
+            uncertainCount.incrementAndGet()
+            blockedResource()
+        }
     }
 
     private fun loadClassifiedImage(request: WebResourceRequest): WebResourceResponse {
@@ -63,6 +79,11 @@ internal class DagImageResourceLoader(
             val bytes = body.byteStream().readLimited(DagImageClassifier.MaximumImageBytes)
             val mimeType = body.contentType()?.toString()
             val classification = classifier.classify(bytes, mimeType)
+            when (classification.decision) {
+                DagImageDecision.Allowed -> allowedCount.incrementAndGet()
+                DagImageDecision.Blocked -> blockedCount.incrementAndGet()
+                DagImageDecision.Uncertain -> uncertainCount.incrementAndGet()
+            }
             if (classification.decision != DagImageDecision.Allowed) return blockedResource()
 
             return WebResourceResponse(
@@ -101,6 +122,15 @@ internal class DagImageResourceLoader(
         const val ReadBufferBytes = 16 * 1024
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }
+}
+
+internal data class DagImagePageSummary(
+    val allowed: Int,
+    val blocked: Int,
+    val uncertain: Int,
+) {
+    val classified: Int
+        get() = allowed + blocked + uncertain
 }
 
 internal fun isPublicAddress(address: InetAddress): Boolean {

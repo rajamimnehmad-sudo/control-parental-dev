@@ -91,6 +91,7 @@ class DagBrowserAvailabilityTest {
 
     private fun reviewCandidate() =
         DagReviewCandidate(
+            url = "https://example.com",
             domain = "example.com",
             title = "Ejemplo",
             category = "unreadable",

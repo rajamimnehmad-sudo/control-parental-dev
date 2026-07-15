@@ -79,6 +79,16 @@ Usuario e2959b015debf74166d0951141c9e0cd252c172f5e1f297a1617386aa1c4572c
 Admin   a2c7113b1b707b996cf5b7ec13820160e98899b3192e38ef04de4e9da3f5ed60
 ```
 
+## Trabajo en curso 2026-07-15 - DAG-SAFETY-01
+
+- DEV 211 esta compilado localmente y pendiente de publicacion. No presentarlo como publico hasta verificar ambos manifiestos DEV.
+- Corrige la sincronizacion de reglas al abrir DAG y comprueba automaticamente durante dos minutos una solicitud recien enviada. Supabase DEV confirma que la aprobacion de `easy.com.ar` y su regla `Allow` por dispositivo existian correctamente; el fallo estaba en el refresco del cliente.
+- Las aprobaciones futuras reutilizan una regla `Allow` existente en vez de crear otro duplicado. No se borraron las reglas duplicadas preexistentes de YouTube ni ningun otro dato.
+- Las imagenes lazy con origen HTTPS y AVIF estatico en Android 12+ pasan por el mismo clasificador local. La decision de pagina incorpora el balance de imagenes seguras, bloqueadas e inciertas; SVG, GIF, animacion, `data:` y `blob:` siguen cerrados.
+- `imgsrc.ru` queda bloqueado antes de crear una navegacion WebView. Es una barrera preventiva no anulable mediante revision de dominio.
+- Atras oculta primero el teclado. Prueba fisica SM-A235M: Wikipedia mostro fotos seguras de manzanas y flores; Atras cerro el teclado sin salir; `imgsrc.ru` mostro bloqueo sin solicitud WebView. Easy requiere validacion final en el celular cuyo dispositivo recibio la aprobacion.
+- Validacion integral local: 895 tareas Gradle correctas con tests de dominio, Usuario y Admin; ktlint, Android lint, builds optimizados y detekt informativo. No se consumieron consultas Brave, no se toco Production, no se agregaron secretos ni Service Role Key a Android.
+
 ## Cierre 2026-07-15 - DAG-IMAGES-01 clasificacion visual local
 
 - DEV 210 permite imagenes estaticas JPEG, PNG y WebP en DAG solo despues de clasificarlas completamente en el telefono. La pagina permanece oculta durante el analisis textual y cada imagen permanece sin entregar al WebView hasta obtener una decision local segura.
