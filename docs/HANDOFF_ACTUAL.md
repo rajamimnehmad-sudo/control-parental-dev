@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 223
-App Admin versionCode 223
+App Usuario versionCode 224
+App Admin versionCode 224
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-223-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-223-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-224-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-224-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario a8b5d4d1ed5fa9da66a17e44ad57d1799ca9775fd8b7e606c8f54ca74f41d06f
-Admin   1c28257031cf2e77801fc92358668a3be7c155e5e23c475098d4c6045b0c1fc6
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DEV 224 paquete visual DAG
+
+- Barra: Home y nueva pestana quedan visibles; Atras, Adelante y Actualizar pasan al menu con estados habilitados coherentes. El boton fisico Atras conserva su navegacion segura.
+- Home: buscador central grande, mascota e identidad `Internet kosher con proteccion local`, sin prometer cobertura absoluta. La barra superior sigue disponible como omnibox.
+- Pestanas: maximo de ocho, contador explicito, estado `Actual`, nueva pestana y cierre de todas con retorno a una pestana segura. Las miniaturas siguen siendo locales, efimeras y solo de contenido visible.
+- Tema: opciones claro, oscuro y segun dispositivo persistidas localmente; se coordinan colores de DAG e iconos de barras del sistema. No cambia el tema del resto de App Usuario.
+- Historial: lista local minimalista agrupada por fecha, hora, tipo, dominio y borrado por fila o total. No cambia el cifrado ni los datos almacenados.
+- Analisis: el estado se integra en la barra con contraste cian/violeta y se elimina el mensaje separado durante la carga. No usa una animacion infinita ni muestra contenido antes de la decision.
+- Validacion local: ktlint, tests DEV Usuario/Admin y builds optimizados de ambos APK correctos, incluida prueba de resolucion de tema. Falta publicacion DEV y prueba fisica.
 
 ## Implementacion 2026-07-15 - DEV 223 compatibilidad visual en sitios densos
 

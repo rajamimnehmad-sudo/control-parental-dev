@@ -1,6 +1,9 @@
 package com.contentfilter.user.dag
 
 import android.annotation.SuppressLint
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -23,6 +26,7 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -41,6 +45,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -50,12 +55,16 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -64,24 +73,26 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.contentfilter.core.ui.PremiumFishMascot
-import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.core.ui.ProductVisualPage
@@ -98,6 +109,33 @@ fun DagBrowserRoute(
     onBack: () -> Unit,
     standalone: Boolean = false,
     viewModel: DagBrowserViewModel = hiltViewModel(),
+) {
+    val context = LocalContext.current
+    var themePreference by remember { mutableStateOf(loadDagThemePreference(context)) }
+    DagBrowserTheme(themePreference) {
+        DagBrowserContent(
+            modifier = modifier,
+            onBack = onBack,
+            standalone = standalone,
+            viewModel = viewModel,
+            themePreference = themePreference,
+            onThemePreferenceChanged = { selected ->
+                themePreference = selected
+                saveDagThemePreference(context, selected)
+            },
+        )
+    }
+}
+
+@Composable
+@OptIn(ExperimentalLayoutApi::class)
+private fun DagBrowserContent(
+    modifier: Modifier,
+    onBack: () -> Unit,
+    standalone: Boolean,
+    viewModel: DagBrowserViewModel,
+    themePreference: DagThemePreference,
+    onThemePreferenceChanged: (DagThemePreference) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
@@ -132,6 +170,7 @@ fun DagBrowserRoute(
     var tabsExpanded by remember { mutableStateOf(false) }
     var addressFocused by remember { mutableStateOf(false) }
     var activeWebView by remember { mutableStateOf<WebView?>(null) }
+    var browserCanGoBack by remember { mutableStateOf(false) }
     var browserCanGoForward by remember { mutableStateOf(false) }
     var tabs by remember { mutableStateOf(listOf(DagTab(snapshot = viewModel.captureTab()))) }
     var activeTabId by remember { mutableStateOf(tabs.first().id) }
@@ -161,11 +200,20 @@ fun DagBrowserRoute(
     }
 
     fun newTab() {
+        if (tabs.size >= MaximumTabs) return
         persistActiveTab()
         viewModel.openNewTab()
         val tab = DagTab(snapshot = viewModel.captureTab())
         tabs = tabs + tab
         activeTabId = tab.id
+        tabsExpanded = false
+    }
+
+    fun closeAllTabs() {
+        viewModel.openNewTab()
+        val replacement = DagTab(snapshot = viewModel.captureTab())
+        tabs = listOf(replacement)
+        activeTabId = replacement.id
         tabsExpanded = false
     }
 
@@ -187,6 +235,8 @@ fun DagBrowserRoute(
         }
     }
 
+    val analyzing = state.loading || (state.view == DagView.Browser && state.pageStatus == DagPageStatus.Loading)
+
     Column(
         modifier =
             modifier
@@ -198,27 +248,8 @@ fun DagBrowserRoute(
             horizontalArrangement = Arrangement.spacedBy(2.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            if (state.view == DagView.Browser) {
-                TextButton(
-                    onClick = {
-                        if (activeWebView?.canGoBack() == true) activeWebView?.goBack() else viewModel.showStart()
-                    },
-                    modifier = Modifier.width(40.dp),
-                ) {
-                    Text("‹", style = MaterialTheme.typography.headlineMedium)
-                }
-                TextButton(
-                    onClick = { activeWebView?.goForward() },
-                    enabled = browserCanGoForward,
-                    modifier = Modifier.width(40.dp),
-                ) {
-                    Text("›", style = MaterialTheme.typography.headlineMedium)
-                }
-            } else if (!standalone || state.view != DagView.Start) {
-                TextButton(
-                    onClick = { if (state.view == DagView.Start) onBack() else viewModel.showStart() },
-                    modifier = Modifier.width(40.dp),
-                ) { Text("‹", style = MaterialTheme.typography.headlineMedium) }
+            TextButton(onClick = viewModel::showStart, modifier = Modifier.width(40.dp)) {
+                Text("⌂", style = MaterialTheme.typography.titleLarge)
             }
             OutlinedTextField(
                 modifier =
@@ -231,9 +262,23 @@ fun DagBrowserRoute(
                         },
                 value = state.address,
                 onValueChange = viewModel::onAddressChanged,
-                placeholder = { Text("Buscar en DAG o escribir dirección") },
+                placeholder = { Text(if (analyzing) "Analizando…" else "Buscar o escribir dirección") },
                 singleLine = true,
                 shape = RoundedCornerShape(28.dp),
+                colors =
+                    OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = if (analyzing) DagNeonCyan else MaterialTheme.colorScheme.primary,
+                        unfocusedBorderColor = if (analyzing) DagNeonViolet else MaterialTheme.colorScheme.outline,
+                        focusedContainerColor = if (analyzing) DagNeonCyan.copy(alpha = 0.10f) else Color.Transparent,
+                        unfocusedContainerColor =
+                            if (analyzing) {
+                                DagNeonViolet.copy(
+                                    alpha = 0.08f,
+                                )
+                            } else {
+                                Color.Transparent
+                            },
+                    ),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Go),
                 keyboardActions =
                     androidx.compose.foundation.text.KeyboardActions(
@@ -241,12 +286,10 @@ fun DagBrowserRoute(
                     ),
             )
             TextButton(
-                onClick = {
-                    if (state.view == DagView.Browser) activeWebView?.reload() else viewModel.submitAddress()
-                },
-                enabled = !state.loading,
-                modifier = Modifier.width(44.dp),
-            ) { Text(if (state.view == DagView.Browser) "↻" else "Ir") }
+                onClick = ::newTab,
+                enabled = tabs.size < MaximumTabs,
+                modifier = Modifier.width(40.dp),
+            ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
             Box {
                 TextButton(
                     onClick = {
@@ -263,10 +306,31 @@ fun DagBrowserRoute(
                 }
                 DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                     DropdownMenuItem(
-                        text = { Text("Inicio") },
+                        text = { Text("Atrás") },
+                        enabled = state.view != DagView.Start && (state.view != DagView.Browser || browserCanGoBack),
                         onClick = {
                             menuExpanded = false
-                            viewModel.showStart()
+                            if (state.view == DagView.Browser && activeWebView?.canGoBack() == true) {
+                                activeWebView?.goBack()
+                            } else {
+                                viewModel.showStart()
+                            }
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Adelante") },
+                        enabled = state.view == DagView.Browser && browserCanGoForward,
+                        onClick = {
+                            menuExpanded = false
+                            activeWebView?.goForward()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Actualizar") },
+                        enabled = state.view == DagView.Browser,
+                        onClick = {
+                            menuExpanded = false
+                            activeWebView?.reload()
                         },
                     )
                     DropdownMenuItem(
@@ -276,14 +340,26 @@ fun DagBrowserRoute(
                             viewModel.showHistory()
                         },
                     )
+                    HorizontalDivider()
+                    DagThemePreference.entries.forEach { preference ->
+                        DropdownMenuItem(
+                            text = {
+                                Text(
+                                    "${if (themePreference == preference) "✓ " else ""}${preference.label}",
+                                )
+                            },
+                            onClick = {
+                                menuExpanded = false
+                                onThemePreferenceChanged(preference)
+                            },
+                        )
+                    }
                 }
             }
         }
         HorizontalDivider()
 
-        if (state.loading) CircularProgressIndicator(modifier = Modifier.height(24.dp).padding(start = 8.dp))
-
-        if (state.message.isNotBlank()) {
+        if (state.message.isNotBlank() && !analyzing) {
             Surface(
                 modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                 shape = RoundedCornerShape(16.dp),
@@ -302,7 +378,12 @@ fun DagBrowserRoute(
         }
 
         when (state.view) {
-            DagView.Start -> DagStartContent()
+            DagView.Start ->
+                DagStartContent(
+                    address = state.address,
+                    onAddressChanged = viewModel::onAddressChanged,
+                    onSubmit = viewModel::submitAddress,
+                )
             DagView.Results -> DagResultsContent(state.results, viewModel::openResult, viewModel::requestReview)
             DagView.History ->
                 DagHistoryContent(
@@ -322,7 +403,10 @@ fun DagBrowserRoute(
                     onPageBlocked = viewModel::onPageBlocked,
                     onRendererGone = viewModel::onBrowserRendererGone,
                     onWebViewChanged = { activeWebView = it },
-                    onNavigationStateChanged = { _, canGoForward -> browserCanGoForward = canGoForward },
+                    onNavigationStateChanged = { canGoBack, canGoForward ->
+                        browserCanGoBack = canGoBack
+                        browserCanGoForward = canGoForward
+                    },
                 )
         }
     }
@@ -341,6 +425,7 @@ fun DagBrowserRoute(
             onOpen = ::openTab,
             onClose = ::closeTab,
             onNew = ::newTab,
+            onCloseAll = ::closeAllTabs,
         )
     }
 }
@@ -351,6 +436,112 @@ private data class DagTab(
     val preview: ImageBitmap? = null,
 )
 
+internal enum class DagThemePreference(
+    val label: String,
+) {
+    System("Tema: según dispositivo"),
+    Light("Tema: claro"),
+    Dark("Tema: oscuro"),
+}
+
+internal fun dagUsesDarkTheme(
+    preference: DagThemePreference,
+    systemDark: Boolean,
+): Boolean =
+    when (preference) {
+        DagThemePreference.System -> systemDark
+        DagThemePreference.Light -> false
+        DagThemePreference.Dark -> true
+    }
+
+@Composable
+private fun DagBrowserTheme(
+    preference: DagThemePreference,
+    content: @Composable () -> Unit,
+) {
+    val dark = dagUsesDarkTheme(preference, isSystemInDarkTheme())
+    val view = LocalView.current
+    SideEffect {
+        view.context.findActivity()?.window?.let { window ->
+            WindowCompat.getInsetsController(window, view).apply {
+                isAppearanceLightStatusBars = !dark
+                isAppearanceLightNavigationBars = !dark
+            }
+        }
+    }
+    DisposableEffect(view) {
+        onDispose {
+            view.context.findActivity()?.window?.let { window ->
+                WindowCompat.getInsetsController(window, view).apply {
+                    isAppearanceLightStatusBars = true
+                    isAppearanceLightNavigationBars = true
+                }
+            }
+        }
+    }
+    MaterialTheme(
+        colorScheme = if (dark) DagDarkScheme else DagLightScheme,
+        typography = MaterialTheme.typography,
+        shapes = MaterialTheme.shapes,
+        content = content,
+    )
+}
+
+private fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return current as? Activity
+}
+
+private fun loadDagThemePreference(context: Context): DagThemePreference {
+    val stored =
+        context.applicationContext
+            .getSharedPreferences(DagPreferencesName, Context.MODE_PRIVATE)
+            .getString(DagThemePreferenceKey, null)
+    return DagThemePreference.entries.firstOrNull { it.name == stored } ?: DagThemePreference.System
+}
+
+private fun saveDagThemePreference(
+    context: Context,
+    preference: DagThemePreference,
+) {
+    context.applicationContext
+        .getSharedPreferences(DagPreferencesName, Context.MODE_PRIVATE)
+        .edit()
+        .putString(DagThemePreferenceKey, preference.name)
+        .apply()
+}
+
+private val DagLightScheme =
+    lightColorScheme(
+        primary = Color(0xFF006C8F),
+        onPrimary = Color.White,
+        primaryContainer = Color(0xFFC4E8FF),
+        background = Color(0xFFF7F9FC),
+        surface = Color.White,
+        surfaceVariant = Color(0xFFE8EEF3),
+        outline = Color(0xFF6F797F),
+    )
+
+private val DagDarkScheme =
+    darkColorScheme(
+        primary = Color(0xFF74D1FA),
+        onPrimary = Color(0xFF003548),
+        primaryContainer = Color(0xFF004D67),
+        background = Color(0xFF101417),
+        surface = Color(0xFF181C20),
+        surfaceVariant = Color(0xFF3F484D),
+        outline = Color(0xFF899399),
+    )
+
+private val DagNeonCyan = Color(0xFF00D8FF)
+private val DagNeonViolet = Color(0xFF8C6CFF)
+private const val DagPreferencesName = "dag_browser_preferences"
+private const val DagThemePreferenceKey = "theme_preference"
+
 @Composable
 private fun DagTabSwitcher(
     tabs: List<DagTab>,
@@ -360,6 +551,7 @@ private fun DagTabSwitcher(
     onOpen: (DagTab) -> Unit,
     onClose: (DagTab) -> Unit,
     onNew: () -> Unit,
+    onCloseAll: () -> Unit,
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
@@ -373,8 +565,14 @@ private fun DagTabSwitcher(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("Pestañas", style = MaterialTheme.typography.titleLarge)
-                    TextButton(onClick = onNew) { Text("＋ Nueva") }
+                    Column {
+                        Text("Pestañas", style = MaterialTheme.typography.titleLarge)
+                        Text("${tabs.size} de $MaximumTabs", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Row {
+                        TextButton(onClick = onCloseAll, enabled = tabs.size > 1) { Text("Cerrar todas") }
+                        TextButton(onClick = onNew, enabled = tabs.size < MaximumTabs) { Text("＋ Nueva") }
+                    }
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
@@ -415,6 +613,18 @@ private fun DagTabSwitcher(
                                             contentScale = ContentScale.Crop,
                                         )
                                     } ?: PremiumFishMascot(modifier = Modifier.width(72.dp).height(58.dp))
+                                    if (tab.id == activeTabId) {
+                                        Surface(
+                                            modifier = Modifier.align(Alignment.TopStart).padding(8.dp),
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = MaterialTheme.colorScheme.primaryContainer,
+                                        ) {
+                                            Text(
+                                                "Actual",
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
+                                            )
+                                        }
+                                    }
                                     TextButton(
                                         onClick = { onClose(tab) },
                                         modifier = Modifier.align(Alignment.TopEnd),
@@ -438,6 +648,7 @@ private fun DagTabSwitcher(
 
 private const val TabPreviewWidth = 240
 private const val TabPreviewHeight = 360
+private const val MaximumTabs = 8
 
 private fun DagTabSnapshot.tabLabel(position: Int): String =
     when (view) {
@@ -448,7 +659,11 @@ private fun DagTabSnapshot.tabLabel(position: Int): String =
     }
 
 @Composable
-private fun DagStartContent() {
+private fun DagStartContent(
+    address: String,
+    onAddressChanged: (String) -> Unit,
+    onSubmit: () -> Unit,
+) {
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -456,10 +671,28 @@ private fun DagStartContent() {
     ) {
         PremiumFishMascot(modifier = Modifier.width(150.dp).height(120.dp))
         Spacer(Modifier.height(12.dp))
-        Text("DAG", style = MaterialTheme.typography.headlineMedium)
+        Text("DAG", style = MaterialTheme.typography.headlineLarge)
         Text(
-            "Buscá y navegá con protección local.",
+            "Internet kosher con protección local",
             style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(24.dp))
+        OutlinedTextField(
+            value = address,
+            onValueChange = onAddressChanged,
+            modifier = Modifier.fillMaxWidth().height(64.dp),
+            placeholder = { Text("Buscar en Internet") },
+            singleLine = true,
+            shape = RoundedCornerShape(32.dp),
+            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Go),
+            keyboardActions = androidx.compose.foundation.text.KeyboardActions(onGo = { onSubmit() }),
+            trailingIcon = { TextButton(onClick = onSubmit, enabled = address.isNotBlank()) { Text("Ir") } },
+        )
+        Spacer(Modifier.height(12.dp))
+        Text(
+            "Las páginas y sus imágenes se analizan antes de mostrarse.",
+            style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
@@ -533,35 +766,81 @@ private fun DagHistoryContent(
     onClear: () -> Unit,
 ) {
     var confirmClear by remember { mutableStateOf(false) }
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text("Historial local", style = MaterialTheme.typography.titleLarge)
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column {
+            Text("Historial", style = MaterialTheme.typography.titleLarge)
+            Text("Guardado solo en este teléfono", style = MaterialTheme.typography.bodySmall)
+        }
         TextButton(onClick = { confirmClear = true }, enabled = history.isNotEmpty()) { Text("Borrar todo") }
     }
     if (history.isEmpty()) {
-        ProductCard { Text("Todavía no hay búsquedas ni páginas visitadas.") }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("Todavía no hay búsquedas ni páginas visitadas.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
     } else {
-        LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(history, key = { it.id }) { entry ->
-                ProductCard(modifier = Modifier.clickable { onOpen(entry) }) {
-                    Text(entry.title ?: entry.value, style = MaterialTheme.typography.titleMedium)
+        LazyColumn(modifier = Modifier.fillMaxSize()) {
+            itemsIndexed(history, key = { _, entry -> entry.id }) { index, entry ->
+                val date = DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(entry.visitedAtEpochMillis))
+                val previousDate =
+                    history.getOrNull(index - 1)?.let {
+                        DateFormat.getDateInstance(DateFormat.MEDIUM).format(Date(it.visitedAtEpochMillis))
+                    }
+                if (date != previousDate) {
                     Text(
-                        if (entry.type == DagHistoryType.Search) {
-                            "Búsqueda"
-                        } else {
-                            DagContentClassifier.domainFrom(
-                                entry.url.orEmpty(),
-                            )
-                        },
-                        color = MaterialTheme.colorScheme.primary,
+                        date,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    Text(
-                        DateFormat.getDateTimeInstance(
-                            DateFormat.SHORT,
-                            DateFormat.SHORT,
-                        ).format(Date(entry.visitedAtEpochMillis)),
-                    )
-                    TextButton(onClick = { onDelete(entry.id) }) { Text("Borrar") }
                 }
+                Row(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable { onOpen(entry) }
+                            .padding(start = 16.dp, top = 10.dp, bottom = 10.dp, end = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Surface(
+                        modifier = Modifier.width(38.dp).height(38.dp),
+                        shape = RoundedCornerShape(19.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(if (entry.type == DagHistoryType.Search) "⌕" else "↗")
+                        }
+                    }
+                    Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                        Text(
+                            entry.title ?: entry.value,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodyLarge,
+                        )
+                        Text(
+                            if (entry.type == DagHistoryType.Search) {
+                                "Búsqueda"
+                            } else {
+                                DagContentClassifier.domainFrom(entry.url.orEmpty())
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        DateFormat.getTimeInstance(DateFormat.SHORT).format(Date(entry.visitedAtEpochMillis)),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    TextButton(onClick = { onDelete(entry.id) }) { Text("×") }
+                }
+                HorizontalDivider(modifier = Modifier.padding(start = 66.dp))
             }
         }
     }
@@ -675,22 +954,20 @@ private fun DagWebContent(
             },
         )
         if (state.pageStatus != DagPageStatus.Visible) {
-            Column(
+            Box(
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
+                contentAlignment = Alignment.Center,
             ) {
-                if (state.pageStatus == DagPageStatus.Loading) CircularProgressIndicator()
-                Spacer(Modifier.height(12.dp))
-                Text(
-                    when (state.pageStatus) {
-                        DagPageStatus.Loading -> "DAG está analizando la página…"
-                        DagPageStatus.Blocked -> "Página bloqueada"
-                        DagPageStatus.Uncertain -> "Página pendiente de revisión"
-                        else -> "Preparando navegador"
-                    },
-                    style = MaterialTheme.typography.titleMedium,
-                )
+                if (state.pageStatus != DagPageStatus.Loading) {
+                    Text(
+                        when (state.pageStatus) {
+                            DagPageStatus.Blocked -> "Página bloqueada"
+                            DagPageStatus.Uncertain -> "Página pendiente de revisión"
+                            else -> "Preparando navegador"
+                        },
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
             }
         }
     }

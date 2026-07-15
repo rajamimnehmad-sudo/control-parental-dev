@@ -139,12 +139,12 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | SUPERADMIN-ALERTS-01 | Idea | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Idea | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
 | BARRIER-LAUNCHER-01 | Idea | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
-| DAG-NAV-UX-01 | Idea | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
-| DAG-HOME-UX-01 | Idea | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
-| DAG-TABS-UX-01 | Idea | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
-| DAG-THEME-01 | Idea | P2 | Mejorar contraste y agregar tema claro, oscuro o segun dispositivo | M | Medio |
-| DAG-HISTORY-UX-01 | Idea | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
-| DAG-ANALYSIS-UX-01 | Idea | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
+| DAG-NAV-UX-01 | En progreso | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
+| DAG-HOME-UX-01 | En progreso | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
+| DAG-TABS-UX-01 | En progreso | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
+| DAG-THEME-01 | En progreso | P2 | Mejorar contraste y agregar tema claro, oscuro o segun dispositivo | M | Medio |
+| DAG-HISTORY-UX-01 | En progreso | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
+| DAG-ANALYSIS-UX-01 | En progreso | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Idea | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
@@ -260,7 +260,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 #### DAG-NAV-UX-01 - Barra de navegacion simplificada
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX y navegacion. Prioridad: P2.
+- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX y navegacion. Prioridad: P2.
 - Problema: la barra expone controles secundarios y resta espacio y claridad a las acciones principales.
 - Solucion propuesta: ocultar `Atras`, `Adelante` y `Actualizar` de la barra y moverlos al menu de tres puntos; mostrar `Home` a la izquierda y reemplazar `Actualizar` por una accion visible de nueva pestana.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
@@ -272,7 +272,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 #### DAG-HOME-UX-01 - Home con buscador central
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX, identidad y Home DAG. Prioridad: P2.
+- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX, identidad y Home DAG. Prioridad: P2.
 - Problema: la entrada del navegador no comunica con suficiente claridad que DAG es un buscador propio de Internet kosher.
 - Solucion propuesta: presentar un buscador grande y centrado, con marca `DAG` y una leyenda como `Internet kosher` u otra frase a definir.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
@@ -284,7 +284,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 #### DAG-TABS-UX-01 - Manejo mejorado de pestanas
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX y gestion de pestanas. Prioridad: P2.
+- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX y gestion de pestanas. Prioridad: P2.
 - Problema: el manejo actual de multiples pestanas necesita una experiencia mas rapida y clara para crear, identificar, cambiar y cerrar pestanas.
 - Solucion propuesta: evolucionar el selector visual existente y coordinarlo con el nuevo boton visible de nueva pestana.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
@@ -296,7 +296,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 #### DAG-THEME-01 - Contraste y tema visual
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: accesibilidad visual y personalizacion. Prioridad: P2.
+- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: accesibilidad visual y personalizacion. Prioridad: P2.
 - Problema: la barra ubicada en la zona superior cercana a la camara tiene contraste insuficiente y algunos iconos se distinguen poco.
 - Solucion propuesta: corregir contraste, incluyendo iconos negros cuando corresponda, y agregar en el menu de tres puntos las opciones `Claro`, `Oscuro` y `Segun el dispositivo`.
 - Evidencia: observacion visual del usuario el 2026-07-15.
@@ -308,7 +308,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 #### DAG-HISTORY-UX-01 - Historial minimalista
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX e historial local. Prioridad: P2.
+- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX e historial local. Prioridad: P2.
 - Problema: la presentacion actual del historial puede simplificarse para escanear y reabrir entradas con menos ruido visual.
 - Solucion propuesta: mostrar una lista minimalista con jerarquia clara y acciones discretas, preservando el almacenamiento local cifrado y el borrado existente.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
@@ -320,7 +320,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 #### DAG-ANALYSIS-UX-01 - Analisis integrado en el buscador
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX, feedback visual y marca DAG. Prioridad: P2.
+- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX, feedback visual y marca DAG. Prioridad: P2.
 - Problema: el mensaje separado `DAG esta analizando la pagina` ocupa espacio y no integra el estado de seguridad con la identidad del buscador.
 - Solucion propuesta: durante el analisis, iluminar el propio buscador con colores neon y una animacion de aspecto inteligente, mostrando dentro de esa zona la leyenda `Analizando...`.
 - Evidencia: propuesta visual del usuario el 2026-07-15.
