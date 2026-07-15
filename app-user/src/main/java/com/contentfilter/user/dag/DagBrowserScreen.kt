@@ -2,6 +2,7 @@ package com.contentfilter.user.dag
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.net.Uri
 import android.net.http.SslError
 import android.webkit.CookieManager
@@ -19,6 +20,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -36,6 +38,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
@@ -60,6 +64,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -67,6 +74,8 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebViewCompat
@@ -80,6 +89,7 @@ import org.json.JSONArray
 import java.text.DateFormat
 import java.util.Date
 import java.util.UUID
+import androidx.compose.foundation.lazy.grid.items as gridItems
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -128,6 +138,19 @@ fun DagBrowserRoute(
 
     fun persistActiveTab() {
         tabs = tabs.map { tab -> if (tab.id == activeTabId) tab.copy(snapshot = viewModel.captureTab()) else tab }
+    }
+
+    fun captureActiveTabPreview() {
+        val view = activeWebView ?: return
+        if (state.pageStatus != DagPageStatus.Visible || view.width <= 0 || view.height <= 0) return
+        val bitmap = Bitmap.createBitmap(TabPreviewWidth, TabPreviewHeight, Bitmap.Config.RGB_565)
+        val canvas = Canvas(bitmap)
+        canvas.scale(TabPreviewWidth.toFloat() / view.width, TabPreviewHeight.toFloat() / view.height)
+        view.draw(canvas)
+        tabs =
+            tabs.map { tab ->
+                if (tab.id == activeTabId) tab.copy(preview = bitmap.asImageBitmap()) else tab
+            }
     }
 
     fun openTab(tab: DagTab) {
@@ -227,32 +250,12 @@ fun DagBrowserRoute(
             Box {
                 TextButton(
                     onClick = {
+                        captureActiveTabPreview()
                         persistActiveTab()
                         tabsExpanded = true
                     },
                     modifier = Modifier.width(40.dp),
                 ) { Text(tabs.size.toString()) }
-                DropdownMenu(expanded = tabsExpanded, onDismissRequest = { tabsExpanded = false }) {
-                    tabs.forEachIndexed { index, tab ->
-                        val snapshot = if (tab.id == activeTabId) viewModel.captureTab() else tab.snapshot
-                        DropdownMenuItem(
-                            text = {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(
-                                        snapshot.tabLabel(index + 1),
-                                        modifier = Modifier.weight(1f),
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                    )
-                                    TextButton(onClick = { closeTab(tab) }) { Text("×") }
-                                }
-                            },
-                            onClick = { openTab(tab.copy(snapshot = snapshot)) },
-                        )
-                    }
-                    HorizontalDivider()
-                    DropdownMenuItem(text = { Text("＋ Nueva pestaña") }, onClick = ::newTab)
-                }
             }
             Box {
                 TextButton(onClick = { menuExpanded = true }, modifier = Modifier.width(40.dp)) {
@@ -328,12 +331,113 @@ fun DagBrowserRoute(
         focusManager.clearFocus()
         keyboardController?.hide()
     }
+
+    if (tabsExpanded) {
+        DagTabSwitcher(
+            tabs = tabs,
+            activeTabId = activeTabId,
+            currentSnapshot = viewModel.captureTab(),
+            onDismiss = { tabsExpanded = false },
+            onOpen = ::openTab,
+            onClose = ::closeTab,
+            onNew = ::newTab,
+        )
+    }
 }
 
 private data class DagTab(
     val id: String = UUID.randomUUID().toString(),
     val snapshot: DagTabSnapshot,
+    val preview: ImageBitmap? = null,
 )
+
+@Composable
+private fun DagTabSwitcher(
+    tabs: List<DagTab>,
+    activeTabId: String,
+    currentSnapshot: DagTabSnapshot,
+    onDismiss: () -> Unit,
+    onOpen: (DagTab) -> Unit,
+    onClose: (DagTab) -> Unit,
+    onNew: () -> Unit,
+) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Surface(
+            modifier = Modifier.fillMaxSize().padding(vertical = 24.dp),
+            shape = RoundedCornerShape(28.dp),
+            color = MaterialTheme.colorScheme.surface,
+        ) {
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text("Pestañas", style = MaterialTheme.typography.titleLarge)
+                    TextButton(onClick = onNew) { Text("＋ Nueva") }
+                }
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(2),
+                    modifier = Modifier.fillMaxSize(),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    gridItems(tabs, key = { it.id }) { tab ->
+                        val snapshot = if (tab.id == activeTabId) currentSnapshot else tab.snapshot
+                        Surface(
+                            modifier =
+                                Modifier
+                                    .fillMaxWidth()
+                                    .clickable { onOpen(tab.copy(snapshot = snapshot)) },
+                            shape = RoundedCornerShape(16.dp),
+                            border =
+                                if (tab.id == activeTabId) {
+                                    androidx.compose.foundation.BorderStroke(2.dp, MaterialTheme.colorScheme.primary)
+                                } else {
+                                    null
+                                },
+                            tonalElevation = 2.dp,
+                        ) {
+                            Column {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .height(170.dp)
+                                            .background(MaterialTheme.colorScheme.surfaceContainer),
+                                    contentAlignment = Alignment.Center,
+                                ) {
+                                    tab.preview?.let { preview ->
+                                        Image(
+                                            bitmap = preview,
+                                            contentDescription = null,
+                                            modifier = Modifier.fillMaxSize(),
+                                            contentScale = ContentScale.Crop,
+                                        )
+                                    } ?: PremiumFishMascot(modifier = Modifier.width(72.dp).height(58.dp))
+                                    TextButton(
+                                        onClick = { onClose(tab) },
+                                        modifier = Modifier.align(Alignment.TopEnd),
+                                    ) { Text("×") }
+                                }
+                                Text(
+                                    snapshot.tabLabel(tabs.indexOf(tab) + 1),
+                                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.labelLarge,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private const val TabPreviewWidth = 240
+private const val TabPreviewHeight = 360
 
 private fun DagTabSnapshot.tabLabel(position: Int): String =
     when (view) {

@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 219
-App Admin versionCode 219
+App Usuario versionCode 220
+App Admin versionCode 220
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,24 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-219-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-219-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-220-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-220-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 58584384a1af9609879cf9acf35cedd30e17dc7705eebe978f0ebd2eb0111861
-Admin   3d948d0a22a47fc526785dd6779790672ab2dc4b3ef920fe2d5635131d606b57
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DEV 220 selector visual de pestañas
+
+- El contador de pestañas abre un selector modal de ancho completo inspirado en Chrome, con cuadrícula de dos columnas, miniatura, nombre de búsqueda/dominio, pestaña activa, cierre individual y nueva pestaña.
+- La miniatura se captura localmente en RGB_565 y baja resolución únicamente cuando la página ya está en estado `Visible`; páginas bloqueadas, inciertas o todavía ocultas muestran la mascota y nunca producen vista previa.
+- Las vistas previas viven solo en memoria durante la sesión de DAG. No se sincronizan, no llegan al administrador, no se guardan en historial ni generan consultas Brave. Los WebView de pestañas inactivas siguen suspendidos para limitar memoria.
+- Gmail: cookies propias y DOM storage de DAG persisten normalmente entre aperturas/actualizaciones si Google permite completar el login. No se comparte la sesión de Chrome y Google puede rechazar autenticación dentro de WebView por su política de user-agent embebido.
+- Validación local: ktlint, tests DEV Usuario y APK Usuario optimizado correctos. Falta publicación y prueba física de DEV 220.
 
 ## Implementacion 2026-07-15 - DEV 219 descarga de actualizaciones resiliente
 
