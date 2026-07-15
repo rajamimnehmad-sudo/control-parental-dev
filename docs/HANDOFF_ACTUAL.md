@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario 3f12bd7475314fd83610bff5f4427a7a4ca8fefee350bfc89fe592dfa8a8dff6
+Admin   8a3c6649f3eca7fbac36a9ef8049e0b62842474feba20f3451926617d49c6aa3
 ```
 
 ## Implementacion 2026-07-15 - DEV 224 paquete visual DAG
@@ -87,7 +87,7 @@ Admin   pendiente de publicacion
 - Tema: opciones claro, oscuro y segun dispositivo persistidas localmente; se coordinan colores de DAG e iconos de barras del sistema. No cambia el tema del resto de App Usuario.
 - Historial: lista local minimalista agrupada por fecha, hora, tipo, dominio y borrado por fila o total. No cambia el cifrado ni los datos almacenados.
 - Analisis: el estado se integra en la barra con contraste cian/violeta y se elimina el mensaje separado durante la carga. No usa una animacion infinita ni muestra contenido antes de la decision.
-- Validacion local: ktlint, tests DEV Usuario/Admin y builds optimizados de ambos APK correctos, incluida prueba de resolucion de tema. Falta publicacion DEV y prueba fisica.
+- Validacion local: ktlint, tests DEV Usuario/Admin y builds optimizados de ambos APK correctos, incluida prueba de resolucion de tema. APKs y manifiestos DEV 224 publicados y verificados; falta prueba fisica.
 
 ## Implementacion 2026-07-15 - DEV 223 compatibilidad visual en sitios densos
 
