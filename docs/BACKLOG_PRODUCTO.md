@@ -65,14 +65,14 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ### DAG-PERF-02 - Fluidez del navegador y App Usuario
 
-- Estado: `Resuelto` el 2026-07-14 en DEV 206; aprobado explicitamente por el usuario.
+- Estado: `Resuelto` el 2026-07-14 en DEV 206-207; aprobado explicitamente por el usuario.
 - Tipo: rendimiento y estabilidad visual. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Causa: el inicio mantenia dos animaciones infinitas superpuestas; Home y Web componian todo su contenido desplazable de forma eager; DAG deshabilitaba la cache HTTP, ejecutaba dos puentes JavaScript por pagina, podia inspeccionar mas de una vez la misma carga y cifraba el historial en el hilo principal.
 - Solucion: mascota estatica; listas lazy en Home y Web; cache HTTP normal del WebView; saneamiento y extraccion de texto en una sola operacion; inspeccion unica por carga; patrones del clasificador precompilados; cifrado y borrado del historial fuera del hilo principal.
 - Alcance comercial: no se agrego cache de consultas ni resultados Brave. Repetir una busqueda sigue consumiendo una consulta; navegar, recargar o abrir una URL/historial no consume Brave.
 - Evidencia fisica SM-A235M: el repintado inactivo del inicio bajo de aproximadamente 183 cuadros en tres segundos a 3. En Web, seis desplazamientos automatizados terminaron con 5,68 % de cuadros fuera de plazo, mediana de 17 ms y percentil 90 de 21 ms.
 - Seguridad: imagenes y video siguen bloqueados; el contenido permanece oculto hasta completar el analisis local; no cambio Supabase, el cupo, la barrera, la VPN ni Accessibility.
-- Seguimiento DEV 207 preparado y validado, pendiente de publicacion: la barrera escaneaba hasta 200 nodos en cada cambio de contenido, incluso fuera de Ajustes. El escaneo queda limitado a Ajustes, instaladores, desinstaladores y las pantallas propias de accesibilidad de Samsung; estas ultimas se agregan expresamente a la proteccion.
+- Seguimiento DEV 207 publicado y validado: la barrera escaneaba hasta 200 nodos en cada cambio de contenido, incluso fuera de Ajustes. El escaneo queda limitado a Ajustes, instaladores, desinstaladores y las pantallas propias de accesibilidad de Samsung; estas ultimas se agregan expresamente a la proteccion.
 - Resultado fisico del seguimiento con Accessibility activo: Mis apps paso de 26,05 % de cuadros lentos y percentil 99 de 200 ms a 5,76 % y 27 ms; Web quedo en 2,44 % y Home en 0,81 %. Tres aperturas de Informacion de la app terminaron en el launcher, con APK instalada, Accessibility enlazado y Device Admin activo.
 - DEV 207 tambien hace la build de Usuario no depurable y optimizada, agrega perfil de arranque, reemplaza la lista pesada de 156 apps por filas nativas reciclables y publica ese inventario en lotes de 20; Supabase DEV confirmo la publicacion sin timeout. No hay cache de resultados Brave ni consumo de consultas durante estas pruebas.
 
@@ -227,6 +227,7 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 | DAG-FOUNDATION-01 | 2026-07-14, DEV 204 | Control por dispositivo, entrada Usuario, pantalla cerrada por defecto y atajo Android; sin abrir contenido ni agregar esquema |
 | PUSH-REAL-01 | 2026-07-14, DEV 202 | FCM real con tokens seguros y credenciales servidor dedicadas; alerta fisica con Admin cerrado y apertura correcta en Apps |
 | USER-PERF-01 | 2026-07-14, DEV 203 | Suscripciones aisladas por pantalla, refresco remoto duplicado eliminado y una unica accion contextual; Home 2,99 % -> 0,26 % y Ajustes 0,66 % -> 0,43 % de frames lentos en SM-A235M |
+| DAG-PERF-02 | 2026-07-14, DEV 206-207 | Home/Web lazy y DAG sin trabajo duplicado; DEV 207 elimina el escaneo global de Accessibility y reduce Mis apps de 26,05 % a 5,76 % de cuadros lentos con la barrera activa |
 | BARRIER-ANDROID-01 | DEV 198-202 | Barrera reforzada, navegacion defensiva, recuperacion y alertas; alcance real documentado en el handoff |
 | WEB-LISTS-A | 2026-07-13 | The Block List Project agregado, deduplicado, firmado, publicado atomicamente y validado |
 | WEB-SENSITIVE-A1 | DEV 192 | Adulto, apuestas, drogas y pirateria/torrents en formato extensible firmado y con validacion fisica |
