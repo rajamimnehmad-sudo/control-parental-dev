@@ -3,6 +3,15 @@ package com.contentfilter.feature.accessibility.service
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 
 class SettingsProtectionPolicy {
+    fun couldContainProtectedScreen(
+        packageName: String,
+        resolvedOwnUninstaller: Boolean,
+    ): Boolean =
+        packageName == AndroidSettingsPackage ||
+            packageName == SamsungAccessibilityPackage ||
+            packageName in PackageInstallerPackages ||
+            resolvedOwnUninstaller
+
     fun shouldLeaveProtectedScreen(
         packageName: String,
         className: String?,
@@ -45,9 +54,13 @@ class SettingsProtectionPolicy {
     private fun isCriticalSettingsScreen(
         packageName: String,
         className: String?,
-    ): Boolean =
-        packageName == AndroidSettingsPackage &&
-            CriticalSettingsClassHints.any { className.orEmpty().contains(it, ignoreCase = true) }
+    ): Boolean {
+        val normalizedClass = className.orEmpty()
+        return packageName == AndroidSettingsPackage &&
+            CriticalSettingsClassHints.any { normalizedClass.contains(it, ignoreCase = true) } ||
+            packageName == SamsungAccessibilityPackage &&
+            normalizedClass.contains(SamsungSubSettingsClassHint, ignoreCase = true)
+    }
 
     private fun protectedScope(
         packageName: String,
@@ -62,6 +75,12 @@ class SettingsProtectionPolicy {
         ) {
             return ProtectionAuthorizationScope.Removal
         }
+        if (
+            packageName == SamsungAccessibilityPackage &&
+            normalizedClass.contains(SamsungSubSettingsClassHint, ignoreCase = true)
+        ) {
+            return ProtectionAuthorizationScope.Settings
+        }
         if (packageName != AndroidSettingsPackage) return null
         if (dangerousSettingsActionVisible) return ProtectionAuthorizationScope.Removal
         if (RemovalClassHints.any { normalizedClass.contains(it, true) }) return ProtectionAuthorizationScope.Removal
@@ -73,6 +92,8 @@ class SettingsProtectionPolicy {
 
     private companion object {
         const val AndroidSettingsPackage = "com.android.settings"
+        const val SamsungAccessibilityPackage = "com.samsung.accessibility"
+        const val SamsungSubSettingsClassHint = "SubSettings"
         const val MinActionIntervalMillis = 2_000L
         val PackageInstallerPackages =
             setOf(

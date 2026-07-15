@@ -26,7 +26,6 @@ data class SupabaseConfig(
         if (!normalized.endsWith(".supabase.co")) {
             Log.w(LogTag, "Supabase URL host is not a Supabase project host: ${normalized.hostForLog()}")
         }
-        Log.i(LogTag, "Supabase URL configured for host=${normalized.hostForLog()}")
         return normalized
     }
 

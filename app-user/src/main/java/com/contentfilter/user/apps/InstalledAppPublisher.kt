@@ -27,25 +27,29 @@ class InstalledAppPublisher
         @ApplicationContext private val context: Context,
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
     ) {
-        suspend fun publish(activation: DeviceActivation) =
-            withContext(Dispatchers.IO) {
-                val now = Instant.now().toString()
-                installedApps().forEach { app ->
-                    remoteInstalledAppRepository.upsertInstalledApp(
-                        RemoteInstalledAppDto(
-                            id = stableId(activation.deviceId, app.packageName),
-                            accountId = activation.accountId,
-                            deviceId = activation.deviceId,
-                            appName = app.name,
-                            packageName = app.packageName,
-                            versionName = app.versionName,
-                            isSystemApp = app.isSystemApp,
-                            iconBase64 = app.iconBase64,
-                            updatedAt = now,
-                        ),
+        suspend fun publish(activation: DeviceActivation) = publish(activation, installedApps())
+
+        suspend fun publish(
+            activation: DeviceActivation,
+            apps: List<DetectedApp>,
+        ) = withContext(Dispatchers.IO) {
+            val now = Instant.now().toString()
+            remoteInstalledAppRepository.upsertInstalledApps(
+                apps.map { app ->
+                    RemoteInstalledAppDto(
+                        id = stableId(activation.deviceId, app.packageName),
+                        accountId = activation.accountId,
+                        deviceId = activation.deviceId,
+                        appName = app.name,
+                        packageName = app.packageName,
+                        versionName = app.versionName,
+                        isSystemApp = app.isSystemApp,
+                        iconBase64 = app.iconBase64,
+                        updatedAt = now,
                     )
-                }
-            }
+                },
+            )
+        }
 
         fun installedApps(): List<DetectedApp> {
             val packageManager = context.packageManager

@@ -100,12 +100,22 @@ class SupabaseRestClient
         suspend fun upsert(
             table: SupabaseTable,
             json: JSONObject,
+        ): RemoteResult<Unit> = upsertJson(table, json.toString())
+
+        suspend fun upsert(
+            table: SupabaseTable,
+            json: JSONArray,
+        ): RemoteResult<Unit> = upsertJson(table, json.toString())
+
+        private suspend fun upsertJson(
+            table: SupabaseTable,
+            json: String,
         ): RemoteResult<Unit> =
             withContext(Dispatchers.IO) {
                 val request =
                     requestBuilder("/rest/v1/${table.tableName}")
                         ?: return@withContext RemoteResult.Failure(OfflineUserMessage, retryable = true)
-                val body = json.toString().toRequestBody(JsonMediaType)
+                val body = json.toRequestBody(JsonMediaType)
                 try {
                     httpClient.newCall(
                         request

@@ -1,6 +1,7 @@
 package com.contentfilter.core.network.remote
 
 import com.contentfilter.core.network.dto.RemoteInstalledAppDto
+import org.json.JSONArray
 import javax.inject.Inject
 
 class SupabaseRemoteInstalledAppRepository
@@ -24,4 +25,20 @@ class SupabaseRemoteInstalledAppRepository
 
         override suspend fun upsertInstalledApp(app: RemoteInstalledAppDto): RemoteResult<Unit> =
             client.upsert(SupabaseTable.DeviceApps, app.toJson())
+
+        override suspend fun upsertInstalledApps(apps: List<RemoteInstalledAppDto>): RemoteResult<Unit> {
+            apps.chunked(MaxUpsertBatchSize).forEach { batch ->
+                val result =
+                    client.upsert(
+                        SupabaseTable.DeviceApps,
+                        JSONArray().apply { batch.forEach { put(it.toJson()) } },
+                    )
+                if (result is RemoteResult.Failure) return result
+            }
+            return RemoteResult.Success(Unit)
+        }
+
+        private companion object {
+            const val MaxUpsertBatchSize = 20
+        }
     }

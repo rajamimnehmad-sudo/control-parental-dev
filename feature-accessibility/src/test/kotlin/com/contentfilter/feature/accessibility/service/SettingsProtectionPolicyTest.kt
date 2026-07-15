@@ -7,6 +7,29 @@ import kotlin.test.assertTrue
 
 class SettingsProtectionPolicyTest {
     @Test
+    fun onlySettingsInstallersAndResolvedUninstallersNeedNodeInspection() {
+        val policy = SettingsProtectionPolicy()
+
+        assertFalse(policy.couldContainProtectedScreen("com.contentfilter.user.dev", false))
+        assertFalse(policy.couldContainProtectedScreen("com.android.chrome", false))
+        assertTrue(policy.couldContainProtectedScreen("com.android.settings", false))
+        assertTrue(policy.couldContainProtectedScreen("com.samsung.accessibility", false))
+        assertTrue(policy.couldContainProtectedScreen("com.android.packageinstaller", false))
+        assertTrue(policy.couldContainProtectedScreen("com.vendor.securitycenter", true))
+    }
+
+    @Test
+    fun samsungAccessibilitySubSettingsAreProtected() {
+        assertTrue(
+            decide(
+                packageName = "com.samsung.accessibility",
+                className = "com.samsung.accessibility.core.winset.activity.SubSettings",
+                ownAppIdentityVisible = false,
+            ),
+        )
+    }
+
+    @Test
     fun normalSettingsRemainAvailable() {
         assertFalse(decide(className = "com.android.settings.Settings"))
     }

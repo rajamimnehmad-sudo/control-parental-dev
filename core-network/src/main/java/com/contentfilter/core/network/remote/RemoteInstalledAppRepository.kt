@@ -9,4 +9,6 @@ interface RemoteInstalledAppRepository {
     ): RemoteResult<List<RemoteInstalledAppDto>>
 
     suspend fun upsertInstalledApp(app: RemoteInstalledAppDto): RemoteResult<Unit>
+
+    suspend fun upsertInstalledApps(apps: List<RemoteInstalledAppDto>): RemoteResult<Unit>
 }

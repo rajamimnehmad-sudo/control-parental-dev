@@ -6,9 +6,11 @@ import javax.inject.Inject
 class BuildConfigSupabaseConfigProvider
     @Inject
     constructor() : SupabaseConfigProvider {
-        override fun current(): SupabaseConfig =
+        private val config =
             SupabaseConfig(
                 url = BuildConfig.SUPABASE_URL,
                 anonKey = BuildConfig.SUPABASE_ANON_KEY,
             )
+
+        override fun current(): SupabaseConfig = config
     }

@@ -79,6 +79,17 @@ Usuario 9be5bfa32b6008c59e8fb76c96c073d23d4c9d94904087262188ebe26f0d928f
 Admin   82e1b020335b782eec026ad900196f2da30eed7638258140683c0ba75e5c1599
 ```
 
+## Preparado 2026-07-14 - DEV 207 rendimiento y barrera Android
+
+- App Usuario y App Admin tienen `versionCode 207` y `versionName 1.0.1-dev`; la publicacion DEV aun esta pendiente. Usuario se genera no depurable, con R8 y perfil de arranque; Admin se genera no depurable y conserva su comportamiento funcional.
+- Causa principal de la lentitud restante: `ProtectorAccessibilityService` recorria hasta 200 nodos de la ventana para buscar acciones peligrosas en cada cambio de contenido, aun dentro de App Usuario y en aplicaciones comunes. El recorrido ahora solo se ejecuta para Ajustes, instaladores, desinstaladores resueltos y pantallas de accesibilidad Samsung.
+- La lista `Mis apps` usa filas Android nativas reciclables, cache de iconos y decodificacion fuera del hilo principal. La carga local aparece antes de la sincronizacion y se evita el doble refresco de inicio/`ON_RESUME`.
+- El inventario de 156 apps ya no se vuelve a detectar para publicarlo ni genera 156 solicitudes. Se envia en lotes de 20; el primer lote unico excedio el timeout de Supabase DEV, mientras que la estrategia final registro `installed apps published` sin errores HTTP.
+- Medicion fisica final SM-A235M, Accessibility activo y diez desplazamientos automatizados: `Mis apps` paso del baseline DEV 206 de 26,05 % de cuadros lentos, p50 18 ms, p90 77 ms y p99 200 ms a 5,76 %, p50 19 ms, p90 20 ms y p99 27 ms. Web registro 2,44 % y Home 0,81 %.
+- Seguridad fisica: tres aperturas consecutivas de Informacion de la app fueron expulsadas hasta el launcher; la ficha y la lista Samsung de servicios instalados no quedaron accesibles. La app siguio instalada, Accessibility enlazado y Device Admin activo.
+- Tests/build: unit tests de `core-network`, `feature-accessibility`, App Usuario y App Admin; ktlint de los cuatro; Android lint Usuario/Admin y ensamblado de ambos APK DEV exitosos. Detekt conserva deuda historica informativa sin fallos nuevos bloqueantes.
+- No se toco Production, no se borraron datos, no se agregaron secretos ni Service Role Key a Android y no se consumieron consultas Brave en estas pruebas.
+
 ## Cierre 2026-07-14 - DAG-PERF-02 fluidez DAG y App Usuario
 
 - DEV 206 elimina el repintado permanente del pez en Home, conserva la ilustracion estatica y cambia Home/Web a listas lazy para no componer todo el contenido desplazable a la vez.

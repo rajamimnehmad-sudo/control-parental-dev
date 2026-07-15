@@ -239,6 +239,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         elapsedRealtimeMillis: Long,
         nowEpochMillis: Long,
     ): Boolean {
+        val resolvedOwnUninstaller = packageName in ownUninstallerPackages
+        if (!settingsProtectionPolicy.couldContainProtectedScreen(packageName, resolvedOwnUninstaller)) return false
         val ownAppIdentityVisible =
             rootInActiveWindow.containsOwnAppIdentity() || eventContainsOwnAppIdentity(event)
         val dangerousSettingsActionVisible = rootInActiveWindow.containsDangerousSettingsAction()
@@ -247,7 +249,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 packageName = packageName,
                 className = className,
                 ownAppIdentityVisible = ownAppIdentityVisible,
-                resolvedOwnUninstaller = packageName in ownUninstallerPackages,
+                resolvedOwnUninstaller = resolvedOwnUninstaller,
                 dangerousSettingsActionVisible = dangerousSettingsActionVisible,
                 deviceAdminEnabled = DeviceAdminController.isEnabled(this),
                 armed = protectionStateStore.isArmed(),

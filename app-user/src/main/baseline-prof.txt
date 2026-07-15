@@ -1,0 +1,12 @@
+# App Usuario startup and critical navigation.
+HSPLcom/contentfilter/user/**->**(**)**
+
+# High-frequency Compose surfaces and protected app list scrolling.
+HPLcom/contentfilter/core/ui/**->**(**)**
+HPLcom/contentfilter/user/apps/**->**(**)**
+HPLcom/contentfilter/user/dag/**->**(**)**
+HPLandroidx/compose/**->**(**)**
+
+# Protection must stay responsive while the user app is visible.
+HPLcom/contentfilter/feature/accessibility/**->**(**)**
+HPLcom/contentfilter/feature/vpn/**->**(**)**

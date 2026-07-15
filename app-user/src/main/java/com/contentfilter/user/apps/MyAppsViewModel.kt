@@ -223,9 +223,12 @@ class MyAppsViewModel
 
         fun refreshApps() {
             if (isRefreshing.value) return
+            isRefreshing.value = true
             viewModelScope.launch(Dispatchers.IO) {
-                isRefreshing.value = true
                 try {
+                    message.value = "Buscando aplicaciones..."
+                    val apps = installedAppPublisher.installedApps()
+                    detectedApps.value = apps
                     message.value = "Sincronizando reglas..."
                     val coreSyncResult = runCatching { syncEngine.syncCoreDataFull() }.getOrNull()
                     val requestResultsSyncResult = runCatching { syncEngine.syncRequestResultsFull() }.getOrNull()
@@ -234,9 +237,19 @@ class MyAppsViewModel
                         "myAppsRefresh coreSyncSuccess=${coreSyncResult?.success} coreMessage=${coreSyncResult?.message.orEmpty()} " +
                             "requestResultsSuccess=${requestResultsSyncResult?.success} requestResultsMessage=${requestResultsSyncResult?.message.orEmpty()}",
                     )
-                    detectedApps.value = installedAppPublisher.installedApps()
                     activationRepository.currentActivation()?.let { activation ->
-                        runCatching { installedAppPublisher.publish(activation) }
+                        viewModelScope.launch(Dispatchers.IO) {
+                            runCatching { installedAppPublisher.publish(activation, apps) }
+                                .onSuccess { result ->
+                                    when (result) {
+                                        is RemoteResult.Success -> Log.i(LogTag, "installed apps published")
+                                        is RemoteResult.Failure ->
+                                            Log.w(LogTag, "installed apps publish failed: ${result.reason}")
+                                    }
+                                }.onFailure { exception ->
+                                    Log.w(LogTag, "installed apps publish failed", exception)
+                                }
+                        }
                     }
                     message.value =
                         if (coreSyncResult?.success == false || requestResultsSyncResult?.success == false) {

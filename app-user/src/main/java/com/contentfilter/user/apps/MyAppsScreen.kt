@@ -1,7 +1,9 @@
 package com.contentfilter.user.apps
 
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Base64
+import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -34,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -55,13 +58,14 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.ui.FeedbackBanner
 import com.contentfilter.core.ui.ProductAppBackground
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductPageHeader
 import com.contentfilter.core.ui.ProductSectionHeader
-import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
-import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun MyAppsRoute(
@@ -143,16 +147,13 @@ private fun MyAppsScreen(
             onSearchChanged = onSearchChanged,
             onRefreshApps = onRefreshApps,
         )
-        LazyColumn(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            if (state.apps.isEmpty()) {
-                item {
-                    Text("No hay apps detectadas todavía.")
-                }
-            }
-            if (quickFilter == MyAppsQuickFilter.InGroup && state.appGroups.isNotEmpty()) {
+        if (state.apps.isEmpty()) {
+            Text("No hay apps detectadas todavía.")
+        } else if (quickFilter == MyAppsQuickFilter.InGroup) {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
                 item {
                     ProductSectionHeader("Apps en grupo", count = state.appGroups.size)
                 }
@@ -166,18 +167,12 @@ private fun MyAppsScreen(
                     HorizontalDivider()
                 }
             }
-            if (quickFilter != MyAppsQuickFilter.InGroup && visibleApps.isNotEmpty()) {
-                item {
-                    ProductSectionHeader("Aplicaciones", count = visibleApps.size)
-                }
-            }
-            items(visibleApps, key = { it.packageName }) { app ->
-                MyAppRow(
-                    app = app,
-                    onRequestAccess = { onRequestAccess(app.packageName) },
-                )
-                HorizontalDivider()
-            }
+        } else {
+            MyAppsNativeList(
+                apps = visibleApps,
+                onRequestAccess = onRequestAccess,
+                modifier = Modifier.weight(1f),
+            )
         }
     }
 }
@@ -466,63 +461,6 @@ private fun GroupAppRow(app: MyAppItemUiState) {
 }
 
 @Composable
-private fun MyAppRow(
-    app: MyAppItemUiState,
-    onRequestAccess: () -> Unit,
-) {
-    val canRequestAccess =
-        app.status == AppAccessStatus.Blocked ||
-            app.status == AppAccessStatus.RequiresAuthorization ||
-            app.status == AppAccessStatus.LimitReached
-    ProductCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            AppIcon(app.name, app.iconBase64)
-            Column(modifier = Modifier.weight(1f)) {
-                Text(app.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    app.limitText,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            StatusLabel(app.status, app.extraTimeRemainingMinutes)
-        }
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.End,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (app.isRequesting) {
-                    Text("Enviando...", style = MaterialTheme.typography.bodySmall)
-                }
-                if (canRequestAccess) {
-                    ProgressActionButton(
-                        modifier = Modifier,
-                        text = "Pedir acceso",
-                        loadingText = "Enviando...",
-                        successText = "Pedido enviado",
-                        onClick = onRequestAccess,
-                        loading = app.isRequesting,
-                        enabled = !app.isRequesting,
-                    )
-                }
-            }
-        }
-        app.timeProgress?.let { progress ->
-            LinearProgressIndicator(
-                progress = { progress },
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-    }
-}
-
-@Composable
 private fun StatusLabel(
     status: AppAccessStatus,
     extraTimeRemainingMinutes: Int?,
@@ -549,18 +487,24 @@ private fun AppIcon(
     iconBase64: String?,
     size: Int = 40,
 ) {
-    val bitmap =
-        remember(iconBase64) {
-            iconBase64?.let {
-                runCatching {
-                    val bytes = Base64.decode(it, Base64.DEFAULT)
-                    BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-                }.getOrNull()
-            }
+    var bitmap by remember(iconBase64) { mutableStateOf(iconBase64?.let(AppIconBitmapCache::get)) }
+    LaunchedEffect(iconBase64) {
+        if (bitmap == null && iconBase64 != null) {
+            bitmap =
+                withContext(Dispatchers.Default) {
+                    runCatching {
+                        val bytes = Base64.decode(iconBase64, Base64.DEFAULT)
+                        BitmapFactory.decodeByteArray(bytes, 0, bytes.size)?.also { decoded ->
+                            AppIconBitmapCache.put(iconBase64, decoded)
+                        }
+                    }.getOrNull()
+                }
         }
-    if (bitmap != null) {
+    }
+    val displayedBitmap = bitmap
+    if (displayedBitmap != null) {
         Image(
-            bitmap = bitmap.asImageBitmap(),
+            bitmap = displayedBitmap.asImageBitmap(),
             contentDescription = null,
             modifier =
                 Modifier
@@ -570,6 +514,13 @@ private fun AppIcon(
     } else {
         FallbackIcon(name, size)
     }
+}
+
+private object AppIconBitmapCache : LruCache<String, Bitmap>(8 * 1024 * 1024) {
+    override fun sizeOf(
+        key: String,
+        value: Bitmap,
+    ): Int = value.allocationByteCount
 }
 
 @Composable

@@ -40,7 +40,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 206
+            versionCode = 207
             versionNameSuffix = "-dev"
         }
         create("beta") {
@@ -50,6 +50,14 @@ android {
         }
         create("prod") {
             dimension = "distribution"
+        }
+    }
+
+    buildTypes {
+        debug {
+            // DEV APKs are installed as updates on physical devices, but do
+            // not need to expose a debuggable runtime outside local builds.
+            isDebuggable = false
         }
     }
 

@@ -24,7 +24,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 206
+            versionCode = 207
             versionNameSuffix = "-dev"
         }
         create("beta") {
@@ -34,6 +34,19 @@ android {
         }
         create("prod") {
             dimension = "distribution"
+        }
+    }
+
+    buildTypes {
+        debug {
+            // DEV is distributed to physical test devices. Keeping the debug
+            // signing key allows in-place updates, while disabling JDWP avoids
+            // the runtime cost of a debuggable Compose/WebView process.
+            isDebuggable = false
+            isMinifyEnabled = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+            )
         }
     }
 
