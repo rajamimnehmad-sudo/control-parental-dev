@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 212
-App Admin versionCode 212
+App Usuario versionCode 215
+App Admin versionCode 215
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-212-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-212-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-215-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-215-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario dd5251b2d51c3c9032026e7057dc17b466e611bc526b51829238119160d54c1c
-Admin   e4ec89b5362d3bcc0482b188b8a28491de408e9c02fdaa1391016e335e76f1f0
+Usuario 5ef812d291d88530ee36ba00543707f87d4079262e8a247cd9c359bf8606a931
+Admin   7cb5b0ebdb35b67611d0152f7286c01b624a9a2829f5823fb4e3952a69619664
 ```
+
+## Cierre 2026-07-15 - DAG DEV 213-215 modelo neural, imagenes y UX compacta
+
+- DEV 213 reemplaza el primer clasificador estadistico por un MiniLM multilingue ONNX profesional que corre localmente. ARM64 usa ONNX Runtime y ARM32 conserva un clasificador compacto compatible para no excluir telefonos estandar. El APK Usuario queda en aproximadamente 39 MiB.
+- DEV 214 generaliza la visualizacion segura de imagenes HTTPS ya aprobadas localmente: reconoce fuentes lazy comunes y fondos CSS, entrega las respuestas filtradas con CORS y eleva el limite a 80 imagenes por pagina. La mejora no es especifica de Carrefour; aplica a sitios compatibles. SVG, GIF, video, `blob:`, recursos inseguros e imagenes no aprobadas permanecen ocultos.
+- La prueba fisica en SM-A235M mostro correctamente imagenes de Carrefour despues de la clasificacion local. La marca exacta `carrefour` dejo de producir el falso positivo observado y una imagen ilegible ya no bloquea el texto seguro de toda la pagina.
+- DEV 215 adopta una interfaz de navegador compacta inspirada en Chrome sin copiar su marca: barra combinada con accion integrada, resultados mas bajos con titulo/dominio/resumen truncados, controles de navegacion uniformes y cierre automatico del teclado al mostrar resultados o pagina.
+- `dag-search` DEV solicita a Brave resultados sin decoraciones HTML. La funcion fue desplegada solo en el proyecto DEV `syeycayasyufedwoprea`; no hubo cambios en Production, borrado de datos ni secretos en Android.
+- Validacion: tests dirigidos, ktlint y `assembleDevDebug` locales correctos; Android CI `29440595594` exitoso. La publicacion automatica `29440595539` encontro un fallo transitorio de resolucion DNS al consultar Supabase despues de completar 1.172 tareas; ambos APK se publicaron luego directamente mediante el flujo atomico DEV y se descargaron para verificar version 215 y SHA-256.
+- Commit DEV 214 `758c447`; commit DEV 215 `ec9bff7`. La version 215 fue probada fisicamente antes de desconectar el telefono: busqueda `carrefour`, teclado oculto, aproximadamente siete resultados visibles y sin etiquetas `<strong>`.
 
 ## Publicacion 2026-07-15 - AI-SEARCH-01A pendiente de prueba fisica
 
