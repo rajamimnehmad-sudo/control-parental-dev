@@ -9,6 +9,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
+import okhttp3.Protocol
 import okhttp3.Request
 import org.json.JSONObject
 import java.io.File
@@ -26,6 +27,8 @@ class DevApkUpdateRepository
     ) : ApkUpdateRepository {
         private val updateHttpClient =
             httpClient.newBuilder()
+                .protocols(listOf(Protocol.HTTP_1_1))
+                .retryOnConnectionFailure(true)
                 .connectTimeout(NetworkTimeoutSeconds, TimeUnit.SECONDS)
                 .readTimeout(NetworkTimeoutSeconds, TimeUnit.SECONDS)
                 .writeTimeout(NetworkTimeoutSeconds, TimeUnit.SECONDS)
@@ -58,7 +61,12 @@ class DevApkUpdateRepository
                     onProgress(0)
                     repeat(MaxDownloadAttempts) { attempt ->
                         val existingBytes = partial.length().takeIf { partial.exists() } ?: 0L
-                        val requestBuilder = Request.Builder().url(manifest.apkUrl).get()
+                        val requestBuilder =
+                            Request.Builder()
+                                .url(manifest.apkUrl)
+                                .header("Accept-Encoding", "identity")
+                                .header("Cache-Control", "no-cache")
+                                .get()
                         if (existingBytes > 0L) {
                             requestBuilder.header("Range", "bytes=$existingBytes-")
                         }
@@ -147,8 +155,8 @@ class DevApkUpdateRepository
             const val UpdateCacheDir = "updates"
             const val DefaultUpdateApkName = "dev-update.apk"
             const val BufferSizeBytes = 64 * 1024
-            const val NetworkTimeoutSeconds = 30L
-            const val DownloadTimeoutSeconds = 180L
+            const val NetworkTimeoutSeconds = 60L
+            const val DownloadTimeoutSeconds = 600L
             const val MaxDownloadAttempts = 3
             const val HttpPartialContent = 206
         }

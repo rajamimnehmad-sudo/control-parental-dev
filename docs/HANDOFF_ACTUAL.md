@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 218
-App Admin versionCode 218
+App Usuario versionCode 219
+App Admin versionCode 219
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,22 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-218-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-218-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-219-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-219-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario e374f1ec67ea6f8687e42c6b7e8544e201dd246672ffac68976fc0ab9aa6f594
-Admin   8a4b77f788c484a8a3c22704a1728896ca7693476014fb51ab01637c6d070d50
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DEV 219 descarga de actualizaciones resiliente
+
+- El APK 218 público fue comprobado externamente: HTTP 200, `Content-Length 40.429.875`, rangos habilitados y primer MiB descargado correctamente. El 0 % observado ocurre después de obtener el manifiesto y antes de recibir bytes en Android.
+- El cliente de actualización queda aislado en HTTP/1.1, fuerza cuerpo sin compresión, evita caché intermedia, reintenta fallos de conexión y conserva reanudación por `Range`. Los timeouts pasan a 60 segundos por operación y 10 minutos por descarga completa para conexiones móviles/VPN lentas.
+- Validación local: ktlint y módulo `core-update`, build optimizado DEV Usuario y Admin correctos. No hay teléfono conectado para reproducir la ruta exacta de red; DEV 219 requiere instalación directa inicial y luego prueba del siguiente chequeo interno.
 
 ## Implementacion 2026-07-15 - DAG DEV 218 WebView resiliente y cierre de buscadores
 
