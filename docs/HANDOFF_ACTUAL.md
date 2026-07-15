@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario f29fecd7416e94d551cb38bd4e622559e69a3b45b8256439be7b36611dedf4dc
+Admin   0ce51af639dad519b773aeaca165ccc6da280114d0dc921be2ee20a2f30d31fd
 ```
 
 ## Implementacion 2026-07-15 - DEV 221 estabilizacion del filtro visual
