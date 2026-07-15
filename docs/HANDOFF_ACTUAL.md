@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario fbdfd46bc131f111d7b31932f35f6cf5eb7c9b60fddb9fdebdf79f64771684c0
+Admin   97c48ab81f1dc666a4e0477f2ce76be427a80e306e4ee8e58a1f879add738c03
 ```
 
 ## Implementacion 2026-07-15 - DAG DEV 217 compatibilidad, Home y pestañas
@@ -86,7 +86,7 @@ Admin   pendiente de publicacion
 - Pestañas funcionales: botón con cantidad, nueva pestaña, cambio y cierre. Cada pestaña conserva Home, resultados o URL; restaurar resultados no repite una consulta Brave. Las pestañas Web se reanudan desde su URL en lugar de mantener varios WebView/ONNX vivos, limitando memoria.
 - Compatibilidad de imágenes: fuentes lazy adicionales, `<picture>` sin eliminar sus `<source>`, detección `Sec-Fetch-Dest`, Referer HTTPS de la página cuando falta y presupuesto de hasta 200 imágenes clasificadas por página. Cada recurso conserva HTTPS, 4 MiB, timeout, SSRF y decisión visual local; no significa permitir toda imagen sin clasificación.
 - `google.com` raíz y `/search` se bloquean como portales de búsqueda no anulables para evitar saltarse Brave, clasificación y cupo. Servicios separados como `mail.google.com` y `maps.google.com` continúan evaluándose como sitios normales. Cookies son propias de DAG y no comparten automáticamente la sesión de Chrome.
-- Validación local dirigida: ktlint, tests DEV Usuario —incluido bypass de buscadores— y APK Usuario optimizado correctos. Falta publicación y prueba física de DEV 217.
+- Validación local dirigida: ktlint, tests DEV Usuario —incluido bypass de buscadores— y APK Usuario optimizado correctos. Ambos APK DEV 217 fueron ensamblados, publicados atomicamente en Supabase DEV y verificados por manifiesto/hash. Falta prueba física de DEV 217.
 
 ## Cierre 2026-07-15 - DAG-UX-02 superficie completa tipo navegador
 
