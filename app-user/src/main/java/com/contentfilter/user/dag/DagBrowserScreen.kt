@@ -32,6 +32,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -57,6 +58,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -68,6 +70,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.contentfilter.core.ui.PremiumFishMascot
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductViolet
@@ -75,6 +78,7 @@ import com.contentfilter.core.ui.ProductVisualPage
 import org.json.JSONArray
 import java.text.DateFormat
 import java.util.Date
+import java.util.UUID
 
 @Composable
 @OptIn(ExperimentalLayoutApi::class)
@@ -114,13 +118,56 @@ fun DagBrowserRoute(
         if (state.view == DagView.Start) onBack() else viewModel.showStart()
     }
     var menuExpanded by remember { mutableStateOf(false) }
+    var tabsExpanded by remember { mutableStateOf(false) }
+    var addressFocused by remember { mutableStateOf(false) }
     var activeWebView by remember { mutableStateOf<WebView?>(null) }
     var browserCanGoForward by remember { mutableStateOf(false) }
+    var tabs by remember { mutableStateOf(listOf(DagTab(snapshot = viewModel.captureTab()))) }
+    var activeTabId by remember { mutableStateOf(tabs.first().id) }
+
+    fun persistActiveTab() {
+        tabs = tabs.map { tab -> if (tab.id == activeTabId) tab.copy(snapshot = viewModel.captureTab()) else tab }
+    }
+
+    fun openTab(tab: DagTab) {
+        persistActiveTab()
+        activeTabId = tab.id
+        viewModel.restoreTab(tab.snapshot)
+        tabsExpanded = false
+    }
+
+    fun newTab() {
+        persistActiveTab()
+        viewModel.openNewTab()
+        val tab = DagTab(snapshot = viewModel.captureTab())
+        tabs = tabs + tab
+        activeTabId = tab.id
+        tabsExpanded = false
+    }
+
+    fun closeTab(tab: DagTab) {
+        persistActiveTab()
+        val remaining = tabs.filterNot { it.id == tab.id }
+        if (remaining.isEmpty()) {
+            viewModel.openNewTab()
+            val replacement = DagTab(snapshot = viewModel.captureTab())
+            tabs = listOf(replacement)
+            activeTabId = replacement.id
+        } else {
+            tabs = remaining
+            if (activeTabId == tab.id) {
+                val replacement = remaining.last()
+                activeTabId = replacement.id
+                viewModel.restoreTab(replacement.snapshot)
+            }
+        }
+    }
 
     Column(
         modifier =
             modifier
-                .background(MaterialTheme.colorScheme.background),
+                .background(MaterialTheme.colorScheme.background)
+                .then(if (standalone) Modifier.statusBarsPadding() else Modifier),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
@@ -150,7 +197,14 @@ fun DagBrowserRoute(
                 ) { Text("‹", style = MaterialTheme.typography.headlineMedium) }
             }
             OutlinedTextField(
-                modifier = Modifier.weight(1f).height(48.dp),
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .height(56.dp)
+                        .onFocusChanged { focusState ->
+                            if (focusState.isFocused && !addressFocused) viewModel.onAddressChanged("")
+                            addressFocused = focusState.isFocused
+                        },
                 value = state.address,
                 onValueChange = viewModel::onAddressChanged,
                 placeholder = { Text("Buscar en DAG o escribir dirección") },
@@ -169,6 +223,36 @@ fun DagBrowserRoute(
                 enabled = !state.loading,
                 modifier = Modifier.width(44.dp),
             ) { Text(if (state.view == DagView.Browser) "↻" else "Ir") }
+            Box {
+                TextButton(
+                    onClick = {
+                        persistActiveTab()
+                        tabsExpanded = true
+                    },
+                    modifier = Modifier.width(40.dp),
+                ) { Text(tabs.size.toString()) }
+                DropdownMenu(expanded = tabsExpanded, onDismissRequest = { tabsExpanded = false }) {
+                    tabs.forEachIndexed { index, tab ->
+                        val snapshot = if (tab.id == activeTabId) viewModel.captureTab() else tab.snapshot
+                        DropdownMenuItem(
+                            text = {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Text(
+                                        snapshot.tabLabel(index + 1),
+                                        modifier = Modifier.weight(1f),
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                    )
+                                    TextButton(onClick = { closeTab(tab) }) { Text("×") }
+                                }
+                            },
+                            onClick = { openTab(tab.copy(snapshot = snapshot)) },
+                        )
+                    }
+                    HorizontalDivider()
+                    DropdownMenuItem(text = { Text("＋ Nueva pestaña") }, onClick = ::newTab)
+                }
+            }
             Box {
                 TextButton(onClick = { menuExpanded = true }, modifier = Modifier.width(40.dp)) {
                     Text("⋮", style = MaterialTheme.typography.headlineSmall)
@@ -214,7 +298,7 @@ fun DagBrowserRoute(
         }
 
         when (state.view) {
-            DagView.Start -> Unit
+            DagView.Start -> DagStartContent()
             DagView.Results -> DagResultsContent(state.results, viewModel::openResult, viewModel::requestReview)
             DagView.History ->
                 DagHistoryContent(
@@ -241,6 +325,37 @@ fun DagBrowserRoute(
     BackHandler(enabled = WindowInsets.isImeVisible) {
         focusManager.clearFocus()
         keyboardController?.hide()
+    }
+}
+
+private data class DagTab(
+    val id: String = UUID.randomUUID().toString(),
+    val snapshot: DagTabSnapshot,
+)
+
+private fun DagTabSnapshot.tabLabel(position: Int): String =
+    when (view) {
+        DagView.Browser -> DagContentClassifier.domainFrom(requestedUrl.orEmpty()).ifBlank { "Pestaña $position" }
+        DagView.Results -> address.ifBlank { "Resultados" }
+        DagView.History -> "Historial"
+        DagView.Start -> "Nueva pestaña"
+    }
+
+@Composable
+private fun DagStartContent() {
+    Column(
+        modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        PremiumFishMascot(modifier = Modifier.width(150.dp).height(120.dp))
+        Spacer(Modifier.height(12.dp))
+        Text("DAG", style = MaterialTheme.typography.headlineMedium)
+        Text(
+            "Buscá y navegá con protección local.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -617,7 +732,7 @@ private class DagWebViewClient(
     override fun shouldInterceptRequest(
         view: WebView?,
         request: WebResourceRequest,
-    ): WebResourceResponse? = imageLoader.intercept(request)
+    ): WebResourceResponse? = imageLoader.intercept(request, view?.url)
 }
 
 private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
@@ -629,6 +744,12 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
               image.getAttribute('data-src'),
               image.getAttribute('data-lazy-src'),
               image.getAttribute('data-original'),
+              image.getAttribute('data-lazy'),
+              image.getAttribute('data-url'),
+              image.getAttribute('data-image'),
+              image.getAttribute('data-hi-res-src'),
+              image.getAttribute('data-src-large'),
+              image.getAttribute('data-flickity-lazyload'),
               image.getAttribute('data-srcset'),
               image.getAttribute('src'),
               image.currentSrc
@@ -665,8 +786,13 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
           function dagSecureNode(node) {
             if (!node || node.nodeType !== 1) return;
             var tag = node.tagName ? node.tagName.toLowerCase() : '';
-            if (tag === 'video' || tag === 'audio' || tag === 'source' || tag === 'canvas' || tag === 'iframe') {
+            if (tag === 'video' || tag === 'audio' || tag === 'canvas' || tag === 'iframe') {
               node.remove();
+              return;
+            }
+            if (tag === 'source') {
+              var parentTag = node.parentElement && node.parentElement.tagName ? node.parentElement.tagName.toLowerCase() : '';
+              if (parentTag === 'video' || parentTag === 'audio') node.remove();
               return;
             }
             if (tag === 'img') {
@@ -680,7 +806,7 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
               if (node.getAttribute('src') !== source) node.src = source;
             }
             dagSecureBackground(node);
-            node.querySelectorAll && node.querySelectorAll('video,audio,source,canvas,iframe').forEach(function(child) { child.remove(); });
+            node.querySelectorAll && node.querySelectorAll('video,audio,video source,audio source,canvas,iframe').forEach(function(child) { child.remove(); });
             node.querySelectorAll && node.querySelectorAll('img').forEach(function(image) {
               dagSecureNode(image);
             });

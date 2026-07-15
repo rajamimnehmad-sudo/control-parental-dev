@@ -72,3 +72,13 @@ data class DagBrowserUiState(
     val message: String = "",
     val reviewCandidate: DagReviewCandidate? = null,
 )
+
+data class DagTabSnapshot(
+    val address: String = "",
+    val view: DagView = DagView.Start,
+    val pageStatus: DagPageStatus = DagPageStatus.Idle,
+    val results: List<DagSearchResult> = emptyList(),
+    val requestedUrl: String? = null,
+    val message: String = "",
+    val reviewCandidate: DagReviewCandidate? = null,
+)

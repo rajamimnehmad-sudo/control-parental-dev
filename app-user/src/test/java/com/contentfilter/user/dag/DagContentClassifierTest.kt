@@ -76,6 +76,22 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `external search portals cannot bypass DAG search`() {
+        assertEquals(
+            DagClassification.Blocked,
+            classifier.classifyDirectUrl("https://google.com").decision,
+        )
+        assertEquals(
+            DagClassification.Blocked,
+            classifier.classifyDirectUrl("https://google.com/search?q=test").decision,
+        )
+        assertEquals(
+            DagClassification.Allowed,
+            classifier.classifyDirectUrl("https://maps.google.com/place/test").decision,
+        )
+    }
+
+    @Test
     fun `obfuscated explicit terms fail closed`() {
         val result = classifier.classifyQuery("p0rn0")
 

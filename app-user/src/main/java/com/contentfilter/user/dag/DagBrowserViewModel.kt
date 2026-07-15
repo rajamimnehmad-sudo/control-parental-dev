@@ -433,6 +433,51 @@ class DagBrowserViewModel
             }
         }
 
+        fun captureTab(): DagTabSnapshot =
+            mutableState.value.let {
+                DagTabSnapshot(
+                    address = it.address,
+                    view = it.view,
+                    pageStatus = it.pageStatus,
+                    results = it.results,
+                    requestedUrl = it.requestedUrl,
+                    message = it.message,
+                    reviewCandidate = it.reviewCandidate,
+                )
+            }
+
+        fun restoreTab(tab: DagTabSnapshot) {
+            mutableState.update {
+                it.copy(
+                    address = tab.address,
+                    view = tab.view,
+                    pageStatus = if (tab.view == DagView.Browser) DagPageStatus.Loading else tab.pageStatus,
+                    results = tab.results,
+                    requestedUrl = tab.requestedUrl,
+                    navigationRevision = it.navigationRevision + 1,
+                    loading = false,
+                    message = tab.message,
+                    reviewCandidate = tab.reviewCandidate,
+                )
+            }
+        }
+
+        fun openNewTab() {
+            mutableState.update {
+                it.copy(
+                    address = "",
+                    view = DagView.Start,
+                    pageStatus = DagPageStatus.Idle,
+                    results = emptyList(),
+                    requestedUrl = null,
+                    navigationRevision = it.navigationRevision + 1,
+                    loading = false,
+                    message = "",
+                    reviewCandidate = null,
+                )
+            }
+        }
+
         fun openHistory(entry: DagHistoryEntry) {
             when (entry.type) {
                 DagHistoryType.Search -> {

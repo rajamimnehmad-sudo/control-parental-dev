@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 216
-App Admin versionCode 216
+App Usuario versionCode 217
+App Admin versionCode 217
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,25 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-216-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-216-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-217-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-217-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario d170d361ba239194d6c5966b88f3d13bfce3ea34604e05ca52d0668498eba329
-Admin   374f55022b94e913c92ddd2af9bb0f91bc78c30875263ec4791129ecd7cc0942
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DAG DEV 217 compatibilidad, Home y pestañas
+
+- La superficie independiente respeta `statusBarsPadding`: barra y controles quedan debajo de cámara, hora, batería e iconos del sistema. La barra combinada vuelve a 56 dp para evitar recorte interno y al recibir foco vacía la dirección anterior.
+- Home incorpora la mascota local y el texto `Buscá y navegá con protección local` sin cargar recursos externos.
+- Pestañas funcionales: botón con cantidad, nueva pestaña, cambio y cierre. Cada pestaña conserva Home, resultados o URL; restaurar resultados no repite una consulta Brave. Las pestañas Web se reanudan desde su URL en lugar de mantener varios WebView/ONNX vivos, limitando memoria.
+- Compatibilidad de imágenes: fuentes lazy adicionales, `<picture>` sin eliminar sus `<source>`, detección `Sec-Fetch-Dest`, Referer HTTPS de la página cuando falta y presupuesto de hasta 200 imágenes clasificadas por página. Cada recurso conserva HTTPS, 4 MiB, timeout, SSRF y decisión visual local; no significa permitir toda imagen sin clasificación.
+- `google.com` raíz y `/search` se bloquean como portales de búsqueda no anulables para evitar saltarse Brave, clasificación y cupo. Servicios separados como `mail.google.com` y `maps.google.com` continúan evaluándose como sitios normales. Cookies son propias de DAG y no comparten automáticamente la sesión de Chrome.
+- Validación local dirigida: ktlint, tests DEV Usuario —incluido bypass de buscadores— y APK Usuario optimizado correctos. Falta publicación y prueba física de DEV 217.
 
 ## Cierre 2026-07-15 - DAG-UX-02 superficie completa tipo navegador
 

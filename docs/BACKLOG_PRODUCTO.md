@@ -345,6 +345,8 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-TABS-01 | 2026-07-15, DEV 217 | Pestañas con alta, cambio y cierre; resultados se restauran sin otra consulta Brave y páginas suspendidas no conservan múltiples WebView en memoria |
+| DAG-COMPAT-01 | 2026-07-15, DEV 217 | Área segura superior, barra sin recorte, Home con mascota y compatibilidad ampliada para imágenes lazy/picture sin relajar clasificación local |
 | DAG-UX-02 | 2026-07-15, DEV 216 | Una sola franja con navegacion, barra, recarga y menu; WebView y resultados de ancho completo sin bordes laterales; Brave permanece como motor |
 | DAG-UX-01 | 2026-07-15, DEV 215 | Barra combinada compacta, resultados tipo navegador, teclado automatico y controles uniformes; prueba fisica en SM-A235M y Android CI exitoso |
 | DAG-IMAGES-01 | 2026-07-15, DEV 210 | Fotos estaticas clasificadas localmente antes de mostrarse; fallo cerrado, privacidad on-device y prueba fisica con APK publico sin consumir Brave |

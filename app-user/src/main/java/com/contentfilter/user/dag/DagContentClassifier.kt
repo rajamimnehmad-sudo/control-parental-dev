@@ -61,6 +61,7 @@ class DagContentClassifier
         }
 
         fun classifyDirectUrl(url: String): DagClassificationResult {
+            if (url.isSearchPortal()) return blocked("search_portal", confidence = 1f)
             val domain = domainFrom(url)
             blockedVisualPlatform(domain)?.let { return it }
             domainBlocklist.categoryFor(domain)?.let { category ->
@@ -130,6 +131,13 @@ class DagContentClassifier
         private fun neuralClassifierOrNull(): DagNeuralTextClassifier? =
             if (::neuralClassifier.isInitialized) neuralClassifier else null
 
+        private fun String.isSearchPortal(): Boolean =
+            runCatching {
+                val uri = URI(this)
+                val domain = uri.host.orEmpty().lowercase(Locale.ROOT).removePrefix("www.")
+                domain in SearchPortalDomains && (uri.path.isNullOrBlank() || uri.path == "/" || uri.path == "/search")
+            }.getOrDefault(false)
+
         private fun allowed(modelVersion: String = ModelVersion) =
             DagClassificationResult(
                 decision = DagClassification.Allowed,
@@ -156,8 +164,9 @@ class DagContentClassifier
             private const val MaxSemanticCharacters = 4_000
             private const val MaxNeuralCharacters = 2_000
             private const val MinimumRiskyImages = 3
-            val NonOverridableCategories = setOf("unsafe_visual_platform")
+            val NonOverridableCategories = setOf("unsafe_visual_platform", "search_portal")
             private val NonOverridableVisualDomains = setOf("imgsrc.ru")
+            private val SearchPortalDomains = setOf("google.com", "bing.com", "search.yahoo.com")
 
             private val CombiningMarksPattern = Regex("\\p{M}+")
             private val InvalidCharactersPattern = Regex("[^\\p{L}\\p{N}.]+")

@@ -51,19 +51,25 @@ internal class DagImageResourceLoader(
             uncertain = uncertainCount.get(),
         )
 
-    fun intercept(request: WebResourceRequest): WebResourceResponse? {
+    fun intercept(
+        request: WebResourceRequest,
+        pageUrl: String? = null,
+    ): WebResourceResponse? {
         if (request.isForMainFrame) return null
         if (isBlockedMediaRequest(request.url.toString(), request.requestHeaders)) return blockedResource()
         if (!isProbableImageRequest(request.url.toString(), request.requestHeaders)) return null
         if (request.url.scheme != "https" || imageCount.incrementAndGet() > MaximumImagesPerPage) return blockedResource()
 
-        return runCatching { loadClassifiedImage(request) }.getOrElse {
+        return runCatching { loadClassifiedImage(request, pageUrl) }.getOrElse {
             uncertainCount.incrementAndGet()
             blockedResource()
         }
     }
 
-    private fun loadClassifiedImage(request: WebResourceRequest): WebResourceResponse {
+    private fun loadClassifiedImage(
+        request: WebResourceRequest,
+        pageUrl: String?,
+    ): WebResourceResponse {
         val requestBuilder = Request.Builder().url(request.url.toString()).get()
         ForwardedHeaders.forEach { name ->
             request.requestHeaders.headerValue(name).takeIf { it.isNotBlank() }?.let { requestBuilder.header(name, it) }
@@ -71,6 +77,11 @@ internal class DagImageResourceLoader(
         cookieManager.getCookie(
             request.url.toString(),
         )?.takeIf { it.isNotBlank() }?.let { requestBuilder.header("Cookie", it) }
+        if (request.requestHeaders.headerValue("Referer").isBlank()) {
+            pageUrl?.takeIf { it.startsWith("https://", ignoreCase = true) }?.let {
+                requestBuilder.header("Referer", it)
+            }
+        }
 
         client.newCall(requestBuilder.build()).execute().use { response ->
             if (!response.isSuccessful || response.request.url.scheme != "https") return blockedResource()
@@ -117,7 +128,7 @@ internal class DagImageResourceLoader(
     }
 
     private companion object {
-        const val MaximumImagesPerPage = 80
+        const val MaximumImagesPerPage = 200
         const val RequestTimeoutSeconds = 8L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
@@ -160,6 +171,7 @@ internal fun isProbableImageRequest(
 ): Boolean {
     val accept = headers.headerValue("Accept").lowercase()
     if (accept.contains("image/")) return true
+    if (headers.headerValue("Sec-Fetch-Dest").equals("image", ignoreCase = true)) return true
     val path = url.substringBefore('?').substringBefore('#').lowercase()
     return ImageExtensions.any(path::endsWith)
 }
