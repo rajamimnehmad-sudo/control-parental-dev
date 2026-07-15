@@ -144,6 +144,8 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | DAG-TABS-UX-01 | Idea | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | Idea | P2 | Mejorar contraste y agregar tema claro, oscuro o segun dispositivo | M | Medio |
 | DAG-HISTORY-UX-01 | Idea | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
+| DAG-ANALYSIS-UX-01 | Idea | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
+| DAG-APPROVAL-CACHE-01 | Idea | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
@@ -315,6 +317,30 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 - Duplicados y relacion: mejora visual del historial ya implementado; no propone ampliar datos guardados ni telemetria.
 - Criterios de aceptacion propuestos: lista facil de recorrer; apertura correcta en pestana; borrado claro y consistente; estados vacio y error; sin guardar consultas, contenido adicional ni datos fuera del alcance vigente.
 - Decisiones pendientes para el ticket: campos visibles, agrupacion por fecha, favicon, acciones por fila y borrado individual o por periodo.
+
+#### DAG-ANALYSIS-UX-01 - Analisis integrado en el buscador
+
+- Estado: `Idea`; no aprobado para codigo. Tipo: UX, feedback visual y marca DAG. Prioridad: P2.
+- Problema: el mensaje separado `DAG esta analizando la pagina` ocupa espacio y no integra el estado de seguridad con la identidad del buscador.
+- Solucion propuesta: durante el analisis, iluminar el propio buscador con colores neon y una animacion de aspecto inteligente, mostrando dentro de esa zona la leyenda `Analizando...`.
+- Evidencia: propuesta visual del usuario el 2026-07-15.
+- Esfuerzo: S. Riesgo: bajo; animaciones intensas pueden afectar rendimiento, accesibilidad o distraer.
+- Dependencias: estado de analisis local, buscador/barra DAG, temas claro y oscuro, preferencias de movimiento reducido y optimizaciones de rendimiento vigentes.
+- Duplicados y relacion: complementa `DAG-HOME-UX-01` y `DAG-THEME-01`; no cambia el clasificador ni permite mostrar contenido antes de finalizar el analisis.
+- Criterios de aceptacion propuestos: el buscador comunica claramente `Analizando...`; el contenido sigue oculto hasta una decision segura; la animacion es fluida, acotada y legible en ambos temas; existe una presentacion reducida para accesibilidad; no agrega recomposiciones o trabajo continuo costoso.
+- Decisiones pendientes para el ticket: paleta neon, intensidad, duracion, comportamiento fuera de Home y tratamiento de movimiento reducido.
+
+#### DAG-APPROVAL-CACHE-01 - Reutilizacion temporal de aprobaciones
+
+- Estado: `Idea`; no aprobado para codigo ni cambios de datos. Tipo: seguridad, cache de decisiones y UX. Prioridad: P1.
+- Problema: una pagina ya aprobada puede volver a exigir analisis o revision en cada apertura, generando espera y solicitudes repetidas aunque la aprobacion sea reciente.
+- Solucion propuesta: conservar una aprobacion con vencimiento y permitir reaperturas directas durante un periodo configurable, por ejemplo una semana o un mes, sujeto a reglas claras de alcance e invalidacion.
+- Evidencia: necesidad expresada por el usuario el 2026-07-15.
+- Esfuerzo: M. Riesgo: alto; el contenido o propietario de una pagina puede cambiar durante la vigencia y una aprobacion demasiado amplia podria autorizar rutas no revisadas.
+- Dependencias: modelo comun `WebPolicyDecision`; aprobaciones Admin; historial cifrado; reglas por dispositivo; version del clasificador y politica; reloj y vencimiento; privacidad y sincronizacion.
+- Duplicados y relacion: se relaciona con `WEB-CACHE-01`, que propone cache local acotada de reputacion sin URL ni historial. No se marca como duplicado hasta definir si la aprobacion aplica a dominio, URL exacta o decision administrativa persistida.
+- Criterios de aceptacion propuestos: una aprobacion vigente evita revisiones repetidas solo dentro de su alcance exacto; toda entrada tiene origen, momento y vencimiento; cambios de politica, revocacion, version incompatible o indicadores de riesgo invalidan la reutilizacion; al vencer se vuelve a analizar o revisar; no se guarda contenido, HTML ni consultas; el administrador puede conocer y revocar la aprobacion aplicable.
+- Decisiones pendientes para el ticket: duracion predeterminada y maxima; dominio, subdominio o URL exacta; quien puede aprobar; almacenamiento local o sincronizado; invalidaciones por cambio de contenido/modelo/politica; reapertura inmediata o analisis local abreviado.
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 
