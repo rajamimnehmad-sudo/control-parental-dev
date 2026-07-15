@@ -58,6 +58,7 @@ Deno.serve(async (request) => {
   endpoint.searchParams.set("ui_lang", language === "he" ? "he-IL" : language === "en" ? "en-US" : "es-AR");
   endpoint.searchParams.set("safesearch", "strict");
   endpoint.searchParams.set("spellcheck", "1");
+  endpoint.searchParams.set("text_decorations", "0");
 
   const response = await fetch(endpoint, {
     method: "GET",

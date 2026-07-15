@@ -43,6 +43,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,6 +60,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -84,6 +86,12 @@ fun DagBrowserRoute(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
+    LaunchedEffect(state.view) {
+        if (state.view == DagView.Results || state.view == DagView.Browser) {
+            focusManager.clearFocus()
+            keyboardController?.hide()
+        }
+    }
     if (!state.dagAvailabilityKnown) {
         Box(modifier = modifier.background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
             CircularProgressIndicator()
@@ -107,8 +115,11 @@ fun DagBrowserRoute(
     var menuExpanded by remember { mutableStateOf(false) }
 
     Column(
-        modifier = modifier.background(MaterialTheme.colorScheme.background).padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        modifier =
+            modifier
+                .background(MaterialTheme.colorScheme.background)
+                .padding(horizontal = 8.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -121,7 +132,7 @@ fun DagBrowserRoute(
                 }
             }
             OutlinedTextField(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier.weight(1f).height(52.dp),
                 value = state.address,
                 onValueChange = viewModel::onAddressChanged,
                 placeholder = { Text("Buscar en DAG o escribir dirección") },
@@ -132,12 +143,12 @@ fun DagBrowserRoute(
                     androidx.compose.foundation.text.KeyboardActions(
                         onGo = { viewModel.submitAddress() },
                     ),
+                trailingIcon = {
+                    TextButton(onClick = viewModel::submitAddress, enabled = !state.loading) {
+                        Text("Ir")
+                    }
+                },
             )
-            Button(
-                onClick = viewModel::submitAddress,
-                enabled = !state.loading,
-                shape = RoundedCornerShape(24.dp),
-            ) { Text("Ir") }
             Box {
                 TextButton(onClick = { menuExpanded = true }) {
                     Text("⋮", style = MaterialTheme.typography.headlineSmall)
@@ -161,15 +172,20 @@ fun DagBrowserRoute(
             }
         }
 
-        if (state.loading) CircularProgressIndicator(modifier = Modifier.height(28.dp))
+        if (state.loading) CircularProgressIndicator(modifier = Modifier.height(24.dp))
 
         if (state.message.isNotBlank()) {
-            ProductCard {
-                Text(state.message, color = MaterialTheme.colorScheme.onSurface)
-                state.reviewCandidate?.let { candidate ->
-                    Spacer(Modifier.height(8.dp))
-                    Button(onClick = { viewModel.requestReview(candidate) }) {
-                        Text("Pedir revisión de ${candidate.domain}")
+            Surface(
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainer,
+            ) {
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Text(state.message, style = MaterialTheme.typography.bodyMedium)
+                    state.reviewCandidate?.let { candidate ->
+                        Spacer(Modifier.height(4.dp))
+                        TextButton(onClick = { viewModel.requestReview(candidate) }) {
+                            Text("Pedir revisión de ${candidate.domain}")
+                        }
                     }
                 }
             }
@@ -211,32 +227,53 @@ private fun DagResultsContent(
     onOpen: (DagSearchResult) -> Unit,
     onReview: (DagReviewCandidate) -> Unit,
 ) {
-    LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    LazyColumn(modifier = Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         items(results, key = { it.url }) { result ->
-            ProductCard(
+            Surface(
                 modifier =
                     Modifier.clickable(enabled = result.classification.decision == DagClassification.Allowed) {
                         onOpen(result)
                     },
+                shape = RoundedCornerShape(16.dp),
+                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                tonalElevation = 1.dp,
             ) {
-                Text(result.title, style = MaterialTheme.typography.titleMedium)
-                Text(result.domain, color = MaterialTheme.colorScheme.primary)
-                if (result.description.isNotBlank()) Text(result.description)
-                if (result.classification.decision == DagClassification.Uncertain) {
-                    Button(
-                        onClick = {
-                            onReview(
-                                DagReviewCandidate(
-                                    url = result.url,
-                                    domain = result.domain,
-                                    title = result.title,
-                                    category = result.classification.category,
-                                    modelVersion = result.classification.modelVersion,
-                                ),
-                            )
-                        },
-                    ) {
-                        Text("Pedir revisión")
+                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                    Text(
+                        result.title,
+                        style = MaterialTheme.typography.titleSmall,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        result.domain,
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    if (result.description.isNotBlank()) {
+                        Text(
+                            result.description,
+                            style = MaterialTheme.typography.bodySmall,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                    }
+                    if (result.classification.decision == DagClassification.Uncertain) {
+                        TextButton(
+                            onClick = {
+                                onReview(
+                                    DagReviewCandidate(
+                                        url = result.url,
+                                        domain = result.domain,
+                                        title = result.title,
+                                        category = result.classification.category,
+                                        modelVersion = result.classification.modelVersion,
+                                    ),
+                                )
+                            },
+                        ) {
+                            Text("Pedir revisión")
+                        }
                     }
                 }
             }
@@ -343,14 +380,25 @@ private fun DagWebContent(
         }
     }
 
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { webView?.goBack() }, enabled = canGoBack) { Text("◀") }
-        OutlinedButton(onClick = { webView?.goForward() }, enabled = canGoForward) { Text("▶") }
-        OutlinedButton(onClick = { webView?.reload() }) { Text("↻") }
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedButton(
+            modifier = Modifier.weight(1f).height(40.dp),
+            onClick = { webView?.goBack() },
+            enabled = canGoBack,
+        ) { Text("‹") }
+        OutlinedButton(
+            modifier = Modifier.weight(1f).height(40.dp),
+            onClick = { webView?.goForward() },
+            enabled = canGoForward,
+        ) { Text("›") }
+        OutlinedButton(
+            modifier = Modifier.weight(1f).height(40.dp),
+            onClick = { webView?.reload() },
+        ) { Text("↻") }
         OutlinedButton(onClick = {
             webView?.stopLoading()
             onHome()
-        }) { Text("⌂") }
+        }, modifier = Modifier.weight(1f).height(40.dp)) { Text("⌂") }
     }
 
     Box(modifier = Modifier.fillMaxSize()) {
