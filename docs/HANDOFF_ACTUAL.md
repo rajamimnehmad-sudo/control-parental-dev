@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 217
-App Admin versionCode 217
+App Usuario versionCode 218
+App Admin versionCode 218
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-217-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-217-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-218-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-218-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario fbdfd46bc131f111d7b31932f35f6cf5eb7c9b60fddb9fdebdf79f64771684c0
-Admin   97c48ab81f1dc666a4e0477f2ce76be427a80e306e4ee8e58a1f879add738c03
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DAG DEV 218 WebView resiliente y cierre de buscadores
+
+- `DagWebViewClient` maneja `onRenderProcessGone` y consume la caída del renderer aislado. DAG abandona solo la pestaña dañada, libera su referencia y vuelve a Home con un mensaje recuperable, en lugar de permitir que Android cierre Content Filter.
+- El presupuesto visual baja de 200 a 120 imágenes clasificadas por página para conservar la compatibilidad ampliada de DEV 217 con menor presión de memoria/renderer.
+- La barrera no anulable `search_portal` cubre Google y dominios regionales, Bing, Yahoo, DuckDuckGo, Brave Search web, Yandex, Ecosia, Startpage, Qwant, Swisscows, Mojeek, AOL, Ask y Baidu. Gmail, Maps y otros subservicios que no sean portales de búsqueda continúan evaluándose normalmente.
+- Validación local: ktlint, tests DEV Usuario con matriz de portales y APK Usuario optimizado correctos. Sin teléfono conectado no fue posible extraer el `logcat` del cierre mostrado por el usuario; la prueba física de recuperación WebView queda pendiente.
 
 ## Implementacion 2026-07-15 - DAG DEV 217 compatibilidad, Home y pestañas
 

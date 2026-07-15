@@ -510,6 +510,21 @@ class DagBrowserViewModel
             }
         }
 
+        fun onBrowserRendererGone() {
+            mutableState.update {
+                it.copy(
+                    address = "",
+                    view = DagView.Start,
+                    pageStatus = DagPageStatus.Idle,
+                    requestedUrl = null,
+                    navigationRevision = it.navigationRevision + 1,
+                    loading = false,
+                    message = "La pestaña se cerró para proteger la estabilidad. Podés volver a intentarlo.",
+                    reviewCandidate = null,
+                )
+            }
+        }
+
         private fun applyExplicitRule(
             domain: String,
             result: DagClassificationResult,

@@ -7,6 +7,7 @@ import android.net.http.SslError
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
+import android.webkit.RenderProcessGoneDetail
 import android.webkit.SafeBrowsingResponse
 import android.webkit.SslErrorHandler
 import android.webkit.ValueCallback
@@ -316,6 +317,7 @@ fun DagBrowserRoute(
                     onPageTextReady = viewModel::onPageTextReady,
                     onBlockedAction = viewModel::onBrowserBlockedAction,
                     onPageBlocked = viewModel::onPageBlocked,
+                    onRendererGone = viewModel::onBrowserRendererGone,
                     onWebViewChanged = { activeWebView = it },
                     onNavigationStateChanged = { _, canGoForward -> browserCanGoForward = canGoForward },
                 )
@@ -485,6 +487,7 @@ private fun DagWebContent(
     onPageTextReady: (String, String, String?, DagImagePageSummary) -> Unit,
     onBlockedAction: (String) -> Unit,
     onPageBlocked: (String) -> Unit,
+    onRendererGone: () -> Unit,
     onWebViewChanged: (WebView?) -> Unit,
     onNavigationStateChanged: (Boolean, Boolean) -> Unit,
 ) {
@@ -554,6 +557,13 @@ private fun DagWebContent(
                                 }
                             },
                             onBlocked = onPageBlocked,
+                            onRendererGone = { failedView ->
+                                if (webView === failedView) {
+                                    webView = null
+                                    onWebViewChanged(null)
+                                    onRendererGone()
+                                }
+                            },
                             imageLoader = imageLoader,
                         )
                     setDownloadListener { _, _, _, _, _ -> onBlockedAction("Las descargas están bloqueadas en DAG.") }
@@ -668,6 +678,7 @@ private class DagWebViewClient(
     private val onStarted: (String) -> Boolean,
     private val onFinished: (WebView, String) -> Unit,
     private val onBlocked: (String) -> Unit,
+    private val onRendererGone: (WebView) -> Unit,
     private val imageLoader: DagImageResourceLoader,
 ) : WebViewClient() {
     override fun shouldOverrideUrlLoading(
@@ -727,6 +738,14 @@ private class DagWebViewClient(
     ) {
         callback.backToSafety(true)
         onBlocked("Navegación peligrosa bloqueada por Android.")
+    }
+
+    override fun onRenderProcessGone(
+        view: WebView,
+        detail: RenderProcessGoneDetail,
+    ): Boolean {
+        onRendererGone(view)
+        return true
     }
 
     override fun shouldInterceptRequest(

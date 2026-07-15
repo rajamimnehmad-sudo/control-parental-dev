@@ -89,6 +89,16 @@ class DagContentClassifierTest {
             DagClassification.Allowed,
             classifier.classifyDirectUrl("https://maps.google.com/place/test").decision,
         )
+        listOf(
+            "https://duckduckgo.com/",
+            "https://search.brave.com/search?q=test",
+            "https://yandex.com/search/?text=test",
+            "https://ecosia.org/search?q=test",
+            "https://startpage.com/search?q=test",
+            "https://google.com.ar/search?q=test",
+        ).forEach { url ->
+            assertEquals(DagClassification.Blocked, classifier.classifyDirectUrl(url).decision, url)
+        }
     }
 
     @Test

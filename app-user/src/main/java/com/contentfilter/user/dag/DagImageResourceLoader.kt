@@ -128,7 +128,7 @@ internal class DagImageResourceLoader(
     }
 
     private companion object {
-        const val MaximumImagesPerPage = 200
+        const val MaximumImagesPerPage = 120
         const val RequestTimeoutSeconds = 8L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024

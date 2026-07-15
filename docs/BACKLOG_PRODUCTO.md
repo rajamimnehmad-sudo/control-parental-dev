@@ -345,6 +345,8 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-RESILIENCE-01 | 2026-07-15, DEV 218 | Caída del renderer WebView contenida por pestaña y retorno recuperable a Home; presupuesto visual reducido para limitar presión de memoria |
+| DAG-SEARCH-BYPASS-01 | 2026-07-15, DEV 218 | Bloqueo no anulable de Google y principales buscadores web alternativos; Gmail/Maps permanecen separados |
 | DAG-TABS-01 | 2026-07-15, DEV 217 | Pestañas con alta, cambio y cierre; resultados se restauran sin otra consulta Brave y páginas suspendidas no conservan múltiples WebView en memoria |
 | DAG-COMPAT-01 | 2026-07-15, DEV 217 | Área segura superior, barra sin recorte, Home con mascota y compatibilidad ampliada para imágenes lazy/picture sin relajar clasificación local |
 | DAG-UX-02 | 2026-07-15, DEV 216 | Una sola franja con navegacion, barra, recarga y menu; WebView y resultados de ancho completo sin bordes laterales; Brave permanece como motor |

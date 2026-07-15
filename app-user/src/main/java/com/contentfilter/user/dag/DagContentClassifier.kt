@@ -135,8 +135,14 @@ class DagContentClassifier
             runCatching {
                 val uri = URI(this)
                 val domain = uri.host.orEmpty().lowercase(Locale.ROOT).removePrefix("www.")
-                domain in SearchPortalDomains && (uri.path.isNullOrBlank() || uri.path == "/" || uri.path == "/search")
+                domain.isSearchPortalDomain() &&
+                    (uri.path.isNullOrBlank() || uri.path == "/" || uri.path.startsWith("/search"))
             }.getOrDefault(false)
+
+        private fun String.isSearchPortalDomain(): Boolean =
+            this in SearchPortalDomains ||
+                startsWith("google.") ||
+                (startsWith("search.") && substringAfter("search.") in SearchPortalDomains)
 
         private fun allowed(modelVersion: String = ModelVersion) =
             DagClassificationResult(
@@ -166,7 +172,24 @@ class DagContentClassifier
             private const val MinimumRiskyImages = 3
             val NonOverridableCategories = setOf("unsafe_visual_platform", "search_portal")
             private val NonOverridableVisualDomains = setOf("imgsrc.ru")
-            private val SearchPortalDomains = setOf("google.com", "bing.com", "search.yahoo.com")
+            private val SearchPortalDomains =
+                setOf(
+                    "google.com",
+                    "bing.com",
+                    "yahoo.com",
+                    "duckduckgo.com",
+                    "search.brave.com",
+                    "yandex.com",
+                    "yandex.ru",
+                    "ecosia.org",
+                    "startpage.com",
+                    "qwant.com",
+                    "swisscows.com",
+                    "mojeek.com",
+                    "aol.com",
+                    "ask.com",
+                    "baidu.com",
+                )
 
             private val CombiningMarksPattern = Regex("\\p{M}+")
             private val InvalidCharactersPattern = Regex("[^\\p{L}\\p{N}.]+")
