@@ -35,12 +35,22 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 209 y App Admin DEV 209, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 210 y App Admin DEV 210, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimo ticket resuelto
+
+### DAG-IMAGES-01 - Clasificacion local de imagenes
+
+- Estado: `Resuelto` el 2026-07-15 en DEV 210; ticket aprobado explicitamente por el usuario.
+- Tipo: IA local, seguridad Web, privacidad y rendimiento. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- Resultado: DAG entrega al WebView solo imagenes estaticas JPEG, PNG y WebP clasificadas localmente como seguras. Toda duda, error, formato animado/no soportado o fallo de descarga se bloquea.
+- Privacidad: imagenes, URLs, scores y decisiones no salen del telefono ni generan revision humana. Admin sigue revisando solo dominios inciertos.
+- Barreras: HTTPS, limites de cantidad/tamano/tiempo, rechazo de redes privadas, sin downgrade, bloqueo temprano de `blob:` y Service Workers. Video y audio permanecen bloqueados.
+- Evidencia fisica SM-A235M: fotos seguras de manzanas y flores visibles en Wikipedia tras el analisis; APK publico DEV 210 instalado in-place, sin crash y con Device Admin, Accessibility y VPN preservados. La navegacion directa no consumio Brave.
+- Publicacion: commit `dc6ad61`, Android CI `29415230021`, workflow DEV `29415229996` y hashes publicos verificados. La clasificacion es probabilistica y no promete precision perfecta.
 
 ### DAG-STANDALONE-01 - Experiencia de navegador independiente
 
@@ -226,6 +236,16 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
   - no aumenta el consumo Brave por relanzar, recargar o alternar entre App Usuario y DAG.
 - Validacion fisica: Samsung actualizo el icono dentro del ciclo remoto probado; al cerrar desaparecio del cajon, el lanzamiento explicito quedo deshabilitado y la tarea abierta se retiro. Al reabrir reaparecio sin reinstalacion. Un atajo fijado manualmente en DEV 204-208 puede permanecer en la pantalla de inicio porque Android reserva su eliminacion al usuario; ya no se crean atajos nuevos y el acceso historico conserva fallo cerrado.
 
+### DAG-IMAGES-01 - Clasificacion local de imagenes
+
+- Estado: `Resuelto` el 2026-07-15 en DEV 210; aprobado explicitamente por el usuario.
+- Objetivo cumplido: mostrar fotos dentro de DAG sin exponerlas antes de analizarlas ni enviarlas a un servicio externo.
+- Alcance: clasificacion on-device de JPEG, PNG y WebP estaticos; score seguro `<= 0.08`; score bloqueado `>= 0.20`; zona incierta y cualquier error bloqueados. Imagenes animadas, SVG, video y audio permanecen cerrados.
+- Privacidad y revision: imagen, URL, score y decision nunca se sincronizan. Admin solo recibe solicitudes por sitios inciertos, no por imagenes.
+- Seguridad y recursos: maximo 40 imagenes por pagina, 4 MiB por recurso, timeout de 8 segundos, solo HTTPS, destinos publicos, sin downgrade y barreras tempranas contra `blob:` y Service Workers.
+- Evidencia: pruebas unitarias de politica/red, validacion Gradle integral y carga fisica de fotos seguras en SM-A235M con APK publico DEV 210. Actualizacion in-place con Device Admin, Accessibility y VPN preservados; cero consultas Brave.
+- Limitacion explicita: el modelo es probabilistico y no puede garantizar 100 % de aciertos. Clasificar video requiere `DAG-VIDEO-01`, aun no aprobado.
+
 ### DAG-USAGE-01 - Contador mensual en Super Web
 
 - Estado: `Completado y publicado`; aprobado por el usuario el 2026-07-14.
@@ -245,6 +265,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | NET-EVASION-01 | Idea | P2 | DoH/DoT desconocido, IP directa, proxies y VPN externas |
 | AI-VISUAL-01 | Idea | P3 | Evaluacion puntual de regiones visibles, sujeta a privacidad, bateria y politicas |
 | AI-SENSITIVE-01 | Idea | P3 | Riesgos sensibles en chats como proyecto separado legal y de privacidad |
+| DAG-VIDEO-01 | Idea | P2 | Clasificar video localmente mediante muestreo temporal, con limites de CPU, bateria y memoria; video sigue bloqueado hasta aprobar el ticket |
 
 Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambiguedad; explicaciones y autorizacion; sugerencias sin aplicacion automatica; revision humana y publicacion comunitaria firmada; alertas agregadas sin historial de navegacion. La experiencia de navegador independiente se normalizo como `DAG-STANDALONE-01`.
 
@@ -270,6 +291,7 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-IMAGES-01 | 2026-07-15, DEV 210 | Fotos estaticas clasificadas localmente antes de mostrarse; fallo cerrado, privacidad on-device y prueba fisica con APK publico sin consumir Brave |
 | DAG-STANDALONE-01 | 2026-07-15, DEV 209 | Icono y tarea DAG propios dentro del mismo APK; cierre remoto oculta launcher y retira tarea; reapertura fisica sin reinstalar |
 | DAG-BROWSER-01A | 2026-07-15, DEV 208 | Busqueda y navegacion protegidas, historial local cifrado, revision incierta y revocacion remota; ciclo fisico completo y reapertura limpia |
 | DAG-FOUNDATION-01 | 2026-07-14, DEV 204 | Control por dispositivo, entrada Usuario, pantalla cerrada por defecto y atajo Android; sin abrir contenido ni agregar esquema |

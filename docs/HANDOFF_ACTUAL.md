@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 209
-App Admin versionCode 209
+App Usuario versionCode 210
+App Admin versionCode 210
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,30 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-209-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-209-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-210-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-210-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 4749ae7c45ecf775a8a296ff78ee381051184f5dfccb902ec483a14853c2a87e
-Admin   f65ce832c13c2b39b670d25e7b92024a891efd316972d8e1c1e0e6fffae2eb8d
+Usuario e2959b015debf74166d0951141c9e0cd252c172f5e1f297a1617386aa1c4572c
+Admin   a2c7113b1b707b996cf5b7ec13820160e98899b3192e38ef04de4e9da3f5ed60
 ```
+
+## Cierre 2026-07-15 - DAG-IMAGES-01 clasificacion visual local
+
+- DEV 210 permite imagenes estaticas JPEG, PNG y WebP en DAG solo despues de clasificarlas completamente en el telefono. La pagina permanece oculta durante el analisis textual y cada imagen permanece sin entregar al WebView hasta obtener una decision local segura.
+- El modelo OpenNSFW cuantizado se incluye dentro del APK Usuario y se ejecuta con TensorFlow Lite en CPU. SHA-256 del modelo `eb3b446a6a8c1a73998a76011b97cfc67bc01084c63ee195c774e71344a66442`; licencia y atribuciones incluidas en `app-user/src/main/assets/dag/THIRD_PARTY_NOTICES.txt`.
+- Politica conservadora fail-closed: score seguro hasta `0.08`; bloqueado desde `0.20`; zona intermedia, error, formato no soportado, descarga incompleta o modelo invalido se bloquean. GIF, SVG, APNG, WebP animado, video y audio permanecen bloqueados.
+- Limites: HTTPS obligatorio, 40 imagenes por pagina, 4 MiB por imagen, timeout de 8 segundos y dimension fuente validada. El proxy no sigue redirecciones HTTPS a HTTP y rechaza destinos locales, privados, link-local, multicast, Carrier NAT e IPv6 ULA para evitar SSRF.
+- El WebView bloquea antes de los scripts de pagina la creacion de URLs `blob:` y el registro/uso previo de Service Workers; descargas, popups, camara, microfono, ubicacion, archivos, HTTP e intents externos conservan sus bloqueos anteriores.
+- Privacidad: imagen, URL, score y resultado visual no se envian a Supabase, Brave ni al administrador. La revision humana sigue limitada a dominios inciertos; las imagenes inciertas se bloquean sin crear solicitud. Navegar o recargar una URL directa no consume una consulta Brave.
+- Compatibilidad del APK Usuario: incluye bibliotecas ARM32 y ARM64 para telefonos Android estandar Samsung, Xiaomi, Motorola y Oppo; x86 de emulador queda excluido. El APK publico Usuario mide aproximadamente 15 MiB.
+- Validacion fisica SM-A235M: los APK publicos DEV 210 se instalaron in-place; Wikipedia `Apple` mostro fotos seguras de manzanas y flores despues del analisis local; no hubo crash. Device Admin y Accessibility permanecieron activos y `FilterVpnService` en primer plano. No se consumieron consultas Brave.
+- Validacion integral local: 1.829 tareas Gradle, builds Usuario/Admin, tests de todas las variantes, ktlint, lint y detekt exitosos. Commit funcional `dc6ad61`; Android CI `29415230021` y workflow `Publicar APKs DEV` `29415229996` exitosos; hashes publicos verificados.
+- La clasificacion probabilistica reduce el riesgo pero no garantiza precision perfecta. Video clasificado no forma parte de este ticket: permanece bloqueado y requiere un ticket separado con muestreo temporal, presupuesto de CPU/bateria y validacion fisica.
+- No se toco Production, no se borro ningun dato, no se modifico Supabase DEV y no se agregaron secretos ni Service Role Key a Android.
 
 ## Cierre 2026-07-15 - DAG-STANDALONE-01 navegador independiente
 
