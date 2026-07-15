@@ -62,7 +62,17 @@ internal class DagImageResourceLoader(
         if (!isProbableImageRequest(request.url.toString(), request.requestHeaders)) return null
         if (request.url.scheme != "https" || imageCount.incrementAndGet() > MaximumImagesPerPage) return blockedResource()
 
-        if (!imageSlots.tryAcquire()) return blockedResource()
+        val acquired =
+            try {
+                imageSlots.tryAcquire(ImageSlotWaitSeconds, TimeUnit.SECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                false
+            }
+        if (!acquired) {
+            uncertainCount.incrementAndGet()
+            return blockedResource()
+        }
         return try {
             runCatching { loadClassifiedImage(request, pageUrl) }.getOrElse {
                 uncertainCount.incrementAndGet()
@@ -135,9 +145,10 @@ internal class DagImageResourceLoader(
     }
 
     private companion object {
-        const val MaximumImagesPerPage = 80
+        const val MaximumImagesPerPage = 160
         const val MaximumConcurrentImages = 3
-        const val RequestTimeoutSeconds = 5L
+        const val ImageSlotWaitSeconds = 8L
+        const val RequestTimeoutSeconds = 8L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
@@ -210,6 +221,8 @@ private val ImageExtensions =
         ".svg",
         ".bmp",
         ".avif",
+        ".heic",
+        ".heif",
     )
 
 private val BlockedMediaExtensions =

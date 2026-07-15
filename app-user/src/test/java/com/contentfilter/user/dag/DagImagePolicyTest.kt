@@ -26,6 +26,7 @@ class DagImagePolicyTest {
     fun `image requests are detected by accept header or extension`() {
         assertTrue(isProbableImageRequest("https://cdn.example/resource", mapOf("Accept" to "image/avif,image/webp")))
         assertTrue(isProbableImageRequest("https://cdn.example/photo.JPG?width=200", emptyMap()))
+        assertTrue(isProbableImageRequest("https://cdn.example/photo.heic", emptyMap()))
         assertFalse(isProbableImageRequest("https://cdn.example/site.css", mapOf("Accept" to "text/css")))
     }
 

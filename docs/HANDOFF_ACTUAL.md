@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 222
-App Admin versionCode 222
+App Usuario versionCode 223
+App Admin versionCode 223
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,24 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-222-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-222-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-223-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-223-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 6666cd1414053a135136dff2ee74d126e574ffdfe4d26d38ca92ed2f67c0e968
-Admin   50cc4b650c731eff5d3302880a3aa23ecc848d976060eddcf049ee24a00d335f
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DEV 223 compatibilidad visual en sitios densos
+
+- Fravega expone imagenes raster publicas PNG y WebP, pero DEV 221/222 bloqueaba inmediatamente toda solicitud que llegara mientras los tres turnos de clasificacion estaban ocupados. En paginas con muchas fotos casi todas desaparecian antes de ser analizadas.
+- Las solicitudes visuales esperan ahora hasta ocho segundos por uno de tres turnos, en vez de fallar de inmediato. El presupuesto sube de 80 a 160 recursos por pagina y el timeout individual vuelve a ocho segundos.
+- La deteccion se amplia por contenido decodificable a JPEG, PNG, WebP, AVIF, HEIF/HEIC y BMP; las extensiones HEIF/HEIC se reconocen aun sin cabecera `Accept`. SVG, GIF y variantes animadas siguen bloqueadas porque validar una sola representacion no garantiza todos sus cuadros o codigo vectorial.
+- La revision seguida de apertura puede ser normal cuando una aprobacion remota llega durante la espera: la primera etapa marca incertidumbre y, al sincronizar la regla del administrador, DAG reintenta y abre. No se elimino este comportamiento seguro.
+- Ktlint, tests DEV Usuario y builds optimizados Usuario/Admin correctos. Falta prueba fisica en Fravega porque no hay telefono disponible.
 
 ## Implementacion 2026-07-15 - DEV 222 correccion de hilo WebView
 

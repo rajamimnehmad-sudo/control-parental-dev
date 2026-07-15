@@ -145,8 +145,17 @@ internal class DagImageClassifier(
             bytes.isPng() -> "image/png"
             bytes.isWebP() -> "image/webp"
             bytes.isStaticAvif() -> "image/avif"
-            else -> null
+            else -> bitmapMime(bytes)
         }
+    }
+
+    private fun bitmapMime(bytes: ByteArray): String? {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
+        if (options.outWidth <= 0 || options.outHeight <= 0) return null
+        return options.outMimeType
+            ?.lowercase()
+            ?.takeIf(SupportedBitmapMimes::contains)
     }
 
     private fun ByteArray.isJpeg(): Boolean =
@@ -197,5 +206,16 @@ internal class DagImageClassifier(
         private const val VggMeanBlue = 103.939f
         private const val VggMeanGreen = 116.779f
         private const val VggMeanRed = 123.68f
+        private val SupportedBitmapMimes =
+            setOf(
+                "image/jpeg",
+                "image/png",
+                "image/webp",
+                "image/avif",
+                "image/heif",
+                "image/heic",
+                "image/bmp",
+                "image/x-ms-bmp",
+            )
     }
 }
