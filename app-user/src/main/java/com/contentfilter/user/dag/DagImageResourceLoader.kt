@@ -92,6 +92,7 @@ internal class DagImageResourceLoader(
                 200,
                 "OK",
                 mapOf(
+                    "Access-Control-Allow-Origin" to "*",
                     "Cache-Control" to "no-store",
                     "Content-Length" to bytes.size.toString(),
                     "X-Content-Type-Options" to "nosniff",
@@ -116,7 +117,7 @@ internal class DagImageResourceLoader(
     }
 
     private companion object {
-        const val MaximumImagesPerPage = 40
+        const val MaximumImagesPerPage = 80
         const val RequestTimeoutSeconds = 8L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024

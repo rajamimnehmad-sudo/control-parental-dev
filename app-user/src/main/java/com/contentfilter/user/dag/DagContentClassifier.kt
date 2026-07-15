@@ -56,8 +56,6 @@ class DagContentClassifier
             return when {
                 images.blocked >= MinimumRiskyImages && images.blocked * 2 >= images.classified ->
                     blocked("unsafe_images", confidence = 0.95f)
-                images.uncertain >= MinimumUncertainImages && images.allowed == 0 ->
-                    uncertain("unreadable_images", confidence = 0.85f)
                 else -> textResult
             }
         }
@@ -112,17 +110,20 @@ class DagContentClassifier
             val semantic =
                 neuralClassifierOrNull()?.classify(rawText.take(MaxNeuralCharacters))
                     ?: semanticClassifier.classify(rawText.take(MaxSemanticCharacters))
-            return when {
-                semantic == null -> uncertain("model_unavailable", confidence = 1f)
-                semantic.category == "sensitive_context" ->
-                    uncertain("semantic_sensitive_context", semantic.confidence, semantic.modelVersion)
-                semantic.category in SemanticUnsafeCategories &&
-                    semantic.confidence >= SemanticBlockThreshold &&
-                    semantic.margin >= SemanticBlockMargin ->
-                    blocked("semantic_${semantic.category}", semantic.confidence, semantic.modelVersion)
-                semantic.category in SemanticUnsafeCategories && semantic.confidence >= SemanticReviewThreshold ->
-                    uncertain("semantic_${semantic.category}", semantic.confidence, semantic.modelVersion)
-                else -> allowed(semantic.modelVersion)
+            return when (dagSemanticDecision(semantic)) {
+                DagClassification.Blocked ->
+                    blocked(
+                        "semantic_${semantic?.category}",
+                        semantic?.confidence ?: 1f,
+                        semantic?.modelVersion ?: ModelVersion,
+                    )
+                DagClassification.Uncertain ->
+                    uncertain(
+                        if (semantic == null) "model_unavailable" else "semantic_${semantic.category}",
+                        semantic?.confidence ?: 1f,
+                        semantic?.modelVersion ?: ModelVersion,
+                    )
+                DagClassification.Allowed -> allowed(semantic?.modelVersion ?: ModelVersion)
             }
         }
 
@@ -155,13 +156,6 @@ class DagContentClassifier
             private const val MaxSemanticCharacters = 4_000
             private const val MaxNeuralCharacters = 2_000
             private const val MinimumRiskyImages = 3
-            private const val MinimumUncertainImages = 4
-            private const val SemanticBlockThreshold = 0.55f
-            private const val SemanticBlockMargin = 0.15f
-            private const val SemanticReviewThreshold = 0.30f
-
-            private val SemanticUnsafeCategories = setOf("sexual", "dating", "gambling", "drugs", "violence")
-
             val NonOverridableCategories = setOf("unsafe_visual_platform")
             private val NonOverridableVisualDomains = setOf("imgsrc.ru")
 

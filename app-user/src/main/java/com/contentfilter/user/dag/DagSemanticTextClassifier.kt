@@ -20,6 +20,24 @@ internal data class DagSemanticPrediction(
     val modelVersion: String,
 )
 
+internal fun dagSemanticDecision(prediction: DagSemanticPrediction?): DagClassification =
+    when {
+        prediction == null -> DagClassification.Uncertain
+        prediction.category == "sensitive_context" -> DagClassification.Uncertain
+        prediction.category !in SemanticUnsafeCategories -> DagClassification.Allowed
+        prediction.confidence >= SemanticBlockThreshold && prediction.margin >= SemanticBlockMargin ->
+            DagClassification.Blocked
+        prediction.confidence >= SemanticReviewThreshold && prediction.margin >= SemanticReviewMargin ->
+            DagClassification.Uncertain
+        else -> DagClassification.Allowed
+    }
+
+private const val SemanticBlockThreshold = 0.55f
+private const val SemanticBlockMargin = 0.15f
+private const val SemanticReviewThreshold = 0.30f
+private const val SemanticReviewMargin = 0.05f
+private val SemanticUnsafeCategories = setOf("sexual", "dating", "gambling", "drugs", "violence")
+
 @Singleton
 class DagSemanticTextClassifier private constructor(
     private val modelSource: () -> InputStream,

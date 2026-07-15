@@ -25,6 +25,32 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `low margin unsafe guess does not block an ordinary brand search`() {
+        val prediction =
+            DagSemanticPrediction(
+                category = "drugs",
+                confidence = 0.304f,
+                margin = 0.008f,
+                modelVersion = DagNeuralTextClassifier.ModelVersion,
+            )
+
+        assertEquals(DagClassification.Allowed, dagSemanticDecision(prediction))
+    }
+
+    @Test
+    fun `meaningful unsafe guess still requires review`() {
+        val prediction =
+            DagSemanticPrediction(
+                category = "drugs",
+                confidence = 0.40f,
+                margin = 0.10f,
+                modelVersion = DagNeuralTextClassifier.ModelVersion,
+            )
+
+        assertEquals(DagClassification.Uncertain, dagSemanticDecision(prediction))
+    }
+
+    @Test
     fun `explicit unsafe intent is blocked in all initial languages`() {
         assertEquals(DagClassification.Blocked, classifier.classifyQuery("video porno").decision)
         assertEquals(DagClassification.Blocked, classifier.classifyQuery("online casino").decision)
@@ -141,6 +167,19 @@ class DagContentClassifierTest {
                 title = "Tienda",
                 text = "Productos para el hogar",
                 images = DagImagePageSummary(allowed = 8, blocked = 1, uncertain = 1),
+            )
+
+        assertEquals(DagClassification.Allowed, result.decision)
+    }
+
+    @Test
+    fun `unreadable images stay hidden without blocking otherwise safe page text`() {
+        val result =
+            classifier.classifyPage(
+                url = "https://shop.example",
+                title = "Tienda",
+                text = "Productos y ofertas del supermercado",
+                images = DagImagePageSummary(allowed = 0, blocked = 0, uncertain = 8),
             )
 
         assertEquals(DagClassification.Allowed, result.decision)

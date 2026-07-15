@@ -572,12 +572,12 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
         (function() {
           function dagHttpsImageSource(image) {
             var candidates = [
-              image.currentSrc,
-              image.getAttribute('src'),
               image.getAttribute('data-src'),
               image.getAttribute('data-lazy-src'),
               image.getAttribute('data-original'),
-              image.getAttribute('data-srcset')
+              image.getAttribute('data-srcset'),
+              image.getAttribute('src'),
+              image.currentSrc
             ];
             for (var index = 0; index < candidates.length; index++) {
               var raw = candidates[index] || '';
@@ -589,6 +589,24 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
               } catch (_) {}
             }
             return '';
+          }
+          function dagSecureBackground(node) {
+            if (!node || node.nodeType !== 1) return;
+            var background = '';
+            try { background = window.getComputedStyle(node).backgroundImage || ''; } catch (_) {}
+            if (!background || background === 'none') return;
+            var matches = background.matchAll(/url\(["']?([^"')]+)["']?\)/g);
+            for (var match of matches) {
+              try {
+                if (new URL(match[1], document.baseURI).protocol !== 'https:') {
+                  node.style.setProperty('background-image', 'none', 'important');
+                  return;
+                }
+              } catch (_) {
+                node.style.setProperty('background-image', 'none', 'important');
+                return;
+              }
+            }
           }
           function dagSecureNode(node) {
             if (!node || node.nodeType !== 1) return;
@@ -603,23 +621,23 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
                 node.remove();
                 return;
               }
-              if (!(node.currentSrc || '').toLowerCase().startsWith('https://')) {
-                node.removeAttribute('srcset');
-                node.removeAttribute('data-srcset');
-                if (node.getAttribute('src') !== source) node.src = source;
-              }
+              node.removeAttribute('srcset');
+              node.removeAttribute('data-srcset');
+              if (node.getAttribute('src') !== source) node.src = source;
             }
+            dagSecureBackground(node);
             node.querySelectorAll && node.querySelectorAll('video,audio,source,canvas,iframe').forEach(function(child) { child.remove(); });
             node.querySelectorAll && node.querySelectorAll('img').forEach(function(image) {
               dagSecureNode(image);
             });
+            node.querySelectorAll && node.querySelectorAll('*').forEach(dagSecureBackground);
           }
           dagSecureNode(document.documentElement);
           var style = document.getElementById('dag-safe-style');
           if (!style) {
             style = document.createElement('style');
             style.id = 'dag-safe-style';
-            style.textContent = '* { background-image: none !important; } video,audio,canvas,iframe { display:none !important; }';
+            style.textContent = 'video,audio,canvas,iframe { display:none !important; }';
             document.documentElement.appendChild(style);
           }
           if (!window.__dagSafeObserver) {
@@ -633,7 +651,7 @@ private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
               childList: true,
               subtree: true,
               attributes: true,
-              attributeFilter: ['src', 'srcset']
+              attributeFilter: ['src', 'srcset', 'style', 'class']
             });
           }
           return document.body ? document.body.innerText.substring(0,24000) : '';
