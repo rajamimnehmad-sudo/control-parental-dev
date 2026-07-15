@@ -785,6 +785,8 @@ private class DagWebViewClient(
     private val onRendererGone: (WebView) -> Unit,
     private val imageLoader: DagImageResourceLoader,
 ) : WebViewClient() {
+    private val pageUrlTracker = DagPageUrlTracker()
+
     override fun shouldOverrideUrlLoading(
         view: WebView,
         request: WebResourceRequest,
@@ -807,6 +809,7 @@ private class DagWebViewClient(
         url: String,
         favicon: Bitmap?,
     ) {
+        pageUrlTracker.update(url)
         if (!onStarted(url)) view.stopLoading()
     }
 
@@ -855,7 +858,18 @@ private class DagWebViewClient(
     override fun shouldInterceptRequest(
         view: WebView?,
         request: WebResourceRequest,
-    ): WebResourceResponse? = imageLoader.intercept(request, view?.url)
+    ): WebResourceResponse? = imageLoader.intercept(request, pageUrlTracker.current())
+}
+
+internal class DagPageUrlTracker {
+    @Volatile
+    private var pageUrl: String? = null
+
+    fun update(url: String) {
+        pageUrl = url
+    }
+
+    fun current(): String? = pageUrl
 }
 
 private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {

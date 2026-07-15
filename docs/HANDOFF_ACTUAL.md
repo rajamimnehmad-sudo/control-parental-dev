@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 221
-App Admin versionCode 221
+App Usuario versionCode 222
+App Admin versionCode 222
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-221-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-221-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-222-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-222-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario f29fecd7416e94d551cb38bd4e622559e69a3b45b8256439be7b36611dedf4dc
-Admin   0ce51af639dad519b773aeaca165ccc6da280114d0dc921be2ee20a2f30d31fd
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DEV 222 correccion de hilo WebView
+
+- DEV 221 siguio cerrandose al entrar a una pagina, por lo que el limite de carga no era la causa principal o no era la unica.
+- Se encontro una infraccion concreta: `shouldInterceptRequest` se ejecuta fuera del hilo principal pero consultaba `WebView.getUrl()`. Android exige que las APIs de WebView se usen en su hilo de creacion y puede terminar la aplicacion al detectar esta llamada.
+- El cliente conserva ahora la URL del frame principal en un estado volatil actualizado desde `onPageStarted`; la intercepcion de recursos lee solo esa copia segura y ya no toca el WebView desde el hilo de red.
+- Se agrego una prueba unitaria del seguimiento de URL. Ktlint, tests DEV Usuario y builds optimizados Usuario/Admin correctos. Falta confirmacion fisica porque no hay telefono ni emulador disponible.
 
 ## Implementacion 2026-07-15 - DEV 221 estabilizacion del filtro visual
 

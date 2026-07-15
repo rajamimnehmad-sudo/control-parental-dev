@@ -368,6 +368,7 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-WEBVIEW-THREAD-01 | 2026-07-15, DEV 222 | Intercepcion de recursos deja de consultar WebView desde el hilo de red; usa URL principal volatil y prueba unitaria; pendiente confirmacion fisica |
 | DAG-IMAGE-STABILITY-01 | 2026-07-15, DEV 221 | Clasificacion visual limitada a tres trabajos concurrentes, 80 recursos y timeout de 5 s; build/tests correctos, pendiente validacion fisica sin telefono disponible |
 | DAG-TABS-02 | 2026-07-15, DEV 220 | Selector visual de dos columnas con miniaturas locales solo de páginas aprobadas, cierre/nueva pestaña y sin persistencia ni consumo Brave |
 | DAG-RESILIENCE-01 | 2026-07-15, DEV 218 | Caída del renderer WebView contenida por pestaña y retorno recuperable a Home; presupuesto visual reducido para limitar presión de memoria |
