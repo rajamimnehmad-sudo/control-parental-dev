@@ -128,6 +128,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | SEC-LICENSE-01 | Idea | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Idea | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
+| BARRIER-DEFAULT-ON-01 | Idea | P1 | Armar automaticamente la barrera al completar y verificar la configuracion de proteccion | S | Medio |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Idea | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
@@ -180,6 +181,27 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
   - pruebas repetidas en los dispositivos fisicos soportados, actualizacion in-place y sin borrar datos;
   - tests del area, regresion de barrera, CI y handoff actualizados antes de marcarlo `Resuelto`.
 - Decisiones pendientes para la entrevista del ticket: dispositivo y version Android afectados; secuencia minima; estado de Device Admin/VPN tras el bypass; comportamiento de watchdog y alerta; matriz OEM y cantidad de repeticiones para aceptar el cierre.
+
+### BARRIER-DEFAULT-ON-01 - Barrera armada de forma predeterminada
+
+- Estado: `Idea`; no aprobado para codigo.
+- Tipo: seguridad, configuracion predeterminada y UX de onboarding.
+- Prioridad: P1.
+- Problema: la barrera depende de una accion posterior del administrador para quedar armada, lo que puede dejar dispositivos configurados con una proteccion antimanipulacion menor a la esperada.
+- Solucion propuesta: armar automaticamente la barrera cuando App Usuario complete la activacion y verifique que Accessibility, VPN y Administrador del dispositivo estan correctamente habilitados. Mantener el desarmado como accion excepcional, protegida y auditable.
+- Evidencia: propuesta del usuario el 2026-07-15 al revisar el alcance real del boton `Activar barrera de proteccion`.
+- Esfuerzo: S estimado.
+- Riesgo: medio; armar antes de completar permisos puede bloquear onboarding o reparacion, y una migracion incorrecta puede cambiar inesperadamente el estado de dispositivos existentes.
+- Dependencias: onboarding y activacion; estado real de Accessibility, VPN y Device Admin; controles remotos de proteccion; mantenimiento temporal; recuperacion offline; sincronizacion y auditoria.
+- Duplicados y relacion: complementa `BARRIER-ANDROID-01` y no resuelve el bypass registrado en `BARRIER-A11Y-RACE-01`.
+- Criterios de aceptacion propuestos:
+  - un dispositivo nuevo queda armado automaticamente solo despues de completar y verificar los permisos requeridos;
+  - reinicios, actualizaciones y fallos transitorios de sincronizacion no desarman la barrera;
+  - un componente degradado mantiene la politica armada, muestra reparacion y genera el estado o alerta correspondiente;
+  - el desarmado exige una accion administrativa explicita y queda identificado de forma auditable;
+  - mantenimiento y recuperacion conservan sus ventanas controladas;
+  - la migracion de dispositivos existentes no bloquea onboarding, reparacion ni acceso autorizado.
+- Decisiones pendientes para la entrevista del ticket: politica de migracion para dispositivos existentes; momento exacto de armado; autoridad para desarmar; presentacion del control en App Admin; comportamiento offline y ante permisos incompletos.
 
 ### ADMIN-ALERTS-UX-01 - Campanita de alertas de seguridad en App Admin
 
