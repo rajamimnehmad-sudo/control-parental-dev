@@ -192,21 +192,32 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ### DAG-STANDALONE-01 - Experiencia de navegador independiente
 
-- Estado: `Propuesto`; requisito expresado por el usuario el 2026-07-15. No autoriza codigo hasta completar la entrevista y aprobar el ticket.
+- Estado: `Propuesto`, con entrevista de producto completada el 2026-07-15. No autoriza codigo hasta que el usuario apruebe explicitamente este alcance cerrado.
 - Tipo: arquitectura Android y UX. Prioridad: P1. Esfuerzo: L. Riesgo: medio.
 - Objetivo: que DAG se perciba y funcione como un navegador independiente, con icono propio en el launcher, tarea propia en Recientes y apertura directa, en lugar de sentirse como una pantalla mas de App Usuario.
 - Arquitectura elegida por el usuario el 2026-07-15: un launcher y una tarea independientes dentro del mismo APK firmado de App Usuario. DAG comparte activacion, actualizacion, historial cifrado, regla por dispositivo, revocacion y barrera sin exigir instalar ni activar una segunda aplicacion.
 - Alternativa descartada para este ticket: un APK y paquete Android separados. No se duplicaran instalacion, activacion, actualizaciones, comunicacion segura ni resistencia a desinstalacion.
-- Alcance propuesto: icono DAG propio; identidad visual de navegador; apertura directa desde launcher/atajo; tarea separada en Recientes; flujo para agregar o retirar el acceso desde App Usuario; cierre remoto inmediato; una sola fuente segura de politica e historial; sin duplicar consumo Brave.
+- Decisiones cerradas en la entrevista:
+  - nombre visible `DAG`;
+  - icono nuevo con lenguaje visual parecido a un navegador moderno, pero con identidad DAG;
+  - App Usuario conserva la entrada DAG dentro de Web;
+  - el icono independiente se habilita automaticamente cuando DAG esta permitido y desaparece del launcher cuando el administrador lo cierra;
+  - Inicio es minimalista y prioriza una unica barra de busqueda;
+  - Atras navega primero dentro de la pagina, luego vuelve a Inicio y un nuevo Atras cierra DAG;
+  - DAG aparece como tarjeta propia en Recientes, separada de App Usuario;
+  - ambas entradas comparten el mismo historial local cifrado;
+  - la apariencia se inspira en Chrome, sin copiar su marca, y usa colores e identidad DAG.
+- Alcance propuesto cerrado: icono DAG propio; identidad visual de navegador; apertura directa desde launcher; tarea separada en Recientes; acceso adicional desde App Usuario; visibilidad del icono ligada a la regla remota; cierre remoto inmediato; una sola fuente segura de politica e historial; sin duplicar consumo Brave.
 - Fuera de alcance hasta otro ticket aprobado: habilitar imagenes o video, multiples pestanas, descargas y debilitar cualquiera de los bloqueos actuales.
 - Criterios de aceptacion propuestos:
   - DAG puede iniciarse desde su propio icono y aparece como experiencia separada en Recientes;
   - no requiere una segunda instalacion o activacion ni duplica credenciales;
   - cerrar DAG desde Admin bloquea tambien la entrada independiente sin demora ni estado obsoleto;
+  - al cerrar DAG, su icono desaparece del launcher; al reabrirlo vuelve automaticamente sin reinstalar ni reactivar;
   - actualizacion in-place conserva activacion, historial, Device Admin, Accessibility y VPN;
   - el usuario reconoce visualmente Inicio, barra de direccion, historial y estado cerrado como partes de un navegador;
   - no aumenta el consumo Brave por relanzar, recargar o alternar entre App Usuario y DAG.
-- Decisiones pendientes para la entrevista: nombre e icono; si App Usuario conserva una entrada Web ademas del icono; comportamiento de Atras/Recientes; creacion automatica o voluntaria del icono; propiedad del historial y tratamiento visual del estado cerrado.
+- Pendiente unicamente: aprobacion explicita del ticket para comenzar codigo. La implementacion debe comprobar en el Samsung real el tiempo de actualizacion del icono que aplica el launcher de Samsung y documentar cualquier demora propia del sistema.
 
 ### DAG-USAGE-01 - Contador mensual en Super Web
 
