@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario e374f1ec67ea6f8687e42c6b7e8544e201dd246672ffac68976fc0ab9aa6f594
+Admin   8a4b77f788c484a8a3c22704a1728896ca7693476014fb51ab01637c6d070d50
 ```
 
 ## Implementacion 2026-07-15 - DAG DEV 218 WebView resiliente y cierre de buscadores
@@ -84,7 +84,7 @@ Admin   pendiente de publicacion
 - `DagWebViewClient` maneja `onRenderProcessGone` y consume la caída del renderer aislado. DAG abandona solo la pestaña dañada, libera su referencia y vuelve a Home con un mensaje recuperable, en lugar de permitir que Android cierre Content Filter.
 - El presupuesto visual baja de 200 a 120 imágenes clasificadas por página para conservar la compatibilidad ampliada de DEV 217 con menor presión de memoria/renderer.
 - La barrera no anulable `search_portal` cubre Google y dominios regionales, Bing, Yahoo, DuckDuckGo, Brave Search web, Yandex, Ecosia, Startpage, Qwant, Swisscows, Mojeek, AOL, Ask y Baidu. Gmail, Maps y otros subservicios que no sean portales de búsqueda continúan evaluándose normalmente.
-- Validación local: ktlint, tests DEV Usuario con matriz de portales y APK Usuario optimizado correctos. Sin teléfono conectado no fue posible extraer el `logcat` del cierre mostrado por el usuario; la prueba física de recuperación WebView queda pendiente.
+- Validación local: ktlint, tests DEV Usuario con matriz de portales y APK Usuario optimizado correctos. Ambos APK 218 fueron publicados atomicamente en Supabase DEV y verificados por manifiesto/hash. Sin teléfono conectado no fue posible extraer el `logcat` del cierre mostrado por el usuario; la prueba física de recuperación WebView queda pendiente.
 
 ## Implementacion 2026-07-15 - DAG DEV 217 compatibilidad, Home y pestañas
 
