@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario 6666cd1414053a135136dff2ee74d126e574ffdfe4d26d38ca92ed2f67c0e968
+Admin   50cc4b650c731eff5d3302880a3aa23ecc848d976060eddcf049ee24a00d335f
 ```
 
 ## Implementacion 2026-07-15 - DEV 222 correccion de hilo WebView
