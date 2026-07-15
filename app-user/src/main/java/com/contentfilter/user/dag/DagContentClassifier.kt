@@ -10,6 +10,7 @@ class DagContentClassifier
     @Inject
     constructor(
         private val domainBlocklist: DynamicDomainBlocklist,
+        private val semanticClassifier: DagSemanticTextClassifier,
     ) {
         fun classifyQuery(text: String): DagClassificationResult = classify(text, directUrl = false)
 
@@ -99,15 +100,32 @@ class DagContentClassifier
                 explicit != null -> blocked(explicit.first, confidence = 0.97f)
                 ambiguous != null -> uncertain(ambiguous.first, confidence = 0.68f)
                 directUrl && !text.contains('.') -> uncertain("invalid_domain", confidence = 1f)
-                else ->
-                    DagClassificationResult(
-                        decision = DagClassification.Allowed,
-                        category = "general",
-                        confidence = 0.82f,
-                        modelVersion = ModelVersion,
-                    )
+                directUrl -> allowed()
+                else -> classifySemantically(rawText)
             }
         }
+
+        private fun classifySemantically(rawText: String): DagClassificationResult {
+            val semantic = semanticClassifier.classify(rawText.take(MaxSemanticCharacters))
+            return when {
+                semantic == null -> uncertain("model_unavailable", confidence = 1f)
+                semantic.category == "sensitive_context" ->
+                    uncertain("semantic_sensitive_context", semantic.confidence)
+                semantic.category in SemanticUnsafeCategories && semantic.confidence >= SemanticBlockThreshold ->
+                    blocked("semantic_${semantic.category}", semantic.confidence)
+                semantic.category in SemanticUnsafeCategories && semantic.confidence >= SemanticReviewThreshold ->
+                    uncertain("semantic_${semantic.category}", semantic.confidence)
+                else -> allowed()
+            }
+        }
+
+        private fun allowed() =
+            DagClassificationResult(
+                decision = DagClassification.Allowed,
+                category = "general",
+                confidence = 0.82f,
+                modelVersion = ModelVersion,
+            )
 
         private fun blocked(
             category: String,
@@ -120,10 +138,15 @@ class DagContentClassifier
         ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, ModelVersion)
 
         companion object {
-            const val ModelVersion = "dag-local-text-1"
+            const val ModelVersion = "dag-local-text-2"
             const val MaxPageCharacters = 24_000
+            private const val MaxSemanticCharacters = 4_000
             private const val MinimumRiskyImages = 3
             private const val MinimumUncertainImages = 4
+            private const val SemanticBlockThreshold = 0.35f
+            private const val SemanticReviewThreshold = 0.24f
+
+            private val SemanticUnsafeCategories = setOf("sexual", "dating", "gambling", "drugs", "violence")
 
             val NonOverridableCategories = setOf("unsafe_visual_platform")
             private val NonOverridableVisualDomains = setOf("imgsrc.ru")

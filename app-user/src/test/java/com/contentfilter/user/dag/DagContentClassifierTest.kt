@@ -1,6 +1,7 @@
 package com.contentfilter.user.dag
 
 import com.contentfilter.feature.vpn.domainlist.DynamicDomainBlocklist
+import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
@@ -13,6 +14,7 @@ class DagContentClassifierTest {
                 object : DynamicDomainBlocklist {
                     override fun categoryFor(domain: String): String? = blockedDomains[domain]
                 },
+            semanticClassifier = DagSemanticTextClassifier(modelBytes()),
         )
 
     @Test
@@ -56,6 +58,55 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `semantic unsafe intent without exact keywords is blocked in all initial languages`() {
+        assertEquals(DagClassification.Blocked, classifier.classifyQuery("galería de chicas sin ropa").decision)
+        assertEquals(
+            DagClassification.Blocked,
+            classifier.classifyQuery("meet someone tonight without commitment").decision,
+        )
+        assertEquals(DagClassification.Blocked, classifier.classifyQuery("לשים כסף על תוצאת משחק").decision)
+    }
+
+    @Test
+    fun `semantic medical context remains uncertain instead of blocked`() {
+        val result = classifier.classifyQuery("guía médica para tratar consumo de cocaína")
+
+        assertEquals(DagClassification.Uncertain, result.decision)
+    }
+
+    @Test
+    fun `missing or corrupt semantic model fails closed`() {
+        val unavailable =
+            DagContentClassifier(
+                domainBlocklist =
+                    object : DynamicDomainBlocklist {
+                        override fun categoryFor(domain: String): String? = null
+                    },
+                semanticClassifier = DagSemanticTextClassifier(byteArrayOf(1, 2, 3)),
+            )
+
+        val result = unavailable.classifyQuery("horario del banco")
+
+        assertEquals(DagClassification.Uncertain, result.decision)
+        assertEquals("model_unavailable", result.category)
+    }
+
+    @Test
+    fun `semantic model never overrides a known blocked domain`() {
+        blockedDomains["blocked.example"] = "adult"
+
+        val result =
+            classifier.classifyResult(
+                "Tienda de muebles",
+                "Productos para el hogar",
+                "https://blocked.example",
+            )
+
+        assertEquals(DagClassification.Blocked, result.decision)
+        assertEquals("adult", result.category)
+    }
+
+    @Test
     fun `reported unsafe visual platform is blocked before loading`() {
         val result = classifier.classifyDirectUrl("https://gallery.imgsrc.ru/example")
 
@@ -93,5 +144,11 @@ class DagContentClassifierTest {
             )
 
         assertEquals(DagClassification.Allowed, result.decision)
+    }
+
+    private fun modelBytes(): ByteArray {
+        val relative = "src/main/assets/dag/dag_text_intent_v1.bin"
+        val candidates = listOf(File(relative), File("app-user/$relative"))
+        return candidates.first(File::isFile).readBytes()
     }
 }
