@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario f83e36745a1aacbd3a9cbb7562b62e453e831b782a5d7acce7a4d0bca41447bf
+Admin   fb980bad5d35f1f1927580a83b4f7aad97d42052b105e96530af03ed8402234a
 ```
 
 ## Implementacion 2026-07-15 - DEV 220 selector visual de pestañas
@@ -85,7 +85,7 @@ Admin   pendiente de publicacion
 - La miniatura se captura localmente en RGB_565 y baja resolución únicamente cuando la página ya está en estado `Visible`; páginas bloqueadas, inciertas o todavía ocultas muestran la mascota y nunca producen vista previa.
 - Las vistas previas viven solo en memoria durante la sesión de DAG. No se sincronizan, no llegan al administrador, no se guardan en historial ni generan consultas Brave. Los WebView de pestañas inactivas siguen suspendidos para limitar memoria.
 - Gmail: cookies propias y DOM storage de DAG persisten normalmente entre aperturas/actualizaciones si Google permite completar el login. No se comparte la sesión de Chrome y Google puede rechazar autenticación dentro de WebView por su política de user-agent embebido.
-- Validación local: ktlint, tests DEV Usuario y APK Usuario optimizado correctos. Falta publicación y prueba física de DEV 220.
+- Validación local: ktlint, tests DEV Usuario y APK Usuario optimizado correctos. Ambos APK 220 fueron publicados atomicamente en Supabase DEV y verificados por manifiesto/hash. Falta prueba física de DEV 220.
 
 ## Implementacion 2026-07-15 - DEV 219 descarga de actualizaciones resiliente
 
