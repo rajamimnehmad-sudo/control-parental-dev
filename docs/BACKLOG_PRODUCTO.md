@@ -136,6 +136,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | SUPERADMIN-MSG-01 | Idea | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Idea | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Idea | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
+| BARRIER-LAUNCHER-01 | Idea | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
@@ -176,6 +177,32 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
   - una misma alerta no aparece duplicada por reintentos de entrega;
   - la experiencia no debilita las notificaciones urgentes ya existentes.
 - Decisiones pendientes para la entrevista del ticket: ubicacion exacta de la campanita; punto o contador; tipos de eventos; destino al tocar; estados leida/no leida; historial, retencion, filtros y agrupacion.
+
+### BARRIER-LAUNCHER-01 - Superficie profesional sin desinstalacion rapida
+
+- Estado: `Idea`; no aprobado para codigo.
+- Tipo: seguridad, antimanipulacion y UX de App Usuario.
+- Prioridad: P2.
+- Problema: al mantener presionado el icono de App Usuario, el launcher muestra la opcion `Desinstalar`. Aunque la barrera actual bloquea las rutas posteriores, la opcion visible transmite una proteccion menos integrada que otros filtros.
+- Solucion propuesta principal: cuando la proteccion este armada, ocultar de forma reversible el componente o alias de launcher de App Usuario, sin deshabilitar la aplicacion ni sus servicios. Ofrecer un acceso controlado alternativo, por ejemplo desde la notificacion persistente o durante una ventana de mantenimiento autorizada.
+- Alternativas investigadas:
+  - interceptar con Accessibility el menu contextual del launcher y cerrarlo al detectar acciones peligrosas; conserva el icono, pero depende del launcher, fabricante, idioma y version;
+  - integrar Samsung Knox SDK para equipos compatibles; requiere programa/licencia Knox y no es universal, y Android 15 restringe parte de las capacidades Knox en modo Device Admin sin Device Owner/Profile Owner;
+  - usar `DevicePolicyManager.setUninstallBlocked`; ofrece control de sistema, pero exige Device Owner o Profile Owner y normalmente aprovisionamiento administrado;
+  - aplicacion de sistema, root o firmware propio; fuera del alcance comercial normal.
+- Evidencia: observacion del usuario el 2026-07-15 al comparar con MB Smart. La documentacion oficial de Android reserva el bloqueo de desinstalacion por politica a propietarios o administradores habilitados; Samsung documenta APIs Knox de gestion de aplicaciones sujetas a compatibilidad, licencia y restricciones de administracion.
+- Esfuerzo: M para la opcion principal y validacion OEM; L/XL si se incorpora Knox o una modalidad administrada.
+- Riesgo: medio; ocultar el launcher sin una ruta segura de acceso puede dejar al usuario sin entrada a la app, y una intercepcion Accessibility demasiado amplia puede bloquear menus de otras aplicaciones.
+- Dependencias: componente de launcher de App Usuario; estado armado y mantenimiento remoto; notificacion foreground; validacion fisica en los Samsung soportados; politicas de Google Play si se distribuye publicamente.
+- Duplicados y relacion: extiende `BARRIER-ANDROID-01`, ya resuelto para las rutas posteriores de manipulacion, sin afirmar que Android normal equivalga a MDM ni reabrir la garantia de Device Owner.
+- Criterios de aceptacion propuestos:
+  - con la proteccion armada no existe una accion rapida visible para desinstalar App Usuario desde su icono, o el menu se neutraliza antes de permitir una accion peligrosa;
+  - la app, VPN, Accessibility, watchdog, sincronizacion y alertas siguen funcionando con el acceso de launcher oculto;
+  - existe una ruta clara y autorizada para abrir la app o restaurar temporalmente el icono;
+  - desarmar o conceder mantenimiento restaura el acceso previsto sin reinstalar ni borrar datos;
+  - no se ocultan ni bloquean menus de otras aplicaciones;
+  - el alcance y las limitaciones se validan fisicamente por fabricante y version Android.
+- Decisiones pendientes para la entrevista del ticket: ocultar completamente el icono o conservarlo e interceptar el menu; ruta alternativa de apertura; comportamiento durante mantenimiento; fabricantes soportados; evaluar o descartar Knox como linea separada.
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 
