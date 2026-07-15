@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 215
-App Admin versionCode 215
+App Usuario versionCode 216
+App Admin versionCode 216
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-215-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-215-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-216-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-216-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 5ef812d291d88530ee36ba00543707f87d4079262e8a247cd9c359bf8606a931
-Admin   7cb5b0ebdb35b67611d0152f7286c01b624a9a2829f5823fb4e3952a69619664
+Usuario d170d361ba239194d6c5966b88f3d13bfce3ea34604e05ca52d0668498eba329
+Admin   374f55022b94e913c92ddd2af9bb0f91bc78c30875263ec4791129ecd7cc0942
 ```
+
+## Cierre 2026-07-15 - DAG-UX-02 superficie completa tipo navegador
+
+- DEV 216 concentra Atrás, Adelante, barra combinada, Recargar/Ir y menú en una única franja superior. La segunda fila de controles fue eliminada para recuperar altura útil.
+- El WebView ocupa todo el ancho y alto restante, sin bordes ni márgenes laterales. Los resultados dejan las tarjetas redondeadas y usan filas continuas de ancho completo, separadas sutilmente, con jerarquía dominio, título y resumen inspirada en buscadores modernos.
+- Brave sigue siendo el motor y el único consumo contabilizado. La presentación puede recordar a Google/Chrome, pero DAG no incrusta Google Search ni reenvía consultas a Google: así conserva control del filtrado, privacidad, revisión y cupo.
+- Validacion local: ktlint, tests unitarios DEV Usuario y ensamblado DEV Usuario/Admin correctos. APK 216 publicado mediante el flujo atomico exclusivamente en Supabase DEV; manifiestos y hashes verificados.
 
 ## Cierre 2026-07-15 - DAG DEV 213-215 modelo neural, imagenes y UX compacta
 
