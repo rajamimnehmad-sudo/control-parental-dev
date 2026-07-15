@@ -35,7 +35,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 210 y App Admin DEV 210, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 211 y App Admin DEV 211, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -44,12 +44,12 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ### DAG-SAFETY-01 - Correcciones de imagenes, revisiones y navegacion
 
-- Estado: `En progreso`; aprobado dentro de la continuacion explicita de DAG el 2026-07-15. Publicacion DEV 211 en preparacion.
+- Estado: `En progreso`; aprobado dentro de la continuacion explicita de DAG el 2026-07-15. DEV 211 publicado y verificado; falta la prueba final de la aprobacion de Easy en el celular personal.
 - Tipo: seguridad Web, sincronizacion, UX y compatibilidad visual. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
 - Problemas reproducidos: fotos ausentes en paginas modernas; `easy.com.ar` seguia cerrado pese a una aprobacion activa; Atras podia navegar antes de ocultar el teclado; `imgsrc.ru` se permitia aunque es una plataforma visual no apta para este perfil.
 - Alcance implementado: imagenes lazy HTTPS y AVIF estatico pasan por el clasificador local; la pagina incorpora el balance de decisiones visuales; `imgsrc.ru` se bloquea antes de WebView; DAG sincroniza al abrir y consulta temporalmente una aprobacion pendiente; futuras aprobaciones reutilizan reglas existentes; Atras cierra primero el teclado.
 - Privacidad y costo: no se agregan servicios, secretos ni consultas Brave. Imagenes y decisiones permanecen en el telefono. No se borra ningun dato ni regla duplicada preexistente.
-- Evidencia local y fisica: tests de clasificador/sincronizacion, validacion integral Gradle y build de ambos APK correctos; Samsung SM-A235M mostro fotos de Wikipedia, mantuvo la pagina al cerrar el teclado y rechazo `imgsrc.ru` antes de cargarlo. La aprobacion de Easy se verificara en el celular al instalar DEV 211.
+- Evidencia local y fisica: tests de clasificador/sincronizacion, validacion integral Gradle y build de ambos APK correctos; Samsung SM-A235M mostro fotos de Wikipedia, mantuvo la pagina al cerrar el teclado y rechazo `imgsrc.ru` antes de cargarlo. APKs publicos DEV 211 y hashes verificados; la aprobacion de Easy se verificara en el celular personal.
 
 ### DAG-IMAGES-01 - Clasificacion local de imagenes
 

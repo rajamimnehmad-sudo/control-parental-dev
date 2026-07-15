@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 210
-App Admin versionCode 210
+App Usuario versionCode 211
+App Admin versionCode 211
 versionName 1.0.1-dev
 ```
 
@@ -68,26 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-210-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-210-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-211-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-211-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario e2959b015debf74166d0951141c9e0cd252c172f5e1f297a1617386aa1c4572c
-Admin   a2c7113b1b707b996cf5b7ec13820160e98899b3192e38ef04de4e9da3f5ed60
+Usuario 37ed27b5a5493df05e6c71ec96e0681b99f89207952a0fa2130c2573744da8ad
+Admin   26409393b703fbda64976ed504bff2caefcc96610739a53755907a2df9e925e5
 ```
 
-## Trabajo en curso 2026-07-15 - DAG-SAFETY-01
+## Publicacion 2026-07-15 - DAG-SAFETY-01 pendiente de prueba final
 
-- DEV 211 esta compilado localmente y pendiente de publicacion. No presentarlo como publico hasta verificar ambos manifiestos DEV.
+- DEV 211 esta publicado para Usuario y Admin en Supabase DEV. Ambos manifiestos y descargas se verificaron por SHA-256. Commit funcional `06c306c`; workflow `Publicar APKs DEV` `29426319592` exitoso. Android CI `29426319513` seguia en curso al escribir esta linea.
 - Corrige la sincronizacion de reglas al abrir DAG y comprueba automaticamente durante dos minutos una solicitud recien enviada. Supabase DEV confirma que la aprobacion de `easy.com.ar` y su regla `Allow` por dispositivo existian correctamente; el fallo estaba en el refresco del cliente.
 - Las aprobaciones futuras reutilizan una regla `Allow` existente en vez de crear otro duplicado. No se borraron las reglas duplicadas preexistentes de YouTube ni ningun otro dato.
 - Las imagenes lazy con origen HTTPS y AVIF estatico en Android 12+ pasan por el mismo clasificador local. La decision de pagina incorpora el balance de imagenes seguras, bloqueadas e inciertas; SVG, GIF, animacion, `data:` y `blob:` siguen cerrados.
 - `imgsrc.ru` queda bloqueado antes de crear una navegacion WebView. Es una barrera preventiva no anulable mediante revision de dominio.
 - Atras oculta primero el teclado. Prueba fisica SM-A235M: Wikipedia mostro fotos seguras de manzanas y flores; Atras cerro el teclado sin salir; `imgsrc.ru` mostro bloqueo sin solicitud WebView. Easy requiere validacion final en el celular cuyo dispositivo recibio la aprobacion.
-- Validacion integral local: 895 tareas Gradle correctas con tests de dominio, Usuario y Admin; ktlint, Android lint, builds optimizados y detekt informativo. No se consumieron consultas Brave, no se toco Production, no se agregaron secretos ni Service Role Key a Android.
+- Validacion integral local: 895 tareas Gradle correctas con tests de dominio, Usuario y Admin; ktlint, Android lint, builds optimizados y detekt informativo. Falta instalar DEV 211 en el celular personal y confirmar que la regla aprobada de Easy se sincroniza y abre sus imagenes. No se consumieron consultas Brave, no se toco Production, no se agregaron secretos ni Service Role Key a Android.
 
 ## Cierre 2026-07-15 - DAG-IMAGES-01 clasificacion visual local
 
