@@ -46,6 +46,23 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".dag.DagActivity"
+            android:enabled="false"
+            android:excludeFromRecents="false"
+            android:exported="true"
+            android:icon="@drawable/ic_dag_launcher"
+            android:label="DAG"
+            android:launchMode="singleTask"
+            android:roundIcon="@drawable/ic_dag_launcher"
+            android:taskAffinity="${applicationId}.dag">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"

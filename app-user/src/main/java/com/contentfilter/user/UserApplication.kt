@@ -14,6 +14,7 @@ import com.contentfilter.feature.activation.InstalledAppVersionProvider
 import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
+import com.contentfilter.user.dag.DagLauncherController
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.protection.ProtectionHealthMonitor
 import com.contentfilter.user.repair.UserLocalDataRepair
@@ -68,6 +69,9 @@ class UserApplication :
     @Inject
     lateinit var protectionHealthMonitor: ProtectionHealthMonitor
 
+    @Inject
+    lateinit var dagLauncherController: DagLauncherController
+
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override val workManagerConfiguration: Configuration
@@ -82,6 +86,10 @@ class UserApplication :
             .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }
             .logFailure("periodic-sync-schedule")
+        appScope.launch {
+            runCatching { dagLauncherController.monitorAvailability() }
+                .logFailure("dag-launcher-monitor")
+        }
         appScope.launch {
             runCatching { webDomainListUpdater.refreshIfDue() }
                 .logFailure("domain-list-refresh")

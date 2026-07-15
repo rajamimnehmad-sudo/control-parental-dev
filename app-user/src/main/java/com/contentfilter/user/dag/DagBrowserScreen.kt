@@ -31,9 +31,12 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -57,7 +60,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductLargeFeatureCard
-import com.contentfilter.core.ui.ProductMint
 import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.core.ui.ProductVisualPage
 import org.json.JSONArray
@@ -66,10 +68,18 @@ import java.util.Date
 
 @Composable
 fun DagBrowserRoute(
+    modifier: Modifier = Modifier,
     onBack: () -> Unit,
+    standalone: Boolean = false,
     viewModel: DagBrowserViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    if (!state.dagAvailabilityKnown) {
+        Box(modifier = modifier.background(MaterialTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+            CircularProgressIndicator()
+        }
+        return
+    }
     if (!state.dagEnabled) {
         ProductVisualPage(title = "DAG", subtitle = "Buscador protegido", onBack = onBack) {
             ProductLargeFeatureCard(
@@ -81,8 +91,13 @@ fun DagBrowserRoute(
         return
     }
 
+    BackHandler(enabled = state.view != DagView.Browser) {
+        if (state.view == DagView.Start) onBack() else viewModel.showStart()
+    }
+    var menuExpanded by remember { mutableStateOf(false) }
+
     Column(
-        modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(12.dp),
+        modifier = modifier.background(MaterialTheme.colorScheme.background).padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(
@@ -90,27 +105,53 @@ fun DagBrowserRoute(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            OutlinedButton(onClick = onBack) { Text("Atrás") }
+            if (!standalone || state.view != DagView.Start) {
+                TextButton(onClick = { if (state.view == DagView.Start) onBack() else viewModel.showStart() }) {
+                    Text("‹", style = MaterialTheme.typography.headlineMedium)
+                }
+            }
             OutlinedTextField(
                 modifier = Modifier.weight(1f),
                 value = state.address,
                 onValueChange = viewModel::onAddressChanged,
-                placeholder = { Text("Buscar o escribir dirección") },
+                placeholder = { Text("Buscar en DAG o escribir dirección") },
                 singleLine = true,
+                shape = RoundedCornerShape(28.dp),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Go),
                 keyboardActions =
                     androidx.compose.foundation.text.KeyboardActions(
                         onGo = { viewModel.submitAddress() },
                     ),
             )
-            Button(onClick = viewModel::submitAddress, enabled = !state.loading) { Text("Ir") }
+            Button(
+                onClick = viewModel::submitAddress,
+                enabled = !state.loading,
+                shape = RoundedCornerShape(24.dp),
+            ) { Text("Ir") }
+            Box {
+                TextButton(onClick = { menuExpanded = true }) {
+                    Text("⋮", style = MaterialTheme.typography.headlineSmall)
+                }
+                DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                    DropdownMenuItem(
+                        text = { Text("Inicio") },
+                        onClick = {
+                            menuExpanded = false
+                            viewModel.showStart()
+                        },
+                    )
+                    DropdownMenuItem(
+                        text = { Text("Historial") },
+                        onClick = {
+                            menuExpanded = false
+                            viewModel.showHistory()
+                        },
+                    )
+                }
+            }
         }
 
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = viewModel::showStart) { Text("Inicio") }
-            OutlinedButton(onClick = viewModel::showHistory) { Text("Historial") }
-            if (state.loading) CircularProgressIndicator(modifier = Modifier.height(32.dp))
-        }
+        if (state.loading) CircularProgressIndicator(modifier = Modifier.height(28.dp))
 
         if (state.message.isNotBlank()) {
             ProductCard {
@@ -125,7 +166,7 @@ fun DagBrowserRoute(
         }
 
         when (state.view) {
-            DagView.Start -> DagStartContent()
+            DagView.Start -> Unit
             DagView.Results -> DagResultsContent(state.results, viewModel::openResult, viewModel::requestReview)
             DagView.History ->
                 DagHistoryContent(
@@ -137,7 +178,7 @@ fun DagBrowserRoute(
             DagView.Browser ->
                 DagWebContent(
                     state = state,
-                    onBackFromBrowser = onBack,
+                    onBackFromBrowser = viewModel::showStart,
                     onNavigate = viewModel::requestNavigation,
                     onPageStarted = viewModel::onPageStarted,
                     onPageTextReady = viewModel::onPageTextReady,
@@ -146,20 +187,6 @@ fun DagBrowserRoute(
                     onHome = viewModel::showStart,
                 )
         }
-    }
-}
-
-@Composable
-private fun DagStartContent() {
-    ProductLargeFeatureCard(
-        title = "Buscador DAG",
-        subtitle = "Búsqueda y navegación protegidas. Las imágenes y los videos permanecen bloqueados.",
-        accent = ProductMint,
-    )
-    ProductCard {
-        Text("Protección local", style = MaterialTheme.typography.titleMedium)
-        Text("DAG analiza consultas y páginas antes de mostrarlas.")
-        Text("Idiomas iniciales: español, hebreo e inglés.")
     }
 }
 

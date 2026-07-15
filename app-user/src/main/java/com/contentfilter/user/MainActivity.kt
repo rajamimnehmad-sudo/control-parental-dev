@@ -5,7 +5,6 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -68,6 +67,7 @@ import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.MyAppsRoute
+import com.contentfilter.user.dag.DagActivity
 import com.contentfilter.user.dag.DagBrowserRoute
 import com.contentfilter.user.dag.DagShortcutController
 import com.contentfilter.user.internet.UserWebViewModel
@@ -257,15 +257,7 @@ private fun UserAppRoot(
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
                     UserWebTab(
                         onBack = ::goBack,
-                        onOpenDag = { navigateTo(UserDestination.Dag) },
-                        onCreateDagShortcut = {
-                            val requested = DagShortcutController.requestPin(context)
-                            Toast.makeText(
-                                context,
-                                if (requested) "Confirmá el atajo DAG." else "Este inicio no admite atajos.",
-                                Toast.LENGTH_SHORT,
-                            ).show()
-                        },
+                        onOpenDag = { DagActivity.open(context) },
                         vpnActive = statusState.isVpnActive,
                         accessibilityActive = statusState.accessibilityState == "Activa",
                         onActivateWebProtection = {
@@ -570,7 +562,6 @@ private fun UserHomeTab(
 private fun UserWebTab(
     onBack: () -> Unit,
     onOpenDag: () -> Unit,
-    onCreateDagShortcut: () -> Unit,
     vpnActive: Boolean,
     accessibilityActive: Boolean,
     onActivateWebProtection: () -> Unit,
@@ -628,8 +619,8 @@ private fun UserWebTab(
                 }
             }
             item {
-                OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCreateDagShortcut) {
-                    Text("Crear atajo DAG")
+                ProductCard {
+                    Text("DAG también aparece como una app independiente en el inicio del teléfono.")
                 }
             }
         }

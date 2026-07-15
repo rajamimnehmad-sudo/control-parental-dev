@@ -58,6 +58,7 @@ enum class DagPageStatus {
 }
 
 data class DagBrowserUiState(
+    val dagAvailabilityKnown: Boolean = false,
     val dagEnabled: Boolean = false,
     val address: String = "",
     val view: DagView = DagView.Start,

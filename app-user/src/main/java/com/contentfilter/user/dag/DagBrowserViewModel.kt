@@ -21,6 +21,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -50,11 +51,15 @@ class DagBrowserViewModel
 
         init {
             viewModelScope.launch {
-                policyRepository.observeActivePolicy().collect { snapshot ->
-                    activeRules = snapshot.rules
-                    val enabled = snapshot.rules.dagEnabled()
-                    mutableState.update { state -> state.withDagAvailability(enabled) }
-                }
+                combine(
+                    policyRepository.observeActivePolicy(),
+                    activationRepository.observeActivation(),
+                ) { snapshot, activation -> snapshot to activation }
+                    .collect { (snapshot, activation) ->
+                        activeRules = snapshot.rules
+                        val enabled = activation != null && snapshot.rules.dagEnabled()
+                        mutableState.update { state -> state.withDagAvailability(enabled) }
+                    }
             }
             viewModelScope.launch {
                 historyStore.observe().collect { entries ->
@@ -486,6 +491,7 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
     when {
         !enabled ->
             copy(
+                dagAvailabilityKnown = true,
                 dagEnabled = false,
                 address = "",
                 view = DagView.Start,
@@ -496,9 +502,10 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 message = "El administrador mantiene DAG cerrado.",
                 reviewCandidate = null,
             )
-        dagEnabled -> this
+        dagEnabled -> copy(dagAvailabilityKnown = true)
         else ->
             copy(
+                dagAvailabilityKnown = true,
                 dagEnabled = true,
                 address = "",
                 view = DagView.Start,

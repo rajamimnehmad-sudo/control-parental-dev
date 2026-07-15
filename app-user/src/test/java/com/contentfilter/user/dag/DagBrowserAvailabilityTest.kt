@@ -25,6 +25,7 @@ class DagBrowserAvailabilityTest {
             ).withDagAvailability(enabled = false)
 
         assertFalse(closed.dagEnabled)
+        assertTrue(closed.dagAvailabilityKnown)
         assertEquals("", closed.address)
         assertEquals(DagView.Start, closed.view)
         assertEquals(DagPageStatus.Idle, closed.pageStatus)
@@ -52,6 +53,7 @@ class DagBrowserAvailabilityTest {
             ).withDagAvailability(enabled = true)
 
         assertTrue(reopened.dagEnabled)
+        assertTrue(reopened.dagAvailabilityKnown)
         assertEquals("", reopened.address)
         assertEquals(DagView.Start, reopened.view)
         assertEquals(DagPageStatus.Idle, reopened.pageStatus)
