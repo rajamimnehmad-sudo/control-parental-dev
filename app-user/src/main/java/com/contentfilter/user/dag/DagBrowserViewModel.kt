@@ -170,7 +170,7 @@ class DagBrowserViewModel
                                     )
                                 }
                             }
-                        historyStore.addSearch(query)
+                        withContext(Dispatchers.IO) { historyStore.addSearch(query) }
                         mutableState.update {
                             it.copy(
                                 address = query,
@@ -268,11 +268,13 @@ class DagBrowserViewModel
             viewModelScope.launch(Dispatchers.Default) {
                 val domain = DagContentClassifier.domainFrom(url)
                 val result = applyExplicitRule(domain, classifier.classifyPage(url, title, text))
+                if (result.decision == DagClassification.Allowed) {
+                    withContext(Dispatchers.IO) { historyStore.addPage(url, title) }
+                }
                 withContext(Dispatchers.Main) {
                     if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return@withContext
                     when (result.decision) {
                         DagClassification.Allowed -> {
-                            historyStore.addPage(url, title)
                             mutableState.update {
                                 it.copy(
                                     address = url,
@@ -404,9 +406,13 @@ class DagBrowserViewModel
             }
         }
 
-        fun deleteHistory(id: String) = historyStore.delete(id)
+        fun deleteHistory(id: String) {
+            viewModelScope.launch(Dispatchers.IO) { historyStore.delete(id) }
+        }
 
-        fun clearHistory() = historyStore.clear()
+        fun clearHistory() {
+            viewModelScope.launch(Dispatchers.IO) { historyStore.clear() }
+        }
 
         fun onBrowserBlockedAction(message: String) {
             mutableState.update { it.copy(message = message) }

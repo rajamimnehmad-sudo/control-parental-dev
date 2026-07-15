@@ -11,14 +11,6 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.FastOutSlowInEasing
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.keyframes
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -46,7 +38,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -61,6 +52,7 @@ import com.contentfilter.core.ui.ProductFeatureTile
 import com.contentfilter.core.ui.ProductHeroPanel
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductLargeFeatureCard
+import com.contentfilter.core.ui.ProductLazyVisualPage
 import com.contentfilter.core.ui.ProductMint
 import com.contentfilter.core.ui.ProductNavGlyph
 import com.contentfilter.core.ui.ProductSky
@@ -68,7 +60,6 @@ import com.contentfilter.core.ui.ProductStatCard
 import com.contentfilter.core.ui.ProductSun
 import com.contentfilter.core.ui.ProductTeal
 import com.contentfilter.core.ui.ProductViolet
-import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.feature.accessibility.service.AccessibilityController
 import com.contentfilter.feature.accessibility.service.DeviceAdminController
 import com.contentfilter.feature.activation.ActivationRoute
@@ -499,67 +490,79 @@ private fun UserHomeTab(
     onWeb: () -> Unit,
     onUpdates: () -> Unit,
 ) {
-    ProductVisualPage(
+    ProductLazyVisualPage(
         title = "Hola",
         subtitle = "Tu dispositivo protegido está listo",
     ) {
-        ProductHeroPanel(
-            title = "Content Filter",
-            subtitle = "Revisá tus apps, permisos y solicitudes desde una experiencia más clara.",
-            mascot = {
-                UserHomeFish(modifier = Modifier.size(170.dp))
-            },
-        )
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ProductStatCard(
-                modifier = Modifier.weight(1f),
-                value = "5",
-                label = "secciones",
-                accent = ProductSky,
-            )
-            ProductStatCard(
-                modifier = Modifier.weight(1f),
-                value = "DEV",
-                label = "versión ${BuildConfig.VERSION_CODE}",
-                accent = ProductMint,
+        item {
+            ProductHeroPanel(
+                title = "Content Filter",
+                subtitle = "Revisá tus apps, permisos y solicitudes desde una experiencia más clara.",
+                mascot = {
+                    UserHomeFish(modifier = Modifier.size(170.dp))
+                },
             )
         }
-        ProductFeatureTile(
-            icon = ProductIcon.Search,
-            title = "Mis apps",
-            subtitle = "Estado, límites y pedidos de acceso",
-            accent = ProductTeal,
-            onClick = onApps,
-        )
-        ProductFeatureTile(
-            icon = ProductIcon.Bell,
-            title = "Solicitudes pendientes",
-            subtitle =
-                if (pendingRequests == 0) {
-                    "No hay pedidos pendientes"
-                } else {
-                    "$pendingRequests pendientes${latestRequestLabel.ifBlank { "" }.let { if (it.isBlank()) "" else " · tocá para ver" }}"
-                },
-            accent = ProductSun,
-            onClick = onRequests,
-        )
-        ProductFeatureTile(
-            icon = ProductIcon.Web,
-            title = "Web",
-            subtitle = "Sección preparada para control web",
-            accent = ProductSky,
-            onClick = onWeb,
-        )
-        ProductFeatureTile(
-            icon = ProductIcon.Update,
-            title = "Ajustes",
-            subtitle = "Protección, sincronización y actualizaciones",
-            accent = ProductViolet,
-            onClick = onUpdates,
-        )
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                ProductStatCard(
+                    modifier = Modifier.weight(1f),
+                    value = "5",
+                    label = "secciones",
+                    accent = ProductSky,
+                )
+                ProductStatCard(
+                    modifier = Modifier.weight(1f),
+                    value = "DEV",
+                    label = "versión ${BuildConfig.VERSION_CODE}",
+                    accent = ProductMint,
+                )
+            }
+        }
+        item {
+            ProductFeatureTile(
+                icon = ProductIcon.Search,
+                title = "Mis apps",
+                subtitle = "Estado, límites y pedidos de acceso",
+                accent = ProductTeal,
+                onClick = onApps,
+            )
+        }
+        item {
+            ProductFeatureTile(
+                icon = ProductIcon.Bell,
+                title = "Solicitudes pendientes",
+                subtitle =
+                    if (pendingRequests == 0) {
+                        "No hay pedidos pendientes"
+                    } else {
+                        "$pendingRequests pendientes${latestRequestLabel.ifBlank { "" }.let { if (it.isBlank()) "" else " · tocá para ver" }}"
+                    },
+                accent = ProductSun,
+                onClick = onRequests,
+            )
+        }
+        item {
+            ProductFeatureTile(
+                icon = ProductIcon.Web,
+                title = "Web",
+                subtitle = "Sección preparada para control web",
+                accent = ProductSky,
+                onClick = onWeb,
+            )
+        }
+        item {
+            ProductFeatureTile(
+                icon = ProductIcon.Update,
+                title = "Ajustes",
+                subtitle = "Protección, sincronización y actualizaciones",
+                accent = ProductViolet,
+                onClick = onUpdates,
+            )
+        }
     }
 }
 
@@ -576,99 +579,115 @@ private fun UserWebTab(
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val blocked = state.webNavigationBlocked
     val protectionActive = vpnActive && accessibilityActive
-    ProductVisualPage(
+    ProductLazyVisualPage(
         title = "Web",
         subtitle = if (blocked) "Internet bloqueado" else "Internet abierto",
         onBack = onBack,
     ) {
-        ProductLargeFeatureCard(
-            title =
-                if (blocked) {
-                    "Internet bloqueado"
-                } else {
-                    if (state.activeLayers.isEmpty()) {
-                        "Internet totalmente abierto"
+        item {
+            ProductLargeFeatureCard(
+                title =
+                    if (blocked) {
+                        "Internet bloqueado"
                     } else {
-                        "Internet abierto con protecciones"
-                    }
-                },
-            subtitle =
-                if (blocked) {
-                    "Las capas elegidas quedan guardadas hasta que el administrador abra Internet."
-                } else {
-                    state.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" }
-                },
-            accent = ProductSky,
-        )
-        UserWebStatusCard(title = "SafeSearch", value = if (blocked) "Automatico" else "Activo")
-        if (state.onlyResultsEnabled) {
-            UserWebStatusCard(title = "Solo resultados", value = if (blocked) "Guardado" else "Activo")
+                        if (state.activeLayers.isEmpty()) {
+                            "Internet totalmente abierto"
+                        } else {
+                            "Internet abierto con protecciones"
+                        }
+                    },
+                subtitle =
+                    if (blocked) {
+                        "Las capas elegidas quedan guardadas hasta que el administrador abra Internet."
+                    } else {
+                        state.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" }
+                    },
+                accent = ProductSky,
+            )
         }
-        ProductLargeFeatureCard(
-            title = "DAG",
-            subtitle =
-                if (state.dagEnabled) {
-                    "Buscador protegido habilitado por el administrador."
-                } else {
-                    "El administrador mantiene DAG cerrado."
-                },
-            accent = ProductMint,
-        )
+        item { UserWebStatusCard(title = "SafeSearch", value = if (blocked) "Automatico" else "Activo") }
+        if (state.onlyResultsEnabled) {
+            item { UserWebStatusCard(title = "Solo resultados", value = if (blocked) "Guardado" else "Activo") }
+        }
+        item {
+            ProductLargeFeatureCard(
+                title = "DAG",
+                subtitle =
+                    if (state.dagEnabled) {
+                        "Buscador protegido habilitado por el administrador."
+                    } else {
+                        "El administrador mantiene DAG cerrado."
+                    },
+                accent = ProductMint,
+            )
+        }
         if (state.dagEnabled) {
-            Button(modifier = Modifier.fillMaxWidth(), onClick = onOpenDag) {
-                Text("Abrir DAG")
+            item {
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onOpenDag) {
+                    Text("Abrir DAG")
+                }
             }
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCreateDagShortcut) {
-                Text("Crear atajo DAG")
+            item {
+                OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCreateDagShortcut) {
+                    Text("Crear atajo DAG")
+                }
             }
         }
         if (state.showDomainListDiagnostics) {
-            ProductCard {
-                Text("Base de proteccion Web", style = MaterialTheme.typography.titleMedium)
-                Text("Estado: ${state.domainList.status}", style = MaterialTheme.typography.bodyMedium)
-                Text(
-                    "Version instalada: ${state.domainList.version.takeIf { it > 0L } ?: "Sin base"}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "Fecha de instalacion: ${state.domainList.installedAtEpochMillis.devDateLabel()}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "Ultima comprobacion: ${state.domainList.lastCheckResult}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                Text(
-                    "Canario incluido: ${if (state.domainList.canaryIncluded) "Si" else "No"}",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-                state.domainList.lastError?.let { error ->
-                    Text("Ultimo error: $error", style = MaterialTheme.typography.bodyMedium)
-                }
-                Button(
-                    enabled = !state.domainList.isChecking,
-                    onClick = viewModel::checkDomainListNow,
-                ) {
-                    Text(if (state.domainList.isChecking) "Comprobando..." else "Comprobar actualizacion ahora")
+            item {
+                ProductCard {
+                    Text("Base de proteccion Web", style = MaterialTheme.typography.titleMedium)
+                    Text("Estado: ${state.domainList.status}", style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        "Version instalada: ${state.domainList.version.takeIf { it > 0L } ?: "Sin base"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "Fecha de instalacion: ${state.domainList.installedAtEpochMillis.devDateLabel()}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "Ultima comprobacion: ${state.domainList.lastCheckResult}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        "Canario incluido: ${if (state.domainList.canaryIncluded) "Si" else "No"}",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    state.domainList.lastError?.let { error ->
+                        Text("Ultimo error: $error", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Button(
+                        enabled = !state.domainList.isChecking,
+                        onClick = viewModel::checkDomainListNow,
+                    ) {
+                        Text(if (state.domainList.isChecking) "Comprobando..." else "Comprobar actualizacion ahora")
+                    }
                 }
             }
         }
         if (!accessibilityActive) {
-            ProductCard {
-                Text("Accessibility apagado.", style = MaterialTheme.typography.bodyMedium)
+            item {
+                ProductCard {
+                    Text("Accessibility apagado.", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
         if (!vpnActive) {
-            ProductCard {
-                Text("VPN apagada.", style = MaterialTheme.typography.bodyMedium)
-                Button(onClick = onActivateWebProtection) {
-                    Text("Activar protección web")
+            item {
+                ProductCard {
+                    Text("VPN apagada.", style = MaterialTheme.typography.bodyMedium)
+                    Button(onClick = onActivateWebProtection) {
+                        Text("Activar protección web")
+                    }
                 }
             }
         }
         if (!protectionActive) {
-            ProductCard {
-                Text("Protección web no activa.", style = MaterialTheme.typography.bodyMedium)
+            item {
+                ProductCard {
+                    Text("Protección web no activa.", style = MaterialTheme.typography.bodyMedium)
+                }
             }
         }
     }
@@ -701,57 +720,6 @@ private fun UserWebStatusCard(
 
 @Composable
 private fun UserHomeFish(modifier: Modifier = Modifier) {
-    val loop = rememberInfiniteTransition(label = "user-home-fish")
-    val swimX by loop.animateFloat(
-        initialValue = 0f,
-        targetValue = 0f,
-        animationSpec =
-            infiniteRepeatable(
-                animation =
-                    keyframes {
-                        durationMillis = 7600
-                        0f at 0 using FastOutSlowInEasing
-                        -8f at 900 using FastOutSlowInEasing
-                        9f at 1850 using FastOutSlowInEasing
-                        -15f at 2800 using FastOutSlowInEasing
-                        18f at 4300 using FastOutSlowInEasing
-                        3f at 6100 using FastOutSlowInEasing
-                        0f at 7600 using FastOutSlowInEasing
-                    },
-                repeatMode = RepeatMode.Restart,
-            ),
-        label = "user-home-fish-x",
-    )
-    val swimY by loop.animateFloat(
-        initialValue = 0f,
-        targetValue = 0f,
-        animationSpec =
-            infiniteRepeatable(
-                animation =
-                    keyframes {
-                        durationMillis = 3600
-                        0f at 0 using FastOutSlowInEasing
-                        -9f at 900 using FastOutSlowInEasing
-                        5f at 1900 using FastOutSlowInEasing
-                        -3f at 2850 using FastOutSlowInEasing
-                        0f at 3600 using FastOutSlowInEasing
-                    },
-                repeatMode = RepeatMode.Restart,
-            ),
-        label = "user-home-fish-y",
-    )
-    val roll by loop.animateFloat(
-        initialValue = -4f,
-        targetValue = 5f,
-        animationSpec = infiniteRepeatable(tween(1400, easing = FastOutSlowInEasing), RepeatMode.Reverse),
-        label = "user-home-fish-roll",
-    )
-    val bubbleRise by loop.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(2200, easing = LinearEasing), RepeatMode.Restart),
-        label = "user-home-bubbles",
-    )
     Box(modifier = modifier) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             drawCircle(
@@ -759,13 +727,12 @@ private fun UserHomeFish(modifier: Modifier = Modifier) {
                 radius = size.width * 0.22f,
                 center = Offset(size.width * 0.55f, size.height * 0.80f),
             )
-            listOf(0.12f, 0.36f, 0.62f, 0.84f).forEachIndexed { index, phase ->
-                val t = (bubbleRise + phase) % 1f
+            listOf(0.12f, 0.36f, 0.62f, 0.84f).forEachIndexed { index, position ->
                 val x = size.width * (0.10f + index * 0.16f)
-                val y = size.height * (0.86f - t * 0.70f)
+                val y = size.height * (0.86f - position * 0.70f)
                 val r = size.minDimension * (0.025f + index * 0.006f)
                 drawCircle(
-                    color = Color.White.copy(alpha = 0.22f * (1f - t * 0.35f)),
+                    color = Color.White.copy(alpha = 0.18f),
                     radius = r,
                     center = Offset(x, y),
                     style = Stroke(width = 2.2f),
@@ -776,14 +743,7 @@ private fun UserHomeFish(modifier: Modifier = Modifier) {
             modifier =
                 Modifier
                     .align(Alignment.Center)
-                    .size(138.dp)
-                    .graphicsLayer {
-                        translationX = swimX.dp.toPx()
-                        translationY = swimY.dp.toPx()
-                        rotationZ = roll
-                        scaleX = 1.04f
-                        scaleY = 1.04f
-                    },
+                    .size(138.dp),
         )
     }
 }

@@ -273,6 +273,7 @@ private fun DagWebContent(
     var webView by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
+    var inspectedUrl by remember { mutableStateOf<String?>(null) }
 
     BackHandler {
         if (webView?.canGoBack() == true) webView?.goBack() else onBackFromBrowser()
@@ -322,12 +323,18 @@ private fun DagWebContent(
                     webViewClient =
                         DagWebViewClient(
                             onNavigate = onNavigate,
-                            onStarted = onPageStarted,
+                            onStarted = { url ->
+                                inspectedUrl = null
+                                onPageStarted(url)
+                            },
                             onFinished = { view, url ->
                                 canGoBack = view.canGoBack()
                                 canGoForward = view.canGoForward()
-                                view.removeVisualMedia {
-                                    view.extractVisibleText { text -> onPageTextReady(url, view.title.orEmpty(), text) }
+                                if (inspectedUrl != url) {
+                                    inspectedUrl = url
+                                    view.sanitizeAndExtractVisibleText { text ->
+                                        onPageTextReady(url, view.title.orEmpty(), text)
+                                    }
                                 }
                             },
                             onBlocked = onPageBlocked,
@@ -371,7 +378,7 @@ private fun WebView.configureDagSettings() {
     settings.javaScriptCanOpenWindowsAutomatically = false
     settings.setSupportMultipleWindows(false)
     settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-    settings.cacheMode = WebSettings.LOAD_NO_CACHE
+    settings.cacheMode = WebSettings.LOAD_DEFAULT
     settings.safeBrowsingEnabled = true
 }
 
@@ -487,7 +494,7 @@ private class DagWebViewClient(
     }
 }
 
-private fun WebView.removeVisualMedia(onDone: () -> Unit) {
+private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
     evaluateJavascript(
         """
         (function() {
@@ -499,15 +506,9 @@ private fun WebView.removeVisualMedia(onDone: () -> Unit) {
             style.textContent = '* { background-image: none !important; } img,picture,video,audio,canvas,iframe { display:none !important; }';
             document.documentElement.appendChild(style);
           }
-          return true;
+          return document.body ? document.body.innerText.substring(0,24000) : '';
         })();
         """.trimIndent(),
-    ) { onDone() }
-}
-
-private fun WebView.extractVisibleText(callback: (String?) -> Unit) {
-    evaluateJavascript(
-        "(function(){return document.body ? document.body.innerText.substring(0,24000) : '';})()",
     ) { encoded -> callback(encoded.decodeJavascriptString()) }
 }
 

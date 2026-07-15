@@ -63,6 +63,16 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
   - pruebas fisicas de scroll, permisos sanos/degradados y solicitud temporal;
   - actualizacion in-place, sin desinstalar ni borrar datos.
 
+### DAG-PERF-02 - Fluidez del navegador y App Usuario
+
+- Estado: `Resuelto` el 2026-07-14 en DEV 206; aprobado explicitamente por el usuario.
+- Tipo: rendimiento y estabilidad visual. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Causa: el inicio mantenia dos animaciones infinitas superpuestas; Home y Web componian todo su contenido desplazable de forma eager; DAG deshabilitaba la cache HTTP, ejecutaba dos puentes JavaScript por pagina, podia inspeccionar mas de una vez la misma carga y cifraba el historial en el hilo principal.
+- Solucion: mascota estatica; listas lazy en Home y Web; cache HTTP normal del WebView; saneamiento y extraccion de texto en una sola operacion; inspeccion unica por carga; patrones del clasificador precompilados; cifrado y borrado del historial fuera del hilo principal.
+- Alcance comercial: no se agrego cache de consultas ni resultados Brave. Repetir una busqueda sigue consumiendo una consulta; navegar, recargar o abrir una URL/historial no consume Brave.
+- Evidencia fisica SM-A235M: el repintado inactivo del inicio bajo de aproximadamente 183 cuadros en tres segundos a 3. En Web, seis desplazamientos automatizados terminaron con 5,68 % de cuadros fuera de plazo, mediana de 17 ms y percentil 90 de 21 ms.
+- Seguridad: imagenes y video siguen bloqueados; el contenido permanece oculto hasta completar el analisis local; no cambio Supabase, el cupo, la barrera, la VPN ni Accessibility.
+
 ## Pendientes priorizados
 
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |

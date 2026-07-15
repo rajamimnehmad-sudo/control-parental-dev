@@ -130,7 +130,15 @@ fun PremiumFeedbackBanner(
 
 @Composable
 fun PremiumFishMascot(modifier: Modifier = Modifier) {
-    BannerFishMascot(mood = BannerFishMood.Idle, modifier = modifier)
+    Canvas(modifier = modifier) {
+        drawBannerFish(
+            tailSway = 0f,
+            finSway = 0f,
+            blink = 0f,
+            bubblePulse = 0f,
+            mood = BannerFishMood.Idle,
+        )
+    }
 }
 
 private enum class BannerFishMood {

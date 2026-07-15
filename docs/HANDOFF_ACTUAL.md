@@ -50,11 +50,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-14:
+Version preparada para publicacion al 2026-07-14:
 
 ```text
-App Usuario versionCode 205
-App Admin versionCode 205
+App Usuario versionCode 206
+App Admin versionCode 206
 versionName 1.0.1-dev
 ```
 
@@ -68,11 +68,21 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-205-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-205-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-206-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-206-debug.apk
 ```
 
 Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
+
+## Cierre 2026-07-14 - DAG-PERF-02 fluidez DAG y App Usuario
+
+- DEV 206 elimina el repintado permanente del pez en Home, conserva la ilustracion estatica y cambia Home/Web a listas lazy para no componer todo el contenido desplazable a la vez.
+- DAG usa la cache HTTP normal del WebView, combina saneamiento y extraccion de texto en una sola llamada JavaScript e inspecciona una sola vez cada carga. Imagenes y video permanecen bloqueados y la pagina sigue oculta hasta terminar la clasificacion local.
+- El clasificador precompila normalizaciones y expresiones de terminos. Las altas, bajas y borrados del historial cifrado se ejecutan fuera del hilo principal.
+- No se implemento cache de consultas ni resultados Brave: repetir una consulta consume nuevamente; navegar directamente, recargar y abrir una pagina desde el historial no consume una busqueda.
+- Medicion fisica SM-A235M: el inicio en reposo paso de aproximadamente 183 cuadros generados en tres segundos a 3. La pantalla Web, con seis desplazamientos automatizados, registro 5,68 % de cuadros fuera de plazo, mediana 17 ms y percentil 90 21 ms.
+- Pruebas: unit tests de App Usuario, ktlint de App Usuario/core-ui y build Usuario/Admin DEV exitosos. Instalacion in-place preserva datos y activacion.
+- No cambio Supabase, Production, datos, secretos, VPN, Accessibility ni la barrera antimanipulacion.
 
 ## En progreso 2026-07-14 - DAG-BROWSER-01A navegador protegido
 
@@ -93,7 +103,7 @@ Los SHA-256 vigentes se toman de los manifiestos publicos indicados arriba.
 - El Super Admin puede cambiar el cupo mensual por comunidad entre 1 y 100.000. El valor inicial y vigente para Yeshurun Tora es 100.
 - Seguridad verificada: `anon` recibe HTTP 401 al invocar el resumen; `anon` y `authenticated` no pueden leer la tabla de uso; las RPC de lectura/escritura exigen sesion autenticada y `require_super_admin()`.
 - Validacion: resumen DEV devuelve Yeshurun Tora con 1 dispositivo DAG activo, 0/100 usadas; TypeScript, ESLint sobre `src`, build Next y bundle Cloudflare exitosos.
-- Super Web Sites version 3 fue publicada en modo privado en `https://super-admin-content-filter.ramnehmad.chatgpt.site`. La prueba fisica final del navegador sigue pendiente por decision del usuario.
+- Super Web Sites version 3 fue publicada en modo privado en `https://super-admin-content-filter.ramnehmad.chatgpt.site`. Es una vista previa secundaria. La web oficial confirmada por el usuario es `https://web-super-admin-nine.vercel.app/communities`; el contador aun debe publicarse alli. La prueba fisica final del navegador sigue pendiente por decision del usuario.
 
 ## Cierre 2026-07-14 - DAG-FOUNDATION-01 entrada, control y atajo
 

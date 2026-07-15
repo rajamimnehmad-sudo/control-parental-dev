@@ -69,13 +69,13 @@ class DagContentClassifier
             val explicit =
                 ExplicitCategories.firstOrNull {
                         (_, terms) ->
-                    terms.any { term -> text.containsTerm(term) }
+                    terms.any { term -> term.matches(text) }
                 }
-            val contextPresent = ContextTerms.any { term -> text.containsTerm(term) }
+            val contextPresent = ContextTerms.any { term -> term.matches(text) }
             val ambiguous =
                 AmbiguousCategories.firstOrNull {
                         (_, terms) ->
-                    terms.any { term -> text.containsTerm(term) }
+                    terms.any { term -> term.matches(text) }
                 }
             return when {
                 explicit != null && contextPresent -> uncertain("${explicit.first}_context", confidence = 0.72f)
@@ -106,6 +106,9 @@ class DagContentClassifier
             const val ModelVersion = "dag-local-text-1"
             const val MaxPageCharacters = 24_000
 
+            private val CombiningMarksPattern = Regex("\\p{M}+")
+            private val InvalidCharactersPattern = Regex("[^\\p{L}\\p{N}.]+")
+
             fun domainFrom(url: String): String =
                 runCatching { URI(url).host.orEmpty() }
                     .getOrDefault("")
@@ -120,27 +123,27 @@ class DagContentClassifier
                             "porn", "porno", "pornografia", "pornography", "xxx", "nude", "nudes", "nudity",
                             "desnudo", "desnuda", "desnudez", "explicit sex", "sexo explicito", "escort", "prostitucion",
                             "פורנו", "פורנוגרפיה", "עירום", "זנות", "מין מפורש",
-                        ),
+                        ).toMatchers(),
                     "dating" to
                         setOf(
                             "dating app", "hookup", "casual dating", "sitio de citas", "app de citas", "encuentros sexuales",
                             "אפליקציית הכרויות", "הכרויות מזדמנות",
-                        ),
+                        ).toMatchers(),
                     "gambling" to
                         setOf(
                             "online casino", "casino online", "sports betting", "apuestas deportivas", "betting odds",
                             "poker por dinero", "הימורים", "קזינו", "הימורי ספורט",
-                        ),
+                        ).toMatchers(),
                     "drugs" to
                         setOf(
                             "buy cocaine", "comprar cocaina", "buy marijuana", "comprar marihuana", "recreational drugs",
                             "drogas recreativas", "לקנות קוקאין", "סמים למכירה", "סמי פנאי",
-                        ),
+                        ).toMatchers(),
                     "violence" to
                         setOf(
                             "gore video", "graphic killing", "torture video", "video gore", "asesinato explicito",
                             "video de tortura", "סרטון רצח", "אלימות גרפית", "סרטון עינויים",
-                        ),
+                        ).toMatchers(),
                 )
 
             private val AmbiguousCategories =
@@ -148,13 +151,16 @@ class DagContentClassifier
                     "sensitive_health" to
                         setOf(
                             "sex", "sexo", "sexual", "sexualidad", "naked", "desnudos", "מין", "מיני", "עירומים",
-                        ),
+                        ).toMatchers(),
                     "relationships" to
-                        setOf("dating", "citas", "pareja", "relationship advice", "relaciones", "הכרויות", "זוגיות"),
+                        setOf("dating", "citas", "pareja", "relationship advice", "relaciones", "הכרויות", "זוגיות")
+                            .toMatchers(),
                     "substances" to
-                        setOf("cannabis", "marijuana", "cocaina", "cocaine", "drugs", "drogas", "קנאביס", "סמים"),
+                        setOf("cannabis", "marijuana", "cocaina", "cocaine", "drugs", "drogas", "קנאביס", "סמים")
+                            .toMatchers(),
                     "violence" to
-                        setOf("violence", "violent", "violencia", "murder", "asesinato", "אלימות", "רצח"),
+                        setOf("violence", "violent", "violencia", "murder", "asesinato", "אלימות", "רצח")
+                            .toMatchers(),
                 )
 
             private val ContextTerms =
@@ -163,26 +169,39 @@ class DagContentClassifier
                     "medico", "medica", "medicina", "salud", "doctor", "doctora", "educativo", "educacion", "biologia",
                     "halacha", "torah", "talmud", "judaism", "rabi", "rabbi", "halaja", "tora", "judaismo",
                     "רפואה", "בריאות", "רופא", "חינוך", "לימוד", "ביולוגיה", "הלכה", "תורה", "תלמוד", "יהדות", "רב",
-                )
+                ).toMatchers()
 
-            private fun String.containsTerm(term: String): Boolean {
-                val normalizedTerm = term.normalizedForDag()
-                if (' ' in normalizedTerm || normalizedTerm.any { it.code > 127 }) return contains(normalizedTerm)
-                return Regex("(^|[^a-z0-9])${Regex.escape(normalizedTerm)}([^a-z0-9]|$)").containsMatchIn(this)
-            }
+            private fun Set<String>.toMatchers(): List<TermMatcher> =
+                map { term ->
+                    val normalizedTerm = term.normalizedForDag()
+                    val wordPattern =
+                        if (' ' in normalizedTerm || normalizedTerm.any { it.code > 127 }) {
+                            null
+                        } else {
+                            Regex("(^|[^a-z0-9])${Regex.escape(normalizedTerm)}([^a-z0-9]|$)")
+                        }
+                    TermMatcher(normalizedTerm, wordPattern)
+                }
 
             private fun String.normalizedForDag(): String =
                 Normalizer
                     .normalize(this, Normalizer.Form.NFKD)
                     .lowercase(Locale.ROOT)
-                    .replace(Regex("\\p{M}+"), "")
+                    .replace(CombiningMarksPattern, "")
                     .replace('0', 'o')
                     .replace('1', 'i')
                     .replace('3', 'e')
                     .replace('4', 'a')
                     .replace('5', 's')
                     .replace('7', 't')
-                    .replace(Regex("[^\\p{L}\\p{N}.]+"), " ")
+                    .replace(InvalidCharactersPattern, " ")
                     .trim()
+
+            private data class TermMatcher(
+                val normalizedTerm: String,
+                val wordPattern: Regex?,
+            ) {
+                fun matches(text: String): Boolean = wordPattern?.containsMatchIn(text) ?: text.contains(normalizedTerm)
+            }
         }
     }
