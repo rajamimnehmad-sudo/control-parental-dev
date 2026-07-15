@@ -192,21 +192,9 @@ class DagBrowserViewModel
 
         fun openResult(result: DagSearchResult) {
             when (result.classification.decision) {
-                DagClassification.Allowed -> requestNavigation(result.url, result.title)
-                DagClassification.Uncertain ->
-                    mutableState.update {
-                        it.copy(
-                            reviewCandidate =
-                                DagReviewCandidate(
-                                    url = result.url,
-                                    domain = result.domain,
-                                    title = result.title,
-                                    category = result.classification.category,
-                                    modelVersion = result.classification.modelVersion,
-                                ),
-                            message = "Este sitio necesita revisión del administrador.",
-                        )
-                    }
+                DagClassification.Allowed,
+                DagClassification.Uncertain,
+                -> requestNavigation(result.url, result.title)
                 DagClassification.Blocked -> Unit
             }
         }

@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 224
-App Admin versionCode 224
+App Usuario versionCode 225
+App Admin versionCode 225
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,25 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-224-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-224-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-225-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-225-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 3f12bd7475314fd83610bff5f4427a7a4ca8fefee350bfc89fe592dfa8a8dff6
-Admin   8a3c6649f3eca7fbac36a9ef8049e0b62842474feba20f3451926617d49c6aa3
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DEV 225 Home y revision por etapas
+
+- Home elimina la mascota y la barra superior completa: queda un unico buscador central exclusivo de Inicio. Al aparecer el teclado conserva una posicion alta estable y al comenzar la busqueda oculta el teclado.
+- Durante busqueda o analisis, el campo muestra `Analizando...` y un borde cian/violeta/rosa cuya direccion luminosa gira. La animacion existe solo mientras hay trabajo activo y se detiene al terminar.
+- Los resultados inciertos por titulo o fragmento ya no piden aprobacion inmediata. DAG abre la pagina oculta, mantiene dominios/listas/barreras antes de WebView y decide con el contenido completo; solo si esa segunda etapa sigue incierta ofrece revision humana.
+- Las paginas JavaScript sin texto inmediato reciben dos reintentos locales acotados antes de declararse ilegibles, reduciendo revisiones falsas por hidratacion tardia.
+- Una palabra ambigua aislada dentro de una pagina extensa ya no fuerza revision por si sola: pasa al modelo contextual. En consultas cortas conserva el criterio conservador; terminos explicitos, categorias no anulables, dominios bloqueados e imagenes inseguras mantienen prioridad.
+- Validacion local: ktlint, tests DEV Usuario/Admin y builds optimizados de ambos APK correctos, incluida una regresion para menciones ambiguas incidentales. Falta publicacion DEV y prueba fisica.
 
 ## Implementacion 2026-07-15 - DEV 224 paquete visual DAG
 

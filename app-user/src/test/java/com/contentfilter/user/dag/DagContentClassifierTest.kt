@@ -199,6 +199,19 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `single incidental ambiguous term does not force review of an otherwise ordinary page`() {
+        val result =
+            classifier.classifyPage(
+                url = "https://shop.example",
+                title = "Tienda para el hogar",
+                text = "Ofertas para vos y tu pareja. Envíos, muebles y electrodomésticos.",
+            )
+
+        assertEquals(DagClassification.Allowed, result.decision)
+        assertEquals(DagClassification.Uncertain, classifier.classifyQuery("consejos de pareja").decision)
+    }
+
+    @Test
     fun `unreadable images stay hidden without blocking otherwise safe page text`() {
         val result =
             classifier.classifyPage(

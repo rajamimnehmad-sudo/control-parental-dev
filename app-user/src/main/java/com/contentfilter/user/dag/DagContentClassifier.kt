@@ -15,7 +15,8 @@ class DagContentClassifier
         @Inject
         lateinit var neuralClassifier: DagNeuralTextClassifier
 
-        fun classifyQuery(text: String): DagClassificationResult = classify(text, directUrl = false)
+        fun classifyQuery(text: String): DagClassificationResult =
+            classify(text, directUrl = false, reviewSingleAmbiguousTerm = true)
 
         fun classifyResult(
             title: String,
@@ -32,7 +33,7 @@ class DagContentClassifier
                     modelVersion = ModelVersion,
                 )
             }
-            return classify("$domain $title $description", directUrl = false)
+            return classify("$domain $title $description", directUrl = false, reviewSingleAmbiguousTerm = true)
         }
 
         internal fun classifyPage(
@@ -51,7 +52,12 @@ class DagContentClassifier
                     modelVersion = ModelVersion,
                 )
             }
-            val textResult = classify("$domain $title ${text.take(MaxPageCharacters)}", directUrl = false)
+            val textResult =
+                classify(
+                    "$domain $title ${text.take(MaxPageCharacters)}",
+                    directUrl = false,
+                    reviewSingleAmbiguousTerm = false,
+                )
             if (textResult.decision != DagClassification.Allowed) return textResult
             return when {
                 images.blocked >= MinimumRiskyImages && images.blocked * 2 >= images.classified ->
@@ -72,7 +78,7 @@ class DagContentClassifier
                     modelVersion = ModelVersion,
                 )
             }
-            return classify(domain, directUrl = true)
+            return classify(domain, directUrl = true, reviewSingleAmbiguousTerm = false)
         }
 
         private fun blockedVisualPlatform(domain: String): DagClassificationResult? =
@@ -83,6 +89,7 @@ class DagContentClassifier
         private fun classify(
             rawText: String,
             directUrl: Boolean,
+            reviewSingleAmbiguousTerm: Boolean,
         ): DagClassificationResult {
             val text = rawText.normalizedForDag()
             if (text.isBlank()) return uncertain("empty", confidence = 1f)
@@ -100,7 +107,7 @@ class DagContentClassifier
             return when {
                 explicit != null && contextPresent -> uncertain("${explicit.first}_context", confidence = 0.72f)
                 explicit != null -> blocked(explicit.first, confidence = 0.97f)
-                ambiguous != null -> uncertain(ambiguous.first, confidence = 0.68f)
+                ambiguous != null && reviewSingleAmbiguousTerm -> uncertain(ambiguous.first, confidence = 0.68f)
                 directUrl && !text.contains('.') -> uncertain("invalid_domain", confidence = 1f)
                 directUrl -> allowed()
                 else -> classifySemantically(rawText)

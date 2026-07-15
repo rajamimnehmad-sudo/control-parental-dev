@@ -146,6 +146,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | DAG-HISTORY-UX-01 | En progreso | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
 | DAG-ANALYSIS-UX-01 | En progreso | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Idea | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
+| DAG-REVIEW-STAGING-01 | En progreso | P1 | Analizar pagina completa antes de pedir revision por un resultado incierto | M | Medio |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
@@ -329,6 +330,14 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 - Duplicados y relacion: complementa `DAG-HOME-UX-01` y `DAG-THEME-01`; no cambia el clasificador ni permite mostrar contenido antes de finalizar el analisis.
 - Criterios de aceptacion propuestos: el buscador comunica claramente `Analizando...`; el contenido sigue oculto hasta una decision segura; la animacion es fluida, acotada y legible en ambos temas; existe una presentacion reducida para accesibilidad; no agrega recomposiciones o trabajo continuo costoso.
 - Decisiones pendientes para el ticket: paleta neon, intensidad, duracion, comportamiento fuera de Home y tratamiento de movimiento reducido.
+
+#### DAG-REVIEW-STAGING-01 - Revision despues del analisis completo
+
+- Estado: `En progreso`; aprobado y ejecutado por pedido del usuario el 2026-07-15, pendiente prueba fisica de DEV 225.
+- Tipo: seguridad Web, precision local y UX. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Causa: un resultado podia quedar incierto por su fragmento breve y pedir revision antes de inspeccionar la pagina; una unica palabra ambigua en miles de caracteres o una pagina JavaScript aun vacia tambien producia falsos positivos.
+- Alcance: preanalisis oculto de resultados inciertos, dos reintentos acotados de extraccion y contexto de pagina para menciones ambiguas aisladas. No cambia listas, bloqueos explicitos, reglas Admin ni analisis visual.
+- Aceptacion: una pagina normal no pide revision por un fragmento o hidratacion tardia; el contenido permanece oculto hasta decidir; una pagina realmente incierta sigue ofreciendo revision; bloqueos conocidos mantienen prioridad.
 
 #### DAG-APPROVAL-CACHE-01 - Reutilizacion temporal de aprobaciones
 
