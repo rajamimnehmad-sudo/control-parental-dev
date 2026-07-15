@@ -61,6 +61,8 @@ supabase storage cp --experimental --linked --content-type application/vnd.andro
 printf 'Archivando artefactos dev anteriores si existen...\n'
 supabase storage mv --experimental --linked ss:///dev-updates/app-user-dev-manifest.json "ss:///dev-updates/app-user-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 supabase storage mv --experimental --linked ss:///dev-updates/app-admin-dev-manifest.json "ss:///dev-updates/app-admin-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
+supabase storage mv --experimental --linked "ss:///dev-updates/$USER_APK_NAME" "ss:///dev-updates/$USER_APK_NAME.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
+supabase storage mv --experimental --linked "ss:///dev-updates/$ADMIN_APK_NAME" "ss:///dev-updates/$ADMIN_APK_NAME.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
 
 printf 'Publicando artefactos staged...\n'
 supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/$USER_APK_NAME" "ss:///dev-updates/$USER_APK_NAME"
