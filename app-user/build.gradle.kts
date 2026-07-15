@@ -17,6 +17,11 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.1"
+        ndk {
+            // Standard Android phones from Samsung, Xiaomi, Motorola and Oppo
+            // use ARM. Excluding emulator-only x86 keeps the local model update small.
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+        }
     }
 
     flavorDimensions += "distribution"
@@ -24,7 +29,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 209
+            versionCode = 210
             versionNameSuffix = "-dev"
         }
         create("beta") {
@@ -53,6 +58,10 @@ android {
     buildFeatures {
         buildConfig = true
     }
+
+    androidResources {
+        noCompress += "tflite"
+    }
 }
 
 dependencies {
@@ -80,8 +89,11 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.hilt.work)
+    implementation(libs.androidx.webkit)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(libs.hilt.android)
+    implementation(libs.okhttp)
+    implementation(libs.tflite)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
     testImplementation("org.json:json:20240303")

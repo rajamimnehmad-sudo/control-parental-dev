@@ -58,6 +58,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductViolet
@@ -297,6 +299,8 @@ private fun DagWebContent(
     onHome: () -> Unit,
 ) {
     val context = LocalContext.current
+    val imageClassifier = remember(context) { DagImageClassifier(context) }
+    val imageLoader = remember(imageClassifier) { DagImageResourceLoader(imageClassifier) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
@@ -321,6 +325,7 @@ private fun DagWebContent(
             webView?.stopLoading()
             webView?.destroy()
             webView = null
+            imageClassifier.close()
         }
     }
 
@@ -352,6 +357,7 @@ private fun DagWebContent(
                             onNavigate = onNavigate,
                             onStarted = { url ->
                                 inspectedUrl = null
+                                imageLoader.resetPage()
                                 onPageStarted(url)
                             },
                             onFinished = { view, url ->
@@ -365,6 +371,7 @@ private fun DagWebContent(
                                 }
                             },
                             onBlocked = onPageBlocked,
+                            imageLoader = imageLoader,
                         )
                     setDownloadListener { _, _, _, _, _ -> onBlockedAction("Las descargas están bloqueadas en DAG.") }
                 }
@@ -394,13 +401,21 @@ private fun DagWebContent(
 
 @SuppressLint("SetJavaScriptEnabled")
 private fun WebView.configureDagSettings() {
+    val supportsDocumentStartScript = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
     settings.javaScriptEnabled = true
+    if (supportsDocumentStartScript) {
+        WebViewCompat.addDocumentStartJavaScript(
+            this,
+            DagDocumentStartScript,
+            setOf("*"),
+        )
+    }
     settings.domStorageEnabled = true
     settings.databaseEnabled = false
     settings.allowFileAccess = false
     settings.allowContentAccess = false
-    settings.loadsImagesAutomatically = false
-    settings.blockNetworkImage = true
+    settings.loadsImagesAutomatically = true
+    settings.blockNetworkImage = false
     settings.mediaPlaybackRequiresUserGesture = true
     settings.javaScriptCanOpenWindowsAutomatically = false
     settings.setSupportMultipleWindows(false)
@@ -408,6 +423,35 @@ private fun WebView.configureDagSettings() {
     settings.cacheMode = WebSettings.LOAD_DEFAULT
     settings.safeBrowsingEnabled = true
 }
+
+private val DagDocumentStartScript =
+    """
+    (function() {
+      try {
+        if (window.URL && window.URL.createObjectURL) {
+          Object.defineProperty(window.URL, 'createObjectURL', {
+            value: function() { throw new Error('DAG blocked blob content'); },
+            writable: false,
+            configurable: false
+          });
+        }
+        if (navigator.serviceWorker) {
+          var worker = navigator.serviceWorker;
+          Object.defineProperty(worker, 'register', {
+            value: function() { return Promise.reject(new Error('DAG blocked service workers')); },
+            writable: false,
+            configurable: false
+          });
+          if (worker.controller) {
+            window.stop();
+            worker.getRegistrations().then(function(registrations) {
+              return Promise.all(registrations.map(function(registration) { return registration.unregister(); }));
+            }).finally(function() { location.reload(); });
+          }
+        }
+      } catch (_) {}
+    })();
+    """.trimIndent()
 
 private class DagChromeClient(
     private val onBlocked: (String) -> Unit,
@@ -441,6 +485,7 @@ private class DagWebViewClient(
     private val onStarted: (String) -> Boolean,
     private val onFinished: (WebView, String) -> Unit,
     private val onBlocked: (String) -> Unit,
+    private val imageLoader: DagImageResourceLoader,
 ) : WebViewClient() {
     override fun shouldOverrideUrlLoading(
         view: WebView,
@@ -504,34 +549,51 @@ private class DagWebViewClient(
     override fun shouldInterceptRequest(
         view: WebView?,
         request: WebResourceRequest,
-    ): WebResourceResponse? {
-        val path = request.url.lastPathSegment.orEmpty().lowercase()
-        if (BlockedMediaExtensions.any(path::endsWith)) {
-            return WebResourceResponse("text/plain", "utf-8", 204, "Blocked", emptyMap(), null)
-        }
-        return null
-    }
-
-    private companion object {
-        val BlockedMediaExtensions =
-            setOf(
-                ".jpg", ".jpeg", ".png", ".gif", ".webp", ".svg", ".bmp", ".avif",
-                ".mp4", ".webm", ".m3u8", ".mp3", ".wav", ".ogg", ".mov",
-            )
-    }
+    ): WebResourceResponse? = imageLoader.intercept(request)
 }
 
 private fun WebView.sanitizeAndExtractVisibleText(callback: (String?) -> Unit) {
     evaluateJavascript(
         """
         (function() {
-          document.querySelectorAll('img,picture,video,audio,source,canvas,iframe').forEach(function(node) { node.remove(); });
+          function dagSecureNode(node) {
+            if (!node || node.nodeType !== 1) return;
+            var tag = node.tagName ? node.tagName.toLowerCase() : '';
+            if (tag === 'video' || tag === 'audio' || tag === 'source' || tag === 'canvas' || tag === 'iframe') {
+              node.remove();
+              return;
+            }
+            if (tag === 'img') {
+              var source = node.currentSrc || node.src || '';
+              if (!source.toLowerCase().startsWith('https://')) node.remove();
+            }
+            node.querySelectorAll && node.querySelectorAll('video,audio,source,canvas,iframe').forEach(function(child) { child.remove(); });
+            node.querySelectorAll && node.querySelectorAll('img').forEach(function(image) {
+              var source = image.currentSrc || image.src || '';
+              if (!source.toLowerCase().startsWith('https://')) image.remove();
+            });
+          }
+          dagSecureNode(document.documentElement);
           var style = document.getElementById('dag-safe-style');
           if (!style) {
             style = document.createElement('style');
             style.id = 'dag-safe-style';
-            style.textContent = '* { background-image: none !important; } img,picture,video,audio,canvas,iframe { display:none !important; }';
+            style.textContent = '* { background-image: none !important; } video,audio,canvas,iframe { display:none !important; }';
             document.documentElement.appendChild(style);
+          }
+          if (!window.__dagSafeObserver) {
+            window.__dagSafeObserver = new MutationObserver(function(records) {
+              records.forEach(function(record) {
+                record.addedNodes.forEach(dagSecureNode);
+                if (record.type === 'attributes') dagSecureNode(record.target);
+              });
+            });
+            window.__dagSafeObserver.observe(document.documentElement, {
+              childList: true,
+              subtree: true,
+              attributes: true,
+              attributeFilter: ['src', 'srcset']
+            });
           }
           return document.body ? document.body.innerText.substring(0,24000) : '';
         })();
