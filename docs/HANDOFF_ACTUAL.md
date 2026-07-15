@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 220
-App Admin versionCode 220
+App Usuario versionCode 221
+App Admin versionCode 221
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-220-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-220-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-221-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-221-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario f83e36745a1aacbd3a9cbb7562b62e453e831b782a5d7acce7a4d0bca41447bf
-Admin   fb980bad5d35f1f1927580a83b4f7aad97d42052b105e96530af03ed8402234a
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Implementacion 2026-07-15 - DEV 221 estabilizacion del filtro visual
+
+- El cierre informado al entrar a una pagina es compatible con saturacion del renderer de WebView: una pagina puede disparar muchas descargas y clasificaciones TFLite simultaneas. App Admin no es el destino intencional; queda visible porque comparte el telefono y estaba debajo de la tarea DAG cuando esta termina.
+- El cargador visual admite como maximo tres clasificaciones concurrentes, 80 imagenes por pagina y cinco segundos por recurso. Si se agota el cupo, la imagen falla cerrada en vez de encolar mas trabajo y presionar memoria/hilos del renderer.
+- No se relaja la seguridad: una imagen sin turno, dudosa, fallida o fuera del presupuesto permanece bloqueada. No cambia Supabase, Brave, historial, cookies ni reglas remotas.
+- Validacion local: ktlint, tests DEV Usuario y builds optimizados Usuario/Admin correctos. No hay telefono ni emulador configurado para reproducir el cierre exacto; queda pendiente prueba fisica de DEV 221 y no se considera confirmada la causa hasta obtener evidencia en dispositivo.
 
 ## Implementacion 2026-07-15 - DEV 220 selector visual de pestañas
 

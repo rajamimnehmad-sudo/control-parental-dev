@@ -9,6 +9,7 @@ import okhttp3.Request
 import java.io.ByteArrayInputStream
 import java.io.IOException
 import java.net.InetAddress
+import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -36,6 +37,7 @@ internal class DagImageResourceLoader(
     private val allowedCount = AtomicInteger(0)
     private val blockedCount = AtomicInteger(0)
     private val uncertainCount = AtomicInteger(0)
+    private val imageSlots = Semaphore(MaximumConcurrentImages, true)
 
     fun resetPage() {
         imageCount.set(0)
@@ -60,9 +62,14 @@ internal class DagImageResourceLoader(
         if (!isProbableImageRequest(request.url.toString(), request.requestHeaders)) return null
         if (request.url.scheme != "https" || imageCount.incrementAndGet() > MaximumImagesPerPage) return blockedResource()
 
-        return runCatching { loadClassifiedImage(request, pageUrl) }.getOrElse {
-            uncertainCount.incrementAndGet()
-            blockedResource()
+        if (!imageSlots.tryAcquire()) return blockedResource()
+        return try {
+            runCatching { loadClassifiedImage(request, pageUrl) }.getOrElse {
+                uncertainCount.incrementAndGet()
+                blockedResource()
+            }
+        } finally {
+            imageSlots.release()
         }
     }
 
@@ -128,8 +135,9 @@ internal class DagImageResourceLoader(
     }
 
     private companion object {
-        const val MaximumImagesPerPage = 120
-        const val RequestTimeoutSeconds = 8L
+        const val MaximumImagesPerPage = 80
+        const val MaximumConcurrentImages = 3
+        const val RequestTimeoutSeconds = 5L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")

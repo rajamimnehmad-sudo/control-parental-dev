@@ -127,6 +127,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | --- | --- | --- | --- | --- | --- |
 | SEC-LICENSE-01 | Idea | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
+| BARRIER-A11Y-RACE-01 | Idea | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Idea | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
@@ -157,6 +158,28 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
   - existe evidencia auditable sin exponer secretos;
   - las pruebas destructivas usan datos autorizados expresamente por el usuario.
 - Decisiones pendientes: borrado completo, desvinculacion o desactivacion previa; alcance sobre dispositivos y datos asociados; retencion de auditoria; estrategia de prueba segura.
+
+### BARRIER-A11Y-RACE-01 - Bypass rapido para apagar Accessibility
+
+- Estado: `Idea` urgente; incidente confirmado por el usuario, no aprobado todavia para diagnostico tecnico ni codigo.
+- Tipo: bug de seguridad y antimanipulacion.
+- Prioridad: P0.
+- Problema: es posible apagar el servicio de Accessibility de App Usuario actuando muy rapido en la pantalla protegida. La barrera cierra la pantalla, pero la accion de desactivacion llega a completarse.
+- Solucion propuesta: diagnosticar la carrera exacta entre el primer evento observable, el cierre defensivo y la accion del sistema; agregar una barrera preventiva que impida confirmar la desactivacion antes de que Android aplique el cambio, sin bloquear Ajustes normales ni el mantenimiento autorizado.
+- Evidencia: prueba fisica informada por el usuario el 2026-07-15. El usuario logro apagar Accessibility rapidamente aunque la pantalla se cerraba. Esta evidencia nueva prevalece sobre la validacion anterior para este recorrido especifico; todavia no se conoce fabricante, version exacta ni secuencia minima reproducible.
+- Esfuerzo: M estimado, sujeto al diagnostico por fabricante y version Android.
+- Riesgo: critico; Accessibility es una capa central para impedir manipulacion y aplicar bloqueos de apps. Un bypass puede debilitar otras defensas aunque VPN, Device Admin y watchdog permanezcan activos.
+- Dependencias: `feature-accessibility`; deteccion temprana de pantallas criticas; watchdog y alertas de componente caido; mantenimiento autorizado; validacion fisica in-place sin borrar datos.
+- Duplicados y relacion: es una regresion o hueco especifico posterior a `BARRIER-ANDROID-01`; no se marca como duplicado ni se cambia el estado historico de ese cierre hasta diagnosticar el nuevo recorrido.
+- Criterios de aceptacion propuestos:
+  - intentos rapidos y repetidos de apagar Accessibility no logran cambiar su estado mientras la barrera esta armada;
+  - la defensa actua antes de que el control nativo confirme la desactivacion, sin depender solo de cerrar la pantalla despues;
+  - el mantenimiento remoto autorizado permite acceder y cambiar el estado segun el flujo previsto;
+  - Ajustes no relacionados siguen disponibles;
+  - si Accessibility cae por cualquier otra via, watchdog, estado y alerta remota lo detectan sin informar falsamente que sigue activa;
+  - pruebas repetidas en los dispositivos fisicos soportados, actualizacion in-place y sin borrar datos;
+  - tests del area, regresion de barrera, CI y handoff actualizados antes de marcarlo `Resuelto`.
+- Decisiones pendientes para la entrevista del ticket: dispositivo y version Android afectados; secuencia minima; estado de Device Admin/VPN tras el bypass; comportamiento de watchdog y alerta; matriz OEM y cantidad de repeticiones para aceptar el cierre.
 
 ### ADMIN-ALERTS-UX-01 - Campanita de alertas de seguridad en App Admin
 
@@ -345,6 +368,7 @@ Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambi
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-IMAGE-STABILITY-01 | 2026-07-15, DEV 221 | Clasificacion visual limitada a tres trabajos concurrentes, 80 recursos y timeout de 5 s; build/tests correctos, pendiente validacion fisica sin telefono disponible |
 | DAG-TABS-02 | 2026-07-15, DEV 220 | Selector visual de dos columnas con miniaturas locales solo de páginas aprobadas, cierre/nueva pestaña y sin persistencia ni consumo Brave |
 | DAG-RESILIENCE-01 | 2026-07-15, DEV 218 | Caída del renderer WebView contenida por pestaña y retorno recuperable a Home; presupuesto visual reducido para limitar presión de memoria |
 | DAG-SEARCH-BYPASS-01 | 2026-07-15, DEV 218 | Bloqueo no anulable de Google y principales buscadores web alternativos; Gmail/Maps permanecen separados |
