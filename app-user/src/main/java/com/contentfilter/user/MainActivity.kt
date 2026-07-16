@@ -559,7 +559,7 @@ private fun UserHomeTab(
             ) {
                 ProductStatCard(
                     modifier = Modifier.weight(1f),
-                    value = "5",
+                    value = "6",
                     label = "secciones",
                     accent = ProductSky,
                 )

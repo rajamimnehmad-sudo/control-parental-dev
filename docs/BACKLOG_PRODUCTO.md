@@ -135,16 +135,16 @@ Flujo de una entrada:
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
-| DATA-DELETE-01 | Implementado backend DEV y candidato Admin DEV 241; pendiente prueba destructiva autorizada | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
-| BARRIER-A11Y-RACE-01 | Implementado DEV 240; pendiente prueba fisica | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
+| DATA-DELETE-01 | Resuelto candidato DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
+| BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
 | BARRIER-DEFAULT-ON-01 | Implementado DEV 241; pendiente prueba fisica | P1 | Armar automaticamente la barrera al completar y verificar la configuracion de proteccion | S | Medio |
-| OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
-| USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
+| OPS-METRICS-01 | Candidato DEV 241 optimizado y con linea base corta; pendiente muestra de 24 h | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
+| USAGE-REAL-01 | Validado fisicamente candidato DEV 241; pendiente publicacion final | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
-| UI-POLISH-01 | Idea | P2 | Consistencia visual y accesibilidad de ambas apps | M | Bajo |
+| UI-POLISH-01 | Candidato DEV 241 validado en SM-A235M; pendiente matriz adicional | P2 | Consistencia visual y accesibilidad de ambas apps | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
-| SUPERADMIN-MSG-01 | Implementado backend DEV y candidato Android DEV 241; pendiente prueba funcional | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
+| SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
@@ -181,7 +181,7 @@ Flujo de una entrada:
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
-- Estado: `Implementado backend DEV y candidato Admin DEV 241; pendiente prueba destructiva autorizada`. El usuario aprobo ejecutar todos los tickets el 2026-07-16, pero se mantiene pendiente la autorizacion especifica para crear y archivar un usuario de prueba.
+- Estado: `Resuelto candidato DEV 241; pendiente publicacion final`. El usuario autorizo expresamente crear y archivar un unico usuario nuevo de prueba en DEV el 2026-07-16.
 - Tipo: bug, ciclo de vida de datos y seguridad.
 - Prioridad: P0.
 - Problema: App Admin muestra la opcion de borrar usuario, pero al usarla el banner informa `No se pudo borrar al usuario` y el usuario permanece visible.
@@ -199,9 +199,9 @@ Flujo de una entrada:
   - existe evidencia auditable sin exponer secretos;
   - las pruebas destructivas usan datos autorizados expresamente por el usuario.
 - Seguridad: `anon` no puede ejecutar la RPC; `authenticated` solo llega al borrado despues de resolver un administrador activo y su comunidad. No se expone Service Role en Android.
-- Validacion no destructiva: migraciones `20260716174500_admin_archive_protected_user.sql` y `20260716175000_admin_archive_protected_user_privileges.sql` aplicadas solo en DEV. Permanecen 2 Usuarios activos y 0 recibos de borrado; no se ejecuto la RPC. Tests, ktlint y build Admin correctos.
+- Validacion: un primer intento con plataforma invalida demostro rollback completo y dejo 0 cuentas de prueba. El segundo creo unicamente `Codex archive test 2026-07-16` y lo archivo por la RPC: 0 dispositivos de prueba activos, 1 dispositivo archivado, 1 activacion revocada, 1 recibo y 2 filas afectadas. Los 2 Usuarios reales permanecieron activos. Tests, ktlint y build Admin correctos.
 - Decision aplicada: eliminacion logica inmediata de datos operativos y retencion de auditoria, alertas y contadores. No se hace `DELETE` fisico ni se borra la cuenta/comunidad.
-- Pendiente: autorizacion explicita para crear y archivar unicamente un usuario de prueba nuevo en DEV y comprobar el resultado extremo a extremo.
+- Cierre: la cuenta tecnica se conserva como exige la decision de retencion; dispositivo y datos operativos quedan archivados. No se borro fisicamente ninguna fila.
 
 ### BARRIER-A11Y-RACE-01 - Bypass rapido para apagar Accessibility
 
@@ -223,7 +223,7 @@ Flujo de una entrada:
   - si Accessibility cae por cualquier otra via, watchdog, estado y alerta remota lo detectan sin informar falsamente que sigue activa;
   - pruebas repetidas en los dispositivos fisicos soportados, actualizacion in-place y sin borrar datos;
   - tests del area, regresion de barrera, CI y handoff actualizados antes de marcarlo `Resuelto`.
-- Validacion pendiente: instalar DEV 240 in-place; veinte intentos rapidos con barrera armada; control positivo con mantenimiento autorizado; confirmar estado real, watchdog y alerta si el servicio llegara a caer. No se marca `Resuelto` sin esa evidencia.
+- Validacion fisica candidato DEV 241: actualizacion in-place en Samsung SM-A235M Android 13, con control reforzado, VPN, Accessibility y Device Admin activos. Veinte recorridos a `Aplicaciones instaladas` con un segundo toque inmediato conservaron Accessibility activa 20/20 y expulsaron la pantalla protegida 20/20. La pagina principal de Accesibilidad permanecio accesible deliberadamente. Falta repetir en el SM-S908E donde se reporto el bypass original; hasta entonces no se marca `Resuelto` global.
 
 ### BARRIER-DEFAULT-ON-01 - Barrera armada de forma predeterminada
 
@@ -245,6 +245,28 @@ Flujo de una entrada:
   - mantenimiento y recuperacion conservan sus ventanas controladas;
   - la migracion de dispositivos existentes no bloquea onboarding, reparacion ni acceso autorizado.
 - Decisiones cerradas: dispositivos existentes con revision cero son elegibles al quedar completamente sanos; cualquier revision administrativa se respeta; Admin conserva la autoridad para desarmar; offline o permisos incompletos mantienen el control previo y reintentan en una comprobacion de salud futura. Falta validar fisicamente activacion, reinicio, actualizacion in-place y desarmado explicito.
+
+### OPS-METRICS-01 - Bateria, trafico y estabilidad
+
+- Estado: `Candidato DEV 241 optimizado y con linea base corta; pendiente muestra de 24 h`.
+- Hallazgo fisico: Accessibility reevaluaba correctamente la app foreground cada 250 ms, pero en DEV tambien insertaba y recortaba un diagnostico Room en cada ciclo aunque nada cambiara. En una ventana de 10 s se observaban unas 40 escrituras equivalentes.
+- Solucion: la frecuencia de enforcement permanece en 250 ms; el log y diagnostico se emiten solo cuando cambian paquete, decision, minuto observado o cantidad de reglas/limites. La repeticion fisica produjo 2 diagnosticos en 10 s (inicio y cambio de minuto) y guardo la sesion al salir.
+- Linea base corta SM-A235M: `Mis apps`, diez desplazamientos, 245 cuadros, 2,04 % lentos, p50 17 ms, p90/p95 20 ms y p99 30 ms. Sin ANR ni crash de Usuario/Admin durante la sesion; VPN, Accessibility y Device Admin siguieron activos.
+- Pendiente honesto: una sesion interactiva corta no demuestra consumo prolongado. Ejecutar una muestra de 24 h con bateria inicial/final, bytes por UID, reinicios de proceso y ANR, sin recopilar consultas, URLs ni contenido.
+
+### USAGE-REAL-01 - Uso foreground y listas estables
+
+- Estado: `Validado fisicamente candidato DEV 241; pendiente publicacion final`.
+- Arquitectura comprobada: no depende de `PACKAGE_USAGE_STATS`; Accessibility mide con reloj monotono, crea checkpoints y guarda sesiones en Room. Esto evita pedir otro acceso especial de Android.
+- Evidencia SM-A235M: Calculadora Samsung permanecio foreground mas de un minuto, el servicio guardo sesiones y reporto 2 minutos persistidos. `Mis apps` mantuvo 156 aplicaciones y el filtro `Calculadora` devolvio una unica fila estable.
+- Rendimiento: la deduplicacion de OPS-METRICS elimina escrituras diagnosticas repetidas sin cambiar tracking, limite ni tiempo de reaccion del bloqueo.
+
+### UI-POLISH-01 - Consistencia visual y accesibilidad
+
+- Estado: `Candidato DEV 241 validado en SM-A235M; pendiente matriz adicional`.
+- Correccion: Home Usuario ahora informa 6 secciones, coherente con la incorporacion de Avisos.
+- Evidencia fisica: saludo personalizado, tarjetas, navegacion inferior, DAG claro, Admin, campanita, Alertas y Avisos sin recortes en 384 dp/Android 13. Lint completo de Usuario/Admin sin errores de accesibilidad; conserva advertencias tecnicas conocidas no bloqueantes.
+- Pendiente: repetir tamanos de fuente y modo oscuro en otro Samsung/API, incluido el SM-S908E. La publicacion final se hace una sola vez con ambos APK.
 
 ### ADMIN-ALERTS-UX-01 - Campanita de alertas de seguridad en App Admin
 
@@ -615,7 +637,7 @@ Flujo de una entrada:
 
 ### SUPERADMIN-MSG-01 - Avisos por comunidad
 
-- Estado: `Implementado backend DEV y candidato Android DEV 241; pendiente prueba funcional`. Aprobado al ordenar ejecutar todos los tickets el 2026-07-16.
+- Estado: `Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb`. Aprobado al ordenar ejecutar todos los tickets el 2026-07-16.
 - Tipo: comunicacion operativa y UX. Prioridad: P2.
 - Alcance cerrado: Super Admin crea un aviso para una comunidad y elige Administradores, Usuarios o ambos. Es un canal unidireccional; no hay chat, respuestas ni recibos de lectura.
 - Superweb incorpora formulario, vencimiento opcional e historial. El aviso queda guardado aunque FCM no este disponible y la UI distingue ese caso.
@@ -623,8 +645,9 @@ Flujo de una entrada:
 - Seguridad: las apps leen solo avisos de su comunidad y rol mediante token de dispositivo. El registro FCM generico acepta solo el token del propio dispositivo. La Service Role y credenciales FCM permanecen en `send-announcement`, nunca en Android.
 - Backend DEV: migraciones `20260716162000_super_admin_announcements.sql` y `20260716162500_device_push_registration_all_roles.sql`; Edge Function `send-announcement` desplegada solo en `syeycayasyufedwoprea`.
 - Compatibilidad: Android 10 o posterior, igual que las apps existentes. Android 13 o posterior pide permiso de notificaciones; si se rechaza, la bandeja sigue funcionando al abrir la app.
-- Validacion: RPC y tabla verificadas sin crear ni borrar avisos; conteo permanecio en cero. Builds optimizados, tests unitarios y ktlint de Usuario/Admin correctos; TypeScript, ESLint de `src` y build de Superweb correctos.
-- Pendiente: prueba autenticada de creacion/entrega con dispositivos fisicos y publicacion final agrupada.
+- Correccion posterior: la prueba autenticada descubrio que las RPC referenciaban el helper inexistente `is_current_user_super_admin`. La migracion DEV `20260716181500_fix_super_admin_announcement_authorization.sql` agrega un alias endurecido sobre `is_super_admin`; `anon` no puede ejecutarlo y `authenticated` sigue sujeto a la comprobacion real de Super Admin.
+- Validacion fisica: se creo por RPC un aviso `Prueba DEV 241` para ambos roles con vencimiento automatico de 30 minutos. Admin y Usuario lo recibieron al actualizar y la accion de apertura directa mostro la bandeja correcta. No se borro el aviso; queda como historial vencido.
+- Pendiente: el navegador integrado no logro navegar fuera de una pestaña vacia, por lo que no se extrajeron sesiones ni credenciales. Falta invocar `send-announcement` desde una sesion Superweb firmada y confirmar la notificacion FCM normal; la bandeja autenticada ya esta comprobada. Publicacion final agrupada pendiente.
 
 ### ALERT-ROUTING-01 - Enrutamiento por intento o desactivacion efectiva
 

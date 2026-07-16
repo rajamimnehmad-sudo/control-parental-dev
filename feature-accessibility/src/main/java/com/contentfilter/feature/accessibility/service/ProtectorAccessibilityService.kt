@@ -90,6 +90,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private var observedWindowClassName: String? = null
     private var lastExplicitSearchNoticeAt: Long = 0L
     private var lastTamperAlertAt: Long = 0L
+    private val foregroundDecisionDiagnosticGate = ForegroundDecisionDiagnosticGate()
     private val ownUninstallerPackages by lazy { resolveOwnUninstallerPackages() }
 
     override fun onServiceConnected() {
@@ -519,11 +520,15 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     .minOfOrNull { it.limitMinutes },
         )
         val decision = policyEvaluator.evaluate(packageName, usedMinutes, state.snapshot, state.health)
-        Log.i(
-            LogTag,
-            "Evaluated app package=$packageName persistedMin=$persistedMinutes activeMs=$activeMillis usedMin=$usedMinutes limits=${state.snapshot.dailyLimits.size} rules=${state.snapshot.rules.size} decision=${decision.label()}",
+        recordForegroundDecisionIfChanged(
+            packageName = packageName,
+            persistedMinutes = persistedMinutes,
+            activeMillis = activeMillis,
+            usedMinutes = usedMinutes,
+            limitCount = state.snapshot.dailyLimits.size,
+            ruleCount = state.snapshot.rules.size,
+            decision = decision,
         )
-        serviceScope?.launch { telemetryReporter.recordDecision(packageName, decision) }
         when (decision) {
             is PolicyDecision.Allow -> clearExtraTimeExpiry()
             is PolicyDecision.Block,
@@ -542,6 +547,25 @@ class ProtectorAccessibilityService : AccessibilityService() {
             is PolicyDecision.GrantExtraTime -> scheduleExtraTimeExpiry(packageName, decision.validUntilEpochMillis)
         }
         return false
+    }
+
+    private fun recordForegroundDecisionIfChanged(
+        packageName: String,
+        persistedMinutes: Int,
+        activeMillis: Long,
+        usedMinutes: Int,
+        limitCount: Int,
+        ruleCount: Int,
+        decision: PolicyDecision,
+    ) {
+        val key = "$packageName|${decision.label()}|$usedMinutes|$limitCount|$ruleCount"
+        if (!foregroundDecisionDiagnosticGate.shouldRecord(key)) return
+        Log.i(
+            LogTag,
+            "Evaluated app package=$packageName persistedMin=$persistedMinutes activeMs=$activeMillis " +
+                "usedMin=$usedMinutes limits=$limitCount rules=$ruleCount decision=${decision.label()}",
+        )
+        serviceScope?.launch { telemetryReporter.recordDecision(packageName, decision) }
     }
 
     private fun leaveBlockedApp(packageName: String) {
@@ -837,6 +861,16 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 "address_bar",
                 "mozac_browser_toolbar_url_view",
             )
+    }
+}
+
+internal class ForegroundDecisionDiagnosticGate {
+    private var lastKey: String? = null
+
+    fun shouldRecord(key: String): Boolean {
+        if (key == lastKey) return false
+        lastKey = key
+        return true
     }
 }
 

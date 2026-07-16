@@ -86,9 +86,9 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Android 13 o posterior solicita permiso de notificaciones. Rechazarlo impide el push pero no la consulta de la bandeja. El minimo del proyecto sigue siendo Android 10/API 29, compatible con la mayoria de telefonos Android actuales sin Device Owner, root ni funciones exclusivas de Samsung.
 - `list_device_announcements` filtra por comunidad y rol usando el token del propio dispositivo. `register_device_push_token` registra Usuario o Admin sin exponer escritura directa a la tabla. No existe Service Role Key ni credencial privada FCM dentro de Android.
 - `send-announcement` se desplego solo en Supabase DEV `syeycayasyufedwoprea`; usa credenciales servidor para seleccionar tokens y enviar datos FCM de prioridad normal. Si el push falla, el aviso ya guardado permanece disponible en la bandeja.
-- Migraciones aplicadas solo en DEV: `20260716162000_super_admin_announcements.sql` y `20260716162500_device_push_registration_all_roles.sql`. La verificacion confirmo las tres RPC y cero avisos; no se crearon ni borraron datos de prueba.
+- Migraciones aplicadas solo en DEV: `20260716162000_super_admin_announcements.sql`, `20260716162500_device_push_registration_all_roles.sql` y `20260716181500_fix_super_admin_announcement_authorization.sql`. La prueba real detecto que las RPC llamaban a un helper inexistente; la tercera migracion agrega el alias endurecido a `is_super_admin`. `anon` no lo ejecuta y `authenticated` sigue sujeto al rol Super Admin.
 - Validacion: tests unitarios, ktlint y builds DEV optimizados de ambos APK correctos; Superweb paso TypeScript, ESLint de `src` y build optimizado. El lint global de Superweb sigue incluyendo deuda ajena en `.open-next` generado.
-- Falta prueba autenticada de extremo a extremo con dispositivos fisicos. No se publico APK ni Superweb intermedia; los manifiestos publicos permanecen en DEV 240.
+- Prueba fisica SM-A235M: un aviso temporal para ambos roles fue creado por la RPC y aparecio en las bandejas Admin y Usuario al actualizar. La accion de apertura directa navega a Avisos. Falta confirmar el push FCM desde una sesion Superweb utilizable; el navegador integrado solo expuso pestañas vacias y no se extrajeron credenciales. No se publico APK ni Superweb intermedia; los manifiestos publicos permanecen en DEV 240.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 DATA-DELETE-01
 
@@ -97,8 +97,16 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - La transaccion revoca activacion y token del dispositivo, marca como eliminados apps, solicitudes, grupos, membresias, reglas, limites, politicas, codigos y token push, y guarda un recibo en `protected_user_deletion_audit`. Alertas de seguridad, consumo agregado y auditoria se conservan; no se hace `DELETE` fisico de datos ni de la cuenta.
 - La confirmacion de App Admin explica el alcance y la retencion de auditoria. Solo despues del exito remoto limpia la copia local y sincroniza la lista.
 - Migraciones `20260716174500_admin_archive_protected_user.sql` y `20260716175000_admin_archive_protected_user_privileges.sql` aplicadas solo en DEV. `anon` no ejecuta la RPC; `authenticated` conserva el permiso sujeto a las validaciones internas.
-- Verificacion deliberadamente no destructiva: 2 Usuarios activos y 0 filas de auditoria antes y despues. No se llamo la RPC. Tests de red/Admin, ktlint y build DEV optimizado correctos.
-- Falta autorizacion especifica para crear y archivar unicamente un usuario de prueba nuevo en DEV. No usar ninguno de los 2 Usuarios existentes para esta prueba.
+- El usuario autorizo especificamente crear y archivar un unico usuario nuevo de prueba. El primer intento con una plataforma invalida revirtio la transaccion y dejo 0 cuentas de prueba. El segundo termino con 0 dispositivos de prueba activos, 1 archivado, activacion revocada, 1 recibo y 2 filas afectadas. Los 2 Usuarios reales permanecieron activos e intactos.
+- DATA-DELETE-01 queda resuelto candidato DEV 241. Tests de red/Admin, ktlint y build DEV optimizado correctos.
+
+## Validacion fisica 2026-07-16 - candidato DEV 241 en SM-A235M
+
+- Actualizacion in-place desde Usuario 215/Admin 213 a 241 sin desinstalar ni limpiar datos. Ambas versiones quedaron en 241; VPN, Accessibility, Device Admin, activacion y control reforzado siguieron activos.
+- BARRIER-A11Y-RACE-01: veinte recorridos rapidos a la pantalla protegida `Aplicaciones instaladas`, con segundo toque inmediato, conservaron Accessibility 20/20 y expulsaron la pantalla 20/20. La pagina principal de Accesibilidad queda disponible deliberadamente. Falta repetir en el SM-S908E donde se reporto el bypass original.
+- USAGE-REAL-01: Calculadora foreground genero checkpoints/sesiones y avanzo a 2 minutos persistidos sin permiso Usage Stats. `Mis apps` conservo 156 filas y el filtro devolvio una Calculadora.
+- OPS-METRICS-01: se elimino I/O diagnostico repetido cada 250 ms sin cambiar la frecuencia de enforcement. La repeticion paso de unas 40 escrituras cada 10 s a 2 por cambio significativo. `Mis apps`, diez desplazamientos: 245 cuadros, 2,04 % lentos, p50 17 ms, p90/p95 20 ms y p99 30 ms. Falta muestra de bateria/red de 24 h.
+- UI-POLISH-01: Home Usuario muestra 6 secciones; saludo, Admin, Alertas, Avisos y DAG no presentaron recortes en 384 dp/Android 13. El lint completo previo de ambos APK no tuvo errores de accesibilidad.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 SEC-LICENSE-01A
 
