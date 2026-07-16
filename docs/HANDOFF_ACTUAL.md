@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 243
-App Admin versionCode 243
+App Usuario versionCode 244
+App Admin versionCode 244
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,24 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-243-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-243-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-244-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-244-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 769ca6a023e6bfb858c3396553bbe44415b34e9b019ccdfa7469a43c45d53926
-Admin   019fc5ec5812c0543eb7a43ef297babab94c69ca229f5b15a08cf39156abe253
+Usuario 209c97e302845102aa235da8363fbc8e587dd19b3bb0ad1de0b252cf3bacae69
+Admin   2d1da40bfc342f232a151c0d47d9cd539264c7a897265839b4fd527faad1c675
 ```
+
+## Correccion de actualizaciones Samsung DEV 244 - 2026-07-16
+
+- Causa: la autorizacion interna se enviaba al paquete Usuario sin componente explicito, la instalacion pendiente no se retomaba al volver de `Permitir desde esta fuente` y la politica no contemplaba todas las clases y paquetes Samsung del instalador y de fuentes externas.
+- Usuario y Admin dirigen ahora la autorizacion al receptor exacto protegido por permiso `signature`; Usuario tambien abre localmente la misma ventana oficial. La ventana dura cinco minutos y solo evita que la propia barrera intercepte el flujo de actualizacion iniciado desde Content Filter. Android conserva su permiso por origen y la confirmacion normal; no se promete instalacion silenciosa.
+- Al regresar de Ajustes, ambas apps detectan el permiso concedido, recuperan el APK ya verificado y abren automaticamente el instalador. La cobertura incluye los paquetes Samsung Package Installer/Permission Controller y variantes OEM de las pantallas de fuentes desconocidas.
+- Usuario y Admin subieron juntos a `versionCode 244`. La matriz integral termino correctamente con 1.011 tareas Gradle: tests unitarios, ktlint, detekt, lint DEV y ambos APK. Los SHA-256 locales preparados son los publicados arriba.
+- Prueba fisica auxiliar SM-A235M: ambos APK se instalaron in-place en 244 sin borrar datos y quedaron activos Accessibility, Device Admin y `FilterVpnService`. El telefono estaba bloqueado, por lo que no se declara prueba visual. La comprobacion determinante del flujo reportado queda pendiente en el Samsung SM-S908E personal.
 
 ## Publicacion UX agrupada DEV 243 - 2026-07-16
 

@@ -133,16 +133,30 @@ class SettingsProtectionPolicy {
                 "com.google.android.packageinstaller",
                 "com.android.permissioncontroller",
                 "com.google.android.permissioncontroller",
+                "com.samsung.android.packageinstaller",
+                "com.samsung.android.permissioncontroller",
             )
         val UninstallClassHints = listOf("Uninstall", "DeletePackage")
         val InstallClassHints =
             listOf(
                 "InstallStart",
+                "InstallConfirm",
                 "PackageInstallerActivity",
+                "PackageInstaller",
                 "InstallInstalling",
+                "InstallStaging",
                 "InstallSuccess",
             )
-        val UnknownSourcesClassHints = listOf("ManageExternalSources", "SpecialAccessDetails")
+        val UnknownSourcesClassHints =
+            listOf(
+                "ManageExternalSources",
+                "ExternalSources",
+                "UnknownAppSources",
+                "UnknownSources",
+                "InstallUnknownApps",
+                "RequestInstallPackages",
+                "SpecialAccessDetails",
+            )
         val DeviceAdminClassHints =
             listOf(
                 "DeviceAdminAdd",
@@ -165,10 +179,7 @@ class SettingsProtectionPolicy {
             ) + DeviceAdminClassHints
         val SettingsClassHints =
             CriticalSettingsClassHints +
-                listOf(
-                    "ManageExternalSources",
-                    "SpecialAccessDetails",
-                )
+                UnknownSourcesClassHints
     }
 }
 

@@ -21,6 +21,6 @@ class TrustedInstallAuthorizationReceiver : BroadcastReceiver() {
 
     private companion object {
         const val TrustedInstallAction = "com.contentfilter.action.AUTHORIZE_TRUSTED_INSTALL"
-        const val TrustedInstallWindowMillis = 2 * 60_000L
+        const val TrustedInstallWindowMillis = 5 * 60_000L
     }
 }

@@ -253,6 +253,39 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun signedTrustedInstallWindowAllowsSamsungPackageInstaller() {
+        assertFalse(
+            decide(
+                packageName = "com.samsung.android.packageinstaller",
+                className = "com.samsung.android.packageinstaller.PackageInstallerActivity",
+                ownAppIdentityVisible = false,
+                trustedInstallAuthorized = true,
+            ),
+        )
+    }
+
+    @Test
+    fun signedTrustedInstallWindowAllowsSamsungExternalSourceSettings() {
+        assertFalse(
+            decide(
+                className = "com.android.settings.Settings\$ExternalSourcesDetailsActivity",
+                ownAppIdentityVisible = true,
+                trustedInstallAuthorized = true,
+            ),
+        )
+    }
+
+    @Test
+    fun samsungExternalSourceSettingsStayBlockedWithoutTrustedWindow() {
+        assertTrue(
+            decide(
+                className = "com.android.settings.Settings\$ExternalSourcesDetailsActivity",
+                ownAppIdentityVisible = true,
+            ),
+        )
+    }
+
+    @Test
     fun unknownSourceSettingsAreBlockedWithoutTrustedInstallWindow() {
         assertTrue(
             decide(

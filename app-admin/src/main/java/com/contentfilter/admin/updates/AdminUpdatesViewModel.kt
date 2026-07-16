@@ -116,6 +116,18 @@ class AdminUpdatesViewModel
             }
         }
 
+        fun resumePendingInstallAfterPermission() {
+            if (
+                _uiState.value.status != AdminUpdatesStatus.NeedsInstallPermission ||
+                downloadedApk == null ||
+                !apkInstaller.canRequestPackageInstalls()
+            ) {
+                return
+            }
+            _uiState.update { it.copy(status = AdminUpdatesStatus.ReadyToInstall) }
+            installDownloadedUpdate()
+        }
+
         fun requestResetLocalAdmin() {
             _uiState.update { it.copy(showResetConfirmation = true, resetMessage = "") }
         }

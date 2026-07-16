@@ -86,6 +86,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.alerts.AdminAlertsRoute
 import com.contentfilter.admin.alerts.AdminAlertsViewModel
@@ -169,6 +171,9 @@ private fun AdminAppRoot(
         }
     val updatesViewModel: AdminUpdatesViewModel = hiltViewModel()
     val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        updatesViewModel.resumePendingInstallAfterPermission()
+    }
     LaunchedEffect(rootState.activated) {
         if (rootState.activated) {
             updatesViewModel.autoCheckAndDownload()

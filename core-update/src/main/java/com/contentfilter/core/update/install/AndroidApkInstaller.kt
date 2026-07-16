@@ -2,6 +2,7 @@ package com.contentfilter.core.update.install
 
 import android.app.Activity
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,7 @@ import android.os.Build
 import android.provider.Settings
 import android.util.Log
 import androidx.core.content.FileProvider
+import com.contentfilter.core.domain.repository.ProtectionStateStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
 import javax.inject.Inject
@@ -18,6 +20,7 @@ class AndroidApkInstaller
     @Inject
     constructor(
         @ApplicationContext private val context: Context,
+        private val protectionStateStore: ProtectionStateStore,
     ) : ApkInstaller {
         override fun canRequestPackageInstalls(): Boolean =
             Build.VERSION.SDK_INT < Build.VERSION_CODES.O ||
@@ -90,6 +93,10 @@ class AndroidApkInstaller
 
         @Suppress("DEPRECATION")
         private fun withTrustedInstallAuthorization(action: () -> Unit) {
+            val authorizationUntil = System.currentTimeMillis() + TrustedInstallWindowMillis
+            if (context.packageName == userPackageName()) {
+                protectionStateStore.authorizeTrustedInstall(authorizationUntil)
+            }
             val receiver =
                 object : BroadcastReceiver() {
                     override fun onReceive(
@@ -98,7 +105,12 @@ class AndroidApkInstaller
                     ) = action()
                 }
             context.sendOrderedBroadcast(
-                Intent(TrustedInstallAction).setPackage(userPackageName()),
+                Intent(TrustedInstallAction).setComponent(
+                    ComponentName(
+                        userPackageName(),
+                        TrustedInstallReceiverClass,
+                    ),
+                ),
                 TrustedInstallPermission,
                 receiver,
                 null,
@@ -121,6 +133,9 @@ class AndroidApkInstaller
             const val LogTag = "ApkInstaller"
             const val TrustedInstallAction = "com.contentfilter.action.AUTHORIZE_TRUSTED_INSTALL"
             const val TrustedInstallPermission = "com.contentfilter.permission.AUTHORIZE_TRUSTED_INSTALL"
+            const val TrustedInstallReceiverClass =
+                "com.contentfilter.user.apps.TrustedInstallAuthorizationReceiver"
+            const val TrustedInstallWindowMillis = 5 * 60_000L
         }
     }
 

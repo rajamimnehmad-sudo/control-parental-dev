@@ -120,6 +120,21 @@ class UpdatesViewModel
             }
         }
 
+        fun resumePendingInstallAfterPermission() {
+            if (!apkInstaller.canRequestPackageInstalls()) return
+            when {
+                _uiState.value.status == UpdatesStatus.NeedsInstallPermission && downloadedApk != null -> {
+                    _uiState.update { it.copy(status = UpdatesStatus.ReadyToInstall) }
+                    installDownloadedUpdate()
+                }
+                _uiState.value.adminInstallStatus == AdminInstallStatus.NeedsInstallPermission &&
+                    downloadedAdminApk != null -> {
+                    _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.ReadyToInstall) }
+                    installDownloadedAdmin()
+                }
+            }
+        }
+
         fun prepareAdminInstall() {
             viewModelScope.launch {
                 _uiState.update {
