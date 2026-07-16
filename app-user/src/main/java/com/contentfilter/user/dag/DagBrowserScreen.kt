@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
 import android.net.http.SslError
+import android.provider.Settings
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
@@ -92,6 +93,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -294,13 +297,70 @@ private fun DagBrowserContent(
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
+            if (state.view == DagView.Start) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        onClick = ::newTab,
+                        enabled = tabs.size < MaximumTabs,
+                        modifier = Modifier.width(44.dp).semantics { contentDescription = "Nueva pestaña" },
+                    ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
+                    TextButton(
+                        onClick = {
+                            persistActiveTab()
+                            tabsExpanded = true
+                        },
+                        modifier = Modifier.width(44.dp).semantics { contentDescription = "Pestañas: ${tabs.size}" },
+                    ) { Text(tabs.size.toString()) }
+                    Box {
+                        TextButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.width(44.dp).semantics { contentDescription = "Menú de DAG" },
+                        ) { Text("⋮", style = MaterialTheme.typography.headlineSmall) }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
+                            DropdownMenuItem(
+                                text = { Text("Historial") },
+                                onClick = {
+                                    menuExpanded = false
+                                    viewModel.showHistory()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Borrar caché de navegación") },
+                                onClick = {
+                                    menuExpanded = false
+                                    clearBrowsingCacheDialog = true
+                                },
+                            )
+                            HorizontalDivider()
+                            DagThemePreference.entries.forEach { preference ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text("${if (themePreference == preference) "✓ " else ""}${preference.label}")
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onThemePreferenceChanged(preference)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+            }
             if (state.view != DagView.Start) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                     horizontalArrangement = Arrangement.spacedBy(2.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    TextButton(onClick = viewModel::showStart, modifier = Modifier.width(40.dp)) {
+                    TextButton(
+                        onClick = viewModel::showStart,
+                        modifier = Modifier.width(40.dp).semantics { contentDescription = "Inicio" },
+                    ) {
                         Text("⌂", style = MaterialTheme.typography.titleLarge)
                     }
                     DagAnalysisFrame(
@@ -360,7 +420,7 @@ private fun DagBrowserContent(
                     TextButton(
                         onClick = ::newTab,
                         enabled = tabs.size < MaximumTabs,
-                        modifier = Modifier.width(40.dp),
+                        modifier = Modifier.width(40.dp).semantics { contentDescription = "Nueva pestaña" },
                     ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
                     Box {
                         TextButton(
@@ -369,11 +429,17 @@ private fun DagBrowserContent(
                                 persistActiveTab()
                                 tabsExpanded = true
                             },
-                            modifier = Modifier.width(40.dp),
+                            modifier =
+                                Modifier
+                                    .width(40.dp)
+                                    .semantics { contentDescription = "Pestañas: ${tabs.size}" },
                         ) { Text(tabs.size.toString()) }
                     }
                     Box {
-                        TextButton(onClick = { menuExpanded = true }, modifier = Modifier.width(40.dp)) {
+                        TextButton(
+                            onClick = { menuExpanded = true },
+                            modifier = Modifier.width(40.dp).semantics { contentDescription = "Menú de DAG" },
+                        ) {
                             Text("⋮", style = MaterialTheme.typography.headlineSmall)
                         }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
@@ -682,7 +748,7 @@ private fun DagAnalysisFrame(
     cornerRadius: Dp,
     content: @Composable () -> Unit,
 ) {
-    if (!analyzing) {
+    if (!analyzing || !dagAnimationsEnabled()) {
         Box(modifier = modifier) { content() }
         return
     }
@@ -727,6 +793,10 @@ private fun DagAnalysisFrame(
 
 @Composable
 private fun DagAnalyzingText() {
+    if (!dagAnimationsEnabled()) {
+        Text("Analizando…")
+        return
+    }
     var dots by remember { mutableIntStateOf(1) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -735,6 +805,16 @@ private fun DagAnalyzingText() {
         }
     }
     Text("Analizando${".".repeat(dots)}")
+}
+
+@Composable
+private fun dagAnimationsEnabled(): Boolean {
+    val context = LocalContext.current
+    return remember(context) {
+        runCatching {
+            Settings.Global.getFloat(context.contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f) > 0f
+        }.getOrDefault(true)
+    }
 }
 
 @Composable
@@ -822,7 +902,10 @@ private fun DagTabSwitcher(
                                     }
                                     TextButton(
                                         onClick = { onClose(tab) },
-                                        modifier = Modifier.align(Alignment.TopEnd),
+                                        modifier =
+                                            Modifier
+                                                .align(Alignment.TopEnd)
+                                                .semantics { contentDescription = "Cerrar pestaña" },
                                     ) { Text("×") }
                                 }
                                 Text(
@@ -1084,7 +1167,10 @@ private fun DagHistoryContent(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    TextButton(onClick = { onDelete(entry.id) }) { Text("×") }
+                    TextButton(
+                        onClick = { onDelete(entry.id) },
+                        modifier = Modifier.semantics { contentDescription = "Borrar del historial" },
+                    ) { Text("×") }
                 }
                 HorizontalDivider(modifier = Modifier.padding(start = 66.dp))
             }

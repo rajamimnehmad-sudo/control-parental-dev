@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 233
-App Admin versionCode 233
+App Usuario versionCode 234
+App Admin versionCode 234
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-233-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-233-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-234-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-234-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 7587bc1d03e0ea112bd94dd1e4446279f79ae43eb4e1c08b79f533ee5271dcbb
-Admin   978ca424d269589c09dc6cbab326d08e49348438d9ff02dd1ce1db6d780b1943
+Usuario 66c312920eaa5bd06a9cd037a0eb4aad5e5f317814977d1d0d205fe47f166f72
+Admin   1cfd5fb268fd6a888fe217123f608f35b869b386a310be655adc28451192f12f
 ```
+
+## Implementacion 2026-07-16 - DEV 234 cierre UX y accesibilidad DAG
+
+- Home conserva un unico buscador central, pero ahora ofrece arriba acciones compactas para nueva pestaña, selector de pestañas y menu. Desde ese menu se accede a historial, borrado de cache y tema sin iniciar una busqueda.
+- Inicio, nueva pestaña, selector, menu, cerrar pestaña y borrar una entrada de historial tienen descripciones semanticas; los simbolos dejan de ser controles mudos para TalkBack.
+- El estado Analizando respeta la escala global de animaciones de Android. Si el usuario desactiva animaciones, DAG conserva el texto de estado estatico y evita el borde giratorio y los puntos continuos.
+- No cambia el buscador, el cupo Brave, la politica kosher, las sesiones, el cifrado ni Supabase. Ktlint, unit tests DEV Usuario y builds DEV Usuario/Admin correctos (758 tareas). APKs y manifiestos DEV 234 publicados exclusivamente en Supabase DEV.
 
 ## Implementacion 2026-07-16 - DEV 233 navegacion Atras por pestana
 

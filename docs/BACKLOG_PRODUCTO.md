@@ -278,7 +278,7 @@ Flujo de una entrada:
 
 #### DAG-NAV-UX-01 - Barra de navegacion simplificada
 
-- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX y navegacion. Prioridad: P2.
+- Estado: `Resuelto` en DEV 234; aprobado por el usuario e implementado progresivamente desde DEV 224. Pendiente prueba fisica. Tipo: UX y navegacion. Prioridad: P2.
 - Problema: la barra expone controles secundarios y resta espacio y claridad a las acciones principales.
 - Solucion propuesta: ocultar `Atras`, `Adelante` y `Actualizar` de la barra y moverlos al menu de tres puntos; mostrar `Home` a la izquierda y reemplazar `Actualizar` por una accion visible de nueva pestana. El menu de tres puntos tambien debe estar disponible en Home.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
@@ -290,7 +290,7 @@ Flujo de una entrada:
 
 #### DAG-HOME-UX-01 - Home con buscador central
 
-- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX, identidad y Home DAG. Prioridad: P2.
+- Estado: `Resuelto` en DEV 234; aprobado por el usuario e implementado progresivamente desde DEV 224. Pendiente prueba fisica. Tipo: UX, identidad y Home DAG. Prioridad: P2.
 - Problema: la entrada del navegador no comunica con suficiente claridad que DAG es un buscador propio de Internet kosher.
 - Solucion propuesta: presentar un buscador grande y centrado, con marca `DAG` y una leyenda como `Internet kosher` u otra frase a definir.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
@@ -314,7 +314,7 @@ Flujo de una entrada:
 
 #### DAG-THEME-01 - Contraste y tema visual
 
-- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: accesibilidad visual y personalizacion. Prioridad: P2.
+- Estado: `Resuelto` en DEV 234; aprobado por el usuario e implementado progresivamente desde DEV 224. Pendiente prueba fisica. Tipo: accesibilidad visual y personalizacion. Prioridad: P2.
 - Problema: la barra ubicada en la zona superior cercana a la camara tiene contraste insuficiente y algunos iconos se distinguen poco.
 - Solucion propuesta: corregir contraste, incluyendo iconos negros cuando corresponda, y agregar en el menu de tres puntos las opciones `Claro`, `Oscuro` y `Segun el dispositivo`.
 - Evidencia: observacion visual del usuario el 2026-07-15.
@@ -326,7 +326,7 @@ Flujo de una entrada:
 
 #### DAG-HISTORY-UX-01 - Historial minimalista
 
-- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX e historial local. Prioridad: P2.
+- Estado: `Resuelto` en DEV 234; aprobado por el usuario e implementado progresivamente desde DEV 224. Pendiente prueba fisica. Tipo: UX e historial local. Prioridad: P2.
 - Problema: la presentacion actual del historial puede simplificarse para escanear y reabrir entradas con menos ruido visual.
 - Solucion propuesta: mostrar una lista minimalista con jerarquia clara y acciones discretas, preservando el almacenamiento local cifrado y el borrado existente.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
