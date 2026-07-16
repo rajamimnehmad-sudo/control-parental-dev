@@ -154,12 +154,15 @@ Flujo de una entrada:
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
-| DAG-THEME-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Hacer coincidir la barra superior de la camara con el color efectivo de DAG | S | Bajo |
+| DAG-THEME-01 | Corregido DEV 239; pendiente prueba fisica | P2 | Integrar la zona de camara con DAG y evitar recortar el texto de busqueda | S | Bajo |
 | DAG-THEME-02 | Resuelto DEV 230 | P1 | Corregir texto negro sobre fondo negro y fondo transparente del WebView | S | Bajo |
 | DAG-VISUAL-KOSHER-03 | Resuelto DEV 230 | P0 | Abrir tiendas normales y ocultar selectivamente imagenes intimas o visualmente no aptas | M | Alto |
 | DAG-VISUAL-CALIBRATION-01 | Resuelto DEV 231 | P0 | Reducir falsos positivos con salida normal, blur fuerte u ocultamiento por imagen | M | Alto |
 | DAG-MODESTY-REGIONS-01 | Resuelto DEV 235 | P0 | Blur local fuerte para calzas, shorts, escotes, manga corta y regiones femeninas cubiertas o expuestas | M | Alto |
 | DAG-IMAGE-DELIVERY-01 | Resuelto DEV 236 | P1 | Evitar huecos tecnicos y reclasificacion duplicada de imagenes dinamicas en la pagina activa | S | Medio |
+| DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
+| DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
+| DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
 | DAG-RESULTS-DIAG-01 | Resuelto DEV 237 | P1 | Contabilizar localmente el embudo de resultados Brave y los descartes DAG sin guardar contenido | S | Bajo |
 | DAG-RESULTS-PAGE-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Ofrecer una unica pagina adicional cuando Brave informa mas resultados, con costo explicito | S | Medio |
 | DAG-HISTORY-UX-01 | Resuelto DEV 234 | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
@@ -323,18 +326,42 @@ Flujo de una entrada:
 - Criterios de aceptacion propuestos: crear, cambiar y cerrar pestanas es evidente; la pestana activa se distingue; se preserva el limite de recursos; cerrar la ultima pestana vuelve a un estado seguro; no se mezclan historiales entre pestanas.
 - Decisiones cerradas: maximo ocho; orden local; miniaturas solo efimeras; cierre individual/masivo; metadatos y resultados cifrados sobreviven al proceso; paginas restauradas recargan y se revalidan sin conservar WebViews inactivos.
 
-#### DAG-THEME-01 - Contraste y tema visual
+#### DAG-THEME-01 - Contraste, zona de camara y texto de busqueda
 
-- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: bug visual, accesibilidad visual y personalizacion. Prioridad: P2.
+- Estado: `Corregido en DEV 239; pendiente prueba fisica`. Tipo: bug visual, accesibilidad visual y personalizacion. Prioridad: P2.
 - Problema: la barra superior del sistema ubicada alrededor de la camara puede permanecer blanca y cortar visualmente la interfaz. No debe tener un color fijo distinto de la pantalla DAG que se encuentra debajo.
 - Solucion propuesta: hacer que toda la zona superior alrededor de la camara coincida con el color efectivo de la interfaz DAG en la pantalla y tema actuales, y elegir iconos claros u oscuros segun ese fondo. Se conservan las opciones `Claro`, `Oscuro` y `Segun el dispositivo`.
-- Resultado DEV 238: DAG aplica el color de fondo del tema efectivo a las barras de estado y navegacion, ajusta el contraste de sus iconos y restaura los colores previos al salir de la experiencia DAG.
+- Resultado DEV 239: DAG pinta su propia superficie detras de la barra edge-to-edge y aplica el inset solo al contenido; ya no depende de una asignacion de color ignorada por Android moderno. Conserva iconos legibles y usa texto compacto en la barra para que una consulta larga no quede cortada por Home, nueva pestana, contador y menu.
 - Evidencia: observacion inicial del usuario el 2026-07-15 y prueba fisica negativa informada el 2026-07-16: la zona superior de la camara sigue blanca y no queda integrada. El usuario preciso el mismo dia que debe coincidir con el color de DAG, no limitarse a cambiar entre blanco y negro.
 - Esfuerzo: S estimado. Riesgo: bajo; una correccion incompleta puede dejar iconos ilegibles o comportamientos distintos segun version Android, recorte o fabricante.
 - Dependencias: tema Compose, barras del sistema, iconos, WebView y persistencia local de preferencia.
-- Duplicados y relacion: no se crea un ID nuevo porque es el mismo problema cubierto por `DAG-THEME-01`; la evidencia fisica invalida su cierre completo. Puede agruparse con `UI-POLISH-01`, pero se conserva separado por afectar especificamente DAG y las barras del sistema.
+- Duplicados y relacion: la evidencia fisica invalido el cierre de DEV 238. El recorte del texto se agrupa en el mismo ticket por compartir la barra superior; puede relacionarse con `UI-POLISH-01`, pero se conserva separado por afectar especificamente DAG.
 - Criterios de aceptacion propuestos: la zona superior alrededor de la camara coincide visualmente con el fondo efectivo de DAG en Home, resultados, pagina Web, historial, selector de pestanas y estados de analisis; los iconos del sistema permanecen legibles; `Segun el dispositivo` sigue el cambio del sistema sin reiniciar DAG; la preferencia persiste; no aparecen franjas ni destellos blancos al navegar; se valida fisicamente en el dispositivo afectado y al menos con los tipos de recorte soportados.
-- Decisiones pendientes para la entrevista del ticket: dispositivo y version Android donde se observo; si ocurre en todas las pantallas DAG o solo al navegar; comportamiento sobre paginas Web claras en modo oscuro; matriz minima de dispositivos con perforacion o notch.
+- Evidencia DEV 239: captura fisica del usuario con franja blanca y `yeshrun` recortado; regresion corregida mediante edge-to-edge compatible con `targetSdk 36`. Falta repetir la matriz visual en el Samsung afectado.
+
+#### DAG-SEARCH-FP-02 - Yeshurun social sin falso positivo
+
+- Estado: `Implementado en DEV 239; pendiente prueba fisica`. Tipo: precision del clasificador local. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Causa: el modelo neuronal y el respaldo compacto no daban la misma decision para la consulta institucional breve `yeshrun instagram`, produciendo primero incertidumbre y luego bloqueo en intentos equivalentes.
+- Alcance: vocabulario cerrado para `yeshrun`/`yeshurun` y destinos institucionales o sociales conocidos. No cambia umbrales ni permite que palabras explicitas, drogas u otros terminos riesgosos queden ocultos por la excepcion.
+- Evidencia y pruebas: controles automatizados permiten `yeshrun instagram` y `Yeshurun pagina oficial`, y bloquean `yeshrun instagram videos porno`.
+- Criterios de aceptacion: la consulta segura tiene una decision estable; variantes con riesgo siguen bloqueadas; no se altera la prioridad de dominios, reglas Admin ni plataformas visuales bloqueadas.
+
+#### DAG-MODESTY-CHEST-02 - Regiones cubiertas sin rostro
+
+- Estado: `Implementado en DEV 239; pendiente prueba fisica`. Tipo: seguridad visual y calibracion local. Prioridad: P0. Esfuerzo: S. Riesgo: alto.
+- Causa: pecho, genitales o gluteos cubiertos solo activaban la politica de modestia si la misma imagen tambien detectaba un rostro femenino; recortes de producto y escotes sin rostro escapaban del blur.
+- Alcance: esas tres regiones cubiertas activan blur fuerte por si mismas. Axila y abdomen conservan la exigencia de contexto femenino para limitar falsos positivos. No se relaja ninguna decision NSFW existente.
+- Referencia aceptada: el desenfoque fuerte mostrado en la pagina de bikinis H&M aportada por el usuario es correcto y debe permanecer.
+- Criterios de aceptacion: escotes y recortes de pecho se desenfocan aunque no haya rostro; bikinis siguen fuertemente desenfocados; rostros benignos aislados y ropa comun sin regiones detectadas no se bloquean por esta regla.
+
+#### DAG-IMAGE-DELIVERY-02 - Cola completa para paginas densas
+
+- Estado: `Implementado en DEV 239; pendiente prueba fisica`. Tipo: confiabilidad de recursos Web y rendimiento. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Causa: solo tres imagenes se analizaban en paralelo y el clasificador era serializado; las solicitudes posteriores abandonaban la espera del turno a los ocho segundos y recibian un recurso neutro, por eso parecian cargar solo las primeras fotos.
+- Alcance: espera justa sin vencimiento interno del turno, cancelacion por generacion al cambiar o cerrar pagina, presupuesto de 400 recursos y cache efimera de 64 entradas/16 MiB. Persisten el timeout de red de ocho segundos, HTTPS, defensa SSRF, maximo de descarga, clasificacion previa y fallo cerrado.
+- Riesgos: una pagina muy grande puede tardar mas en completar su cola y usar mas memoria efimera; los topes siguen acotados y abandonar la pagina cancela el trabajo pendiente.
+- Criterios de aceptacion: al desplazarse por una tienda densa se procesan tambien las fotos posteriores; ninguna imagen se muestra antes de clasificarse; cambiar de pagina no mezcla resultados ni deja trabajo viejo; fallos reales de red o formato permanecen neutros y seguros.
 
 #### DAG-HISTORY-UX-01 - Historial minimalista
 

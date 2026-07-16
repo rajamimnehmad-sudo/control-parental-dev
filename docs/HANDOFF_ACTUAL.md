@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 238
-App Admin versionCode 238
+App Usuario versionCode 239
+App Admin versionCode 239
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,25 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-238-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-238-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-239-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-239-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario c096df07328aff99e52dcc7de98c70db6523f07845e10d9d07e06ba054aadd12
-Admin   f339ada678537c6e1b8596a5943627fde3e7e2617b85ad7ddb6befcc771e3ef4
+Usuario 8e78e4a36304e1a359e8f9fe5714c2eb101a6dc60a1c0a41905db01cdc32f684
+Admin   7ce2ac04e45dd442a4d5ce7513a3535c2895004e9a3028e15d3854d54b545187
 ```
+
+## Implementacion 2026-07-16 - DEV 239 correcciones de prueba fisica DAG
+
+- `DAG-THEME-01`: con `targetSdk 36`, asignar colores directamente a las barras del sistema ya no pintaba la zona de la camara bajo edge-to-edge. DAG ahora pinta su superficie hasta el borde, aplica el inset solo al contenido y conserva el contraste de los iconos. La direccion usa una tipografia mas compacta para evitar recortar busquedas como `yeshrun instagram`.
+- `DAG-SEARCH-FP-02`: la consulta institucional cerrada `yeshrun`/`yeshurun` con destinos sociales conocidos se considera segura de forma determinista. Agregar vocabulario explicito o riesgoso conserva el bloqueo normal, por lo que la excepcion no enmascara busquedas peligrosas.
+- `DAG-MODESTY-CHEST-02`: pecho, genitales o gluteos femeninos cubiertos activan blur fuerte aunque el detector no encuentre un rostro. Axila y abdomen siguen requiriendo contexto femenino. La pagina de bikinis H&M desenfocada aportada por el usuario es la referencia visual correcta que debe conservarse.
+- `DAG-IMAGE-DELIVERY-02`: las imagenes de paginas densas esperan en una cola justa en vez de agotarse a los ocho segundos mientras el clasificador local serializado esta ocupado. La cola se cancela al abandonar la pagina; el presupuesto por pagina sube de 160 a 400 recursos y la cache efimera de 24/8 MiB a 64/16 MiB. Se mantienen HTTPS, defensa SSRF, limites de red y tamano, clasificacion local previa y fallo cerrado.
+- Validacion local: 1.103 tareas correctas para tests de `core-domain`, tests DEV Usuario/Admin, ktlint, Android Lint, detekt y builds de ambos APK. Commit funcional `1da0cec`. Workflow `Publicar APKs DEV` `29506428228` exitoso. APKs publicos 239 descargados y verificados contra sus manifiestos: Usuario 47.828.636 bytes y Admin 27.917.808 bytes, con los SHA-256 documentados arriba. Android CI `29506435216` se inicio sobre el mismo commit y queda registrado hasta su finalizacion.
+- Pendiente fisico: actualizar Usuario y Admin; comprobar que no haya franja blanca alrededor de la camara, que se lea completa una busqueda larga, que `yeshrun instagram` no alterne entre incierto y bloqueado, que las fotos posteriores aparezcan al desplazarse por una tienda densa, que un escote reciba blur y que la referencia de bikinis H&M siga fuertemente desenfocada.
 
 ## Implementacion 2026-07-16 - DEV 238 cierre agrupado de pendientes DAG
 
