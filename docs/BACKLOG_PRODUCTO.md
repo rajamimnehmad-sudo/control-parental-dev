@@ -169,6 +169,7 @@ Flujo de una entrada:
 | DAG-REQUEST-STATUS-01 | Idea | P1 | Confirmar solicitudes enviadas y mostrar pendientes de revision desde el menu DAG | M | Medio |
 | DAG-SHARE-01 | Idea | P2 | Compartir de forma segura el enlace de la pagina actual desde DAG | S | Medio |
 | DAG-AUTOCOMPLETE-02 | Idea | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
+| DAG-CAPTCHA-01 | Idea | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
 | USER-GREETING-01 | Idea | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
@@ -448,6 +449,25 @@ Flujo de una entrada:
   - cada toque aceptado consume como maximo una consulta Brave;
   - pulsaciones rapidas, recomposiciones y cambios de pestana no duplican ni cruzan busquedas.
 - Decisiones pendientes para la entrevista del ticket: si todas las sugerencias buscan directamente o si las del historial pueden abrir su URL; comportamiento con pulsacion larga; feedback durante la transicion; accesibilidad y accion del teclado.
+
+#### DAG-CAPTCHA-01 - Compatibilidad segura con CAPTCHA
+
+- Estado: `Idea`; defecto observado, no aprobado todavia para diagnostico tecnico ni codigo. Tipo: bug de compatibilidad Web y seguridad. Prioridad: P1.
+- Problema: DAG no muestra el CAPTCHA de la pagina de multas de CABA, por lo que el usuario no puede completar el tramite aunque la pagina principal sea accesible.
+- Solucion propuesta: incorporar un tratamiento acotado para desafios CAPTCHA utilizados por paginas permitidas, cargando solamente los recursos, scripts, iframes y comunicaciones indispensables del proveedor validado. El desafio y su resultado deben permanecer dentro de la navegacion protegida y no convertirse en una excepcion general para contenido externo.
+- Evidencia: prueba fisica informada por el usuario el 2026-07-16 en la pagina de multas de CABA; el CAPTCHA no aparece. No se conoce todavia la URL exacta, proveedor ni tipo de recurso bloqueado.
+- Esfuerzo: M estimado. Riesgo: alto; los CAPTCHAs suelen depender de scripts, iframes, cookies y dominios externos, y una habilitacion demasiado amplia podria crear una ruta de contenido no analizado, rastreo adicional o navegacion externa.
+- Dependencias: intercepcion de recursos WebView; politica de iframes, JavaScript, cookies y dominios secundarios; clasificacion de imagenes; navegacion y sesiones; listas dinamicas; proveedores reCAPTCHA, hCaptcha, Turnstile u otros a identificar.
+- Duplicados y relacion: no existe una entrada previa equivalente. Se relaciona con compatibilidad de recursos e imagenes DAG, pero se mantiene separado porque un CAPTCHA es un flujo interactivo externo y sensible, no una imagen comun.
+- Criterios de aceptacion propuestos:
+  - el CAPTCHA del tramite de multas de CABA se muestra, permite interacción y valida correctamente dentro de DAG;
+  - solo se habilitan los proveedores, dominios y tipos de recursos estrictamente necesarios;
+  - el contenido del desafio no queda visible antes de aplicar las barreras compatibles y los errores fallan cerrados con un mensaje entendible;
+  - resolver el CAPTCHA no abre ventanas, aplicaciones externas, descargas ni navegaciones no autorizadas;
+  - cookies o tokens del desafio tienen alcance y persistencia minimos y no se incorporan al historial ni a solicitudes Admin;
+  - sitios bloqueados o inciertos no usan el soporte CAPTCHA para evitar su decision;
+  - se prueban desafio correcto, vencido, recarga, error de red, modo claro/oscuro y regreso desde segundo plano.
+- Decisiones pendientes para la entrevista del ticket: URL exacta y paso del tramite; proveedor y modalidad del CAPTCHA; comportamiento visible actual; si ocurre en otros sitios; cookies necesarias; persistencia de sesion; proveedores admitidos y politica ante desafios visuales que el filtro considere riesgosos.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
