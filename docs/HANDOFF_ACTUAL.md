@@ -81,7 +81,7 @@ Admin   PENDIENTE
 
 ## Implementacion 2026-07-15 - DEV 229 IA visual kosher profesional
 
-- ARM64 incorpora `Marqo/nsfw-image-detection-384`, ViT-Tiny local Apache-2.0 de 5,6 millones de parámetros entrenado sobre 220.000 imágenes; el model card reporta 98,56 % en su propio conjunto balanceado. Artefacto ONNX de 22.527.617 bytes, SHA-256 `7b81155313d894bba3a3b9bace059a6da2a0c509d10cea43fcb0b3c5a4edd26d`.
+- ARM64 incorpora `Marqo/nsfw-image-detection-384`, ViT-Tiny local Apache-2.0 de 5,6 millones de parámetros entrenado sobre 220.000 imágenes; el model card reporta 98,56 % en su propio conjunto balanceado. La conversión ONNX cuantizada INT8 pesa 6.702.582 bytes, SHA-256 `0366969ece89f252f05fad2c730d6c7e3373000e1ff43e4cfab8425aad94405b`; una imagen benigna de control conservó la decisión entre FP32 e INT8.
 - La decisión es un ensemble conservador: una imagen solo se muestra si el ViT profesional y el OpenNSFW anterior la consideran segura. Zona dudosa, error o salida inválida permanecen ocultos. ARM32 conserva OpenNSFW porque el runtime ONNX se excluye allí por compatibilidad/tamaño.
 - `lencería`, ropa íntima/interior y equivalentes en español e inglés son categoría sexual explícita para la política kosher; se bloquean desde búsqueda/metadatos/texto de página aunque no exista desnudez. Las aprobaciones rápidas anteriores se invalidan por la nueva versión visual.
 - Todo sucede en el teléfono: imagen, URL, probabilidad y decisión no se envían a Supabase, Brave ni al administrador. La precisión probabilística no equivale a garantía absoluta y requiere validación física con páginas reales.

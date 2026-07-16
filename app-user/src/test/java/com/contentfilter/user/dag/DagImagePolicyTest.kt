@@ -15,7 +15,7 @@ class DagImagePolicyTest {
         val model = listOf(File(relative), File("app-user/$relative")).first(File::isFile)
         val digest = MessageDigest.getInstance("SHA-256").digest(model.readBytes()).toHex()
 
-        assertEquals("7b81155313d894bba3a3b9bace059a6da2a0c509d10cea43fcb0b3c5a4edd26d", digest)
+        assertEquals("0366969ece89f252f05fad2c730d6c7e3373000e1ff43e4cfab8425aad94405b", digest)
     }
 
     @Test

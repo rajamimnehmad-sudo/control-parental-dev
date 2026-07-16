@@ -67,14 +67,14 @@ DAG professional local image safety model
 Marqo/nsfw-image-detection-384
 https://huggingface.co/Marqo/nsfw-image-detection-384
 
-The bundled ONNX model is a ViT-Tiny image classifier trained by Marqo on a
+The bundled ONNX model is an INT8-weight-quantized ViT-Tiny image classifier trained by Marqo on a
 proprietary 220,000-image dataset. The model card reports 98.56% accuracy on its
 own balanced evaluation set. DAG uses it locally as the first member of a
 conservative ensemble; the Yahoo OpenNSFW model remains a second independent
 barrier. No image, score, or decision leaves the device.
 
 Model SHA-256:
-7b81155313d894bba3a3b9bace059a6da2a0c509d10cea43fcb0b3c5a4edd26d
+0366969ece89f252f05fad2c730d6c7e3373000e1ff43e4cfab8425aad94405b
 
 Copyright Marqo contributors.
 Licensed under the Apache License, Version 2.0:
