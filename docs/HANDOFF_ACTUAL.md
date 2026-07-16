@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-15
+Fecha de corte: 2026-07-16
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 237
-App Admin versionCode 237
+App Usuario versionCode 238
+App Admin versionCode 238
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,28 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-237-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-237-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-238-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-238-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 809f032a2f28cd665cef407f927a6eecd2b2588f49c3b85963a28f56990d0398
-Admin   4b25c9da872f35138e9430be4965def334e21ce22d750ed3166355f8f320c7b6
+Usuario c096df07328aff99e52dcc7de98c70db6523f07845e10d9d07e06ba054aadd12
+Admin   f339ada678537c6e1b8596a5943627fde3e7e2617b85ad7ddb6befcc771e3ef4
 ```
+
+## Implementacion 2026-07-16 - DEV 238 cierre agrupado de pendientes DAG
+
+- `DAG-RESULTS-PAGE-01`: Brave mantiene diez candidatos por pagina. DAG ofrece una unica pagina adicional solo cuando `query.more_results_available` es verdadero, muestra que consume otra busqueda, concatena y deduplica URLs y no permite una tercera pagina. La Edge Function `dag-search` version 8 esta activa solo en Supabase DEV, con JWT requerido.
+- `DAG-AUTOCOMPLETE-02`, `DAG-SHARE-01` y `DAG-THEME-01`: tocar una sugerencia inicia una sola busqueda segura; una pagina HTTPS visible puede compartir solamente su URL mediante el selector Android; y las barras del sistema siguen el tema claro/oscuro de DAG y restauran sus colores al salir.
+- `DAG-REQUEST-STATUS-01`: el envio confirma estado pendiente, evita duplicar el mismo dominio mientras exista una solicitud activa y agrega `Pendientes de revision` desde Home y navegacion. La bandeja usa solo solicitudes de dominio guardadas localmente, distingue estados y solo permite reabrir una aprobada, que vuelve a pasar por DAG.
+- `DAG-APPROVAL-POLICY-01`: DEV conservaba la regla DAG en las aprobaciones recientes verificadas, sin registros que debieran repararse. La mutacion Admin ahora republica la politica local completa, incluida `__dag_enabled__`, junto con la regla aprobada, y sigue rechazando una politica incompleta antes de informar exito.
+- `DAG-CAPTCHA-01`: la pagina oficial de infracciones CABA usa Google reCAPTCHA y DAG la ocultaba al eliminar todos los iframes. La excepcion permite solo rutas HTTPS `/recaptcha/` de `www.google.com` o `www.recaptcha.net` dentro de la ruta oficial de infracciones; otros iframes siguen cerrados y los recursos visuales conservan clasificacion local.
+- Cuota DEV temporal: la licencia de `Yeshurun tora` quedo en 1.000 busquedas mensuales por dispositivo, sin borrar ni reiniciar consumo. Es un limite de producto; no agrega credito a Brave. Con el precio vigente de USD 5 por 1.000 solicitudes y USD 5 de credito mensual, las 1.000 solicitudes gratuitas son globales para la cuenta y cada pagina adicional exitosa cuenta otra vez.
+- Actualizaciones: DAG comparte APK con App Usuario. Puede comprobar y descargar una version, pero Android normal exige confirmacion del instalador. No se promete instalacion silenciosa sin Device Owner/Android Enterprise, root o tienda administrada.
+- Validacion local: 775 tareas correctas para tests de `core-domain`, tests DEV Usuario/Admin, ktlint y builds de ambos APK; luego el control global `ktlintCheck lint detekt` completo tambien finalizo correctamente. Commits `4908437`, `3d29a6d` y cierre de CI `51f2a63`. Android CI `29502441215` exitoso con build, unit tests, ktlint, Android Lint y detekt. Workflow `Publicar APKs DEV` `29501433942` exitoso; un segundo intento sobre el mismo `versionCode` fue rechazado por la proteccion anti-sobrescritura y no modifico Storage. APKs publicos 238 descargados y verificados: Usuario 47.828.636 bytes, Admin 27.917.808 bytes, con los SHA-256 documentados arriba.
+- Pendiente fisico: probar una busqueda con `Mas resultados`, pulsaciones rapidas de sugerencias, compartir/cancelar, tema oscuro, bandeja de revisiones, ciclo solicitud-aprobacion-reinicio sin cerrar DAG y reCAPTCHA (checkbox, desafio, vencimiento y segundo plano).
 
 ## Implementacion 2026-07-16 - DEV 237 diagnostico agregado de resultados DAG
 

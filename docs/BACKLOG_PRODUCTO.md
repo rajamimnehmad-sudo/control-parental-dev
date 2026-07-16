@@ -154,23 +154,25 @@ Flujo de una entrada:
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
-| DAG-THEME-01 | Reabierto | P2 | Corregir barra superior blanca en modo oscuro y mantener temas claro, oscuro o segun dispositivo | S | Bajo |
+| DAG-THEME-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Corregir barra superior blanca en modo oscuro y mantener temas claro, oscuro o segun dispositivo | S | Bajo |
 | DAG-THEME-02 | Resuelto DEV 230 | P1 | Corregir texto negro sobre fondo negro y fondo transparente del WebView | S | Bajo |
 | DAG-VISUAL-KOSHER-03 | Resuelto DEV 230 | P0 | Abrir tiendas normales y ocultar selectivamente imagenes intimas o visualmente no aptas | M | Alto |
 | DAG-VISUAL-CALIBRATION-01 | Resuelto DEV 231 | P0 | Reducir falsos positivos con salida normal, blur fuerte u ocultamiento por imagen | M | Alto |
 | DAG-MODESTY-REGIONS-01 | Resuelto DEV 235 | P0 | Blur local fuerte para calzas, shorts, escotes, manga corta y regiones femeninas cubiertas o expuestas | M | Alto |
 | DAG-IMAGE-DELIVERY-01 | Resuelto DEV 236 | P1 | Evitar huecos tecnicos y reclasificacion duplicada de imagenes dinamicas en la pagina activa | S | Medio |
 | DAG-RESULTS-DIAG-01 | Resuelto DEV 237 | P1 | Contabilizar localmente el embudo de resultados Brave y los descartes DAG sin guardar contenido | S | Bajo |
+| DAG-RESULTS-PAGE-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Ofrecer una unica pagina adicional cuando Brave informa mas resultados, con costo explicito | S | Medio |
 | DAG-HISTORY-UX-01 | Resuelto DEV 234 | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
 | DAG-ANALYSIS-UX-01 | Resuelto DEV 226 | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Resuelto DEV 226 | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
 | DAG-REVIEW-STAGING-01 | Resuelto DEV 225 | P1 | Analizar pagina completa antes de pedir revision por un resultado incierto | M | Medio |
 | DAG-BACK-NAV-01 | Resuelto DEV 233 | P2 | Atras respeta paginas y resultados antes de volver a Home | S | Medio |
-| DAG-APPROVAL-POLICY-01 | Reabierto | P0 | Evitar que aprobar un sitio desde App Admin desactive DAG | M | Alto |
-| DAG-REQUEST-STATUS-01 | Idea | P1 | Confirmar solicitudes enviadas y mostrar pendientes de revision desde el menu DAG | M | Medio |
-| DAG-SHARE-01 | Idea | P2 | Compartir de forma segura el enlace de la pagina actual desde DAG | S | Medio |
-| DAG-AUTOCOMPLETE-02 | Idea | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
-| DAG-CAPTCHA-01 | Idea | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
+| DAG-APPROVAL-POLICY-01 | Implementado DEV 238; pendiente prueba fisica | P0 | Evitar que aprobar un sitio desde App Admin desactive DAG | M | Alto |
+| DAG-REQUEST-STATUS-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Confirmar solicitudes enviadas y mostrar pendientes de revision desde el menu DAG | M | Medio |
+| DAG-SHARE-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Compartir de forma segura el enlace de la pagina actual desde DAG | S | Medio |
+| DAG-AUTOCOMPLETE-02 | Implementado DEV 238; pendiente prueba fisica | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
+| DAG-CAPTCHA-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
+| DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | USER-GREETING-01 | Idea | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
@@ -322,9 +324,10 @@ Flujo de una entrada:
 
 #### DAG-THEME-01 - Contraste y tema visual
 
-- Estado: `Reabierto`; implementado progresivamente entre DEV 224 y DEV 234, pero la validacion fisica del usuario detecto un defecto pendiente el 2026-07-16. No aprobado todavia como ticket de correccion. Tipo: bug visual, accesibilidad visual y personalizacion. Prioridad: P2.
+- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: bug visual, accesibilidad visual y personalizacion. Prioridad: P2.
 - Problema: en modo oscuro, la barra superior del sistema ubicada alrededor de la camara permanece blanca y rompe la continuidad visual de DAG. El contraste general y las opciones de tema ya existen, pero no alcanzan correctamente esta superficie.
 - Solucion propuesta: hacer que la barra superior del sistema siga el tema efectivo de DAG y elegir iconos claros u oscuros segun el fondo, conservando las opciones `Claro`, `Oscuro` y `Segun el dispositivo`.
+- Resultado DEV 238: DAG aplica el color de fondo del tema efectivo a las barras de estado y navegacion, ajusta el contraste de sus iconos y restaura los colores previos al salir de la experiencia DAG.
 - Evidencia: observacion inicial del usuario el 2026-07-15 y prueba fisica negativa informada el 2026-07-16: con DAG en modo oscuro, la zona superior de la camara sigue blanca y no queda integrada.
 - Esfuerzo: S estimado. Riesgo: bajo; una correccion incompleta puede dejar iconos ilegibles o comportamientos distintos segun version Android, recorte o fabricante.
 - Dependencias: tema Compose, barras del sistema, iconos, WebView y persistencia local de preferencia.
@@ -378,7 +381,7 @@ Flujo de una entrada:
 
 #### DAG-APPROVAL-POLICY-01 - Aprobacion sin desactivar DAG
 
-- Estado: `Reabierto`; corregido tecnicamente en DEV 227, pero una nueva prueba fisica del usuario el 2026-07-16 demuestra que el fallo sigue presente o reaparecio. No aprobado todavia como ticket de diagnostico o codigo.
+- Estado: `Implementado en DEV 238; pendiente prueba fisica`. La aprobacion conserva el rechazo seguro de politicas incompletas y ahora republica en una sola mutacion todas las reglas locales vigentes, incluida `__dag_enabled__`, junto con la nueva regla de dominio.
 - Tipo: regresion funcional y consistencia de politica. Prioridad: P0.
 - Problema: cuando App Admin permite un sitio solicitado, DAG se desactiva en App Usuario. La aprobacion de un dominio no debe reemplazar, eliminar ni revocar la regla que habilita DAG para el dispositivo.
 - Solucion propuesta: diagnosticar el recorrido real de aprobacion y sincronizacion en la version publicada, garantizar que toda mutacion preserve la politica completa del dispositivo y rechazar de forma segura cualquier aprobacion basada en un estado incompleto, sin informar exito falso.
@@ -398,9 +401,10 @@ Flujo de una entrada:
 
 #### DAG-REQUEST-STATUS-01 - Confirmacion y pendientes de revision
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX de solicitudes y navegacion DAG. Prioridad: P1.
+- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: UX de solicitudes y navegacion DAG. Prioridad: P1.
 - Problema: despues de pedir revision de una pagina no queda claro que la solicitud fue enviada ni cual es su estado. El usuario tampoco tiene un lugar dentro de DAG para consultar las revisiones que siguen pendientes.
 - Solucion propuesta: mostrar una confirmacion persistente e inequivoca inmediatamente despues del envio y agregar en el menu de tres puntos un apartado `Pendientes de revision` con las solicitudes del usuario, su sitio y estado. Evitar reenvios duplicados mientras una solicitud equivalente siga pendiente.
+- Resultado DEV 238: DAG confirma `Solicitud enviada y pendiente de revision`, observa solo las solicitudes locales de dominio, ofrece la bandeja desde Home y navegacion, distingue pendiente de envio, pendiente remota, aprobada, rechazada o expirada y evita otro envio del mismo dominio mientras exista una equivalente pendiente. Solo una aprobada permite volver a abrir el dominio, que se analiza nuevamente.
 - Evidencia: observacion de uso del usuario el 2026-07-16.
 - Esfuerzo: M estimado. Riesgo: medio; la pantalla puede exponer mas historial del necesario, mostrar estados obsoletos o confundir una solicitud enviada con una aprobacion.
 - Dependencias: solicitudes de dominio DAG; sincronizacion y estados pendiente/aprobada/rechazada; menu de tres puntos; navegacion por pestana; privacidad del historial local; `DAG-APPROVAL-POLICY-01` para el resultado aprobado.
@@ -417,9 +421,10 @@ Flujo de una entrada:
 
 #### DAG-SHARE-01 - Compartir enlace actual
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX de navegacion e interoperabilidad Android. Prioridad: P2.
+- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: UX de navegacion e interoperabilidad Android. Prioridad: P2.
 - Problema: DAG no ofrece una accion clara para compartir el enlace de la pagina actual con otra persona o aplicacion.
 - Solucion propuesta: agregar `Compartir enlace` al menu de tres puntos y abrir el selector nativo de Android con la URL segura de la pagina visible. La accion comparte el enlace, no el HTML, capturas, consultas, historial ni decisiones internas del filtro.
+- Resultado DEV 238: la accion aparece solo para una pagina HTTPS visible y comparte unicamente la URL valida de la pestana activa mediante el selector nativo. Home, resultados, carga, bloqueos y revisiones no habilitan la accion.
 - Evidencia: solicitud del usuario del 2026-07-16.
 - Esfuerzo: S estimado. Riesgo: medio; compartir puede sacar una URL del entorno protegido, exponer parametros sensibles o habilitar destinos externos no controlados por DAG.
 - Dependencias: menu DAG; URL efectiva y navegacion por pestana; intents Android; normalizacion y saneamiento de URL; reglas para paginas internas, bloqueadas, inciertas o pendientes.
@@ -435,9 +440,10 @@ Flujo de una entrada:
 
 #### DAG-AUTOCOMPLETE-02 - Buscar al tocar una sugerencia
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX de busqueda. Prioridad: P2.
+- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: UX de busqueda. Prioridad: P2.
 - Problema: al tocar una sugerencia de DAG, el texto puede quedar solamente cargado en el buscador y exigir una segunda accion, en vez de iniciar la busqueda esperada.
 - Solucion propuesta: tratar el toque sobre una sugerencia como confirmacion: completar el campo, cerrar el teclado y ejecutar inmediatamente el mismo flujo seguro de busqueda que usa el boton o la tecla Buscar.
+- Resultado DEV 238: el toque reserva atomicamente una sola busqueda, cierra sugerencias/teclado y vuelve a ejecutar clasificacion local antes de consultar Brave; una segunda pulsacion mientras carga no duplica consumo.
 - Evidencia: solicitud del usuario del 2026-07-16.
 - Esfuerzo: S estimado. Riesgo: bajo; una ejecucion duplicada puede consumir dos consultas Brave o buscar una sugerencia distinta de la mostrada si el estado cambia entre pulsacion y envio.
 - Dependencias: `DAG-AUTOCOMPLETE-01`; buscador combinado; clasificacion local; debounce; contador Brave; teclado y estado por pestana.
@@ -453,10 +459,11 @@ Flujo de una entrada:
 
 #### DAG-CAPTCHA-01 - Compatibilidad segura con CAPTCHA
 
-- Estado: `Idea`; defecto observado, no aprobado todavia para diagnostico tecnico ni codigo. Tipo: bug de compatibilidad Web y seguridad. Prioridad: P1.
+- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: bug de compatibilidad Web y seguridad. Prioridad: P1.
 - Problema: DAG no muestra el CAPTCHA de la pagina de multas de CABA, por lo que el usuario no puede completar el tramite aunque la pagina principal sea accesible.
 - Solucion propuesta: incorporar un tratamiento acotado para desafios CAPTCHA utilizados por paginas permitidas, cargando solamente los recursos, scripts, iframes y comunicaciones indispensables del proveedor validado. El desafio y su resultado deben permanecer dentro de la navegacion protegida y no convertirse en una excepcion general para contenido externo.
-- Evidencia: prueba fisica informada por el usuario el 2026-07-16 en la pagina de multas de CABA; el CAPTCHA no aparece. No se conoce todavia la URL exacta, proveedor ni tipo de recurso bloqueado.
+- Resultado DEV 238: la inspeccion del tramite oficial identifico Google reCAPTCHA. DAG permite exclusivamente `https://www.google.com/recaptcha/*` o `https://www.recaptcha.net/recaptcha/*` como iframe dentro de `https://buenosaires.gob.ar/licenciasdeconducir/consulta-de-infracciones/`; todos los demas iframes siguen eliminados y las imagenes del desafio conservan la intercepcion/clasificacion local. Falta validar interaccion y vencimiento en el telefono.
+- Evidencia: prueba fisica informada por el usuario el 2026-07-16; la inspeccion posterior de la URL oficial confirmo un iframe Google reCAPTCHA que DAG eliminaba por su bloqueo general de iframes.
 - Esfuerzo: M estimado. Riesgo: alto; los CAPTCHAs suelen depender de scripts, iframes, cookies y dominios externos, y una habilitacion demasiado amplia podria crear una ruta de contenido no analizado, rastreo adicional o navegacion externa.
 - Dependencias: intercepcion de recursos WebView; politica de iframes, JavaScript, cookies y dominios secundarios; clasificacion de imagenes; navegacion y sesiones; listas dinamicas; proveedores reCAPTCHA, hCaptcha, Turnstile u otros a identificar.
 - Duplicados y relacion: no existe una entrada previa equivalente. Se relaciona con compatibilidad de recursos e imagenes DAG, pero se mantiene separado porque un CAPTCHA es un flujo interactivo externo y sensible, no una imagen comun.
@@ -468,7 +475,7 @@ Flujo de una entrada:
   - cookies o tokens del desafio tienen alcance y persistencia minimos y no se incorporan al historial ni a solicitudes Admin;
   - sitios bloqueados o inciertos no usan el soporte CAPTCHA para evitar su decision;
   - se prueban desafio correcto, vencido, recarga, error de red, modo claro/oscuro y regreso desde segundo plano.
-- Decisiones pendientes para la entrevista del ticket: URL exacta y paso del tramite; proveedor y modalidad del CAPTCHA; comportamiento visible actual; si ocurre en otros sitios; cookies necesarias; persistencia de sesion; proveedores admitidos y politica ante desafios visuales que el filtro considere riesgosos.
+- Validacion pendiente: comprobar en el telefono el checkbox, desafio visual cuando aparezca, vencimiento, recarga y regreso desde segundo plano. Otros proveedores o sitios requieren otro alcance explicito y no heredan esta excepcion.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
@@ -498,7 +505,23 @@ Flujo de una entrada:
 - Causa: Brave entregaba como maximo 10 resultados y DAG ocultaba los bloqueados, pero no existia evidencia para separar resultados ausentes en origen, rechazados por contrato o descartados por cada capa local.
 - Resultado: la Edge Function devuelve solamente cantidades agregadas de recibidos y rechazados; Android asigna cada candidato a lista de dominios, regla Admin, plataforma prohibida, clasificador local, incierto mostrado o permitido mostrado. Logcat contiene exclusivamente esos conteos.
 - Privacidad y costo: no se guardan ni registran consultas, URLs, dominios, titulos o descripciones. No cambia el cupo, los umbrales, la UI ni el consumo de una busqueda.
-- Aceptacion: una prueba controlada contabiliza exactamente 10 de 10 resultados una sola vez; tests DEV Usuario/Admin, ktlint y builds de ambas apps correctos. Paginacion y `Mas resultados` permanecen fuera de alcance porque cada pagina adicional consume otra consulta Brave.
+- Aceptacion: una prueba controlada contabiliza exactamente 10 de 10 resultados una sola vez; tests DEV Usuario/Admin, ktlint y builds de ambas apps correctos. La paginacion quedo luego implementada por separado en `DAG-RESULTS-PAGE-01` porque cada pagina adicional consume otra consulta Brave.
+
+#### DAG-RESULTS-PAGE-01 - Una pagina adicional con costo explicito
+
+- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Aprobado por el usuario el 2026-07-16 al pedir completar los pendientes DAG.
+- Causa: la busqueda inicial solicitaba diez resultados y no existia paginacion, aun cuando Brave podia informar otra pagina disponible.
+- Resultado: la Edge Function acepta solo pagina 0 o 1, usa el `offset` por pagina documentado por Brave y devuelve `has_more_results`. Android ofrece `Mas resultados · consume 1 busqueda` unicamente cuando Brave confirma disponibilidad, concatena y deduplica por URL y conserva como maximo una pagina adicional.
+- Costo y limites: la primera pagina consume una consulta Brave y tocar `Mas resultados` consume otra. El tope funcional es de veinte candidatos brutos por busqueda; no hay paginacion automatica ni tercera pagina.
+- Persistencia y privacidad: la consulta y la pagina activa sobreviven en la sesion cifrada de pestanas existente. No se agregan consultas, URLs, titulos ni contenido a diagnosticos remotos.
+- Validacion tecnica: tests de paginacion y acciones DAG, tests DEV Usuario/Admin, ktlint global, Android Lint, detekt y builds de ambas apps correctos. `dag-search` version 8 activa solo en Supabase DEV con verificacion JWT.
+
+#### DAG-UPDATE-01 - Actualizacion compartida con App Usuario
+
+- Estado: `Decision cerrada en DEV 238`; no requirio un mecanismo de instalacion nuevo.
+- Decision: DAG forma parte del mismo APK y paquete de App Usuario. La app puede comprobar el manifiesto DEV y descargar una actualizacion, pero en Android normal el instalador del sistema exige confirmacion de la persona para instalarla.
+- Limite explicito: no se promete actualizacion silenciosa. Una instalacion sin confirmacion requiere un dispositivo aprovisionado como Device Owner/Android Enterprise, acceso root o una tienda administrada con politica compatible.
+- Persistencia: la actualizacion debe ser in-place y conservar activacion, politica, historial cifrado, estado de protecciones y launcher DAG; no se desinstala ni se borran datos para actualizar.
 
 ### USER-GREETING-01 - Saludo personalizado en App Usuario
 
@@ -686,6 +709,7 @@ Flujo de una entrada:
 - Objetivo: mostrar en Super Web el consumo mensual de DAG casi en tiempo real, con usados, limite y restantes por comunidad y dispositivo, total general, costo Brave estimado y alertas al 80% y 100%.
 - Privacidad: no exponer consultas, URLs, resultados ni historial. Super Web consulta un agregado autorizado; la tabla de contadores permanece inaccesible para clientes comunes.
 - Implementacion: refresco seguro cada 10 segundos, cupo configurable por comunidad, proyeccion mensual y costo estimado luego del credito Brave global. El piloto comercial aprobado es USD 1 con 100 busquedas por dispositivo/mes.
+- Excepcion DEV temporal 2026-07-16: la licencia de `Yeshurun tora` quedo en 1.000 busquedas mensuales por dispositivo para continuar pruebas, sin reiniciar ni borrar consumo. Este cupo de producto no amplía el credito global de la cuenta Brave: cada pagina exitosa sigue contando como una solicitud facturable y los USD 5 mensuales gratuitos equivalen a 1.000 solicitudes totales de la cuenta al precio vigente.
 - Aceptacion tecnica: migracion DEV aplicada, Edge Function actualizada, RPCs Super Admin aisladas de `anon`, tabla sin lectura de clientes, builds Web exitosos y Super Web Sites version 3 publicada en modo privado. La prueba fisica completa de `DAG-BROWSER-01A` se cerro en DEV 208.
 
 ### Otros tickets de roadmap
