@@ -147,6 +147,7 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | DAG-ANALYSIS-UX-01 | En progreso | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Idea | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
 | DAG-REVIEW-STAGING-01 | En progreso | P1 | Analizar pagina completa antes de pedir revision por un resultado incierto | M | Medio |
+| USER-GREETING-01 | Idea | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
@@ -350,6 +351,18 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 - Duplicados y relacion: se relaciona con `WEB-CACHE-01`, que propone cache local acotada de reputacion sin URL ni historial. No se marca como duplicado hasta definir si la aprobacion aplica a dominio, URL exacta o decision administrativa persistida.
 - Criterios de aceptacion propuestos: una aprobacion vigente evita revisiones repetidas solo dentro de su alcance exacto; toda entrada tiene origen, momento y vencimiento; cambios de politica, revocacion, version incompatible o indicadores de riesgo invalidan la reutilizacion; al vencer se vuelve a analizar o revisar; no se guarda contenido, HTML ni consultas; el administrador puede conocer y revocar la aprobacion aplicable.
 - Decisiones pendientes para el ticket: duracion predeterminada y maxima; dominio, subdominio o URL exacta; quien puede aprobar; almacenamiento local o sincronizado; invalidaciones por cambio de contenido/modelo/politica; reapertura inmediata o analisis local abreviado.
+
+### USER-GREETING-01 - Saludo personalizado en App Usuario
+
+- Estado: `Idea`; no aprobado para codigo. Tipo: UX y personalizacion de App Usuario. Prioridad: P2.
+- Problema: el encabezado superior muestra un saludo generico y no identifica al usuario protegido que esta usando la aplicacion.
+- Solucion propuesta: reemplazar `Hola` por `Hola, {nombre}`, usando el nombre del usuario definido por el administrador.
+- Evidencia: solicitud del usuario el 2026-07-15.
+- Esfuerzo: S. Riesgo: bajo; deben contemplarse nombre ausente, sincronizacion tardia, longitud, caracteres especiales y privacidad en pantalla.
+- Dependencias: nombre del usuario protegido disponible en App Usuario; sincronizacion y estado local; encabezado de Home; accesibilidad y tamanos de fuente.
+- Duplicados y relacion: puede agruparse visualmente con `UI-POLISH-01`, pero se conserva como entrada separada por depender del dato remoto definido por Admin.
+- Criterios de aceptacion propuestos: el encabezado muestra el nombre correcto del usuario activo; los cambios realizados por el administrador se reflejan tras la sincronizacion prevista; existe un fallback simple si el nombre falta; nombres largos no rompen el layout; no se muestra el nombre de otro usuario o dispositivo.
+- Decisiones pendientes para el ticket: puntuacion y texto exactos; fallback; longitud maxima o truncado; momento de actualizacion; tratamiento de privacidad en capturas y pantalla bloqueada.
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 
