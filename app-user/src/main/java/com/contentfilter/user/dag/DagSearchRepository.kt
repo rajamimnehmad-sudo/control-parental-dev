@@ -14,12 +14,14 @@ class DagSearchRepository
             deviceId: String,
             query: String,
             language: String,
+            page: Int = 0,
         ): RemoteResult<DagRemoteSearchResponse> {
             val payload =
                 JSONObject()
                     .put("device_id", deviceId)
                     .put("query", query)
                     .put("language", language)
+                    .put("page", page)
             return when (val response = client.invokeFunctionForObject(FunctionName, payload)) {
                 is RemoteResult.Failure -> response
                 is RemoteResult.Success ->
@@ -37,6 +39,7 @@ class DagSearchRepository
                         val diagnostics = response.value.optJSONObject("diagnostics")
                         DagRemoteSearchResponse(
                             results = parsed,
+                            hasMoreResults = response.value.optBoolean("has_more_results", false),
                             braveReceived = diagnostics?.optInt("brave_received", parsed.size) ?: parsed.size,
                             serverRejected = diagnostics?.optInt("server_rejected", 0) ?: 0,
                         )
@@ -68,6 +71,7 @@ data class DagRemoteSearchResult(
 
 data class DagRemoteSearchResponse(
     val results: List<DagRemoteSearchResult>,
+    val hasMoreResults: Boolean,
     val braveReceived: Int,
     val serverRejected: Int,
 )

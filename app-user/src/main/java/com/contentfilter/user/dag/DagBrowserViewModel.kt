@@ -18,6 +18,7 @@ import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -56,6 +57,7 @@ class DagBrowserViewModel
         private var activePolicyVersion: Long = 0L
         private var approvalPollingJob: Job? = null
         private var suggestionJob: Job? = null
+        private val reviewSubmissionsInFlight = mutableSetOf<String>()
 
         init {
             viewModelScope.launch {
@@ -77,6 +79,15 @@ class DagBrowserViewModel
             viewModelScope.launch {
                 historyStore.observe().collect { entries ->
                     mutableState.update { it.copy(history = entries) }
+                }
+            }
+            viewModelScope.launch {
+                accessRequestRepository.observeRequests().collect { requests ->
+                    val reviews =
+                        requests
+                            .filter { it.requestType == AccessRequestType.DOMAIN_ACCESS }
+                            .sortedByDescending(AccessRequest::createdAtEpochMillis)
+                    mutableState.update { it.copy(reviewRequests = reviews) }
                 }
             }
         }
@@ -120,6 +131,7 @@ class DagBrowserViewModel
                     mutableState.update {
                         it.copy(
                             view = DagView.Start,
+                            loading = false,
                             message = "La búsqueda fue bloqueada por la protección DAG.",
                             results = emptyList(),
                             suggestions = emptyList(),
@@ -131,6 +143,7 @@ class DagBrowserViewModel
                     mutableState.update {
                         it.copy(
                             view = DagView.Start,
+                            loading = false,
                             message = "DAG no tiene suficiente certeza. Reformulá la búsqueda con más contexto.",
                             results = emptyList(),
                             suggestions = emptyList(),
@@ -142,7 +155,11 @@ class DagBrowserViewModel
             }
         }
 
-        private fun performSearch(query: String) {
+        private fun performSearch(
+            query: String,
+            page: Int = 0,
+            append: Boolean = false,
+        ) {
             viewModelScope.launch {
                 mutableState.update {
                     it.copy(
@@ -169,6 +186,7 @@ class DagBrowserViewModel
                             deviceId = activation.deviceId,
                             query = query,
                             language = query.dagLanguage(),
+                            page = page,
                         )
                 ) {
                     is RemoteResult.Failure -> {
@@ -231,20 +249,48 @@ class DagBrowserViewModel
                                         reason == DagSearchDecisionReason.LocalClassifierBlock
                                 }
                             }
-                        withContext(Dispatchers.IO) { historyStore.addSearch(query) }
-                        mutableState.update {
-                            it.copy(
+                        if (!append) {
+                            withContext(Dispatchers.IO) { historyStore.addSearch(query) }
+                        }
+                        mutableState.update { state ->
+                            val combined =
+                                if (append) {
+                                    (state.results + classified).distinctBy(DagSearchResult::url)
+                                } else {
+                                    classified
+                                }
+                            state.copy(
                                 address = query,
                                 loading = false,
                                 view = DagView.Results,
-                                results = classified,
+                                results = combined,
+                                searchQuery = query,
+                                searchPage = page,
+                                canLoadMoreResults = dagCanLoadMoreResults(page, response.value.hasMoreResults),
                                 suggestions = emptyList(),
-                                message = if (classified.isEmpty()) "DAG no encontró resultados que pueda mostrar." else "",
+                                message = if (combined.isEmpty()) "DAG no encontró resultados que pueda mostrar." else "",
                             )
                         }
                     }
                 }
             }
+        }
+
+        fun loadMoreResults() {
+            val state = mutableState.value
+            if (!state.dagEnabled || state.loading || !state.canLoadMoreResults || state.searchQuery.isBlank()) return
+            performSearch(state.searchQuery, page = state.searchPage + 1, append = true)
+        }
+
+        fun selectSuggestion(suggestion: String) {
+            val state = mutableState.value
+            if (state.loading || !state.dagEnabled) return
+            val accepted =
+                mutableState.compareAndSet(
+                    state,
+                    state.copy(address = suggestion, loading = true, message = "", suggestions = emptyList()),
+                )
+            if (accepted) search(suggestion)
         }
 
         fun openResult(result: DagSearchResult) {
@@ -427,39 +473,53 @@ class DagBrowserViewModel
 
         fun requestReview(candidate: DagReviewCandidate) {
             if (!mutableState.value.dagEnabled) return
+            val domain = candidate.domain.lowercase(Locale.ROOT).removePrefix("www.").removeSuffix(".")
+            if (domain.isBlank()) return
+            val alreadyPending = mutableState.value.reviewRequests.any { it.isPendingDagReviewFor(domain) }
+            if (alreadyPending || !reviewSubmissionsInFlight.add(domain)) {
+                mutableState.update { it.copy(message = "Ya hay una solicitud pendiente para $domain.") }
+                return
+            }
             viewModelScope.launch {
-                val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
-                if (activation == null) {
-                    mutableState.update { it.copy(message = "No se pudo identificar el dispositivo.") }
-                    return@launch
+                try {
+                    val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
+                    if (activation == null) {
+                        mutableState.update { it.copy(message = "No se pudo identificar el dispositivo.") }
+                        return@launch
+                    }
+                    val request =
+                        AccessRequest(
+                            id = UUID.randomUUID().toString(),
+                            requestType = AccessRequestType.DOMAIN_ACCESS,
+                            targetType = PolicyTargetType.Domain,
+                            target = domain,
+                            targetPackageName = null,
+                            targetDomain = domain,
+                            reason =
+                                "DAG · ${candidate.title.take(100)} · ${candidate.category.take(40)} · " +
+                                    candidate.modelVersion,
+                            requestedMinutes = null,
+                            status = RequestStatus.PendingLocal,
+                            createdAtEpochMillis = System.currentTimeMillis(),
+                            expiresAtEpochMillis = null,
+                            deviceId = activation.deviceId,
+                        )
+                    accessRequestRepository.saveRequest(request)
+                    syncScheduler.requestSync()
+                    withContext(Dispatchers.IO) { runCatching { syncEngine.syncOnce() } }
+                    mutableState.update {
+                        it.copy(
+                            reviewCandidate = null,
+                            message = "Solicitud enviada y pendiente de revisión.",
+                        )
+                    }
+                    waitForApproval(candidate.copy(domain = domain), activation.deviceId)
+                } catch (exception: Exception) {
+                    if (exception is CancellationException) throw exception
+                    mutableState.update { it.copy(message = "No se pudo enviar la solicitud. Intentá nuevamente.") }
+                } finally {
+                    reviewSubmissionsInFlight.remove(domain)
                 }
-                val request =
-                    AccessRequest(
-                        id = UUID.randomUUID().toString(),
-                        requestType = AccessRequestType.DOMAIN_ACCESS,
-                        targetType = PolicyTargetType.Domain,
-                        target = candidate.domain,
-                        targetPackageName = null,
-                        targetDomain = candidate.domain,
-                        reason =
-                            "DAG · ${candidate.title.take(100)} · ${candidate.category.take(40)} · " +
-                                candidate.modelVersion,
-                        requestedMinutes = null,
-                        status = RequestStatus.PendingLocal,
-                        createdAtEpochMillis = System.currentTimeMillis(),
-                        expiresAtEpochMillis = null,
-                        deviceId = activation.deviceId,
-                    )
-                accessRequestRepository.saveRequest(request)
-                syncScheduler.requestSync()
-                withContext(Dispatchers.IO) { runCatching { syncEngine.syncOnce() } }
-                mutableState.update {
-                    it.copy(
-                        reviewCandidate = null,
-                        message = "Solicitud enviada. DAG abrirá el sitio cuando el administrador lo apruebe.",
-                    )
-                }
-                waitForApproval(candidate, activation.deviceId)
             }
         }
 
@@ -496,6 +556,18 @@ class DagBrowserViewModel
             }
         }
 
+        fun showReviewRequests() {
+            if (mutableState.value.dagEnabled) {
+                mutableState.update { it.copy(view = DagView.Reviews, message = "", suggestions = emptyList()) }
+            }
+        }
+
+        fun openApprovedReview(request: AccessRequest) {
+            if (request.status != RequestStatus.Approved || request.requestType != AccessRequestType.DOMAIN_ACCESS) return
+            val domain = request.targetDomain ?: request.target
+            requestNavigation("https://$domain", domain)
+        }
+
         fun clearPageApprovals() {
             viewModelScope.launch(Dispatchers.IO) { historyStore.clearPageApprovals() }
             mutableState.update { it.copy(message = "Se borraron las decisiones rápidas guardadas.") }
@@ -529,6 +601,9 @@ class DagBrowserViewModel
                     view = it.view,
                     pageStatus = it.pageStatus,
                     results = it.results,
+                    searchQuery = it.searchQuery,
+                    searchPage = it.searchPage,
+                    canLoadMoreResults = it.canLoadMoreResults,
                     requestedUrl = it.requestedUrl,
                     message = it.message,
                     reviewCandidate = it.reviewCandidate,
@@ -542,6 +617,9 @@ class DagBrowserViewModel
                     view = tab.view,
                     pageStatus = if (tab.view == DagView.Browser) DagPageStatus.Loading else tab.pageStatus,
                     results = tab.results,
+                    searchQuery = tab.searchQuery,
+                    searchPage = tab.searchPage,
+                    canLoadMoreResults = tab.canLoadMoreResults,
                     requestedUrl = tab.requestedUrl,
                     navigationRevision = it.navigationRevision + 1,
                     loading = false,
@@ -559,6 +637,9 @@ class DagBrowserViewModel
                     view = DagView.Start,
                     pageStatus = DagPageStatus.Idle,
                     results = emptyList(),
+                    searchQuery = "",
+                    searchPage = 0,
+                    canLoadMoreResults = false,
                     requestedUrl = null,
                     navigationRevision = it.navigationRevision + 1,
                     loading = false,
@@ -684,6 +765,18 @@ class DagBrowserViewModel
         }
     }
 
+internal fun dagCanLoadMoreResults(
+    page: Int,
+    providerHasMoreResults: Boolean,
+): Boolean = page == 0 && providerHasMoreResults
+
+internal fun AccessRequest.isPendingDagReviewFor(domain: String): Boolean {
+    val requestDomain = (targetDomain ?: target).lowercase(Locale.ROOT).removePrefix("www.").removeSuffix(".")
+    return requestType == AccessRequestType.DOMAIN_ACCESS &&
+        requestDomain == domain &&
+        (status == RequestStatus.PendingLocal || status == RequestStatus.PendingRemote)
+}
+
 private fun List<PolicyRule>.hasAllowRule(domain: String): Boolean =
     asSequence()
         .filter { it.enabled && it.scope == RuleScope.Domain && it.action == RuleAction.Allow }
@@ -700,6 +793,9 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 view = DagView.Start,
                 pageStatus = DagPageStatus.Idle,
                 results = emptyList(),
+                searchQuery = "",
+                searchPage = 0,
+                canLoadMoreResults = false,
                 suggestions = emptyList(),
                 requestedUrl = null,
                 loading = false,
@@ -715,6 +811,9 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 view = DagView.Start,
                 pageStatus = DagPageStatus.Idle,
                 results = emptyList(),
+                searchQuery = "",
+                searchPage = 0,
+                canLoadMoreResults = false,
                 suggestions = emptyList(),
                 requestedUrl = null,
                 loading = false,
@@ -729,6 +828,9 @@ internal fun DagBrowserUiState.toDagStart(): DagBrowserUiState =
         view = DagView.Start,
         pageStatus = DagPageStatus.Idle,
         results = emptyList(),
+        searchQuery = "",
+        searchPage = 0,
+        canLoadMoreResults = false,
         suggestions = emptyList(),
         requestedUrl = null,
         navigationRevision = navigationRevision + 1,

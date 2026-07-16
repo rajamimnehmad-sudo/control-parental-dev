@@ -4,6 +4,7 @@ type DagSearchPayload = {
   device_id?: string;
   query?: string;
   language?: string;
+  page?: number;
 };
 
 type BraveWebResult = {
@@ -21,7 +22,8 @@ Deno.serve(async (request) => {
   const deviceId = payload.device_id?.trim() ?? "";
   const query = payload.query?.trim() ?? "";
   const language = supportedLanguage(payload.language);
-  if (!isUuid(deviceId) || query.length < 2 || query.length > 400 || wordCount(query) > 50) {
+  const page = Number.isInteger(payload.page) ? Number(payload.page) : 0;
+  if (!isUuid(deviceId) || query.length < 2 || query.length > 400 || wordCount(query) > 50 || page < 0 || page > 1) {
     return json({ error: "La búsqueda no es válida." }, 400);
   }
 
@@ -53,6 +55,7 @@ Deno.serve(async (request) => {
   const endpoint = new URL("https://api.search.brave.com/res/v1/web/search");
   endpoint.searchParams.set("q", query);
   endpoint.searchParams.set("count", "10");
+  endpoint.searchParams.set("offset", String(page));
   endpoint.searchParams.set("country", "AR");
   endpoint.searchParams.set("search_lang", language);
   endpoint.searchParams.set("ui_lang", language === "he" ? "he-IL" : language === "en" ? "en-US" : "es-AR");
@@ -84,6 +87,7 @@ Deno.serve(async (request) => {
     .slice(0, 10);
   return json({
     results,
+    has_more_results: body?.query?.more_results_available === true,
     diagnostics: {
       brave_received: remoteResults.length,
       server_rejected: remoteResults.length - results.length,

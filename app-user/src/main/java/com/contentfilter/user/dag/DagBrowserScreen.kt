@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
@@ -88,6 +89,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -107,12 +109,15 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
+import com.contentfilter.core.domain.model.AccessRequest
+import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.ui.PremiumFishMascot
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.core.ui.ProductVisualPage
 import kotlinx.coroutines.delay
 import org.json.JSONArray
+import java.net.URI
 import java.text.DateFormat
 import java.util.Date
 import java.util.UUID
@@ -156,6 +161,7 @@ private fun DagBrowserContent(
     onThemePreferenceChanged: (DagThemePreference) -> Unit,
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val context = LocalContext.current
     val focusManager = LocalFocusManager.current
     val keyboardController = LocalSoftwareKeyboardController.current
     LaunchedEffect(state.view, state.loading) {
@@ -329,6 +335,13 @@ private fun DagBrowserContent(
                                 },
                             )
                             DropdownMenuItem(
+                                text = { Text("Pendientes de revisión") },
+                                onClick = {
+                                    menuExpanded = false
+                                    viewModel.showReviewRequests()
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Borrar caché de navegación") },
                                 onClick = {
                                     menuExpanded = false
@@ -485,6 +498,21 @@ private fun DagBrowserContent(
                                 },
                             )
                             DropdownMenuItem(
+                                text = { Text("Pendientes de revisión") },
+                                onClick = {
+                                    menuExpanded = false
+                                    viewModel.showReviewRequests()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Compartir enlace") },
+                                enabled = state.view == DagView.Browser && state.pageStatus == DagPageStatus.Visible,
+                                onClick = {
+                                    menuExpanded = false
+                                    state.requestedUrl?.let { shareDagUrl(context, it) }
+                                },
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Borrar caché de navegación") },
                                 onClick = {
                                     menuExpanded = false
@@ -510,7 +538,7 @@ private fun DagBrowserContent(
                 }
                 HorizontalDivider()
                 if (addressFocused && state.suggestions.isNotEmpty() && !analyzing) {
-                    DagSearchSuggestions(state.suggestions, viewModel::onAddressChanged)
+                    DagSearchSuggestions(state.suggestions, viewModel::selectSuggestion)
                 }
             }
 
@@ -539,15 +567,28 @@ private fun DagBrowserContent(
                         suggestions = state.suggestions,
                         analyzing = analyzing,
                         onAddressChanged = viewModel::onAddressChanged,
+                        onSuggestionSelected = viewModel::selectSuggestion,
                         onSubmit = viewModel::submitAddress,
                     )
-                DagView.Results -> DagResultsContent(state.results, viewModel::openResult)
+                DagView.Results ->
+                    DagResultsContent(
+                        results = state.results,
+                        canLoadMore = state.canLoadMoreResults,
+                        loading = state.loading,
+                        onOpen = viewModel::openResult,
+                        onLoadMore = viewModel::loadMoreResults,
+                    )
                 DagView.History ->
                     DagHistoryContent(
                         history = state.history,
                         onOpen = viewModel::openHistory,
                         onDelete = viewModel::deleteHistory,
                         onClear = viewModel::clearHistory,
+                    )
+                DagView.Reviews ->
+                    DagReviewRequestsContent(
+                        requests = state.reviewRequests,
+                        onOpenApproved = viewModel::openApprovedReview,
                     )
                 DagView.Browser ->
                     DagWebContent(
@@ -650,17 +691,26 @@ private fun DagBrowserTheme(
 ) {
     val dark = dagUsesDarkTheme(preference, isSystemInDarkTheme())
     val view = LocalView.current
+    val window = view.context.findActivity()?.window
+    val originalBars = remember(window) { window?.let { it.statusBarColor to it.navigationBarColor } }
+    val barColor = if (dark) DagDarkScheme.background.toArgb() else DagLightScheme.background.toArgb()
     SideEffect {
-        view.context.findActivity()?.window?.let { window ->
+        window?.let { window ->
+            window.statusBarColor = barColor
+            window.navigationBarColor = barColor
             WindowCompat.getInsetsController(window, view).apply {
                 isAppearanceLightStatusBars = !dark
                 isAppearanceLightNavigationBars = !dark
             }
         }
     }
-    DisposableEffect(view) {
+    DisposableEffect(view, window, originalBars) {
         onDispose {
-            view.context.findActivity()?.window?.let { window ->
+            window?.let { window ->
+                originalBars?.let { (statusBarColor, navigationBarColor) ->
+                    window.statusBarColor = statusBarColor
+                    window.navigationBarColor = navigationBarColor
+                }
                 WindowCompat.getInsetsController(window, view).apply {
                     isAppearanceLightStatusBars = true
                     isAppearanceLightNavigationBars = true
@@ -675,6 +725,20 @@ private fun DagBrowserTheme(
         content = content,
     )
 }
+
+private fun shareDagUrl(
+    context: Context,
+    url: String,
+) {
+    val safeUrl = dagShareableUrl(url) ?: return
+    val intent = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, safeUrl)
+    context.startActivity(Intent.createChooser(intent, "Compartir enlace"))
+}
+
+internal fun dagShareableUrl(url: String): String? =
+    runCatching {
+        URI(url).takeIf { it.scheme.equals("https", ignoreCase = true) && !it.host.isNullOrBlank() }?.toString()
+    }.getOrNull()
 
 private fun Context.findActivity(): Activity? {
     var current: Context? = this
@@ -927,6 +991,7 @@ private fun DagTabSwitcher(
 private const val TabPreviewWidth = 240
 private const val TabPreviewHeight = 360
 private const val MaximumTabs = 8
+private const val MaxVisibleReviewRequests = 50
 private const val TabPersistenceDebounceMillis = 500L
 
 private fun DagTabSnapshot.tabLabel(position: Int): String =
@@ -934,6 +999,7 @@ private fun DagTabSnapshot.tabLabel(position: Int): String =
         DagView.Browser -> DagContentClassifier.domainFrom(requestedUrl.orEmpty()).ifBlank { "Pestaña $position" }
         DagView.Results -> address.ifBlank { "Resultados" }
         DagView.History -> "Historial"
+        DagView.Reviews -> "Revisiones"
         DagView.Start -> "Nueva pestaña"
     }
 
@@ -944,6 +1010,7 @@ private fun DagStartContent(
     suggestions: List<String>,
     analyzing: Boolean,
     onAddressChanged: (String) -> Unit,
+    onSuggestionSelected: (String) -> Unit,
     onSubmit: () -> Unit,
 ) {
     val keyboardVisible = WindowInsets.isImeVisible
@@ -1003,7 +1070,7 @@ private fun DagStartContent(
             )
         }
         if (suggestions.isNotEmpty() && !analyzing) {
-            DagSearchSuggestions(suggestions, onAddressChanged)
+            DagSearchSuggestions(suggestions, onSuggestionSelected)
         }
         Spacer(Modifier.height(12.dp))
         Text(
@@ -1040,7 +1107,10 @@ private fun DagSearchSuggestions(
 @Composable
 private fun DagResultsContent(
     results: List<DagSearchResult>,
+    canLoadMore: Boolean,
+    loading: Boolean,
     onOpen: (DagSearchResult) -> Unit,
+    onLoadMore: () -> Unit,
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         items(results, key = { it.url }) { result ->
@@ -1084,8 +1154,82 @@ private fun DagResultsContent(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
         }
+        if (canLoadMore) {
+            item(key = "more-results") {
+                TextButton(
+                    onClick = onLoadMore,
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth().padding(12.dp),
+                ) {
+                    Text(if (loading) "Buscando…" else "Más resultados · consume 1 búsqueda")
+                }
+            }
+        }
     }
 }
+
+@Composable
+private fun DagReviewRequestsContent(
+    requests: List<AccessRequest>,
+    onOpenApproved: (AccessRequest) -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+            Text("Revisiones de DAG", style = MaterialTheme.typography.titleLarge)
+            Text("Estados guardados en este teléfono", style = MaterialTheme.typography.bodySmall)
+        }
+        if (requests.isEmpty()) {
+            Text(
+                "Todavía no pediste revisiones de sitios.",
+                modifier = Modifier.padding(16.dp),
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        } else {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
+                items(requests.take(MaxVisibleReviewRequests), key = AccessRequest::id) { request ->
+                    val approved = request.status == RequestStatus.Approved
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = approved) { onOpenApproved(request) }
+                                .padding(horizontal = 16.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(3.dp),
+                    ) {
+                        Text(
+                            request.targetDomain ?: request.target,
+                            style = MaterialTheme.typography.titleMedium,
+                            color = if (approved) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        )
+                        Text(dagReviewStatusLabel(request.status), style = MaterialTheme.typography.labelLarge)
+                        Text(
+                            DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
+                                .format(Date(request.createdAtEpochMillis)),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        if (approved) {
+                            Text(
+                                "Tocá para abrir el sitio con la protección de DAG",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        }
+                    }
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+                }
+            }
+        }
+    }
+}
+
+internal fun dagReviewStatusLabel(status: RequestStatus): String =
+    when (status) {
+        RequestStatus.PendingLocal -> "Pendiente de envío"
+        RequestStatus.PendingRemote -> "Pendiente de revisión"
+        RequestStatus.Approved -> "Aprobada"
+        RequestStatus.Rejected -> "Rechazada"
+        RequestStatus.Expired -> "Expirada"
+    }
 
 @Composable
 private fun DagHistoryContent(
@@ -1566,10 +1710,37 @@ private fun WebView.sanitizeAndExtractVisibleText(
               }
             }
           }
+          function dagAllowedCaptchaFrame(frame) {
+            if (!frame || !window.location) return false;
+            var pageHost = (window.location.hostname || '').toLowerCase();
+            var pagePath = window.location.pathname || '';
+            if (pageHost !== 'buenosaires.gob.ar' || pagePath !== '/licenciasdeconducir/consulta-de-infracciones/') {
+              return false;
+            }
+            try {
+              var source = new URL(frame.getAttribute('src') || '', document.baseURI);
+              var provider = source.hostname.toLowerCase();
+              return source.protocol === 'https:' &&
+                (provider === 'www.google.com' || provider === 'www.recaptcha.net') &&
+                source.pathname.indexOf('/recaptcha/') === 0;
+            } catch (_) {
+              return false;
+            }
+          }
           function dagSecureNode(node) {
             if (!node || node.nodeType !== 1) return;
             var tag = node.tagName ? node.tagName.toLowerCase() : '';
-            if (tag === 'video' || tag === 'audio' || tag === 'canvas' || tag === 'iframe') {
+            if (tag === 'iframe') {
+              if (dagAllowedCaptchaFrame(node)) {
+                if (node.getAttribute('data-dag-safe-captcha') !== 'true') {
+                  node.setAttribute('data-dag-safe-captcha', 'true');
+                }
+                return;
+              }
+              node.remove();
+              return;
+            }
+            if (tag === 'video' || tag === 'audio' || tag === 'canvas') {
               node.remove();
               return;
             }
@@ -1590,7 +1761,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               if (node.getAttribute('src') !== source) node.src = source;
             }
             dagSecureBackground(node);
-            node.querySelectorAll && node.querySelectorAll('video,audio,video source,audio source,canvas,iframe').forEach(function(child) { child.remove(); });
+            node.querySelectorAll && node.querySelectorAll('video,audio,video source,audio source,canvas,iframe').forEach(dagSecureNode);
             node.querySelectorAll && node.querySelectorAll('img').forEach(function(image) {
               dagSecureNode(image);
             });
@@ -1601,7 +1772,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
           if (!style) {
             style = document.createElement('style');
             style.id = 'dag-safe-style';
-            style.textContent = 'video,audio,canvas,iframe { display:none !important; } img[data-dag-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; transform: scale(1.14) !important; }';
+            style.textContent = 'video,audio,canvas,iframe:not([data-dag-safe-captcha="true"]) { display:none !important; } img[data-dag-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; transform: scale(1.14) !important; }';
             document.documentElement.appendChild(style);
           }
           if (!window.__dagSafeObserver) {

@@ -327,6 +327,9 @@ class DagHistoryStore
                 JSONObject()
                     .put("address", snapshot.address.take(MaxValueCharacters))
                     .put("view", snapshot.view.name)
+                    .put("search_query", snapshot.searchQuery.take(MaxValueCharacters))
+                    .put("search_page", snapshot.searchPage)
+                    .put("can_load_more", snapshot.canLoadMoreResults)
                     .put("requested_url", snapshot.requestedUrl?.take(MaxValueCharacters) ?: JSONObject.NULL)
                     .put(
                         "results",
@@ -382,6 +385,9 @@ class DagHistoryStore
                     view = safeView,
                     pageStatus = if (safeView == DagView.Browser) DagPageStatus.Loading else DagPageStatus.Idle,
                     results = if (safeView == DagView.Results || safeView == DagView.Browser) results else emptyList(),
+                    searchQuery = json.optString("search_query"),
+                    searchPage = json.optInt("search_page", 0),
+                    canLoadMoreResults = json.optBoolean("can_load_more", false),
                     requestedUrl = requestedUrl.takeIf { safeView == DagView.Browser },
                 )
             }

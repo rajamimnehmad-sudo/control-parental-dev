@@ -1,5 +1,7 @@
 package com.contentfilter.user.dag
 
+import com.contentfilter.core.domain.model.AccessRequest
+
 enum class DagClassification {
     Allowed,
     Blocked,
@@ -57,6 +59,7 @@ enum class DagView {
     Results,
     Browser,
     History,
+    Reviews,
 }
 
 enum class DagPageStatus {
@@ -74,8 +77,12 @@ data class DagBrowserUiState(
     val view: DagView = DagView.Start,
     val pageStatus: DagPageStatus = DagPageStatus.Idle,
     val results: List<DagSearchResult> = emptyList(),
+    val searchQuery: String = "",
+    val searchPage: Int = 0,
+    val canLoadMoreResults: Boolean = false,
     val suggestions: List<String> = emptyList(),
     val history: List<DagHistoryEntry> = emptyList(),
+    val reviewRequests: List<AccessRequest> = emptyList(),
     val requestedUrl: String? = null,
     val navigationRevision: Long = 0L,
     val loading: Boolean = false,
@@ -88,6 +95,9 @@ data class DagTabSnapshot(
     val view: DagView = DagView.Start,
     val pageStatus: DagPageStatus = DagPageStatus.Idle,
     val results: List<DagSearchResult> = emptyList(),
+    val searchQuery: String = "",
+    val searchPage: Int = 0,
+    val canLoadMoreResults: Boolean = false,
     val requestedUrl: String? = null,
     val message: String = "",
     val reviewCandidate: DagReviewCandidate? = null,
