@@ -130,6 +130,16 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Migracion `20260716155020_admin_token_audit_and_revocation.sql` aplicada exclusivamente en Supabase DEV. Se verificaron trigger, `SECURITY DEFINER`, revocacion a `PUBLIC/anon` y acceso autenticado solo para la RPC de Super Admin.
 - Validacion: Superweb paso ESLint de `src`, TypeScript y build optimizado. No se genero ni revoco ningun token real durante la prueba y no hubo publicacion intermedia.
 
+## Implementacion 2026-07-16 - candidato DEV 241 ALERT-ROUTING-01 / SUPERADMIN-ALERTS-01 / ADMIN-ALERTS-UX-01
+
+- La politica queda diferenciada por resultado: `tamper_attempt` representa un intento que la barrera bloqueo y se conserva solo en la bandeja Super Admin; `web_disabled`, `apps_disabled`, `admin_disabled` e `incomplete` representan degradacion efectiva y permanecen visibles tanto para Super Admin como para App Admin. Los pedidos de mantenimiento tambien llegan a Admin.
+- La Edge Function DEV `send-protection-alert` version 13 deja de enviar FCM a Admin para intentos bloqueados, pero primero crea/deduplica el evento para Super Admin. Las desactivaciones confirmadas conservan push urgente y se abren directamente en la nueva bandeja Admin.
+- Superweb agrega `/alerts`, con hasta 200 eventos recientes, comunidad, dispositivo, fecha y distincion `Bloqueado/Confirmado`. La RPC `super_admin_list_protection_alerts` exige rol Super Admin y no expone consultas, URLs ni historial.
+- App Admin incorpora campanita con contador de eventos disponibles, tarjeta de acceso separada de Solicitudes, bandeja con refresco manual y mensaje explicito de alcance. Su RLS excluye `tamper_attempt` aunque exista una sesion anterior o se consulte REST directamente con token Admin.
+- La deduplicacion existente de cinco minutos por dispositivo/tipo se conserva, por lo que watchdog, reintentos y FCM no crean otro incidente dentro de esa ventana. No se borro ni modifico ningun evento historico.
+- Migracion `20260716155413_protection_alert_routing_and_super_admin.sql` aplicada solo en Supabase DEV. Se verificaron la policy filtrada y Edge Function activa con SHA-256 `49734e6bc61cd981e8923bb2fcf94bfc4095f09a940c8911f2707104cc8e824b`.
+- Validacion local: tests/compilacion Admin, formato de Admin y red, ESLint de `src`, TypeScript y build Superweb correctos. Falta prueba fisica de los dos recorridos y publicacion final de APK/Superweb.
+
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
 
 - Un dispositivo Usuario con control de proteccion nunca configurado se arma automaticamente solo cuando App Usuario comprueba simultaneamente el tunel VPN real, Accessibility habilitado, Device Admin activo y ausencia de una desactivacion intencional de la VPN.

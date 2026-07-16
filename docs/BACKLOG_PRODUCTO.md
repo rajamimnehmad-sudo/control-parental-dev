@@ -145,9 +145,9 @@ Flujo de una entrada:
 | UI-POLISH-01 | Idea | P2 | Consistencia visual y accesibilidad de ambas apps | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | SUPERADMIN-MSG-01 | Idea | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
-| SUPERADMIN-ALERTS-01 | Idea | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
-| ADMIN-ALERTS-UX-01 | Idea | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
-| ALERT-ROUTING-01 | Idea | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
+| SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
+| ADMIN-ALERTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
+| ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Idea | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Idea | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
 | BARRIER-LAUNCHER-01 | Idea | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
@@ -244,7 +244,7 @@ Flujo de una entrada:
 
 ### ADMIN-ALERTS-UX-01 - Campanita de alertas de seguridad en App Admin
 
-- Estado: `Idea`; las preferencias se definiran cuando el usuario pida preparar el ticket.
+- Estado: `Implementado candidato DEV 241; pendiente prueba fisica`. Aprobado por el usuario al ordenar ejecutar todos los tickets el 2026-07-16.
 - Tipo: seguridad, notificaciones y UX de App Admin.
 - Prioridad: P2.
 - Problema: las alertas de proteccion no tienen una bandeja visual dedicada y persistente dentro de App Admin.
@@ -584,7 +584,7 @@ Flujo de una entrada:
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 
-- Estado: `Idea`; las preferencias se definiran al aprobar un futuro ticket que toque Super Admin.
+- Estado: `Implementado candidato DEV 241; pendiente prueba funcional`. Aprobado por el usuario al ordenar ejecutar todos los tickets el 2026-07-16.
 - Tipo: seguridad, alertas y UX de Super Admin.
 - Prioridad: P2.
 - Problema: los intentos de borrar la App Usuario o modificar Ajustes protegidos deben poder advertirse tambien desde Super Admin, ademas de los canales ya implementados.
@@ -603,7 +603,7 @@ Flujo de una entrada:
 
 ### ALERT-ROUTING-01 - Enrutamiento por intento o desactivacion efectiva
 
-- Estado: `Idea`; no aprobado para codigo ni cambios de notificaciones.
+- Estado: `Implementado backend DEV y candidato Android DEV 241; pendiente prueba fisica`. Aprobado por el usuario al ordenar ejecutar todos los tickets el 2026-07-16.
 - Tipo: seguridad, alertas y politica de destinatarios.
 - Prioridad: P1.
 - Problema: intentos bloqueados y desactivaciones efectivas tienen distinta gravedad y no deberian necesariamente notificarse a los mismos destinatarios.

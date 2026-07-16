@@ -7,11 +7,19 @@ import type {
   DagUsageDevice,
   DagUsageSummary,
   ProtectedUser,
+  ProtectionAlertEvent,
 } from "@/lib/types";
 
 function raise(error: unknown): never {
   const message = error instanceof Error ? error.message : "No se pudo completar la operacion";
   throw new Error(message);
+}
+
+export async function listProtectionAlerts() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("super_admin_list_protection_alerts", { max_rows: 200 });
+  if (error) raise(error);
+  return (data ?? []) as ProtectionAlertEvent[];
 }
 
 export async function listCommunities() {

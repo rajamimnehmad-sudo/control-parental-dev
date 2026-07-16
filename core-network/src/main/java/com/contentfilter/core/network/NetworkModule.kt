@@ -12,6 +12,7 @@ import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteLicenseRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
+import com.contentfilter.core.network.remote.RemoteProtectionAlertRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.SupabaseProtectionControlRepository
 import com.contentfilter.core.network.remote.SupabasePushNotificationRepository
@@ -21,6 +22,7 @@ import com.contentfilter.core.network.remote.SupabaseRemoteInstalledAppRepositor
 import com.contentfilter.core.network.remote.SupabaseRemoteLicenseRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteLimitRepository
 import com.contentfilter.core.network.remote.SupabaseRemotePolicyRepository
+import com.contentfilter.core.network.remote.SupabaseRemoteProtectionAlertRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteRequestRepository
 import dagger.Binds
 import dagger.Module
@@ -41,6 +43,11 @@ abstract class NetworkModule {
 
     @Binds
     abstract fun bindRemotePolicyRepository(repository: SupabaseRemotePolicyRepository): RemotePolicyRepository
+
+    @Binds
+    abstract fun bindRemoteProtectionAlertRepository(
+        repository: SupabaseRemoteProtectionAlertRepository,
+    ): RemoteProtectionAlertRepository
 
     @Binds
     abstract fun bindRemoteLimitRepository(repository: SupabaseRemoteLimitRepository): RemoteLimitRepository

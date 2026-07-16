@@ -91,3 +91,15 @@ export type DagUsageDevice = {
   last_usage_at: string | null;
   last_seen_at: string | null;
 };
+
+export type ProtectionAlertEvent = {
+  event_id: string;
+  community_id: string;
+  community_name: string;
+  device_id: string;
+  device_name: string;
+  alert_type: string;
+  title: string;
+  body: string;
+  created_at: string;
+};

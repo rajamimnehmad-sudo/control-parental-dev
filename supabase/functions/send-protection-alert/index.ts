@@ -59,6 +59,12 @@ Deno.serve(async (request) => {
     return json({ event_id: event.event_id, sent: 0, failed: 0, deduplicated: true });
   }
 
+  // Blocked attempts remain in the Super Admin audit feed. Only confirmed
+  // degradation or explicit maintenance requests are routed to App Admin.
+  if (payload.alert_type === "tamper_attempt") {
+    return json({ event_id: event.event_id, sent: 0, failed: 0, super_admin_only: true });
+  }
+
   const serviceClient = createClient(supabaseUrl, serviceRoleKey);
   const { data: tokens, error: tokenError } = await serviceClient
     .from("device_push_tokens")

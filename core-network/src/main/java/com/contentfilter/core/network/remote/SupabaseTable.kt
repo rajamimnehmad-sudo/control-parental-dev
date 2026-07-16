@@ -13,4 +13,5 @@ enum class SupabaseTable(val tableName: String) {
     ExtraTimeGrants("extra_time_grants"),
     DevicePushTokens("device_push_tokens"),
     DeviceProtectionControls("device_protection_controls"),
+    ProtectionAlertEvents("protection_alert_events"),
 }

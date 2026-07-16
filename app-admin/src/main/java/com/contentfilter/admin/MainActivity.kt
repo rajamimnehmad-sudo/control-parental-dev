@@ -87,6 +87,8 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.admin.alerts.AdminAlertsRoute
+import com.contentfilter.admin.alerts.AdminAlertsViewModel
 import com.contentfilter.admin.auth.AdminAuthRoute
 import com.contentfilter.admin.dashboard.DashboardRoute
 import com.contentfilter.admin.push.AdminProtectionAlertPayload
@@ -176,8 +178,8 @@ private fun AdminAppRoot(
     }
     LaunchedEffect(rootState.activated, protectionAlertPayload?.eventId) {
         if (rootState.activated && protectionAlertPayload != null) {
-            tab = AdminTab.Community
-            section = AdminSection.Apps
+            tab = AdminTab.Home
+            section = AdminSection.Alerts
         }
     }
     LaunchedEffect(rootState.activated) {
@@ -244,6 +246,14 @@ private fun AdminAppRoot(
                     ) {
                         AdminRequestsRoute(refreshKey = requestsRefreshKey)
                     }
+                AdminSection.Alerts ->
+                    SectionContainer(
+                        title = "Alertas de seguridad",
+                        subtitle = "Desactivaciones confirmadas y mantenimiento",
+                        onBack = { section = null },
+                    ) {
+                        AdminAlertsRoute()
+                    }
                 AdminSection.Updates ->
                     SectionContainer(
                         title = "Actualizaciones",
@@ -261,6 +271,7 @@ private fun AdminAppRoot(
                                     requestsRefreshKey += 1
                                     section = AdminSection.Requests
                                 },
+                                onAlerts = { section = AdminSection.Alerts },
                             )
                         AdminTab.Community ->
                             CommunityTab(
@@ -321,11 +332,38 @@ private fun AdminAppRoot(
 private fun HomeTab(
     onManageUsers: () -> Unit,
     onRequests: () -> Unit,
+    onAlerts: () -> Unit,
 ) {
+    val alertsViewModel: AdminAlertsViewModel = hiltViewModel()
+    val alertsState by alertsViewModel.uiState.collectAsStateWithLifecycle()
     VisualPage(
         title = "Hola",
         subtitle = "Tu panel de administración está listo",
     ) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            Box {
+                IconButton(onClick = onAlerts) {
+                    Icon(Icons.Filled.Notifications, contentDescription = "Abrir alertas de seguridad")
+                }
+                if (alertsState.alerts.isNotEmpty()) {
+                    Box(
+                        modifier =
+                            Modifier
+                                .align(Alignment.TopEnd)
+                                .size(20.dp)
+                                .clip(CircleShape)
+                                .background(MaterialTheme.colorScheme.error),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            alertsState.alerts.size.coerceAtMost(99).toString(),
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White,
+                        )
+                    }
+                }
+            }
+        }
         AdminHeroCard()
         FeatureTile(
             icon = Icons.Filled.Person,
@@ -340,6 +378,13 @@ private fun HomeTab(
             subtitle = "Aprobar accesos y tiempo extra",
             accent = Sun,
             onClick = onRequests,
+        )
+        FeatureTile(
+            icon = Icons.Filled.Notifications,
+            title = "Alertas de seguridad",
+            subtitle = "Ver protecciones desactivadas",
+            accent = Color(0xFFFF8A80),
+            onClick = onAlerts,
         )
     }
 }
@@ -1292,6 +1337,7 @@ private enum class AdminSection {
     Web,
     ManageUsers,
     Requests,
+    Alerts,
     Updates,
 }
 
