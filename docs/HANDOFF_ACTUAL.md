@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 239
-App Admin versionCode 239
+App Usuario versionCode 240
+App Admin versionCode 240
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-239-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-239-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-240-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-240-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 8e78e4a36304e1a359e8f9fe5714c2eb101a6dc60a1c0a41905db01cdc32f684
-Admin   7ce2ac04e45dd442a4d5ce7513a3535c2895004e9a3028e15d3854d54b545187
+Usuario 519b911b5d6e5489f30e64bfc37d2e409794fdc37d9f2a159b1662e9687b2875
+Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 ```
 
 ## Implementacion 2026-07-16 - DEV 240 cierre tecnico BARRIER-A11Y-RACE-01
@@ -85,7 +85,7 @@ Admin   7ce2ac04e45dd442a4d5ce7513a3535c2895004e9a3028e15d3854d54b545187
 - Causa tecnica: la configuracion y el filtro del servicio no solicitaban `TYPE_VIEW_CLICKED`. La barrera dependia de cambios posteriores de ventana, contenido o foco; una pulsacion rapida sobre el interruptor nativo podia adelantarse a esos eventos.
 - Correccion: el servicio escucha clics solo para decidir sobre Ajustes, instaladores o desinstaladores protegibles. Un clic dentro de una pantalla critica y sin mantenimiento autorizado ejecuta una salida urgente a Home; los demas eventos conservan la secuencia Back/Back/Home. Los clics del resto de las aplicaciones se descartan antes de evaluar uso o politica para no reintroducir trabajo global por toque.
 - Mantenimiento: una autorizacion vigente de Ajustes o retiro conserva prioridad y no dispara la salida urgente. Ajustes normales y pantallas de otras aplicaciones siguen disponibles.
-- Validacion local: 789 tareas correctas para tests de `feature-accessibility`, tests DEV Usuario/Admin, ktlint de las areas y builds de ambos APK. Pruebas nuevas cubren la suscripcion a clics y la salida urgente. Falta CI, publicacion DEV y prueba fisica repetida antes de marcar el ticket resuelto.
+- Validacion local: 789 tareas correctas para tests de `feature-accessibility`, tests DEV Usuario/Admin, ktlint de las areas y builds de ambos APK. Pruebas nuevas cubren la suscripcion a clics y la salida urgente. Commit funcional `f1f6bfc`; workflow `Publicar APKs DEV` `29508704344` exitoso. APKs publicos descargados y verificados contra sus manifiestos: Usuario 47.828.636 bytes y Admin 27.917.808 bytes, con los SHA-256 documentados arriba. Android CI `29508703556` queda registrado hasta completar sus controles.
 - Pendiente fisico: instalar DEV 240 in-place en el SM-S908E y realizar veinte intentos rapidos de apagar Accessibility con barrera armada, mas un control positivo dentro de una ventana de mantenimiento autorizada. No se promete resistencia absoluta de Device Owner en Android normal.
 
 ## Implementacion 2026-07-16 - DEV 239 correcciones de prueba fisica DAG
