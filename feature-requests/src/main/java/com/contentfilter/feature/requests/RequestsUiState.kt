@@ -11,4 +11,6 @@ data class RequestsUiState(
     val message: String = "Las solicitudes se guardan localmente y se sincronizarán cuando sea posible.",
     val requests: List<AccessRequest> = emptyList(),
     val extraTimeGrants: List<ExtraTimeGrant> = emptyList(),
+    val isRefreshing: Boolean = false,
+    val lastRefreshedAtEpochMillis: Long? = null,
 )

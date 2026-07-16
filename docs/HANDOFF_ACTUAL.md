@@ -106,6 +106,14 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Migraciones `20260716154242_dag_community_entitlement.sql` y `20260716154403_dag_entitlement_audit_read_policy.sql` aplicadas solo en Supabase DEV `syeycayasyufedwoprea`. La unica licencia existente conservo DAG habilitado; las nuevas licencias comienzan deshabilitadas. No se borro ni reinicio consumo.
 - Validacion: tests Usuario/Admin/dominio y formato correctos; Superweb paso ESLint de `src`, TypeScript y build optimizado; funciones y privilegios verificados en DEV. Los advisors conservan deuda previa de RPC anon autenticadas por token y politicas multiples. No se publico APK ni Superweb; el manifiesto publico sigue en DEV 240.
 
+## Implementacion 2026-07-16 - candidato DEV 241 REQUESTS-UX-01
+
+- App Usuario deja de ocultar solicitudes resueltas: muestra el historial local reciente de apps y tiempo extra, ordenado de mas nuevo a mas antiguo, con estados pendiente, aprobada, rechazada o expirada y las concesiones de tiempo asociadas.
+- La pantalla incorpora `Actualizar solicitudes`, estado de carga y resultado explicito online/offline. El refresco sincroniza primero la salida pendiente y despues trae resultados; sin red conserva y muestra los datos guardados.
+- Antes de crear, se rechaza otra solicitud pendiente del mismo tipo y destino. Esto evita duplicados por pulsaciones repetidas o por reintentar antes de la sincronizacion, sin borrar solicitudes anteriores.
+- Las solicitudes de dominio DAG siguen en su bandeja especifica para no mezclar historial de navegacion con permisos de apps. App Admin ya tenia refresco manual y acciones con progreso; conserva su bandeja operativa de pendientes.
+- Validacion local: formato, compilacion y tests de `feature-requests` y App Usuario correctos. Sin migracion ni publicacion intermedia.
+
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
 
 - Un dispositivo Usuario con control de proteccion nunca configurado se arma automaticamente solo cuando App Usuario comprueba simultaneamente el tunel VPN real, Accessibility habilitado, Device Admin activo y ausencia de una desactivacion intencional de la VPN.

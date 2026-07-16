@@ -41,11 +41,11 @@ class RequestsViewModel
                     grantRepository.observeGrants(),
                 ) { requests, grants -> requests to grants }
                     .collect { (requests, grants) ->
-                        val pendingRequests =
-                            requests.filter {
-                                (it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote) &&
-                                    it.requestType != AccessRequestType.DOMAIN_ACCESS
-                            }
+                        val visibleRequests =
+                            requests
+                                .filter { it.requestType != AccessRequestType.DOMAIN_ACCESS }
+                                .sortedByDescending(AccessRequest::createdAtEpochMillis)
+                        val pendingRequests = visibleRequests.filter { it.status.isPending() }
                         val latestResult =
                             requests
                                 .filter { it.status == RequestStatus.Approved || it.status == RequestStatus.Rejected }
@@ -53,7 +53,7 @@ class RequestsViewModel
                         mutableState.update {
                             it.copy(
                                 pendingCount = pendingRequests.size,
-                                requests = pendingRequests,
+                                requests = visibleRequests,
                                 extraTimeGrants = grants,
                                 message =
                                     latestResult?.let { request ->
@@ -63,7 +63,7 @@ class RequestsViewModel
                         }
                     }
             }
-            syncResultsNow()
+            refreshRequests()
         }
 
         fun onTargetChanged(value: String) = mutableState.update { it.copy(target = value) }
@@ -97,6 +97,16 @@ class RequestsViewModel
                 return
             }
             val target = state.target.trim()
+            if (
+                state.requests.any {
+                    it.status.isPending() &&
+                        it.requestType == requestType &&
+                        it.target.equals(target.ifBlank { "extra_time" }, ignoreCase = true)
+                }
+            ) {
+                mutableState.update { it.copy(message = "Ya existe una solicitud pendiente para lo mismo.") }
+                return
+            }
             viewModelScope.launch {
                 val request =
                     AccessRequest(
@@ -142,13 +152,36 @@ class RequestsViewModel
             }
         }
 
-        private fun syncResultsNow() {
+        fun refreshRequests() {
+            if (mutableState.value.isRefreshing) return
+            mutableState.update { it.copy(isRefreshing = true, message = "Actualizando solicitudes...") }
             viewModelScope.launch(Dispatchers.IO) {
                 runCatching {
+                    val outbox = syncEngine.syncOnce()
                     val result = syncEngine.syncRequestResultsFull()
-                    Log.i(LogTag, "Request results sync success=${result.success} message=${result.message}")
+                    val success = outbox.success && result.success
+                    Log.i(LogTag, "Request refresh success=$success message=${result.message}")
+                    mutableState.update {
+                        it.copy(
+                            isRefreshing = false,
+                            lastRefreshedAtEpochMillis = System.currentTimeMillis(),
+                            message =
+                                if (success) {
+                                    "Solicitudes actualizadas."
+                                } else {
+                                    "Sin conexión. Mostrando el historial guardado."
+                                },
+                        )
+                    }
                 }.onFailure { exception ->
-                    Log.e(LogTag, "Request results sync failed: ${exception.message}", exception)
+                    Log.e(LogTag, "Request refresh failed: ${exception.message}", exception)
+                    mutableState.update {
+                        it.copy(
+                            isRefreshing = false,
+                            lastRefreshedAtEpochMillis = System.currentTimeMillis(),
+                            message = "Sin conexión. Mostrando el historial guardado.",
+                        )
+                    }
                 }
             }
         }
@@ -167,3 +200,6 @@ private fun RequestStatus.displayName(): String =
         RequestStatus.Rejected -> "Rechazada"
         RequestStatus.Expired -> "Expirada"
     }
+
+private fun RequestStatus.isPending(): Boolean =
+    this == RequestStatus.PendingLocal || this == RequestStatus.PendingRemote

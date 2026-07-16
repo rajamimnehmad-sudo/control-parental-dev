@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -47,6 +48,7 @@ fun RequestsRoute(
     RequestsScreen(
         state = state.value,
         onBack = onBack,
+        onRefresh = viewModel::refreshRequests,
         modifier = modifier,
     )
 }
@@ -55,6 +57,7 @@ fun RequestsRoute(
 fun RequestsScreen(
     state: RequestsUiState,
     onBack: (() -> Unit)? = null,
+    onRefresh: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     ProductVisualPage(
@@ -71,12 +74,19 @@ fun RequestsScreen(
         if (state.message.isNotBlank()) {
             PremiumFeedbackBanner(text = state.message, isError = state.message.startsWith("No se pudo"))
         }
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = onRefresh,
+            enabled = !state.isRefreshing,
+        ) {
+            Text(if (state.isRefreshing) "Actualizando..." else "Actualizar solicitudes")
+        }
         Column(
             modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             if (state.requests.isEmpty()) {
-                Text("No hay solicitudes pendientes. Pedilas desde Mis apps.")
+                Text("Todavía no hay solicitudes. Pedilas desde Mis apps.")
             } else {
                 state.requests.forEach { request ->
                     UserRequestCard(
