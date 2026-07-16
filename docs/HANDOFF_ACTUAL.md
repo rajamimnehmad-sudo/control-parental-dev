@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 236
-App Admin versionCode 236
+App Usuario versionCode 237
+App Admin versionCode 237
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-236-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-236-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-237-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-237-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 15c41e33a9a66ea6b477c2d0bb5f0d13041d9741f4e949c0c058fbc7ce111273
-Admin   47b1abd930fbbea438b522cda05ad4167ca7e57babca7b5e924f4ba3f03d3808
+Usuario 809f032a2f28cd665cef407f927a6eecd2b2588f49c3b85963a28f56990d0398
+Admin   4b25c9da872f35138e9430be4965def334e21ce22d750ed3166355f8f320c7b6
 ```
 
 ## Implementacion 2026-07-16 - DEV 237 diagnostico agregado de resultados DAG
@@ -84,7 +84,7 @@ Admin   47b1abd930fbbea438b522cda05ad4167ca7e57babca7b5e924f4ba3f03d3808
 - Brave sigue recibiendo una unica consulta de hasta 10 resultados por busqueda. `dag-search` agrega a su respuesta solo las cantidades recibidas y rechazadas por titulo o URL HTTPS invalida; no registra ni devuelve diagnosticos con consultas, URLs, dominios, titulos o descripciones.
 - App Usuario clasifica cada resultado en un unico destino agregado: bloqueado por lista de dominios, regla Admin, plataforma visual no anulable o clasificador local; incierto mostrado; o permitido mostrado. El resumen existe durante la busqueda activa y se escribe en Logcat solo como cantidades tecnicas.
 - No cambia la UI, los umbrales, las reglas kosher, el cupo mensual ni la cantidad solicitada a Brave. No hay paginacion todavia: una futura pagina adicional contaria como otra consulta y requiere un ticket separado.
-- Validacion local: tests DEV Usuario/Admin, ktlint y builds optimizados de ambas apps correctos (773 tareas). La prueba del embudo exige que una respuesta controlada de 10 elementos quede contabilizada exactamente una vez por destino.
+- Validacion local: tests DEV Usuario/Admin, ktlint y builds optimizados de ambas apps correctos (773 tareas). La prueba del embudo exige que una respuesta controlada de 10 elementos quede contabilizada exactamente una vez por destino. `dag-search` version 7 activa solo en DEV; workflow `Publicar APKs DEV` `29499140202` exitoso. APKs y manifiestos DEV 237 descargados y verificados por version, tamano y SHA-256.
 
 ## Implementacion 2026-07-16 - DEV 236 entrega visual estable y deduplicada
 
