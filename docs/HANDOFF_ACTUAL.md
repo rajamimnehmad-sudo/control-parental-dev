@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 232
-App Admin versionCode 232
+App Usuario versionCode 233
+App Admin versionCode 233
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-232-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-232-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-233-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-233-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario af2c17fdd56cbfd33a50469d2a0d1c6b4b6681dbb0c0a7de59e3a8467dbee8b8
-Admin   9a6d1b0d80b9a7e5ab9a0549349f1616f2cc0a7c12ad1145844dbcf6a0d3518e
+Usuario 7587bc1d03e0ea112bd94dd1e4446279f79ae43eb4e1c08b79f533ee5271dcbb
+Admin   978ca424d269589c09dc6cbab326d08e49348438d9ff02dd1ce1db6d780b1943
 ```
+
+## Implementacion 2026-07-16 - DEV 233 navegacion Atras por pestana
+
+- Desde una pagina abierta mediante una busqueda, Atrás recorre primero el historial interno del WebView, luego vuelve a los mismos resultados y solo el siguiente Atrás regresa a Home. Una URL directa sin resultados vuelve a Home.
+- El menu de tres puntos aplica la misma semantica y habilita Atrás cuando existen resultados aunque el WebView no tenga otra pagina. El teclado conserva prioridad y se cierra sin consumir navegacion.
+- Los resultados permanecen asociados a su pestaña y sobreviven al proceso mediante el almacenamiento cifrado existente. Volver a ellos no repite la consulta Brave; una pagina restaurada sigue recargando y revalidandose.
+- Pruebas cubren pagina a resultados a Home y persistencia de resultados en una pestaña Browser. Ktlint, unit tests DEV Usuario y builds DEV Usuario/Admin correctos (758 tareas). APKs y manifiestos DEV 233 publicados solo en Supabase DEV.
 
 ## Implementacion 2026-07-16 - DEV 232 cobertura visual general y continuidad de pagina
 

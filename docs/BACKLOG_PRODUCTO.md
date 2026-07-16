@@ -370,7 +370,7 @@ Flujo de una entrada:
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
-- Estado: `Idea`; no aprobado para codigo.
+- Estado: `Resuelto` en DEV 233; aprobado por el usuario al pedir continuar con los pendientes DAG el 2026-07-16. Pendiente prueba fisica.
 - Tipo: bug/UX de navegacion DAG.
 - Prioridad: P2.
 - Problema: al usar Atras desde una pagina, DAG puede volver directamente a Home y omitir el listado de resultados desde el que se abrio.
@@ -387,7 +387,7 @@ Flujo de una entrada:
   - cerrar el teclado tiene prioridad cuando corresponde y no consume un paso de historial;
   - recarga, aprobacion, bloqueo o recuperacion del renderer no crean saltos ni bucles;
   - Home sin historial aplica el comportamiento de salida definido para DAG.
-- Decisiones pendientes para el ticket: comportamiento exacto al abrir URL directa, historial local, enlaces en nueva pestana, pagina bloqueada y cierre de la ultima pestana.
+- Decisiones cerradas: URL directa vuelve a Home; pagina desde resultados vuelve primero a esos resultados; historial WebView tiene prioridad; cada pestaña conserva su propio origen; el teclado se cierra antes; la restauracion conserva resultados pero revalida paginas.
 
 ### USER-GREETING-01 - Saludo personalizado en App Usuario
 

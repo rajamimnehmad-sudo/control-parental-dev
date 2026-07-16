@@ -379,13 +379,19 @@ private fun DagBrowserContent(
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(
                                 text = { Text("Atrás") },
-                                enabled = state.view != DagView.Start && (state.view != DagView.Browser || browserCanGoBack),
+                                enabled =
+                                    state.view != DagView.Start &&
+                                        (state.view != DagView.Browser || browserCanGoBack || state.results.isNotEmpty()),
                                 onClick = {
                                     menuExpanded = false
                                     if (state.view == DagView.Browser && activeWebView?.canGoBack() == true) {
                                         activeWebView?.goBack()
                                     } else {
-                                        viewModel.showStart()
+                                        if (state.view == DagView.Browser) {
+                                            viewModel.backFromBrowser()
+                                        } else {
+                                            viewModel.showStart()
+                                        }
                                     }
                                 },
                             )
@@ -480,7 +486,7 @@ private fun DagBrowserContent(
                 DagView.Browser ->
                     DagWebContent(
                         state = state,
-                        onBackFromBrowser = viewModel::showStart,
+                        onBackFromBrowser = viewModel::backFromBrowser,
                         onNavigate = viewModel::requestNavigation,
                         onPageStarted = viewModel::onPageStarted,
                         onPageTextReady = viewModel::onPageTextReady,

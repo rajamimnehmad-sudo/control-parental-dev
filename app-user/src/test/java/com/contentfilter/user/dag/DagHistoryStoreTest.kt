@@ -87,6 +87,7 @@ class DagHistoryStoreTest {
                                     address = "https://example.com",
                                     view = DagView.Browser,
                                     pageStatus = DagPageStatus.Visible,
+                                    results = listOf(result),
                                     requestedUrl = "https://example.com",
                                 ),
                         ),
@@ -99,5 +100,6 @@ class DagHistoryStoreTest {
         assertEquals(listOf(result), decoded.tabs.first().snapshot.results)
         assertEquals(DagPageStatus.Loading, decoded.tabs.last().snapshot.pageStatus)
         assertEquals("https://example.com", decoded.tabs.last().snapshot.requestedUrl)
+        assertEquals(listOf(result), decoded.tabs.last().snapshot.results)
     }
 }

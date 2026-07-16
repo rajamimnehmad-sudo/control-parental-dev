@@ -381,7 +381,7 @@ class DagHistoryStore
                     address = json.getString("address"),
                     view = safeView,
                     pageStatus = if (safeView == DagView.Browser) DagPageStatus.Loading else DagPageStatus.Idle,
-                    results = if (safeView == DagView.Results) results else emptyList(),
+                    results = if (safeView == DagView.Results || safeView == DagView.Browser) results else emptyList(),
                     requestedUrl = requestedUrl.takeIf { safeView == DagView.Browser },
                 )
             }

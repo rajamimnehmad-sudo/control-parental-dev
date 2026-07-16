@@ -8,6 +8,26 @@ import kotlin.test.assertTrue
 
 class DagBrowserAvailabilityTest {
     @Test
+    fun `browser back returns to its results before home`() {
+        val result =
+            DagSearchResult(
+                title = "Resultado",
+                url = "https://example.com",
+                domain = "example.com",
+                description = "Seguro",
+                classification = DagClassificationResult(DagClassification.Allowed, "safe", 1f, "test"),
+            )
+        val browser = DagBrowserUiState(view = DagView.Browser, results = listOf(result), requestedUrl = result.url)
+
+        val results = browser.toDagResults()
+
+        assertEquals(DagView.Results, results.view)
+        assertEquals(listOf(result), results.results)
+        assertEquals(null, results.requestedUrl)
+        assertEquals(DagView.Start, results.toDagStart().view)
+    }
+
+    @Test
     fun `home starts with an empty search and no stale page state`() {
         val home =
             DagBrowserUiState(
