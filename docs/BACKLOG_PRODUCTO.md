@@ -149,6 +149,7 @@ Flujo de una entrada:
 | ADMIN-ALERTS-UX-01 | Idea | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
 | ALERT-ROUTING-01 | Idea | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Idea | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
+| SUPERADMIN-DAG-ENTITLEMENT-01 | Idea | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
 | BARRIER-LAUNCHER-01 | Idea | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
 | DAG-NAV-UX-01 | En progreso | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | En progreso | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
@@ -443,6 +444,28 @@ Flujo de una entrada:
   - el usuario no puede habilitar `Instalar apps desconocidas` ni completar Package Installer mientras la proteccion esta armada y no existe autorizacion;
   - actualizaciones de apps ya aprobadas no se confunden con instalaciones nuevas.
 - Decisiones pendientes para el ticket: garantia requerida o best-effort; Family Link, Device Owner o Accessibility; alcance sobre apps gratuitas/pagas; duracion de aprobacion; tratamiento de actualizaciones, reinstalaciones, otras tiendas, adjuntos de mensajeria, gestores de archivos, ADB y apps del sistema.
+
+### SUPERADMIN-DAG-ENTITLEMENT-01 - DAG como funcion premium
+
+- Estado: `Idea`; no aprobado para codigo, cambios de licencia ni Supabase.
+- Tipo: monetizacion, licencias y control Super Admin.
+- Prioridad: P1.
+- Problema: DAG es una funcion premium y su disponibilidad no debe depender unicamente del control por dispositivo que usa App Admin.
+- Solucion propuesta: agregar en Super Admin una habilitacion de producto para DAG a nivel de comunidad o licencia. Solo cuando la comunidad tenga DAG habilitado, sus administradores pueden abrirlo o cerrarlo para usuarios/dispositivos.
+- Evidencia: decision comercial expresada por el usuario el 2026-07-15.
+- Esfuerzo: M.
+- Riesgo: alto; una validacion solo visual podria permitir acceso por sesiones o reglas antiguas, y una deshabilitacion incorrecta podria borrar configuracion o historial local.
+- Dependencias: `SEC-LICENSE-01`; Super Admin Web; modelo de comunidad/licencia; reglas DAG por dispositivo; App Admin, App Usuario y sincronizacion; comportamiento offline; costos y cupos Brave.
+- Duplicados y relacion: no duplica el switch DAG existente; agrega una capa superior de entitlement premium. La jerarquia propuesta es Super Admin/comunidad -> Admin/dispositivo -> App Usuario.
+- Criterios de aceptacion propuestos:
+  - Super Admin puede habilitar o deshabilitar DAG para la comunidad correcta;
+  - App Admin solo muestra o permite el control DAG cuando el entitlement premium esta activo;
+  - App Usuario y el launcher DAG rechazan acceso si la comunidad no tiene entitlement, aunque exista una regla antigua `Allow` por dispositivo;
+  - deshabilitar conserva configuracion, historial local y reglas para una futura renovacion, salvo una politica distinta aprobada expresamente;
+  - renovar o reactivar restaura la capacidad sin reinstalar ni borrar datos;
+  - estado offline, sesiones anteriores, realtime, full sync y reinicios no permiten eludir el entitlement;
+  - el cambio queda auditable sin exponer consultas ni historial.
+- Decisiones pendientes para el ticket: nivel comunidad, plan o licencia; precio y cupo incluidos; periodo de gracia; comportamiento al vencer; visibilidad del upsell en Admin; quien puede activar; soporte offline y migracion de comunidades actuales.
 
 ## Roadmap DAG, Web e IA local
 
