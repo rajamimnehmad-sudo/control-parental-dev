@@ -40,6 +40,18 @@ internal fun dagProfessionalImageDecision(unsafeProbability: Float): DagImageDec
         else -> DagImageDecision.Uncertain
     }
 
+internal fun dagEnsembleImageDecision(
+    professional: DagImageDecision,
+    legacy: DagImageDecision,
+): DagImageDecision =
+    when {
+        professional == DagImageDecision.Allowed && legacy == DagImageDecision.Allowed -> DagImageDecision.Allowed
+        professional == DagImageDecision.Blocked && legacy == DagImageDecision.Blocked -> DagImageDecision.Blocked
+        professional == DagImageDecision.Blocked && legacy == DagImageDecision.Uncertain -> DagImageDecision.Blocked
+        professional == DagImageDecision.Uncertain && legacy == DagImageDecision.Blocked -> DagImageDecision.Blocked
+        else -> DagImageDecision.Uncertain
+    }
+
 internal class DagImageClassifier(
     context: Context,
 ) : Closeable {
@@ -60,17 +72,21 @@ internal class DagImageClassifier(
             val bitmap = decodeForClassification(bytes) ?: return@synchronized DagImageClassification(DagImageDecision.Uncertain)
             try {
                 val professional = professionalClassifier.classify(bitmap)
-                if (professional.decision != DagImageDecision.Allowed) {
-                    return@synchronized DagImageClassification(
-                        professional.decision,
-                        professional.unsafeScore,
-                        detectedMime,
-                    )
-                }
                 val output = Array(1) { FloatArray(OutputClasses) }
                 model().run(bitmapToInput(bitmap), output)
-                val unsafeScore = output[0][UnsafeOutputIndex]
-                DagImageClassification(dagImageDecision(unsafeScore), unsafeScore, detectedMime)
+                val legacyScore = output[0][UnsafeOutputIndex]
+                val legacyDecision = dagImageDecision(legacyScore)
+                val decision =
+                    if (professionalClassifier.isAvailable()) {
+                        dagEnsembleImageDecision(professional.decision, legacyDecision)
+                    } else {
+                        legacyDecision
+                    }
+                DagImageClassification(
+                    decision = decision,
+                    unsafeScore = maxOf(professional.unsafeScore ?: 0f, legacyScore),
+                    mimeType = detectedMime,
+                )
             } catch (_: RuntimeException) {
                 DagImageClassification(DagImageDecision.Uncertain)
             } finally {
@@ -207,8 +223,8 @@ internal class DagImageClassifier(
     }
 
     companion object {
-        internal const val SafeThreshold = 0.08f
-        internal const val BlockThreshold = 0.20f
+        internal const val SafeThreshold = 0.15f
+        internal const val BlockThreshold = 0.65f
         internal const val MaximumImageBytes = 4 * 1024 * 1024
 
         private const val ModelAsset = "dag/nsfw_open_nsfw_quantized.tflite"

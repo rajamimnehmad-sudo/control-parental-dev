@@ -66,12 +66,7 @@ class DagContentClassifier
                     directUrl = false,
                     reviewSingleAmbiguousTerm = false,
                 )
-            if (textResult.decision != DagClassification.Allowed) return textResult
-            return when {
-                images.blocked >= MinimumRiskyImages && images.blocked * 2 >= images.classified ->
-                    blocked("unsafe_images", confidence = 0.95f)
-                else -> textResult
-            }
+            return textResult
         }
 
         fun classifyDirectUrl(url: String): DagClassificationResult {
@@ -180,11 +175,10 @@ class DagContentClassifier
         ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, modelVersion)
 
         companion object {
-            const val ModelVersion = "dag-local-text-6"
+            const val ModelVersion = "dag-local-text-7"
             const val MaxPageCharacters = 24_000
             private const val MaxSemanticCharacters = 4_000
             private const val MaxNeuralCharacters = 2_000
-            private const val MinimumRiskyImages = 3
             val NonOverridableCategories = setOf("unsafe_visual_platform", "search_portal")
             private val NonOverridableVisualDomains = setOf("imgsrc.ru")
             private val SearchPortalDomains =

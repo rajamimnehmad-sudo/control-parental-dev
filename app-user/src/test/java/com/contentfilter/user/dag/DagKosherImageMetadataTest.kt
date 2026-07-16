@@ -10,7 +10,7 @@ class DagKosherImageMetadataTest {
         assertTrue(isIntimateImageMetadata("Lencería íntima para mujer"))
         assertTrue(isIntimateImageMetadata("Women's underwear product photo"))
         assertTrue(isIntimateImageMetadata("bralette-and-panties.webp"))
-        assertTrue(isIntimateImageMetadata("traje de baño femenino"))
+        assertTrue(isIntimateImageMetadata("malla de mujer"))
     }
 
     @Test
@@ -18,5 +18,6 @@ class DagKosherImageMetadataTest {
         assertFalse(isIntimateImageMetadata("Campera de mujer color negro"))
         assertFalse(isIntimateImageMetadata("brand-logo.svg"))
         assertFalse(isIntimateImageMetadata("pantalón y camisa"))
+        assertFalse(isIntimateImageMetadata("swimwear navigation menu"))
     }
 }

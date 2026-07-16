@@ -1,5 +1,7 @@
 package com.contentfilter.user.dag
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -7,6 +9,7 @@ import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.InetAddress
 import java.util.concurrent.Semaphore
@@ -112,7 +115,10 @@ internal class DagImageResourceLoader(
                 DagImageDecision.Blocked -> blockedCount.incrementAndGet()
                 DagImageDecision.Uncertain -> uncertainCount.incrementAndGet()
             }
-            if (classification.decision != DagImageDecision.Allowed) return blockedResource()
+            if (classification.decision == DagImageDecision.Blocked) return blockedResource()
+            if (classification.decision == DagImageDecision.Uncertain) {
+                return blurredImageResource(bytes) ?: blockedResource()
+            }
 
             return WebResourceResponse(
                 classification.mimeType ?: return blockedResource(),
@@ -129,6 +135,49 @@ internal class DagImageResourceLoader(
             )
         }
     }
+
+    private fun blurredImageResource(bytes: ByteArray): WebResourceResponse? {
+        val source = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        return try {
+            val outputWidth = minOf(source.width, MaximumBlurredDimension)
+            val outputHeight = maxOf(1, source.height * outputWidth / source.width)
+            val tinyWidth = minOf(BlurSampleSide, outputWidth)
+            val tinyHeight = maxOf(1, outputHeight * tinyWidth / outputWidth)
+            val tiny = Bitmap.createScaledBitmap(source, tinyWidth, tinyHeight, true)
+            val blurred = Bitmap.createScaledBitmap(tiny, outputWidth, outputHeight, true)
+            val output = ByteArrayOutputStream()
+            try {
+                if (!blurred.compress(Bitmap.CompressFormat.JPEG, BlurJpegQuality, output)) return null
+                val blurredBytes = output.toByteArray()
+                imageResource(blurredBytes, "image/jpeg", "blurred")
+            } finally {
+                if (blurred !== tiny && blurred !== source) blurred.recycle()
+                if (tiny !== source) tiny.recycle()
+            }
+        } finally {
+            source.recycle()
+        }
+    }
+
+    private fun imageResource(
+        bytes: ByteArray,
+        mimeType: String,
+        decision: String? = null,
+    ): WebResourceResponse =
+        WebResourceResponse(
+            mimeType,
+            null,
+            200,
+            "OK",
+            buildMap {
+                put("Access-Control-Allow-Origin", "*")
+                put("Cache-Control", "no-store")
+                put("Content-Length", bytes.size.toString())
+                put("X-Content-Type-Options", "nosniff")
+                decision?.let { put("X-DAG-Image-Decision", it) }
+            },
+            ByteArrayInputStream(bytes),
+        )
 
     private fun java.io.InputStream.readLimited(maxBytes: Int): ByteArray {
         val output = java.io.ByteArrayOutputStream(minOf(maxBytes, InitialBufferBytes))
@@ -151,6 +200,9 @@ internal class DagImageResourceLoader(
         const val RequestTimeoutSeconds = 8L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
+        const val MaximumBlurredDimension = 480
+        const val BlurSampleSide = 12
+        const val BlurJpegQuality = 72
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }
 }

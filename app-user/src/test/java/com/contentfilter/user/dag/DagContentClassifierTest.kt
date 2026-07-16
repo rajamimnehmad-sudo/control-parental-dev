@@ -201,7 +201,7 @@ class DagContentClassifierTest {
     }
 
     @Test
-    fun `page image signal blocks a page with mostly unsafe images`() {
+    fun `unsafe images are isolated without closing an otherwise safe store`() {
         val result =
             classifier.classifyPage(
                 url = "https://images.example",
@@ -210,8 +210,7 @@ class DagContentClassifierTest {
                 images = DagImagePageSummary(allowed = 1, blocked = 4, uncertain = 0),
             )
 
-        assertEquals(DagClassification.Blocked, result.decision)
-        assertEquals("unsafe_images", result.category)
+        assertEquals(DagClassification.Allowed, result.decision)
     }
 
     @Test

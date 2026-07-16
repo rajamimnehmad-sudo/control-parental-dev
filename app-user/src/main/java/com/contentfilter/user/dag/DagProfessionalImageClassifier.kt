@@ -51,6 +51,8 @@ internal class DagProfessionalImageClassifier(
             }
         }
 
+    internal fun isAvailable(): Boolean = supportsOnnxRuntime()
+
     private fun Bitmap.toModelInput(): FloatArray {
         val side = minOf(width, height)
         val cropped = Bitmap.createBitmap(this, (width - side) / 2, (height - side) / 2, side, side)
@@ -73,9 +75,9 @@ internal class DagProfessionalImageClassifier(
     private fun supportsOnnxRuntime(): Boolean = android.os.Build.SUPPORTED_ABIS.any { it == "arm64-v8a" }
 
     companion object {
-        internal const val ModelVersion = "marqo-nsfw-vit-tiny-384-1"
-        internal const val SafeThreshold = 0.08f
-        internal const val BlockThreshold = 0.20f
+        internal const val ModelVersion = "marqo-nsfw-vit-tiny-384-2"
+        internal const val SafeThreshold = 0.15f
+        internal const val BlockThreshold = 0.65f
         private const val ModelAsset = "dag/nsfw_marqo_vit_tiny_384.onnx"
         private const val InputName = "pixel_values"
         private const val InputSize = 384

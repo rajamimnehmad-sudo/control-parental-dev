@@ -22,7 +22,7 @@ class DagImagePolicyTest {
     fun `only low unsafe scores are allowed`() {
         assertEquals(DagImageDecision.Allowed, dagImageDecision(0f))
         assertEquals(DagImageDecision.Allowed, dagImageDecision(DagImageClassifier.SafeThreshold))
-        assertEquals(DagImageDecision.Uncertain, dagImageDecision(0.081f))
+        assertEquals(DagImageDecision.Uncertain, dagImageDecision(0.151f))
         assertEquals(DagImageDecision.Blocked, dagImageDecision(DagImageClassifier.BlockThreshold))
     }
 
@@ -40,7 +40,7 @@ class DagImagePolicyTest {
             DagImageDecision.Allowed,
             dagProfessionalImageDecision(DagProfessionalImageClassifier.SafeThreshold),
         )
-        assertEquals(DagImageDecision.Uncertain, dagProfessionalImageDecision(0.081f))
+        assertEquals(DagImageDecision.Uncertain, dagProfessionalImageDecision(0.151f))
         assertEquals(
             DagImageDecision.Blocked,
             dagProfessionalImageDecision(DagProfessionalImageClassifier.BlockThreshold),
@@ -52,6 +52,30 @@ class DagImagePolicyTest {
     fun `professional probability conversion is stable`() {
         assertTrue(binarySoftmaxFirst(4f, -4f) > 0.99f)
         assertTrue(binarySoftmaxFirst(-4f, 4f) < 0.01f)
+    }
+
+    @Test
+    fun `ensemble shows safe images blurs disagreement and blocks corroborated risk`() {
+        assertEquals(
+            DagImageDecision.Allowed,
+            dagEnsembleImageDecision(DagImageDecision.Allowed, DagImageDecision.Allowed),
+        )
+        assertEquals(
+            DagImageDecision.Uncertain,
+            dagEnsembleImageDecision(DagImageDecision.Blocked, DagImageDecision.Allowed),
+        )
+        assertEquals(
+            DagImageDecision.Uncertain,
+            dagEnsembleImageDecision(DagImageDecision.Allowed, DagImageDecision.Uncertain),
+        )
+        assertEquals(
+            DagImageDecision.Blocked,
+            dagEnsembleImageDecision(DagImageDecision.Blocked, DagImageDecision.Blocked),
+        )
+        assertEquals(
+            DagImageDecision.Blocked,
+            dagEnsembleImageDecision(DagImageDecision.Blocked, DagImageDecision.Uncertain),
+        )
     }
 
     @Test

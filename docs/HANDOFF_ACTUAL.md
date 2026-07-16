@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 230
-App Admin versionCode 230
+App Usuario versionCode 231
+App Admin versionCode 231
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,25 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-230-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-230-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-231-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-231-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 5099eb22581e0dc7e52a3207d68504b7b2538f7472f7bdcc6e4dabf97a409bcc
-Admin   2e0a0d1798b422a1ac47f742d8d43157cd2654e177952698879bb9d63ef26afd
+Usuario pendiente de publicacion DEV 231
+Admin   pendiente de publicacion DEV 231
 ```
+
+## Implementacion 2026-07-15 - DEV 231 calibracion visual y blur local
+
+- DAG aplica tres salidas por imagen: normal cuando ambos modelos locales coinciden en seguridad; blur irreversible cuando discrepan o la imagen queda en zona dudosa; ocultamiento cuando ambos detectan riesgo o uno detecta riesgo y el otro no puede decidir. Ninguna imagen ni score sale del telefono.
+- El blur se genera antes de entregar el recurso al WebView: reduce la imagen a 12 pixeles de detalle horizontal y la vuelve a ampliar hasta un maximo de 480 px. No existe accion del usuario para quitarlo ni se conserva la imagen original en la pagina.
+- Los umbrales de ambos modelos pasan a una calibracion conservadora de tres zonas: seguro hasta 15 %, dudoso entre 15 % y 65 %, riesgo desde 65 %. La version visual sube a `marqo-nsfw-vit-tiny-384-2` y la politica de pagina a `dag-local-text-7`, invalidando aprobaciones rapidas incompatibles.
+- H&M y tiendas similares ya no heredan palabras como `lingerie`, `swimwear` o `underwear` desde menus globales: solo cuentan atributos de la imagen y un contenedor de producto pequeno y cercano. `swimwear` generico deja de ocultar por metadatos y pasa por la IA visual; lenceria y ropa intima concreta siguen ocultas.
+- Una pagina segura ya no se cierra porque contenga muchas imagenes rechazadas: cada recurso queda aislado. Plataformas o dominios prohibidos y el texto explicito continúan bloqueandose por sus reglas independientes. La calibracion usa Yeshurun Tora, H&M y contenido social como referencias para la prueba fisica.
+- Ktlint, tests DEV completos de Usuario/Admin, lint vital y builds optimizados correctos (773 tareas Gradle). Publicacion, hashes y validacion fisica quedan pendientes al cerrar el ticket.
 
 ## Implementacion 2026-07-15 - DEV 230 filtrado selectivo y contraste DAG
 

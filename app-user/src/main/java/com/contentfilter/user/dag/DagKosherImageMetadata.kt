@@ -5,7 +5,7 @@ import java.util.Locale
 
 internal const val DagIntimateImageJavaScriptPattern =
     "\\b(lingerie|lenceria|ropa\\s+(interior|intima)|women'?s?\\s+underwear|female\\s+underwear|" +
-        "intimate\\s+apparel|bra(s|lette)?|pant(y|ies)|thong|bikini|swimwear|traje\\s+de\\s+bano|" +
+        "intimate\\s+apparel|bra(s|lette)?|pant(y|ies)|thong|" +
         "malla\\s+de\\s+mujer|corpin(o|os)|bombacha(s)?|bodysuit)\\b"
 
 internal fun isIntimateImageMetadata(value: String): Boolean =

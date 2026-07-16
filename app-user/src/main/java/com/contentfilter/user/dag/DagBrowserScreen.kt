@@ -1402,11 +1402,13 @@ private fun WebView.sanitizeAndExtractVisibleText(
             return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
           }
           function dagImageContext(image) {
-            var container = image.closest && image.closest('[data-product],article,.product,.product-card,.product-item,li');
+            var container = image.closest && image.closest('[data-product],article,.product,.product-card,.product-item,[class*="product-card"],[class*="product-item"]');
+            var containerText = container && (container.innerText || '');
+            if (containerText && containerText.length > 800) containerText = '';
             return dagNormalizedText([
               image.getAttribute('alt'), image.getAttribute('title'), image.getAttribute('aria-label'),
               image.getAttribute('src'), image.getAttribute('data-src'), image.currentSrc,
-              container && (container.innerText || '').substring(0, 600)
+              (containerText || '').substring(0, 400)
             ].join(' '));
           }
           function dagBlockIntimateImage(image) {
