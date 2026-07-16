@@ -37,7 +37,11 @@ class DagContentClassifier
                     modelVersion = ModelVersion,
                 )
             }
-            return classify("$domain $title $description", directUrl = false, reviewSingleAmbiguousTerm = true)
+            return classify(
+                "$domain $title $description".withoutIntimateApparelTerms(),
+                directUrl = false,
+                reviewSingleAmbiguousTerm = true,
+            )
         }
 
         internal fun classifyPage(
@@ -58,7 +62,7 @@ class DagContentClassifier
             }
             val textResult =
                 classify(
-                    "$domain $title ${text.take(MaxPageCharacters)}",
+                    "$domain $title ${text.take(MaxPageCharacters)}".withoutIntimateApparelTerms(),
                     directUrl = false,
                     reviewSingleAmbiguousTerm = false,
                 )
@@ -176,7 +180,7 @@ class DagContentClassifier
         ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, modelVersion)
 
         companion object {
-            const val ModelVersion = "dag-local-text-5"
+            const val ModelVersion = "dag-local-text-6"
             const val MaxPageCharacters = 24_000
             private const val MaxSemanticCharacters = 4_000
             private const val MaxNeuralCharacters = 2_000
@@ -231,8 +235,6 @@ class DagContentClassifier
                         setOf(
                             "porn", "porno", "pornografia", "pornography", "xxx", "nude", "nudes", "nudity",
                             "desnudo", "desnuda", "desnudez", "explicit sex", "sexo explicito", "escort", "prostitucion",
-                            "lenceria", "lenceria intima", "ropa interior", "ropa intima", "corpiño", "bombacha",
-                            "lingerie", "intimate apparel", "women underwear", "womens underwear", "bra and panties",
                             "פורנו", "פורנוגרפיה", "עירום", "זנות", "מין מפורש",
                         ).toMatchers(),
                     "dating" to
@@ -282,6 +284,16 @@ class DagContentClassifier
                     "רפואה", "בריאות", "רופא", "חינוך", "לימוד", "ביולוגיה", "הלכה", "תורה", "תלמוד", "יהדות", "רב",
                 ).toMatchers()
 
+            private val IntimateApparelTerms =
+                setOf(
+                    "lenceria", "lenceria intima", "ropa interior", "ropa intima", "corpiño", "bombacha",
+                    "lingerie", "intimate apparel", "women underwear", "womens underwear", "female underwear",
+                    "bra and panties", "bralette", "bikini", "swimwear", "traje de baño",
+                ).toMatchers()
+
+            private fun String.withoutIntimateApparelTerms(): String =
+                IntimateApparelTerms.fold(normalizedForDag()) { text, term -> term.removeFrom(text) }
+
             private fun Set<String>.toMatchers(): List<TermMatcher> =
                 map { term ->
                     val normalizedTerm = term.normalizedForDag()
@@ -313,6 +325,11 @@ class DagContentClassifier
                 val wordPattern: Regex?,
             ) {
                 fun matches(text: String): Boolean = wordPattern?.containsMatchIn(text) ?: text.contains(normalizedTerm)
+
+                fun removeFrom(text: String): String =
+                    wordPattern?.replace(text) { match ->
+                        "${match.groupValues[1]} ${match.groupValues[2]}"
+                    } ?: text.replace(normalizedTerm, " ")
             }
         }
     }

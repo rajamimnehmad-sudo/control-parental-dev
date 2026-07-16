@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 229
-App Admin versionCode 229
+App Usuario versionCode 230
+App Admin versionCode 230
 versionName 1.0.1-dev
 ```
 
@@ -68,22 +68,31 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-229-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-229-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-230-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-230-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 4ff89ce2fff6212b944c8df96477953f45a0308ff1eead8c98ab207f5e1521e4
-Admin   08a3a94fca550eb2d3d56d34870dd7d1a76d72066e190a11f507d9c4750549dc
+Usuario 5099eb22581e0dc7e52a3207d68504b7b2538f7472f7bdcc6e4dabf97a409bcc
+Admin   2e0a0d1798b422a1ac47f742d8d43157cd2654e177952698879bb9d63ef26afd
 ```
+
+## Implementacion 2026-07-15 - DEV 230 filtrado selectivo y contraste DAG
+
+- Las tiendas generales como Calvin Klein permanecen navegables: DAG ya no bloquea la pagina completa solo por palabras como `lenceria`, `ropa interior`, `bralette` o `swimwear` en titulo, resultado o texto visible.
+- Cada imagen se decide por separado. Antes de exponerla, el ensemble visual local profesional conserva su politica conservadora; ademas, DAG oculta imagenes cuyo `alt`, titulo, URL o contexto inmediato de producto identifica lenceria, ropa intima o equivalentes. El observador vuelve a aplicar la regla sobre contenido lazy/dinamico.
+- El filtro selectivo elimina fuentes y variantes `srcset` de una imagen rechazada y falla cerrado. No envia imagenes ni metadatos fuera del telefono. Esto mejora la politica kosher, pero sigue siendo clasificacion probabilistica y requiere validacion fisica con sitios reales.
+- El tema DAG ahora establece `onBackground` para todo el arbol Compose; los textos que no declaran color dejan de heredar negro en modo oscuro. WebView recibe fondo blanco para evitar texto oscuro de paginas transparentes sobre el fondo oscuro de DAG.
+- La version de politica de texto sube a `dag-local-text-6`, por lo que se invalidan aprobaciones rapidas incompatibles. Pruebas especificas cubren tienda permitida, contenido pornografico aun bloqueado y metadatos intimos/benignos. Ktlint, tests DEV completos de Usuario/Admin, lint vital y builds optimizados correctos (775 tareas Gradle).
+- APKs y manifiestos DEV 230 publicados exclusivamente en Supabase DEV y verificados por version, SHA-256, tamaño y HTTP 200. Usuario pesa 45.574.608 bytes y Admin 27.901.424 bytes. Falta validacion visual en un telefono real con tienda general, imagen intima y ambos temas.
 
 ## Implementacion 2026-07-15 - DEV 229 IA visual kosher profesional
 
 - ARM64 incorpora `Marqo/nsfw-image-detection-384`, ViT-Tiny local Apache-2.0 de 5,6 millones de parámetros entrenado sobre 220.000 imágenes; el model card reporta 98,56 % en su propio conjunto balanceado. La conversión ONNX cuantizada INT8 pesa 6.702.582 bytes, SHA-256 `0366969ece89f252f05fad2c730d6c7e3373000e1ff43e4cfab8425aad94405b`; una imagen benigna de control conservó la decisión entre FP32 e INT8.
 - La decisión es un ensemble conservador: una imagen solo se muestra si el ViT profesional y el OpenNSFW anterior la consideran segura. Zona dudosa, error o salida inválida permanecen ocultos. ARM32 conserva OpenNSFW porque el runtime ONNX se excluye allí por compatibilidad/tamaño.
-- `lencería`, ropa íntima/interior y equivalentes en español e inglés son categoría sexual explícita para la política kosher; se bloquean desde búsqueda/metadatos/texto de página aunque no exista desnudez. Las aprobaciones rápidas anteriores se invalidan por la nueva versión visual.
+- En DEV 229, `lencería`, ropa íntima/interior y equivalentes se bloquearon a nivel de página. Esa conducta historica fue reemplazada en DEV 230 por filtrado selectivo de cada imagen para mantener abiertas las tiendas generales.
 - Todo sucede en el teléfono: imagen, URL, probabilidad y decisión no se envían a Supabase, Brave ni al administrador. La precisión probabilística no equivale a garantía absoluta y requiere validación física con páginas reales.
 - La variante FP32 inicial llevó el APK a 58 MiB y Supabase DEV rechazó el objeto por tamaño antes de cambiar los manifiestos públicos. La cuantización selectiva de MatMul/Gemm redujo el modelo de 22,5 a 6,7 MB y el APK a 45.574.608 bytes; el control benigno pasó de 5,76 % a 6,37 % NSFW, conservando la decisión segura con el umbral 8 %. Ktlint, tests DEV y builds optimizados Usuario/Admin correctos. APKs/manifiestos DEV 229 publicados solo en Supabase DEV y verificados por versión, hash declarado y HTTP 200.
 

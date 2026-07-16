@@ -66,23 +66,24 @@ class DagContentClassifierTest {
     }
 
     @Test
-    fun `intimate apparel is blocked by kosher policy`() {
-        listOf(
-            "lencería íntima de mujer",
-            "catálogo de ropa interior femenina",
-            "women lingerie store",
-            "bra and panties sale",
-        ).forEach { query ->
-            assertEquals(DagClassification.Blocked, classifier.classifyQuery(query).decision, query)
-        }
+    fun `intimate retail page stays open for selective image filtering`() {
         assertEquals(
-            DagClassification.Blocked,
+            DagClassification.Allowed,
+            classifier.classifyResult(
+                title = "Calvin Klein Underwear",
+                description = "Catálogo de lencería y ropa íntima para mujer",
+                url = "https://www.calvinklein.example/women/underwear",
+            ).decision,
+        )
+        assertEquals(
+            DagClassification.Allowed,
             classifier.classifyPage(
                 url = "https://shop.example/intimates",
                 title = "Nueva colección",
                 text = "Catálogo de lencería y ropa íntima para mujer",
             ).decision,
         )
+        assertEquals(DagClassification.Blocked, classifier.classifyQuery("lencería con videos porno").decision)
     }
 
     @Test

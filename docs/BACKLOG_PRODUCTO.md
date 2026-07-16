@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 212 y App Admin DEV 212, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 230 y App Admin DEV 230, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -155,6 +155,8 @@ Flujo de una entrada:
 | DAG-HOME-UX-01 | En progreso | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | Resuelto DEV 228 | P2 | Mejorar contraste y agregar tema claro, oscuro o segun dispositivo | M | Medio |
+| DAG-THEME-02 | Resuelto DEV 230 | P1 | Corregir texto negro sobre fondo negro y fondo transparente del WebView | S | Bajo |
+| DAG-VISUAL-KOSHER-03 | Resuelto DEV 230 | P0 | Abrir tiendas normales y ocultar selectivamente imagenes intimas o visualmente no aptas | M | Alto |
 | DAG-HISTORY-UX-01 | En progreso | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
 | DAG-ANALYSIS-UX-01 | Resuelto DEV 226 | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Resuelto DEV 226 | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |

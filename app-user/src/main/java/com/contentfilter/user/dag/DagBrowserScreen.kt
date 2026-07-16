@@ -288,208 +288,212 @@ private fun DagBrowserContent(
 
     val analyzing = state.loading || (state.view == DagView.Browser && state.pageStatus == DagPageStatus.Loading)
 
-    Column(
-        modifier =
-            modifier
-                .background(MaterialTheme.colorScheme.background)
-                .then(if (standalone) Modifier.statusBarsPadding() else Modifier),
+    Surface(
+        modifier = modifier.then(if (standalone) Modifier.statusBarsPadding() else Modifier),
+        color = MaterialTheme.colorScheme.background,
+        contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        if (state.view != DagView.Start) {
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                TextButton(onClick = viewModel::showStart, modifier = Modifier.width(40.dp)) {
-                    Text("⌂", style = MaterialTheme.typography.titleLarge)
-                }
-                DagAnalysisFrame(
-                    analyzing = analyzing,
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .height(52.dp),
-                    cornerRadius = 26.dp,
+        Column(modifier = Modifier.fillMaxSize()) {
+            if (state.view != DagView.Start) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    OutlinedTextField(
+                    TextButton(onClick = viewModel::showStart, modifier = Modifier.width(40.dp)) {
+                        Text("⌂", style = MaterialTheme.typography.titleLarge)
+                    }
+                    DagAnalysisFrame(
+                        analyzing = analyzing,
                         modifier =
                             Modifier
-                                .fillMaxSize()
-                                .onFocusChanged { focusState ->
-                                    if (focusState.isFocused && !addressFocused) viewModel.onAddressChanged("")
-                                    addressFocused = focusState.isFocused
-                                },
-                        value = if (analyzing) "" else state.address,
-                        onValueChange = viewModel::onAddressChanged,
-                        placeholder = {
-                            if (analyzing) DagAnalyzingText() else Text("Buscar o escribir dirección")
-                        },
-                        readOnly = analyzing,
-                        singleLine = true,
-                        shape = RoundedCornerShape(26.dp),
-                        colors =
-                            OutlinedTextFieldDefaults.colors(
-                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
-                                cursorColor = MaterialTheme.colorScheme.primary,
-                                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                                focusedBorderColor = if (analyzing) Color.Transparent else MaterialTheme.colorScheme.primary,
-                                unfocusedBorderColor = if (analyzing) Color.Transparent else MaterialTheme.colorScheme.outline,
-                                focusedContainerColor =
-                                    if (analyzing) {
-                                        DagNeonCyan.copy(
-                                            alpha = 0.10f,
-                                        )
-                                    } else {
-                                        Color.Transparent
+                                .weight(1f)
+                                .height(52.dp),
+                        cornerRadius = 26.dp,
+                    ) {
+                        OutlinedTextField(
+                            modifier =
+                                Modifier
+                                    .fillMaxSize()
+                                    .onFocusChanged { focusState ->
+                                        if (focusState.isFocused && !addressFocused) viewModel.onAddressChanged("")
+                                        addressFocused = focusState.isFocused
                                     },
-                                unfocusedContainerColor =
-                                    if (analyzing) DagNeonViolet.copy(alpha = 0.08f) else Color.Transparent,
-                            ),
-                        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Go),
-                        keyboardActions =
-                            androidx.compose.foundation.text.KeyboardActions(
-                                onGo = { viewModel.submitAddress() },
-                            ),
-                    )
-                }
-                TextButton(
-                    onClick = ::newTab,
-                    enabled = tabs.size < MaximumTabs,
-                    modifier = Modifier.width(40.dp),
-                ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
-                Box {
-                    TextButton(
-                        onClick = {
-                            captureActiveTabPreview()
-                            persistActiveTab()
-                            tabsExpanded = true
-                        },
-                        modifier = Modifier.width(40.dp),
-                    ) { Text(tabs.size.toString()) }
-                }
-                Box {
-                    TextButton(onClick = { menuExpanded = true }, modifier = Modifier.width(40.dp)) {
-                        Text("⋮", style = MaterialTheme.typography.headlineSmall)
+                            value = if (analyzing) "" else state.address,
+                            onValueChange = viewModel::onAddressChanged,
+                            placeholder = {
+                                if (analyzing) DagAnalyzingText() else Text("Buscar o escribir dirección")
+                            },
+                            readOnly = analyzing,
+                            singleLine = true,
+                            shape = RoundedCornerShape(26.dp),
+                            colors =
+                                OutlinedTextFieldDefaults.colors(
+                                    focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                    cursorColor = MaterialTheme.colorScheme.primary,
+                                    focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    focusedBorderColor = if (analyzing) Color.Transparent else MaterialTheme.colorScheme.primary,
+                                    unfocusedBorderColor = if (analyzing) Color.Transparent else MaterialTheme.colorScheme.outline,
+                                    focusedContainerColor =
+                                        if (analyzing) {
+                                            DagNeonCyan.copy(
+                                                alpha = 0.10f,
+                                            )
+                                        } else {
+                                            Color.Transparent
+                                        },
+                                    unfocusedContainerColor =
+                                        if (analyzing) DagNeonViolet.copy(alpha = 0.08f) else Color.Transparent,
+                                ),
+                            keyboardOptions =
+                                androidx.compose.foundation.text.KeyboardOptions(
+                                    imeAction = ImeAction.Go,
+                                ),
+                            keyboardActions =
+                                androidx.compose.foundation.text.KeyboardActions(
+                                    onGo = { viewModel.submitAddress() },
+                                ),
+                        )
                     }
-                    DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
-                        DropdownMenuItem(
-                            text = { Text("Atrás") },
-                            enabled = state.view != DagView.Start && (state.view != DagView.Browser || browserCanGoBack),
+                    TextButton(
+                        onClick = ::newTab,
+                        enabled = tabs.size < MaximumTabs,
+                        modifier = Modifier.width(40.dp),
+                    ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
+                    Box {
+                        TextButton(
                             onClick = {
-                                menuExpanded = false
-                                if (state.view == DagView.Browser && activeWebView?.canGoBack() == true) {
-                                    activeWebView?.goBack()
-                                } else {
-                                    viewModel.showStart()
-                                }
+                                captureActiveTabPreview()
+                                persistActiveTab()
+                                tabsExpanded = true
                             },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Adelante") },
-                            enabled = state.view == DagView.Browser && browserCanGoForward,
-                            onClick = {
-                                menuExpanded = false
-                                activeWebView?.goForward()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Actualizar") },
-                            enabled = state.view == DagView.Browser,
-                            onClick = {
-                                menuExpanded = false
-                                activeWebView?.reload()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Historial") },
-                            onClick = {
-                                menuExpanded = false
-                                viewModel.showHistory()
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Borrar caché de navegación") },
-                            onClick = {
-                                menuExpanded = false
-                                clearBrowsingCacheDialog = true
-                            },
-                        )
-                        HorizontalDivider()
-                        DagThemePreference.entries.forEach { preference ->
+                            modifier = Modifier.width(40.dp),
+                        ) { Text(tabs.size.toString()) }
+                    }
+                    Box {
+                        TextButton(onClick = { menuExpanded = true }, modifier = Modifier.width(40.dp)) {
+                            Text("⋮", style = MaterialTheme.typography.headlineSmall)
+                        }
+                        DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(
-                                text = {
-                                    Text(
-                                        "${if (themePreference == preference) "✓ " else ""}${preference.label}",
-                                    )
-                                },
+                                text = { Text("Atrás") },
+                                enabled = state.view != DagView.Start && (state.view != DagView.Browser || browserCanGoBack),
                                 onClick = {
                                     menuExpanded = false
-                                    onThemePreferenceChanged(preference)
+                                    if (state.view == DagView.Browser && activeWebView?.canGoBack() == true) {
+                                        activeWebView?.goBack()
+                                    } else {
+                                        viewModel.showStart()
+                                    }
                                 },
                             )
+                            DropdownMenuItem(
+                                text = { Text("Adelante") },
+                                enabled = state.view == DagView.Browser && browserCanGoForward,
+                                onClick = {
+                                    menuExpanded = false
+                                    activeWebView?.goForward()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Actualizar") },
+                                enabled = state.view == DagView.Browser,
+                                onClick = {
+                                    menuExpanded = false
+                                    activeWebView?.reload()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Historial") },
+                                onClick = {
+                                    menuExpanded = false
+                                    viewModel.showHistory()
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text("Borrar caché de navegación") },
+                                onClick = {
+                                    menuExpanded = false
+                                    clearBrowsingCacheDialog = true
+                                },
+                            )
+                            HorizontalDivider()
+                            DagThemePreference.entries.forEach { preference ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            "${if (themePreference == preference) "✓ " else ""}${preference.label}",
+                                        )
+                                    },
+                                    onClick = {
+                                        menuExpanded = false
+                                        onThemePreferenceChanged(preference)
+                                    },
+                                )
+                            }
+                        }
+                    }
+                }
+                HorizontalDivider()
+                if (addressFocused && state.suggestions.isNotEmpty() && !analyzing) {
+                    DagSearchSuggestions(state.suggestions, viewModel::onAddressChanged)
+                }
+            }
+
+            if (state.message.isNotBlank() && !analyzing) {
+                Surface(
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    color = MaterialTheme.colorScheme.surfaceContainer,
+                ) {
+                    Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
+                        Text(state.message, style = MaterialTheme.typography.bodyMedium)
+                        state.reviewCandidate?.let { candidate ->
+                            Spacer(Modifier.height(4.dp))
+                            TextButton(onClick = { viewModel.requestReview(candidate) }) {
+                                Text("Pedir revisión de ${candidate.domain}")
+                            }
                         }
                     }
                 }
             }
-            HorizontalDivider()
-            if (addressFocused && state.suggestions.isNotEmpty() && !analyzing) {
-                DagSearchSuggestions(state.suggestions, viewModel::onAddressChanged)
-            }
-        }
 
-        if (state.message.isNotBlank() && !analyzing) {
-            Surface(
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                shape = RoundedCornerShape(16.dp),
-                color = MaterialTheme.colorScheme.surfaceContainer,
-            ) {
-                Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
-                    Text(state.message, style = MaterialTheme.typography.bodyMedium)
-                    state.reviewCandidate?.let { candidate ->
-                        Spacer(Modifier.height(4.dp))
-                        TextButton(onClick = { viewModel.requestReview(candidate) }) {
-                            Text("Pedir revisión de ${candidate.domain}")
-                        }
-                    }
-                }
+            when (state.view) {
+                DagView.Start ->
+                    DagStartContent(
+                        address = state.address,
+                        suggestions = state.suggestions,
+                        analyzing = analyzing,
+                        onAddressChanged = viewModel::onAddressChanged,
+                        onSubmit = viewModel::submitAddress,
+                    )
+                DagView.Results -> DagResultsContent(state.results, viewModel::openResult)
+                DagView.History ->
+                    DagHistoryContent(
+                        history = state.history,
+                        onOpen = viewModel::openHistory,
+                        onDelete = viewModel::deleteHistory,
+                        onClear = viewModel::clearHistory,
+                    )
+                DagView.Browser ->
+                    DagWebContent(
+                        state = state,
+                        onBackFromBrowser = viewModel::showStart,
+                        onNavigate = viewModel::requestNavigation,
+                        onPageStarted = viewModel::onPageStarted,
+                        onPageTextReady = viewModel::onPageTextReady,
+                        onBlockedAction = viewModel::onBrowserBlockedAction,
+                        onPageBlocked = viewModel::onPageBlocked,
+                        onRendererGone = viewModel::onBrowserRendererGone,
+                        onWebViewChanged = { activeWebView = it },
+                        onNavigationStateChanged = { canGoBack, canGoForward ->
+                            browserCanGoBack = canGoBack
+                            browserCanGoForward = canGoForward
+                        },
+                    )
             }
-        }
-
-        when (state.view) {
-            DagView.Start ->
-                DagStartContent(
-                    address = state.address,
-                    suggestions = state.suggestions,
-                    analyzing = analyzing,
-                    onAddressChanged = viewModel::onAddressChanged,
-                    onSubmit = viewModel::submitAddress,
-                )
-            DagView.Results -> DagResultsContent(state.results, viewModel::openResult)
-            DagView.History ->
-                DagHistoryContent(
-                    history = state.history,
-                    onOpen = viewModel::openHistory,
-                    onDelete = viewModel::deleteHistory,
-                    onClear = viewModel::clearHistory,
-                )
-            DagView.Browser ->
-                DagWebContent(
-                    state = state,
-                    onBackFromBrowser = viewModel::showStart,
-                    onNavigate = viewModel::requestNavigation,
-                    onPageStarted = viewModel::onPageStarted,
-                    onPageTextReady = viewModel::onPageTextReady,
-                    onBlockedAction = viewModel::onBrowserBlockedAction,
-                    onPageBlocked = viewModel::onPageBlocked,
-                    onRendererGone = viewModel::onBrowserRendererGone,
-                    onWebViewChanged = { activeWebView = it },
-                    onNavigationStateChanged = { canGoBack, canGoForward ->
-                        browserCanGoBack = canGoBack
-                        browserCanGoForward = canGoForward
-                    },
-                )
         }
     }
 
@@ -1150,6 +1154,7 @@ private fun DagWebContent(
                     webView = this
                     onWebViewChanged(this)
                     configureDagSettings()
+                    setBackgroundColor(android.graphics.Color.WHITE)
                     val dagWebView = this
                     CookieManager.getInstance().apply {
                         setAcceptCookie(true)
@@ -1392,6 +1397,28 @@ private fun WebView.sanitizeAndExtractVisibleText(
     evaluateJavascript(
         """
         (function() {
+          var dagIntimatePattern = /$DagIntimateImageJavaScriptPattern/i;
+          function dagNormalizedText(value) {
+            return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+          }
+          function dagImageContext(image) {
+            var container = image.closest && image.closest('[data-product],article,.product,.product-card,.product-item,li');
+            return dagNormalizedText([
+              image.getAttribute('alt'), image.getAttribute('title'), image.getAttribute('aria-label'),
+              image.getAttribute('src'), image.getAttribute('data-src'), image.currentSrc,
+              container && (container.innerText || '').substring(0, 600)
+            ].join(' '));
+          }
+          function dagBlockIntimateImage(image) {
+            if (image.getAttribute('data-dag-kosher-blocked') === 'true') return true;
+            if (!dagIntimatePattern.test(dagImageContext(image))) return false;
+            image.setAttribute('data-dag-kosher-blocked', 'true');
+            ['src','srcset','data-src','data-lazy-src','data-original','data-srcset'].forEach(function(name) {
+              image.removeAttribute(name);
+            });
+            image.style.setProperty('display', 'none', 'important');
+            return true;
+          }
           function dagHttpsImageSource(image) {
             var candidates = [
               image.getAttribute('data-src'),
@@ -1449,6 +1476,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               return;
             }
             if (tag === 'img') {
+              if (dagBlockIntimateImage(node)) return;
               var source = dagHttpsImageSource(node);
               if (!source) {
                 node.remove();
@@ -1484,7 +1512,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               childList: true,
               subtree: true,
               attributes: true,
-              attributeFilter: ['src', 'srcset', 'style', 'class']
+              attributeFilter: ['src', 'srcset', 'style', 'class', 'alt', 'title', 'aria-label']
             });
           }
           return document.body ? document.body.innerText.substring(0,24000) : '';
