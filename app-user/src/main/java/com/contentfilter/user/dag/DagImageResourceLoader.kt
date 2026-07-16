@@ -41,12 +41,18 @@ internal class DagImageResourceLoader(
     private val blockedCount = AtomicInteger(0)
     private val uncertainCount = AtomicInteger(0)
     private val imageSlots = Semaphore(MaximumConcurrentImages, true)
+    private val responseCache = LinkedHashMap<String, CachedImageResource>(16, 0.75f, true)
+    private var responseCacheBytes = 0
 
     fun resetPage() {
         imageCount.set(0)
         allowedCount.set(0)
         blockedCount.set(0)
         uncertainCount.set(0)
+        synchronized(responseCache) {
+            responseCache.clear()
+            responseCacheBytes = 0
+        }
     }
 
     fun pageSummary(): DagImagePageSummary =
@@ -63,7 +69,10 @@ internal class DagImageResourceLoader(
         if (request.isForMainFrame) return null
         if (isBlockedMediaRequest(request.url.toString(), request.requestHeaders)) return blockedResource()
         if (!isProbableImageRequest(request.url.toString(), request.requestHeaders)) return null
-        if (request.url.scheme != "https" || imageCount.incrementAndGet() > MaximumImagesPerPage) return blockedResource()
+        cachedResource(request.url.toString())?.let { return it }
+        if (request.url.scheme != "https" || imageCount.incrementAndGet() > MaximumImagesPerPage) {
+            return unavailableImageResource()
+        }
 
         val acquired =
             try {
@@ -74,12 +83,12 @@ internal class DagImageResourceLoader(
             }
         if (!acquired) {
             uncertainCount.incrementAndGet()
-            return blockedResource()
+            return unavailableImageResource()
         }
         return try {
             runCatching { loadClassifiedImage(request, pageUrl) }.getOrElse {
                 uncertainCount.incrementAndGet()
-                blockedResource()
+                unavailableImageResource()
             }
         } finally {
             imageSlots.release()
@@ -104,14 +113,14 @@ internal class DagImageResourceLoader(
         }
 
         client.newCall(requestBuilder.build()).execute().use { response ->
-            if (!response.isSuccessful || response.request.url.scheme != "https") return blockedResource()
-            val body = response.body ?: return blockedResource()
-            if (body.contentLength() > DagImageClassifier.MaximumImageBytes) return blockedResource()
+            if (!response.isSuccessful || response.request.url.scheme != "https") return unavailableImageResource()
+            val body = response.body ?: return unavailableImageResource()
+            if (body.contentLength() > DagImageClassifier.MaximumImageBytes) return unavailableImageResource()
             val bytes = body.byteStream().readLimited(DagImageClassifier.MaximumImageBytes)
             val mimeType = body.contentType()?.toString()
             if (isSafeStaticSvg(bytes, mimeType)) {
                 allowedCount.incrementAndGet()
-                return imageResource(bytes, "image/svg+xml", "safe-icon")
+                return cacheAndCreateResource(request.url.toString(), bytes, "image/svg+xml", "safe-icon")
             }
             val classification = classifier.classify(bytes, mimeType)
             when (classification.decision) {
@@ -120,26 +129,21 @@ internal class DagImageResourceLoader(
                 DagImageDecision.Uncertain -> uncertainCount.incrementAndGet()
             }
             if (classification.decision != DagImageDecision.Allowed) {
-                return blurredImageResource(bytes) ?: blockedResource()
+                return blurredImageResource(request.url.toString(), bytes) ?: unavailableImageResource()
             }
 
-            return WebResourceResponse(
-                classification.mimeType ?: return blockedResource(),
-                null,
-                200,
-                "OK",
-                mapOf(
-                    "Access-Control-Allow-Origin" to "*",
-                    "Cache-Control" to "no-store",
-                    "Content-Length" to bytes.size.toString(),
-                    "X-Content-Type-Options" to "nosniff",
-                ),
-                ByteArrayInputStream(bytes),
+            return cacheAndCreateResource(
+                request.url.toString(),
+                bytes,
+                classification.mimeType ?: return unavailableImageResource(),
             )
         }
     }
 
-    private fun blurredImageResource(bytes: ByteArray): WebResourceResponse? {
+    private fun blurredImageResource(
+        cacheKey: String,
+        bytes: ByteArray,
+    ): WebResourceResponse? {
         val source = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
         return try {
             val outputWidth = minOf(source.width, MaximumBlurredDimension)
@@ -152,7 +156,7 @@ internal class DagImageResourceLoader(
             try {
                 if (!blurred.compress(Bitmap.CompressFormat.JPEG, BlurJpegQuality, output)) return null
                 val blurredBytes = output.toByteArray()
-                imageResource(blurredBytes, "image/jpeg", "blurred")
+                cacheAndCreateResource(cacheKey, blurredBytes, "image/jpeg", "blurred")
             } finally {
                 if (blurred !== tiny && blurred !== source) blurred.recycle()
                 if (tiny !== source) tiny.recycle()
@@ -160,6 +164,32 @@ internal class DagImageResourceLoader(
         } finally {
             source.recycle()
         }
+    }
+
+    private fun cachedResource(key: String): WebResourceResponse? =
+        synchronized(responseCache) { responseCache[key] }?.let {
+            imageResource(it.bytes, it.mimeType, it.decision)
+        }
+
+    private fun cacheAndCreateResource(
+        key: String,
+        bytes: ByteArray,
+        mimeType: String,
+        decision: String? = null,
+    ): WebResourceResponse {
+        val cached = CachedImageResource(bytes, mimeType, decision)
+        if (bytes.size <= MaximumCachedImageBytes) {
+            synchronized(responseCache) {
+                responseCache.put(key, cached)?.let { responseCacheBytes -= it.bytes.size }
+                responseCacheBytes += bytes.size
+                while (responseCacheBytes > MaximumResponseCacheBytes || responseCache.size > MaximumCachedImages) {
+                    val eldest = responseCache.entries.iterator().next()
+                    responseCacheBytes -= eldest.value.bytes.size
+                    responseCache.remove(eldest.key)
+                }
+            }
+        }
+        return imageResource(cached.bytes, cached.mimeType, cached.decision)
     }
 
     private fun imageResource(
@@ -206,9 +236,18 @@ internal class DagImageResourceLoader(
         const val MaximumBlurredDimension = 480
         const val BlurSampleSide = 4
         const val BlurJpegQuality = 72
+        const val MaximumCachedImages = 24
+        const val MaximumCachedImageBytes = 1024 * 1024
+        const val MaximumResponseCacheBytes = 8 * 1024 * 1024
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }
 }
+
+private data class CachedImageResource(
+    val bytes: ByteArray,
+    val mimeType: String,
+    val decision: String?,
+)
 
 internal fun isSafeStaticSvg(
     bytes: ByteArray,
@@ -278,6 +317,22 @@ private fun Map<String, String>.headerValue(name: String): String =
 private fun blockedResource(): WebResourceResponse =
     WebResourceResponse("text/plain", "utf-8", 204, "Blocked", emptyMap(), ByteArrayInputStream(ByteArray(0)))
 
+private fun unavailableImageResource(): WebResourceResponse =
+    WebResourceResponse(
+        "image/png",
+        null,
+        200,
+        "OK",
+        mapOf(
+            "Access-Control-Allow-Origin" to "*",
+            "Cache-Control" to "no-store",
+            "Content-Length" to NeutralPlaceholderPng.size.toString(),
+            "X-Content-Type-Options" to "nosniff",
+            "X-DAG-Image-Decision" to "blurred",
+        ),
+        ByteArrayInputStream(NeutralPlaceholderPng),
+    )
+
 private val ImageExtensions =
     setOf(
         ".jpg",
@@ -298,6 +353,13 @@ private val BlockedMediaExtensions =
     )
 
 private const val MaximumSafeSvgBytes = 64 * 1024
+
+private val NeutralPlaceholderPng by lazy(LazyThreadSafetyMode.PUBLICATION) {
+    android.util.Base64.decode(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        android.util.Base64.DEFAULT,
+    )
+}
 private val ForbiddenSvgPattern =
     listOf(
         Regex("<!DOCTYPE|<!ENTITY", RegexOption.IGNORE_CASE),

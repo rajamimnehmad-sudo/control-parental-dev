@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 235
-App Admin versionCode 235
+App Usuario versionCode 236
+App Admin versionCode 236
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,24 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-235-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-235-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-236-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-236-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 0ec6f8b406063d4fcd530d652112155ba27a2019ada105c8e0dd8b5ab5d9c636
-Admin   e3cc88b43fd2317cbbebbbb4ffc2741069d562765576e182216795e5e6134a84
+Usuario 15c41e33a9a66ea6b477c2d0bb5f0d13041d9741f4e949c0c058fbc7ce111273
+Admin   47b1abd930fbbea438b522cda05ad4167ca7e57babca7b5e924f4ba3f03d3808
 ```
+
+## Implementacion 2026-07-16 - DEV 236 entrega visual estable y deduplicada
+
+- DAG conserva en memoria solo durante la pagina activa hasta 24 respuestas visuales ya clasificadas, con limites de 1 MB por recurso y 8 MB totales. Una URL repetida por `lazy loading`, recomposicion del sitio o atributos dinamicos reutiliza exactamente la copia que ya paso por las IAs, evitando otra descarga y otra inferencia.
+- La cache se borra al cambiar o reiniciar la pagina, no persiste en disco, no cruza paginas y no convierte una decision antigua en confianza futura. Historial, sesiones, aprobaciones y consumo Brave no cambian.
+- Cuando una imagen no puede decodificarse, excede los limites, agota el turno de analisis o usa un formato inseguro, DAG devuelve una superficie raster neutra marcada como difuminada en lugar de un recurso vacio. Video y audio siguen bloqueados sin placeholder.
+- El backlog deja de mostrar como `En progreso` o `Idea` tickets que sus propias fichas y el handoff ya registraban como resueltos en DEV 225, 233 y 234.
+- Validacion: 60 tests DEV Usuario, ktlint y builds optimizados Usuario/Admin correctos (758 tareas). APKs/manifiestos DEV 236 publicados exclusivamente en Supabase DEV y verificados por version y SHA-256.
 
 ## Implementacion 2026-07-16 - DEV 235 modestia visual regional y blur reforzado
 
