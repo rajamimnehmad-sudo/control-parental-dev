@@ -1,12 +1,23 @@
 package com.contentfilter.user.dag
 
+import java.io.File
 import java.net.InetAddress
+import java.security.MessageDigest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class DagImagePolicyTest {
+    @Test
+    fun `professional model artifact is pinned`() {
+        val relative = "src/main/assets/dag/nsfw_marqo_vit_tiny_384.onnx"
+        val model = listOf(File(relative), File("app-user/$relative")).first(File::isFile)
+        val digest = MessageDigest.getInstance("SHA-256").digest(model.readBytes()).toHex()
+
+        assertEquals("7b81155313d894bba3a3b9bace059a6da2a0c509d10cea43fcb0b3c5a4edd26d", digest)
+    }
+
     @Test
     fun `only low unsafe scores are allowed`() {
         assertEquals(DagImageDecision.Allowed, dagImageDecision(0f))
@@ -20,6 +31,27 @@ class DagImagePolicyTest {
         assertEquals(DagImageDecision.Uncertain, dagImageDecision(Float.NaN))
         assertEquals(DagImageDecision.Uncertain, dagImageDecision(-0.1f))
         assertEquals(DagImageDecision.Uncertain, dagImageDecision(1.1f))
+    }
+
+    @Test
+    fun `professional model only allows extremely low unsafe probability`() {
+        assertEquals(DagImageDecision.Allowed, dagProfessionalImageDecision(0f))
+        assertEquals(
+            DagImageDecision.Allowed,
+            dagProfessionalImageDecision(DagProfessionalImageClassifier.SafeThreshold),
+        )
+        assertEquals(DagImageDecision.Uncertain, dagProfessionalImageDecision(0.081f))
+        assertEquals(
+            DagImageDecision.Blocked,
+            dagProfessionalImageDecision(DagProfessionalImageClassifier.BlockThreshold),
+        )
+        assertEquals(DagImageDecision.Uncertain, dagProfessionalImageDecision(Float.NaN))
+    }
+
+    @Test
+    fun `professional probability conversion is stable`() {
+        assertTrue(binarySoftmaxFirst(4f, -4f) > 0.99f)
+        assertTrue(binarySoftmaxFirst(-4f, 4f) < 0.01f)
     }
 
     @Test
@@ -47,3 +79,5 @@ class DagImagePolicyTest {
         assertTrue(isPublicAddress(InetAddress.getByName("2606:4700:4700::1111")))
     }
 }
+
+private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

@@ -698,6 +698,7 @@ Revision realizada el 2026-07-15 sobre `Backlog Codex - Control Parental`. El co
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-VISUAL-KOSHER-02 | 2026-07-15, DEV 229 | Ensemble local Marqo ViT-Tiny + OpenNSFW, umbrales conservadores y bloqueo explícito de lencería/ropa íntima; imágenes y scores permanecen en el teléfono |
 | DAG-AUTOCOMPLETE-01 | 2026-07-15, DEV 228 | Sugerencias durante escritura desde historial cifrado local y reformulaciones seguras; clasificación local, debounce y cero consultas Brave por pulsación |
 | DAG-THEME-01 | 2026-07-15, DEV 228 | Barra más compacta y colores explícitos para resúmenes y sugerencias en tema oscuro/claro |
 | DAG-APPROVAL-POLICY-01 | 2026-07-15, DEV 227 | Admin carga la politica completa antes de aprobar y rechaza una aprobacion DAG sobre politica incompleta, evitando cerrar el navegador |

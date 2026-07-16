@@ -176,7 +176,7 @@ class DagContentClassifier
         ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, modelVersion)
 
         companion object {
-            const val ModelVersion = "dag-local-text-4"
+            const val ModelVersion = "dag-local-text-5"
             const val MaxPageCharacters = 24_000
             private const val MaxSemanticCharacters = 4_000
             private const val MaxNeuralCharacters = 2_000
@@ -231,6 +231,8 @@ class DagContentClassifier
                         setOf(
                             "porn", "porno", "pornografia", "pornography", "xxx", "nude", "nudes", "nudity",
                             "desnudo", "desnuda", "desnudez", "explicit sex", "sexo explicito", "escort", "prostitucion",
+                            "lenceria", "lenceria intima", "ropa interior", "ropa intima", "corpiño", "bombacha",
+                            "lingerie", "intimate apparel", "women underwear", "womens underwear", "bra and panties",
                             "פורנו", "פורנוגרפיה", "עירום", "זנות", "מין מפורש",
                         ).toMatchers(),
                     "dating" to

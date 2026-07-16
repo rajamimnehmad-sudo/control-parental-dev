@@ -66,6 +66,26 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `intimate apparel is blocked by kosher policy`() {
+        listOf(
+            "lencería íntima de mujer",
+            "catálogo de ropa interior femenina",
+            "women lingerie store",
+            "bra and panties sale",
+        ).forEach { query ->
+            assertEquals(DagClassification.Blocked, classifier.classifyQuery(query).decision, query)
+        }
+        assertEquals(
+            DagClassification.Blocked,
+            classifier.classifyPage(
+                url = "https://shop.example/intimates",
+                title = "Nueva colección",
+                text = "Catálogo de lencería y ropa íntima para mujer",
+            ).decision,
+        )
+    }
+
+    @Test
     fun `medical religious and educational sensitive contexts remain uncertain`() {
         assertEquals(DagClassification.Uncertain, classifier.classifyQuery("educación sexual médica").decision)
         assertEquals(DagClassification.Uncertain, classifier.classifyQuery("sexual health education").decision)

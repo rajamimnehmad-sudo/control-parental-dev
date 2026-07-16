@@ -32,12 +32,21 @@ internal fun dagImageDecision(unsafeScore: Float): DagImageDecision =
         else -> DagImageDecision.Uncertain
     }
 
+internal fun dagProfessionalImageDecision(unsafeProbability: Float): DagImageDecision =
+    when {
+        !unsafeProbability.isFinite() || unsafeProbability !in 0f..1f -> DagImageDecision.Uncertain
+        unsafeProbability <= DagProfessionalImageClassifier.SafeThreshold -> DagImageDecision.Allowed
+        unsafeProbability >= DagProfessionalImageClassifier.BlockThreshold -> DagImageDecision.Blocked
+        else -> DagImageDecision.Uncertain
+    }
+
 internal class DagImageClassifier(
     context: Context,
 ) : Closeable {
     private val applicationContext = context.applicationContext
     private val lock = Any()
     private var interpreter: Interpreter? = null
+    private val professionalClassifier = DagProfessionalImageClassifier(applicationContext)
 
     fun classify(
         bytes: ByteArray,
@@ -50,6 +59,14 @@ internal class DagImageClassifier(
             }
             val bitmap = decodeForClassification(bytes) ?: return@synchronized DagImageClassification(DagImageDecision.Uncertain)
             try {
+                val professional = professionalClassifier.classify(bitmap)
+                if (professional.decision != DagImageDecision.Allowed) {
+                    return@synchronized DagImageClassification(
+                        professional.decision,
+                        professional.unsafeScore,
+                        detectedMime,
+                    )
+                }
                 val output = Array(1) { FloatArray(OutputClasses) }
                 model().run(bitmapToInput(bitmap), output)
                 val unsafeScore = output[0][UnsafeOutputIndex]
@@ -65,6 +82,7 @@ internal class DagImageClassifier(
         synchronized(lock) {
             interpreter?.close()
             interpreter = null
+            professionalClassifier.close()
         }
     }
 

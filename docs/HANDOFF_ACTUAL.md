@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 228
-App Admin versionCode 228
+App Usuario versionCode 229
+App Admin versionCode 229
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-228-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-228-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-229-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-229-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 690242c8bb9a4779b4a88eac3c3b7b6b64f58098d6179609c8bb28bf05049678
-Admin   a3dcec4816998db9831c43d737582787ac9367b9727feeae57cdd00a2c585a63
+Usuario PENDIENTE
+Admin   PENDIENTE
 ```
+
+## Implementacion 2026-07-15 - DEV 229 IA visual kosher profesional
+
+- ARM64 incorpora `Marqo/nsfw-image-detection-384`, ViT-Tiny local Apache-2.0 de 5,6 millones de parámetros entrenado sobre 220.000 imágenes; el model card reporta 98,56 % en su propio conjunto balanceado. Artefacto ONNX de 22.527.617 bytes, SHA-256 `7b81155313d894bba3a3b9bace059a6da2a0c509d10cea43fcb0b3c5a4edd26d`.
+- La decisión es un ensemble conservador: una imagen solo se muestra si el ViT profesional y el OpenNSFW anterior la consideran segura. Zona dudosa, error o salida inválida permanecen ocultos. ARM32 conserva OpenNSFW porque el runtime ONNX se excluye allí por compatibilidad/tamaño.
+- `lencería`, ropa íntima/interior y equivalentes en español e inglés son categoría sexual explícita para la política kosher; se bloquean desde búsqueda/metadatos/texto de página aunque no exista desnudez. Las aprobaciones rápidas anteriores se invalidan por la nueva versión visual.
+- Todo sucede en el teléfono: imagen, URL, probabilidad y decisión no se envían a Supabase, Brave ni al administrador. La precisión probabilística no equivale a garantía absoluta y requiere validación física con páginas reales.
 
 ## Implementacion 2026-07-15 - DEV 228 autocompletado y contraste DAG
 

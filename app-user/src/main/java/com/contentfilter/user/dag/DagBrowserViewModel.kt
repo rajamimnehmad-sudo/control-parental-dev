@@ -640,7 +640,8 @@ class DagBrowserViewModel
             const val ApprovalPollingAttempts = 24
             const val SuggestionDebounceMillis = 120L
             const val PageApprovalModelVersion =
-                "dag-page-approval-1:${DagContentClassifier.ModelVersion}:${DagNeuralTextClassifier.ModelVersion}"
+                "dag-page-approval-1:${DagContentClassifier.ModelVersion}:${DagNeuralTextClassifier.ModelVersion}:" +
+                    DagProfessionalImageClassifier.ModelVersion
         }
     }
 
