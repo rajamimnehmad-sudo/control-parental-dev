@@ -480,8 +480,95 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 | AI-VISUAL-01 | Idea | P3 | Evaluacion puntual de regiones visibles, sujeta a privacidad, bateria y politicas |
 | AI-SENSITIVE-01 | Idea | P3 | Riesgos sensibles en chats como proyecto separado legal y de privacidad |
 | DAG-VIDEO-01 | Idea | P2 | Clasificar video localmente mediante muestreo temporal, con limites de CPU, bateria y memoria; video sigue bloqueado hasta aprobar el ticket |
+| POLICY-SCHEDULE-01 | Idea | P2 | Politicas adaptativas por horario o contexto, siempre bajo control del administrador |
+| WEB-AMBIGUITY-01 | Idea | P2 | Fallback seguro a SafeSearch o Solo resultados ante decisiones ambiguas |
+| POLICY-EXPLAIN-01 | Idea | P2 | Explicaciones simples y solicitud de autorizacion para decisiones bloqueadas o inciertas |
+| POLICY-SUGGEST-01 | Idea | P3 | Sugerencias de categorias, dominios o reglas redundantes sin aplicacion automatica |
+| COMMUNITY-REVIEW-01 | Idea | P3 | Revision humana y publicacion comunitaria firmada antes de decisiones globales |
+| OPS-HEALTH-ALERTS-01 | Archivado | P2 | Alertas agregadas de salud sin historial; agrupadas en alertas Admin y Super Admin |
 
-Ideas conservadas: politicas por horario/contexto; fallback SafeSearch para ambiguedad; explicaciones y autorizacion; sugerencias sin aplicacion automatica; revision humana y publicacion comunitaria firmada; alertas agregadas sin historial de navegacion. La experiencia de navegador independiente se normalizo como `DAG-STANDALONE-01`.
+### Ideas historicas normalizadas con ID propio
+
+#### POLICY-SCHEDULE-01 - Politicas por horario o contexto
+
+- Estado: `Idea`. Tipo: politica y automatizacion. Prioridad: P2. Evidencia: Google Doc historico conciliado el 2026-07-15. Esfuerzo: L. Riesgo: alto.
+- Problema y solucion propuesta: permitir variaciones explicitas por horario o contexto sin reemplazar reglas deterministicas ni aplicar cambios inferidos sin control Admin.
+- Dependencias: modelo de politicas, reloj y zona horaria, reglas por dispositivo, offline y auditoria.
+- Aceptacion propuesta: precedencia deterministica; comportamiento offline definido; cambios visibles y revocables; sin reglas sorpresa ni debilitamiento automatico.
+- Decisiones pendientes: contextos admitidos, autoridad, zona horaria, conflictos y experiencia Admin/Usuario.
+
+#### WEB-AMBIGUITY-01 - Fallback seguro ante ambiguedad
+
+- Estado: `Idea`. Tipo: seguridad Web y UX. Prioridad: P2. Evidencia: Google Doc historico conciliado el 2026-07-15. Esfuerzo: M. Riesgo: medio.
+- Problema y solucion propuesta: cuando una decision sea ambigua, aplicar temporalmente SafeSearch o Solo resultados segun una politica explicita, en vez de permitir contenido incierto o fallar de forma confusa.
+- Dependencias: `WebPolicyDecision`, DAG, SafeSearch, Solo resultados y autorizaciones Admin.
+- Aceptacion propuesta: fallback cerrado y explicable; no anula bloqueos; caduca o se revoca; no guarda consulta ni contenido.
+- Decisiones pendientes: fallback por categoria/confianza, duracion, mensaje y posibilidad de solicitar autorizacion.
+
+#### POLICY-EXPLAIN-01 - Explicaciones y autorizacion
+
+- Estado: `Idea`. Tipo: UX, transparencia y solicitudes. Prioridad: P2. Evidencia: Google Doc historico conciliado el 2026-07-15. Esfuerzo: M. Riesgo: medio.
+- Problema y solucion propuesta: explicar con lenguaje simple por que una accion fue bloqueada o quedo incierta y ofrecer solicitud de autorizacion solo cuando corresponda, sin exponer reglas evadibles ni detalles sensibles.
+- Dependencias: decisiones Web/apps, solicitudes, textos neutrales, privacidad y accesibilidad.
+- Aceptacion propuesta: motivo entendible; una accion siguiente clara; sin datos sensibles ni pistas de evasion; estados sincronizados y sin solicitudes duplicadas.
+- Decisiones pendientes: nivel de detalle, categorias visibles, eventos autorizables y textos por edad/contexto.
+
+#### POLICY-SUGGEST-01 - Sugerencias sin aplicacion automatica
+
+- Estado: `Idea`. Tipo: asistencia Admin y calidad de reglas. Prioridad: P3. Evidencia: Google Doc historico conciliado el 2026-07-15. Esfuerzo: L. Riesgo: medio.
+- Problema y solucion propuesta: detectar posibles categorias, dominios o reglas redundantes y presentarlos como sugerencias revisables; nunca aplicar cambios automaticamente.
+- Dependencias: inventario de reglas, metricas agregadas sin navegacion, explicabilidad y auditoria.
+- Aceptacion propuesta: toda sugerencia muestra fundamento y alcance; aceptar/rechazar es explicito; no cambia proteccion sin confirmacion; falsos positivos medidos.
+- Decisiones pendientes: fuentes de evidencia, destinatarios, frecuencia, privacidad y ciclo de descarte.
+
+#### COMMUNITY-REVIEW-01 - Revision y publicacion comunitaria firmada
+
+- Estado: `Idea`. Tipo: gobernanza, seguridad de contenido e infraestructura. Prioridad: P3. Evidencia: Google Doc historico conciliado el 2026-07-15. Esfuerzo: XL. Riesgo: muy alto.
+- Problema y solucion propuesta: permitir revision humana antes de convertir decisiones locales en conocimiento comunitario, con publicacion firmada, trazable y reversible.
+- Dependencias: roles y comunidades, moderacion, firma, versionado, rollback, privacidad, licencias y proceso de apelacion.
+- Aceptacion propuesta: ninguna decision local se publica automaticamente; revisores autorizados; artefactos firmados y versionados; rollback; ausencia de consultas, historial o datos personales.
+- Decisiones pendientes: gobernanza, quorum, categorias, retencion, apelaciones y responsabilidad legal.
+
+#### OPS-HEALTH-ALERTS-01 - Alertas agregadas de salud
+
+- Estado: `Archivado`. Tipo: operaciones y alertas. Prioridad historica: P2. Evidencia: Google Doc historico conciliado el 2026-07-15. Esfuerzo estimado: M. Riesgo: medio.
+- Motivo de archivo: la idea no se borra; se agrupa en `ADMIN-ALERTS-UX-01` para App Admin y `SUPERADMIN-ALERTS-01` para Super Admin, ambos con requisito de no incluir historial de navegacion.
+- Dependencias y aceptacion heredadas: eventos de salud/proteccion, deduplicacion, permisos, destinatarios y privacidad; las alertas deben ser agregadas, atribuibles al dispositivo correcto y no contener navegacion.
+- Decisiones pendientes: se resolveran en los dos tickets receptores; este ID no autoriza implementacion separada.
+
+## Conciliacion completa del Google Doc historico
+
+Revision realizada el 2026-07-15 sobre `Backlog Codex - Control Parental`. El contenido tecnico desactualizado no reemplaza al handoff; cada idea de producto quedo mapeada sin borrarse.
+
+| Bloque historico | Destino canonico | Resultado de conciliacion |
+| --- | --- | --- |
+| Ciclo de vida de comunidad y licencia | `SEC-LICENSE-01` | Conservado como P0 |
+| Borrado definitivo de usuario | `DATA-DELETE-01` | Conservado y ampliado con la falla actual |
+| Medicion sostenida de bateria, datos y estabilidad | `OPS-METRICS-01` | Conservado como P1 |
+| Tiempo real de uso de apps y lista estable | `USAGE-REAL-01` | Conservado como P1 |
+| Push real FCM | `PUSH-REAL-01` | Resuelto; estado tecnico en handoff |
+| Push manual y mensajeria desde Super Admin | `SUPERADMIN-MSG-01` | Conservado como P2 |
+| Solicitudes y actualizacion manual | `REQUESTS-UX-01` | Conservado como P2 |
+| Super Admin: token inmediato | `SUPERADMIN-TOKEN-01` | Conservado como P2 |
+| Pulido visual | `UI-POLISH-01` | Conservado como P2 |
+| Resiliencia de App Usuario | `USER-RESILIENCE-01` | Conservado como P2 |
+| Fuentes complementarias Web | `WEB-SOURCES-01` y `WEB-LISTS-A` | Seguimiento conservado; primera incorporacion resuelta |
+| Cache local de reputacion | `WEB-CACHE-01` | Conservado como P1 |
+| Clasificador local de dominios | `AI-DOMAIN-01` | Conservado como P1 |
+| Clasificador local de busquedas | `AI-SEARCH-01A` y `AI-SEARCH-01B` | Primera fase en progreso; ampliacion conservada |
+| Evasiones, idiomas y dominios espejo | `NET-EVASION-01` y `AI-SEARCH-01B` | Separado entre red y clasificacion |
+| IA visual local | `AI-VISUAL-01` y `DAG-IMAGES-01` | Exploracion general conservada; imagenes DAG resueltas |
+| Chats y riesgos sensibles | `AI-SENSITIVE-01` | Conservado como proyecto separado P3 |
+| Buscador/navegador propio DAG | `DAG-FOUNDATION-01`, `DAG-BROWSER-01A` y `DAG-STANDALONE-01` | Implementado por fases; no queda como idea duplicada |
+| Politicas por horario o contexto | `POLICY-SCHEDULE-01` | Normalizado con ID propio |
+| Fallback SafeSearch/Solo resultados | `WEB-AMBIGUITY-01` | Normalizado con ID propio |
+| Explicaciones y autorizacion | `POLICY-EXPLAIN-01` | Normalizado con ID propio |
+| Sugerencias sin aplicacion automatica | `POLICY-SUGGEST-01` | Normalizado con ID propio |
+| Revision humana y publicacion comunitaria firmada | `COMMUNITY-REVIEW-01` | Normalizado con ID propio |
+| Alertas agregadas sin historial | `OPS-HEALTH-ALERTS-01` | Archivado por agrupacion, con destinos explicitos |
+| Decisiones comerciales: familias, escuelas, comunidades, pagos externos y multiples admins | Decisiones de producto vigentes | Conservadas como decisiones, no como tickets duplicados |
+| Baseline, versiones, APK, FCM y cierres DEV 188-192 | `docs/HANDOFF_ACTUAL.md` y resueltos relevantes | Reconciliados como historia tecnica; prevalece el handoff |
+| Bloquear imagenes | Regla de exclusion historica | Eliminado previamente y no debe reaparecer |
 
 ## Decisiones de producto vigentes
 
