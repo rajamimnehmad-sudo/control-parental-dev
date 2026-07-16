@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 241
-App Admin versionCode 241
+App Usuario versionCode 242
+App Admin versionCode 242
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-241-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-241-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-242-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-242-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 5c5fc702692e044db5973992afbfd27af4438672ca2eeaaf15cf2b46e102c1fe
-Admin   bee3f0aa3e86174d4110c43c2d392cfd6e3a90ad2f61da127abfe6ea1d9fe642
+Usuario 214181454504f56294cc0b109d6d5d69503c7bf7ae39ee89547d7d4de85e011a
+Admin   0d305da4f9d95149751c1f4a1f41bd84dd29463288ebba2736642acff224f349
 ```
+
+## Publicacion correctiva DEV 242 - 2026-07-16
+
+- El workflow `Publicar APKs DEV` `29524803991` termino correctamente en 5m32s y publico ambos APK una sola vez exclusivamente en Supabase DEV `syeycayasyufedwoprea`.
+- Android CI `29524803097` termino correctamente: build DEV, unit tests, ktlint, lint y detekt.
+- Los manifiestos y las descargas publicas coinciden exactamente con los SHA-256 anteriores. `aapt` confirmo version 242, paquetes DEV correctos y `minSdkVersion 29`; `apksigner` confirmo en ambos la firma `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- DEV 242 reemplaza a 241 como version publica vigente. La prueba del bootstrap Admin sin una instalacion previa sigue pendiente exclusivamente en el SM-S908E personal; no se desinstalo Admin ni se borraron datos del SM-A235M para simularla.
 
 ## Publicacion agrupada DEV 241 - 2026-07-16
 
@@ -98,13 +105,13 @@ Admin   bee3f0aa3e86174d4110c43c2d392cfd6e3a90ad2f61da127abfe6ea1d9fe642
 - Validacion: tests unitarios, ktlint y builds DEV optimizados de ambos APK correctos; Superweb paso TypeScript, ESLint de `src` y build optimizado. El lint global de Superweb sigue incluyendo deuda ajena en `.open-next` generado.
 - Prueba fisica SM-A235M: un aviso temporal para ambos roles fue creado por la RPC y aparecio en las bandejas Admin y Usuario al actualizar. La accion de apertura directa navega a Avisos. Falta confirmar el push FCM desde una sesion Superweb utilizable; el navegador integrado solo expuso pestañas vacias y no se extrajeron credenciales. Android DEV 241 quedo publicado en el cierre agrupado; Superweb sigue pendiente por el bloqueo de hosting documentado arriba.
 
-## Correccion 2026-07-16 - candidato DEV 242 acceso Usuario e instalacion Admin
+## Correccion 2026-07-16 - DEV 242 acceso Usuario e instalacion Admin
 
 - El reporte corresponde al Samsung SM-S908E personal: con la barrera armada, DEV 241 ocultaba el launcher de App Usuario y bloqueaba correctamente el instalador abierto desde el navegador. Como Admin aun no estaba instalado, no existia una ruta practica para autorizar mantenimiento y se producia un circulo cerrado.
 - DEV 242 mantiene siempre visible el icono de App Usuario. Se revierte la estrategia visual de `BARRIER-LAUNCHER-01`; la proteccion posterior de desinstalacion mediante Accessibility y Device Admin permanece, sin prometer capacidad MDM en Android normal.
 - Ajustes de App Usuario agrega `App Administrador`: consulta el manifiesto Admin oficial, descarga el APK, verifica SHA-256, packageName exacto de la variante y que la firma sea la misma que App Usuario. Solo entonces abre la ventana interna firmada de dos minutos; Android conserva el permiso por origen y la confirmacion normal de instalacion.
 - Una descarga o instalacion iniciada directamente desde Chrome sigue bloqueada deliberadamente. No se habilitan APK arbitrarios, no se incorpora ningun secreto y no se usa Service Role en Android.
-- Usuario y Admin suben juntos a `versionCode 242`. Tests de confianza para paquete/firma, tests Usuario, ktlint de Usuario/core-update y builds DEV de ambos APK correctos. Prueba fisica en SM-A235M: actualizacion in-place sin borrar datos, ambos paquetes en 242, alias Usuario restaurado, MainActivity abre y la tarjeta Admin informa correctamente que la version instalada ya esta actualizada. Falta ejecutar el bootstrap real en el SM-S908E, donde Admin no esta instalado.
+- Usuario y Admin subieron juntos a `versionCode 242` y estan publicados. Tests de confianza para paquete/firma, tests Usuario, ktlint de Usuario/core-update, lint y builds DEV de ambos APK correctos. Prueba fisica en SM-A235M: actualizacion in-place sin borrar datos, ambos paquetes en 242, alias Usuario restaurado, MainActivity abre y la tarjeta Admin informa correctamente que la version instalada ya esta actualizada. Falta ejecutar el bootstrap real en el SM-S908E, donde Admin no esta instalado.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 DATA-DELETE-01
 

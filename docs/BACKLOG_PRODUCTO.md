@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 241 y App Admin DEV 241, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 242 y App Admin DEV 242, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -150,7 +150,7 @@ Flujo de una entrada:
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Implementado candidato DEV 241; pendiente prueba fisica | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
-| BARRIER-LAUNCHER-01 | Revisado candidato DEV 242; icono visible y bootstrap Admin seguro | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
+| BARRIER-LAUNCHER-01 | Revisado y publicado DEV 242; pendiente bootstrap en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
@@ -290,7 +290,7 @@ Flujo de una entrada:
 
 ### BARRIER-LAUNCHER-01 - Superficie profesional sin desinstalacion rapida
 
-- Estado: `Revisado candidato DEV 242; pendiente bootstrap real en SM-S908E`. Aprobado por el usuario al ordenar ejecutar todos los tickets y redefinido tras el reporte fisico del 2026-07-16.
+- Estado: `Revisado y publicado DEV 242; pendiente bootstrap real en SM-S908E`. Aprobado por el usuario al ordenar ejecutar todos los tickets y redefinido tras el reporte fisico del 2026-07-16.
 - Tipo: seguridad, antimanipulacion y UX de App Usuario.
 - Prioridad: P2.
 - Problema: al mantener presionado el icono de App Usuario, el launcher muestra la opcion `Desinstalar`. Aunque la barrera actual bloquea las rutas posteriores, la opcion visible transmite una proteccion menos integrada que otros filtros.
