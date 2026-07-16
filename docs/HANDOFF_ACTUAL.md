@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario PENDIENTE
-Admin   PENDIENTE
+Usuario 4ff89ce2fff6212b944c8df96477953f45a0308ff1eead8c98ab207f5e1521e4
+Admin   08a3a94fca550eb2d3d56d34870dd7d1a76d72066e190a11f507d9c4750549dc
 ```
 
 ## Implementacion 2026-07-15 - DEV 229 IA visual kosher profesional
@@ -85,6 +85,7 @@ Admin   PENDIENTE
 - La decisión es un ensemble conservador: una imagen solo se muestra si el ViT profesional y el OpenNSFW anterior la consideran segura. Zona dudosa, error o salida inválida permanecen ocultos. ARM32 conserva OpenNSFW porque el runtime ONNX se excluye allí por compatibilidad/tamaño.
 - `lencería`, ropa íntima/interior y equivalentes en español e inglés son categoría sexual explícita para la política kosher; se bloquean desde búsqueda/metadatos/texto de página aunque no exista desnudez. Las aprobaciones rápidas anteriores se invalidan por la nueva versión visual.
 - Todo sucede en el teléfono: imagen, URL, probabilidad y decisión no se envían a Supabase, Brave ni al administrador. La precisión probabilística no equivale a garantía absoluta y requiere validación física con páginas reales.
+- La variante FP32 inicial llevó el APK a 58 MiB y Supabase DEV rechazó el objeto por tamaño antes de cambiar los manifiestos públicos. La cuantización selectiva de MatMul/Gemm redujo el modelo de 22,5 a 6,7 MB y el APK a 45.574.608 bytes; el control benigno pasó de 5,76 % a 6,37 % NSFW, conservando la decisión segura con el umbral 8 %. Ktlint, tests DEV y builds optimizados Usuario/Admin correctos. APKs/manifiestos DEV 229 publicados solo en Supabase DEV y verificados por versión, hash declarado y HTTP 200.
 
 ## Implementacion 2026-07-15 - DEV 228 autocompletado y contraste DAG
 
