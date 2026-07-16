@@ -57,6 +57,7 @@ class VpnDomainPolicyEvaluator
                                 ),
                         ),
                 )
+            if (policyDecision is PolicyDecision.RequireActivation) return policyDecision
             val webBlocked = snapshot.rules.webNavigationBlocked()
             val onlyResults = !webBlocked && snapshot.rules.onlySearchResultsEnabled()
             if (webBlocked || (onlyResults && policyDecision !is PolicyDecision.Allow)) {

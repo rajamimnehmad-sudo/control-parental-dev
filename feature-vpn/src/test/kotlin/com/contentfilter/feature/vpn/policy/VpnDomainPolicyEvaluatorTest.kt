@@ -35,6 +35,18 @@ class VpnDomainPolicyEvaluatorTest {
     }
 
     @Test
+    fun `expired license requires activation instead of enforcing domain rules`() {
+        val decision =
+            evaluator.evaluate(
+                "blocked.example",
+                snapshot(rule("blocked.example", RuleAction.Block)),
+                activeHealth().copy(licenseState = LicenseState.Expired),
+            )
+
+        assertIs<PolicyDecision.RequireActivation>(decision)
+    }
+
+    @Test
     fun `returns block for blocked domain`() {
         val decision =
             evaluator.evaluate(

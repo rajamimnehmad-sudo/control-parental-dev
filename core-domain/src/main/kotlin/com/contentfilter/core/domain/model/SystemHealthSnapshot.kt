@@ -11,6 +11,9 @@ data class SystemHealthSnapshot(
     val integrityState: ComponentState,
     val databaseState: ComponentState,
     val licenseState: LicenseState,
+    val licenseStartsAtEpochMillis: Long? = null,
+    val licenseExpiresAtEpochMillis: Long? = null,
+    val licenseVerifiedAtEpochMillis: Long? = null,
     val updateState: UpdateState,
     val checkedAtEpochMillis: Long,
 ) {

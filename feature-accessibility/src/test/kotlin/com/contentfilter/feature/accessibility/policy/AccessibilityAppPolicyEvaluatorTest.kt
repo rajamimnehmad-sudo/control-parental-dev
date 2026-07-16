@@ -6,6 +6,7 @@ import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class AccessibilityAppPolicyEvaluatorTest {
@@ -24,6 +25,25 @@ class AccessibilityAppPolicyEvaluatorTest {
         assertEquals(12, context.usedMinutesToday)
         assertEquals(12 * 60, context.time.minuteOfDay)
         assertTrue(context.device.isActivated)
+    }
+
+    @Test
+    fun `expired and suspended licenses do not allow enforcement`() {
+        val expired =
+            evaluator.buildContext(
+                "com.example.app",
+                0,
+                activeHealth().copy(licenseState = LicenseState.Expired),
+            )
+        val suspended =
+            evaluator.buildContext(
+                "com.example.app",
+                0,
+                activeHealth().copy(licenseState = LicenseState.Suspended),
+            )
+
+        assertFalse(expired.device.isActivated)
+        assertFalse(suspended.device.isActivated)
     }
 
     private fun activeHealth(): SystemHealthSnapshot =

@@ -4,6 +4,7 @@ import com.contentfilter.core.database.dao.SyncCursorDao
 import com.contentfilter.core.database.entity.SyncCursorEntity
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceActivation
+import com.contentfilter.core.domain.model.LicenseEntitlement
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
@@ -20,6 +21,7 @@ import com.contentfilter.core.network.dto.RemotePolicyDto
 import com.contentfilter.core.network.dto.RemotePolicyRuleDto
 import com.contentfilter.core.network.remote.RemoteAccountRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
+import com.contentfilter.core.network.remote.RemoteLicenseRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
@@ -108,6 +110,7 @@ class DefaultSyncEngineFastPathTest {
             deviceRepository = FakeDeviceRepository(),
             policyRepository = policies,
             limitRepository = limits,
+            licenseRepository = FakeLicenseRepository(),
             requestRepository = requests,
             syncCursorDao = FakeSyncCursorDao(),
             applier = applier,
@@ -305,6 +308,10 @@ class DefaultSyncEngineFastPathTest {
         override suspend fun saveActivation(activation: DeviceActivation) = Unit
     }
 
+    private class FakeLicenseRepository : RemoteLicenseRepository {
+        override suspend fun getDeviceEntitlement(deviceId: String): RemoteResult<LicenseEntitlement> = error("unused")
+    }
+
     private class FakeSystemStatusRepository : SystemStatusRepository {
         override fun observeHealth(): Flow<SystemHealthSnapshot> = flowOf(error("unused"))
 
@@ -319,6 +326,10 @@ class DefaultSyncEngineFastPathTest {
         override suspend fun updateSyncState(state: ComponentState) = Unit
 
         override suspend fun updateLicenseState(state: LicenseState) = Unit
+
+        override suspend fun updateLicenseEntitlement(entitlement: LicenseEntitlement) = Unit
+
+        override suspend fun refreshLicenseState() = Unit
     }
 
     private companion object {

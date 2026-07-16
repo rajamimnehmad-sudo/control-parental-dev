@@ -5,6 +5,7 @@ import com.contentfilter.core.domain.model.ActivationCredentials
 import com.contentfilter.core.domain.model.ActivationResult
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.DeviceActivation
+import com.contentfilter.core.domain.model.LicenseEntitlement
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.repository.ActivationRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
@@ -62,7 +63,6 @@ class DefaultActivationRepository
                                 ),
                             )
                         }
-                        systemStatusRepository.updateLicenseState(LicenseState.Active)
                         Log.i(
                             LogTag,
                             "Activation skipped; local device is already activated deviceId=${activation.deviceId}",
@@ -170,7 +170,14 @@ class DefaultActivationRepository
                         appRole = credentials.appRole,
                     ),
                 )
-                systemStatusRepository.updateLicenseState(LicenseState.Active)
+                systemStatusRepository.updateLicenseEntitlement(
+                    LicenseEntitlement(
+                        state = LicenseState.Active,
+                        startsAtEpochMillis = null,
+                        expiresAtEpochMillis = null,
+                        verifiedAtEpochMillis = System.currentTimeMillis(),
+                    ),
+                )
                 return@withContext ActivationResult.Activated(domain)
             }
 

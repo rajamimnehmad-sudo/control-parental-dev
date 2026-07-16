@@ -13,6 +13,7 @@ import com.contentfilter.core.network.dto.RemoteDailyLimitDto
 import com.contentfilter.core.network.dto.RemotePolicyRuleDto
 import com.contentfilter.core.network.remote.RemoteAccountRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
+import com.contentfilter.core.network.remote.RemoteLicenseRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
@@ -35,6 +36,7 @@ class DefaultSyncEngine
         private val deviceRepository: RemoteDeviceRepository,
         private val policyRepository: RemotePolicyRepository,
         private val limitRepository: RemoteLimitRepository,
+        private val licenseRepository: RemoteLicenseRepository,
         private val requestRepository: RemoteRequestRepository,
         private val syncCursorDao: SyncCursorDao,
         private val applier: RemoteApplier,
@@ -47,6 +49,7 @@ class DefaultSyncEngine
         override suspend fun syncOnce(): SyncResult = policySyncMutex.withLock { syncOnceLocked() }
 
         private suspend fun syncOnceLocked(): SyncResult {
+            refreshLicenseEntitlement()
             markCurrentDeviceSeen()
             runCatching {
                 outboxProcessor.processPending()
@@ -102,6 +105,7 @@ class DefaultSyncEngine
         override suspend fun syncCoreDataFull(): SyncResult = policySyncMutex.withLock { syncCoreDataFullLocked() }
 
         private suspend fun syncCoreDataFullLocked(): SyncResult {
+            refreshLicenseEntitlement()
             markCurrentDeviceSeen()
             runCatching {
                 outboxProcessor.processPending()
@@ -119,9 +123,19 @@ class DefaultSyncEngine
 
         override suspend fun syncDevicesFull(): SyncResult =
             run {
+                refreshLicenseEntitlement()
                 markCurrentDeviceSeen()
                 syncDevicesFullInternal()
             }
+
+        private suspend fun refreshLicenseEntitlement() {
+            systemStatusRepository.refreshLicenseState()
+            val activation = deviceActivationRepository.currentActivation() ?: return
+            when (val result = licenseRepository.getDeviceEntitlement(activation.deviceId)) {
+                is RemoteResult.Success -> systemStatusRepository.updateLicenseEntitlement(result.value)
+                is RemoteResult.Failure -> Log.w(LogTag, "License refresh deferred: ${result.reason}")
+            }
+        }
 
         private suspend fun syncDevicesFullInternal(): SyncResult =
             when (val result = deviceRepository.pullDevices(updatedAfterIso = null)) {

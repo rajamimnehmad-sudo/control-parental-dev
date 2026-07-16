@@ -190,6 +190,15 @@ object DatabaseMigrations {
             }
         }
 
+    val Migration11To12: Migration =
+        object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE system_health ADD COLUMN licenseStartsAtEpochMillis INTEGER")
+                db.execSQL("ALTER TABLE system_health ADD COLUMN licenseExpiresAtEpochMillis INTEGER")
+                db.execSQL("ALTER TABLE system_health ADD COLUMN licenseVerifiedAtEpochMillis INTEGER")
+            }
+        }
+
     val All: Array<Migration> =
         arrayOf(
             Migration1To2,
@@ -202,5 +211,6 @@ object DatabaseMigrations {
             Migration8To9,
             Migration9To10,
             Migration10To11,
+            Migration11To12,
         )
 }

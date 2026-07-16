@@ -1,6 +1,7 @@
 package com.contentfilter.core.domain.repository
 
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.LicenseEntitlement
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import kotlinx.coroutines.flow.Flow
@@ -22,4 +23,8 @@ interface SystemStatusRepository {
     suspend fun updateSyncState(state: ComponentState)
 
     suspend fun updateLicenseState(state: LicenseState)
+
+    suspend fun updateLicenseEntitlement(entitlement: LicenseEntitlement)
+
+    suspend fun refreshLicenseState()
 }

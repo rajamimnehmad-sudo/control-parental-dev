@@ -5,7 +5,6 @@ import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DevicePolicyContext
 import com.contentfilter.core.domain.model.DomainPolicyContext
 import com.contentfilter.core.domain.model.ExtraTimeGrant
-import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicyContext
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyRule
@@ -17,6 +16,7 @@ import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.TimePolicyContext
 import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
+import com.contentfilter.core.domain.model.allowsProtection
 import com.contentfilter.core.domain.model.onlySearchResultsEnabled
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -153,7 +153,7 @@ class DefaultPolicyEngine : PolicyEngine {
     ): PolicyDecision {
         val device =
             DevicePolicyContext(
-                isActivated = context.healthSnapshot.licenseState != LicenseState.PendingActivation,
+                isActivated = context.healthSnapshot.licenseState.allowsProtection(),
                 healthSnapshot = context.healthSnapshot,
             )
         val time =

@@ -2,11 +2,11 @@ package com.contentfilter.feature.accessibility.policy
 
 import com.contentfilter.core.domain.model.AppPolicyContext
 import com.contentfilter.core.domain.model.DevicePolicyContext
-import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.TimePolicyContext
+import com.contentfilter.core.domain.model.allowsProtection
 import com.contentfilter.core.policy.DefaultPolicyEngine
 import javax.inject.Inject
 
@@ -45,7 +45,7 @@ class AccessibilityAppPolicyEvaluator
                     ),
                 device =
                     DevicePolicyContext(
-                        isActivated = health.licenseState != LicenseState.PendingActivation,
+                        isActivated = health.licenseState.allowsProtection(),
                         healthSnapshot = health,
                     ),
             )

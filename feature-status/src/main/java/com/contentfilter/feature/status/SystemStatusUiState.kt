@@ -68,6 +68,7 @@ data class SystemStatusUiState(
         private fun LicenseState.displayName(): String =
             when (this) {
                 LicenseState.Active -> "Activada"
+                LicenseState.Scheduled -> "Programada"
                 LicenseState.ExpiringSoon -> "Por vencer"
                 LicenseState.PendingActivation -> "Pendiente"
                 LicenseState.Expired -> "Expirada"

@@ -5,9 +5,13 @@ package com.contentfilter.core.domain.model
  */
 enum class LicenseState {
     Active,
+    Scheduled,
     ExpiringSoon,
     Expired,
     GracePeriod,
     Suspended,
     PendingActivation,
 }
+
+fun LicenseState.allowsProtection(): Boolean =
+    this == LicenseState.Active || this == LicenseState.ExpiringSoon || this == LicenseState.GracePeriod

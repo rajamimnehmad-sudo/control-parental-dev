@@ -87,6 +87,15 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Validacion: Supabase DEV `syeycayasyufedwoprea` devolvio correctamente los cuatro casos activo/programado/vencido/suspendido; la funcion auxiliar no es ejecutable por `anon`, mientras las RPC de Super Admin conservan acceso autenticado y su comprobacion interna de rol. `eslint src`, TypeScript y build optimizado de Superweb correctos. El lint global conserva deuda porque incluye artefactos generados `.open-next`; no corresponde al codigo fuente de este ticket.
 - Pendiente de `SEC-LICENSE-01`: propagar el estado efectivo a dispositivos Usuario/Admin ya activados, aplicar el comportamiento offline y completar la restauracion automatica al renovar. Este tramo no publica APK ni Superweb.
 
+## Implementacion 2026-07-16 - candidato DEV 241 SEC-LICENSE-01B
+
+- El ciclo efectivo de licencia ya llega a los dispositivos activados mediante `get_device_license_entitlement`, autenticada con el token del propio dispositivo. Android no incorpora Service Role y la RPC no permite consultar otro dispositivo.
+- Usuario y Admin guardan inicio, vencimiento y ultima verificacion en Room 12. Con esos datos recalculan localmente `Programada`, `Activa`, `Vencida` o `Suspendida`: el vencimiento se aplica tambien sin conexion y un fallo de red conserva el ultimo derecho conocido en vez de inventar una licencia activa.
+- Solo `Activa`, `Por vencer` y `Periodo de gracia` habilitan proteccion. Una licencia programada, vencida o suspendida desactiva el enforcement sin borrar reglas, controles ni configuracion; una renovacion valida los restaura en la siguiente sincronizacion.
+- Se elimino el atajo que convertia cualquier activacion preexistente en licencia activa. VPN comprueba la licencia antes de reglas explicitas, Accessibility respeta el mismo criterio y el monitor de salud actualiza el estado temporal en cada comprobacion.
+- La migracion `20260716152914_device_license_entitlement.sql` fue aplicada exclusivamente en Supabase DEV `syeycayasyufedwoprea`. Se verificaron `SECURITY DEFINER`, revocacion a `PUBLIC` y acceso deliberado de `anon/authenticated` protegido por `device_token_matches_device`; no modifica ni borra filas.
+- Validacion local correcta: tests de dominio, sincronizacion, Accessibility, VPN, Usuario y Admin; `ktlintCheck`; builds DEV optimizados de ambos APK, siempre excluyendo las tareas de publicacion. El APK/manifiesto publico permanece en DEV 240; DEV 241 se publicara una sola vez al finalizar el paquete de tickets. Falta prueba fisica de vencimiento/renovacion en Samsung SM-S908E.
+
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
 
 - Un dispositivo Usuario con control de proteccion nunca configurado se arma automaticamente solo cuando App Usuario comprueba simultaneamente el tunel VPN real, Accessibility habilitado, Device Admin activo y ausencia de una desactivacion intencional de la VPN.

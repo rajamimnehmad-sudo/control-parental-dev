@@ -4,7 +4,6 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.ComponentState
-import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.repository.AccountRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
@@ -45,7 +44,7 @@ class SystemStatusViewModel
                 repository.observeHealth(),
                 activationFlow,
                 accountFlow,
-            ) { health, activation, account ->
+            ) { health, _, account ->
                 val accessibilityState =
                     if (AccessibilityController.isEnabled(context)) {
                         ComponentState.Enabled
@@ -64,19 +63,16 @@ class SystemStatusViewModel
                     } else {
                         ComponentState.Disabled
                     }
-                val licenseState = if (activation != null) LicenseState.Active else health.licenseState
                 NormalizedStatus(
                     snapshot =
                         health.copy(
                             vpnState = vpnState,
                             accessibilityState = accessibilityState,
                             deviceAdminState = deviceAdminState,
-                            licenseState = licenseState,
                         ),
                     shouldPersistVpn = health.vpnState != vpnState,
                     shouldPersistAccessibility = health.accessibilityState != accessibilityState,
                     shouldPersistDeviceAdmin = health.deviceAdminState != deviceAdminState,
-                    shouldPersistLicense = health.licenseState != licenseState,
                     communityName = account?.communityName.orEmpty(),
                     guideName = account?.guideName.orEmpty(),
                 )
@@ -90,9 +86,6 @@ class SystemStatusViewModel
                     }
                     if (status.shouldPersistDeviceAdmin) {
                         repository.updateDeviceAdminState(status.snapshot.deviceAdminState)
-                    }
-                    if (status.shouldPersistLicense) {
-                        repository.updateLicenseState(status.snapshot.licenseState)
                     }
                 }
                 .map { SystemStatusUiState.from(it.snapshot, it.communityName, it.guideName) }
@@ -121,7 +114,6 @@ class SystemStatusViewModel
             val shouldPersistVpn: Boolean,
             val shouldPersistAccessibility: Boolean,
             val shouldPersistDeviceAdmin: Boolean,
-            val shouldPersistLicense: Boolean,
             val communityName: String,
             val guideName: String,
         )

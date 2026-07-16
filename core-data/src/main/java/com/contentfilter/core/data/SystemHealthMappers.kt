@@ -2,22 +2,36 @@ package com.contentfilter.core.data
 
 import com.contentfilter.core.database.entity.SystemHealthEntity
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.LicenseEntitlement
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 
-internal fun SystemHealthEntity.toDomain(): SystemHealthSnapshot =
-    SystemHealthSnapshot(
+internal fun SystemHealthEntity.toDomain(): SystemHealthSnapshot {
+    val now = System.currentTimeMillis()
+    val storedState = enumValueOrDefault(licenseState, LicenseState.PendingActivation)
+    val effectiveState =
+        LicenseEntitlement(
+            state = storedState,
+            startsAtEpochMillis = licenseStartsAtEpochMillis,
+            expiresAtEpochMillis = licenseExpiresAtEpochMillis,
+            verifiedAtEpochMillis = licenseVerifiedAtEpochMillis ?: checkedAtEpochMillis,
+        ).effectiveState(now)
+    return SystemHealthSnapshot(
         vpnState = enumValueOrDefault(vpnState, ComponentState.Unknown),
         accessibilityState = enumValueOrDefault(accessibilityState, ComponentState.Unknown),
         deviceAdminState = enumValueOrDefault(deviceAdminState, ComponentState.Unknown),
         syncState = enumValueOrDefault(syncState, ComponentState.Unknown),
         integrityState = enumValueOrDefault(integrityState, ComponentState.Unknown),
         databaseState = enumValueOrDefault(databaseState, ComponentState.Warning),
-        licenseState = enumValueOrDefault(licenseState, LicenseState.PendingActivation),
+        licenseState = effectiveState,
+        licenseStartsAtEpochMillis = licenseStartsAtEpochMillis,
+        licenseExpiresAtEpochMillis = licenseExpiresAtEpochMillis,
+        licenseVerifiedAtEpochMillis = licenseVerifiedAtEpochMillis,
         updateState = enumValueOrDefault(updateState, UpdateState.Unknown),
         checkedAtEpochMillis = checkedAtEpochMillis,
     )
+}
 
 internal fun defaultHealthSnapshot(nowEpochMillis: Long): SystemHealthSnapshot =
     SystemHealthSnapshot(
@@ -41,6 +55,9 @@ internal fun SystemHealthSnapshot.toEntity(): SystemHealthEntity =
         integrityState = integrityState.name,
         databaseState = databaseState.name,
         licenseState = licenseState.name,
+        licenseStartsAtEpochMillis = licenseStartsAtEpochMillis,
+        licenseExpiresAtEpochMillis = licenseExpiresAtEpochMillis,
+        licenseVerifiedAtEpochMillis = licenseVerifiedAtEpochMillis,
         updateState = updateState.name,
         checkedAtEpochMillis = checkedAtEpochMillis,
     )

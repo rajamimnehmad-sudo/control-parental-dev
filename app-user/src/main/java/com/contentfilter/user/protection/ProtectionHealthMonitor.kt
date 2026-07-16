@@ -32,6 +32,7 @@ class ProtectionHealthMonitor
                 reportedAlerts.clear()
                 return
             }
+            systemStatusRepository.refreshLicenseState()
             val vpnPermissionGranted = VpnController.prepareIntent(context) == null
             val decision =
                 ProtectionHealthPolicy.evaluate(

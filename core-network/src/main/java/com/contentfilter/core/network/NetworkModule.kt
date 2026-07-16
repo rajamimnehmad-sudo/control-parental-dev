@@ -9,6 +9,7 @@ import com.contentfilter.core.network.realtime.SupabaseRealtimeSubscription
 import com.contentfilter.core.network.remote.RemoteAccountRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
+import com.contentfilter.core.network.remote.RemoteLicenseRepository
 import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
@@ -17,6 +18,7 @@ import com.contentfilter.core.network.remote.SupabasePushNotificationRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteAccountRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteDeviceRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteInstalledAppRepository
+import com.contentfilter.core.network.remote.SupabaseRemoteLicenseRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteLimitRepository
 import com.contentfilter.core.network.remote.SupabaseRemotePolicyRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteRequestRepository
@@ -42,6 +44,9 @@ abstract class NetworkModule {
 
     @Binds
     abstract fun bindRemoteLimitRepository(repository: SupabaseRemoteLimitRepository): RemoteLimitRepository
+
+    @Binds
+    abstract fun bindRemoteLicenseRepository(repository: SupabaseRemoteLicenseRepository): RemoteLicenseRepository
 
     @Binds
     abstract fun bindRemoteDeviceRepository(repository: SupabaseRemoteDeviceRepository): RemoteDeviceRepository

@@ -167,7 +167,11 @@ class AccessibilityPolicySnapshotProvider
         private fun com.contentfilter.core.domain.model.SystemHealthSnapshot.withActiveLicenseIfActivated(
             isActivated: Boolean,
         ): com.contentfilter.core.domain.model.SystemHealthSnapshot =
-            if (isActivated) copy(licenseState = LicenseState.Active) else this
+            if (isActivated && licenseState == LicenseState.PendingActivation) {
+                copy(licenseState = LicenseState.Active)
+            } else {
+                this
+            }
 
         private data class PolicyParts(
             val snapshot: PolicySnapshot,
