@@ -114,6 +114,35 @@ class DagImagePolicyTest {
         assertFalse(isSafeStaticSvg(external, "image/svg+xml"))
         assertFalse(isSafeStaticSvg(safe, "text/html"))
     }
+
+    @Test
+    fun `modesty detector blurs female covered or exposed regions but not faces alone`() {
+        assertTrue(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleFace = 0.85f, femaleBreastCovered = 0.55f),
+            ),
+        )
+        assertTrue(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleFace = 0.60f, armpitsExposed = 0.25f),
+            ),
+        )
+        assertFalse(requiresKosherModestyBlur(DagModestyScores(femaleFace = 0.90f)))
+        assertFalse(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleFace = 0.90f, femaleBreastCovered = 0.10f),
+            ),
+        )
+    }
+
+    @Test
+    fun `modesty model artifact is pinned`() {
+        val relative = "src/main/assets/dag/nudenet_modesty_320n_uint8.onnx"
+        val model = listOf(File(relative), File("app-user/$relative")).first(File::isFile)
+        val digest = MessageDigest.getInstance("SHA-256").digest(model.readBytes()).toHex()
+
+        assertEquals("2e5d2b1471903c5bad06596dbb57bc991a489e27d5b475a62269321db42f123b", digest)
+    }
 }
 
 private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

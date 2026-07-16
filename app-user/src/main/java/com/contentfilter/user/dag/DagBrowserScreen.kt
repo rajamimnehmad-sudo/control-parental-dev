@@ -1601,7 +1601,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
           if (!style) {
             style = document.createElement('style');
             style.id = 'dag-safe-style';
-            style.textContent = 'video,audio,canvas,iframe { display:none !important; } img[data-dag-kosher-blurred="true"] { filter: blur(28px) saturate(0.15) !important; transform: scale(1.08) !important; }';
+            style.textContent = 'video,audio,canvas,iframe { display:none !important; } img[data-dag-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; transform: scale(1.14) !important; }';
             document.documentElement.appendChild(style);
           }
           if (!window.__dagSafeObserver) {

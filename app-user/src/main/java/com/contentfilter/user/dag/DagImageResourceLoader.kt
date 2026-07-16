@@ -204,7 +204,7 @@ internal class DagImageResourceLoader(
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
         const val MaximumBlurredDimension = 480
-        const val BlurSampleSide = 12
+        const val BlurSampleSide = 4
         const val BlurJpegQuality = 72
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }

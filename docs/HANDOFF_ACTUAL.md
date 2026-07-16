@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 234
-App Admin versionCode 234
+App Usuario versionCode 235
+App Admin versionCode 235
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,24 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-234-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-234-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-235-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-235-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 66c312920eaa5bd06a9cd037a0eb4aad5e5f317814977d1d0d205fe47f166f72
-Admin   1cfd5fb268fd6a888fe217123f608f35b869b386a310be655adc28451192f12f
+Usuario 0ec6f8b406063d4fcd530d652112155ba27a2019ada105c8e0dd8b5ab5d9c636
+Admin   e3cc88b43fd2317cbbebbbb4ffc2741069d562765576e182216795e5e6134a84
 ```
+
+## Implementacion 2026-07-16 - DEV 235 modestia visual regional y blur reforzado
+
+- DAG incorpora en ARM64 una tercera capa ONNX local para detectar regiones corporales cubiertas o expuestas en contexto femenino. Complementa los dos clasificadores NSFW generales porque estos daban por seguras las tres referencias de H&M aportadas por el usuario.
+- La politica envia a blur fuerte las combinaciones de rostro femenino con pecho cubierto, genitalia cubierta, gluteos cubiertos, axilas expuestas o abdomen expuesto, ademas de regiones explicitas. Un rostro femenino aislado no alcanza para activar la regla, protegiendo fotos benignas como las del sitio de Yeshurun Tora.
+- El modelo NudeNet YOLO cuantizado QUInt8 pesa aproximadamente 3,1 MB y se ejecuta solo en el telefono. El archivo incluido tiene SHA-256 `2e5d2b1471903c5bad06596dbb57bc991a489e27d5b475a62269321db42f123b`; su fuente y licencia Apache-2.0 quedan documentadas en `THIRD_PARTY_NOTICES.txt`.
+- Las imagenes dudosas o no aptas conservan su espacio y se entregan como copia raster irreversible con detalle reducido a cuatro pixeles de muestra y blur CSS de 48 px cuando tambien existe evidencia contextual. Errores tecnicos de decodificacion y formatos inseguros siguen cerrados.
+- Pruebas unitarias cubren las combinaciones regionales, la exclusion de rostro aislado y la integridad del modelo. Ktlint, unit tests DEV Usuario y builds DEV Usuario/Admin correctos (758 tareas). APKs y manifiestos DEV 235 publicados exclusivamente en Supabase DEV. Pendiente validacion fisica con H&M, Yeshurun Tora y paginas dinamicas.
 
 ## Implementacion 2026-07-16 - DEV 234 cierre UX y accesibilidad DAG
 

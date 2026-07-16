@@ -59,6 +59,7 @@ internal class DagImageClassifier(
     private val lock = Any()
     private var interpreter: Interpreter? = null
     private val professionalClassifier = DagProfessionalImageClassifier(applicationContext)
+    private val modestyClassifier = DagModestyImageClassifier(applicationContext)
 
     fun classify(
         bytes: ByteArray,
@@ -76,11 +77,17 @@ internal class DagImageClassifier(
                 model().run(bitmapToInput(bitmap), output)
                 val legacyScore = output[0][UnsafeOutputIndex]
                 val legacyDecision = dagImageDecision(legacyScore)
-                val decision =
+                val ensembleDecision =
                     if (professionalClassifier.isAvailable()) {
                         dagEnsembleImageDecision(professional.decision, legacyDecision)
                     } else {
                         legacyDecision
+                    }
+                val decision =
+                    if (ensembleDecision == DagImageDecision.Allowed && modestyClassifier.requiresBlur(bitmap)) {
+                        DagImageDecision.Uncertain
+                    } else {
+                        ensembleDecision
                     }
                 DagImageClassification(
                     decision = decision,
@@ -99,6 +106,7 @@ internal class DagImageClassifier(
             interpreter?.close()
             interpreter = null
             professionalClassifier.close()
+            modestyClassifier.close()
         }
     }
 

@@ -79,3 +79,23 @@ Model SHA-256:
 Copyright Marqo contributors.
 Licensed under the Apache License, Version 2.0:
 https://www.apache.org/licenses/LICENSE-2.0
+
+---
+
+DAG local modesty region detector
+
+NudeNet 320n ONNX detector, sourced from the Apache-2.0 model repository:
+https://huggingface.co/deepghs/nudenet_onnx
+
+DAG uses an unsigned INT8 weight quantization and local post-processing to detect
+covered or exposed body regions relevant to its kosher modesty policy. Face-only
+detections do not trigger blur. No image, region, score or decision leaves the device.
+
+Original model SHA-256:
+c15d8273adad2d0a92f014cc69ab2d6c311a06777a55545f2c4eb46f51911f0f
+
+Bundled quantized model SHA-256:
+2e5d2b1471903c5bad06596dbb57bc991a489e27d5b475a62269321db42f123b
+
+Licensed under the Apache License, Version 2.0:
+https://www.apache.org/licenses/LICENSE-2.0
