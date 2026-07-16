@@ -167,6 +167,8 @@ Flujo de una entrada:
 | DAG-BACK-NAV-01 | Resuelto DEV 233 | P2 | Atras respeta paginas y resultados antes de volver a Home | S | Medio |
 | DAG-APPROVAL-POLICY-01 | Reabierto | P0 | Evitar que aprobar un sitio desde App Admin desactive DAG | M | Alto |
 | DAG-REQUEST-STATUS-01 | Idea | P1 | Confirmar solicitudes enviadas y mostrar pendientes de revision desde el menu DAG | M | Medio |
+| DAG-SHARE-01 | Idea | P2 | Compartir de forma segura el enlace de la pagina actual desde DAG | S | Medio |
+| DAG-AUTOCOMPLETE-02 | Idea | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
 | USER-GREETING-01 | Idea | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
@@ -410,6 +412,42 @@ Flujo de una entrada:
   - los cambios de estado se actualizan de forma consistente y sobreviven al reinicio previsto;
   - no se expone la consulta completa, contenido de pagina ni historial adicional al administrador o a servicios remotos.
 - Decisiones pendientes para la entrevista del ticket: texto y duracion de la confirmacion; si la bandeja muestra solo pendientes o tambien resueltas; datos visibles por fila; retencion; accion al tocar una aprobada o rechazada; agrupacion por dominio o URL; comportamiento offline y entre pestanas.
+
+#### DAG-SHARE-01 - Compartir enlace actual
+
+- Estado: `Idea`; no aprobado para codigo. Tipo: UX de navegacion e interoperabilidad Android. Prioridad: P2.
+- Problema: DAG no ofrece una accion clara para compartir el enlace de la pagina actual con otra persona o aplicacion.
+- Solucion propuesta: agregar `Compartir enlace` al menu de tres puntos y abrir el selector nativo de Android con la URL segura de la pagina visible. La accion comparte el enlace, no el HTML, capturas, consultas, historial ni decisiones internas del filtro.
+- Evidencia: solicitud del usuario del 2026-07-16.
+- Esfuerzo: S estimado. Riesgo: medio; compartir puede sacar una URL del entorno protegido, exponer parametros sensibles o habilitar destinos externos no controlados por DAG.
+- Dependencias: menu DAG; URL efectiva y navegacion por pestana; intents Android; normalizacion y saneamiento de URL; reglas para paginas internas, bloqueadas, inciertas o pendientes.
+- Duplicados y relacion: no existe un ticket previo equivalente. Complementa `DAG-NAV-UX-01`, sin modificar el analisis ni la politica de apertura dentro de DAG.
+- Criterios de aceptacion propuestos:
+  - una pagina HTTPS permitida ofrece `Compartir enlace` desde el menu;
+  - se comparte solamente la URL normalizada de la pestana activa y, si se acuerda, un titulo no sensible;
+  - Home, resultados internos, estados de analisis, bloqueos y solicitudes pendientes no comparten URLs internas o incompletas;
+  - cancelar el selector no cambia la pagina ni el estado de DAG;
+  - compartir no marca el destino como aprobado ni evita que vuelva a analizarse al abrirlo;
+  - no se registran ni sincronizan la aplicacion elegida, el destinatario o el contenido compartido.
+- Decisiones pendientes para la entrevista del ticket: ubicacion exacta; compartir solo URL o URL y titulo; tratamiento de parametros y sesiones; paginas aprobadas temporalmente; aviso de que el receptor puede abrir fuera de DAG; disponibilidad desde resultados e historial.
+
+#### DAG-AUTOCOMPLETE-02 - Buscar al tocar una sugerencia
+
+- Estado: `Idea`; no aprobado para codigo. Tipo: UX de busqueda. Prioridad: P2.
+- Problema: al tocar una sugerencia de DAG, el texto puede quedar solamente cargado en el buscador y exigir una segunda accion, en vez de iniciar la busqueda esperada.
+- Solucion propuesta: tratar el toque sobre una sugerencia como confirmacion: completar el campo, cerrar el teclado y ejecutar inmediatamente el mismo flujo seguro de busqueda que usa el boton o la tecla Buscar.
+- Evidencia: solicitud del usuario del 2026-07-16.
+- Esfuerzo: S estimado. Riesgo: bajo; una ejecucion duplicada puede consumir dos consultas Brave o buscar una sugerencia distinta de la mostrada si el estado cambia entre pulsacion y envio.
+- Dependencias: `DAG-AUTOCOMPLETE-01`; buscador combinado; clasificacion local; debounce; contador Brave; teclado y estado por pestana.
+- Duplicados y relacion: seguimiento de `DAG-AUTOCOMPLETE-01`, resuelto en DEV 228 para generar y mostrar sugerencias. No reabre aquel alcance porque esta entrada define la accion posterior al toque.
+- Criterios de aceptacion propuestos:
+  - tocar una sugerencia ejecuta inmediatamente una unica busqueda con el texto exacto mostrado;
+  - el teclado y la lista de sugerencias se cierran al comenzar;
+  - la consulta vuelve a pasar por todas las reglas y clasificadores locales;
+  - una sugerencia bloqueada o que cambie a incierta no evita la politica de seguridad;
+  - cada toque aceptado consume como maximo una consulta Brave;
+  - pulsaciones rapidas, recomposiciones y cambios de pestana no duplican ni cruzan busquedas.
+- Decisiones pendientes para la entrevista del ticket: si todas las sugerencias buscan directamente o si las del historial pueden abrir su URL; comportamiento con pulsacion larga; feedback durante la transicion; accesibilidad y accion del teclado.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
