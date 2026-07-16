@@ -50,6 +50,11 @@ export type CommunityDevice = {
   updated_at: string;
 };
 
+export type DevAppVersions = {
+  user: number | null;
+  admin: number | null;
+};
+
 export type ProtectedUserStatus = "pending" | "activated" | "expired";
 
 export type ProtectedUser = {

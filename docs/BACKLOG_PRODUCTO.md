@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-15
+Ultima sincronizacion: 2026-07-16
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 242 y App Admin DEV 242, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 243 y App Admin DEV 243, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -142,7 +142,7 @@ Flujo de una entrada:
 | USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
-| UI-POLISH-01 | Candidato DEV 241 validado en SM-A235M; pendiente matriz adicional | P2 | Consistencia visual y accesibilidad de ambas apps | M | Bajo |
+| UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
@@ -150,7 +150,7 @@ Flujo de una entrada:
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Implementado candidato DEV 241; pendiente prueba fisica | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
-| BARRIER-LAUNCHER-01 | Revisado y publicado DEV 242; pendiente bootstrap en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
+| BARRIER-LAUNCHER-01 | Resuelto y validado DEV 242 en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
@@ -264,10 +264,11 @@ Flujo de una entrada:
 
 ### UI-POLISH-01 - Consistencia visual y accesibilidad
 
-- Estado: `Candidato DEV 241 validado en SM-A235M; pendiente matriz adicional`.
+- Estado: `Publicado DEV 243; pendiente comprobacion visual con el telefono desbloqueado`.
 - Correccion: Home Usuario ahora informa 6 secciones, coherente con la incorporacion de Avisos.
 - Evidencia fisica: saludo personalizado, tarjetas, navegacion inferior, DAG claro, Admin, campanita, Alertas y Avisos sin recortes en 384 dp/Android 13. Lint completo de Usuario/Admin sin errores de accesibilidad; conserva advertencias tecnicas conocidas no bloqueantes.
-- Pendiente: repetir tamanos de fuente y modo oscuro en otro Samsung/API, incluido el SM-S908E. La publicacion final se hace una sola vez con ambos APK.
+- Seguimiento DEV 243: las cabeceras con Volver quedan fijas; la campanita Admin sube al encabezado; Inicio Usuario deja de repetir destinos del nav; Superweb muestra en la ficha de comunidad el estado de actualizacion contra los manifiestos DEV y fija su cabecera Volver.
+- Validacion: matriz integral de 1.013 tareas Gradle, TypeScript, ESLint, Next y bundle Sites correctos. Ambos APK se instalaron in-place en SM-A235M y conservaron Accessibility, Device Admin y servicios de proteccion/VPN. Falta solo la comprobacion visual con pantalla desbloqueada y la matriz adicional de tamanos de fuente/modo oscuro.
 
 ### ADMIN-ALERTS-UX-01 - Campanita de alertas de seguridad en App Admin
 
@@ -291,7 +292,7 @@ Flujo de una entrada:
 
 ### BARRIER-LAUNCHER-01 - Superficie profesional sin desinstalacion rapida
 
-- Estado: `Revisado y publicado DEV 242; pendiente bootstrap real en SM-S908E`. Aprobado por el usuario al ordenar ejecutar todos los tickets y redefinido tras el reporte fisico del 2026-07-16.
+- Estado: `Resuelto y validado DEV 242 en SM-S908E`. Aprobado por el usuario al ordenar ejecutar todos los tickets y redefinido tras el reporte fisico del 2026-07-16.
 - Tipo: seguridad, antimanipulacion y UX de App Usuario.
 - Prioridad: P2.
 - Problema: al mantener presionado el icono de App Usuario, el launcher muestra la opcion `Desinstalar`. Aunque la barrera actual bloquea las rutas posteriores, la opcion visible transmite una proteccion menos integrada que otros filtros.
@@ -316,8 +317,9 @@ Flujo de una entrada:
 - Implementacion: un `activity-alias` reversible contiene la unica entrada Launcher de App Usuario. Se oculta sin matar el proceso solamente cuando hay activacion, proteccion armada, licencia efectiva y VPN activa; reaparece si falta alguna condicion o existe autorizacion temporal de Ajustes/retiro.
 - Acceso alternativo: la notificacion foreground de la VPN abre directamente `MainActivity` mediante una accion interna del paquete aunque el alias Launcher este oculto. El vencimiento de mantenimiento vuelve a ocultar el alias automaticamente.
 - Compatibilidad elegida: Android normal desde el minimo soportado, sin Knox, root, Device Owner ni restablecimiento. El comportamiento visual exacto del launcher puede variar por fabricante y no se promete un bloqueo de sistema equivalente a MDM.
-- Validacion: tests de decision visible/oculto, compilacion, manifiesto combinado, tests DEV y formato de Usuario/VPN correctos. Falta validar icono, notificacion, mantenimiento y reinicio en Samsung SM-S908E; no hubo publicacion intermedia.
+- Validacion previa: tests de decision visible/oculto, compilacion, manifiesto combinado, tests DEV y formato de Usuario/VPN correctos. La estrategia de ocultamiento se sustituyo en la revision siguiente por el launcher siempre visible y el bootstrap oficial.
 - Revision DEV 242: ocultar el alias dejo al SM-S908E sin una ruta obvia a Usuario y, al no existir Admin todavia, el bloqueo correcto del instalador de Chrome impidio completar el alta de Admin. El alias queda siempre visible. App Usuario incorpora un bootstrap Admin que valida manifiesto, SHA-256, packageName y firma antes de abrir la autorizacion interna; Android sigue mostrando su confirmacion normal. El instalador directo del navegador permanece bloqueado.
+- Validacion SM-S908E: el bootstrap oficial instalo Admin sin borrar datos. La autorizacion temporal se retiro al terminar y el control DEV quedo `armed=true`, sin alcance de mantenimiento y con revision 5 aplicada.
 
 ### BARRIER-SETTINGS-VISIBILITY-01 - Controles peligrosos fuera de alcance
 

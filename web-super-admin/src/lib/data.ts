@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import type {
   CommunityAdmin,
   CommunityDetail,
+  CommunityDevice,
   CommunitySummary,
   DagUsageDevice,
   DagUsageSummary,
@@ -10,6 +11,19 @@ import type {
   ProtectionAlertEvent,
   Announcement,
 } from "@/lib/types";
+
+const devUpdateBase = "https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates";
+
+async function readDevVersion(app: "user" | "admin"): Promise<number | null> {
+  try {
+    const response = await fetch(`${devUpdateBase}/app-${app}-dev-manifest.json`, { cache: "no-store" });
+    if (!response.ok) return null;
+    const value = (await response.json()) as { versionCode?: unknown };
+    return typeof value.versionCode === "number" ? value.versionCode : null;
+  } catch {
+    return null;
+  }
+}
 
 export async function listAnnouncements() {
   const supabase = await createClient();
@@ -39,16 +53,20 @@ export async function listCommunities() {
 
 export async function getCommunityBundle(communityId: string) {
   const supabase = await createClient();
-  const [detailResult, adminsResult, protectedUsersResult, dagEntitlementResult] = await Promise.all([
+  const [detailResult, adminsResult, protectedUsersResult, devicesResult, dagEntitlementResult, userVersion, adminVersion] = await Promise.all([
     supabase.rpc("super_admin_get_community_detail", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_community_admins", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_protected_users", { target_community_id: communityId }),
+    supabase.rpc("super_admin_list_community_devices", { target_community_id: communityId }),
     supabase.rpc("super_admin_get_dag_entitlement", { target_community_id: communityId }),
+    readDevVersion("user"),
+    readDevVersion("admin"),
   ]);
 
   if (detailResult.error) raise(detailResult.error);
   if (adminsResult.error) raise(adminsResult.error);
   if (protectedUsersResult.error) raise(protectedUsersResult.error);
+  if (devicesResult.error) raise(devicesResult.error);
   if (dagEntitlementResult.error) raise(dagEntitlementResult.error);
 
   const detailRow = (detailResult.data ?? [])[0] as Omit<CommunityDetail, "dag_entitled"> | undefined;
@@ -61,6 +79,8 @@ export async function getCommunityBundle(communityId: string) {
     detail,
     admins: (adminsResult.data ?? []) as CommunityAdmin[],
     protectedUsers: (protectedUsersResult.data ?? []) as ProtectedUser[],
+    devices: (devicesResult.data ?? []) as CommunityDevice[],
+    devVersions: { user: userVersion, admin: adminVersion },
   };
 }
 

@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 242
-App Admin versionCode 242
+App Usuario versionCode 243
+App Admin versionCode 243
 versionName 1.0.1-dev
 ```
 
@@ -68,23 +68,32 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-242-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-242-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-243-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-243-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 214181454504f56294cc0b109d6d5d69503c7bf7ae39ee89547d7d4de85e011a
-Admin   0d305da4f9d95149751c1f4a1f41bd84dd29463288ebba2736642acff224f349
+Usuario 769ca6a023e6bfb858c3396553bbe44415b34e9b019ccdfa7469a43c45d53926
+Admin   019fc5ec5812c0543eb7a43ef297babab94c69ca229f5b15a08cf39156abe253
 ```
+
+## Publicacion UX agrupada DEV 243 - 2026-07-16
+
+- App Usuario elimina de Inicio los accesos repetidos a `Mis apps`, `Web` y `Ajustes`, porque ya son destinos permanentes del nav inferior. Inicio conserva Solicitudes y Avisos, que no forman parte de ese nav.
+- Las cabeceras con Volver quedan fuera del contenido desplazable mediante el componente comun de Usuario. App Admin ya mantenia fijas sus cabeceras de seccion y reglas; su campanita sube al encabezado principal, junto al saludo, con el contador existente.
+- La ficha de comunidad Superweb incorpora una cabecera Volver fija y un bloque `Actualizaciones` que compara cada dispositivo activo con los manifiestos publicos DEV de Usuario/Admin. Es informativo: Android normal conserva el permiso por origen y la confirmacion de instalacion.
+- Usuario y Admin subieron juntos a `versionCode 243`. La matriz local termino con 1.013 tareas Gradle: tests unitarios, ktlint, detekt, lint completo y APK optimizados. Superweb paso TypeScript, ESLint, Next y `build:sites`.
+- Publicacion unica y atomica exclusivamente en Supabase DEV `syeycayasyufedwoprea`. Los manifiestos publicos declaran 243 y las descargas recalculan exactamente los SHA-256 anteriores.
+- Prueba fisica SM-A235M: ambos APK se instalaron in-place en 243 sin borrar datos; Accessibility, Device Admin y los servicios de proteccion/VPN siguieron registrados. El telefono quedo bloqueado durante la comprobacion visual, por lo que no se declara una captura fisica de las pantallas UX.
 
 ## Publicacion correctiva DEV 242 - 2026-07-16
 
 - El workflow `Publicar APKs DEV` `29524803991` termino correctamente en 5m32s y publico ambos APK una sola vez exclusivamente en Supabase DEV `syeycayasyufedwoprea`.
 - Android CI `29524803097` termino correctamente: build DEV, unit tests, ktlint, lint y detekt.
 - Los manifiestos y las descargas publicas coinciden exactamente con los SHA-256 anteriores. `aapt` confirmo version 242, paquetes DEV correctos y `minSdkVersion 29`; `apksigner` confirmo en ambos la firma `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
-- DEV 242 reemplaza a 241 como version publica vigente. La prueba del bootstrap Admin sin una instalacion previa sigue pendiente exclusivamente en el SM-S908E personal; no se desinstalo Admin ni se borraron datos del SM-A235M para simularla.
+- DEV 242 reemplazo a 241. El bootstrap Admin fue completado despues en el SM-S908E personal: Usuario descargo el APK oficial, Android confirmo la instalacion y Admin quedo instalado. La autorizacion temporal se cerro y DEV confirmo la proteccion rearmada con revision aplicada 5.
 
 ## Publicacion agrupada DEV 241 - 2026-07-16
 
@@ -111,7 +120,7 @@ Admin   0d305da4f9d95149751c1f4a1f41bd84dd29463288ebba2736642acff224f349
 - DEV 242 mantiene siempre visible el icono de App Usuario. Se revierte la estrategia visual de `BARRIER-LAUNCHER-01`; la proteccion posterior de desinstalacion mediante Accessibility y Device Admin permanece, sin prometer capacidad MDM en Android normal.
 - Ajustes de App Usuario agrega `App Administrador`: consulta el manifiesto Admin oficial, descarga el APK, verifica SHA-256, packageName exacto de la variante y que la firma sea la misma que App Usuario. Solo entonces abre la ventana interna firmada de dos minutos; Android conserva el permiso por origen y la confirmacion normal de instalacion.
 - Una descarga o instalacion iniciada directamente desde Chrome sigue bloqueada deliberadamente. No se habilitan APK arbitrarios, no se incorpora ningun secreto y no se usa Service Role en Android.
-- Usuario y Admin subieron juntos a `versionCode 242` y estan publicados. Tests de confianza para paquete/firma, tests Usuario, ktlint de Usuario/core-update, lint y builds DEV de ambos APK correctos. Prueba fisica en SM-A235M: actualizacion in-place sin borrar datos, ambos paquetes en 242, alias Usuario restaurado, MainActivity abre y la tarjeta Admin informa correctamente que la version instalada ya esta actualizada. Falta ejecutar el bootstrap real en el SM-S908E, donde Admin no esta instalado.
+- Usuario y Admin subieron juntos a `versionCode 242` y fueron publicados. Tests de confianza para paquete/firma, tests Usuario, ktlint de Usuario/core-update, lint y builds DEV de ambos APK correctos. Prueba fisica en SM-A235M: actualizacion in-place sin borrar datos, ambos paquetes en 242, alias Usuario restaurado, MainActivity abre y la tarjeta Admin informa correctamente que la version instalada ya esta actualizada. El bootstrap real se completo luego en el SM-S908E y la proteccion quedo rearmada.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 DATA-DELETE-01
 

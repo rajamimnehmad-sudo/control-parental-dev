@@ -45,6 +45,32 @@ fun ProductVisualPage(
     onBack: (() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    if (onBack != null) {
+        Column(
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    .background(ProductAppBackground)
+                    .statusBarsPadding(),
+        ) {
+            ProductPageHeader(
+                title = title,
+                subtitle = subtitle,
+                onBack = onBack,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            )
+            Column(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                content = content,
+            )
+        }
+        return
+    }
     Column(
         modifier =
             modifier
@@ -68,6 +94,29 @@ fun ProductLazyVisualPage(
     onBack: (() -> Unit)? = null,
     content: LazyListScope.() -> Unit,
 ) {
+    if (onBack != null) {
+        Column(
+            modifier =
+                modifier
+                    .fillMaxSize()
+                    .background(ProductAppBackground)
+                    .statusBarsPadding(),
+        ) {
+            ProductPageHeader(
+                title = title,
+                subtitle = subtitle,
+                onBack = onBack,
+                modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
+            )
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                verticalArrangement = Arrangement.spacedBy(18.dp),
+                content = content,
+            )
+        }
+        return
+    }
     LazyColumn(
         modifier =
             modifier

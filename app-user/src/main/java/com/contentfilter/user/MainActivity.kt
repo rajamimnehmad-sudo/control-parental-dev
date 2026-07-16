@@ -61,8 +61,6 @@ import com.contentfilter.core.ui.ProductNavGlyph
 import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.ProductStatCard
 import com.contentfilter.core.ui.ProductSun
-import com.contentfilter.core.ui.ProductTeal
-import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.feature.accessibility.service.AccessibilityController
 import com.contentfilter.feature.accessibility.service.DeviceAdminController
 import com.contentfilter.feature.activation.ActivationRoute
@@ -282,10 +280,7 @@ private fun UserAppRoot(
             when (destination) {
                 UserDestination.Home ->
                     UserHomeRoute(
-                        onApps = { navigateTo(UserDestination.MyApps) },
                         onRequests = { navigateTo(UserDestination.Requests) },
-                        onWeb = { navigateTo(UserDestination.Web) },
-                        onUpdates = { navigateTo(UserDestination.Updates) },
                         onAnnouncements = { navigateTo(UserDestination.Announcements) },
                     )
                 UserDestination.MyApps -> MyAppsRoute(onBack = ::goBack)
@@ -506,10 +501,7 @@ private fun UserAppRoot(
 
 @Composable
 private fun UserHomeRoute(
-    onApps: () -> Unit,
     onRequests: () -> Unit,
-    onWeb: () -> Unit,
-    onUpdates: () -> Unit,
     onAnnouncements: () -> Unit,
     requestsViewModel: RequestsViewModel = hiltViewModel(),
     homeViewModel: UserHomeViewModel = hiltViewModel(),
@@ -520,10 +512,7 @@ private fun UserHomeRoute(
         greeting = homeState.greeting,
         pendingRequests = requestsState.pendingCount,
         latestRequestLabel = requestsState.requests.firstOrNull()?.requestType?.name.orEmpty(),
-        onApps = onApps,
         onRequests = onRequests,
-        onWeb = onWeb,
-        onUpdates = onUpdates,
         onAnnouncements = onAnnouncements,
     )
 }
@@ -533,10 +522,7 @@ private fun UserHomeTab(
     greeting: String,
     pendingRequests: Int,
     latestRequestLabel: String,
-    onApps: () -> Unit,
     onRequests: () -> Unit,
-    onWeb: () -> Unit,
-    onUpdates: () -> Unit,
     onAnnouncements: () -> Unit,
 ) {
     ProductLazyVisualPage(
@@ -573,15 +559,6 @@ private fun UserHomeTab(
         }
         item {
             ProductFeatureTile(
-                icon = ProductIcon.Search,
-                title = "Mis apps",
-                subtitle = "Estado, límites y pedidos de acceso",
-                accent = ProductTeal,
-                onClick = onApps,
-            )
-        }
-        item {
-            ProductFeatureTile(
                 icon = ProductIcon.Bell,
                 title = "Solicitudes pendientes",
                 subtitle =
@@ -592,24 +569,6 @@ private fun UserHomeTab(
                     },
                 accent = ProductSun,
                 onClick = onRequests,
-            )
-        }
-        item {
-            ProductFeatureTile(
-                icon = ProductIcon.Web,
-                title = "Web",
-                subtitle = "Sección preparada para control web",
-                accent = ProductSky,
-                onClick = onWeb,
-            )
-        }
-        item {
-            ProductFeatureTile(
-                icon = ProductIcon.Update,
-                title = "Ajustes",
-                subtitle = "Protección, sincronización y actualizaciones",
-                accent = ProductViolet,
-                onClick = onUpdates,
             )
         }
         item {

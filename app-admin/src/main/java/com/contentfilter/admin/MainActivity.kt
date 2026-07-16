@@ -362,8 +362,7 @@ private fun HomeTab(
     VisualPage(
         title = "Hola",
         subtitle = "Tu panel de administración está listo",
-    ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        headerAction = {
             Box {
                 IconButton(onClick = onAlerts) {
                     Icon(Icons.Filled.Notifications, contentDescription = "Abrir alertas de seguridad")
@@ -386,7 +385,8 @@ private fun HomeTab(
                     }
                 }
             }
-        }
+        },
+    ) {
         AdminHeroCard()
         FeatureTile(
             icon = Icons.Filled.Person,
@@ -1108,6 +1108,7 @@ private fun SettingsTab(
 private fun VisualPage(
     title: String,
     subtitle: String,
+    headerAction: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     Column(
@@ -1120,7 +1121,7 @@ private fun VisualPage(
                 .padding(horizontal = 18.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(18.dp),
     ) {
-        PageHeader(title = title, subtitle = subtitle)
+        PageHeader(title = title, subtitle = subtitle, action = headerAction)
         content()
     }
 }
@@ -1131,6 +1132,7 @@ private fun PageHeader(
     subtitle: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    action: (@Composable () -> Unit)? = null,
 ) {
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -1153,6 +1155,7 @@ private fun PageHeader(
                 color = MutedInk,
             )
         }
+        action?.invoke()
     }
 }
 
