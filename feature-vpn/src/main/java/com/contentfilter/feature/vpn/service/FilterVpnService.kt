@@ -1,5 +1,6 @@
 package com.contentfilter.feature.vpn.service
 
+import android.annotation.SuppressLint
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.LinkProperties
@@ -420,6 +421,7 @@ class FilterVpnService : VpnService() {
             }
         }
 
+    @SuppressLint("MissingPermission")
     private fun currentDnsServers(): List<InetAddress> {
         val connectivityManager = getSystemService(ConnectivityManager::class.java)
         val linkProperties: LinkProperties? = connectivityManager?.getLinkProperties(connectivityManager.activeNetwork)

@@ -59,9 +59,11 @@ class ApproveAccessRequestUseCase(
                 val completeRules =
                     policy.rules.filterNot { existing ->
                         existing.id == rule.id ||
-                            (existing.scope == rule.scope &&
-                                existing.target == rule.target &&
-                                existing.action == rule.action)
+                            (
+                                existing.scope == rule.scope &&
+                                    existing.target == rule.target &&
+                                    existing.action == rule.action
+                            )
                     } + rule
                 policyRepository.saveRules(completeRules, request.deviceId)
             } else {
