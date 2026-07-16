@@ -55,7 +55,18 @@ class ApproveAccessRequestUseCase(
                     priority = max(existingRule.priority, APPROVED_REQUEST_PRIORITY),
                     enabled = true,
                 ) ?: generatedRule
-            policyRepository.saveRule(rule, request.deviceId)
+            if (request.requestType == AccessRequestType.DOMAIN_ACCESS) {
+                val completeRules =
+                    policy.rules.filterNot { existing ->
+                        existing.id == rule.id ||
+                            (existing.scope == rule.scope &&
+                                existing.target == rule.target &&
+                                existing.action == rule.action)
+                    } + rule
+                policyRepository.saveRules(completeRules, request.deviceId)
+            } else {
+                policyRepository.saveRule(rule, request.deviceId)
+            }
         }
         requestRepository.updateStatus(request.id, RequestStatus.Approved)
     }

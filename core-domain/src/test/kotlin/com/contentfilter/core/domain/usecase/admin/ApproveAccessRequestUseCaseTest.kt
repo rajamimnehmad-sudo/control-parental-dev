@@ -107,6 +107,12 @@ class ApproveAccessRequestUseCaseTest {
             useCase(domainAccessRequest())
 
             assertEquals(emptyList(), limitRepository.deletedIds)
+            assertTrue(policyRepository.savedRules.any { it.target == WebNavigationPolicy.DagEnabledTarget && it.enabled })
+            assertTrue(
+                policyRepository.savedRules.any {
+                    it.scope == RuleScope.Domain && it.target == "airbnb.com" && it.action == RuleAction.Allow && it.enabled
+                },
+            )
             assertEquals(RequestStatus.Approved, requestRepository.updatedStatus)
         }
 
@@ -133,10 +139,11 @@ class ApproveAccessRequestUseCaseTest {
 
             useCase(domainAccessRequest(target = "example.com"))
 
-            assertEquals(1, policyRepository.savedRules.size)
-            assertEquals("existing-domain-allow", policyRepository.savedRules.single().id)
-            assertTrue(policyRepository.savedRules.single().enabled)
-            assertEquals(1_000, policyRepository.savedRules.single().priority)
+            val savedAllow = policyRepository.savedRules.single { it.target == "example.com" }
+            assertEquals("existing-domain-allow", savedAllow.id)
+            assertTrue(savedAllow.enabled)
+            assertEquals(1_000, savedAllow.priority)
+            assertTrue(policyRepository.savedRules.any { it.target == WebNavigationPolicy.DagEnabledTarget && it.enabled })
         }
 
     @Test
