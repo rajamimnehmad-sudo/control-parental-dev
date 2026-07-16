@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 245 y App Admin DEV 245, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 246 y App Admin DEV 246, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -142,9 +142,9 @@ Flujo de una entrada:
 | USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERWEB-DEPLOY-SYNC-01 | En progreso; fuente verificable lista, pendiente reconectar y publicar Vercel oficial | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
-| UI-BANNER-UNIFY-01 | Implementado candidato DEV 246; pendiente comprobacion visual | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
+| UI-BANNER-UNIFY-01 | Publicado DEV 246; pendiente comprobacion visual | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
-| ANDROID-PHYSICAL-CLOSEOUT-01 | En progreso sin ADB; matriz automatizada en ejecucion y prueba fisica diferida | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
+| ANDROID-PHYSICAL-CLOSEOUT-01 | Automatizacion y publicacion DEV 246 correctas; prueba fisica diferida sin ADB | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
@@ -197,7 +197,7 @@ Flujo de una entrada:
 
 ### UI-BANNER-UNIFY-01 - Feedback premium compartido
 
-- Estado: `Implementado candidato DEV 246; pendiente comprobacion visual`; aprobado explicitamente el 2026-07-16.
+- Estado: `Publicado DEV 246; pendiente comprobacion visual`; aprobado explicitamente el 2026-07-16.
 - Tipo: UX y accesibilidad Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Causa: coexistian el banner premium y el banner legado; Mis apps seguia usando el legado y las bandejas nuevas de Avisos/Alertas, Actualizaciones Admin y reseteo Admin mostraban feedback como texto plano.
 - Resultado: el API legado delega en el banner premium y las superficies nuevas lo usan directamente. La altura deja de ser fija: conserva 42 dp minimos y crece para mensajes largos, con degradado, texto blanco, pez y estado de error consistente.
@@ -214,9 +214,9 @@ Flujo de una entrada:
 
 ### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
 
-- Estado: `En progreso`; aprobado explicitamente el 2026-07-16. El usuario indico que no hay telefono ADB disponible durante esta ejecucion.
+- Estado: `Automatizacion y publicacion DEV 246 correctas; prueba fisica diferida sin ADB`; aprobado explicitamente el 2026-07-16. El usuario indico que no hay telefono ADB disponible durante esta ejecucion.
 - Tipo: QA Android, compatibilidad y cierre de candidatos. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
-- Alcance automatizado: ejecutar tests, ktlint, detekt, lint y builds DEV de Usuario/Admin con el mismo versionCode, verificar paquetes, minSdk, firma y hashes antes de una unica publicacion final.
+- Alcance automatizado completado: tests, ktlint, detekt, lint y builds DEV de Usuario/Admin pasaron localmente con el mismo versionCode. La unica publicacion DEV termino correctamente; manifiestos y APK publicos 246 coinciden en version, paquetes, `minSdk 29`, firma y SHA-256.
 - Alcance fisico diferido: banners y fuentes/modo oscuro; actualizacion Usuario/Admin; Play Store/APK/aprobacion; bypass rapido Accessibility; licencia/renovacion; estados DAG candidatos y notificacion push. No se usa ADB ni se declara validacion fisica inexistente.
 - Aceptacion: matriz automatizada y CI correctos; publicacion DEV unica; manifiestos/hashes verificables; una lista reproducible conserva cada recorrido fisico pendiente para el proximo acceso al Samsung.
 

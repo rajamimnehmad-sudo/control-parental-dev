@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 245
-App Admin versionCode 245
+App Usuario versionCode 246
+App Admin versionCode 246
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-245-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-245-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-246-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-246-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 1bf7147bf5ebb493e094af6972d0728b845c86b284bb132db32337ae608c1bd2
-Admin   334ee599a325ae63abe25a158057ac80ce2feebfa684088902baf6ec0cfe8789
+Usuario 5ed0bf43507b764295eb589da2ccd0b526df118b04116c5cf37c3286aa026b0e
+Admin   4d9632957b8139c32a47ba2a2f03f8822ff1aed10c1e1e33509bc07673efc8d9
 ```
 
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
@@ -87,7 +87,7 @@ Admin   334ee599a325ae63abe25a158057ac80ce2feebfa684088902baf6ec0cfe8789
 - Fuente Web validada con TypeScript, ESLint de `src`, build Next y bundle Sites. El build contiene `/communities`, `/dag-usage`, `/alerts`, `/announcements` y `/api/health`; localmente las rutas privadas redirigen a `/login` y health declara DEV. Las funciones DEV `dag-search` v8, `send-protection-alert` v13 y `send-announcement` v1 estan activas; las RPC sensibles comprobadas rechazan `anon`.
 - Pendiente Web externo: el propietario debe iniciar sesion en Vercel para revisar/reconectar el proyecto `web-super-admin-nine`, publicar el commit final y ejecutar la verificacion autenticada de licencias, tokens, DAG premium, actualizaciones, alertas y avisos. Hasta entonces no se declara publicada la Superweb oficial.
 - Android unifica el feedback: el `FeedbackBanner` legado delega en `PremiumFeedbackBanner`; Avisos Usuario/Admin, Alertas Admin, Actualizaciones Admin y reseteo Admin dejan de usar texto plano. El banner conserva 42 dp minimos pero crece para que mensajes largos no se recorten.
-- Usuario y Admin suben juntos a `versionCode 246`. La matriz local termino correctamente con 1.837 tareas: tests de variantes, ktlint, detekt, lint DEV y builds optimizados de ambos APK. El usuario indico expresamente que no hay telefono ADB disponible, por lo que banners, actualizacion, instalacion/aprobacion, Accessibility y candidatos DAG conservan prueba fisica pendiente y no se inventa validacion.
+- Usuario y Admin subieron juntos a `versionCode 246` mediante una unica publicacion DEV. La matriz local termino correctamente con 1.837 tareas: tests de variantes, ktlint, detekt, lint DEV y builds optimizados de ambos APK. El trabajo remoto de publicacion termino correctamente y los APK publicos fueron verificados por version, package name, `minSdk 29`, firma comun y SHA-256 contra sus manifiestos. El usuario indico expresamente que no hay telefono ADB disponible, por lo que banners, actualizacion, instalacion/aprobacion, Accessibility y candidatos DAG conservan prueba fisica pendiente y no se inventa validacion.
 
 ## Correccion de identidad Admin DEV 245 - 2026-07-16
 
