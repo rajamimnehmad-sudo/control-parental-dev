@@ -50,11 +50,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-15:
+Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 231
-App Admin versionCode 231
+App Usuario versionCode 232
+App Admin versionCode 232
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,24 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-231-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-231-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-232-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-232-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 7429ac5f34df431632ffa5eaf8c055bf72504c85ee292ead84927e5e2e3e8052
-Admin   c7af07f9b385bdd9c3737c3ac204a4139f9e10690bf893fed61179f063c062b1
+Usuario af2c17fdd56cbfd33a50469d2a0d1c6b4b6681dbb0c0a7de59e3a8467dbee8b8
+Admin   9a6d1b0d80b9a7e5ab9a0549349f1616f2cc0a7c12ad1145844dbcf6a0d3518e
 ```
+
+## Implementacion 2026-07-16 - DEV 232 cobertura visual general y continuidad de pagina
+
+- DAG deja de entregar huecos cuando el ensemble visual considera una foto riesgosa: tanto riesgo como incertidumbre producen una copia raster local con blur muy fuerte e irreversible; solo un recurso ilegible o tecnicamente inseguro queda oculto.
+- La capa de contexto reconoce rutas femeninas de ropa interior en español e ingles y tarjetas de producto genericas, incluidas variantes VTEX `product-summary`. Usa ruta, enlace, atributos y texto cercano por imagen, sin bloquear la tienda completa ni depender de un dominio concreto.
+- Las imágenes íntimas detectadas por metadatos reciben blur de 28 px y desaturacion, reaplicados sobre contenido lazy/dinamico. Cabeceras, navegacion, logos e iconos no heredan el contexto sensible de la categoria.
+- SVG pequeños y estaticos pueden mostrarse como iconos solo con MIME exacto y una lista cerrada de seguridad: se rechazan scripts, eventos, entidades, contenido embebido, animacion, referencias, URLs y datos externos. GIF y SVG no seguros siguen cerrados.
+- Pruebas cubren rutas genericas mujer/ropa interior, exclusiones de hombre/ropa comun, SVG estatico seguro y SVG ejecutable o externo. Ktlint, unit tests DEV Usuario y builds DEV Usuario/Admin correctos (758 tareas). APKs y manifiestos DEV 232 publicados exclusivamente en Supabase DEV.
 
 ## Implementacion 2026-07-15 - DEV 231 calibracion visual y blur local
 

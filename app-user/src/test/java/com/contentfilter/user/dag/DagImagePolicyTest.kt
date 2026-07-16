@@ -102,6 +102,18 @@ class DagImagePolicyTest {
         assertTrue(isPublicAddress(InetAddress.getByName("1.1.1.1")))
         assertTrue(isPublicAddress(InetAddress.getByName("2606:4700:4700::1111")))
     }
+
+    @Test
+    fun `safe static svg icons pass and executable svg fails closed`() {
+        val safe = "<svg viewBox=\"0 0 24 24\"><path d=\"M1 1h20v20z\"/></svg>".encodeToByteArray()
+        val script = "<svg><script>alert(1)</script></svg>".encodeToByteArray()
+        val external = "<svg><use href=\"https://evil.example/a.svg#x\"/></svg>".encodeToByteArray()
+
+        assertTrue(isSafeStaticSvg(safe, "image/svg+xml; charset=utf-8"))
+        assertFalse(isSafeStaticSvg(script, "image/svg+xml"))
+        assertFalse(isSafeStaticSvg(external, "image/svg+xml"))
+        assertFalse(isSafeStaticSvg(safe, "text/html"))
+    }
 }
 
 private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }

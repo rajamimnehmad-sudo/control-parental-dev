@@ -1402,23 +1402,32 @@ private fun WebView.sanitizeAndExtractVisibleText(
             return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
           }
           function dagImageContext(image) {
-            var container = image.closest && image.closest('[data-product],article,.product,.product-card,.product-item,[class*="product-card"],[class*="product-item"]');
+            var container = image.closest && image.closest('[data-product],article,.product,.product-card,.product-item,[class*="product-card"],[class*="product-item"],[class*="product-summary"],[class*="productSummary"]');
             var containerText = container && (container.innerText || '');
             if (containerText && containerText.length > 800) containerText = '';
+            var productLink = image.closest && image.closest('a[href]');
             return dagNormalizedText([
               image.getAttribute('alt'), image.getAttribute('title'), image.getAttribute('aria-label'),
               image.getAttribute('src'), image.getAttribute('data-src'), image.currentSrc,
+              productLink && productLink.getAttribute('href'),
               (containerText || '').substring(0, 400)
             ].join(' '));
           }
-          function dagBlockIntimateImage(image) {
-            if (image.getAttribute('data-dag-kosher-blocked') === 'true') return true;
-            if (!dagIntimatePattern.test(dagImageContext(image))) return false;
-            image.setAttribute('data-dag-kosher-blocked', 'true');
-            ['src','srcset','data-src','data-lazy-src','data-original','data-srcset'].forEach(function(name) {
-              image.removeAttribute(name);
-            });
-            image.style.setProperty('display', 'none', 'important');
+          function dagFemaleIntimatePage() {
+            var route = dagNormalizedText(location.pathname.replace(/[-_]+/g, ' '));
+            return /\b(mujer(es)?|women|woman|dama(s)?|female)\b/.test(route) &&
+              /\b(ropa\s+(interior|intima)|underwear|lingerie|lenceria|intimates|corpin(es|os)?|bombacha(s)?|bralette(s)?|pant(y|ies))\b/.test(route);
+          }
+          function dagIsContentImage(image) {
+            if (image.closest && image.closest('header,nav,[role="navigation"]')) return false;
+            var marker = dagNormalizedText([image.className, image.id, image.getAttribute('alt')].join(' '));
+            return !/\b(logo|icon|sprite|flag|payment)\b/.test(marker);
+          }
+          function dagBlurIntimateImage(image) {
+            var sensitive = dagIntimatePattern.test(dagImageContext(image));
+            if (!sensitive && dagFemaleIntimatePage() && dagIsContentImage(image)) sensitive = true;
+            if (!sensitive) return false;
+            image.setAttribute('data-dag-kosher-blurred', 'true');
             return true;
           }
           function dagHttpsImageSource(image) {
@@ -1478,7 +1487,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               return;
             }
             if (tag === 'img') {
-              if (dagBlockIntimateImage(node)) return;
+              dagBlurIntimateImage(node);
               var source = dagHttpsImageSource(node);
               if (!source) {
                 node.remove();
@@ -1500,7 +1509,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
           if (!style) {
             style = document.createElement('style');
             style.id = 'dag-safe-style';
-            style.textContent = 'video,audio,canvas,iframe { display:none !important; }';
+            style.textContent = 'video,audio,canvas,iframe { display:none !important; } img[data-dag-kosher-blurred="true"] { filter: blur(28px) saturate(0.15) !important; transform: scale(1.08) !important; }';
             document.documentElement.appendChild(style);
           }
           if (!window.__dagSafeObserver) {

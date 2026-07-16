@@ -109,14 +109,17 @@ internal class DagImageResourceLoader(
             if (body.contentLength() > DagImageClassifier.MaximumImageBytes) return blockedResource()
             val bytes = body.byteStream().readLimited(DagImageClassifier.MaximumImageBytes)
             val mimeType = body.contentType()?.toString()
+            if (isSafeStaticSvg(bytes, mimeType)) {
+                allowedCount.incrementAndGet()
+                return imageResource(bytes, "image/svg+xml", "safe-icon")
+            }
             val classification = classifier.classify(bytes, mimeType)
             when (classification.decision) {
                 DagImageDecision.Allowed -> allowedCount.incrementAndGet()
                 DagImageDecision.Blocked -> blockedCount.incrementAndGet()
                 DagImageDecision.Uncertain -> uncertainCount.incrementAndGet()
             }
-            if (classification.decision == DagImageDecision.Blocked) return blockedResource()
-            if (classification.decision == DagImageDecision.Uncertain) {
+            if (classification.decision != DagImageDecision.Allowed) {
                 return blurredImageResource(bytes) ?: blockedResource()
             }
 
@@ -207,6 +210,18 @@ internal class DagImageResourceLoader(
     }
 }
 
+internal fun isSafeStaticSvg(
+    bytes: ByteArray,
+    mimeType: String?,
+): Boolean {
+    if (bytes.size !in 32..MaximumSafeSvgBytes) return false
+    if (!mimeType.orEmpty().substringBefore(';').trim().equals("image/svg+xml", ignoreCase = true)) return false
+    val svg = bytes.toString(Charsets.UTF_8)
+    if (!svg.trimStart().startsWith("<svg", ignoreCase = true)) return false
+    if (!svg.contains("</svg>", ignoreCase = true)) return false
+    return ForbiddenSvgPattern.none { it.containsMatchIn(svg) }
+}
+
 internal data class DagImagePageSummary(
     val allowed: Int,
     val blocked: Int,
@@ -280,4 +295,17 @@ private val ImageExtensions =
 private val BlockedMediaExtensions =
     setOf(
         ".mp4", ".webm", ".m3u8", ".mp3", ".wav", ".ogg", ".mov", ".m4a", ".aac",
+    )
+
+private const val MaximumSafeSvgBytes = 64 * 1024
+private val ForbiddenSvgPattern =
+    listOf(
+        Regex("<!DOCTYPE|<!ENTITY", RegexOption.IGNORE_CASE),
+        Regex(
+            "<(script|foreignObject|image|iframe|object|embed|video|audio|use|animate|set)\\b",
+            RegexOption.IGNORE_CASE,
+        ),
+        Regex("\\bon[a-z]+\\s*=", RegexOption.IGNORE_CASE),
+        Regex("\\b(xlink:href|href)\\s*=", RegexOption.IGNORE_CASE),
+        Regex("url\\s*\\(|@import|javascript:|data:", RegexOption.IGNORE_CASE),
     )

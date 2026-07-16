@@ -20,4 +20,12 @@ class DagKosherImageMetadataTest {
         assertFalse(isIntimateImageMetadata("pantalón y camisa"))
         assertFalse(isIntimateImageMetadata("swimwear navigation menu"))
     }
+
+    @Test
+    fun `female intimate category urls are detected without targeting a store`() {
+        assertTrue(isFemaleIntimateCategoryUrl("https://shop.example/mujer/ropa-interior"))
+        assertTrue(isFemaleIntimateCategoryUrl("https://shop.example/women/underwear/new"))
+        assertFalse(isFemaleIntimateCategoryUrl("https://shop.example/mujer/camperas"))
+        assertFalse(isFemaleIntimateCategoryUrl("https://shop.example/hombre/ropa-interior"))
+    }
 }
