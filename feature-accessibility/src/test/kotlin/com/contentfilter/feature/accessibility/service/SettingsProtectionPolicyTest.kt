@@ -237,6 +237,14 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun protectedSettingsClickEscapesHomeImmediately() {
+        assertEquals(
+            SettingsEscapeAction.Home,
+            SettingsEscapeStrategy.actionForAttempt(attempt = 0, urgent = true),
+        )
+    }
+
+    @Test
     fun samsungAdminLabelIdentifiesOwnApp() {
         assertTrue(
             "Protección de Content Filter".matchesOwnAppIdentity(

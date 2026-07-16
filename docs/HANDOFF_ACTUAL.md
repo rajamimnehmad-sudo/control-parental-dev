@@ -79,6 +79,15 @@ Usuario 8e78e4a36304e1a359e8f9fe5714c2eb101a6dc60a1c0a41905db01cdc32f684
 Admin   7ce2ac04e45dd442a4d5ce7513a3535c2895004e9a3028e15d3854d54b545187
 ```
 
+## Implementacion 2026-07-16 - DEV 240 cierre tecnico BARRIER-A11Y-RACE-01
+
+- Evidencia fisica de origen: el usuario confirmo que en Samsung SM-S908E podia apagar rapidamente Accessibility aunque la pantalla protegida terminara cerrandose.
+- Causa tecnica: la configuracion y el filtro del servicio no solicitaban `TYPE_VIEW_CLICKED`. La barrera dependia de cambios posteriores de ventana, contenido o foco; una pulsacion rapida sobre el interruptor nativo podia adelantarse a esos eventos.
+- Correccion: el servicio escucha clics solo para decidir sobre Ajustes, instaladores o desinstaladores protegibles. Un clic dentro de una pantalla critica y sin mantenimiento autorizado ejecuta una salida urgente a Home; los demas eventos conservan la secuencia Back/Back/Home. Los clics del resto de las aplicaciones se descartan antes de evaluar uso o politica para no reintroducir trabajo global por toque.
+- Mantenimiento: una autorizacion vigente de Ajustes o retiro conserva prioridad y no dispara la salida urgente. Ajustes normales y pantallas de otras aplicaciones siguen disponibles.
+- Validacion local: 789 tareas correctas para tests de `feature-accessibility`, tests DEV Usuario/Admin, ktlint de las areas y builds de ambos APK. Pruebas nuevas cubren la suscripcion a clics y la salida urgente. Falta CI, publicacion DEV y prueba fisica repetida antes de marcar el ticket resuelto.
+- Pendiente fisico: instalar DEV 240 in-place en el SM-S908E y realizar veinte intentos rapidos de apagar Accessibility con barrera armada, mas un control positivo dentro de una ventana de mantenimiento autorizada. No se promete resistencia absoluta de Device Owner en Android normal.
+
 ## Implementacion 2026-07-16 - DEV 239 correcciones de prueba fisica DAG
 
 - `DAG-THEME-01`: con `targetSdk 36`, asignar colores directamente a las barras del sistema ya no pintaba la zona de la camara bajo edge-to-edge. DAG ahora pinta su superficie hasta el borde, aplica el inset solo al contenido y conserva el contraste de los iconos. La direccion usa una tipografia mas compacta para evitar recortar busquedas como `yeshrun instagram`.

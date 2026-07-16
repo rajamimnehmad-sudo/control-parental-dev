@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 231 y App Admin DEV 231, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 239 y App Admin DEV 239, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -136,7 +136,7 @@ Flujo de una entrada:
 | --- | --- | --- | --- | --- | --- |
 | SEC-LICENSE-01 | Idea | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
-| BARRIER-A11Y-RACE-01 | Idea | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
+| BARRIER-A11Y-RACE-01 | Implementado DEV 240; pendiente prueba fisica | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
 | BARRIER-DEFAULT-ON-01 | Idea | P1 | Armar automaticamente la barrera al completar y verificar la configuracion de proteccion | S | Medio |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
@@ -201,12 +201,12 @@ Flujo de una entrada:
 
 ### BARRIER-A11Y-RACE-01 - Bypass rapido para apagar Accessibility
 
-- Estado: `Idea` urgente; incidente confirmado por el usuario, no aprobado todavia para diagnostico tecnico ni codigo.
+- Estado: `Implementado en DEV 240; pendiente prueba fisica`. El usuario aprobo avanzar el 2026-07-16 y confirmo que el incidente ocurre en Samsung SM-S908E.
 - Tipo: bug de seguridad y antimanipulacion.
 - Prioridad: P0.
 - Problema: es posible apagar el servicio de Accessibility de App Usuario actuando muy rapido en la pantalla protegida. La barrera cierra la pantalla, pero la accion de desactivacion llega a completarse.
-- Solucion propuesta: diagnosticar la carrera exacta entre el primer evento observable, el cierre defensivo y la accion del sistema; agregar una barrera preventiva que impida confirmar la desactivacion antes de que Android aplique el cambio, sin bloquear Ajustes normales ni el mantenimiento autorizado.
-- Evidencia: prueba fisica informada por el usuario el 2026-07-15. El usuario logro apagar Accessibility rapidamente aunque la pantalla se cerraba. Esta evidencia nueva prevalece sobre la validacion anterior para este recorrido especifico; todavia no se conoce fabricante, version exacta ni secuencia minima reproducible.
+- Causa y solucion DEV 240: el servicio no solicitaba ni procesaba `TYPE_VIEW_CLICKED`, por lo que esperaba cambios posteriores de ventana, contenido o foco. Ahora los clics se aceptan unicamente para pantallas protegibles y provocan salida urgente a Home cuando la barrera aplica; los clics de aplicaciones comunes se descartan de inmediato y el mantenimiento autorizado conserva acceso.
+- Evidencia: prueba fisica informada por el usuario el 2026-07-15 y dispositivo confirmado el 2026-07-16: Samsung SM-S908E. El usuario logro apagar Accessibility rapidamente aunque la pantalla se cerraba. La regresion automatizada cubre suscripcion a clics y salida urgente; falta repeticion fisica con el APK publicado.
 - Esfuerzo: M estimado, sujeto al diagnostico por fabricante y version Android.
 - Riesgo: critico; Accessibility es una capa central para impedir manipulacion y aplicar bloqueos de apps. Un bypass puede debilitar otras defensas aunque VPN, Device Admin y watchdog permanezcan activos.
 - Dependencias: `feature-accessibility`; deteccion temprana de pantallas criticas; watchdog y alertas de componente caido; mantenimiento autorizado; validacion fisica in-place sin borrar datos.
@@ -219,7 +219,7 @@ Flujo de una entrada:
   - si Accessibility cae por cualquier otra via, watchdog, estado y alerta remota lo detectan sin informar falsamente que sigue activa;
   - pruebas repetidas en los dispositivos fisicos soportados, actualizacion in-place y sin borrar datos;
   - tests del area, regresion de barrera, CI y handoff actualizados antes de marcarlo `Resuelto`.
-- Decisiones pendientes para la entrevista del ticket: dispositivo y version Android afectados; secuencia minima; estado de Device Admin/VPN tras el bypass; comportamiento de watchdog y alerta; matriz OEM y cantidad de repeticiones para aceptar el cierre.
+- Validacion pendiente: instalar DEV 240 in-place; veinte intentos rapidos con barrera armada; control positivo con mantenimiento autorizado; confirmar estado real, watchdog y alerta si el servicio llegara a caer. No se marca `Resuelto` sin esa evidencia.
 
 ### BARRIER-DEFAULT-ON-01 - Barrera armada de forma predeterminada
 

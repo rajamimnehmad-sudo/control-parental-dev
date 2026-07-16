@@ -112,6 +112,10 @@ class ProtectorAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null || !AccessibilityEventFilter.isHandled(event.eventType)) return
         val packageName = event.packageName?.toString()?.takeIf { it.isNotBlank() } ?: return
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) {
+            val resolvedOwnUninstaller = packageName in ownUninstallerPackages
+            if (!settingsProtectionPolicy.couldContainProtectedScreen(packageName, resolvedOwnUninstaller)) return
+        }
         if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
             observedWindowPackageName = packageName
             observedWindowClassName = event.className?.toString()
@@ -120,6 +124,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val elapsed = clock.elapsedRealtimeMillis()
         val now = clock.nowEpochMillis()
         if (handleSettingsProtection(event, packageName, event.className?.toString(), elapsed, now)) return
+        if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) return
         if (packageName.isAlwaysAllowedPackage()) {
             handleAlwaysAllowedForeground(packageName, elapsed, now)
             return
@@ -268,7 +273,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         ) {
             return false
         }
-        leaveProtectedSettings()
+        leaveProtectedSettings(urgent = event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED)
         Toast.makeText(this, "Este ajuste está protegido", Toast.LENGTH_SHORT).show()
         serviceScope?.launch {
             telemetryReporter.recordSettingsProtection()
@@ -280,16 +285,21 @@ class ProtectorAccessibilityService : AccessibilityService() {
         return true
     }
 
-    private fun leaveProtectedSettings() {
-        if (settingsEscapeJob?.isActive == true) return
-        performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0))
+    private fun leaveProtectedSettings(urgent: Boolean = false) {
+        if (urgent) {
+            performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0, urgent = true))
+        } else {
+            if (settingsEscapeJob?.isActive == true) return
+            performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt = 0, urgent = false))
+        }
         val scope = serviceScope ?: return
+        if (settingsEscapeJob?.isActive == true) return
         settingsEscapeJob =
             scope.launch {
                 for (attempt in 1..SettingsEscapeFallbackAttempt) {
                     delay(SettingsEscapeRecheckDelayMillis)
                     if (!isProtectedSettingsStillVisible()) break
-                    performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt))
+                    performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt, urgent = false))
                 }
                 settingsEscapeJob = null
             }

@@ -15,6 +15,7 @@ class AccessibilityEventFilterTest {
     fun `keeps existing handled events`() {
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED))
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_WINDOWS_CHANGED))
+        assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_CLICKED))
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_FOCUSED))
         assertTrue(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED))
         assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_SCROLLED))
@@ -22,6 +23,6 @@ class AccessibilityEventFilterTest {
 
     @Test
     fun `ignores unrelated events`() {
-        assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_CLICKED))
+        assertFalse(AccessibilityEventFilter.isHandled(AccessibilityEvent.TYPE_VIEW_SCROLLED))
     }
 }

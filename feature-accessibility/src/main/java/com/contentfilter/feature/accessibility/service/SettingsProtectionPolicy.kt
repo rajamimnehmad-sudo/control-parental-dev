@@ -166,8 +166,11 @@ internal enum class SettingsEscapeAction {
 }
 
 internal object SettingsEscapeStrategy {
-    fun actionForAttempt(attempt: Int): SettingsEscapeAction =
-        if (attempt < BackAttemptsBeforeHome) {
+    fun actionForAttempt(
+        attempt: Int,
+        urgent: Boolean = false,
+    ): SettingsEscapeAction =
+        if (!urgent && attempt < BackAttemptsBeforeHome) {
             SettingsEscapeAction.Back
         } else {
             SettingsEscapeAction.Home
