@@ -138,6 +138,13 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - App Admin incorpora campanita con contador de eventos disponibles, tarjeta de acceso separada de Solicitudes, bandeja con refresco manual y mensaje explicito de alcance. Su RLS excluye `tamper_attempt` aunque exista una sesion anterior o se consulte REST directamente con token Admin.
 - La deduplicacion existente de cinco minutos por dispositivo/tipo se conserva, por lo que watchdog, reintentos y FCM no crean otro incidente dentro de esa ventana. No se borro ni modifico ningun evento historico.
 - Migracion `20260716155413_protection_alert_routing_and_super_admin.sql` aplicada solo en Supabase DEV. Se verificaron la policy filtrada y Edge Function activa con SHA-256 `49734e6bc61cd981e8923bb2fcf94bfc4095f09a940c8911f2707104cc8e824b`.
+
+## Implementacion 2026-07-16 - candidato DEV 241 USER-GREETING-01
+
+- El encabezado del Home de App Usuario muestra `Hola, {nombre}` usando exclusivamente el `displayName` del dispositivo que coincide con la activacion local vigente. No elige por orden ni usa el nombre de otro dispositivo como fallback.
+- Mientras la activacion, la fila sincronizada o un nombre no vacio no esten disponibles muestra el fallback neutro `Hola`. Los cambios de nombre se reflejan al actualizarse Room por el flujo normal de sincronizacion.
+- El nombre solo aparece dentro del Home: no se copia a notificaciones ni pantalla bloqueada y no se agrega persistencia nueva. Los espacios externos se normalizan y se conservan caracteres especiales y el nombre completo; el encabezado puede ocupar mas de una linea.
+- Validacion: tests unitarios de nombre activo, aislamiento entre dispositivos y fallbacks; compilacion DEV y `ktlintCheck` de App Usuario correctos. Falta prueba visual fisica y no hubo publicacion intermedia.
 - Validacion local: tests/compilacion Admin, formato de Admin y red, ESLint de `src`, TypeScript y build Superweb correctos. Falta prueba fisica de los dos recorridos y publicacion final de APK/Superweb.
 
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01

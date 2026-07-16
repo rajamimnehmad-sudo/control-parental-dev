@@ -177,7 +177,7 @@ Flujo de una entrada:
 | DAG-CAPTCHA-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Idea | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
-| USER-GREETING-01 | Idea | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
+| USER-GREETING-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
@@ -572,15 +572,17 @@ Flujo de una entrada:
 
 ### USER-GREETING-01 - Saludo personalizado en App Usuario
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX y personalizacion de App Usuario. Prioridad: P2.
+- Estado: `Implementado candidato DEV 241; pendiente prueba fisica`. Aprobado al ordenar ejecutar todos los tickets el 2026-07-16. Tipo: UX y personalizacion de App Usuario. Prioridad: P2.
 - Problema: el encabezado superior muestra un saludo generico y no identifica al usuario protegido que esta usando la aplicacion.
 - Solucion propuesta: reemplazar `Hola` por `Hola, {nombre}`, usando el nombre del usuario definido por el administrador.
 - Evidencia: solicitud del usuario el 2026-07-15.
 - Esfuerzo: S. Riesgo: bajo; deben contemplarse nombre ausente, sincronizacion tardia, longitud, caracteres especiales y privacidad en pantalla.
 - Dependencias: nombre del usuario protegido disponible en App Usuario; sincronizacion y estado local; encabezado de Home; accesibilidad y tamanos de fuente.
 - Duplicados y relacion: puede agruparse visualmente con `UI-POLISH-01`, pero se conserva como entrada separada por depender del dato remoto definido por Admin.
-- Criterios de aceptacion propuestos: el encabezado muestra el nombre correcto del usuario activo; los cambios realizados por el administrador se reflejan tras la sincronizacion prevista; existe un fallback simple si el nombre falta; nombres largos no rompen el layout; no se muestra el nombre de otro usuario o dispositivo.
-- Decisiones pendientes para el ticket: puntuacion y texto exactos; fallback; longitud maxima o truncado; momento de actualizacion; tratamiento de privacidad en capturas y pantalla bloqueada.
+- Implementacion: el Home observa activacion y dispositivos locales sincronizados, cruza exclusivamente por el `deviceId` activo y muestra `Hola, {nombre}`. Si la activacion, el dispositivo o el nombre todavia no estan disponibles muestra `Hola`; nunca toma el primer nombre de otra fila como reemplazo.
+- Criterios de aceptacion cubiertos: el encabezado muestra el nombre correcto del usuario activo; los cambios se reflejan cuando Room recibe la sincronizacion; existe fallback simple; el encabezado admite salto de linea para nombres largos; no se muestra el nombre de otro usuario o dispositivo.
+- Decision aplicada: no se copia el nombre a notificaciones ni pantalla bloqueada y no se agrega otra persistencia. Se conserva completo, con espacios externos normalizados, para no alterar nombres ni caracteres especiales.
+- Validacion: tests del cruce seguro, fallback y nombre normalizado; compilacion y `ktlintCheck` de App Usuario correctos. Falta prueba visual en Samsung SM-S908E y no hubo publicacion intermedia.
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 

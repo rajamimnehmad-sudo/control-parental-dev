@@ -471,12 +471,15 @@ private fun UserHomeRoute(
     onRequests: () -> Unit,
     onWeb: () -> Unit,
     onUpdates: () -> Unit,
-    viewModel: RequestsViewModel = hiltViewModel(),
+    requestsViewModel: RequestsViewModel = hiltViewModel(),
+    homeViewModel: UserHomeViewModel = hiltViewModel(),
 ) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val requestsState by requestsViewModel.uiState.collectAsStateWithLifecycle()
+    val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
     UserHomeTab(
-        pendingRequests = state.pendingCount,
-        latestRequestLabel = state.requests.firstOrNull()?.requestType?.name.orEmpty(),
+        greeting = homeState.greeting,
+        pendingRequests = requestsState.pendingCount,
+        latestRequestLabel = requestsState.requests.firstOrNull()?.requestType?.name.orEmpty(),
         onApps = onApps,
         onRequests = onRequests,
         onWeb = onWeb,
@@ -486,6 +489,7 @@ private fun UserHomeRoute(
 
 @Composable
 private fun UserHomeTab(
+    greeting: String,
     pendingRequests: Int,
     latestRequestLabel: String,
     onApps: () -> Unit,
@@ -494,7 +498,7 @@ private fun UserHomeTab(
     onUpdates: () -> Unit,
 ) {
     ProductLazyVisualPage(
-        title = "Hola",
+        title = greeting,
         subtitle = "Tu dispositivo protegido está listo",
     ) {
         item {
