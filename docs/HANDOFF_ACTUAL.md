@@ -72,11 +72,11 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-228-debug.apk
 ```
 
-SHA-256 publicados (completar al publicar DEV 228):
+SHA-256 publicados:
 
 ```text
-Usuario PENDIENTE
-Admin   PENDIENTE
+Usuario 690242c8bb9a4779b4a88eac3c3b7b6b64f58098d6179609c8bb28bf05049678
+Admin   a3dcec4816998db9831c43d737582787ac9367b9727feeae57cdd00a2c585a63
 ```
 
 ## Implementacion 2026-07-15 - DEV 228 autocompletado y contraste DAG
@@ -85,6 +85,7 @@ Admin   PENDIENTE
 - Consultas ambiguas como `coca` proponen contexto seguro y concreto, por ejemplo `Coca-Cola gaseosa`, sin relajar la decision final del clasificador.
 - La barra superior baja de 58 a 52 dp y el buscador de Home de 64 a 56 dp. Los resúmenes de resultados y las sugerencias declaran colores de alto contraste para tema claro y oscuro.
 - La actualización DEV ya se comprueba automáticamente al entrar en la pantalla Actualizaciones y puede descargar/verificar el APK; Android normal exige confirmación del usuario para instalar un APK externo. Instalación silenciosa requiere Device Owner, root o una tienda administrada y no se intenta eludir esa protección.
+- Ktlint, pruebas unitarias DEV y builds optimizados de Usuario/Admin correctos. APKs y manifiestos DEV 228 publicados exclusivamente en Supabase DEV y verificados por versión, hash declarado y HTTP 200; falta validación visual en teléfono.
 
 ## Implementacion 2026-07-15 - DEV 227 falsos positivos, aprobacion DAG y Home
 
