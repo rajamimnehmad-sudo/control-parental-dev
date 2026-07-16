@@ -121,6 +121,15 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - La instalacion de actualizaciones conserva el comportamiento real de Android normal: App Usuario comprueba y descarga, pero Android solicita permiso y confirmacion para instalar; no se promete actualizacion silenciosa.
 - Validacion local: formato, compilacion y tests DEV de App Usuario correctos. Falta recorrer las acciones en Samsung SM-S908E; no hubo publicacion intermedia.
 
+## Implementacion 2026-07-16 - candidato DEV 241 SUPERADMIN-TOKEN-01
+
+- El token de activacion Admin se entrega una sola vez y queda solo en memoria de la pestaña actual. Superweb ya no lo persiste en `localStorage` ni en cookies; al ocultarlo, recargar o cerrar la pestaña no puede recuperarlo. Supabase conserva exclusivamente el hash bcrypt preexistente.
+- La ruta de generacion acepta solo la solicitud JSON autenticada de la interfaz; se elimino el fallback de formulario que guardaba el secreto en una cookie para poder mostrarlo despues.
+- Super Admin puede revocar un token Admin pendiente sin borrar el administrador. La RPC valida comunidad y admin, solo invalida codigos Admin sin usar y no afecta dispositivos ya activados.
+- La tabla privada `activation_code_audit` registra generacion, uso y revocacion con ID de codigo, rol, vencimiento, actor cuando existe y fecha; nunca guarda el codigo ni su hash. RLS permite lectura solo a Super Admin.
+- Migracion `20260716155020_admin_token_audit_and_revocation.sql` aplicada exclusivamente en Supabase DEV. Se verificaron trigger, `SECURITY DEFINER`, revocacion a `PUBLIC/anon` y acceso autenticado solo para la RPC de Super Admin.
+- Validacion: Superweb paso ESLint de `src`, TypeScript y build optimizado. No se genero ni revoco ningun token real durante la prueba y no hubo publicacion intermedia.
+
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
 
 - Un dispositivo Usuario con control de proteccion nunca configurado se arma automaticamente solo cuando App Usuario comprueba simultaneamente el tunel VPN real, Accessibility habilitado, Device Admin activo y ausencia de una desactivacion intencional de la VPN.

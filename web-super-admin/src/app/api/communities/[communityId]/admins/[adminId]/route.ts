@@ -23,3 +23,17 @@ export async function DELETE(_request: Request, { params }: Props) {
 
   return NextResponse.json({ ok: true, deleted: data ?? 0 });
 }
+
+export async function PATCH(_request: Request, { params }: Props) {
+  const { communityId, adminId } = await params;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("super_admin_revoke_admin_pairing_codes", {
+    target_community_id: communityId,
+    target_admin_id: adminId,
+  });
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+
+  revalidatePath(`/communities/${communityId}`);
+  return NextResponse.json({ ok: true, revoked: data ?? 0 });
+}

@@ -141,7 +141,7 @@ Flujo de una entrada:
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
-| SUPERADMIN-TOKEN-01 | Idea | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
+| SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Idea | P2 | Consistencia visual y accesibilidad de ambas apps | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | SUPERADMIN-MSG-01 | Idea | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |

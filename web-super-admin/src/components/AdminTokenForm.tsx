@@ -1,7 +1,7 @@
 "use client";
 
 import { AlertTriangle, CheckCircle2, KeyRound, Loader2, X } from "lucide-react";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useState } from "react";
 import { CopyButton } from "@/components/CopyButton";
 
 type TokenResult = {
@@ -10,31 +10,10 @@ type TokenResult = {
   expiresAt: string;
 };
 
-export function AdminTokenForm({ communityId, initialToken }: { communityId: string; initialToken?: TokenResult | null }) {
+export function AdminTokenForm({ communityId }: { communityId: string }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [token, setToken] = useState<TokenResult | null>(initialToken ?? null);
-  const storageKey = useMemo(() => `last-admin-token:${communityId}`, [communityId]);
-  const cookieName = useMemo(() => `last-admin-token-${communityId}`, [communityId]);
-
-  useEffect(() => {
-    if (initialToken?.activationCode) {
-      window.localStorage.setItem(storageKey, JSON.stringify(initialToken));
-      setToken(initialToken);
-      return;
-    }
-    const saved = window.localStorage.getItem(storageKey);
-    if (!saved) return;
-
-    try {
-      const parsed = JSON.parse(saved) as TokenResult;
-      if (parsed.activationCode && parsed.expiresAt && new Date(parsed.expiresAt).getTime() > Date.now()) {
-        setToken(parsed);
-      }
-    } catch {
-      window.localStorage.removeItem(storageKey);
-    }
-  }, [initialToken, storageKey]);
+  const [token, setToken] = useState<TokenResult | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -71,15 +50,12 @@ export function AdminTokenForm({ communityId, initialToken }: { communityId: str
     }
 
     const nextToken = payload as TokenResult;
-    window.localStorage.setItem(storageKey, JSON.stringify(nextToken));
     event.currentTarget.reset();
     setToken(nextToken);
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   }
 
   function clearToken() {
-    window.localStorage.removeItem(storageKey);
-    document.cookie = `${cookieName}=; Max-Age=0; path=/communities/${communityId}; SameSite=Lax; Secure`;
     setToken(null);
   }
 
@@ -161,7 +137,7 @@ function TokenPanel({ token, onClear }: { token: TokenResult; onClear: () => voi
       </div>
       <div className="mt-3 flex items-start gap-2 rounded-md bg-white p-3 text-sm font-semibold text-teal-950">
         <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-        <p>Copiá este token ahora. También queda visible en este navegador hasta que toques Ocultar o hasta que venza.</p>
+        <p>Copiá este token ahora. Solo se mantiene en memoria en esta pestaña y no vuelve a mostrarse al recargar.</p>
       </div>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm font-semibold text-teal-950">Vence: {new Date(token.expiresAt).toLocaleString("es-AR")}</p>

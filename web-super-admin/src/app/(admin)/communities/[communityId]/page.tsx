@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { cookies } from "next/headers";
 import { ArrowLeft, CalendarClock, KeyRound, Mail, MonitorSmartphone, Settings2, ShieldCheck, Smartphone, UserRound, UsersRound } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AdminTokenForm } from "@/components/AdminTokenForm";
@@ -10,6 +9,7 @@ import { DagEntitlementForm } from "@/components/DagEntitlementForm";
 import { EmptyState } from "@/components/EmptyState";
 import { LicenseBadge, ProtectedUserBadge } from "@/components/Badge";
 import { LicenseForm } from "@/components/LicenseForm";
+import { RevokeAdminTokenButton } from "@/components/RevokeAdminTokenButton";
 import { getCommunityBundle } from "@/lib/data";
 import type { CommunityAdmin, ProtectedUser } from "@/lib/types";
 import { compactNumber, formatDate } from "@/lib/utils";
@@ -21,7 +21,6 @@ type Props = {
 export default async function CommunityDetailPage({ params }: Props) {
   const { communityId } = await params;
   const { detail, admins, protectedUsers } = await getCommunityBundle(communityId);
-  const initialAdminToken = await readInitialAdminToken(communityId);
   const pendingUsers = protectedUsers.filter((user) => user.status === "pending").length;
   const activatedUsers = protectedUsers.filter((user) => user.status === "activated").length;
 
@@ -89,7 +88,7 @@ export default async function CommunityDetailPage({ params }: Props) {
             <span className="hidden text-sm font-semibold text-accent group-open:inline">Cerrar</span>
           </summary>
           <div className="border-t border-line p-4">
-            <AdminTokenForm communityId={communityId} initialToken={initialAdminToken} />
+            <AdminTokenForm communityId={communityId} />
           </div>
         </details>
 
@@ -166,6 +165,9 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
         <InfoLine icon={Smartphone} label={admin.activated_device_name ?? "Sin dispositivo activado"} />
         <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(admin.last_seen_at)}`} />
         {!active ? <InfoLine icon={KeyRound} label={`Token pendiente: ${formatDate(admin.pending_token_expires_at)}`} /> : null}
+        {!active && admin.pending_token_expires_at ? (
+          <RevokeAdminTokenButton communityId={communityId} adminId={admin.admin_id} />
+        ) : null}
       </div>
     </article>
   );
@@ -203,23 +205,4 @@ function InfoLine({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
       <span>{label}</span>
     </div>
   );
-}
-
-async function readInitialAdminToken(communityId: string) {
-  const cookieStore = await cookies();
-  const raw = cookieStore.get(`last-admin-token-${communityId}`)?.value;
-  if (!raw) return null;
-
-  try {
-    const parsed = JSON.parse(raw) as { communityAdminId?: string; activationCode?: string; expiresAt?: string };
-    if (!parsed.communityAdminId || !parsed.activationCode || !parsed.expiresAt) return null;
-    if (new Date(parsed.expiresAt).getTime() <= Date.now()) return null;
-    return {
-      communityAdminId: parsed.communityAdminId,
-      activationCode: parsed.activationCode,
-      expiresAt: parsed.expiresAt,
-    };
-  } catch {
-    return null;
-  }
 }
