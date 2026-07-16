@@ -1,4 +1,4 @@
-export type LicenseStatus = "active" | "suspended" | "expired";
+export type LicenseStatus = "active" | "suspended" | "expired" | "scheduled";
 
 export type CommunitySummary = {
   community_id: string;

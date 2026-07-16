@@ -134,7 +134,7 @@ Flujo de una entrada:
 
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
-| SEC-LICENSE-01 | Idea | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
+| SEC-LICENSE-01 | En progreso; tramo A implementado en DEV | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Implementado DEV 240; pendiente prueba fisica | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
 | BARRIER-DEFAULT-ON-01 | Implementado DEV 241; pendiente prueba fisica | P1 | Armar automaticamente la barrera al completar y verificar la configuracion de proteccion | S | Medio |

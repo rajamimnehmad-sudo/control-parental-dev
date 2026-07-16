@@ -15,7 +15,10 @@ const communitySchema = z.object({
   maxUserDevices: z.coerce.number().int().min(1),
   maxAdminDevices: z.coerce.number().int().min(1),
   internalNotes: z.string().trim().optional(),
-});
+}).refine(
+  (value) => !value.expiresAt || new Date(`${value.expiresAt}T23:59:59.000Z`) > new Date(),
+  { message: "La fecha de vencimiento debe ser futura", path: ["expiresAt"] },
+);
 
 const licenseSchema = z.object({
   communityId: z.string().uuid(),
@@ -27,7 +30,10 @@ const licenseSchema = z.object({
   maxUserDevices: z.coerce.number().int().min(1),
   maxAdminDevices: z.coerce.number().int().min(1),
   internalNotes: z.string().trim().optional(),
-});
+}).refine(
+  (value) => !value.expiresAt || !value.startsAt || value.expiresAt >= value.startsAt,
+  { message: "El vencimiento no puede ser anterior al inicio", path: ["expiresAt"] },
+);
 
 const dagLimitSchema = z.object({
   communityId: z.string().uuid(),

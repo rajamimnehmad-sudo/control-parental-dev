@@ -9,6 +9,7 @@ import { formatDateInput } from "@/lib/utils";
 
 export function LicenseForm({ detail, compact = false }: { detail: CommunityDetail; compact?: boolean }) {
   const [state, action, pending] = useActionState(updateLicenseAction, emptyState);
+  const storedStatus = detail.license_status === "scheduled" ? "active" : detail.license_status;
   const formClassName = compact
     ? "grid gap-4 rounded-md border border-line bg-white p-4 shadow-soft"
     : "grid gap-4 rounded-md border border-line bg-white p-4 shadow-soft lg:grid-cols-4";
@@ -18,7 +19,7 @@ export function LicenseForm({ detail, compact = false }: { detail: CommunityDeta
       <input type="hidden" name="communityId" value={detail.community_id} />
       <label className="field">
         Estado
-        <select className="input" name="status" defaultValue={detail.license_status}>
+        <select className="input" name="status" defaultValue={storedStatus}>
           <option value="active">Activa</option>
           <option value="suspended">Suspendida</option>
           <option value="expired">Vencida</option>

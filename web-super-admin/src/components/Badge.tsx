@@ -5,12 +5,14 @@ const labels: Record<LicenseStatus, string> = {
   active: "Activa",
   suspended: "Suspendida",
   expired: "Vencida",
+  scheduled: "Programada",
 };
 
 const styles: Record<LicenseStatus, string> = {
   active: "border-teal-200 bg-teal-50 text-teal-800",
   suspended: "border-amber-200 bg-amber-50 text-warning",
   expired: "border-red-200 bg-red-50 text-danger",
+  scheduled: "border-sky-200 bg-sky-50 text-sky-800",
 };
 
 export function LicenseBadge({ status }: { status: LicenseStatus }) {

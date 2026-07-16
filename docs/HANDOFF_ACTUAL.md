@@ -79,6 +79,14 @@ Usuario 519b911b5d6e5489f30e64bfc37d2e409794fdc37d9f2a159b1662e9687b2875
 Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 ```
 
+## Implementacion 2026-07-16 - candidato DEV 241 SEC-LICENSE-01A
+
+- Primer tramo del ciclo de licencia: Super Admin ya no confunde el estado manual almacenado con el estado efectivo. Una licencia activa con inicio futuro aparece `Programada`; al alcanzar `expires_at` aparece `Vencida`; una suspension manual conserva prioridad.
+- La migracion `20260716151923_effective_community_license_status.sql` agrega una funcion pura de estado efectivo, hace que listado y detalle usen la misma decision y rechaza periodos cuya fecha de vencimiento no sea posterior al inicio. No actualiza licencias existentes, no borra comunidades, dispositivos, reglas ni configuracion.
+- Renovar consiste en volver a `Activa` con un periodo valido; la fila existente se actualiza y toda la configuracion asociada se conserva. La UI muestra `Programada` sin intentar guardar ese estado derivado como si fuera un estado manual.
+- Validacion: Supabase DEV `syeycayasyufedwoprea` devolvio correctamente los cuatro casos activo/programado/vencido/suspendido; la funcion auxiliar no es ejecutable por `anon`, mientras las RPC de Super Admin conservan acceso autenticado y su comprobacion interna de rol. `eslint src`, TypeScript y build optimizado de Superweb correctos. El lint global conserva deuda porque incluye artefactos generados `.open-next`; no corresponde al codigo fuente de este ticket.
+- Pendiente de `SEC-LICENSE-01`: propagar el estado efectivo a dispositivos Usuario/Admin ya activados, aplicar el comportamiento offline y completar la restauracion automatica al renovar. Este tramo no publica APK ni Superweb.
+
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
 
 - Un dispositivo Usuario con control de proteccion nunca configurado se arma automaticamente solo cuando App Usuario comprueba simultaneamente el tunel VPN real, Accessibility habilitado, Device Admin activo y ausencia de una desactivacion intencional de la VPN.
