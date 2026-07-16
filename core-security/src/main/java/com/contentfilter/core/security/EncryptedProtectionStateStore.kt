@@ -32,7 +32,10 @@ class EncryptedProtectionStateStore
         @Volatile
         private var state: StoredState = loadSafely()
 
-        private val controlState = MutableSharedFlow<DeviceProtectionControl?>(replay = 1).apply { tryEmit(state.control) }
+        private val controlState =
+            MutableSharedFlow<DeviceProtectionControl?>(replay = 1).apply {
+                tryEmit(state.control)
+            }
 
         override fun observeControl(): Flow<DeviceProtectionControl?> = controlState
 
