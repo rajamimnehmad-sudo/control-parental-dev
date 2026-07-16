@@ -148,7 +148,7 @@ Flujo de una entrada:
 | SUPERADMIN-ALERTS-01 | Idea | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Idea | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
 | ALERT-ROUTING-01 | Idea | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
-| APP-INSTALL-APPROVAL-01 | Idea | P1 | Play Store visible, pero cada instalacion requiere aprobacion explicita del administrador | L | Alto |
+| APP-INSTALL-APPROVAL-01 | Idea | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | BARRIER-LAUNCHER-01 | Idea | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
 | DAG-NAV-UX-01 | En progreso | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | En progreso | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
@@ -419,17 +419,18 @@ Flujo de una entrada:
 - Estado: `Idea`; no aprobado para codigo, Android Enterprise ni cambios de cuenta Google.
 - Tipo: control de aplicaciones, seguridad y solicitudes.
 - Prioridad: P1.
-- Problema: se quiere conservar Play Store disponible para explorar aplicaciones, pero impedir que una app se instale hasta recibir permiso explicito del administrador.
-- Solucion propuesta de producto: al intentar instalar, identificar la app y crear una solicitud para Admin; solo una aprobacion vigente habilita la instalacion de ese paquete. Mantener una defensa posterior que bloquee o ponga en cuarentena una app instalada sin autorizacion.
+- Problema: se quiere conservar Play Store disponible para explorar aplicaciones, pero impedir que una app se instale hasta recibir permiso explicito del administrador. Tambien se deben impedir la descarga y la instalacion lateral de archivos APK.
+- Solucion propuesta de producto: al intentar instalar desde Play Store, identificar la app y crear una solicitud para Admin; solo una aprobacion vigente habilita la instalacion de ese paquete. Para APK externos, bloquear la descarga cuando el canal sea observable y bloquear siempre el acceso al instalador o la ejecucion de paquetes no autorizados. Mantener una defensa posterior que bloquee o ponga en cuarentena una app instalada sin autorizacion.
 - Alternativas tecnicas:
   - Android Enterprise/Device Owner con Managed Google Play y politica allowlist: garantia del sistema, pero requiere dispositivo administrado y aprovisionamiento compatible;
   - cuenta infantil supervisada con Family Link: Google Play ofrece aprobacion de descargas, pero el flujo y la autoridad pertenecen a Google/Family Link, no a Content Filter;
   - arquitectura actual sin MDM: Accessibility intercepta el boton o flujo de instalacion de Play Store, envia la solicitud y permite temporalmente el paquete aprobado; es best-effort y depende de version, idioma y fabricante;
+  - bloqueo de APK: DAG puede impedir descargas por extension, MIME y respuesta; navegadores y apps externas requieren VPN/Accessibility y siguen siendo best-effort. El instalador de paquetes y el permiso `Instalar apps desconocidas` constituyen la barrera final;
   - respaldo post-instalacion: detectar paquetes nuevos y bloquear su ejecucion hasta aprobacion; evita uso no autorizado, pero no impide que el APK llegue a instalarse.
 - Evidencia: idea expresada por el usuario el 2026-07-15. Android Management API permite definir apps `AVAILABLE` o `BLOCKED` y un modo allowlist en dispositivos administrados; Family Link admite aprobaciones de descargas para cuentas supervisadas.
 - Esfuerzo: L.
 - Riesgo: alto; Play Store cambia su UI, instalaciones pueden iniciarse desde web u otras tiendas, las actualizaciones deben distinguirse de instalaciones nuevas y una ventana demasiado amplia podria autorizar otro paquete.
-- Dependencias: Accessibility y barrera; inventario de apps instaladas; solicitudes y FCM; packageName confiable; instaladores y fuentes desconocidas; autorizaciones temporales por dispositivo; posible linea futura Device Owner/Android Enterprise.
+- Dependencias: Accessibility y barrera; VPN y DAG; inventario de apps instaladas; solicitudes y FCM; packageName confiable; Package Installer, gestores de archivos, navegadores, mensajeria, tiendas alternativas y permiso de fuentes desconocidas; autorizaciones temporales por dispositivo; posible linea futura Device Owner/Android Enterprise.
 - Duplicados y relacion: complementa `USAGE-REAL-01`, solicitudes existentes y la barrera antimanipulacion; no duplica bloqueo de uso porque agrega aprobacion previa a la instalacion.
 - Criterios de aceptacion propuestos:
   - Play Store permanece accesible para buscar y revisar fichas;
@@ -438,8 +439,10 @@ Flujo de una entrada:
   - aprobar habilita unicamente el paquete solicitado y por una ventana acotada;
   - rechazar mantiene el bloqueo y no genera solicitudes duplicadas;
   - instalaciones desde web, tiendas alternativas, APK local y ADB tienen una politica explicita;
+  - DAG no descarga archivos APK y los canales externos cubiertos bloquean la descarga o el acceso al instalador;
+  - el usuario no puede habilitar `Instalar apps desconocidas` ni completar Package Installer mientras la proteccion esta armada y no existe autorizacion;
   - actualizaciones de apps ya aprobadas no se confunden con instalaciones nuevas.
-- Decisiones pendientes para el ticket: garantia requerida o best-effort; Family Link, Device Owner o Accessibility; alcance sobre apps gratuitas/pagas; duracion de aprobacion; tratamiento de actualizaciones, reinstalaciones, otras tiendas y apps del sistema.
+- Decisiones pendientes para el ticket: garantia requerida o best-effort; Family Link, Device Owner o Accessibility; alcance sobre apps gratuitas/pagas; duracion de aprobacion; tratamiento de actualizaciones, reinstalaciones, otras tiendas, adjuntos de mensajeria, gestores de archivos, ADB y apps del sistema.
 
 ## Roadmap DAG, Web e IA local
 
