@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario 199c04dc656c12158d04004f33e9552a6653c7835a504f922e76838ae66ed1cc
-Admin   031309c11651dc77c7bc08250c23d3fb4884d2ccf70416803dbb6844dc5aa7a2
+Usuario 1bf7147bf5ebb493e094af6972d0728b845c86b284bb132db32337ae608c1bd2
+Admin   334ee599a325ae63abe25a158057ac80ce2feebfa684088902baf6ec0cfe8789
 ```
 
 ## Correccion de identidad Admin DEV 245 - 2026-07-16
