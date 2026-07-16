@@ -11,5 +11,12 @@ class DagLauncherControllerTest {
         assertFalse(dagLauncherShouldBeEnabled(hasActivation = false, dagEnabled = true))
         assertFalse(dagLauncherShouldBeEnabled(hasActivation = true, dagEnabled = false))
         assertFalse(dagLauncherShouldBeEnabled(hasActivation = false, dagEnabled = false))
+        assertFalse(
+            dagLauncherShouldBeEnabled(
+                hasActivation = true,
+                dagEnabled = true,
+                dagEntitled = false,
+            ),
+        )
     }
 }

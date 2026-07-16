@@ -14,6 +14,7 @@ data class SystemHealthSnapshot(
     val licenseStartsAtEpochMillis: Long? = null,
     val licenseExpiresAtEpochMillis: Long? = null,
     val licenseVerifiedAtEpochMillis: Long? = null,
+    val dagEntitled: Boolean = false,
     val updateState: UpdateState,
     val checkedAtEpochMillis: Long,
 ) {

@@ -199,6 +199,13 @@ object DatabaseMigrations {
             }
         }
 
+    val Migration12To13: Migration =
+        object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE system_health ADD COLUMN dagEntitled INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
     val All: Array<Migration> =
         arrayOf(
             Migration1To2,
@@ -212,5 +219,6 @@ object DatabaseMigrations {
             Migration9To10,
             Migration10To11,
             Migration11To12,
+            Migration12To13,
         )
 }

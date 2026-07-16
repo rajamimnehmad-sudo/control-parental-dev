@@ -16,6 +16,7 @@ data class SystemHealthEntity(
     val licenseStartsAtEpochMillis: Long? = null,
     val licenseExpiresAtEpochMillis: Long? = null,
     val licenseVerifiedAtEpochMillis: Long? = null,
+    val dagEntitled: Boolean = false,
     val updateState: String,
     val checkedAtEpochMillis: Long,
 ) {

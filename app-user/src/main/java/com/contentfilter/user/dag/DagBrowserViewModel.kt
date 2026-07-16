@@ -14,6 +14,7 @@ import com.contentfilter.core.domain.model.dagEnabled
 import com.contentfilter.core.domain.repository.AccessRequestRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
+import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
@@ -46,6 +47,7 @@ class DagBrowserViewModel
         private val historyStore: DagHistoryStore,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
+        systemStatusRepository: SystemStatusRepository,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(DagBrowserUiState())
         val uiState: StateFlow<DagBrowserUiState> = mutableState.asStateFlow()
@@ -68,11 +70,12 @@ class DagBrowserViewModel
                 combine(
                     policyRepository.observeActivePolicy(),
                     activationRepository.observeActivation(),
-                ) { snapshot, activation -> snapshot to activation }
-                    .collect { (snapshot, activation) ->
+                    systemStatusRepository.observeHealth(),
+                ) { snapshot, activation, health -> Triple(snapshot, activation, health) }
+                    .collect { (snapshot, activation, health) ->
                         activeRules = snapshot.rules
                         activePolicyVersion = snapshot.version
-                        val enabled = activation != null && snapshot.rules.dagEnabled()
+                        val enabled = activation != null && health.dagEntitled && snapshot.rules.dagEnabled()
                         mutableState.update { state -> state.withDagAvailability(enabled) }
                     }
             }

@@ -96,6 +96,16 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - La migracion `20260716152914_device_license_entitlement.sql` fue aplicada exclusivamente en Supabase DEV `syeycayasyufedwoprea`. Se verificaron `SECURITY DEFINER`, revocacion a `PUBLIC` y acceso deliberado de `anon/authenticated` protegido por `device_token_matches_device`; no modifica ni borra filas.
 - Validacion local correcta: tests de dominio, sincronizacion, Accessibility, VPN, Usuario y Admin; `ktlintCheck`; builds DEV optimizados de ambos APK, siempre excluyendo las tareas de publicacion. El APK/manifiesto publico permanece en DEV 240; DEV 241 se publicara una sola vez al finalizar el paquete de tickets. Falta prueba fisica de vencimiento/renovacion en Samsung SM-S908E.
 
+## Implementacion 2026-07-16 - candidato DEV 241 SUPERADMIN-DAG-ENTITLEMENT-01
+
+- DAG tiene ahora dos niveles independientes: el derecho premium de la licencia/comunidad en Super Admin y el permiso por dispositivo en App Admin. Una regla antigua `__dag_enabled__` no basta si falta el derecho superior.
+- Superweb muestra el estado `DAG premium` en el detalle de la comunidad y permite habilitarlo o deshabilitarlo sin borrar reglas, historial ni configuracion. Cada cambio efectivo se registra en `community_license_audit` con actor, valor anterior, valor nuevo y fecha; la lectura directa queda restringida a Super Admin por RLS.
+- App Admin deshabilita el switch y explica que DAG no esta incluido. App Usuario oculta la entrada y el launcher independiente; una sesion DAG abierta observa el estado local y se cierra cuando deja de estar habilitada.
+- El derecho se entrega dentro de la misma RPC autenticada por token de dispositivo y se conserva en Room 13 para reinicios y periodos offline. Al renovar o reactivar vuelve en la siguiente sincronizacion sin reinstalar ni reconstruir reglas.
+- `dag_search_authorized` exige simultaneamente licencia efectiva activa, `dag_entitled=true`, dispositivo Usuario valido y regla DAG activa antes de consumir cuota o llamar a Brave. Asi una sesion obsoleta tampoco elude la decision del servidor.
+- Migraciones `20260716154242_dag_community_entitlement.sql` y `20260716154403_dag_entitlement_audit_read_policy.sql` aplicadas solo en Supabase DEV `syeycayasyufedwoprea`. La unica licencia existente conservo DAG habilitado; las nuevas licencias comienzan deshabilitadas. No se borro ni reinicio consumo.
+- Validacion: tests Usuario/Admin/dominio y formato correctos; Superweb paso ESLint de `src`, TypeScript y build optimizado; funciones y privilegios verificados en DEV. Los advisors conservan deuda previa de RPC anon autenticadas por token y politicas multiples. No se publico APK ni Superweb; el manifiesto publico sigue en DEV 240.
+
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
 
 - Un dispositivo Usuario con control de proteccion nunca configurado se arma automaticamente solo cuando App Usuario comprueba simultaneamente el tunel VPN real, Accessibility habilitado, Device Admin activo y ausencia de una desactivacion intencional de la VPN.

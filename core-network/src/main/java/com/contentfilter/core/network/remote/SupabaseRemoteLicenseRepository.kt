@@ -41,6 +41,7 @@ class SupabaseRemoteLicenseRepository
                 startsAtEpochMillis = optionalInstant("starts_at"),
                 expiresAtEpochMillis = optionalInstant("expires_at"),
                 verifiedAtEpochMillis = Instant.parse(getString("evaluated_at")).toEpochMilli(),
+                dagEntitled = optBoolean("dag_entitled", false),
             )
 
         private fun JSONObject.optionalInstant(key: String): Long? =

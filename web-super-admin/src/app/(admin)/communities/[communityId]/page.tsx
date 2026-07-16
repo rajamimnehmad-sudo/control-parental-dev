@@ -6,6 +6,7 @@ import { AdminTokenForm } from "@/components/AdminTokenForm";
 import { DeleteCommunityButton } from "@/components/DeleteCommunityButton";
 import { DeleteAdminButton } from "@/components/DeleteAdminButton";
 import { DeleteProtectedUserButton } from "@/components/DeleteProtectedUserButton";
+import { DagEntitlementForm } from "@/components/DagEntitlementForm";
 import { EmptyState } from "@/components/EmptyState";
 import { LicenseBadge, ProtectedUserBadge } from "@/components/Badge";
 import { LicenseForm } from "@/components/LicenseForm";
@@ -102,7 +103,10 @@ export default async function CommunityDetailPage({ params }: Props) {
             <span className="hidden text-sm font-semibold text-accent group-open:inline">Cerrar</span>
           </summary>
           <div className="border-t border-line p-4">
-            <LicenseForm detail={detail} compact />
+            <div className="grid gap-4">
+              <DagEntitlementForm detail={detail} />
+              <LicenseForm detail={detail} compact />
+            </div>
           </div>
         </details>
       </section>

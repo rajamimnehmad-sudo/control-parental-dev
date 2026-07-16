@@ -653,7 +653,7 @@ Flujo de una entrada:
 
 ### SUPERADMIN-DAG-ENTITLEMENT-01 - DAG como funcion premium
 
-- Estado: `Idea`; no aprobado para codigo, cambios de licencia ni Supabase.
+- Estado: `Implementado candidato DEV 241; pendiente prueba fisica y publicacion final`. Aprobado por el usuario al ordenar ejecutar todos los tickets el 2026-07-16.
 - Tipo: monetizacion, licencias y control Super Admin.
 - Prioridad: P1.
 - Problema: DAG es una funcion premium y su disponibilidad no debe depender unicamente del control por dispositivo que usa App Admin.
@@ -672,6 +672,7 @@ Flujo de una entrada:
   - estado offline, sesiones anteriores, realtime, full sync y reinicios no permiten eludir el entitlement;
   - el cambio queda auditable sin exponer consultas ni historial.
 - Decisiones pendientes para el ticket: nivel comunidad, plan o licencia; precio y cupo incluidos; periodo de gracia; comportamiento al vencer; visibilidad del upsell en Admin; quien puede activar; soporte offline y migracion de comunidades actuales.
+- Decision implementada: booleano en la licencia de comunidad, separado del cupo mensual. Las comunidades existentes conservan el acceso; las nuevas comienzan sin DAG. Super Admin es la unica autoridad para cambiarlo; una licencia no activa o sin entitlement cierra DAG conservando toda la configuracion.
 
 ## Roadmap DAG, Web e IA local
 

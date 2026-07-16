@@ -23,17 +23,22 @@ export async function listCommunities() {
 
 export async function getCommunityBundle(communityId: string) {
   const supabase = await createClient();
-  const [detailResult, adminsResult, protectedUsersResult] = await Promise.all([
+  const [detailResult, adminsResult, protectedUsersResult, dagEntitlementResult] = await Promise.all([
     supabase.rpc("super_admin_get_community_detail", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_community_admins", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_protected_users", { target_community_id: communityId }),
+    supabase.rpc("super_admin_get_dag_entitlement", { target_community_id: communityId }),
   ]);
 
   if (detailResult.error) raise(detailResult.error);
   if (adminsResult.error) raise(adminsResult.error);
   if (protectedUsersResult.error) raise(protectedUsersResult.error);
+  if (dagEntitlementResult.error) raise(dagEntitlementResult.error);
 
-  const detail = (detailResult.data ?? [])[0] as CommunityDetail | undefined;
+  const detailRow = (detailResult.data ?? [])[0] as Omit<CommunityDetail, "dag_entitled"> | undefined;
+  const detail = detailRow
+    ? { ...detailRow, dag_entitled: dagEntitlementResult.data === true }
+    : undefined;
   if (!detail) notFound();
 
   return {

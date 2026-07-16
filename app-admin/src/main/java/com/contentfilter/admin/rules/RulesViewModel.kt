@@ -23,6 +23,7 @@ import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.InstalledAppRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.ProtectionControlRepository
+import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
@@ -87,6 +88,7 @@ class RulesViewModel
         private val telemetryRepository: TelemetryRepository,
         private val protectionControlRepository: ProtectionControlRepository,
         private val recoveryCodeHasher: RecoveryCodeHasher,
+        systemStatusRepository: SystemStatusRepository,
     ) : ViewModel() {
         private val form =
             MutableStateFlow(
@@ -144,7 +146,8 @@ class RulesViewModel
                 devices,
                 installedApps,
                 form,
-            ) { policy, devices, apps, formState ->
+                systemStatusRepository.observeHealth(),
+            ) { policy, devices, apps, formState, health ->
                 val userDevices = devices.toUserDevices(apps)
                 val selectedDeviceId = userDevices.selectedDeviceId(formState.selectedDeviceId)
                 val savedInternetBlocked = policy.rules.internetBlocked()
@@ -182,7 +185,8 @@ class RulesViewModel
                             ?: policy.rules.externalSearchResultsAllowedForWeb(),
                     safeSearchEnabled =
                         formState.pendingSafeSearchEnabled ?: policy.rules.safeSearchEnabledForWeb(),
-                    dagEnabled = formState.pendingDagEnabled ?: policy.rules.dagEnabled(),
+                    dagEnabled = health.dagEntitled && (formState.pendingDagEnabled ?: policy.rules.dagEnabled()),
+                    dagEntitled = health.dagEntitled,
                     appControls =
                         if (selectedDeviceId == null) {
                             emptyList()
@@ -652,6 +656,10 @@ class RulesViewModel
         }
 
         fun setDagEnabled(enabled: Boolean) {
+            if (!uiState.value.dagEntitled) {
+                form.update { it.copy(message = "DAG no está incluido en la licencia de esta comunidad.") }
+                return
+            }
             setWebOption(
                 preference = WebPolicyPreference.DagEnabled,
                 action = "dag-enabled",

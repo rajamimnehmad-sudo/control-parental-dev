@@ -16,6 +16,7 @@ internal fun SystemHealthEntity.toDomain(): SystemHealthSnapshot {
             startsAtEpochMillis = licenseStartsAtEpochMillis,
             expiresAtEpochMillis = licenseExpiresAtEpochMillis,
             verifiedAtEpochMillis = licenseVerifiedAtEpochMillis ?: checkedAtEpochMillis,
+            dagEntitled = dagEntitled,
         ).effectiveState(now)
     return SystemHealthSnapshot(
         vpnState = enumValueOrDefault(vpnState, ComponentState.Unknown),
@@ -28,6 +29,7 @@ internal fun SystemHealthEntity.toDomain(): SystemHealthSnapshot {
         licenseStartsAtEpochMillis = licenseStartsAtEpochMillis,
         licenseExpiresAtEpochMillis = licenseExpiresAtEpochMillis,
         licenseVerifiedAtEpochMillis = licenseVerifiedAtEpochMillis,
+        dagEntitled = dagEntitled,
         updateState = enumValueOrDefault(updateState, UpdateState.Unknown),
         checkedAtEpochMillis = checkedAtEpochMillis,
     )
@@ -58,6 +60,7 @@ internal fun SystemHealthSnapshot.toEntity(): SystemHealthEntity =
         licenseStartsAtEpochMillis = licenseStartsAtEpochMillis,
         licenseExpiresAtEpochMillis = licenseExpiresAtEpochMillis,
         licenseVerifiedAtEpochMillis = licenseVerifiedAtEpochMillis,
+        dagEntitled = dagEntitled,
         updateState = updateState.name,
         checkedAtEpochMillis = checkedAtEpochMillis,
     )

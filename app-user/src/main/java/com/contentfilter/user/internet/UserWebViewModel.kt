@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.domain.repository.PolicyRepository
+import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.feature.vpn.domainlist.WebDomainListState
 import com.contentfilter.feature.vpn.domainlist.WebDomainListStatus
 import com.contentfilter.feature.vpn.domainlist.WebDomainListStore
@@ -29,6 +30,7 @@ class UserWebViewModel
     constructor(
         @ApplicationContext context: Context,
         policyRepository: PolicyRepository,
+        systemStatusRepository: SystemStatusRepository,
         private val domainListUpdater: WebDomainListUpdater,
         domainListStore: WebDomainListStore,
     ) : ViewModel() {
@@ -39,7 +41,8 @@ class UserWebViewModel
                 policyRepository.observeActivePolicy(),
                 domainListStore.observeStatus(),
                 checkingDomainList,
-            ) { snapshot, domainListStatus, isCheckingDomainList ->
+                systemStatusRepository.observeHealth(),
+            ) { snapshot, domainListStatus, isCheckingDomainList, health ->
                 val blocked = snapshot.rules.webNavigationBlocked()
                 Log.i(
                     LogTag,
@@ -53,7 +56,8 @@ class UserWebViewModel
                     webNavigationBlocked = blocked,
                     externalSearchResultsAllowed = snapshot.rules.externalSearchResultsAllowed(),
                     safeSearchEnabled = snapshot.rules.safeSearchEnabled(),
-                    dagEnabled = snapshot.rules.dagEnabled(),
+                    dagEnabled = health.dagEntitled && snapshot.rules.dagEnabled(),
+                    dagEntitled = health.dagEntitled,
                     showDomainListDiagnostics = context.packageName.endsWith(".dev"),
                     domainList = domainListStatus.toUiState(isCheckingDomainList),
                 )
@@ -82,6 +86,7 @@ data class UserWebUiState(
     val externalSearchResultsAllowed: Boolean = true,
     val safeSearchEnabled: Boolean = true,
     val dagEnabled: Boolean = false,
+    val dagEntitled: Boolean = false,
     val showDomainListDiagnostics: Boolean = false,
     val domainList: DomainListUiState = DomainListUiState(),
 ) {

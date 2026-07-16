@@ -7,6 +7,7 @@ data class LicenseEntitlement(
     val startsAtEpochMillis: Long?,
     val expiresAtEpochMillis: Long?,
     val verifiedAtEpochMillis: Long,
+    val dagEntitled: Boolean = false,
 ) {
     fun effectiveState(nowEpochMillis: Long): LicenseState =
         when {

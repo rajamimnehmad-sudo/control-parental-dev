@@ -51,6 +51,7 @@ class RoomSystemStatusRepository
                     licenseStartsAtEpochMillis = entitlement.startsAtEpochMillis,
                     licenseExpiresAtEpochMillis = entitlement.expiresAtEpochMillis,
                     licenseVerifiedAtEpochMillis = entitlement.verifiedAtEpochMillis,
+                    dagEntitled = entitlement.dagEntitled,
                 )
             }
         }
@@ -65,6 +66,7 @@ class RoomSystemStatusRepository
                             startsAtEpochMillis = current.licenseStartsAtEpochMillis,
                             expiresAtEpochMillis = current.licenseExpiresAtEpochMillis,
                             verifiedAtEpochMillis = current.licenseVerifiedAtEpochMillis ?: current.checkedAtEpochMillis,
+                            dagEntitled = current.dagEntitled,
                         ).effectiveState(now),
                 )
             }

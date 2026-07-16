@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import com.contentfilter.core.domain.model.dagEnabled
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
+import com.contentfilter.core.domain.repository.SystemStatusRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
@@ -19,15 +20,18 @@ class DagLauncherController
         @ApplicationContext private val context: Context,
         activationRepository: DeviceActivationRepository,
         policyRepository: PolicyRepository,
+        systemStatusRepository: SystemStatusRepository,
     ) {
         private val availability =
             combine(
                 activationRepository.observeActivation(),
                 policyRepository.observeActivePolicy(),
-            ) { activation, policy ->
+                systemStatusRepository.observeHealth(),
+            ) { activation, policy, health ->
                 dagLauncherShouldBeEnabled(
                     hasActivation = activation != null,
                     dagEnabled = policy.rules.dagEnabled(),
+                    dagEntitled = health.dagEntitled,
                 )
             }.distinctUntilChanged()
 
@@ -55,4 +59,5 @@ class DagLauncherController
 internal fun dagLauncherShouldBeEnabled(
     hasActivation: Boolean,
     dagEnabled: Boolean,
-): Boolean = hasActivation && dagEnabled
+    dagEntitled: Boolean = true,
+): Boolean = hasActivation && dagEntitled && dagEnabled

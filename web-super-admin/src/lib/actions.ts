@@ -40,6 +40,11 @@ const dagLimitSchema = z.object({
   monthlyLimit: z.coerce.number().int().min(1).max(100000),
 });
 
+const dagEntitlementSchema = z.object({
+  communityId: z.string().uuid(),
+  enabled: z.enum(["true", "false"]).transform((value) => value === "true"),
+});
+
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
@@ -164,4 +169,24 @@ export async function updateDagLimitAction(_prevState: ActionState, formData: Fo
   if (error) return errorState(error);
   revalidatePath("/dag-usage");
   return { ok: true, message: "Cupo actualizado" };
+}
+
+export async function updateDagEntitlementAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = dagEntitlementSchema.safeParse({
+    communityId: formValue(formData, "communityId"),
+    enabled: formValue(formData, "enabled"),
+  });
+
+  if (!parsed.success) return { ok: false, message: "Estado DAG inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("super_admin_set_dag_entitlement", {
+    target_community_id: parsed.data.communityId,
+    new_dag_entitled: parsed.data.enabled,
+  });
+
+  if (error) return errorState(error);
+  revalidatePath(`/communities/${parsed.data.communityId}`);
+  revalidatePath("/dag-usage");
+  return { ok: true, message: parsed.data.enabled ? "DAG habilitado para la comunidad" : "DAG deshabilitado para la comunidad" };
 }

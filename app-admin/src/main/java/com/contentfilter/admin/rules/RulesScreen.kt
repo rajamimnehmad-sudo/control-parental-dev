@@ -965,6 +965,7 @@ private fun UserDetailContent(
                             navigationSaving = state.pendingInternetBlocked != null,
                             onlyResultsSaving = state.pendingOnlyResultsEnabled != null,
                             dagEnabled = state.dagEnabled,
+                            dagEntitled = state.dagEntitled,
                             dagSaving = state.pendingDagEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
@@ -1112,6 +1113,7 @@ private fun WebNavigationPanel(
     navigationSaving: Boolean,
     onlyResultsSaving: Boolean,
     dagEnabled: Boolean,
+    dagEntitled: Boolean,
     dagSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
@@ -1162,9 +1164,14 @@ private fun WebNavigationPanel(
             }
             WebSwitchRow(
                 title = "Buscador DAG",
-                description = "Habilita el acceso al buscador protegido desde la App Usuario.",
+                description =
+                    if (dagEntitled) {
+                        "Habilita el acceso al buscador protegido desde la App Usuario."
+                    } else {
+                        "DAG no está incluido en la licencia de esta comunidad."
+                    },
                 checked = dagEnabled,
-                enabled = !dagSaving,
+                enabled = dagEntitled && !dagSaving,
                 saving = dagSaving,
                 onCheckedChange = onDagEnabledChanged,
             )

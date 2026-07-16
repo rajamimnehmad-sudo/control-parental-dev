@@ -606,6 +606,8 @@ private fun UserWebTab(
                 subtitle =
                     if (state.dagEnabled) {
                         "Buscador protegido habilitado por el administrador."
+                    } else if (!state.dagEntitled) {
+                        "DAG no está incluido en la licencia de esta comunidad."
                     } else {
                         "El administrador mantiene DAG cerrado."
                     },

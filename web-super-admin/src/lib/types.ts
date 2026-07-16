@@ -21,6 +21,7 @@ export type CommunitySummary = {
 export type CommunityDetail = CommunitySummary & {
   starts_at: string | null;
   internal_notes: string | null;
+  dag_entitled: boolean;
 };
 
 export type CommunityAdmin = {
