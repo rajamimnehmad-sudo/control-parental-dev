@@ -9,6 +9,8 @@ import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RecoveryUnlockResult
 import com.contentfilter.core.domain.repository.ProtectionStateStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import org.json.JSONObject
 import java.security.KeyStore
 import javax.crypto.Cipher
@@ -29,6 +31,10 @@ class EncryptedProtectionStateStore
 
         @Volatile
         private var state: StoredState = loadSafely()
+
+        private val controlState = MutableSharedFlow<DeviceProtectionControl?>(replay = 1).apply { tryEmit(state.control) }
+
+        override fun observeControl(): Flow<DeviceProtectionControl?> = controlState
 
         override fun currentControl(): DeviceProtectionControl? = state.control
 
@@ -57,6 +63,12 @@ class EncryptedProtectionStateStore
             return scope == ProtectionAuthorizationScope.Removal &&
                 current.localRemovalUntilEpochMillis?.let { it > nowEpochMillis } == true
         }
+
+        override fun authorizationExpiresAtEpochMillis(nowEpochMillis: Long): Long? =
+            listOfNotNull(
+                state.control?.authorizationExpiresAtEpochMillis,
+                state.localRemovalUntilEpochMillis,
+            ).filter { it > nowEpochMillis }.maxOrNull()
 
         @Synchronized
         override fun verifyAndConsumeRecovery(
@@ -125,10 +137,14 @@ class EncryptedProtectionStateStore
         private fun persist(updated: StoredState) {
             runCatching {
                 preferences.edit().putString(EncryptedStateKey, encrypt(updated.toJson())).commit()
-            }.onSuccess { state = updated }
+            }.onSuccess {
+                state = updated
+                controlState.tryEmit(updated.control)
+            }
                 .onFailure {
                     preferences.edit().remove(EncryptedStateKey).commit()
                     state = StoredState()
+                    controlState.tryEmit(null)
                 }
         }
 

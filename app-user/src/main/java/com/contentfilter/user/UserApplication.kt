@@ -18,6 +18,7 @@ import com.contentfilter.user.dag.DagLauncherController
 import com.contentfilter.user.dag.DagNeuralTextClassifier
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.protection.ProtectionHealthMonitor
+import com.contentfilter.user.protection.UserLauncherController
 import com.contentfilter.user.repair.UserLocalDataRepair
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -74,6 +75,9 @@ class UserApplication :
     lateinit var dagLauncherController: DagLauncherController
 
     @Inject
+    lateinit var userLauncherController: UserLauncherController
+
+    @Inject
     lateinit var dagNeuralTextClassifier: DagNeuralTextClassifier
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -93,6 +97,10 @@ class UserApplication :
         appScope.launch {
             runCatching { dagLauncherController.monitorAvailability() }
                 .logFailure("dag-launcher-monitor")
+        }
+        appScope.launch {
+            runCatching { userLauncherController.monitorVisibility() }
+                .logFailure("user-launcher-monitor")
         }
         appScope.launch {
             runCatching { dagNeuralTextClassifier.prepare() }

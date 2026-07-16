@@ -40,11 +40,23 @@
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
+                <action android:name="com.contentfilter.action.OPEN_USER_APP" />
+            </intent-filter>
+        </activity>
+
+        <activity-alias
+            android:name=".UserLauncherAlias"
+            android:enabled="true"
+            android:exported="true"
+            android:icon="@drawable/ic_user_launcher"
+            android:label="Content Filter"
+            android:targetActivity=".MainActivity">
+            <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <activity
             android:name=".dag.DagActivity"

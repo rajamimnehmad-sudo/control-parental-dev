@@ -149,8 +149,8 @@ Flujo de una entrada:
 | ADMIN-ALERTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Idea | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
-| SUPERADMIN-DAG-ENTITLEMENT-01 | Idea | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
-| BARRIER-LAUNCHER-01 | Idea | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
+| SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
+| BARRIER-LAUNCHER-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
@@ -264,7 +264,7 @@ Flujo de una entrada:
 
 ### BARRIER-LAUNCHER-01 - Superficie profesional sin desinstalacion rapida
 
-- Estado: `Idea`; no aprobado para codigo.
+- Estado: `Implementado candidato DEV 241; pendiente prueba fisica`. Aprobado por el usuario al ordenar ejecutar todos los tickets y definido para Android normal compatible con la mayoria de equipos el 2026-07-16.
 - Tipo: seguridad, antimanipulacion y UX de App Usuario.
 - Prioridad: P2.
 - Problema: al mantener presionado el icono de App Usuario, el launcher muestra la opcion `Desinstalar`. Aunque la barrera actual bloquea las rutas posteriores, la opcion visible transmite una proteccion menos integrada que otros filtros.
@@ -286,7 +286,10 @@ Flujo de una entrada:
   - desarmar o conceder mantenimiento restaura el acceso previsto sin reinstalar ni borrar datos;
   - no se ocultan ni bloquean menus de otras aplicaciones;
   - el alcance y las limitaciones se validan fisicamente por fabricante y version Android.
-- Decisiones pendientes para la entrevista del ticket: ocultar completamente el icono o conservarlo e interceptar el menu; ruta alternativa de apertura; comportamiento durante mantenimiento; fabricantes soportados; evaluar o descartar Knox como linea separada.
+- Implementacion: un `activity-alias` reversible contiene la unica entrada Launcher de App Usuario. Se oculta sin matar el proceso solamente cuando hay activacion, proteccion armada, licencia efectiva y VPN activa; reaparece si falta alguna condicion o existe autorizacion temporal de Ajustes/retiro.
+- Acceso alternativo: la notificacion foreground de la VPN abre directamente `MainActivity` mediante una accion interna del paquete aunque el alias Launcher este oculto. El vencimiento de mantenimiento vuelve a ocultar el alias automaticamente.
+- Compatibilidad elegida: Android normal desde el minimo soportado, sin Knox, root, Device Owner ni restablecimiento. El comportamiento visual exacto del launcher puede variar por fabricante y no se promete un bloqueo de sistema equivalente a MDM.
+- Validacion: tests de decision visible/oculto, compilacion, manifiesto combinado, tests DEV y formato de Usuario/VPN correctos. Falta validar icono, notificacion, mantenimiento y reinicio en Samsung SM-S908E; no hubo publicacion intermedia.
 
 ### Checklist de mejoras visuales y navegacion DAG
 

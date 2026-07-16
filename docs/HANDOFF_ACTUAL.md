@@ -153,6 +153,14 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - `Nueva pestaña` reutiliza primero la pestaña vacia mas recientemente usada. Vacia significa estrictamente Home sin texto, consulta, resultados ni URL; una pagina o listado nunca se reemplaza por error. Si no hay vacia crea una nueva hasta el limite existente de ocho.
 - Abrir el selector, reordenar visualmente o enfocar una pestaña no vuelve a buscar ni consume Brave. Se conservan aislamiento, resultados, restauracion cifrada y revalidacion de paginas.
 - Validacion: tests del codec, persistencia de ultimo uso y definicion de pestaña vacia; compilacion DEV y `ktlintCheck` de App Usuario correctos. Falta prueba fisica y no hubo publicacion intermedia.
+
+## Implementacion 2026-07-16 - candidato DEV 241 BARRIER-LAUNCHER-01
+
+- App Usuario usa un `activity-alias` como unica entrada Launcher. El alias se oculta de forma reversible, sin detener la app ni sus servicios, solamente cuando coinciden activacion vigente, barrera armada, licencia que permite proteccion y VPN activa.
+- Si la proteccion se degrada, se desarma o recibe autorizacion temporal de Ajustes/retiro, el icono reaparece. El vencimiento de la ventana vuelve a aplicar la decision automaticamente; el estado cifrado expone cambios reactivos sin polling constante.
+- La notificacion foreground de VPN incorpora una accion interna del paquete que abre `MainActivity` aun cuando el alias Launcher esta oculto. Esto mantiene una ruta clara de acceso y recuperacion.
+- El alcance elegido prioriza Android normal y la mayoria de fabricantes, sin Knox, root, Device Owner ni restablecimiento. No equivale al bloqueo de desinstalacion garantizado por MDM y debe comprobarse por launcher/OEM.
+- Validacion: tests de la politica de visibilidad, core-security y App Usuario; manifiesto combinado, compilacion y formato Usuario/VPN correctos. Falta prueba fisica en Samsung SM-S908E y no hubo publicacion intermedia.
 - Validacion local: tests/compilacion Admin, formato de Admin y red, ESLint de `src`, TypeScript y build Superweb correctos. Falta prueba fisica de los dos recorridos y publicacion final de APK/Superweb.
 
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
