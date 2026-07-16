@@ -1,8 +1,11 @@
 package com.contentfilter.user
 
+import android.Manifest
 import android.app.admin.DevicePolicyManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
@@ -39,6 +42,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
@@ -66,6 +70,7 @@ import com.contentfilter.feature.requests.RequestsRoute
 import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
+import com.contentfilter.user.announcements.UserAnnouncementsRoute
 import com.contentfilter.user.apps.MyAppsRoute
 import com.contentfilter.user.dag.DagActivity
 import com.contentfilter.user.dag.DagBrowserRoute
@@ -74,6 +79,8 @@ import com.contentfilter.user.internet.UserWebViewModel
 import com.contentfilter.user.protection.BatteryOptimizationController
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.protection.ProtectionViewModel
+import com.contentfilter.user.push.OpenAnnouncementsAction
+import com.contentfilter.user.push.UserPushViewModel
 import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
@@ -85,6 +92,7 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val dagLaunchRequests = MutableStateFlow(0)
+    private val announcementOpenRequests = MutableStateFlow(0)
 
     @javax.inject.Inject
     lateinit var activationRepository: DeviceActivationRepository
@@ -98,12 +106,15 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         recordDagLaunch(intent)
+        recordAnnouncementLaunch(intent)
         setContent {
             ContentFilterTheme {
                 val dagLaunchRequest by dagLaunchRequests.collectAsStateWithLifecycle()
+                val announcementOpenRequest by announcementOpenRequests.collectAsStateWithLifecycle()
                 UserAppRoot(
                     modifier = Modifier.fillMaxSize(),
                     dagLaunchRequest = dagLaunchRequest,
+                    announcementOpenRequest = announcementOpenRequest,
                 )
             }
         }
@@ -113,6 +124,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         recordDagLaunch(intent)
+        recordAnnouncementLaunch(intent)
     }
 
     override fun onStart() {
@@ -132,12 +144,17 @@ class MainActivity : ComponentActivity() {
             dagLaunchRequests.value += 1
         }
     }
+
+    private fun recordAnnouncementLaunch(intent: Intent?) {
+        if (intent?.action == OpenAnnouncementsAction) announcementOpenRequests.value += 1
+    }
 }
 
 @Composable
 private fun UserAppRoot(
     modifier: Modifier = Modifier,
     dagLaunchRequest: Int = 0,
+    announcementOpenRequest: Int = 0,
 ) {
     var destination by rememberSaveable { mutableStateOf(UserDestination.Home) }
     var backStack by rememberSaveable { mutableStateOf<List<UserDestination>>(emptyList()) }
@@ -167,6 +184,11 @@ private fun UserAppRoot(
     val rootViewModel: UserRootViewModel = hiltViewModel()
     val rootState by rootViewModel.uiState.collectAsStateWithLifecycle()
     val updatesViewModel: UpdatesViewModel = hiltViewModel()
+    val pushViewModel: UserPushViewModel = hiltViewModel()
+    val notificationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+            pushViewModel.registerIfReady()
+        }
     val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         updatesViewModel.autoCheckAndDownload()
@@ -175,6 +197,21 @@ private fun UserAppRoot(
         if (dagLaunchRequest > 0) {
             backStack = listOf(UserDestination.Web)
             destination = UserDestination.Dag
+        }
+    }
+    LaunchedEffect(announcementOpenRequest) {
+        if (announcementOpenRequest > 0) {
+            backStack = listOf(UserDestination.Home)
+            destination = UserDestination.Announcements
+        }
+    }
+    LaunchedEffect(rootState.needsActivation) {
+        if (!rootState.needsActivation) {
+            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            } else {
+                pushViewModel.registerIfReady()
+            }
         }
     }
     LaunchedEffect(destination) {
@@ -249,9 +286,11 @@ private fun UserAppRoot(
                         onRequests = { navigateTo(UserDestination.Requests) },
                         onWeb = { navigateTo(UserDestination.Web) },
                         onUpdates = { navigateTo(UserDestination.Updates) },
+                        onAnnouncements = { navigateTo(UserDestination.Announcements) },
                     )
                 UserDestination.MyApps -> MyAppsRoute(onBack = ::goBack)
                 UserDestination.Requests -> RequestsRoute(onBack = ::goBack)
+                UserDestination.Announcements -> UserAnnouncementsRoute(onBack = ::goBack)
                 UserDestination.Web -> {
                     val statusViewModel: SystemStatusViewModel = hiltViewModel()
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
@@ -471,6 +510,7 @@ private fun UserHomeRoute(
     onRequests: () -> Unit,
     onWeb: () -> Unit,
     onUpdates: () -> Unit,
+    onAnnouncements: () -> Unit,
     requestsViewModel: RequestsViewModel = hiltViewModel(),
     homeViewModel: UserHomeViewModel = hiltViewModel(),
 ) {
@@ -484,6 +524,7 @@ private fun UserHomeRoute(
         onRequests = onRequests,
         onWeb = onWeb,
         onUpdates = onUpdates,
+        onAnnouncements = onAnnouncements,
     )
 }
 
@@ -496,6 +537,7 @@ private fun UserHomeTab(
     onRequests: () -> Unit,
     onWeb: () -> Unit,
     onUpdates: () -> Unit,
+    onAnnouncements: () -> Unit,
 ) {
     ProductLazyVisualPage(
         title = greeting,
@@ -568,6 +610,15 @@ private fun UserHomeTab(
                 subtitle = "Protección, sincronización y actualizaciones",
                 accent = ProductViolet,
                 onClick = onUpdates,
+            )
+        }
+        item {
+            ProductFeatureTile(
+                icon = ProductIcon.Bell,
+                title = "Avisos",
+                subtitle = "Mensajes de tu comunidad",
+                accent = ProductMint,
+                onClick = onAnnouncements,
             )
         }
     }
@@ -766,5 +817,6 @@ private enum class UserDestination(
     Web("Web", ProductIcon.Web),
     Dag("DAG", ProductIcon.Search, showInNav = false),
     Requests("Solicitudes", ProductIcon.Bell, showInNav = false),
+    Announcements("Avisos", ProductIcon.Bell, showInNav = false),
     Updates("Ajustes", ProductIcon.Settings),
 }

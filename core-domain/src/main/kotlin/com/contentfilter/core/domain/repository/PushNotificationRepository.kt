@@ -5,5 +5,7 @@ import com.contentfilter.core.domain.model.ProtectionAlertType
 interface PushNotificationRepository {
     suspend fun registerAdminToken(token: String)
 
+    suspend fun registerDeviceToken(token: String) = registerAdminToken(token)
+
     suspend fun reportProtectionAlert(type: ProtectionAlertType)
 }

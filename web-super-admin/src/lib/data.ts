@@ -8,7 +8,15 @@ import type {
   DagUsageSummary,
   ProtectedUser,
   ProtectionAlertEvent,
+  Announcement,
 } from "@/lib/types";
+
+export async function listAnnouncements() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("super_admin_list_announcements", { max_rows: 100 });
+  if (error) raise(error);
+  return (data ?? []) as Announcement[];
+}
 
 function raise(error: unknown): never {
   const message = error instanceof Error ? error.message : "No se pudo completar la operacion";

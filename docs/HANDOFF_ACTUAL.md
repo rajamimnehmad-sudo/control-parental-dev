@@ -79,6 +79,17 @@ Usuario 519b911b5d6e5489f30e64bfc37d2e409794fdc37d9f2a159b1662e9687b2875
 Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 ```
 
+## Implementacion 2026-07-16 - candidato DEV 241 SUPERADMIN-MSG-01
+
+- Super Admin dispone de `/announcements` para guardar avisos por comunidad destinados a App Usuario, App Admin o ambas. Admite vencimiento opcional e historial y es deliberadamente unidireccional: no hay chat, respuestas ni recibos de lectura.
+- App Usuario y App Admin incorporan una bandeja `Avisos`, refresco manual y apertura directa desde una notificacion normal. Las alertas de seguridad conservan su canal urgente separado.
+- Android 13 o posterior solicita permiso de notificaciones. Rechazarlo impide el push pero no la consulta de la bandeja. El minimo del proyecto sigue siendo Android 10/API 29, compatible con la mayoria de telefonos Android actuales sin Device Owner, root ni funciones exclusivas de Samsung.
+- `list_device_announcements` filtra por comunidad y rol usando el token del propio dispositivo. `register_device_push_token` registra Usuario o Admin sin exponer escritura directa a la tabla. No existe Service Role Key ni credencial privada FCM dentro de Android.
+- `send-announcement` se desplego solo en Supabase DEV `syeycayasyufedwoprea`; usa credenciales servidor para seleccionar tokens y enviar datos FCM de prioridad normal. Si el push falla, el aviso ya guardado permanece disponible en la bandeja.
+- Migraciones aplicadas solo en DEV: `20260716162000_super_admin_announcements.sql` y `20260716162500_device_push_registration_all_roles.sql`. La verificacion confirmo las tres RPC y cero avisos; no se crearon ni borraron datos de prueba.
+- Validacion: tests unitarios, ktlint y builds DEV optimizados de ambos APK correctos; Superweb paso TypeScript, ESLint de `src` y build optimizado. El lint global de Superweb sigue incluyendo deuda ajena en `.open-next` generado.
+- Falta prueba autenticada de extremo a extremo con dispositivos fisicos. No se publico APK ni Superweb intermedia; los manifiestos publicos permanecen en DEV 240.
+
 ## Implementacion 2026-07-16 - candidato DEV 241 SEC-LICENSE-01A
 
 - Primer tramo del ciclo de licencia: Super Admin ya no confunde el estado manual almacenado con el estado efectivo. Una licencia activa con inicio futuro aparece `Programada`; al alcanzar `expires_at` aparece `Vencida`; una suspension manual conserva prioridad.

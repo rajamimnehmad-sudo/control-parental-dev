@@ -144,7 +144,7 @@ Flujo de una entrada:
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Idea | P2 | Consistencia visual y accesibilidad de ambas apps | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
-| SUPERADMIN-MSG-01 | Idea | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
+| SUPERADMIN-MSG-01 | Implementado backend DEV y candidato Android DEV 241; pendiente prueba funcional | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
@@ -608,6 +608,19 @@ Flujo de una entrada:
   - no se duplican eventos ni se debilitan las alertas existentes de App Admin;
   - el alcance final documenta canal, inmediatez, retencion y tratamiento de eventos repetidos.
 - Decisiones pendientes: bandeja web, notificacion del navegador u otro canal; destinatarios; eventos exactos incluidos; aviso inmediato o diferido; retencion, lectura y agrupacion; integracion o separacion respecto de `SUPERADMIN-MSG-01`.
+
+### SUPERADMIN-MSG-01 - Avisos por comunidad
+
+- Estado: `Implementado backend DEV y candidato Android DEV 241; pendiente prueba funcional`. Aprobado al ordenar ejecutar todos los tickets el 2026-07-16.
+- Tipo: comunicacion operativa y UX. Prioridad: P2.
+- Alcance cerrado: Super Admin crea un aviso para una comunidad y elige Administradores, Usuarios o ambos. Es un canal unidireccional; no hay chat, respuestas ni recibos de lectura.
+- Superweb incorpora formulario, vencimiento opcional e historial. El aviso queda guardado aunque FCM no este disponible y la UI distingue ese caso.
+- App Usuario y App Admin incorporan bandeja con refresco manual. Un push normal abre esa bandeja; no usa el canal urgente reservado para incidentes de proteccion.
+- Seguridad: las apps leen solo avisos de su comunidad y rol mediante token de dispositivo. El registro FCM generico acepta solo el token del propio dispositivo. La Service Role y credenciales FCM permanecen en `send-announcement`, nunca en Android.
+- Backend DEV: migraciones `20260716162000_super_admin_announcements.sql` y `20260716162500_device_push_registration_all_roles.sql`; Edge Function `send-announcement` desplegada solo en `syeycayasyufedwoprea`.
+- Compatibilidad: Android 10 o posterior, igual que las apps existentes. Android 13 o posterior pide permiso de notificaciones; si se rechaza, la bandeja sigue funcionando al abrir la app.
+- Validacion: RPC y tabla verificadas sin crear ni borrar avisos; conteo permanecio en cero. Builds optimizados, tests unitarios y ktlint de Usuario/Admin correctos; TypeScript, ESLint de `src` y build de Superweb correctos.
+- Pendiente: prueba autenticada de creacion/entrega con dispositivos fisicos y publicacion final agrupada.
 
 ### ALERT-ROUTING-01 - Enrutamiento por intento o desactivacion efectiva
 

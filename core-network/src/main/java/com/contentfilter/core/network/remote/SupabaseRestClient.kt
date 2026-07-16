@@ -226,6 +226,38 @@ class SupabaseRestClient
                 }
             }
 
+        suspend fun invokeRpcForArray(
+            functionName: String,
+            json: JSONObject,
+        ): RemoteResult<JSONArray> =
+            withContext(Dispatchers.IO) {
+                val request =
+                    requestBuilder("/rest/v1/rpc/$functionName")
+                        ?: return@withContext RemoteResult.Failure(OfflineUserMessage, retryable = true)
+                val body = json.toString().toRequestBody(JsonMediaType)
+                try {
+                    httpClient.newCall(request.post(body).build()).execute().use { response ->
+                        val responseBody = response.body?.string().orEmpty()
+                        if (response.isSuccessful) {
+                            runCatching { JSONArray(responseBody) }
+                                .fold(
+                                    onSuccess = { RemoteResult.Success(it) },
+                                    onFailure = {
+                                        RemoteResult.Failure(
+                                            "La respuesta remota no es válida.",
+                                            retryable = true,
+                                        )
+                                    },
+                                )
+                        } else {
+                            httpFailure("Supabase RPC $functionName", response.code, responseBody)
+                        }
+                    }
+                } catch (exception: Exception) {
+                    exceptionFailure("Supabase RPC $functionName", exception)
+                }
+            }
+
         suspend fun invokeRpcForObject(
             functionName: String,
             json: JSONObject,

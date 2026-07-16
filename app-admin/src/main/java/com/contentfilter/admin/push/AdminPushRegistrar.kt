@@ -31,6 +31,7 @@ class AdminPushRegistrar
         fun registerIfReady() {
             if (!notificationsAllowed()) return
             AdminPushNotificationChannels.ensureUrgentProtectionChannel(context)
+            AdminPushNotificationChannels.ensureAnnouncementsChannel(context)
             ensureFirebaseConfigured()
             if (FirebaseApp.getApps(context).isEmpty()) {
                 Log.w(LogTag, "Firebase is not configured; admin push token not registered.")
@@ -39,7 +40,7 @@ class AdminPushRegistrar
             FirebaseMessaging.getInstance().token
                 .addOnSuccessListener { token ->
                     if (token.isNullOrBlank()) return@addOnSuccessListener
-                    scope.launch { pushNotificationRepository.registerAdminToken(token) }
+                    scope.launch { pushNotificationRepository.registerDeviceToken(token) }
                 }
                 .addOnFailureListener { error ->
                     Log.w(LogTag, "FCM token read failed: ${error.message}")

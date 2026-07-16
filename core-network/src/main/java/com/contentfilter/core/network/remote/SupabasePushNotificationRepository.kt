@@ -14,10 +14,14 @@ class SupabasePushNotificationRepository
         private val activationRepository: DeviceActivationRepository,
     ) : PushNotificationRepository {
         override suspend fun registerAdminToken(token: String) {
+            registerDeviceToken(token)
+        }
+
+        override suspend fun registerDeviceToken(token: String) {
             val json = JSONObject().put("p_fcm_token", token)
-            when (val result = client.invokeRpc(RegisterAdminPushTokenRpc, json)) {
+            when (val result = client.invokeRpc(RegisterDevicePushTokenRpc, json)) {
                 is RemoteResult.Success -> Unit
-                is RemoteResult.Failure -> Log.w(LogTag, "Admin FCM token registration failed: ${result.reason}")
+                is RemoteResult.Failure -> Log.w(LogTag, "FCM token registration failed: ${result.reason}")
             }
         }
 
@@ -35,7 +39,7 @@ class SupabasePushNotificationRepository
 
         private companion object {
             const val FunctionName = "send-protection-alert"
-            const val RegisterAdminPushTokenRpc = "register_admin_push_token"
+            const val RegisterDevicePushTokenRpc = "register_device_push_token"
             const val LogTag = "PushNotifications"
         }
     }

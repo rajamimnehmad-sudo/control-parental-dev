@@ -103,3 +103,14 @@ export type ProtectionAlertEvent = {
   body: string;
   created_at: string;
 };
+
+export type Announcement = {
+  announcement_id: string;
+  community_id: string;
+  community_name: string;
+  target_role: "admin" | "user" | "all";
+  title: string;
+  body: string;
+  created_at: string;
+  expires_at: string | null;
+};

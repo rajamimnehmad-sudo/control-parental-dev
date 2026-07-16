@@ -89,6 +89,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.alerts.AdminAlertsRoute
 import com.contentfilter.admin.alerts.AdminAlertsViewModel
+import com.contentfilter.admin.announcements.AdminAnnouncementsRoute
 import com.contentfilter.admin.auth.AdminAuthRoute
 import com.contentfilter.admin.dashboard.DashboardRoute
 import com.contentfilter.admin.push.AdminProtectionAlertPayload
@@ -98,6 +99,7 @@ import com.contentfilter.admin.push.DataTypeKey
 import com.contentfilter.admin.push.DeviceIdKey
 import com.contentfilter.admin.push.DeviceNameKey
 import com.contentfilter.admin.push.EventIdKey
+import com.contentfilter.admin.push.OpenAnnouncementsAction
 import com.contentfilter.admin.push.parseAdminProtectionAlertPayload
 import com.contentfilter.admin.requests.AdminRequestsRoute
 import com.contentfilter.admin.rules.RulesEntryMode
@@ -112,15 +114,18 @@ import kotlinx.coroutines.launch
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private var protectionAlertPayload by mutableStateOf<AdminProtectionAlertPayload?>(null)
+    private var announcementOpenRequest by mutableStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         protectionAlertPayload = intent.adminProtectionAlertPayload()
+        if (intent.action == OpenAnnouncementsAction) announcementOpenRequest += 1
         setContent {
             ContentFilterTheme {
                 AdminAppRoot(
                     modifier = Modifier.fillMaxSize(),
                     protectionAlertPayload = protectionAlertPayload,
+                    announcementOpenRequest = announcementOpenRequest,
                 )
             }
         }
@@ -130,6 +135,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         protectionAlertPayload = intent.adminProtectionAlertPayload()
+        if (intent.action == OpenAnnouncementsAction) announcementOpenRequest += 1
     }
 
     private fun android.content.Intent.adminProtectionAlertPayload(): AdminProtectionAlertPayload? =
@@ -148,6 +154,7 @@ class MainActivity : ComponentActivity() {
 private fun AdminAppRoot(
     modifier: Modifier = Modifier,
     protectionAlertPayload: AdminProtectionAlertPayload? = null,
+    announcementOpenRequest: Int = 0,
 ) {
     var tab by rememberSaveable { mutableStateOf(AdminTab.Home) }
     var section by rememberSaveable { mutableStateOf<AdminSection?>(null) }
@@ -180,6 +187,12 @@ private fun AdminAppRoot(
         if (rootState.activated && protectionAlertPayload != null) {
             tab = AdminTab.Home
             section = AdminSection.Alerts
+        }
+    }
+    LaunchedEffect(rootState.activated, announcementOpenRequest) {
+        if (rootState.activated && announcementOpenRequest > 0) {
+            tab = AdminTab.Home
+            section = AdminSection.Announcements
         }
     }
     LaunchedEffect(rootState.activated) {
@@ -254,6 +267,14 @@ private fun AdminAppRoot(
                     ) {
                         AdminAlertsRoute()
                     }
+                AdminSection.Announcements ->
+                    SectionContainer(
+                        title = "Avisos",
+                        subtitle = "Mensajes de tu comunidad",
+                        onBack = { section = null },
+                    ) {
+                        AdminAnnouncementsRoute()
+                    }
                 AdminSection.Updates ->
                     SectionContainer(
                         title = "Actualizaciones",
@@ -272,6 +293,7 @@ private fun AdminAppRoot(
                                     section = AdminSection.Requests
                                 },
                                 onAlerts = { section = AdminSection.Alerts },
+                                onAnnouncements = { section = AdminSection.Announcements },
                             )
                         AdminTab.Community ->
                             CommunityTab(
@@ -333,6 +355,7 @@ private fun HomeTab(
     onManageUsers: () -> Unit,
     onRequests: () -> Unit,
     onAlerts: () -> Unit,
+    onAnnouncements: () -> Unit,
 ) {
     val alertsViewModel: AdminAlertsViewModel = hiltViewModel()
     val alertsState by alertsViewModel.uiState.collectAsStateWithLifecycle()
@@ -385,6 +408,13 @@ private fun HomeTab(
             subtitle = "Ver protecciones desactivadas",
             accent = Color(0xFFFF8A80),
             onClick = onAlerts,
+        )
+        FeatureTile(
+            icon = Icons.Filled.Notifications,
+            title = "Avisos",
+            subtitle = "Mensajes de tu comunidad",
+            accent = Mint,
+            onClick = onAnnouncements,
         )
     }
 }
@@ -1338,6 +1368,7 @@ private enum class AdminSection {
     ManageUsers,
     Requests,
     Alerts,
+    Announcements,
     Updates,
 }
 

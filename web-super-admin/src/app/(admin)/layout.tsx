@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, BellRing, Building2, Database, LogOut, ShieldCheck } from "lucide-react";
+import { BarChart3, BellRing, Building2, Database, LogOut, Megaphone, ShieldCheck } from "lucide-react";
 import { requireSuperAdmin } from "@/lib/auth";
 import { signOutAction } from "@/lib/actions";
 
@@ -39,6 +39,10 @@ export default async function AdminLayout({ children }: { children: React.ReactN
               <Link className="button button-secondary" href="/alerts">
                 <BellRing className="h-4 w-4" />
                 Alertas
+              </Link>
+              <Link className="button button-secondary" href="/announcements">
+                <Megaphone className="h-4 w-4" />
+                Avisos
               </Link>
             </nav>
             <span className="max-w-64 truncate text-sm text-slate-500">{email}</span>

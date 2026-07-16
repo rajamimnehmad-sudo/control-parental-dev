@@ -7,6 +7,14 @@ plugins {
     alias(libs.plugins.ksp)
 }
 
+fun envValue(name: String): String {
+    val fromEnvironment = providers.environmentVariable(name).orNull
+    if (!fromEnvironment.isNullOrBlank()) return fromEnvironment
+    val envFile = rootProject.file(".env")
+    if (!envFile.exists()) return ""
+    return envFile.readLines().firstOrNull { it.startsWith("$name=") }?.substringAfter("=")?.trim().orEmpty()
+}
+
 android {
     namespace = "com.contentfilter.user"
     compileSdk = 36
@@ -17,6 +25,9 @@ android {
         targetSdk = 36
         versionCode = 1
         versionName = "1.0.1"
+        buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${envValue("FIREBASE_APPLICATION_ID")}\"")
+        buildConfigField("String", "FIREBASE_API_KEY", "\"${envValue("FIREBASE_API_KEY")}\"")
+        buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${envValue("FIREBASE_PROJECT_ID")}\"")
         ndk {
             // Standard Android phones from Samsung, Xiaomi, Motorola and Oppo
             // use ARM. Excluding emulator-only x86 keeps the local model update small.
@@ -114,6 +125,8 @@ dependencies {
     implementation(libs.androidx.hilt.work)
     implementation(libs.androidx.webkit)
     implementation(libs.androidx.work.runtime.ktx)
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.messaging)
     implementation(libs.hilt.android)
     implementation(libs.okhttp)
     implementation(libs.onnxruntime.android)

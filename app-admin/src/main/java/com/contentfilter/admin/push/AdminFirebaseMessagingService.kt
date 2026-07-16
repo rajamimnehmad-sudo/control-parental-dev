@@ -29,11 +29,15 @@ class AdminFirebaseMessagingService : FirebaseMessagingService() {
 
     override fun onNewToken(token: String) {
         if (token.isBlank()) return
-        scope.launch { pushNotificationRepository.registerAdminToken(token) }
+        scope.launch { pushNotificationRepository.registerDeviceToken(token) }
     }
 
     override fun onMessageReceived(message: RemoteMessage) {
         if (!notificationsAllowed()) return
+        if (message.data[DataTypeKey] == AnnouncementType) {
+            showAnnouncement(message)
+            return
+        }
         AdminPushNotificationChannels.ensureUrgentProtectionChannel(this)
         val title = message.data[TitleKey] ?: message.notification?.title ?: "Protección incompleta"
         val body = message.data[BodyKey] ?: message.notification?.body ?: "Un dispositivo necesita atención."
@@ -71,6 +75,37 @@ class AdminFirebaseMessagingService : FirebaseMessagingService() {
             ?.notify(notificationId, notification)
     }
 
+    private fun showAnnouncement(message: RemoteMessage) {
+        AdminPushNotificationChannels.ensureAnnouncementsChannel(this)
+        val title = message.data[TitleKey] ?: "Nuevo aviso"
+        val body = message.data[BodyKey] ?: "Hay un nuevo mensaje para tu comunidad."
+        val id = notificationId(message.data[AnnouncementIdKey] ?: message.messageId)
+        val intent =
+            Intent(this, MainActivity::class.java).apply {
+                action = OpenAnnouncementsAction
+                flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
+            }
+        val contentIntent =
+            PendingIntent.getActivity(
+                this,
+                id,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+            )
+        val notification =
+            NotificationCompat.Builder(this, AdminPushNotificationChannels.AnnouncementsChannelId)
+                .setSmallIcon(R.drawable.ic_admin_launcher)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+                .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+                .setCategory(Notification.CATEGORY_MESSAGE)
+                .setContentIntent(contentIntent)
+                .setAutoCancel(true)
+                .build()
+        getSystemService(NotificationManager::class.java)?.notify(id, notification)
+    }
+
     private fun notificationsAllowed(): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
             ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
@@ -88,3 +123,7 @@ class AdminFirebaseMessagingService : FirebaseMessagingService() {
                 ?: 7001
     }
 }
+
+const val AnnouncementType = "announcement"
+const val AnnouncementIdKey = "announcement_id"
+const val OpenAnnouncementsAction = "com.contentfilter.admin.action.OPEN_ANNOUNCEMENTS"

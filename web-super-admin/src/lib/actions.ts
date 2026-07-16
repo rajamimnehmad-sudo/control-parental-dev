@@ -45,6 +45,17 @@ const dagEntitlementSchema = z.object({
   enabled: z.enum(["true", "false"]).transform((value) => value === "true"),
 });
 
+const announcementSchema = z.object({
+  communityId: z.string().uuid(),
+  targetRole: z.enum(["admin", "user", "all"]),
+  title: z.string().trim().min(2, "El título debe tener al menos 2 caracteres").max(80),
+  body: z.string().trim().min(2, "El mensaje debe tener al menos 2 caracteres").max(500),
+  expiresAt: z.string().trim().optional(),
+}).refine(
+  (value) => !value.expiresAt || new Date(value.expiresAt) > new Date(),
+  { message: "El vencimiento debe ser futuro", path: ["expiresAt"] },
+);
+
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
@@ -189,4 +200,37 @@ export async function updateDagEntitlementAction(_prevState: ActionState, formDa
   revalidatePath(`/communities/${parsed.data.communityId}`);
   revalidatePath("/dag-usage");
   return { ok: true, message: parsed.data.enabled ? "DAG habilitado para la comunidad" : "DAG deshabilitado para la comunidad" };
+}
+
+export async function createAnnouncementAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = announcementSchema.safeParse({
+    communityId: formValue(formData, "communityId"),
+    targetRole: formValue(formData, "targetRole"),
+    title: formValue(formData, "title"),
+    body: formValue(formData, "body"),
+    expiresAt: formValue(formData, "expiresAt"),
+  });
+  if (!parsed.success) return { ok: false, message: parsed.error.issues[0]?.message ?? "Datos inválidos" };
+
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("super_admin_create_announcement", {
+    target_community_id: parsed.data.communityId,
+    target_app_role: parsed.data.targetRole,
+    announcement_title: parsed.data.title,
+    announcement_body: parsed.data.body,
+    announcement_expires_at: parsed.data.expiresAt ? new Date(parsed.data.expiresAt).toISOString() : null,
+  });
+  if (error) return errorState(error);
+  const announcementId = (data ?? [])[0]?.announcement_id as string | undefined;
+  if (!announcementId) return { ok: false, message: "El aviso no pudo guardarse" };
+
+  const { data: delivery, error: deliveryError } = await supabase.functions.invoke("send-announcement", {
+    body: { announcement_id: announcementId },
+  });
+  revalidatePath("/announcements");
+  if (deliveryError || delivery?.error) {
+    return { ok: true, message: "Aviso guardado. El push no estuvo disponible; seguirá visible en la bandeja." };
+  }
+  const sent = Number(delivery?.sent ?? 0);
+  return { ok: true, message: sent > 0 ? `Aviso guardado y enviado a ${sent} dispositivo(s)` : "Aviso guardado; no había dispositivos con push registrado" };
 }

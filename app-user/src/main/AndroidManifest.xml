@@ -97,6 +97,14 @@
                 android:value="local_content_filter_vpn" />
         </service>
 
+        <service
+            android:name=".push.UserFirebaseMessagingService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
         <receiver
             android:name="com.contentfilter.feature.vpn.service.VpnStartupReceiver"
             android:exported="false">
