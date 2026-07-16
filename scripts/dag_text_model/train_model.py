@@ -73,8 +73,10 @@ SEEDS = {
         "escenas íntimas explícitas", "modelos desnudas", "imágenes subidas de tono", "contenido para mayores",
         "adult videos", "women without clothes", "erotic pictures", "hot explicit content",
         "uncensored intimate scenes", "naked models gallery", "adult only images", "explicit bedroom videos",
+        "private collection of nude pictures",
         "סרטים למבוגרים", "נשים בלי בגדים", "תמונות אירוטיות", "תוכן מיני מפורש",
         "סצנות אינטימיות ללא צנזורה", "גלריית נשים עירומות", "סרטונים חמים", "תמונות למבוגרים בלבד",
+        "אוסף פרטי של צילומי עירום", "גלריה פרטית של עירום", "תמונות עירום פרטיות",
     ),
     "dating": (
         "conocer solteras cerca", "encuentros casuales", "chatear con chicas para salir", "buscar pareja online",
@@ -84,6 +86,7 @@ SEEDS = {
         "meet someone with no commitment", "find singles available tonight",
         "להכיר רווקות קרוב", "מפגשים מזדמנים", "צ'אט עם נשים לדייט", "מציאת זוגיות באינטרנט",
         "דייטים ללא מחויבות", "פנויים להערב", "אפליקציה להיכרויות", "מפגשים פרטיים",
+        "שיחה פרטית עם רווקות באזור", "קשר אינטימי בלי מחויבות",
     ),
     "gambling": (
         "dónde apostar un partido", "ruleta con dinero real", "cuotas para apostar", "tragamonedas online",
@@ -102,6 +105,7 @@ SEEDS = {
         "recreational pills", "cocaine for sale", "buy illegal substances", "where to buy marijuana",
         "לקנות סמים קרוב", "לקנות מריחואנה", "סוחר סמים באזור", "איך להתמסטל",
         "כדורים לשימוש פנאי", "קוקאין למכירה", "לקנות חומרים אסורים", "איפה מוכרים קנאביס",
+        "פרטי קשר של סוחר סמים",
     ),
     "violence": (
         "videos de muertes reales", "peleas con sangre", "torturas sin censura", "accidentes fatales explícitos",

@@ -30,4 +30,74 @@ class DagHistoryStoreTest {
 
         assertEquals(expected, decoded)
     }
+
+    @Test
+    fun `page approval codec preserves exact scope and invalidation metadata`() {
+        val expected =
+            listOf(
+                DagPageApproval(
+                    url = "https://example.com/product?id=1",
+                    fingerprint = "abc123",
+                    policyVersion = 42L,
+                    modelVersion = "model-v1",
+                    approvedAtEpochMillis = 100L,
+                    expiresAtEpochMillis = 200L,
+                ),
+            )
+
+        val decoded = DagHistoryStore.decodePageApprovals(DagHistoryStore.encodePageApprovals(expected))
+
+        assertEquals(expected, decoded)
+    }
+
+    @Test
+    fun `tab session codec preserves tabs and forces browser revalidation`() {
+        val result =
+            DagSearchResult(
+                title = "Resultado",
+                url = "https://example.com",
+                domain = "example.com",
+                description = "Descripción",
+                classification =
+                    DagClassificationResult(
+                        decision = DagClassification.Allowed,
+                        category = "safe",
+                        confidence = 0.98f,
+                        modelVersion = "model-v1",
+                    ),
+            )
+        val session =
+            DagSavedTabSession(
+                activeTabId = "browser",
+                tabs =
+                    listOf(
+                        DagSavedTab(
+                            id = "results",
+                            snapshot =
+                                DagTabSnapshot(
+                                    address = "consulta",
+                                    view = DagView.Results,
+                                    results = listOf(result),
+                                ),
+                        ),
+                        DagSavedTab(
+                            id = "browser",
+                            snapshot =
+                                DagTabSnapshot(
+                                    address = "https://example.com",
+                                    view = DagView.Browser,
+                                    pageStatus = DagPageStatus.Visible,
+                                    requestedUrl = "https://example.com",
+                                ),
+                        ),
+                    ),
+            )
+
+        val decoded = DagHistoryStore.decodeTabSession(DagHistoryStore.encodeTabSession(session))
+
+        assertEquals("browser", decoded.activeTabId)
+        assertEquals(listOf(result), decoded.tabs.first().snapshot.results)
+        assertEquals(DagPageStatus.Loading, decoded.tabs.last().snapshot.pageStatus)
+        assertEquals("https://example.com", decoded.tabs.last().snapshot.requestedUrl)
+    }
 }

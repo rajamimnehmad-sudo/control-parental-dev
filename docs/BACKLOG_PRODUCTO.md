@@ -150,11 +150,11 @@ Flujo de una entrada:
 | BARRIER-LAUNCHER-01 | Idea | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
 | DAG-NAV-UX-01 | En progreso | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | En progreso | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
-| DAG-TABS-UX-01 | En progreso | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
+| DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | En progreso | P2 | Mejorar contraste y agregar tema claro, oscuro o segun dispositivo | M | Medio |
 | DAG-HISTORY-UX-01 | En progreso | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
-| DAG-ANALYSIS-UX-01 | En progreso | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
-| DAG-APPROVAL-CACHE-01 | Idea | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
+| DAG-ANALYSIS-UX-01 | Resuelto DEV 226 | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
+| DAG-APPROVAL-CACHE-01 | Resuelto DEV 226 | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
 | DAG-REVIEW-STAGING-01 | En progreso | P1 | Analizar pagina completa antes de pedir revision por un resultado incierto | M | Medio |
 | USER-GREETING-01 | Idea | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
@@ -295,7 +295,7 @@ Flujo de una entrada:
 
 #### DAG-TABS-UX-01 - Manejo mejorado de pestanas
 
-- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX y gestion de pestanas. Prioridad: P2.
+- Estado: `Resuelto` en DEV 226; pendiente prueba fisica. Tipo: UX y gestion de pestanas. Prioridad: P2.
 - Problema: el manejo actual de multiples pestanas necesita una experiencia mas rapida y clara para crear, identificar, cambiar y cerrar pestanas.
 - Solucion propuesta: evolucionar el selector visual existente y coordinarlo con el nuevo boton visible de nueva pestana.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
@@ -303,7 +303,7 @@ Flujo de una entrada:
 - Dependencias: `DAG-TABS-02`, presupuesto de memoria, recuperacion del renderer, historial y barra de navegacion.
 - Duplicados y relacion: seguimiento de `DAG-TABS-02`, que permanece resuelto; este item captura mejoras posteriores sin reabrir aquel alcance.
 - Criterios de aceptacion propuestos: crear, cambiar y cerrar pestanas es evidente; la pestana activa se distingue; se preserva el limite de recursos; cerrar la ultima pestana vuelve a un estado seguro; no se mezclan historiales entre pestanas.
-- Decisiones pendientes para el ticket: limite de pestanas, persistencia entre sesiones, orden, miniaturas, cierre masivo y recuperacion tras caida.
+- Decisiones cerradas: maximo ocho; orden local; miniaturas solo efimeras; cierre individual/masivo; metadatos y resultados cifrados sobreviven al proceso; paginas restauradas recargan y se revalidan sin conservar WebViews inactivos.
 
 #### DAG-THEME-01 - Contraste y tema visual
 
@@ -331,7 +331,7 @@ Flujo de una entrada:
 
 #### DAG-ANALYSIS-UX-01 - Analisis integrado en el buscador
 
-- Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX, feedback visual y marca DAG. Prioridad: P2.
+- Estado: `Resuelto` en DEV 226; pendiente prueba fisica. Tipo: UX, feedback visual y marca DAG. Prioridad: P2.
 - Problema: el mensaje separado `DAG esta analizando la pagina` ocupa espacio y no integra el estado de seguridad con la identidad del buscador.
 - Solucion propuesta: durante el analisis, iluminar el propio buscador con colores neon y una animacion de aspecto inteligente, mostrando dentro de esa zona la leyenda `Analizando...`.
 - Evidencia: propuesta visual del usuario el 2026-07-15.
@@ -339,7 +339,7 @@ Flujo de una entrada:
 - Dependencias: estado de analisis local, buscador/barra DAG, temas claro y oscuro, preferencias de movimiento reducido y optimizaciones de rendimiento vigentes.
 - Duplicados y relacion: complementa `DAG-HOME-UX-01` y `DAG-THEME-01`; no cambia el clasificador ni permite mostrar contenido antes de finalizar el analisis.
 - Criterios de aceptacion propuestos: el buscador comunica claramente `Analizando...`; el contenido sigue oculto hasta una decision segura; la animacion es fluida, acotada y legible en ambos temas; existe una presentacion reducida para accesibilidad; no agrega recomposiciones o trabajo continuo costoso.
-- Decisiones pendientes para el ticket: paleta neon, intensidad, duracion, comportamiento fuera de Home y tratamiento de movimiento reducido.
+- Resultado DEV 226: la direccion previa y el texto central desaparecen durante carga; queda solo `Analizando` con puntos animados dentro del campo y el borde acotado al trabajo activo. No altera la decision ni muestra contenido antes de aprobar.
 
 #### DAG-REVIEW-STAGING-01 - Revision despues del analisis completo
 
@@ -351,7 +351,7 @@ Flujo de una entrada:
 
 #### DAG-APPROVAL-CACHE-01 - Reutilizacion temporal de aprobaciones
 
-- Estado: `Idea`; no aprobado para codigo ni cambios de datos. Tipo: seguridad, cache de decisiones y UX. Prioridad: P1.
+- Estado: `Resuelto` en DEV 226; aprobado por el usuario el 2026-07-15, pendiente prueba fisica. Tipo: seguridad, cache de decisiones y UX. Prioridad: P1.
 - Problema: una pagina ya aprobada puede volver a exigir analisis o revision en cada apertura, generando espera y solicitudes repetidas aunque la aprobacion sea reciente.
 - Solucion propuesta: conservar una aprobacion con vencimiento y permitir reaperturas directas durante un periodo configurable, por ejemplo una semana o un mes, sujeto a reglas claras de alcance e invalidacion.
 - Evidencia: necesidad expresada por el usuario el 2026-07-15.
@@ -359,7 +359,7 @@ Flujo de una entrada:
 - Dependencias: modelo comun `WebPolicyDecision`; aprobaciones Admin; historial cifrado; reglas por dispositivo; version del clasificador y politica; reloj y vencimiento; privacidad y sincronizacion.
 - Duplicados y relacion: se relaciona con `WEB-CACHE-01`, que propone cache local acotada de reputacion sin URL ni historial. No se marca como duplicado hasta definir si la aprobacion aplica a dominio, URL exacta o decision administrativa persistida.
 - Criterios de aceptacion propuestos: una aprobacion vigente evita revisiones repetidas solo dentro de su alcance exacto; toda entrada tiene origen, momento y vencimiento; cambios de politica, revocacion, version incompatible o indicadores de riesgo invalidan la reutilizacion; al vencer se vuelve a analizar o revisar; no se guarda contenido, HTML ni consultas; el administrador puede conocer y revocar la aprobacion aplicable.
-- Decisiones pendientes para el ticket: duracion predeterminada y maxima; dominio, subdominio o URL exacta; quien puede aprobar; almacenamiento local o sincronizado; invalidaciones por cambio de contenido/modelo/politica; reapertura inmediata o analisis local abreviado.
+- Decisiones cerradas: siete dias; URL exacta; solo decisiones locales permitidas; almacenamiento cifrado en el dispositivo; huella de URL/titulo/texto/resumen visual; invalidacion por contenido, tiempo/reloj, politica o modelo; comprobacion dura de dominio y reglas en cada carga. Se puede borrar por separado sin borrar historial, sesiones ni pestanas.
 
 ### USER-GREETING-01 - Saludo personalizado en App Usuario
 
@@ -466,7 +466,7 @@ Flujo de una entrada:
 - Objetivo implementado: sumar comprension estadistica local de sinonimos y evasiones simples sin reemplazar las reglas duras ni enviar contenido fuera del telefono.
 - Modelo: clasificador lineal propio de 112 KiB sobre n-gramas de caracteres y palabras, con siete categorias y cobertura inicial espanol/ingles/hebreo. No es un LLM ni un transformer y no promete comprension humana.
 - Decision: una categoria riesgosa con confianza alta bloquea; confianza media o contexto sensible quedan inciertos; general permite solo si ninguna capa anterior bloqueo. Modelo ausente o invalido falla cerrado.
-- Datos y costo: 557 ejemplos controlados, 34 casos separados de verificacion, entrenamiento reproducible sin dependencias externas y cero costo/API adicional. Consultas, texto, scores y decisiones permanecen locales.
+- Datos y costo: 636 ejemplos controlados, 69 casos separados de verificacion, entrenamiento reproducible sin dependencias externas y cero costo/API adicional. DEV 226 corrige cinco evasiones detectadas por el control, principalmente en hebreo, y publica `dag-local-text-3` con SHA-256 `8ffb797ab8976f4a4cd18728c8a64ff5973392e30562a3e4291783f00cb9e612`. Consultas, texto, scores y decisiones permanecen locales.
 - Aceptacion tecnica cumplida: pruebas dirigidas, build/test/lint local integral, publicacion DEV 212 y hashes publicos verificados. Aceptacion fisica pendiente: calidad en busquedas cotidianas/riesgosas, ausencia de falsos positivos graves y fluidez en el Samsung personal.
 
 ### DAG-USAGE-01 - Contador mensual en Super Web
@@ -601,6 +601,9 @@ Revision realizada el 2026-07-15 sobre `Backlog Codex - Control Parental`. El co
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-APPROVAL-CACHE-01 | 2026-07-15, DEV 226 | Cache cifrada por URL/contenido/resumen visual/politica/modelo durante siete dias, invalidacion segura y borrado separado |
+| DAG-TABS-UX-01 | 2026-07-15, DEV 226 | Hasta ocho pestanas cifradas sobreviven al proceso; sin HTML/miniaturas persistidas y con recarga/revalidacion al restaurar |
+| DAG-ANALYSIS-UX-01 | 2026-07-15, DEV 226 | Durante carga queda solo `Analizando` con puntos animados dentro del campo; sin direccion vieja ni texto central |
 | DAG-IMAGE-COMPAT-02 | 2026-07-15, DEV 223 | Sitios densos esperan turno visual; 160 recursos, formatos raster por contenido y HEIF/HEIC; SVG/animaciones continúan cerrados; pendiente prueba física en Frávega |
 | DAG-WEBVIEW-THREAD-01 | 2026-07-15, DEV 222 | Intercepcion de recursos deja de consultar WebView desde el hilo de red; usa URL principal volatil y prueba unitaria; pendiente confirmacion fisica |
 | DAG-IMAGE-STABILITY-01 | 2026-07-15, DEV 221 | Clasificacion visual limitada a tres trabajos concurrentes, 80 recursos y timeout de 5 s; build/tests correctos, pendiente validacion fisica sin telefono disponible |

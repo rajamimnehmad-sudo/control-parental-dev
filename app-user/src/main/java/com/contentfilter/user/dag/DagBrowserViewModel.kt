@@ -50,6 +50,9 @@ class DagBrowserViewModel
 
         @Volatile
         private var activeRules: List<PolicyRule> = emptyList()
+
+        @Volatile
+        private var activePolicyVersion: Long = 0L
         private var approvalPollingJob: Job? = null
 
         init {
@@ -64,6 +67,7 @@ class DagBrowserViewModel
                 ) { snapshot, activation -> snapshot to activation }
                     .collect { (snapshot, activation) ->
                         activeRules = snapshot.rules
+                        activePolicyVersion = snapshot.version
                         val enabled = activation != null && snapshot.rules.dagEnabled()
                         mutableState.update { state -> state.withDagAvailability(enabled) }
                     }
@@ -263,9 +267,35 @@ class DagBrowserViewModel
             }
             viewModelScope.launch(Dispatchers.Default) {
                 val domain = DagContentClassifier.domainFrom(url)
-                val result = applyExplicitRule(domain, classifier.classifyPage(url, title, text, images))
+                val fingerprint = dagPageFingerprint(url, title, text, images)
+                val policyVersion = activePolicyVersion
+                val cachedApproval =
+                    withContext(Dispatchers.IO) {
+                        historyStore.hasFreshPageApproval(
+                            url = url,
+                            fingerprint = fingerprint,
+                            policyVersion = policyVersion,
+                            modelVersion = PageApprovalModelVersion,
+                        )
+                    }
+                val result =
+                    if (cachedApproval) {
+                        applyExplicitRule(domain, classifier.classifyDirectUrl(url))
+                    } else {
+                        applyExplicitRule(domain, classifier.classifyPage(url, title, text, images))
+                    }
                 if (result.decision == DagClassification.Allowed) {
-                    withContext(Dispatchers.IO) { historyStore.addPage(url, title) }
+                    withContext(Dispatchers.IO) {
+                        if (!cachedApproval) {
+                            historyStore.savePageApproval(
+                                url = url,
+                                fingerprint = fingerprint,
+                                policyVersion = policyVersion,
+                                modelVersion = PageApprovalModelVersion,
+                            )
+                        }
+                        historyStore.addPage(url, title)
+                    }
                 }
                 withContext(Dispatchers.Main) {
                     if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return@withContext
@@ -408,6 +438,22 @@ class DagBrowserViewModel
 
         fun showHistory() {
             if (mutableState.value.dagEnabled) mutableState.update { it.copy(view = DagView.History, message = "") }
+        }
+
+        fun clearPageApprovals() {
+            viewModelScope.launch(Dispatchers.IO) { historyStore.clearPageApprovals() }
+            mutableState.update { it.copy(message = "Se borraron las decisiones rápidas guardadas.") }
+        }
+
+        internal suspend fun loadTabSession(): DagSavedTabSession? =
+            withContext(Dispatchers.IO) { historyStore.loadTabSession() }
+
+        internal fun saveTabSession(session: DagSavedTabSession) {
+            viewModelScope.launch(Dispatchers.IO) { historyStore.saveTabSession(session) }
+        }
+
+        fun clearTabSession() {
+            viewModelScope.launch(Dispatchers.IO) { historyStore.clearTabSession() }
         }
 
         fun showStart() {
@@ -573,6 +619,8 @@ class DagBrowserViewModel
             const val MaxAddressCharacters = 400
             const val ApprovalPollingIntervalMillis = 5_000L
             const val ApprovalPollingAttempts = 24
+            const val PageApprovalModelVersion =
+                "dag-page-approval-1:${DagContentClassifier.ModelVersion}:${DagNeuralTextClassifier.ModelVersion}"
         }
     }
 

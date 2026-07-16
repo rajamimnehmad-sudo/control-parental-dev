@@ -172,7 +172,7 @@ class DagContentClassifier
         ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, modelVersion)
 
         companion object {
-            const val ModelVersion = "dag-local-text-2"
+            const val ModelVersion = "dag-local-text-3"
             const val MaxPageCharacters = 24_000
             private const val MaxSemanticCharacters = 4_000
             private const val MaxNeuralCharacters = 2_000

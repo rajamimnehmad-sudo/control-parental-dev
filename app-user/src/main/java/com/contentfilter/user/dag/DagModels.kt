@@ -35,6 +35,15 @@ data class DagHistoryEntry(
     val visitedAtEpochMillis: Long,
 )
 
+internal data class DagPageApproval(
+    val url: String,
+    val fingerprint: String,
+    val policyVersion: Long,
+    val modelVersion: String,
+    val approvedAtEpochMillis: Long,
+    val expiresAtEpochMillis: Long,
+)
+
 data class DagReviewCandidate(
     val url: String,
     val domain: String,
@@ -81,4 +90,14 @@ data class DagTabSnapshot(
     val requestedUrl: String? = null,
     val message: String = "",
     val reviewCandidate: DagReviewCandidate? = null,
+)
+
+internal data class DagSavedTab(
+    val id: String,
+    val snapshot: DagTabSnapshot,
+)
+
+internal data class DagSavedTabSession(
+    val activeTabId: String,
+    val tabs: List<DagSavedTab>,
 )

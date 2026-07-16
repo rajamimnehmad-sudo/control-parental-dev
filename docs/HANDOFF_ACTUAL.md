@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 225
-App Admin versionCode 225
+App Usuario versionCode 226
+App Admin versionCode 226
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,25 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-225-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-225-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-226-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-226-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 8cc96c0eee73652ce8489e1e4993eb496d73396272b314353c226af12ee12271
-Admin   ac843c3db2d90fe834a26cb39bd7e43b54d0a1bebb15c920e07995e1d13efa42
+Usuario 0dacca34d1cf6fbcbb52cfd303153e3efa70bbae56830900bfa3e1a1fe9eda1e
+Admin   be5f8f7b29f50a9ba6fe5591375743a4cd51aada5aaaa7d9ddc045a076c16dbb
 ```
+
+## Implementacion 2026-07-15 - DEV 226 cache segura, pestanas persistentes y calibracion DAG
+
+- El estado de analisis ocupa solo el campo combinado: oculta la direccion anterior, muestra `Analizando` con uno a tres puntos animados y elimina `Preparando navegador` del centro de la pantalla. El contenido continua invisible hasta una decision.
+- DAG conserva durante siete dias una aprobacion local cifrada para la URL exacta solo cuando tambien coinciden la huella del titulo/texto, el resumen visual, la version de politica y las versiones de clasificadores. Las reglas duras y el dominio se comprueban en cada carga; cambio, vencimiento, reloj retrocedido, modelo o politica invalidan el atajo.
+- El menu permite borrar esta cache con confirmacion sin borrar historial, cookies/inicios de sesion ni pestanas. No se agrego cache persistente por imagen porque cifrar y escribir cada recurso podia empeorar el tiempo de carga; las imagenes siguen clasificandose y fallando cerradas.
+- Hasta ocho pestanas sobreviven al cierre del proceso mediante almacenamiento local cifrado. Se guardan URL o resultados seguros, pero no miniaturas, HTML ni contenido de pagina. Una pestana Web restaurada recarga y vuelve a pasar por las barreras; no se restaura como visible por confianza previa.
+- La calibracion reproducible del modelo compacto de respaldo sube de 557 a 636 ejemplos y pasa 69 controles separados. Corrige cinco evasiones de riesgo detectadas antes de tocar umbrales, principalmente frases hebreas; artefacto de 114.736 bytes, SHA-256 `8ffb797ab8976f4a4cd18728c8a64ff5973392e30562a3e4291783f00cb9e612`, version `dag-local-text-3`. El modelo neuronal profesional conserva prioridad y las reglas explicitas no se relajan.
+- Validacion local: generacion determinista del modelo, ktlint Usuario, tests DEV Usuario/Admin y builds optimizados de ambos APK correctos. APKs y manifiestos DEV 226 publicados y verificados; falta prueba fisica de visual, reapertura y rendimiento.
 
 ## Implementacion 2026-07-15 - DEV 225 Home y revision por etapas
 

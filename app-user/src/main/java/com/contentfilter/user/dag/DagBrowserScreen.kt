@@ -73,6 +73,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -107,6 +108,7 @@ import com.contentfilter.core.ui.PremiumFishMascot
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.core.ui.ProductVisualPage
+import kotlinx.coroutines.delay
 import org.json.JSONArray
 import java.text.DateFormat
 import java.util.Date
@@ -181,12 +183,47 @@ private fun DagBrowserContent(
     }
     var menuExpanded by remember { mutableStateOf(false) }
     var tabsExpanded by remember { mutableStateOf(false) }
+    var clearBrowsingCacheDialog by remember { mutableStateOf(false) }
     var addressFocused by remember { mutableStateOf(false) }
     var activeWebView by remember { mutableStateOf<WebView?>(null) }
     var browserCanGoBack by remember { mutableStateOf(false) }
     var browserCanGoForward by remember { mutableStateOf(false) }
     var tabs by remember { mutableStateOf(listOf(DagTab(snapshot = viewModel.captureTab()))) }
     var activeTabId by remember { mutableStateOf(tabs.first().id) }
+    var tabsRestored by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        val saved = viewModel.loadTabSession()
+        if (saved != null) {
+            tabs = saved.tabs.map { DagTab(id = it.id, snapshot = it.snapshot) }
+            activeTabId = saved.activeTabId
+            viewModel.restoreTab(saved.tabs.first { it.id == saved.activeTabId }.snapshot)
+        }
+        tabsRestored = true
+    }
+
+    LaunchedEffect(
+        tabs,
+        activeTabId,
+        state.address,
+        state.view,
+        state.pageStatus,
+        state.results,
+        state.requestedUrl,
+        tabsRestored,
+    ) {
+        if (!tabsRestored) return@LaunchedEffect
+        delay(TabPersistenceDebounceMillis)
+        val currentSnapshot = viewModel.captureTab().forPersistence()
+        val savedTabs =
+            tabs.map { tab ->
+                DagSavedTab(
+                    id = tab.id,
+                    snapshot = if (tab.id == activeTabId) currentSnapshot else tab.snapshot.forPersistence(),
+                )
+            }
+        viewModel.saveTabSession(DagSavedTabSession(activeTabId = activeTabId, tabs = savedTabs))
+    }
 
     fun persistActiveTab() {
         tabs = tabs.map { tab -> if (tab.id == activeTabId) tab.copy(snapshot = viewModel.captureTab()) else tab }
@@ -223,6 +260,7 @@ private fun DagBrowserContent(
     }
 
     fun closeAllTabs() {
+        viewModel.clearTabSession()
         viewModel.openNewTab()
         val replacement = DagTab(snapshot = viewModel.captureTab())
         tabs = listOf(replacement)
@@ -281,10 +319,12 @@ private fun DagBrowserContent(
                                     if (focusState.isFocused && !addressFocused) viewModel.onAddressChanged("")
                                     addressFocused = focusState.isFocused
                                 },
-                        value = state.address,
+                        value = if (analyzing) "" else state.address,
                         onValueChange = viewModel::onAddressChanged,
-                        placeholder = { Text("Buscar o escribir dirección") },
-                        label = if (analyzing) ({ Text("Analizando…") }) else null,
+                        placeholder = {
+                            if (analyzing) DagAnalyzingText() else Text("Buscar o escribir dirección")
+                        },
+                        readOnly = analyzing,
                         singleLine = true,
                         shape = RoundedCornerShape(29.dp),
                         colors =
@@ -362,6 +402,13 @@ private fun DagBrowserContent(
                             onClick = {
                                 menuExpanded = false
                                 viewModel.showHistory()
+                            },
+                        )
+                        DropdownMenuItem(
+                            text = { Text("Borrar caché de navegación") },
+                            onClick = {
+                                menuExpanded = false
+                                clearBrowsingCacheDialog = true
                             },
                         )
                         HorizontalDivider()
@@ -454,6 +501,30 @@ private fun DagBrowserContent(
             onCloseAll = ::closeAllTabs,
         )
     }
+
+    if (clearBrowsingCacheDialog) {
+        AlertDialog(
+            onDismissRequest = { clearBrowsingCacheDialog = false },
+            title = { Text("¿Borrar caché de navegación?") },
+            text = {
+                Text(
+                    "DAG volverá a analizar por completo las páginas. El historial, los inicios de sesión y las pestañas no se borrarán.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        activeWebView?.clearCache(true)
+                        viewModel.clearPageApprovals()
+                        clearBrowsingCacheDialog = false
+                    },
+                ) { Text("Borrar") }
+            },
+            dismissButton = {
+                TextButton(onClick = { clearBrowsingCacheDialog = false }) { Text("Cancelar") }
+            },
+        )
+    }
 }
 
 private data class DagTab(
@@ -461,6 +532,13 @@ private data class DagTab(
     val snapshot: DagTabSnapshot,
     val preview: ImageBitmap? = null,
 )
+
+private fun DagTabSnapshot.forPersistence(): DagTabSnapshot =
+    copy(
+        pageStatus = if (view == DagView.Browser) DagPageStatus.Loading else DagPageStatus.Idle,
+        message = "",
+        reviewCandidate = null,
+    )
 
 internal enum class DagThemePreference(
     val label: String,
@@ -619,6 +697,18 @@ private fun DagAnalysisFrame(
 }
 
 @Composable
+private fun DagAnalyzingText() {
+    var dots by remember { mutableIntStateOf(1) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(350L)
+            dots = dots % 3 + 1
+        }
+    }
+    Text("Analizando${".".repeat(dots)}")
+}
+
+@Composable
 private fun DagTabSwitcher(
     tabs: List<DagTab>,
     activeTabId: String,
@@ -725,6 +815,7 @@ private fun DagTabSwitcher(
 private const val TabPreviewWidth = 240
 private const val TabPreviewHeight = 360
 private const val MaximumTabs = 8
+private const val TabPersistenceDebounceMillis = 500L
 
 private fun DagTabSnapshot.tabLabel(position: Int): String =
     when (view) {
@@ -762,11 +853,11 @@ private fun DagStartContent(
             cornerRadius = 32.dp,
         ) {
             OutlinedTextField(
-                value = address,
+                value = if (analyzing) "" else address,
                 onValueChange = onAddressChanged,
                 modifier = Modifier.fillMaxSize(),
-                placeholder = { Text("Buscar en Internet") },
-                label = if (analyzing) ({ Text("Analizando…") }) else null,
+                placeholder = { if (analyzing) DagAnalyzingText() else Text("Buscar en Internet") },
+                readOnly = analyzing,
                 singleLine = true,
                 shape = RoundedCornerShape(32.dp),
                 colors =
@@ -785,11 +876,12 @@ private fun DagStartContent(
                     ),
                 keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = ImeAction.Go),
                 keyboardActions = androidx.compose.foundation.text.KeyboardActions(onGo = { onSubmit() }),
-                trailingIcon = {
-                    TextButton(onClick = onSubmit, enabled = address.isNotBlank() && !analyzing) {
-                        Text(if (analyzing) "Analizando…" else "Ir")
-                    }
-                },
+                trailingIcon =
+                    if (analyzing) {
+                        null
+                    } else {
+                        { TextButton(onClick = onSubmit, enabled = address.isNotBlank()) { Text("Ir") } }
+                    },
             )
         }
         Spacer(Modifier.height(12.dp))
@@ -1050,12 +1142,12 @@ private fun DagWebContent(
                 modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).padding(24.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                if (state.pageStatus != DagPageStatus.Loading) {
+                if (state.pageStatus == DagPageStatus.Blocked || state.pageStatus == DagPageStatus.Uncertain) {
                     Text(
                         when (state.pageStatus) {
                             DagPageStatus.Blocked -> "Página bloqueada"
                             DagPageStatus.Uncertain -> "Página pendiente de revisión"
-                            else -> "Preparando navegador"
+                            else -> ""
                         },
                         style = MaterialTheme.typography.titleMedium,
                     )

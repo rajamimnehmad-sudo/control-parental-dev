@@ -85,7 +85,7 @@ private class DagSemanticLinearModel(
                     category = Categories[bestIndex],
                     confidence = (exponentials[bestIndex] / validTotal).toFloat(),
                     margin = ((exponentials[bestIndex] - exponentials[secondIndex]) / validTotal).toFloat(),
-                    modelVersion = "dag-local-text-2",
+                    modelVersion = "dag-local-text-3",
                 )
             }
         }
