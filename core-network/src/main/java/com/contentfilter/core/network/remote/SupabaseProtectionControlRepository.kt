@@ -27,6 +27,13 @@ class SupabaseProtectionControlRepository
                 is RemoteResult.Failure -> Result.failure(IllegalStateException(result.reason))
             }
 
+        override suspend fun autoArm(deviceId: String): Result<Unit> =
+            client
+                .invokeRpc(
+                    "auto_arm_device_protection",
+                    JSONObject().put("p_device_id", deviceId),
+                ).toResult()
+
         override suspend fun setArmed(
             accountId: String,
             deviceId: String,

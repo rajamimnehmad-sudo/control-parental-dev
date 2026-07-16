@@ -6,6 +6,8 @@ import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 interface ProtectionControlRepository {
     suspend fun get(deviceId: String): Result<DeviceProtectionControl?>
 
+    suspend fun autoArm(deviceId: String): Result<Unit>
+
     suspend fun setArmed(
         accountId: String,
         deviceId: String,

@@ -137,7 +137,7 @@ Flujo de una entrada:
 | SEC-LICENSE-01 | Idea | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Implementado DEV 240; pendiente prueba fisica | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
-| BARRIER-DEFAULT-ON-01 | Idea | P1 | Armar automaticamente la barrera al completar y verificar la configuracion de proteccion | S | Medio |
+| BARRIER-DEFAULT-ON-01 | Implementado DEV 241; pendiente prueba fisica | P1 | Armar automaticamente la barrera al completar y verificar la configuracion de proteccion | S | Medio |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Idea | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Idea | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
@@ -223,11 +223,11 @@ Flujo de una entrada:
 
 ### BARRIER-DEFAULT-ON-01 - Barrera armada de forma predeterminada
 
-- Estado: `Idea`; no aprobado para codigo.
+- Estado: `Implementado en DEV 241; pendiente prueba fisica`. Aprobado por el usuario dentro de la ejecucion consecutiva de pendientes el 2026-07-16.
 - Tipo: seguridad, configuracion predeterminada y UX de onboarding.
 - Prioridad: P1.
 - Problema: la barrera depende de una accion posterior del administrador para quedar armada, lo que puede dejar dispositivos configurados con una proteccion antimanipulacion menor a la esperada.
-- Solucion propuesta: armar automaticamente la barrera cuando App Usuario complete la activacion y verifique que Accessibility, VPN y Administrador del dispositivo estan correctamente habilitados. Mantener el desarmado como accion excepcional, protegida y auditable.
+- Resultado DEV 241: App Usuario intenta el armado automatico solo con VPN real, Accessibility y Device Admin habilitados y sin desactivacion intencional. La RPC por token de dispositivo modifica exclusivamente controles nunca decididos (`command_revision = 0`); una decision previa del administrador nunca se revierte automaticamente.
 - Evidencia: propuesta del usuario el 2026-07-15 al revisar el alcance real del boton `Activar barrera de proteccion`.
 - Esfuerzo: S estimado.
 - Riesgo: medio; armar antes de completar permisos puede bloquear onboarding o reparacion, y una migracion incorrecta puede cambiar inesperadamente el estado de dispositivos existentes.
@@ -240,7 +240,7 @@ Flujo de una entrada:
   - el desarmado exige una accion administrativa explicita y queda identificado de forma auditable;
   - mantenimiento y recuperacion conservan sus ventanas controladas;
   - la migracion de dispositivos existentes no bloquea onboarding, reparacion ni acceso autorizado.
-- Decisiones pendientes para la entrevista del ticket: politica de migracion para dispositivos existentes; momento exacto de armado; autoridad para desarmar; presentacion del control en App Admin; comportamiento offline y ante permisos incompletos.
+- Decisiones cerradas: dispositivos existentes con revision cero son elegibles al quedar completamente sanos; cualquier revision administrativa se respeta; Admin conserva la autoridad para desarmar; offline o permisos incompletos mantienen el control previo y reintentan en una comprobacion de salud futura. Falta validar fisicamente activacion, reinicio, actualizacion in-place y desarmado explicito.
 
 ### ADMIN-ALERTS-UX-01 - Campanita de alertas de seguridad en App Admin
 

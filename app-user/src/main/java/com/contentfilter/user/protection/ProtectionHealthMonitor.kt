@@ -23,6 +23,7 @@ class ProtectionHealthMonitor
         private val activationRepository: DeviceActivationRepository,
         private val systemStatusRepository: SystemStatusRepository,
         private val pushNotificationRepository: PushNotificationRepository,
+        private val protectionControlCoordinator: ProtectionControlCoordinator,
     ) {
         private val reportedAlerts = mutableSetOf<ProtectionAlertType>()
 
@@ -41,6 +42,9 @@ class ProtectionHealthMonitor
                     vpnProtectionDisabled = VpnController.isDevProtectionDisabled(context),
                 )
             persistChangedStates(decision)
+            if (decision.canAutoArm) {
+                protectionControlCoordinator.autoArmIfEligible()
+            }
             decision.alerts.forEach { alert ->
                 if (reportedAlerts.add(alert)) {
                     pushNotificationRepository.reportProtectionAlert(alert)
@@ -81,6 +85,7 @@ internal data class ProtectionHealthDecision(
     val accessibilityState: ComponentState,
     val deviceAdminState: ComponentState,
     val shouldRestartVpn: Boolean,
+    val canAutoArm: Boolean,
     val alerts: Set<ProtectionAlertType>,
 )
 
@@ -103,6 +108,11 @@ internal object ProtectionHealthPolicy {
             accessibilityState = accessibilityEnabled.toComponentState(),
             deviceAdminState = deviceAdminEnabled.toComponentState(),
             shouldRestartVpn = !vpnActive && vpnPermissionGranted && !vpnProtectionDisabled,
+            canAutoArm =
+                vpnActive &&
+                    accessibilityEnabled &&
+                    deviceAdminEnabled &&
+                    !vpnProtectionDisabled,
             alerts = alerts,
         )
     }

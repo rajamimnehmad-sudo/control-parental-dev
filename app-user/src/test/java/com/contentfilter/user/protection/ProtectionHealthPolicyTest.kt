@@ -16,6 +16,7 @@ class ProtectionHealthPolicyTest {
         assertEquals(ComponentState.Enabled, decision.accessibilityState)
         assertEquals(ComponentState.Enabled, decision.deviceAdminState)
         assertFalse(decision.shouldRestartVpn)
+        assertTrue(decision.canAutoArm)
         assertTrue(decision.alerts.isEmpty())
     }
 
@@ -68,6 +69,14 @@ class ProtectionHealthPolicyTest {
             ),
             decision.alerts,
         )
+        assertFalse(decision.canAutoArm)
+    }
+
+    @Test
+    fun intentionallyDisabledVpnDoesNotAutoArmEvenIfTunnelIsStillStopping() {
+        val decision = decide(vpnProtectionDisabled = true)
+
+        assertFalse(decision.canAutoArm)
     }
 
     private fun decide(

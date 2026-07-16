@@ -79,6 +79,14 @@ Usuario 519b911b5d6e5489f30e64bfc37d2e409794fdc37d9f2a159b1662e9687b2875
 Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 ```
 
+## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
+
+- Un dispositivo Usuario con control de proteccion nunca configurado se arma automaticamente solo cuando App Usuario comprueba simultaneamente el tunel VPN real, Accessibility habilitado, Device Admin activo y ausencia de una desactivacion intencional de la VPN.
+- La migracion conservadora usa `command_revision = 0` como señal de control nunca decidido. Un control ya armado o desarmado explicitamente por Admin no se modifica automaticamente; desarmar sigue siendo una accion administrativa excepcional y auditable.
+- La RPC `auto_arm_device_protection` se autentica mediante el token del propio dispositivo, no acepta otro dispositivo y solo cambia `armed=false/revision=0` a `armed=true/revision=1`. No usa Service Role en Android, no borra datos y no altera autorizaciones vigentes decididas por Admin.
+- La migracion `20260716150738_auto_arm_healthy_device_protection.sql` fue aplicada exclusivamente en Supabase DEV `syeycayasyufedwoprea`. Se verificaron existencia `SECURITY DEFINER`, revocacion a `PUBLIC` y acceso intencional de `anon/authenticated` protegido por `device_token_matches_device`. El advisor conserva una advertencia esperada por RPC anon con validacion personalizada y deuda previa no introducida por este ticket.
+- Validacion local: 815 tareas correctas para `core-domain`, `core-network`, tests DEV Usuario/Admin, ktlint y builds de ambos APK. Pruebas cubren salud completa, componente faltante, VPN desactivada intencionalmente, control nuevo elegible y prohibicion de rearmar un desarmado explicito. Falta CI, publicacion de APK y prueba fisica de onboarding/reinicio.
+
 ## Implementacion 2026-07-16 - DEV 240 cierre tecnico BARRIER-A11Y-RACE-01
 
 - Evidencia fisica de origen: el usuario confirmo que en Samsung SM-S908E podia apagar rapidamente Accessibility aunque la pantalla protegida terminara cerrandose.
