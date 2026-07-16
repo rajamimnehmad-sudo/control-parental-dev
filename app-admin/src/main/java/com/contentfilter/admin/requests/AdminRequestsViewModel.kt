@@ -17,6 +17,7 @@ import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
+import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +43,7 @@ class AdminRequestsViewModel
         private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
+        private val targetedPolicySyncCoordinator: TargetedPolicySyncCoordinator,
     ) : ViewModel() {
         private val syncMessage = MutableStateFlow("")
         private val isLoading = MutableStateFlow(false)
@@ -133,6 +135,18 @@ class AdminRequestsViewModel
                     if (domainRequest == null) {
                         setRequestStatus(requestId, RequestStatus.Approved)
                     } else {
+                        if (domainRequest.requestType == AccessRequestType.DOMAIN_ACCESS) {
+                            domainRequest.deviceId?.let { deviceId ->
+                                runCatching {
+                                    targetedPolicySyncCoordinator.refresh(
+                                        deviceId = deviceId,
+                                        reason = "admin-domain-approval",
+                                    )
+                                }.onFailure { exception ->
+                                    Log.w(LogTag, "Policy refresh before domain approval failed: ${exception.message}")
+                                }
+                            }
+                        }
                         approveAccessRequest(domainRequest)
                     }
                     syncScheduler.requestSync()

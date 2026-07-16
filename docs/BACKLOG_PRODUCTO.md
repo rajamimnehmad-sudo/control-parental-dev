@@ -653,6 +653,9 @@ Revision realizada el 2026-07-15 sobre `Backlog Codex - Control Parental`. El co
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-APPROVAL-POLICY-01 | 2026-07-15, DEV 227 | Admin carga la politica completa antes de aprobar y rechaza una aprobacion DAG sobre politica incompleta, evitando cerrar el navegador |
+| DAG-SEARCH-FP-01 | 2026-07-15, DEV 227 | `Coca-Cola` comercial se permite con vocabulario cerrado sin enmascarar cocaína ni contenido explícito; regresiones automatizadas |
+| DAG-HOME-RESET-01 | 2026-07-15, DEV 227 | Home limpia buscador, URL/resultados/carga y navegacion previa; contraste explicito en tema claro y oscuro |
 | DAG-APPROVAL-CACHE-01 | 2026-07-15, DEV 226 | Cache cifrada por URL/contenido/resumen visual/politica/modelo durante siete dias, invalidacion segura y borrado separado |
 | DAG-TABS-UX-01 | 2026-07-15, DEV 226 | Hasta ocho pestanas cifradas sobreviven al proceso; sin HTML/miniaturas persistidas y con recarga/revalidacion al restaurar |
 | DAG-ANALYSIS-UX-01 | 2026-07-15, DEV 226 | Durante carga queda solo `Analizando` con puntos animados dentro del campo; sin direccion vieja ni texto central |

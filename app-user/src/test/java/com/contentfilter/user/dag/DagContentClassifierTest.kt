@@ -25,6 +25,14 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `coca cola commercial searches are safe without masking risky additions`() {
+        assertEquals(DagClassification.Allowed, classifier.classifyQuery("Coca-Cola").decision)
+        assertEquals(DagClassification.Allowed, classifier.classifyQuery("comprar coca cola cerca").decision)
+        assertEquals(DagClassification.Uncertain, classifier.classifyQuery("coca cola y cocaína").decision)
+        assertEquals(DagClassification.Blocked, classifier.classifyQuery("coca cola y videos porno").decision)
+    }
+
+    @Test
     fun `low margin unsafe guess does not block an ordinary brand search`() {
         val prediction =
             DagSemanticPrediction(

@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 226
-App Admin versionCode 226
+App Usuario versionCode 227
+App Admin versionCode 227
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,25 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-226-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-226-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-227-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-227-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 0dacca34d1cf6fbcbb52cfd303153e3efa70bbae56830900bfa3e1a1fe9eda1e
-Admin   be5f8f7b29f50a9ba6fe5591375743a4cd51aada5aaaa7d9ddc045a076c16dbb
+Usuario b82b8647e5491f23a56ebbbc95dac9287a9b598ad1c593e952e37827a5b7f191
+Admin   dd7ebbefdc380843608d3311486aef01455cc3f1fc2943fc11c34e9126322424
 ```
+
+## Implementacion 2026-07-15 - DEV 227 falsos positivos, aprobacion DAG y Home
+
+- Causa del bloqueo `comprar Coca-Cola`: el modelo compacto daba demasiado peso a `comprar` por la proporcion de ejemplos de drogas. Las consultas comerciales inequívocas de Coca-Cola se permiten antes del modelo; la excepcion usa vocabulario cerrado y no se aplica si aparece cualquier termino adicional desconocido/riesgoso. Pruebas cubren permitido, incierto por cocaína y bloqueo por contenido explícito.
+- Causa del cierre al aprobar: App Admin podia aprobar un dominio sin haber cargado la politica completa del dispositivo; `RoomPolicyRepository` creaba entonces una politica activa nueva con solo la regla del dominio y sin `__dag_enabled__`, que App Usuario interpretaba correctamente como revocacion. Admin fuerza primero un pull dirigido de esa politica y el caso de uso rechaza la aprobacion si DAG no figura completo y habilitado, evitando reemplazar la politica.
+- Una politica ya dañada por una version anterior no se modifica automaticamente: despues de actualizar, el administrador debe volver a habilitar DAG una vez para ese dispositivo. Las aprobaciones siguientes preservan la regla.
+- Home ahora borra direccion, resultados, URL solicitada, carga, mensaje y candidato, e invalida la navegacion Web anterior. El buscador siempre aparece vacio al entrar a Inicio.
+- Tema claro/oscuro declara colores de texto, superficie, variantes, contornos, cursor y placeholders con contraste explicito; no depende de valores derivados que podian dejar texto oscuro sobre fondo oscuro.
+- `DagContentClassifier.ModelVersion` sube a `dag-local-text-4`, invalidando decisiones rapidas anteriores. Validacion: core-domain, ktlint Usuario/Admin, tests DEV de ambas apps y builds optimizados correctos. APKs/manifiestos DEV 227 publicados y verificados; falta prueba fisica del ciclo solicitud -> aprobacion -> DAG permanece abierto.
 
 ## Implementacion 2026-07-15 - DEV 226 cache segura, pestanas persistentes y calibracion DAG
 

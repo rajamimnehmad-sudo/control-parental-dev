@@ -8,6 +8,33 @@ import kotlin.test.assertTrue
 
 class DagBrowserAvailabilityTest {
     @Test
+    fun `home starts with an empty search and no stale page state`() {
+        val home =
+            DagBrowserUiState(
+                dagEnabled = true,
+                address = "https://example.com",
+                view = DagView.Browser,
+                pageStatus = DagPageStatus.Visible,
+                results = listOf(searchResult()),
+                requestedUrl = "https://example.com",
+                navigationRevision = 4L,
+                loading = true,
+                message = "Página visible",
+                reviewCandidate = reviewCandidate(),
+            ).toDagStart()
+
+        assertEquals("", home.address)
+        assertEquals(DagView.Start, home.view)
+        assertEquals(DagPageStatus.Idle, home.pageStatus)
+        assertTrue(home.results.isEmpty())
+        assertNull(home.requestedUrl)
+        assertEquals(5L, home.navigationRevision)
+        assertFalse(home.loading)
+        assertEquals("", home.message)
+        assertNull(home.reviewCandidate)
+    }
+
+    @Test
     fun `closing dag clears the visual session but preserves local history`() {
         val history = listOf(historyEntry())
         val closed =

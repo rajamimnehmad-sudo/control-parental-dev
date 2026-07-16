@@ -329,6 +329,11 @@ private fun DagBrowserContent(
                         shape = RoundedCornerShape(29.dp),
                         colors =
                             OutlinedTextFieldDefaults.colors(
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                cursorColor = MaterialTheme.colorScheme.primary,
+                                focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 focusedBorderColor = if (analyzing) Color.Transparent else MaterialTheme.colorScheme.primary,
                                 unfocusedBorderColor = if (analyzing) Color.Transparent else MaterialTheme.colorScheme.outline,
                                 focusedContainerColor =
@@ -624,10 +629,15 @@ private val DagLightScheme =
         primary = Color(0xFF006C8F),
         onPrimary = Color.White,
         primaryContainer = Color(0xFFC4E8FF),
+        onPrimaryContainer = Color(0xFF001F2A),
         background = Color(0xFFF7F9FC),
+        onBackground = Color(0xFF111417),
         surface = Color.White,
+        onSurface = Color(0xFF111417),
         surfaceVariant = Color(0xFFE8EEF3),
+        onSurfaceVariant = Color(0xFF3E484E),
         outline = Color(0xFF6F797F),
+        outlineVariant = Color(0xFFBFC8CE),
     )
 
 private val DagDarkScheme =
@@ -635,10 +645,15 @@ private val DagDarkScheme =
         primary = Color(0xFF74D1FA),
         onPrimary = Color(0xFF003548),
         primaryContainer = Color(0xFF004D67),
+        onPrimaryContainer = Color(0xFFC4E8FF),
         background = Color(0xFF101417),
+        onBackground = Color(0xFFE1E3E6),
         surface = Color(0xFF181C20),
+        onSurface = Color(0xFFE1E3E6),
         surfaceVariant = Color(0xFF3F484D),
-        outline = Color(0xFF899399),
+        onSurfaceVariant = Color(0xFFBFC8CE),
+        outline = Color(0xFF899298),
+        outlineVariant = Color(0xFF3F484D),
     )
 
 private val DagNeonCyan = Color(0xFF00D8FF)
@@ -862,6 +877,11 @@ private fun DagStartContent(
                 shape = RoundedCornerShape(32.dp),
                 colors =
                     OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        unfocusedTextColor = MaterialTheme.colorScheme.onSurface,
+                        cursorColor = MaterialTheme.colorScheme.primary,
+                        focusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        unfocusedPlaceholderColor = MaterialTheme.colorScheme.onSurfaceVariant,
                         focusedBorderColor = if (analyzing) Color.Transparent else MaterialTheme.colorScheme.primary,
                         unfocusedBorderColor = if (analyzing) Color.Transparent else MaterialTheme.colorScheme.outline,
                         focusedContainerColor = if (analyzing) DagNeonCyan.copy(alpha = 0.10f) else Color.Transparent,

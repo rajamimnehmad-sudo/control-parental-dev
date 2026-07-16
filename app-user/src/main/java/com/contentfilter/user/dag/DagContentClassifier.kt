@@ -16,7 +16,11 @@ class DagContentClassifier
         lateinit var neuralClassifier: DagNeuralTextClassifier
 
         fun classifyQuery(text: String): DagClassificationResult =
-            classify(text, directUrl = false, reviewSingleAmbiguousTerm = true)
+            if (text.isClearlySafeCocaColaQuery()) {
+                allowed()
+            } else {
+                classify(text, directUrl = false, reviewSingleAmbiguousTerm = true)
+            }
 
         fun classifyResult(
             title: String,
@@ -172,7 +176,7 @@ class DagContentClassifier
         ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, modelVersion)
 
         companion object {
-            const val ModelVersion = "dag-local-text-3"
+            const val ModelVersion = "dag-local-text-4"
             const val MaxPageCharacters = 24_000
             private const val MaxSemanticCharacters = 4_000
             private const val MaxNeuralCharacters = 2_000
@@ -200,6 +204,19 @@ class DagContentClassifier
 
             private val CombiningMarksPattern = Regex("\\p{M}+")
             private val InvalidCharactersPattern = Regex("[^\\p{L}\\p{N}.]+")
+
+            private fun String.isClearlySafeCocaColaQuery(): Boolean {
+                val words = normalizedForDag().split(' ').filter(String::isNotBlank)
+                if (words.size < 2 || !words.contains("coca") || !words.contains("cola")) return false
+                return words.all(SafeCocaColaQueryWords::contains)
+            }
+
+            private val SafeCocaColaQueryWords =
+                setOf(
+                    "coca", "cola", "comprar", "compra", "precio", "precios", "oferta", "ofertas",
+                    "supermercado", "bebida", "gaseosa", "lata", "botella", "argentina", "cerca", "donde",
+                    "conseguir", "delivery", "zero", "light", "sin", "azucar", "en", "de", "una", "la", "quiero",
+                )
 
             fun domainFrom(url: String): String =
                 runCatching { URI(url).host.orEmpty() }

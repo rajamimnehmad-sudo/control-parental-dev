@@ -8,6 +8,7 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.dagEnabled
 import com.contentfilter.core.domain.repository.AccessRequestRepository
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
@@ -22,6 +23,9 @@ class ApproveAccessRequestUseCase(
 ) {
     suspend operator fun invoke(request: AccessRequest) {
         val policy = policyRepository.getActivePolicy(request.deviceId)
+        require(request.requestType != AccessRequestType.DOMAIN_ACCESS || policy.rules.dagEnabled()) {
+            "No se puede aprobar un sitio DAG sin la política completa y habilitada del dispositivo."
+        }
         request.allowTarget()?.let { target ->
             policy.rules
                 .filter {

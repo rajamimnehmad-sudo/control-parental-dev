@@ -457,14 +457,7 @@ class DagBrowserViewModel
         }
 
         fun showStart() {
-            mutableState.update {
-                it.copy(
-                    view = DagView.Start,
-                    pageStatus = DagPageStatus.Idle,
-                    message = "",
-                    reviewCandidate = null,
-                )
-            }
+            mutableState.update(DagBrowserUiState::toDagStart)
         }
 
         fun captureTab(): DagTabSnapshot =
@@ -660,3 +653,16 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 reviewCandidate = null,
             )
     }
+
+internal fun DagBrowserUiState.toDagStart(): DagBrowserUiState =
+    copy(
+        address = "",
+        view = DagView.Start,
+        pageStatus = DagPageStatus.Idle,
+        results = emptyList(),
+        requestedUrl = null,
+        navigationRevision = navigationRevision + 1,
+        loading = false,
+        message = "",
+        reviewCandidate = null,
+    )
