@@ -171,14 +171,14 @@ class SupabaseActivationClient
                 executeActivationRequest(request, "Supabase pair_admin_device_with_password RPC")
             }
 
-        suspend fun revokeDevice(deviceId: String): RemoteResult<Unit> =
+        suspend fun archiveProtectedUser(deviceId: String): RemoteResult<Unit> =
             withContext(Dispatchers.IO) {
                 val config = configProvider.current()
                 val baseUrl = config.normalizedUrlOrNull()
                 val token = authTokenProvider.currentToken()
                 if (baseUrl == null || token == null) {
                     return@withContext RemoteResult.Failure(
-                        "Supabase revoke requires an authenticated admin session.",
+                        "Supabase archive requires an authenticated admin session.",
                         retryable = true,
                     )
                 }
@@ -189,7 +189,7 @@ class SupabaseActivationClient
                         .toRequestBody(JsonMediaType)
                 val request =
                     Request.Builder()
-                        .url("$baseUrl/rest/v1/rpc/revoke_device")
+                        .url("$baseUrl/rest/v1/rpc/admin_archive_protected_user")
                         .header("apikey", config.anonKey)
                         .header("Authorization", "Bearer $token")
                         .header("Content-Type", "application/json")
@@ -201,11 +201,11 @@ class SupabaseActivationClient
                         if (response.isSuccessful) {
                             RemoteResult.Success(Unit)
                         } else {
-                            httpFailure("Supabase revoke_device RPC", response.code, responseBody)
+                            httpFailure("Supabase admin_archive_protected_user RPC", response.code, responseBody)
                         }
                     }
                 } catch (exception: Exception) {
-                    exceptionFailure("Supabase revoke_device RPC", exception)
+                    exceptionFailure("Supabase admin_archive_protected_user RPC", exception)
                 }
             }
 

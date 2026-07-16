@@ -516,7 +516,7 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
-                when (activationClient.revokeDevice(deviceId)) {
+                when (activationClient.archiveProtectedUser(deviceId)) {
                     is RemoteResult.Success -> {
                         deviceRepository.deleteDevice(deviceId)
                         installedAppRepository.deleteForDevice(deviceId)

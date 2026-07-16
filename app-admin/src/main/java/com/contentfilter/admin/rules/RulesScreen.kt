@@ -677,7 +677,7 @@ private fun ProtectedUserCard(
             title = { Text("Borrar usuario") },
             text = {
                 Text(
-                    "Esto borra definitivamente el usuario, sus apps detectadas, activaciones y solicitudes asociadas.",
+                    "El usuario perderá acceso de inmediato y se ocultarán sus apps, reglas, activaciones y solicitudes. Se conservará un registro de auditoría.",
                 )
             },
             confirmButton = {

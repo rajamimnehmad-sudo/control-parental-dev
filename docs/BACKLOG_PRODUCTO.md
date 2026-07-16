@@ -135,7 +135,7 @@ Flujo de una entrada:
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
-| DATA-DELETE-01 | Idea | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
+| DATA-DELETE-01 | Implementado backend DEV y candidato Admin DEV 241; pendiente prueba destructiva autorizada | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Implementado DEV 240; pendiente prueba fisica | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
 | BARRIER-DEFAULT-ON-01 | Implementado DEV 241; pendiente prueba fisica | P1 | Armar automaticamente la barrera al completar y verificar la configuracion de proteccion | S | Medio |
 | OPS-METRICS-01 | Idea | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
@@ -181,11 +181,12 @@ Flujo de una entrada:
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
-- Estado: `Idea`; no aprobado para diagnostico tecnico, codigo ni pruebas destructivas.
+- Estado: `Implementado backend DEV y candidato Admin DEV 241; pendiente prueba destructiva autorizada`. El usuario aprobo ejecutar todos los tickets el 2026-07-16, pero se mantiene pendiente la autorizacion especifica para crear y archivar un usuario de prueba.
 - Tipo: bug, ciclo de vida de datos y seguridad.
 - Prioridad: P0.
 - Problema: App Admin muestra la opcion de borrar usuario, pero al usarla el banner informa `No se pudo borrar al usuario` y el usuario permanece visible.
-- Solucion propuesta: diagnosticar el flujo actual y definir un borrado definitivo, consistente y auditable, con confirmacion destructiva separada.
+- Causa confirmada sin identificar personas: los 2 dispositivos Usuario activos tienen un `community_admins.auth_user_id` valido, pero su `accounts.owner_user_id` no coincide. La RPC legado `revoke_device` exigia el propietario de cuenta y por eso rechazaba ambos casos antes de cambiar datos.
+- Solucion implementada: `admin_archive_protected_user` autentica al administrador de comunidad, valida que el Usuario pertenezca a esa comunidad y ejecuta una unica transaccion. Revoca activacion y token, oculta apps, solicitudes, grupos, reglas, limites, codigos y push operativos, y conserva incidentes/consumo junto con un recibo inmutable en `protected_user_deletion_audit`.
 - Evidencia: el usuario reporta el 2026-07-14 que el fallo ocurre con todos los usuarios probados y que ninguno se elimina.
 - Esfuerzo: L.
 - Riesgo: muy alto por perdida irreversible, relaciones entre entidades y posible inconsistencia entre datos locales y remotos.
@@ -197,7 +198,10 @@ Flujo de una entrada:
   - los fallos no dejan eliminaciones parciales ni muestran exito incorrecto;
   - existe evidencia auditable sin exponer secretos;
   - las pruebas destructivas usan datos autorizados expresamente por el usuario.
-- Decisiones pendientes: borrado completo, desvinculacion o desactivacion previa; alcance sobre dispositivos y datos asociados; retencion de auditoria; estrategia de prueba segura.
+- Seguridad: `anon` no puede ejecutar la RPC; `authenticated` solo llega al borrado despues de resolver un administrador activo y su comunidad. No se expone Service Role en Android.
+- Validacion no destructiva: migraciones `20260716174500_admin_archive_protected_user.sql` y `20260716175000_admin_archive_protected_user_privileges.sql` aplicadas solo en DEV. Permanecen 2 Usuarios activos y 0 recibos de borrado; no se ejecuto la RPC. Tests, ktlint y build Admin correctos.
+- Decision aplicada: eliminacion logica inmediata de datos operativos y retencion de auditoria, alertas y contadores. No se hace `DELETE` fisico ni se borra la cuenta/comunidad.
+- Pendiente: autorizacion explicita para crear y archivar unicamente un usuario de prueba nuevo en DEV y comprobar el resultado extremo a extremo.
 
 ### BARRIER-A11Y-RACE-01 - Bypass rapido para apagar Accessibility
 

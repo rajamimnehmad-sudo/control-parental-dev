@@ -90,6 +90,16 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Validacion: tests unitarios, ktlint y builds DEV optimizados de ambos APK correctos; Superweb paso TypeScript, ESLint de `src` y build optimizado. El lint global de Superweb sigue incluyendo deuda ajena en `.open-next` generado.
 - Falta prueba autenticada de extremo a extremo con dispositivos fisicos. No se publico APK ni Superweb intermedia; los manifiestos publicos permanecen en DEV 240.
 
+## Implementacion 2026-07-16 - candidato DEV 241 DATA-DELETE-01
+
+- Causa raiz confirmada sin exponer identidades: App Admin llamaba `revoke_device`, RPC legado que compara `accounts.owner_user_id` con la sesion. Los 2 Usuarios activos de DEV estan correctamente vinculados a `community_admins.auth_user_id`, pero ambos difieren del propietario legado; por eso el flujo fallaba antes de modificar filas.
+- App Admin llama ahora `admin_archive_protected_user`. La RPC exige sesion autenticada, resuelve un administrador de comunidad activo y solo acepta un dispositivo Usuario activo de la misma comunidad.
+- La transaccion revoca activacion y token del dispositivo, marca como eliminados apps, solicitudes, grupos, membresias, reglas, limites, politicas, codigos y token push, y guarda un recibo en `protected_user_deletion_audit`. Alertas de seguridad, consumo agregado y auditoria se conservan; no se hace `DELETE` fisico de datos ni de la cuenta.
+- La confirmacion de App Admin explica el alcance y la retencion de auditoria. Solo despues del exito remoto limpia la copia local y sincroniza la lista.
+- Migraciones `20260716174500_admin_archive_protected_user.sql` y `20260716175000_admin_archive_protected_user_privileges.sql` aplicadas solo en DEV. `anon` no ejecuta la RPC; `authenticated` conserva el permiso sujeto a las validaciones internas.
+- Verificacion deliberadamente no destructiva: 2 Usuarios activos y 0 filas de auditoria antes y despues. No se llamo la RPC. Tests de red/Admin, ktlint y build DEV optimizado correctos.
+- Falta autorizacion especifica para crear y archivar unicamente un usuario de prueba nuevo en DEV. No usar ninguno de los 2 Usuarios existentes para esta prueba.
+
 ## Implementacion 2026-07-16 - candidato DEV 241 SEC-LICENSE-01A
 
 - Primer tramo del ciclo de licencia: Super Admin ya no confunde el estado manual almacenado con el estado efectivo. Una licencia activa con inicio futuro aparece `Programada`; al alcanzar `expires_at` aparece `Vencida`; una suspension manual conserva prioridad.
