@@ -165,6 +165,8 @@ Flujo de una entrada:
 | DAG-APPROVAL-CACHE-01 | Resuelto DEV 226 | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
 | DAG-REVIEW-STAGING-01 | Resuelto DEV 225 | P1 | Analizar pagina completa antes de pedir revision por un resultado incierto | M | Medio |
 | DAG-BACK-NAV-01 | Resuelto DEV 233 | P2 | Atras respeta paginas y resultados antes de volver a Home | S | Medio |
+| DAG-APPROVAL-POLICY-01 | Reabierto | P0 | Evitar que aprobar un sitio desde App Admin desactive DAG | M | Alto |
+| DAG-REQUEST-STATUS-01 | Idea | P1 | Confirmar solicitudes enviadas y mostrar pendientes de revision desde el menu DAG | M | Medio |
 | USER-GREETING-01 | Idea | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
@@ -369,6 +371,45 @@ Flujo de una entrada:
 - Duplicados y relacion: se relaciona con `WEB-CACHE-01`, que propone cache local acotada de reputacion sin URL ni historial. No se marca como duplicado hasta definir si la aprobacion aplica a dominio, URL exacta o decision administrativa persistida.
 - Criterios de aceptacion propuestos: una aprobacion vigente evita revisiones repetidas solo dentro de su alcance exacto; toda entrada tiene origen, momento y vencimiento; cambios de politica, revocacion, version incompatible o indicadores de riesgo invalidan la reutilizacion; al vencer se vuelve a analizar o revisar; no se guarda contenido, HTML ni consultas; el administrador puede conocer y revocar la aprobacion aplicable.
 - Decisiones cerradas: siete dias; URL exacta; solo decisiones locales permitidas; almacenamiento cifrado en el dispositivo; huella de URL/titulo/texto/resumen visual; invalidacion por contenido, tiempo/reloj, politica o modelo; comprobacion dura de dominio y reglas en cada carga. Se puede borrar por separado sin borrar historial, sesiones ni pestanas.
+
+#### DAG-APPROVAL-POLICY-01 - Aprobacion sin desactivar DAG
+
+- Estado: `Reabierto`; corregido tecnicamente en DEV 227, pero una nueva prueba fisica del usuario el 2026-07-16 demuestra que el fallo sigue presente o reaparecio. No aprobado todavia como ticket de diagnostico o codigo.
+- Tipo: regresion funcional y consistencia de politica. Prioridad: P0.
+- Problema: cuando App Admin permite un sitio solicitado, DAG se desactiva en App Usuario. La aprobacion de un dominio no debe reemplazar, eliminar ni revocar la regla que habilita DAG para el dispositivo.
+- Solucion propuesta: diagnosticar el recorrido real de aprobacion y sincronizacion en la version publicada, garantizar que toda mutacion preserve la politica completa del dispositivo y rechazar de forma segura cualquier aprobacion basada en un estado incompleto, sin informar exito falso.
+- Evidencia: reporte fisico del usuario del 2026-07-16. El handoff registra que DEV 227 corrigio exactamente este cierre al aprobar mediante una carga previa de la politica completa; la nueva evidencia invalida el cierre operativo para el recorrido observado, aunque no permite asumir todavia la misma causa raiz.
+- Esfuerzo: M estimado. Riesgo: alto; una correccion superficial puede conservar estados parciales, duplicar reglas o desactivar otras protecciones del dispositivo.
+- Dependencias: flujo de solicitudes de dominio en App Admin; politica por dispositivo y regla `__dag_enabled__`; pull dirigido, Room, outbox y sincronizacion; aprobaciones existentes; estado publicado DEV vigente.
+- Duplicados y relacion: se conserva el ID historico porque el sintoma coincide con `DAG-APPROVAL-POLICY-01`; no se mezcla con `DAG-APPROVAL-CACHE-01`, que solo reutiliza decisiones locales ya aprobadas.
+- Criterios de aceptacion propuestos:
+  - aprobar un sitio conserva DAG habilitado y permite abrir el sitio dentro del alcance autorizado;
+  - rechazar o fallar una aprobacion tampoco cambia el estado de DAG;
+  - una politica local o remota incompleta no se publica ni reemplaza la politica vigente;
+  - App Admin no muestra exito hasta confirmar una mutacion consistente;
+  - no se crean reglas duplicadas ni se alteran otras preferencias Web o protecciones;
+  - el ciclo solicitud -> aprobacion -> sincronizacion -> apertura se repite fisicamente varias veces y tras reiniciar ambas apps;
+  - una actualizacion in-place conserva DAG y las aprobaciones existentes sin borrar datos.
+- Decisiones pendientes para la entrevista del ticket: version instalada en ambas apps; dispositivo afectado; sitio usado; si DAG desaparece, figura cerrado o solo deja de abrir; momento exacto del cambio; estado tras volver a habilitarlo; alcance de logs y datos de prueba autorizados.
+
+#### DAG-REQUEST-STATUS-01 - Confirmacion y pendientes de revision
+
+- Estado: `Idea`; no aprobado para codigo. Tipo: UX de solicitudes y navegacion DAG. Prioridad: P1.
+- Problema: despues de pedir revision de una pagina no queda claro que la solicitud fue enviada ni cual es su estado. El usuario tampoco tiene un lugar dentro de DAG para consultar las revisiones que siguen pendientes.
+- Solucion propuesta: mostrar una confirmacion persistente e inequivoca inmediatamente despues del envio y agregar en el menu de tres puntos un apartado `Pendientes de revision` con las solicitudes del usuario, su sitio y estado. Evitar reenvios duplicados mientras una solicitud equivalente siga pendiente.
+- Evidencia: observacion de uso del usuario el 2026-07-16.
+- Esfuerzo: M estimado. Riesgo: medio; la pantalla puede exponer mas historial del necesario, mostrar estados obsoletos o confundir una solicitud enviada con una aprobacion.
+- Dependencias: solicitudes de dominio DAG; sincronizacion y estados pendiente/aprobada/rechazada; menu de tres puntos; navegacion por pestana; privacidad del historial local; `DAG-APPROVAL-POLICY-01` para el resultado aprobado.
+- Duplicados y relacion: especializa `REQUESTS-UX-01` para la experiencia dentro de DAG y se relaciona con `POLICY-EXPLAIN-01`; se mantiene separado de la bandeja de solicitudes de App Admin porque aqui el destinatario visual es el usuario que envio la pagina.
+- Criterios de aceptacion propuestos:
+  - al enviar una solicitud, DAG confirma claramente que fue enviada y que esta pendiente;
+  - repetir la misma accion no genera solicitudes duplicadas mientras exista una equivalente activa;
+  - el menu de tres puntos ofrece `Pendientes de revision` aun desde Home;
+  - la lista distingue al menos pendiente, aprobada y rechazada sin prometer aprobacion antes de sincronizarla;
+  - tocar una entrada permite volver al contexto seguro correspondiente sin mostrar contenido no aprobado;
+  - los cambios de estado se actualizan de forma consistente y sobreviven al reinicio previsto;
+  - no se expone la consulta completa, contenido de pagina ni historial adicional al administrador o a servicios remotos.
+- Decisiones pendientes para la entrevista del ticket: texto y duracion de la confirmacion; si la bandeja muestra solo pendientes o tambien resueltas; datos visibles por fila; retencion; accion al tocar una aprobada o rechazada; agrupacion por dominio o URL; comportamiento offline y entre pestanas.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
