@@ -151,6 +151,7 @@ Flujo de una entrada:
 | APP-INSTALL-APPROVAL-01 | Implementado candidato DEV 241; pendiente prueba fisica | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
 | BARRIER-LAUNCHER-01 | Revisado y publicado DEV 242; pendiente bootstrap en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
+| BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
@@ -317,6 +318,24 @@ Flujo de una entrada:
 - Compatibilidad elegida: Android normal desde el minimo soportado, sin Knox, root, Device Owner ni restablecimiento. El comportamiento visual exacto del launcher puede variar por fabricante y no se promete un bloqueo de sistema equivalente a MDM.
 - Validacion: tests de decision visible/oculto, compilacion, manifiesto combinado, tests DEV y formato de Usuario/VPN correctos. Falta validar icono, notificacion, mantenimiento y reinicio en Samsung SM-S908E; no hubo publicacion intermedia.
 - Revision DEV 242: ocultar el alias dejo al SM-S908E sin una ruta obvia a Usuario y, al no existir Admin todavia, el bloqueo correcto del instalador de Chrome impidio completar el alta de Admin. El alias queda siempre visible. App Usuario incorpora un bootstrap Admin que valida manifiesto, SHA-256, packageName y firma antes de abrir la autorizacion interna; Android sigue mostrando su confirmacion normal. El instalador directo del navegador permanece bloqueado.
+
+### BARRIER-SETTINGS-VISIBILITY-01 - Controles peligrosos fuera de alcance
+
+- Estado: `Idea`; no aprobado para diagnostico tecnico ni codigo. Tipo: seguridad, antimanipulacion y UX de Ajustes. Prioridad: P1.
+- Problema: en la superficie identificada por el usuario como `Seguridad` siguen visibles botones para eliminar aplicaciones y un acceso a la configuracion de VPN. Aunque la barrera ya protege recorridos posteriores, mostrar o permitir alcanzar esos controles facilita intentos de desactivacion y transmite una proteccion menos integrada.
+- Solucion propuesta: cuando la barrera este armada, ocultar esos controles si pertenecen a una interfaz propia de Content Filter. Si son controles nativos de Android que no pueden retirarse con la autoridad disponible, neutralizar el acceso antes de que se dibuje o pueda accionarse y ofrecerlos solo durante mantenimiento administrativo autorizado.
+- Evidencia: solicitud del usuario del 2026-07-16. El handoff confirma que la barrera ya bloquea pantallas criticas de desinstalacion, App Info y configuracion VPN; esta idea endurece su visibilidad y acceso, no reemplaza esas defensas.
+- Esfuerzo: M estimado. Riesgo: alto; una deteccion demasiado amplia puede impedir ajustes legitimos, bloquear VPN ajenas o dejar sin ruta de reparacion al administrador.
+- Dependencias: `BARRIER-ANDROID-01`, `BARRIER-A11Y-RACE-01` y mantenimiento temporal; Accessibility; resolucion de paquetes y pantallas de Ajustes por OEM; estado real de VPN; flujos de reparacion y recuperacion offline.
+- Duplicados y relacion: seguimiento de la barrera ya resuelta para bloqueo funcional. No duplica `BARRIER-LAUNCHER-01`, que trata la accion rapida desde el icono de App Usuario.
+- Criterios de aceptacion propuestos:
+  - con la barrera armada, el usuario no puede ver o alcanzar acciones que eliminen, desinstalen o deshabiliten las aplicaciones protegidas dentro del alcance acordado;
+  - el acceso a la configuracion de la VPN protegida no queda disponible fuera de una ventana de mantenimiento autorizada;
+  - si Android no permite ocultar un control nativo, la barrera actua antes de que pueda confirmarse la accion y no depende solamente de reparar el estado despues;
+  - Ajustes de seguridad no relacionados, otras aplicaciones y VPN ajenas permanecen disponibles segun la politica acordada;
+  - mantenimiento y recuperacion ofrecen una ruta clara para diagnosticar, reparar o cambiar la VPN sin desarmar permanentemente la proteccion;
+  - intentos bloqueados conservan la auditoria y alertas vigentes sin generar duplicados.
+- Decisiones pendientes para la entrevista del ticket: pantalla exacta llamada `Seguridad`; aplicaciones alcanzadas por `eliminar`; si se trata de controles propios o Ajustes Android; alcance sobre otras VPN; autoridad Admin o Super Admin; comportamiento durante mantenimiento; dispositivos y versiones Android soportados.
 
 ### Checklist de mejoras visuales y navegacion DAG
 
