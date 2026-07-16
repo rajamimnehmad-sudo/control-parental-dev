@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario 209c97e302845102aa235da8363fbc8e587dd19b3bb0ad1de0b252cf3bacae69
-Admin   2d1da40bfc342f232a151c0d47d9cd539264c7a897265839b4fd527faad1c675
+Usuario 4c0bdb6cee0d3b1a4788542871d6567eab193c205ec6c832b2fbb5e7aae27914
+Admin   90b08b1f283096084fe626845ff19922fc3868b4cc50b6c1b9a3459cd61eecd3
 ```
 
 ## Correccion de actualizaciones Samsung DEV 244 - 2026-07-16
@@ -84,7 +84,7 @@ Admin   2d1da40bfc342f232a151c0d47d9cd539264c7a897265839b4fd527faad1c675
 - Causa: la autorizacion interna se enviaba al paquete Usuario sin componente explicito, la instalacion pendiente no se retomaba al volver de `Permitir desde esta fuente` y la politica no contemplaba todas las clases y paquetes Samsung del instalador y de fuentes externas.
 - Usuario y Admin dirigen ahora la autorizacion al receptor exacto protegido por permiso `signature`; Usuario tambien abre localmente la misma ventana oficial. La ventana dura cinco minutos y solo evita que la propia barrera intercepte el flujo de actualizacion iniciado desde Content Filter. Android conserva su permiso por origen y la confirmacion normal; no se promete instalacion silenciosa.
 - Al regresar de Ajustes, ambas apps detectan el permiso concedido, recuperan el APK ya verificado y abren automaticamente el instalador. La cobertura incluye los paquetes Samsung Package Installer/Permission Controller y variantes OEM de las pantallas de fuentes desconocidas.
-- Usuario y Admin subieron juntos a `versionCode 244`. La matriz integral termino correctamente con 1.011 tareas Gradle: tests unitarios, ktlint, detekt, lint DEV y ambos APK. Los SHA-256 locales preparados son los publicados arriba.
+- Usuario y Admin subieron juntos a `versionCode 244`. La matriz integral termino correctamente con 1.011 tareas Gradle: tests unitarios, ktlint, detekt, lint DEV y ambos APK. Los SHA-256 publicos verificados son los indicados arriba.
 - Prueba fisica auxiliar SM-A235M: ambos APK se instalaron in-place en 244 sin borrar datos y quedaron activos Accessibility, Device Admin y `FilterVpnService`. El telefono estaba bloqueado, por lo que no se declara prueba visual. La comprobacion determinante del flujo reportado queda pendiente en el Samsung SM-S908E personal.
 
 ## Publicacion UX agrupada DEV 243 - 2026-07-16
