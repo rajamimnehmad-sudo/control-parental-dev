@@ -26,11 +26,20 @@ Si una version, prueba o capacidad difiere entre fuentes, prevalece `docs/HANDOF
 
 ## Flujo vivo
 
-1. Capturar la idea en el chat dedicado o en el Google Doc.
-2. Entrevistar al usuario antes de convertirla en solucion.
-3. Deduplicar, asignar ID y dejarla como `Propuesto`.
-4. Esperar aprobacion explicita del primer ticket.
-5. Implementar el ticket en un chat de ejecucion, con alcance pequeno.
+Modalidad del chat dedicado de backlog:
+
+- El usuario puede volcar ideas desordenadas, incompletas o encadenadas sin responder una entrevista en ese momento.
+- Codex captura cada idea, asigna un ID estable, registra evidencia y decisiones pendientes, detecta duplicados y la deja en estado `Idea`.
+- Codex no interpreta la captura como aprobacion para codigo ni interrumpe el flujo de ideas con preguntas de detalle.
+- Cuando el usuario pide preparar o elegir trabajo, Codex agrupa las ideas relacionadas en tickets pequenos, propone orden y dependencias, y recien entonces entrevista las decisiones que cambian alcance o aceptacion.
+
+Flujo de una entrada:
+
+1. Capturar la idea en el chat dedicado o importarla desde una fuente historica.
+2. Normalizarla como `Idea`, sin exigir definiciones prematuras.
+3. Al preparar trabajo, deduplicar y agrupar por tickets pequenos; entrevistar lo necesario.
+4. Pasar a `Propuesto` y esperar aprobacion explicita del primer ticket.
+5. Implementar el ticket aprobado en un chat de ejecucion, con alcance pequeno.
 6. Al cerrar, actualizar este archivo y `docs/HANDOFF_ACTUAL.md` en el mismo commit.
 
 ## Ancla tecnica actual
