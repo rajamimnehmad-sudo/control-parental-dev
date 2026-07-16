@@ -73,6 +73,7 @@ class DagHistoryStoreTest {
                     listOf(
                         DagSavedTab(
                             id = "results",
+                            lastUsedAtEpochMillis = 100L,
                             snapshot =
                                 DagTabSnapshot(
                                     address = "consulta",
@@ -82,6 +83,7 @@ class DagHistoryStoreTest {
                         ),
                         DagSavedTab(
                             id = "browser",
+                            lastUsedAtEpochMillis = 200L,
                             snapshot =
                                 DagTabSnapshot(
                                     address = "https://example.com",
@@ -101,5 +103,14 @@ class DagHistoryStoreTest {
         assertEquals(DagPageStatus.Loading, decoded.tabs.last().snapshot.pageStatus)
         assertEquals("https://example.com", decoded.tabs.last().snapshot.requestedUrl)
         assertEquals(listOf(result), decoded.tabs.last().snapshot.results)
+        assertEquals(listOf(100L, 200L), decoded.tabs.map { it.lastUsedAtEpochMillis })
+    }
+
+    @Test
+    fun `empty tab requires a clean start snapshot`() {
+        assertEquals(true, DagTabSnapshot().isEmptyTab())
+        assertEquals(false, DagTabSnapshot(address = "consulta").isEmptyTab())
+        assertEquals(false, DagTabSnapshot(view = DagView.History).isEmptyTab())
+        assertEquals(false, DagTabSnapshot(requestedUrl = "https://example.com").isEmptyTab())
     }
 }

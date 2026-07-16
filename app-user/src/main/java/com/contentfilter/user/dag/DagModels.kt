@@ -106,7 +106,15 @@ data class DagTabSnapshot(
 internal data class DagSavedTab(
     val id: String,
     val snapshot: DagTabSnapshot,
+    val lastUsedAtEpochMillis: Long = 0L,
 )
+
+internal fun DagTabSnapshot.isEmptyTab(): Boolean =
+    view == DagView.Start &&
+        address.isBlank() &&
+        searchQuery.isBlank() &&
+        results.isEmpty() &&
+        requestedUrl == null
 
 internal data class DagSavedTabSession(
     val activeTabId: String,

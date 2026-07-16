@@ -298,6 +298,7 @@ class DagHistoryStore
                                 put(
                                     JSONObject()
                                         .put("id", tab.id)
+                                        .put("last_used_at", tab.lastUsedAtEpochMillis)
                                         .put("snapshot", encodeTabSnapshot(tab.snapshot)),
                                 )
                             }
@@ -313,6 +314,7 @@ class DagHistoryStore
                         DagSavedTab(
                             id = json.getString("id"),
                             snapshot = decodeTabSnapshot(json.getJSONObject("snapshot")),
+                            lastUsedAtEpochMillis = json.optLong("last_used_at", (tabsJson.length() - index).toLong()),
                         )
                     }.take(MaxSavedTabs)
                 require(tabs.isNotEmpty())

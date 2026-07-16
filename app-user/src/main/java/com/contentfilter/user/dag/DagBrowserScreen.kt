@@ -110,7 +110,6 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.contentfilter.core.domain.model.AccessRequest
 import com.contentfilter.core.domain.model.RequestStatus
-import com.contentfilter.core.ui.PremiumFishMascot
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.core.ui.ProductVisualPage
@@ -203,9 +202,16 @@ private fun DagBrowserContent(
     LaunchedEffect(Unit) {
         val saved = viewModel.loadTabSession()
         if (saved != null) {
-            tabs = saved.tabs.map { DagTab(id = it.id, snapshot = it.snapshot) }
+            tabs =
+                saved.tabs.map {
+                    DagTab(id = it.id, snapshot = it.snapshot, lastUsedAtEpochMillis = it.lastUsedAtEpochMillis)
+                }
             activeTabId = saved.activeTabId
             viewModel.restoreTab(saved.tabs.first { it.id == saved.activeTabId }.snapshot)
+            tabs =
+                tabs.map {
+                    if (it.id == activeTabId) it.copy(lastUsedAtEpochMillis = System.currentTimeMillis()) else it
+                }
         }
         tabsRestored = true
     }
@@ -228,6 +234,7 @@ private fun DagBrowserContent(
                 DagSavedTab(
                     id = tab.id,
                     snapshot = if (tab.id == activeTabId) currentSnapshot else tab.snapshot.forPersistence(),
+                    lastUsedAtEpochMillis = tab.lastUsedAtEpochMillis,
                 )
             }
         viewModel.saveTabSession(DagSavedTabSession(activeTabId = activeTabId, tabs = savedTabs))
@@ -254,12 +261,36 @@ private fun DagBrowserContent(
         persistActiveTab()
         activeTabId = tab.id
         viewModel.restoreTab(tab.snapshot)
+        tabs =
+            tabs.map {
+                if (it.id == tab.id) it.copy(snapshot = tab.snapshot, lastUsedAtEpochMillis = System.currentTimeMillis()) else it
+            }
         tabsExpanded = false
     }
 
     fun newTab() {
-        if (tabs.size >= MaximumTabs) return
         persistActiveTab()
+        val currentSnapshot = viewModel.captureTab()
+        val reusable =
+            tabs
+                .map { if (it.id == activeTabId) it.copy(snapshot = currentSnapshot) else it }
+                .filter { it.snapshot.isEmptyTab() }
+                .maxByOrNull { it.lastUsedAtEpochMillis }
+        if (reusable != null) {
+            activeTabId = reusable.id
+            viewModel.restoreTab(reusable.snapshot)
+            tabs =
+                tabs.map {
+                    if (it.id == reusable.id) {
+                        it.copy(snapshot = reusable.snapshot, lastUsedAtEpochMillis = System.currentTimeMillis())
+                    } else {
+                        it
+                    }
+                }
+            tabsExpanded = false
+            return
+        }
+        if (tabs.size >= MaximumTabs) return
         viewModel.openNewTab()
         val tab = DagTab(snapshot = viewModel.captureTab())
         tabs = tabs + tab
@@ -312,7 +343,10 @@ private fun DagBrowserContent(
                 ) {
                     TextButton(
                         onClick = ::newTab,
-                        enabled = tabs.size < MaximumTabs,
+                        enabled =
+                            tabs.size < MaximumTabs ||
+                                viewModel.captureTab().isEmptyTab() ||
+                                tabs.any { it.snapshot.isEmptyTab() },
                         modifier = Modifier.width(44.dp).semantics { contentDescription = "Nueva pestaña" },
                     ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
                     TextButton(
@@ -434,7 +468,10 @@ private fun DagBrowserContent(
                     }
                     TextButton(
                         onClick = ::newTab,
-                        enabled = tabs.size < MaximumTabs,
+                        enabled =
+                            tabs.size < MaximumTabs ||
+                                viewModel.captureTab().isEmptyTab() ||
+                                tabs.any { it.snapshot.isEmptyTab() },
                         modifier = Modifier.width(40.dp).semantics { contentDescription = "Nueva pestaña" },
                     ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
                     Box {
@@ -659,6 +696,7 @@ private data class DagTab(
     val id: String = UUID.randomUUID().toString(),
     val snapshot: DagTabSnapshot,
     val preview: ImageBitmap? = null,
+    val lastUsedAtEpochMillis: Long = System.currentTimeMillis(),
 )
 
 private fun DagTabSnapshot.forPersistence(): DagTabSnapshot =
@@ -900,12 +938,18 @@ private fun DagTabSwitcher(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column {
-                        Text("Pestañas", style = MaterialTheme.typography.titleLarge)
+                        Text("Pestañas recientes", style = MaterialTheme.typography.titleLarge)
                         Text("${tabs.size} de $MaximumTabs", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
                     Row {
                         TextButton(onClick = onCloseAll, enabled = tabs.size > 1) { Text("Cerrar todas") }
-                        TextButton(onClick = onNew, enabled = tabs.size < MaximumTabs) { Text("＋ Nueva") }
+                        TextButton(
+                            onClick = onNew,
+                            enabled =
+                                tabs.size < MaximumTabs ||
+                                    currentSnapshot.isEmptyTab() ||
+                                    tabs.any { it.snapshot.isEmptyTab() },
+                        ) { Text("＋ Nueva") }
                     }
                 }
                 LazyVerticalGrid(
@@ -914,7 +958,7 @@ private fun DagTabSwitcher(
                     horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                 ) {
-                    gridItems(tabs, key = { it.id }) { tab ->
+                    gridItems(tabs.sortedByDescending(DagTab::lastUsedAtEpochMillis), key = { it.id }) { tab ->
                         val snapshot = if (tab.id == activeTabId) currentSnapshot else tab.snapshot
                         Surface(
                             modifier =
@@ -946,7 +990,11 @@ private fun DagTabSwitcher(
                                             modifier = Modifier.fillMaxSize(),
                                             contentScale = ContentScale.Crop,
                                         )
-                                    } ?: PremiumFishMascot(modifier = Modifier.width(72.dp).height(58.dp))
+                                    } ?: Text(
+                                        text = "DAG",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        style = MaterialTheme.typography.titleLarge,
+                                    )
                                     if (tab.id == activeTabId) {
                                         Surface(
                                             modifier = Modifier.align(Alignment.TopStart).padding(8.dp),

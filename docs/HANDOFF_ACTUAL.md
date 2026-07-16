@@ -145,6 +145,14 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Mientras la activacion, la fila sincronizada o un nombre no vacio no esten disponibles muestra el fallback neutro `Hola`. Los cambios de nombre se reflejan al actualizarse Room por el flujo normal de sincronizacion.
 - El nombre solo aparece dentro del Home: no se copia a notificaciones ni pantalla bloqueada y no se agrega persistencia nueva. Los espacios externos se normalizan y se conservan caracteres especiales y el nombre completo; el encabezado puede ocupar mas de una linea.
 - Validacion: tests unitarios de nombre activo, aislamiento entre dispositivos y fallbacks; compilacion DEV y `ktlintCheck` de App Usuario correctos. Falta prueba visual fisica y no hubo publicacion intermedia.
+
+## Implementacion 2026-07-16 - candidato DEV 241 DAG-TABS-UX-02
+
+- El selector DAG ya no usa peces: una pestaña sin miniatura muestra una superficie neutra rotulada `DAG`. La pantalla se identifica como `Pestañas recientes` y ordena las pestañas abiertas por ultimo uso.
+- La fecha de ultimo uso se persiste con la sesion cifrada. Las sesiones de versiones anteriores, que no tienen ese campo, reciben un orden determinista al decodificarse; no se guardan ni reabren pestañas cerradas.
+- `Nueva pestaña` reutiliza primero la pestaña vacia mas recientemente usada. Vacia significa estrictamente Home sin texto, consulta, resultados ni URL; una pagina o listado nunca se reemplaza por error. Si no hay vacia crea una nueva hasta el limite existente de ocho.
+- Abrir el selector, reordenar visualmente o enfocar una pestaña no vuelve a buscar ni consume Brave. Se conservan aislamiento, resultados, restauracion cifrada y revalidacion de paginas.
+- Validacion: tests del codec, persistencia de ultimo uso y definicion de pestaña vacia; compilacion DEV y `ktlintCheck` de App Usuario correctos. Falta prueba fisica y no hubo publicacion intermedia.
 - Validacion local: tests/compilacion Admin, formato de Admin y red, ESLint de `src`, TypeScript y build Superweb correctos. Falta prueba fisica de los dos recorridos y publicacion final de APK/Superweb.
 
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01

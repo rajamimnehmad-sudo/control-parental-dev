@@ -176,7 +176,7 @@ Flujo de una entrada:
 | DAG-AUTOCOMPLETE-02 | Implementado DEV 238; pendiente prueba fisica | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
 | DAG-CAPTCHA-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
-| DAG-TABS-UX-02 | Idea | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
+| DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
 | USER-GREETING-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
@@ -507,7 +507,7 @@ Flujo de una entrada:
 
 #### DAG-TABS-UX-02 - Selector reciente, limpio y sin vacias duplicadas
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX, identidad visual y gestion de pestanas. Prioridad: P2.
+- Estado: `Implementado candidato DEV 241; pendiente prueba fisica`. Aprobado al ordenar ejecutar todos los tickets el 2026-07-16. Tipo: UX, identidad visual y gestion de pestanas. Prioridad: P2.
 - Problema: el selector de pestanas conserva ilustraciones de peces aunque DAG ya elimino esa mascota de las demas superficies; tampoco presenta claramente las pestanas recientes y permite crear nuevas pestanas cuando ya existe una vacia, acumulando estados redundantes.
 - Solucion propuesta: eliminar todos los peces del selector y reemplazar estados sin miniatura por una representacion neutra de DAG; incorporar una vista o agrupacion de pestanas recientes; y hacer que `Nueva pestana` enfoque una pestana vacia existente en vez de crear otra.
 - Evidencia: observacion y propuesta del usuario del 2026-07-16. El handoff confirma que Home elimino la mascota en DEV 225, mientras que el selector historico usa la mascota para paginas sin vista previa.
@@ -522,7 +522,10 @@ Flujo de una entrada:
   - si existen varias vacias heredadas, el comportamiento es determinista y permite cerrarlas sin afectar paginas abiertas;
   - el limite de ocho, el aislamiento de historial y la restauracion cifrada continuan funcionando;
   - cambiar el orden o abrir una reciente no recarga resultados ni consume una consulta Brave innecesaria.
-- Decisiones pendientes para la entrevista del ticket: significado exacto de `recientes` —orden por uso, seccion separada o pestanas cerradas recientemente—; cantidad y retencion; si se pueden reabrir cerradas; definicion de pestana vacia; cual vacia enfocar si hay varias; diseno neutro que reemplaza al pez.
+- Implementacion: el selector se titula `Pestañas recientes`, ordena las pestañas abiertas por ultimo uso y persiste esa marca junto al estado cifrado. No conserva ni reabre pestañas cerradas. Las tarjetas sin miniatura muestran una superficie neutra con `DAG`, sin peces.
+- Reutilizacion: se considera vacia solamente una pestaña en Home sin texto, consulta, resultados ni URL. `Nueva` enfoca la vacia usada mas recientemente —incluida la activa— antes de crear otra; las vacias heredadas restantes se pueden cerrar normalmente. El limite continua en ocho.
+- Compatibilidad: sesiones cifradas anteriores sin fecha se restauran con un orden determinista; resultados y paginas no se recargan al abrir el selector ni se ejecuta una consulta Brave.
+- Validacion: codec de sesiones y compatibilidad de marca de uso, definicion estricta de vacia, tests DEV, compilacion y `ktlintCheck` de App Usuario correctos. Falta prueba visual y de restauracion fisica en Samsung SM-S908E; no hubo publicacion intermedia.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
