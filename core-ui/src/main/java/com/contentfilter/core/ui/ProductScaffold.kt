@@ -153,27 +153,5 @@ fun FeedbackBanner(
     modifier: Modifier = Modifier,
     isError: Boolean = false,
 ) {
-    if (text.isBlank()) return
-    val containerColor =
-        if (isError) {
-            MaterialTheme.colorScheme.errorContainer
-        } else {
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
-        }
-    val contentColor =
-        if (isError) {
-            MaterialTheme.colorScheme.onErrorContainer
-        } else {
-            MaterialTheme.colorScheme.primary
-        }
-    Text(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(containerColor, RoundedCornerShape(14.dp))
-                .padding(horizontal = 12.dp, vertical = 10.dp),
-        text = text,
-        style = MaterialTheme.typography.bodyMedium,
-        color = contentColor,
-    )
+    PremiumFeedbackBanner(text = text, modifier = modifier, isError = isError)
 }

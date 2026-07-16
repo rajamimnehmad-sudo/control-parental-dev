@@ -15,6 +15,7 @@ import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.network.remote.RemoteAnnouncement
 import com.contentfilter.core.network.remote.RemoteAnnouncementRepository
 import com.contentfilter.core.network.remote.RemoteResult
+import com.contentfilter.core.ui.PremiumFeedbackBanner
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductLazyVisualPage
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -39,7 +40,14 @@ fun UserAnnouncementsRoute(
                 Text(if (state.loading) "Actualizando..." else "Actualizar avisos")
             }
         }
-        if (state.message.isNotBlank()) item { Text(state.message) }
+        if (state.message.isNotBlank()) {
+            item {
+                PremiumFeedbackBanner(
+                    text = state.message,
+                    isError = state.message.startsWith("No se pudo"),
+                )
+            }
+        }
         items(state.items, key = RemoteAnnouncement::id) { item ->
             ProductCard {
                 Text(item.title, style = MaterialTheme.typography.titleMedium)

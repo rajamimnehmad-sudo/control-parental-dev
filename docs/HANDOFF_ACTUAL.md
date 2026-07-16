@@ -79,6 +79,16 @@ Usuario 1bf7147bf5ebb493e094af6972d0728b845c86b284bb132db32337ae608c1bd2
 Admin   334ee599a325ae63abe25a158057ac80ce2feebfa684088902baf6ec0cfe8789
 ```
 
+## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
+
+- El usuario aprobo ejecutar juntos `SUPERWEB-DEPLOY-SYNC-01`, `UI-BANNER-UNIFY-01`, `SUPERWEB-FUNCTIONAL-VERIFY-01` y `ANDROID-PHYSICAL-CLOSEOUT-01`, conservando tickets verificables y una sola publicacion final.
+- Causa de la ausencia de funciones Super Admin: la fuente y `main` contienen Uso DAG, Alertas, Avisos, DAG premium, tokens auditables y estado de actualizaciones, pero la URL oficial Vercel sirve una compilacion anterior. `/dag-usage`, `/alerts` y `/announcements` devuelven 404 y los commits nuevos no muestran integracion Vercel.
+- La Superweb ahora rechaza cualquier `NEXT_PUBLIC_SUPABASE_URL` distinta de DEV `syeycayasyufedwoprea`. `/api/health` devuelve exclusivamente entorno, project ref y commit; `scripts/verify_superweb.sh` comprueba ese contrato y que las rutas privadas existan y redirijan a Login. El Vercel antiguo falla correctamente la verificacion.
+- Fuente Web validada con TypeScript, ESLint de `src`, build Next y bundle Sites. El build contiene `/communities`, `/dag-usage`, `/alerts`, `/announcements` y `/api/health`; localmente las rutas privadas redirigen a `/login` y health declara DEV. Las funciones DEV `dag-search` v8, `send-protection-alert` v13 y `send-announcement` v1 estan activas; las RPC sensibles comprobadas rechazan `anon`.
+- Pendiente Web externo: el propietario debe iniciar sesion en Vercel para revisar/reconectar el proyecto `web-super-admin-nine`, publicar el commit final y ejecutar la verificacion autenticada de licencias, tokens, DAG premium, actualizaciones, alertas y avisos. Hasta entonces no se declara publicada la Superweb oficial.
+- Android unifica el feedback: el `FeedbackBanner` legado delega en `PremiumFeedbackBanner`; Avisos Usuario/Admin, Alertas Admin, Actualizaciones Admin y reseteo Admin dejan de usar texto plano. El banner conserva 42 dp minimos pero crece para que mensajes largos no se recorten.
+- Usuario y Admin suben juntos a `versionCode 246`. La matriz local termino correctamente con 1.837 tareas: tests de variantes, ktlint, detekt, lint DEV y builds optimizados de ambos APK. El usuario indico expresamente que no hay telefono ADB disponible, por lo que banners, actualizacion, instalacion/aprobacion, Accessibility y candidatos DAG conservan prueba fisica pendiente y no se inventa validacion.
+
 ## Correccion de identidad Admin DEV 245 - 2026-07-16
 
 - Causa confirmada por el reporte del Samsung SM-S908E: la pantalla de Ajustes mostraba `Content Filter Admin`, pero el detector buscaba la etiqueta generica `Content Filter` y la confundia con App Usuario. La pantalla de permiso `Instalar apps desconocidas` tampoco distinguia para que aplicacion se estaba configurando.

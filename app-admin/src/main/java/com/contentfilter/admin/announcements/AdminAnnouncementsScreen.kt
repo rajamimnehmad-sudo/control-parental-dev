@@ -21,6 +21,7 @@ import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.network.remote.RemoteAnnouncement
 import com.contentfilter.core.network.remote.RemoteAnnouncementRepository
 import com.contentfilter.core.network.remote.RemoteResult
+import com.contentfilter.core.ui.PremiumFeedbackBanner
 import com.contentfilter.core.ui.ProductCard
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
@@ -47,7 +48,12 @@ private fun AnnouncementInbox(
         OutlinedButton(onClick = onRefresh, modifier = Modifier.fillMaxWidth(), enabled = !state.loading) {
             Text(if (state.loading) "Actualizando..." else "Actualizar avisos")
         }
-        if (state.message.isNotBlank()) Text(state.message)
+        if (state.message.isNotBlank()) {
+            PremiumFeedbackBanner(
+                text = state.message,
+                isError = state.message.startsWith("No se pudo"),
+            )
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(state.items, key = RemoteAnnouncement::id) { item ->
                 ProductCard {

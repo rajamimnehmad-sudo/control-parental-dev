@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.BuildConfig
+import com.contentfilter.core.ui.PremiumFeedbackBanner
 
 @Composable
 fun AdminUpdatesRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
@@ -83,9 +84,9 @@ private fun AdminUpdatesScreen(
                 .padding(20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text(
+        PremiumFeedbackBanner(
             text = state.status.message(),
-            style = MaterialTheme.typography.bodyLarge,
+            isError = state.status.isError(),
         )
         Text(
             text = "Version instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
@@ -175,7 +176,10 @@ private fun AdminUpdatesScreen(
             Text("Cambiar administrador")
         }
         if (state.resetMessage.isNotBlank()) {
-            Text(state.resetMessage, style = MaterialTheme.typography.bodyMedium)
+            PremiumFeedbackBanner(
+                text = state.resetMessage,
+                isError = state.resetMessage.startsWith("No se pudo"),
+            )
         }
     }
 }
@@ -194,6 +198,11 @@ private fun AdminUpdatesStatus.message(): String =
         AdminUpdatesStatus.ChecksumFailed -> "La descarga no paso la verificacion SHA-256."
         AdminUpdatesStatus.DownloadFailed -> "No se pudo descargar la actualizacion."
     }
+
+private fun AdminUpdatesStatus.isError(): Boolean =
+    this == AdminUpdatesStatus.SearchFailed ||
+        this == AdminUpdatesStatus.DownloadFailed ||
+        this == AdminUpdatesStatus.ChecksumFailed
 
 private fun AdminUpdatesStatus.versionLabel(): String =
     when (this) {

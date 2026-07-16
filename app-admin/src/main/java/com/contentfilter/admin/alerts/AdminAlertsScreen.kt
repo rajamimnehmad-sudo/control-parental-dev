@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.ui.PremiumFeedbackBanner
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.StatusChip
 import java.text.DateFormat
@@ -47,7 +48,12 @@ private fun AdminAlertsScreen(
         ) {
             Text(if (state.loading) "Actualizando..." else "Actualizar alertas")
         }
-        if (state.message.isNotBlank()) Text(state.message)
+        if (state.message.isNotBlank()) {
+            PremiumFeedbackBanner(
+                text = state.message,
+                isError = state.message.startsWith("No se pudo"),
+            )
+        }
         LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(state.alerts, key = AdminAlertUiState::id) { alert ->
                 ProductCard {

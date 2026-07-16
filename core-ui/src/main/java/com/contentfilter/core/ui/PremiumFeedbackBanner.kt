@@ -12,8 +12,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -87,7 +87,7 @@ fun PremiumFeedbackBanner(
         modifier =
             modifier
                 .fillMaxWidth()
-                .height(42.dp)
+                .defaultMinSize(minHeight = 42.dp)
                 .background(
                     brush =
                         Brush.linearGradient(
@@ -95,7 +95,7 @@ fun PremiumFeedbackBanner(
                         ),
                     shape = RoundedCornerShape(14.dp),
                 )
-                .padding(start = 10.dp, top = 5.dp, end = 10.dp, bottom = 5.dp),
+                .padding(start = 10.dp, top = 8.dp, end = 10.dp, bottom = 8.dp),
     ) {
         BannerFishMascot(
             mood = mood,

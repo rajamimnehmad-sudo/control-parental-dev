@@ -20,7 +20,7 @@ NEXT_PUBLIC_SUPABASE_URL=https://syeycayasyufedwoprea.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_...
 ```
 
-Usar solo la publishable key de la Supabase actual. No usar Service Role Key.
+Usar exclusivamente la publishable key de Supabase DEV `syeycayasyufedwoprea`. La aplicacion falla cerrada si la URL apunta a otro proyecto. No usar Service Role Key.
 
 4. Build settings:
 
@@ -30,6 +30,14 @@ Build Command: pnpm run build
 ```
 
 Vercel detecta Next.js automaticamente.
+
+Después de publicar, verificar desde la raíz del repositorio:
+
+```bash
+scripts/verify_superweb.sh https://web-super-admin-nine.vercel.app COMMIT_SHA
+```
+
+La comprobación exige que `/api/health` declare DEV y el commit esperado, y que las rutas privadas nuevas existan y redirijan al login en vez de devolver 404.
 
 5. En Supabase, configurar Auth:
 
@@ -70,7 +78,7 @@ http://127.0.0.1:3000
 
 - No guardar secretos en Git.
 - No usar Service Role Key en frontend.
-- Esta instalacion usa la Supabase actual como base real del panel.
+- Esta instalacion acepta unicamente Supabase DEV `syeycayasyufedwoprea` como backend del panel.
 - El panel usa `sb_publishable_...` y RLS/RPCs con chequeo `is_super_admin()`.
 - El sitio envia headers `noindex` y `robots.txt` bloquea indexacion.
 - Las RPCs Super Admin no son ejecutables por `anon`.

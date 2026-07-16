@@ -141,6 +141,10 @@ Flujo de una entrada:
 | OPS-METRICS-01 | Candidato DEV 241 optimizado y con linea base corta; pendiente muestra de 24 h | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
+| SUPERWEB-DEPLOY-SYNC-01 | En progreso; fuente verificable lista, pendiente reconectar y publicar Vercel oficial | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
+| UI-BANNER-UNIFY-01 | Implementado candidato DEV 246; pendiente comprobacion visual | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
+| SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
+| ANDROID-PHYSICAL-CLOSEOUT-01 | En progreso sin ADB; matriz automatizada en ejecucion y prueba fisica diferida | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
@@ -179,6 +183,42 @@ Flujo de una entrada:
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
 | USER-GREETING-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
+
+### SUPERWEB-DEPLOY-SYNC-01 - Publicacion oficial verificable
+
+- Estado: `En progreso`; aprobado explicitamente junto con los cuatro tickets de cierre el 2026-07-16.
+- Tipo: operacion, despliegue y seguridad Super Admin. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
+- Causa confirmada: `main` contiene `/dag-usage`, `/alerts`, `/announcements`, DAG premium y estado de actualizaciones, pero `https://web-super-admin-nine.vercel.app` sirve una compilacion anterior: las tres rutas nuevas devuelven 404 y los commits recientes no registran una comprobacion Vercel.
+- Alcance: recuperar la conexion del proyecto Vercel oficial con `main` y `web-super-admin`, publicar una sola vez la fuente validada y dejar una prueba publica de entorno y commit. No se reemplaza ni elimina la URL oficial ni se apunta a Production.
+- Seguridad implementada: la Superweb falla cerrada si `NEXT_PUBLIC_SUPABASE_URL` no es exactamente DEV `syeycayasyufedwoprea`; `/api/health` publica solo nombre de servicio, entorno, project ref y commit, nunca claves o sesion.
+- Verificacion implementada: `scripts/verify_superweb.sh` exige health DEV, commit esperado y existencia protegida de Comunidades, Uso DAG, Alertas y Avisos. El Vercel viejo falla correctamente esta comprobacion.
+- Pendiente externo: iniciar sesion en Vercel como propietario, revisar proyecto/rama/root directory, reconectar GitHub si corresponde, desplegar y ejecutar la verificacion contra la URL oficial.
+- Aceptacion: URL oficial sin 404 en rutas nuevas; anonimo redirigido a Login; health coincide con el commit publicado y DEV; futuros pushes de `main` vuelven a generar estado/despliegue visible; ninguna variable de Production ni Service Role.
+
+### UI-BANNER-UNIFY-01 - Feedback premium compartido
+
+- Estado: `Implementado candidato DEV 246; pendiente comprobacion visual`; aprobado explicitamente el 2026-07-16.
+- Tipo: UX y accesibilidad Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Causa: coexistian el banner premium y el banner legado; Mis apps seguia usando el legado y las bandejas nuevas de Avisos/Alertas, Actualizaciones Admin y reseteo Admin mostraban feedback como texto plano.
+- Resultado: el API legado delega en el banner premium y las superficies nuevas lo usan directamente. La altura deja de ser fija: conserva 42 dp minimos y crece para mensajes largos, con degradado, texto blanco, pez y estado de error consistente.
+- Alcance deliberado: los mensajes accionables internos de DAG conservan su contenedor con `Pedir revision`; no se convierte informacion estatica o contenido de tarjetas en banners.
+- Aceptacion: no quedan dos estilos de feedback; errores, progreso y resultados transitorios usan el componente compartido; textos largos no se recortan; Usuario y Admin compilan y pasan formato/lint; comprobacion visual fisica diferida por ausencia de ADB.
+
+### SUPERWEB-FUNCTIONAL-VERIFY-01 - Recorrido funcional del propietario
+
+- Estado: `Validacion automatizada DEV correcta; pendiente sesion autenticada publicada`; aprobado explicitamente el 2026-07-16.
+- Tipo: QA funcional, permisos y operacion. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Cobertura automatizada: TypeScript, ESLint, Next y bundle Sites incluyen Comunidades, Uso DAG, Alertas, Avisos y health; las rutas privadas redirigen a Login. DEV confirma `dag-search` v8, `send-protection-alert` v13 y `send-announcement` v1 activas. Las RPC sensibles rechazan `anon` y los manifiestos publicos de Usuario/Admin son legibles.
+- Pendiente autenticado: desde la URL oficial publicada, comprobar lectura de licencia efectiva, token de una sola visualizacion/revocacion, DAG premium, estado de versiones, alertas, creacion de aviso y resultado del push. No se alteraran comunidades reales para simular casos ni se borraran datos.
+- Aceptacion: cada modulo carga con el rol Super Admin correcto; acciones muestran exito o fallo real; un usuario anonimo o autenticado sin rol no accede; Avisos conserva el registro aunque FCM no este disponible; toda prueba usa exclusivamente DEV.
+
+### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
+
+- Estado: `En progreso`; aprobado explicitamente el 2026-07-16. El usuario indico que no hay telefono ADB disponible durante esta ejecucion.
+- Tipo: QA Android, compatibilidad y cierre de candidatos. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Alcance automatizado: ejecutar tests, ktlint, detekt, lint y builds DEV de Usuario/Admin con el mismo versionCode, verificar paquetes, minSdk, firma y hashes antes de una unica publicacion final.
+- Alcance fisico diferido: banners y fuentes/modo oscuro; actualizacion Usuario/Admin; Play Store/APK/aprobacion; bypass rapido Accessibility; licencia/renovacion; estados DAG candidatos y notificacion push. No se usa ADB ni se declara validacion fisica inexistente.
+- Aceptacion: matriz automatizada y CI correctos; publicacion DEV unica; manifiestos/hashes verificables; una lista reproducible conserva cada recorrido fisico pendiente para el proximo acceso al Samsung.
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
