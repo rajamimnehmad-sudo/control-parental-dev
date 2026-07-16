@@ -26,21 +26,43 @@ class DagContentClassifier
             title: String,
             description: String,
             url: String,
-        ): DagClassificationResult {
+        ): DagClassificationResult = classifyResultWithReason(title, description, url).classification
+
+        internal fun classifyResultWithReason(
+            title: String,
+            description: String,
+            url: String,
+        ): DagClassifiedSearchResult {
             val domain = domainFrom(url)
-            blockedVisualPlatform(domain)?.let { return it }
+            blockedVisualPlatform(domain)?.let {
+                return DagClassifiedSearchResult(it, DagSearchDecisionReason.PlatformBlock)
+            }
             domainBlocklist.categoryFor(domain)?.let { category ->
-                return DagClassificationResult(
-                    decision = DagClassification.Blocked,
-                    category = category,
-                    confidence = 1f,
-                    modelVersion = ModelVersion,
+                return DagClassifiedSearchResult(
+                    classification =
+                        DagClassificationResult(
+                            decision = DagClassification.Blocked,
+                            category = category,
+                            confidence = 1f,
+                            modelVersion = ModelVersion,
+                        ),
+                    reason = DagSearchDecisionReason.DomainListBlock,
                 )
             }
-            return classify(
-                "$domain $title $description".withoutIntimateApparelTerms(),
-                directUrl = false,
-                reviewSingleAmbiguousTerm = true,
+            val classification =
+                classify(
+                    "$domain $title $description".withoutIntimateApparelTerms(),
+                    directUrl = false,
+                    reviewSingleAmbiguousTerm = true,
+                )
+            return DagClassifiedSearchResult(
+                classification = classification,
+                reason =
+                    when (classification.decision) {
+                        DagClassification.Allowed -> DagSearchDecisionReason.Allowed
+                        DagClassification.Uncertain -> DagSearchDecisionReason.Uncertain
+                        DagClassification.Blocked -> DagSearchDecisionReason.LocalClassifierBlock
+                    },
             )
         }
 

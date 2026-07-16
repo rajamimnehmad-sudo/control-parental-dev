@@ -82,7 +82,13 @@ Deno.serve(async (request) => {
     }))
     .filter((result) => result.title.length > 0 && result.url.length > 0)
     .slice(0, 10);
-  return json({ results }, 200);
+  return json({
+    results,
+    diagnostics: {
+      brave_received: remoteResults.length,
+      server_rejected: remoteResults.length - results.length,
+    },
+  }, 200);
 });
 
 function consumeRate(deviceId: string): boolean {

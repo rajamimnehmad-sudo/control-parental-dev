@@ -79,6 +79,13 @@ Usuario 15c41e33a9a66ea6b477c2d0bb5f0d13041d9741f4e949c0c058fbc7ce111273
 Admin   47b1abd930fbbea438b522cda05ad4167ca7e57babca7b5e924f4ba3f03d3808
 ```
 
+## Implementacion 2026-07-16 - DEV 237 diagnostico agregado de resultados DAG
+
+- Brave sigue recibiendo una unica consulta de hasta 10 resultados por busqueda. `dag-search` agrega a su respuesta solo las cantidades recibidas y rechazadas por titulo o URL HTTPS invalida; no registra ni devuelve diagnosticos con consultas, URLs, dominios, titulos o descripciones.
+- App Usuario clasifica cada resultado en un unico destino agregado: bloqueado por lista de dominios, regla Admin, plataforma visual no anulable o clasificador local; incierto mostrado; o permitido mostrado. El resumen existe durante la busqueda activa y se escribe en Logcat solo como cantidades tecnicas.
+- No cambia la UI, los umbrales, las reglas kosher, el cupo mensual ni la cantidad solicitada a Brave. No hay paginacion todavia: una futura pagina adicional contaria como otra consulta y requiere un ticket separado.
+- Validacion local: tests DEV Usuario/Admin, ktlint y builds optimizados de ambas apps correctos (773 tareas). La prueba del embudo exige que una respuesta controlada de 10 elementos quede contabilizada exactamente una vez por destino.
+
 ## Implementacion 2026-07-16 - DEV 236 entrega visual estable y deduplicada
 
 - DAG conserva en memoria solo durante la pagina activa hasta 24 respuestas visuales ya clasificadas, con limites de 1 MB por recurso y 8 MB totales. Una URL repetida por `lazy loading`, recomposicion del sitio o atributos dinamicos reutiliza exactamente la copia que ya paso por las IAs, evitando otra descarga y otra inferencia.

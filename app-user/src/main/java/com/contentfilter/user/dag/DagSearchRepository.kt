@@ -14,7 +14,7 @@ class DagSearchRepository
             deviceId: String,
             query: String,
             language: String,
-        ): RemoteResult<List<DagRemoteSearchResult>> {
+        ): RemoteResult<DagRemoteSearchResponse> {
             val payload =
                 JSONObject()
                     .put("device_id", deviceId)
@@ -25,14 +25,21 @@ class DagSearchRepository
                 is RemoteResult.Success ->
                     runCatching {
                         val results = response.value.getJSONArray("results")
-                        (0 until results.length()).map { index ->
-                            val json = results.getJSONObject(index)
-                            DagRemoteSearchResult(
-                                title = json.getString("title").take(MaxTitleCharacters),
-                                url = json.getString("url").take(MaxUrlCharacters),
-                                description = json.optString("description").take(MaxDescriptionCharacters),
-                            )
-                        }
+                        val parsed =
+                            (0 until results.length()).map { index ->
+                                val json = results.getJSONObject(index)
+                                DagRemoteSearchResult(
+                                    title = json.getString("title").take(MaxTitleCharacters),
+                                    url = json.getString("url").take(MaxUrlCharacters),
+                                    description = json.optString("description").take(MaxDescriptionCharacters),
+                                )
+                            }
+                        val diagnostics = response.value.optJSONObject("diagnostics")
+                        DagRemoteSearchResponse(
+                            results = parsed,
+                            braveReceived = diagnostics?.optInt("brave_received", parsed.size) ?: parsed.size,
+                            serverRejected = diagnostics?.optInt("server_rejected", 0) ?: 0,
+                        )
                     }.fold(
                         onSuccess = { RemoteResult.Success(it) },
                         onFailure = {
@@ -57,4 +64,10 @@ data class DagRemoteSearchResult(
     val title: String,
     val url: String,
     val description: String,
+)
+
+data class DagRemoteSearchResponse(
+    val results: List<DagRemoteSearchResult>,
+    val braveReceived: Int,
+    val serverRejected: Int,
 )

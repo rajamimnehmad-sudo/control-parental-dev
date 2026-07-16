@@ -160,6 +160,7 @@ Flujo de una entrada:
 | DAG-VISUAL-CALIBRATION-01 | Resuelto DEV 231 | P0 | Reducir falsos positivos con salida normal, blur fuerte u ocultamiento por imagen | M | Alto |
 | DAG-MODESTY-REGIONS-01 | Resuelto DEV 235 | P0 | Blur local fuerte para calzas, shorts, escotes, manga corta y regiones femeninas cubiertas o expuestas | M | Alto |
 | DAG-IMAGE-DELIVERY-01 | Resuelto DEV 236 | P1 | Evitar huecos tecnicos y reclasificacion duplicada de imagenes dinamicas en la pagina activa | S | Medio |
+| DAG-RESULTS-DIAG-01 | Resuelto DEV 237 | P1 | Contabilizar localmente el embudo de resultados Brave y los descartes DAG sin guardar contenido | S | Bajo |
 | DAG-HISTORY-UX-01 | Resuelto DEV 234 | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
 | DAG-ANALYSIS-UX-01 | Resuelto DEV 226 | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Resuelto DEV 226 | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
@@ -489,6 +490,15 @@ Flujo de una entrada:
   - recarga, aprobacion, bloqueo o recuperacion del renderer no crean saltos ni bucles;
   - Home sin historial aplica el comportamiento de salida definido para DAG.
 - Decisiones cerradas: URL directa vuelve a Home; pagina desde resultados vuelve primero a esos resultados; historial WebView tiene prioridad; cada pestaña conserva su propio origen; el teclado se cierra antes; la restauracion conserva resultados pero revalida paginas.
+
+#### DAG-RESULTS-DIAG-01 - Diagnostico agregado del embudo de resultados
+
+- Estado: `Resuelto` en DEV 237; aprobado explicitamente por el usuario el 2026-07-16.
+- Tipo: diagnostico local, privacidad y calidad de busqueda. Prioridad: P1. Esfuerzo: S. Riesgo: bajo.
+- Causa: Brave entregaba como maximo 10 resultados y DAG ocultaba los bloqueados, pero no existia evidencia para separar resultados ausentes en origen, rechazados por contrato o descartados por cada capa local.
+- Resultado: la Edge Function devuelve solamente cantidades agregadas de recibidos y rechazados; Android asigna cada candidato a lista de dominios, regla Admin, plataforma prohibida, clasificador local, incierto mostrado o permitido mostrado. Logcat contiene exclusivamente esos conteos.
+- Privacidad y costo: no se guardan ni registran consultas, URLs, dominios, titulos o descripciones. No cambia el cupo, los umbrales, la UI ni el consumo de una busqueda.
+- Aceptacion: una prueba controlada contabiliza exactamente 10 de 10 resultados una sola vez; tests DEV Usuario/Admin, ktlint y builds de ambas apps correctos. Paginacion y `Mas resultados` permanecen fuera de alcance porque cada pagina adicional consume otra consulta Brave.
 
 ### USER-GREETING-01 - Saludo personalizado en App Usuario
 

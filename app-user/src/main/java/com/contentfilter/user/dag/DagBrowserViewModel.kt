@@ -1,5 +1,6 @@
 package com.contentfilter.user.dag
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.AccessRequest
@@ -174,29 +175,60 @@ class DagBrowserViewModel
                         mutableState.update { it.copy(loading = false, message = response.reason) }
                     }
                     is RemoteResult.Success -> {
-                        val classified =
+                        val classifiedWithReasons =
                             withContext(Dispatchers.Default) {
-                                response.value.mapNotNull { remote ->
+                                response.value.results.mapNotNull { remote ->
                                     val domain = DagContentClassifier.domainFrom(remote.url)
                                     if (domain.isBlank()) return@mapNotNull null
-                                    val decision =
-                                        applyExplicitRule(
-                                            domain = domain,
-                                            result =
-                                                classifier.classifyResult(
-                                                    remote.title,
-                                                    remote.description,
-                                                    remote.url,
-                                                ),
+                                    val local =
+                                        classifier.classifyResultWithReason(
+                                            remote.title,
+                                            remote.description,
+                                            remote.url,
                                         )
-                                    if (decision.decision == DagClassification.Blocked) return@mapNotNull null
-                                    DagSearchResult(
-                                        title = remote.title,
-                                        url = remote.url,
-                                        domain = domain,
-                                        description = remote.description,
-                                        classification = decision,
-                                    )
+                                    val decision = applyExplicitRule(domain = domain, result = local.classification)
+                                    val reason =
+                                        if (
+                                            decision.decision == DagClassification.Blocked &&
+                                            decision.category == "admin_block"
+                                        ) {
+                                            DagSearchDecisionReason.AdminRuleBlock
+                                        } else {
+                                            local.reason
+                                        }
+                                    reason to
+                                        DagSearchResult(
+                                            title = remote.title,
+                                            url = remote.url,
+                                            domain = domain,
+                                            description = remote.description,
+                                            classification = decision,
+                                        )
+                                }
+                            }
+                        val diagnostics =
+                            dagSearchDiagnostics(
+                                braveReceived = response.value.braveReceived,
+                                serverRejected = response.value.serverRejected,
+                                decisions = classifiedWithReasons.map { it.first },
+                            )
+                        Log.i(
+                            DiagnosticsLogTag,
+                            "results brave=${diagnostics.braveReceived} serverRejected=${diagnostics.serverRejected} " +
+                                "domainListBlocked=${diagnostics.domainListBlocked} " +
+                                "adminRuleBlocked=${diagnostics.adminRuleBlocked} " +
+                                "platformBlocked=${diagnostics.platformBlocked} " +
+                                "localClassifierBlocked=${diagnostics.localClassifierBlocked} " +
+                                "uncertainShown=${diagnostics.uncertainShown} " +
+                                "allowedShown=${diagnostics.allowedShown} shown=${diagnostics.shown}",
+                        )
+                        val classified =
+                            classifiedWithReasons.mapNotNull { (reason, result) ->
+                                result.takeUnless {
+                                    reason == DagSearchDecisionReason.DomainListBlock ||
+                                        reason == DagSearchDecisionReason.AdminRuleBlock ||
+                                        reason == DagSearchDecisionReason.PlatformBlock ||
+                                        reason == DagSearchDecisionReason.LocalClassifierBlock
                                 }
                             }
                         withContext(Dispatchers.IO) { historyStore.addSearch(query) }
@@ -645,6 +677,7 @@ class DagBrowserViewModel
             const val ApprovalPollingIntervalMillis = 5_000L
             const val ApprovalPollingAttempts = 24
             const val SuggestionDebounceMillis = 120L
+            const val DiagnosticsLogTag = "DagSearchDiagnostics"
             const val PageApprovalModelVersion =
                 "dag-page-approval-1:${DagContentClassifier.ModelVersion}:${DagNeuralTextClassifier.ModelVersion}:" +
                     DagProfessionalImageClassifier.ModelVersion
