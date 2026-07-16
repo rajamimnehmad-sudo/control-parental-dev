@@ -11,13 +11,17 @@ import android.widget.Toast
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.PolicyDecision
+import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.ProtectionAlertType
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
+import com.contentfilter.core.domain.model.RuleAction
+import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
+import com.contentfilter.core.domain.repository.InstallApprovalStore
 import com.contentfilter.core.domain.repository.ProtectionStateStore
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
@@ -63,6 +67,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
     @Inject lateinit var usageSessionRepository: UsageSessionRepository
 
     @Inject lateinit var syncScheduler: SyncScheduler
+
+    @Inject lateinit var installApprovalStore: InstallApprovalStore
 
     private val usageTracker = AppUsageTracker()
     private val settingsProtectionPolicy = SettingsProtectionPolicy()
@@ -268,6 +274,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                         ProtectionAuthorizationScope.Removal,
                         nowEpochMillis,
                     ),
+                trustedInstallAuthorized = protectionStateStore.isTrustedInstallAuthorized(nowEpochMillis),
                 elapsedRealtimeMillis = elapsedRealtimeMillis,
             )
         ) {
@@ -330,6 +337,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     ProtectionAuthorizationScope.Removal,
                     clock.nowEpochMillis(),
                 ),
+            trustedInstallAuthorized = protectionStateStore.isTrustedInstallAuthorized(clock.nowEpochMillis()),
             elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
         )
     }
@@ -484,6 +492,17 @@ class ProtectorAccessibilityService : AccessibilityService() {
         elapsedRealtimeMillis: Long,
     ): Boolean {
         val state = snapshotProvider.current()
+        if (installApprovalStore.isPending(packageName)) {
+            if (hasExplicitAppApproval(packageName, state.snapshot.rules)) {
+                installApprovalStore.markApproved(packageName)
+            } else {
+                val decision = PolicyDecision.RequestAuthorization(packageName)
+                serviceScope?.launch { telemetryReporter.recordDecision(packageName, decision) }
+                Toast.makeText(this, "Esta app espera aprobación del administrador", Toast.LENGTH_SHORT).show()
+                leaveBlockedApp(packageName)
+                return true
+            }
+        }
         val persistedMinutes =
             state.snapshot.dailyUsage
                 .firstOrNull { it.packageName == packageName }
@@ -556,6 +575,12 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private fun String.isStillBlocked(): Boolean {
         val elapsed = clock.elapsedRealtimeMillis()
         val state = snapshotProvider.current()
+        if (
+            installApprovalStore.isPending(this) &&
+            !hasExplicitAppApproval(this, state.snapshot.rules)
+        ) {
+            return true
+        }
         val persistedMinutes =
             state.snapshot.dailyUsage
                 .firstOrNull { it.packageName == this }
@@ -814,6 +839,17 @@ class ProtectorAccessibilityService : AccessibilityService() {
             )
     }
 }
+
+internal fun hasExplicitAppApproval(
+    packageName: String,
+    rules: List<PolicyRule>,
+): Boolean =
+    rules.any {
+        it.enabled &&
+            it.scope == RuleScope.App &&
+            it.target == packageName &&
+            it.action == RuleAction.Allow
+    }
 
 private data class BrowserPageObservation(
     val host: String? = null,

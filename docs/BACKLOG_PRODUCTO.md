@@ -148,7 +148,7 @@ Flujo de una entrada:
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
-| APP-INSTALL-APPROVAL-01 | Idea | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
+| APP-INSTALL-APPROVAL-01 | Implementado candidato DEV 241; pendiente prueba fisica | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
 | BARRIER-LAUNCHER-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
@@ -631,7 +631,7 @@ Flujo de una entrada:
 
 ### APP-INSTALL-APPROVAL-01 - Aprobacion previa para instalar apps
 
-- Estado: `Idea`; no aprobado para codigo, Android Enterprise ni cambios de cuenta Google.
+- Estado: `Implementado candidato DEV 241; pendiente prueba fisica`. Aprobado por el usuario al ordenar todos los tickets y definido el 2026-07-16 para Android normal compatible con la mayoria de equipos, sin Android Enterprise ni cambios de cuenta Google.
 - Tipo: control de aplicaciones, seguridad y solicitudes.
 - Prioridad: P1.
 - Problema: se quiere conservar Play Store disponible para explorar aplicaciones, pero impedir que una app se instale hasta recibir permiso explicito del administrador. Tambien se deben impedir la descarga y la instalacion lateral de archivos APK.
@@ -657,7 +657,11 @@ Flujo de una entrada:
   - DAG no descarga archivos APK y los canales externos cubiertos bloquean la descarga o el acceso al instalador;
   - el usuario no puede habilitar `Instalar apps desconocidas` ni completar Package Installer mientras la proteccion esta armada y no existe autorizacion;
   - actualizaciones de apps ya aprobadas no se confunden con instalaciones nuevas.
-- Decisiones pendientes para el ticket: garantia requerida o best-effort; Family Link, Device Owner o Accessibility; alcance sobre apps gratuitas/pagas; duracion de aprobacion; tratamiento de actualizaciones, reinstalaciones, otras tiendas, adjuntos de mensajeria, gestores de archivos, ADB y apps del sistema.
+- Implementacion compatible: Play Store permanece visible. `PACKAGE_ADDED` distingue una app nueva de una actualizacion, pone el paquete nuevo no sistemico en cuarentena local y crea una unica solicitud `APP_ACCESS` con packageName, nombre, usuario y dispositivo. Accessibility impide abrirlo hasta que exista una regla Allow explicita para ese paquete.
+- Barrera APK: DAG ya bloqueaba todas las descargas. Accessibility bloquea Package Installer y la habilitacion de fuentes desconocidas mientras la proteccion esta armada. Una autorizacion interna protegida por permiso `signature` abre por dos minutos exclusivamente el flujo de actualizacion iniciado por App Usuario o App Admin, manteniendo la confirmacion normal de Android.
+- Decisiones aplicadas: mismo comportamiento para apps gratuitas o pagas; actualizaciones de paquetes existentes no solicitan permiso; una reinstalacion conserva una aprobacion Allow previa y, sin ella, vuelve a cuarentena; tiendas, adjuntos, gestores de archivos y ADB quedan cubiertos por bloqueo observable del instalador mas cuarentena posterior. Apps del sistema y los dos paquetes Content Filter quedan excluidos.
+- Limite real: es best-effort en Android normal. Sin Device Owner no se promete impedir materialmente toda instalacion en todos los OEM, pero una app nueva detectada no puede usarse sin aprobacion mientras Accessibility funciona. La garantia de sistema queda como modalidad empresarial futura y requeriria aprovisionamiento administrado.
+- Validacion: tests de clasificacion de paquete nuevo, aprobacion exacta, instalador, fuentes desconocidas y ventana firmada; compilacion Usuario/Admin, manifiestos combinados, tests y formato correctos. Falta prueba completa Play Store/APK/aprobacion en Samsung SM-S908E; no hubo publicacion intermedia.
 
 ### SUPERADMIN-DAG-ENTITLEMENT-01 - DAG como funcion premium
 

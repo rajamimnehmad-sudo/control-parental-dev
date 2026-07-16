@@ -230,6 +230,39 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun packageInstallerIsBlockedForThirdPartyAppsWhileArmed() {
+        assertTrue(
+            decide(
+                packageName = "com.google.android.packageinstaller",
+                className = "com.android.packageinstaller.InstallStart",
+                ownAppIdentityVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun signedTrustedInstallWindowAllowsContentFilterUpdates() {
+        assertFalse(
+            decide(
+                packageName = "com.google.android.packageinstaller",
+                className = "com.android.packageinstaller.InstallStart",
+                ownAppIdentityVisible = false,
+                trustedInstallAuthorized = true,
+            ),
+        )
+    }
+
+    @Test
+    fun unknownSourceSettingsAreBlockedWithoutTrustedInstallWindow() {
+        assertTrue(
+            decide(
+                className = "com.android.settings.Settings\$ManageExternalSourcesActivity",
+                ownAppIdentityVisible = false,
+            ),
+        )
+    }
+
+    @Test
     fun protectedSettingsGoBackBeforeFallingBackHome() {
         assertEquals(SettingsEscapeAction.Back, SettingsEscapeStrategy.actionForAttempt(0))
         assertEquals(SettingsEscapeAction.Back, SettingsEscapeStrategy.actionForAttempt(1))
@@ -274,6 +307,7 @@ class SettingsProtectionPolicyTest {
         armed: Boolean = true,
         settingsAuthorized: Boolean = false,
         removalAuthorized: Boolean = false,
+        trustedInstallAuthorized: Boolean = false,
     ): Boolean =
         SettingsProtectionPolicy().shouldLeaveProtectedScreen(
             packageName = packageName,
@@ -285,6 +319,7 @@ class SettingsProtectionPolicyTest {
             armed = armed,
             settingsAuthorized = settingsAuthorized,
             removalAuthorized = removalAuthorized,
+            trustedInstallAuthorized = trustedInstallAuthorized,
             elapsedRealtimeMillis = 10_000,
         )
 
@@ -299,6 +334,7 @@ class SettingsProtectionPolicyTest {
             armed = false,
             settingsAuthorized = false,
             removalAuthorized = false,
+            trustedInstallAuthorized = false,
             elapsedRealtimeMillis = elapsedRealtimeMillis,
         )
 }

@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
+import com.contentfilter.core.domain.repository.InstallApprovalStore
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
@@ -52,6 +53,9 @@ class UserApplication :
 
     @Inject
     lateinit var installedAppPublisher: InstalledAppPublisher
+
+    @Inject
+    lateinit var installApprovalStore: InstallApprovalStore
 
     @Inject
     lateinit var localDataRepair: UserLocalDataRepair
@@ -116,6 +120,11 @@ class UserApplication :
             }
         }
         appScope.launch {
+            runCatching {
+                installApprovalStore.initializeBaseline(
+                    installedAppPublisher.installedApps().map(InstalledAppPublisher.DetectedApp::packageName).toSet(),
+                )
+            }.logFailure("install-approval-baseline")
             runCatching { localDataRepair.repairIfNeeded() }
                 .logFailure("local-data-repair")
             val activation = deviceActivationRepository.currentActivation()

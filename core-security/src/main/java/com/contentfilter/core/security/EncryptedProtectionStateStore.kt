@@ -71,6 +71,15 @@ class EncryptedProtectionStateStore
             ).filter { it > nowEpochMillis }.maxOrNull()
 
         @Synchronized
+        override fun authorizeTrustedInstall(untilEpochMillis: Long) {
+            if (untilEpochMillis <= System.currentTimeMillis()) return
+            persist(state.copy(trustedInstallUntilEpochMillis = untilEpochMillis))
+        }
+
+        override fun isTrustedInstallAuthorized(nowEpochMillis: Long): Boolean =
+            state.trustedInstallUntilEpochMillis?.let { it > nowEpochMillis } == true
+
+        @Synchronized
         override fun verifyAndConsumeRecovery(
             code: String,
             nowEpochMillis: Long,
@@ -189,6 +198,7 @@ class EncryptedProtectionStateStore
                 .put("locked_until", lockedUntilEpochMillis ?: JSONObject.NULL)
                 .put("local_removal_until", localRemovalUntilEpochMillis ?: JSONObject.NULL)
                 .put("pending_consumed_revision", pendingRecoveryConsumedRevision ?: JSONObject.NULL)
+                .put("trusted_install_until", trustedInstallUntilEpochMillis ?: JSONObject.NULL)
                 .toString()
 
         private fun String.toStoredState(): StoredState {
@@ -199,6 +209,7 @@ class EncryptedProtectionStateStore
                 lockedUntilEpochMillis = json.optNullableLong("locked_until"),
                 localRemovalUntilEpochMillis = json.optNullableLong("local_removal_until"),
                 pendingRecoveryConsumedRevision = json.optNullableLong("pending_consumed_revision"),
+                trustedInstallUntilEpochMillis = json.optNullableLong("trusted_install_until"),
             )
         }
 
@@ -240,6 +251,7 @@ class EncryptedProtectionStateStore
             val lockedUntilEpochMillis: Long? = null,
             val localRemovalUntilEpochMillis: Long? = null,
             val pendingRecoveryConsumedRevision: Long? = null,
+            val trustedInstallUntilEpochMillis: Long? = null,
         )
 
         private companion object {

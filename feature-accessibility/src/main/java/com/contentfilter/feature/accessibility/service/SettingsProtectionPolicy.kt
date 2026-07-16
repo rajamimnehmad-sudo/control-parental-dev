@@ -22,6 +22,7 @@ class SettingsProtectionPolicy {
         armed: Boolean,
         settingsAuthorized: Boolean,
         removalAuthorized: Boolean,
+        trustedInstallAuthorized: Boolean,
         elapsedRealtimeMillis: Long,
     ): Boolean {
         val requiredScope =
@@ -34,8 +35,19 @@ class SettingsProtectionPolicy {
         if (!armed && !deviceAdminEnabled) return false
         val deviceAdminRemovalScreen = isDeviceAdminRemovalScreen(packageName, className)
         val criticalSettingsScreen = isCriticalSettingsScreen(packageName, className)
+        val packageInstallScreen = isPackageInstallScreen(packageName, className)
+        val unknownSourcesScreen = isUnknownSourcesScreen(packageName, className)
         if (deviceAdminRemovalScreen && !deviceAdminEnabled) return false
-        if (!deviceAdminRemovalScreen && !criticalSettingsScreen && !ownAppIdentityVisible) return false
+        if (trustedInstallAuthorized && (packageInstallScreen || unknownSourcesScreen)) return false
+        if (
+            !deviceAdminRemovalScreen &&
+            !criticalSettingsScreen &&
+            !packageInstallScreen &&
+            !unknownSourcesScreen &&
+            !ownAppIdentityVisible
+        ) {
+            return false
+        }
         if (requiredScope == ProtectionAuthorizationScope.Settings && settingsAuthorized) return false
         if (requiredScope == ProtectionAuthorizationScope.Removal && removalAuthorized) return false
         if (elapsedRealtimeMillis - lastActionAtElapsedMillis >= MinActionIntervalMillis) {
@@ -62,6 +74,20 @@ class SettingsProtectionPolicy {
             normalizedClass.contains(SamsungSubSettingsClassHint, ignoreCase = true)
     }
 
+    private fun isPackageInstallScreen(
+        packageName: String,
+        className: String?,
+    ): Boolean =
+        packageName in PackageInstallerPackages &&
+            InstallClassHints.any { className.orEmpty().contains(it, ignoreCase = true) }
+
+    private fun isUnknownSourcesScreen(
+        packageName: String,
+        className: String?,
+    ): Boolean =
+        packageName == AndroidSettingsPackage &&
+            UnknownSourcesClassHints.any { className.orEmpty().contains(it, ignoreCase = true) }
+
     private fun protectedScope(
         packageName: String,
         className: String?,
@@ -74,6 +100,12 @@ class SettingsProtectionPolicy {
             UninstallClassHints.any { normalizedClass.contains(it, true) }
         ) {
             return ProtectionAuthorizationScope.Removal
+        }
+        if (
+            packageName in PackageInstallerPackages &&
+            InstallClassHints.any { normalizedClass.contains(it, true) }
+        ) {
+            return ProtectionAuthorizationScope.Settings
         }
         if (
             packageName == SamsungAccessibilityPackage &&
@@ -103,6 +135,14 @@ class SettingsProtectionPolicy {
                 "com.google.android.permissioncontroller",
             )
         val UninstallClassHints = listOf("Uninstall", "DeletePackage")
+        val InstallClassHints =
+            listOf(
+                "InstallStart",
+                "PackageInstallerActivity",
+                "InstallInstalling",
+                "InstallSuccess",
+            )
+        val UnknownSourcesClassHints = listOf("ManageExternalSources", "SpecialAccessDetails")
         val DeviceAdminClassHints =
             listOf(
                 "DeviceAdminAdd",

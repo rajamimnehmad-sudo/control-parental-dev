@@ -21,6 +21,10 @@ interface ProtectionStateStore {
 
     fun authorizationExpiresAtEpochMillis(nowEpochMillis: Long = System.currentTimeMillis()): Long?
 
+    fun authorizeTrustedInstall(untilEpochMillis: Long)
+
+    fun isTrustedInstallAuthorized(nowEpochMillis: Long = System.currentTimeMillis()): Boolean
+
     fun verifyAndConsumeRecovery(
         code: String,
         nowEpochMillis: Long = System.currentTimeMillis(),

@@ -161,6 +161,16 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - La notificacion foreground de VPN incorpora una accion interna del paquete que abre `MainActivity` aun cuando el alias Launcher esta oculto. Esto mantiene una ruta clara de acceso y recuperacion.
 - El alcance elegido prioriza Android normal y la mayoria de fabricantes, sin Knox, root, Device Owner ni restablecimiento. No equivale al bloqueo de desinstalacion garantizado por MDM y debe comprobarse por launcher/OEM.
 - Validacion: tests de la politica de visibilidad, core-security y App Usuario; manifiesto combinado, compilacion y formato Usuario/VPN correctos. Falta prueba fisica en Samsung SM-S908E y no hubo publicacion intermedia.
+
+## Implementacion 2026-07-16 - candidato DEV 241 APP-INSTALL-APPROVAL-01
+
+- El alcance elegido es Android normal best-effort para la mayoria de fabricantes, sin Knox, Family Link, root, Device Owner ni restablecimiento. Play Store permanece visible para explorar.
+- App Usuario establece una base local de paquetes existentes. Un `PACKAGE_ADDED` nuevo, no sistemico y que no sea Content Filter queda en cuarentena, se publica en el inventario normal y crea una sola solicitud `APP_ACCESS` con packageName, nombre, usuario y dispositivo; no incluye busquedas de Play Store.
+- Accessibility envia al Home cualquier app en cuarentena. Solo una regla Allow explicita, habilitada y para el packageName exacto la libera; rechazar o no responder conserva la cuarentena. Actualizaciones de paquetes existentes no se confunden con instalaciones nuevas y una reinstalacion hereda exclusivamente una aprobacion Allow que siga vigente.
+- Package Installer y las pantallas de fuentes desconocidas quedan protegidas mientras la barrera esta armada. DAG ya bloquea descargas. Canales externos, adjuntos, gestores y ADB tienen una ultima defensa comun: si materialmente logran instalar un paquete nuevo, este no puede abrirse sin aprobacion mientras Accessibility este activa.
+- Para no bloquear las actualizaciones propias, Usuario y Admin solicitan una ventana interna de dos minutos mediante un broadcast dirigido protegido por permiso Android `signature`; luego Android sigue exigiendo permiso y confirmacion normal. Ninguna clave ni Service Role se incorpora a Android.
+- Limite explicito: sin administracion empresarial no se garantiza evitar toda instalacion en todos los OEM; se garantiza el flujo implementado y la cuarentena observable, sujeto a Accessibility. La modalidad Device Owner queda fuera de este ticket.
+- Validacion: tests de paquete nuevo/excluido, Allow exacto, instalador, fuentes desconocidas y ventana firmada; core-security, Accessibility y Usuario pasan tests/formato; Usuario y Admin compilan y los manifiestos combinados contienen receivers y permiso correctos. Falta prueba fisica integral y no hubo publicacion intermedia.
 - Validacion local: tests/compilacion Admin, formato de Admin y red, ESLint de `src`, TypeScript y build Superweb correctos. Falta prueba fisica de los dos recorridos y publicacion final de APK/Superweb.
 
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01

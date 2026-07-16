@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
+    <permission
+        android:name="com.contentfilter.permission.AUTHORIZE_TRUSTED_INSTALL"
+        android:protectionLevel="signature" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -100,6 +103,26 @@
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
                 <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".apps.PackageChangeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.PACKAGE_ADDED" />
+                <action android:name="android.intent.action.PACKAGE_REMOVED" />
+
+                <data android:scheme="package" />
+            </intent-filter>
+        </receiver>
+
+        <receiver
+            android:name=".apps.TrustedInstallAuthorizationReceiver"
+            android:exported="true"
+            android:permission="com.contentfilter.permission.AUTHORIZE_TRUSTED_INSTALL">
+            <intent-filter>
+                <action android:name="com.contentfilter.action.AUTHORIZE_TRUSTED_INSTALL" />
             </intent-filter>
         </receiver>
 
