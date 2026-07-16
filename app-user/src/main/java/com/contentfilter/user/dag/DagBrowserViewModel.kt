@@ -54,6 +54,7 @@ class DagBrowserViewModel
         @Volatile
         private var activePolicyVersion: Long = 0L
         private var approvalPollingJob: Job? = null
+        private var suggestionJob: Job? = null
 
         init {
             viewModelScope.launch {
@@ -80,7 +81,23 @@ class DagBrowserViewModel
         }
 
         fun onAddressChanged(value: String) {
-            mutableState.update { it.copy(address = value.take(MaxAddressCharacters), message = "") }
+            val address = value.take(MaxAddressCharacters)
+            mutableState.update { it.copy(address = address, message = "", suggestions = emptyList()) }
+            suggestionJob?.cancel()
+            if (address.isBlank()) return
+            suggestionJob =
+                viewModelScope.launch {
+                    delay(SuggestionDebounceMillis)
+                    val history = mutableState.value.history
+                    val suggestions =
+                        withContext(Dispatchers.Default) {
+                            dagSearchSuggestionCandidates(address, history)
+                                .filter { classifier.classifyQuery(it).decision == DagClassification.Allowed }
+                        }
+                    if (mutableState.value.address == address) {
+                        mutableState.update { it.copy(suggestions = suggestions) }
+                    }
+                }
         }
 
         fun submitAddress() {
@@ -104,6 +121,7 @@ class DagBrowserViewModel
                             view = DagView.Start,
                             message = "La búsqueda fue bloqueada por la protección DAG.",
                             results = emptyList(),
+                            suggestions = emptyList(),
                             reviewCandidate = null,
                         )
                     }
@@ -114,6 +132,7 @@ class DagBrowserViewModel
                             view = DagView.Start,
                             message = "DAG no tiene suficiente certeza. Reformulá la búsqueda con más contexto.",
                             results = emptyList(),
+                            suggestions = emptyList(),
                             reviewCandidate = null,
                         )
                     }
@@ -130,6 +149,7 @@ class DagBrowserViewModel
                         message = "",
                         reviewCandidate = null,
                         pageStatus = DagPageStatus.Idle,
+                        suggestions = emptyList(),
                     )
                 }
                 val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
@@ -186,6 +206,7 @@ class DagBrowserViewModel
                                 loading = false,
                                 view = DagView.Results,
                                 results = classified,
+                                suggestions = emptyList(),
                                 message = if (classified.isEmpty()) "DAG no encontró resultados que pueda mostrar." else "",
                             )
                         }
@@ -222,6 +243,7 @@ class DagBrowserViewModel
                             pageStatus = DagPageStatus.Blocked,
                             message = "DAG bloqueó este sitio.",
                             reviewCandidate = null,
+                            suggestions = emptyList(),
                         )
                     }
                 DagClassification.Uncertain ->
@@ -437,7 +459,9 @@ class DagBrowserViewModel
         }
 
         fun showHistory() {
-            if (mutableState.value.dagEnabled) mutableState.update { it.copy(view = DagView.History, message = "") }
+            if (mutableState.value.dagEnabled) {
+                mutableState.update { it.copy(view = DagView.History, message = "", suggestions = emptyList()) }
+            }
         }
 
         fun clearPageApprovals() {
@@ -483,6 +507,7 @@ class DagBrowserViewModel
                     requestedUrl = tab.requestedUrl,
                     navigationRevision = it.navigationRevision + 1,
                     loading = false,
+                    suggestions = emptyList(),
                     message = tab.message,
                     reviewCandidate = tab.reviewCandidate,
                 )
@@ -499,6 +524,7 @@ class DagBrowserViewModel
                     requestedUrl = null,
                     navigationRevision = it.navigationRevision + 1,
                     loading = false,
+                    suggestions = emptyList(),
                     message = "",
                     reviewCandidate = null,
                 )
@@ -612,6 +638,7 @@ class DagBrowserViewModel
             const val MaxAddressCharacters = 400
             const val ApprovalPollingIntervalMillis = 5_000L
             const val ApprovalPollingAttempts = 24
+            const val SuggestionDebounceMillis = 120L
             const val PageApprovalModelVersion =
                 "dag-page-approval-1:${DagContentClassifier.ModelVersion}:${DagNeuralTextClassifier.ModelVersion}"
         }
@@ -633,6 +660,7 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 view = DagView.Start,
                 pageStatus = DagPageStatus.Idle,
                 results = emptyList(),
+                suggestions = emptyList(),
                 requestedUrl = null,
                 loading = false,
                 message = "El administrador mantiene DAG cerrado.",
@@ -647,6 +675,7 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 view = DagView.Start,
                 pageStatus = DagPageStatus.Idle,
                 results = emptyList(),
+                suggestions = emptyList(),
                 requestedUrl = null,
                 loading = false,
                 message = "",
@@ -660,6 +689,7 @@ internal fun DagBrowserUiState.toDagStart(): DagBrowserUiState =
         view = DagView.Start,
         pageStatus = DagPageStatus.Idle,
         results = emptyList(),
+        suggestions = emptyList(),
         requestedUrl = null,
         navigationRevision = navigationRevision + 1,
         loading = false,

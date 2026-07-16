@@ -154,7 +154,7 @@ Flujo de una entrada:
 | DAG-NAV-UX-01 | En progreso | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | En progreso | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
-| DAG-THEME-01 | En progreso | P2 | Mejorar contraste y agregar tema claro, oscuro o segun dispositivo | M | Medio |
+| DAG-THEME-01 | Resuelto DEV 228 | P2 | Mejorar contraste y agregar tema claro, oscuro o segun dispositivo | M | Medio |
 | DAG-HISTORY-UX-01 | En progreso | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
 | DAG-ANALYSIS-UX-01 | Resuelto DEV 226 | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Resuelto DEV 226 | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
@@ -277,13 +277,13 @@ Flujo de una entrada:
 
 - Estado: `En progreso`; aprobado por el usuario el 2026-07-15 e implementado en DEV 224, pendiente prueba fisica. Tipo: UX y navegacion. Prioridad: P2.
 - Problema: la barra expone controles secundarios y resta espacio y claridad a las acciones principales.
-- Solucion propuesta: ocultar `Atras`, `Adelante` y `Actualizar` de la barra y moverlos al menu de tres puntos; mostrar `Home` a la izquierda y reemplazar `Actualizar` por una accion visible de nueva pestana.
+- Solucion propuesta: ocultar `Atras`, `Adelante` y `Actualizar` de la barra y moverlos al menu de tres puntos; mostrar `Home` a la izquierda y reemplazar `Actualizar` por una accion visible de nueva pestana. El menu de tres puntos tambien debe estar disponible en Home.
 - Evidencia: checklist visual aportado por el usuario el 2026-07-15.
 - Esfuerzo: M. Riesgo: medio; esconder acciones frecuentes puede reducir descubribilidad o accesibilidad.
 - Dependencias: navegacion WebView, menu de tres puntos, Home DAG y gestion de pestanas.
 - Duplicados y relacion: se relaciona con `DAG-TABS-02`, pero cambia la jerarquia de controles y no duplica el selector ya resuelto.
-- Criterios de aceptacion propuestos: Home y nueva pestana son acciones visibles; atras, adelante y actualizar funcionan desde el menu; los estados no disponibles se representan correctamente; no se pierde historial ni estado de pestanas.
-- Decisiones pendientes para el ticket: iconografia, orden del menu, gestos alternativos y comportamiento del boton fisico Atras.
+- Criterios de aceptacion propuestos: Home y nueva pestana son acciones visibles; atras, adelante y actualizar funcionan desde el menu; Home conserva acceso al menu de tres puntos; los estados no disponibles se ocultan o representan correctamente; no se pierde historial ni estado de pestanas.
+- Decisiones pendientes para el ticket: iconografia, orden y acciones disponibles del menu en Home; gestos alternativos y comportamiento del boton fisico Atras.
 
 #### DAG-HOME-UX-01 - Home con buscador central
 
@@ -698,6 +698,8 @@ Revision realizada el 2026-07-15 sobre `Backlog Codex - Control Parental`. El co
 
 | ID | Resuelto | Evidencia resumida |
 | --- | --- | --- |
+| DAG-AUTOCOMPLETE-01 | 2026-07-15, DEV 228 | Sugerencias durante escritura desde historial cifrado local y reformulaciones seguras; clasificación local, debounce y cero consultas Brave por pulsación |
+| DAG-THEME-01 | 2026-07-15, DEV 228 | Barra más compacta y colores explícitos para resúmenes y sugerencias en tema oscuro/claro |
 | DAG-APPROVAL-POLICY-01 | 2026-07-15, DEV 227 | Admin carga la politica completa antes de aprobar y rechaza una aprobacion DAG sobre politica incompleta, evitando cerrar el navegador |
 | DAG-SEARCH-FP-01 | 2026-07-15, DEV 227 | `Coca-Cola` comercial se permite con vocabulario cerrado sin enmascarar cocaína ni contenido explícito; regresiones automatizadas |
 | DAG-HOME-RESET-01 | 2026-07-15, DEV 227 | Home limpia buscador, URL/resultados/carga y navegacion previa; contraste explicito en tema claro y oscuro |

@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-15:
 
 ```text
-App Usuario versionCode 227
-App Admin versionCode 227
+App Usuario versionCode 228
+App Admin versionCode 228
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-227-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-227-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-228-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-228-debug.apk
 ```
 
-SHA-256 publicados:
+SHA-256 publicados (completar al publicar DEV 228):
 
 ```text
-Usuario b82b8647e5491f23a56ebbbc95dac9287a9b598ad1c593e952e37827a5b7f191
-Admin   dd7ebbefdc380843608d3311486aef01455cc3f1fc2943fc11c34e9126322424
+Usuario PENDIENTE
+Admin   PENDIENTE
 ```
+
+## Implementacion 2026-07-15 - DEV 228 autocompletado y contraste DAG
+
+- DAG ofrece hasta cinco sugerencias mientras se escribe, sin consultar Brave: usa el historial cifrado del telefono y reformulaciones locales de contexto inequivoco. Cada candidata se vuelve a clasificar en el dispositivo y un debounce corto evita trabajo por cada pulsacion.
+- Consultas ambiguas como `coca` proponen contexto seguro y concreto, por ejemplo `Coca-Cola gaseosa`, sin relajar la decision final del clasificador.
+- La barra superior baja de 58 a 52 dp y el buscador de Home de 64 a 56 dp. Los resúmenes de resultados y las sugerencias declaran colores de alto contraste para tema claro y oscuro.
+- La actualización DEV ya se comprueba automáticamente al entrar en la pantalla Actualizaciones y puede descargar/verificar el APK; Android normal exige confirmación del usuario para instalar un APK externo. Instalación silenciosa requiere Device Owner, root o una tienda administrada y no se intenta eludir esa protección.
 
 ## Implementacion 2026-07-15 - DEV 227 falsos positivos, aprobacion DAG y Home
 

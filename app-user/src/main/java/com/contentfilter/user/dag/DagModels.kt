@@ -74,6 +74,7 @@ data class DagBrowserUiState(
     val view: DagView = DagView.Start,
     val pageStatus: DagPageStatus = DagPageStatus.Idle,
     val results: List<DagSearchResult> = emptyList(),
+    val suggestions: List<String> = emptyList(),
     val history: List<DagHistoryEntry> = emptyList(),
     val requestedUrl: String? = null,
     val navigationRevision: Long = 0L,

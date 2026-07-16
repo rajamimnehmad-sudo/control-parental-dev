@@ -308,8 +308,8 @@ private fun DagBrowserContent(
                     modifier =
                         Modifier
                             .weight(1f)
-                            .height(58.dp),
-                    cornerRadius = 29.dp,
+                            .height(52.dp),
+                    cornerRadius = 26.dp,
                 ) {
                     OutlinedTextField(
                         modifier =
@@ -326,7 +326,7 @@ private fun DagBrowserContent(
                         },
                         readOnly = analyzing,
                         singleLine = true,
-                        shape = RoundedCornerShape(29.dp),
+                        shape = RoundedCornerShape(26.dp),
                         colors =
                             OutlinedTextFieldDefaults.colors(
                                 focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -434,6 +434,9 @@ private fun DagBrowserContent(
                 }
             }
             HorizontalDivider()
+            if (addressFocused && state.suggestions.isNotEmpty() && !analyzing) {
+                DagSearchSuggestions(state.suggestions, viewModel::onAddressChanged)
+            }
         }
 
         if (state.message.isNotBlank() && !analyzing) {
@@ -458,6 +461,7 @@ private fun DagBrowserContent(
             DagView.Start ->
                 DagStartContent(
                     address = state.address,
+                    suggestions = state.suggestions,
                     analyzing = analyzing,
                     onAddressChanged = viewModel::onAddressChanged,
                     onSubmit = viewModel::submitAddress,
@@ -844,6 +848,7 @@ private fun DagTabSnapshot.tabLabel(position: Int): String =
 @OptIn(ExperimentalLayoutApi::class)
 private fun DagStartContent(
     address: String,
+    suggestions: List<String>,
     analyzing: Boolean,
     onAddressChanged: (String) -> Unit,
     onSubmit: () -> Unit,
@@ -864,8 +869,8 @@ private fun DagStartContent(
         Spacer(Modifier.height(24.dp))
         DagAnalysisFrame(
             analyzing = analyzing,
-            modifier = Modifier.fillMaxWidth().height(64.dp),
-            cornerRadius = 32.dp,
+            modifier = Modifier.fillMaxWidth().height(56.dp),
+            cornerRadius = 28.dp,
         ) {
             OutlinedTextField(
                 value = if (analyzing) "" else address,
@@ -874,7 +879,7 @@ private fun DagStartContent(
                 placeholder = { if (analyzing) DagAnalyzingText() else Text("Buscar en Internet") },
                 readOnly = analyzing,
                 singleLine = true,
-                shape = RoundedCornerShape(32.dp),
+                shape = RoundedCornerShape(28.dp),
                 colors =
                     OutlinedTextFieldDefaults.colors(
                         focusedTextColor = MaterialTheme.colorScheme.onSurface,
@@ -904,12 +909,38 @@ private fun DagStartContent(
                     },
             )
         }
+        if (suggestions.isNotEmpty() && !analyzing) {
+            DagSearchSuggestions(suggestions, onAddressChanged)
+        }
         Spacer(Modifier.height(12.dp))
         Text(
             "Las páginas y sus imágenes se analizan antes de mostrarse.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun DagSearchSuggestions(
+    suggestions: List<String>,
+    onSelect: (String) -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = MaterialTheme.colorScheme.surfaceContainer,
+    ) {
+        Column {
+            suggestions.forEach { suggestion ->
+                Text(
+                    text = suggestion,
+                    modifier = Modifier.fillMaxWidth().clickable { onSelect(suggestion) }.padding(14.dp, 10.dp),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
     }
 }
 
@@ -945,6 +976,7 @@ private fun DagResultsContent(
                     Text(
                         result.description,
                         style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                     )
