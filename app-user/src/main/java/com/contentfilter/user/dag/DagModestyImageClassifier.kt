@@ -23,9 +23,9 @@ internal data class DagModestyScores(
 internal fun requiresKosherModestyBlur(scores: DagModestyScores): Boolean {
     val femaleContext = scores.femaleFace >= FemaleFaceThreshold
     return scores.explicitRegion >= ExplicitThreshold ||
-        (femaleContext && scores.femaleBreastCovered >= CoveredRegionThreshold) ||
-        (femaleContext && scores.femaleGenitaliaCovered >= CoveredRegionThreshold) ||
-        (femaleContext && scores.buttocksCovered >= CoveredRegionThreshold) ||
+        scores.femaleBreastCovered >= CoveredRegionThreshold ||
+        scores.femaleGenitaliaCovered >= CoveredRegionThreshold ||
+        scores.buttocksCovered >= CoveredRegionThreshold ||
         (femaleContext && scores.armpitsExposed >= ExposedRegionThreshold) ||
         (femaleContext && scores.bellyExposed >= ExposedRegionThreshold)
 }

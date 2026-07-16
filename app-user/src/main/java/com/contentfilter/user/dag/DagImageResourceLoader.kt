@@ -14,6 +14,7 @@ import java.io.IOException
 import java.net.InetAddress
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 internal class DagImageResourceLoader(
@@ -40,11 +41,14 @@ internal class DagImageResourceLoader(
     private val allowedCount = AtomicInteger(0)
     private val blockedCount = AtomicInteger(0)
     private val uncertainCount = AtomicInteger(0)
+    private val pageGeneration = AtomicInteger(0)
+    private val closed = AtomicBoolean(false)
     private val imageSlots = Semaphore(MaximumConcurrentImages, true)
     private val responseCache = LinkedHashMap<String, CachedImageResource>(16, 0.75f, true)
     private var responseCacheBytes = 0
 
     fun resetPage() {
+        pageGeneration.incrementAndGet()
         imageCount.set(0)
         allowedCount.set(0)
         blockedCount.set(0)
@@ -62,10 +66,16 @@ internal class DagImageResourceLoader(
             uncertain = uncertainCount.get(),
         )
 
+    fun cancel() {
+        closed.set(true)
+        pageGeneration.incrementAndGet()
+    }
+
     fun intercept(
         request: WebResourceRequest,
         pageUrl: String? = null,
     ): WebResourceResponse? {
+        if (closed.get()) return unavailableImageResource()
         if (request.isForMainFrame) return null
         if (isBlockedMediaRequest(request.url.toString(), request.requestHeaders)) return blockedResource()
         if (!isProbableImageRequest(request.url.toString(), request.requestHeaders)) return null
@@ -73,10 +83,12 @@ internal class DagImageResourceLoader(
         if (request.url.scheme != "https" || imageCount.incrementAndGet() > MaximumImagesPerPage) {
             return unavailableImageResource()
         }
+        val generation = pageGeneration.get()
 
         val acquired =
             try {
-                imageSlots.tryAcquire(ImageSlotWaitSeconds, TimeUnit.SECONDS)
+                imageSlots.acquire()
+                true
             } catch (_: InterruptedException) {
                 Thread.currentThread().interrupt()
                 false
@@ -86,6 +98,7 @@ internal class DagImageResourceLoader(
             return unavailableImageResource()
         }
         return try {
+            if (closed.get() || generation != pageGeneration.get()) return unavailableImageResource()
             runCatching { loadClassifiedImage(request, pageUrl) }.getOrElse {
                 uncertainCount.incrementAndGet()
                 unavailableImageResource()
@@ -227,18 +240,17 @@ internal class DagImageResourceLoader(
     }
 
     private companion object {
-        const val MaximumImagesPerPage = 160
+        const val MaximumImagesPerPage = 400
         const val MaximumConcurrentImages = 3
-        const val ImageSlotWaitSeconds = 8L
         const val RequestTimeoutSeconds = 8L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
         const val MaximumBlurredDimension = 480
         const val BlurSampleSide = 4
         const val BlurJpegQuality = 72
-        const val MaximumCachedImages = 24
+        const val MaximumCachedImages = 64
         const val MaximumCachedImageBytes = 1024 * 1024
-        const val MaximumResponseCacheBytes = 8 * 1024 * 1024
+        const val MaximumResponseCacheBytes = 16 * 1024 * 1024
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }
 }

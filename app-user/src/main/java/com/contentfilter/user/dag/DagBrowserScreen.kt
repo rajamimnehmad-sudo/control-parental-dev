@@ -89,7 +89,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -298,11 +297,13 @@ private fun DagBrowserContent(
     val analyzing = state.loading || (state.view == DagView.Browser && state.pageStatus == DagPageStatus.Loading)
 
     Surface(
-        modifier = modifier.then(if (standalone) Modifier.statusBarsPadding() else Modifier),
+        modifier = modifier,
         color = MaterialTheme.colorScheme.background,
         contentColor = MaterialTheme.colorScheme.onBackground,
     ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(
+            modifier = Modifier.fillMaxSize().then(if (standalone) Modifier.statusBarsPadding() else Modifier),
+        ) {
             if (state.view == DagView.Start) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
@@ -399,6 +400,7 @@ private fun DagBrowserContent(
                             },
                             readOnly = analyzing,
                             singleLine = true,
+                            textStyle = MaterialTheme.typography.bodySmall,
                             shape = RoundedCornerShape(26.dp),
                             colors =
                                 OutlinedTextFieldDefaults.colors(
@@ -692,29 +694,22 @@ private fun DagBrowserTheme(
     val dark = dagUsesDarkTheme(preference, isSystemInDarkTheme())
     val view = LocalView.current
     val window = view.context.findActivity()?.window
-    val originalBars = remember(window) { window?.let { it.statusBarColor to it.navigationBarColor } }
-    val barColor = if (dark) DagDarkScheme.background.toArgb() else DagLightScheme.background.toArgb()
+    val insetsController = remember(view, window) { window?.let { WindowCompat.getInsetsController(it, view) } }
+    val originalAppearance =
+        remember(insetsController) {
+            insetsController?.let { it.isAppearanceLightStatusBars to it.isAppearanceLightNavigationBars }
+        }
     SideEffect {
-        window?.let { window ->
-            window.statusBarColor = barColor
-            window.navigationBarColor = barColor
-            WindowCompat.getInsetsController(window, view).apply {
-                isAppearanceLightStatusBars = !dark
-                isAppearanceLightNavigationBars = !dark
-            }
+        insetsController?.apply {
+            isAppearanceLightStatusBars = !dark
+            isAppearanceLightNavigationBars = !dark
         }
     }
-    DisposableEffect(view, window, originalBars) {
+    DisposableEffect(insetsController, originalAppearance) {
         onDispose {
-            window?.let { window ->
-                originalBars?.let { (statusBarColor, navigationBarColor) ->
-                    window.statusBarColor = statusBarColor
-                    window.navigationBarColor = navigationBarColor
-                }
-                WindowCompat.getInsetsController(window, view).apply {
-                    isAppearanceLightStatusBars = true
-                    isAppearanceLightNavigationBars = true
-                }
+            originalAppearance?.let { (lightStatusBars, lightNavigationBars) ->
+                insetsController?.isAppearanceLightStatusBars = lightStatusBars
+                insetsController?.isAppearanceLightNavigationBars = lightNavigationBars
             }
         }
     }
@@ -1378,6 +1373,7 @@ private fun DagWebContent(
             webView?.destroy()
             webView = null
             onWebViewChanged(null)
+            imageLoader.cancel()
             imageClassifier.close()
         }
     }

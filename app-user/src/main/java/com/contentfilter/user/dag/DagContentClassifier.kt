@@ -16,7 +16,7 @@ class DagContentClassifier
         lateinit var neuralClassifier: DagNeuralTextClassifier
 
         fun classifyQuery(text: String): DagClassificationResult =
-            if (text.isClearlySafeCocaColaQuery()) {
+            if (text.isClearlySafeCocaColaQuery() || text.isClearlySafeYeshurunQuery()) {
                 allowed()
             } else {
                 classify(text, directUrl = false, reviewSingleAmbiguousTerm = true)
@@ -231,11 +231,23 @@ class DagContentClassifier
                 return words.all(SafeCocaColaQueryWords::contains)
             }
 
+            private fun String.isClearlySafeYeshurunQuery(): Boolean {
+                val words = normalizedForDag().split(' ').filter(String::isNotBlank)
+                if (words.none { it == "yeshrun" || it == "yeshurun" }) return false
+                return words.all(SafeYeshurunQueryWords::contains)
+            }
+
             private val SafeCocaColaQueryWords =
                 setOf(
                     "coca", "cola", "comprar", "compra", "precio", "precios", "oferta", "ofertas",
                     "supermercado", "bebida", "gaseosa", "lata", "botella", "argentina", "cerca", "donde",
                     "conseguir", "delivery", "zero", "light", "sin", "azucar", "en", "de", "una", "la", "quiero",
+                )
+
+            private val SafeYeshurunQueryWords =
+                setOf(
+                    "yeshrun", "yeshurun", "instagram", "facebook", "oficial", "comunidad", "tora", "torah",
+                    "yeshiva", "buenos", "aires", "argentina", "sitio", "pagina", "buscar", "en", "de", "la",
                 )
 
             fun domainFrom(url: String): String =

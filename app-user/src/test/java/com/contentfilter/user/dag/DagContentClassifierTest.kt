@@ -33,6 +33,13 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `yeshurun social profile lookup is safe without masking risky additions`() {
+        assertEquals(DagClassification.Allowed, classifier.classifyQuery("yeshrun instagram").decision)
+        assertEquals(DagClassification.Allowed, classifier.classifyQuery("Yeshurun página oficial").decision)
+        assertEquals(DagClassification.Blocked, classifier.classifyQuery("yeshrun instagram videos porno").decision)
+    }
+
+    @Test
     fun `low margin unsafe guess does not block an ordinary brand search`() {
         val prediction =
             DagSemanticPrediction(

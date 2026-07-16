@@ -128,6 +128,16 @@ class DagImagePolicyTest {
             ),
         )
         assertFalse(requiresKosherModestyBlur(DagModestyScores(femaleFace = 0.90f)))
+        assertTrue(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleBreastCovered = 0.35f),
+            ),
+        )
+        assertTrue(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleGenitaliaCovered = 0.35f),
+            ),
+        )
         assertFalse(
             requiresKosherModestyBlur(
                 DagModestyScores(femaleFace = 0.90f, femaleBreastCovered = 0.10f),
