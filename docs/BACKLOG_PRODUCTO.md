@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado al inicio del ticket: App Usuario DEV 230 y App Admin DEV 230, `1.0.1-dev`. DEV 231 queda preparado para publicacion.
+- Estado publicado: App Usuario DEV 231 y App Admin DEV 231, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.

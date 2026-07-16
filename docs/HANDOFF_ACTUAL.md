@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion DEV 231
-Admin   pendiente de publicacion DEV 231
+Usuario 7429ac5f34df431632ffa5eaf8c055bf72504c85ee292ead84927e5e2e3e8052
+Admin   c7af07f9b385bdd9c3737c3ac204a4139f9e10690bf893fed61179f063c062b1
 ```
 
 ## Implementacion 2026-07-15 - DEV 231 calibracion visual y blur local
@@ -86,7 +86,7 @@ Admin   pendiente de publicacion DEV 231
 - Los umbrales de ambos modelos pasan a una calibracion conservadora de tres zonas: seguro hasta 15 %, dudoso entre 15 % y 65 %, riesgo desde 65 %. La version visual sube a `marqo-nsfw-vit-tiny-384-2` y la politica de pagina a `dag-local-text-7`, invalidando aprobaciones rapidas incompatibles.
 - H&M y tiendas similares ya no heredan palabras como `lingerie`, `swimwear` o `underwear` desde menus globales: solo cuentan atributos de la imagen y un contenedor de producto pequeno y cercano. `swimwear` generico deja de ocultar por metadatos y pasa por la IA visual; lenceria y ropa intima concreta siguen ocultas.
 - Una pagina segura ya no se cierra porque contenga muchas imagenes rechazadas: cada recurso queda aislado. Plataformas o dominios prohibidos y el texto explicito continúan bloqueandose por sus reglas independientes. La calibracion usa Yeshurun Tora, H&M y contenido social como referencias para la prueba fisica.
-- Ktlint, tests DEV completos de Usuario/Admin, lint vital y builds optimizados correctos (773 tareas Gradle). Publicacion, hashes y validacion fisica quedan pendientes al cerrar el ticket.
+- Ktlint, tests DEV completos de Usuario/Admin, lint vital y builds optimizados correctos (773 tareas Gradle). Android CI `29467699637` y workflow `Publicar APKs DEV` `29467699649` exitosos; APKs/manifiestos DEV 231 publicados solo en Supabase DEV y verificados por version, SHA-256, tamaño y HTTP 200. Usuario pesa 45.590.988 bytes y Admin 27.901.424 bytes. Falta validacion fisica con Yeshurun Tora, H&M y contenido social.
 
 ## Implementacion 2026-07-15 - DEV 230 filtrado selectivo y contraste DAG
 
