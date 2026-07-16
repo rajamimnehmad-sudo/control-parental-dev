@@ -114,6 +114,13 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Las solicitudes de dominio DAG siguen en su bandeja especifica para no mezclar historial de navegacion con permisos de apps. App Admin ya tenia refresco manual y acciones con progreso; conserva su bandeja operativa de pendientes.
 - Validacion local: formato, compilacion y tests de `feature-requests` y App Usuario correctos. Sin migracion ni publicacion intermedia.
 
+## Implementacion 2026-07-16 - candidato DEV 241 USER-RESILIENCE-01
+
+- Ajustes de App Usuario ofrece una accion directa para cada componente recuperable: abrir Accesibilidad, pedir/encender la VPN, activar Device Admin, quitar restricciones de bateria y volver a comprobar la barrera. Ya no agrupa fallos distintos bajo un unico boton ambiguo.
+- Los estados de licencia programada, pendiente, vencida o suspendida explican la causa y, en el vencimiento, que la configuracion se conserva hasta renovar. No se invita al usuario a reparar localmente una decision que depende de Super Admin.
+- La instalacion de actualizaciones conserva el comportamiento real de Android normal: App Usuario comprueba y descarga, pero Android solicita permiso y confirmacion para instalar; no se promete actualizacion silenciosa.
+- Validacion local: formato, compilacion y tests DEV de App Usuario correctos. Falta recorrer las acciones en Samsung SM-S908E; no hubo publicacion intermedia.
+
 ## Implementacion 2026-07-16 - DEV 241 BARRIER-DEFAULT-ON-01
 
 - Un dispositivo Usuario con control de proteccion nunca configurado se arma automaticamente solo cuando App Usuario comprueba simultaneamente el tunel VPN real, Accessibility habilitado, Device Admin activo y ausencia de una desactivacion intencional de la VPN.

@@ -297,6 +297,17 @@ private fun UserAppRoot(
                         onActivateDeviceAdmin = {
                             deviceAdminLauncher.launch(DeviceAdminController.activationIntent(context))
                         },
+                        onActivateAccessibility = {
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        },
+                        onActivateVpn = {
+                            val permissionIntent = VpnController.prepareIntent(context)
+                            if (permissionIntent == null) {
+                                VpnController.start(context)
+                            } else {
+                                vpnPermissionLauncher.launch(permissionIntent)
+                            }
+                        },
                         onRequestBatteryOptimizationExemption = {
                             batteryOptimizationLauncher.launch(BatteryOptimizationController.requestIntent(context))
                         },

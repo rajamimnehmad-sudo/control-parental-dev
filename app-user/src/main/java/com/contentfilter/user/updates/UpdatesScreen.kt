@@ -48,6 +48,8 @@ fun UpdatesRoute(
     protectionMessage: String = "",
     protectionRefreshing: Boolean = false,
     onActivateDeviceAdmin: () -> Unit = {},
+    onActivateAccessibility: () -> Unit = {},
+    onActivateVpn: () -> Unit = {},
     onRequestBatteryOptimizationExemption: () -> Unit = {},
     onProtectionRefresh: () -> Unit = {},
     onRequestMaintenance: () -> Unit = {},
@@ -87,6 +89,8 @@ fun UpdatesRoute(
         protectionMessage = protectionMessage,
         protectionRefreshing = protectionRefreshing,
         onActivateDeviceAdmin = onActivateDeviceAdmin,
+        onActivateAccessibility = onActivateAccessibility,
+        onActivateVpn = onActivateVpn,
         onRequestBatteryOptimizationExemption = onRequestBatteryOptimizationExemption,
         onProtectionRefresh = onProtectionRefresh,
         onRequestMaintenance = onRequestMaintenance,
@@ -122,6 +126,8 @@ private fun UpdatesScreen(
     protectionMessage: String,
     protectionRefreshing: Boolean,
     onActivateDeviceAdmin: () -> Unit,
+    onActivateAccessibility: () -> Unit,
+    onActivateVpn: () -> Unit,
     onRequestBatteryOptimizationExemption: () -> Unit,
     onProtectionRefresh: () -> Unit,
     onRequestMaintenance: () -> Unit,
@@ -208,6 +214,16 @@ private fun UpdatesScreen(
         }
         ProductCard {
             Text("Mantenimiento y recuperación", style = MaterialTheme.typography.titleMedium)
+            if (accessibilityState != "Activa") {
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onActivateAccessibility) {
+                    Text("Activar accesibilidad")
+                }
+            }
+            if (vpnState != "Activa") {
+                Button(modifier = Modifier.fillMaxWidth(), onClick = onActivateVpn) {
+                    Text("Activar protección web")
+                }
+            }
             if (deviceAdminState != "Activa") {
                 Button(modifier = Modifier.fillMaxWidth(), onClick = onActivateDeviceAdmin) {
                     Text("Activar protección contra desinstalación")
@@ -220,6 +236,18 @@ private fun UpdatesScreen(
                 ) {
                     Text("Permitir funcionamiento continuo")
                 }
+            }
+            if (activationState in setOf("Expirada", "Suspendida", "Programada", "Pendiente")) {
+                Text(
+                    when (activationState) {
+                        "Expirada" -> "La licencia venció. La configuración se conserva y volverá al renovar."
+                        "Suspendida" -> "La comunidad suspendió temporalmente la licencia."
+                        "Programada" -> "La licencia todavía no comenzó."
+                        else -> "Este dispositivo todavía no completó la activación."
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                )
             }
             val primaryAction =
                 protectionPrimaryAction(
