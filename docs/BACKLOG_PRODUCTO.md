@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 240 y App Admin DEV 240, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 241 y App Admin DEV 241, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -135,11 +135,11 @@ Flujo de una entrada:
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
-| DATA-DELETE-01 | Resuelto candidato DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
+| DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
 | BARRIER-DEFAULT-ON-01 | Implementado DEV 241; pendiente prueba fisica | P1 | Armar automaticamente la barrera al completar y verificar la configuracion de proteccion | S | Medio |
 | OPS-METRICS-01 | Candidato DEV 241 optimizado y con linea base corta; pendiente muestra de 24 h | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
-| USAGE-REAL-01 | Validado fisicamente candidato DEV 241; pendiente publicacion final | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
+| USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Candidato DEV 241 validado en SM-A235M; pendiente matriz adicional | P2 | Consistencia visual y accesibilidad de ambas apps | M | Bajo |
@@ -150,7 +150,7 @@ Flujo de una entrada:
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Implementado candidato DEV 241; pendiente prueba fisica | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
-| BARRIER-LAUNCHER-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
+| BARRIER-LAUNCHER-01 | Revisado candidato DEV 242; icono visible y bootstrap Admin seguro | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
@@ -181,7 +181,7 @@ Flujo de una entrada:
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
 
-- Estado: `Resuelto candidato DEV 241; pendiente publicacion final`. El usuario autorizo expresamente crear y archivar un unico usuario nuevo de prueba en DEV el 2026-07-16.
+- Estado: `Resuelto y publicado en DEV 241`. El usuario autorizo expresamente crear y archivar un unico usuario nuevo de prueba en DEV el 2026-07-16.
 - Tipo: bug, ciclo de vida de datos y seguridad.
 - Prioridad: P0.
 - Problema: App Admin muestra la opcion de borrar usuario, pero al usarla el banner informa `No se pudo borrar al usuario` y el usuario permanece visible.
@@ -256,7 +256,7 @@ Flujo de una entrada:
 
 ### USAGE-REAL-01 - Uso foreground y listas estables
 
-- Estado: `Validado fisicamente candidato DEV 241; pendiente publicacion final`.
+- Estado: `Validado fisicamente y publicado en DEV 241`.
 - Arquitectura comprobada: no depende de `PACKAGE_USAGE_STATS`; Accessibility mide con reloj monotono, crea checkpoints y guarda sesiones en Room. Esto evita pedir otro acceso especial de Android.
 - Evidencia SM-A235M: Calculadora Samsung permanecio foreground mas de un minuto, el servicio guardo sesiones y reporto 2 minutos persistidos. `Mis apps` mantuvo 156 aplicaciones y el filtro `Calculadora` devolvio una unica fila estable.
 - Rendimiento: la deduplicacion de OPS-METRICS elimina escrituras diagnosticas repetidas sin cambiar tracking, limite ni tiempo de reaccion del bloqueo.
@@ -290,7 +290,7 @@ Flujo de una entrada:
 
 ### BARRIER-LAUNCHER-01 - Superficie profesional sin desinstalacion rapida
 
-- Estado: `Implementado candidato DEV 241; pendiente prueba fisica`. Aprobado por el usuario al ordenar ejecutar todos los tickets y definido para Android normal compatible con la mayoria de equipos el 2026-07-16.
+- Estado: `Revisado candidato DEV 242; pendiente bootstrap real en SM-S908E`. Aprobado por el usuario al ordenar ejecutar todos los tickets y redefinido tras el reporte fisico del 2026-07-16.
 - Tipo: seguridad, antimanipulacion y UX de App Usuario.
 - Prioridad: P2.
 - Problema: al mantener presionado el icono de App Usuario, el launcher muestra la opcion `Desinstalar`. Aunque la barrera actual bloquea las rutas posteriores, la opcion visible transmite una proteccion menos integrada que otros filtros.
@@ -316,6 +316,7 @@ Flujo de una entrada:
 - Acceso alternativo: la notificacion foreground de la VPN abre directamente `MainActivity` mediante una accion interna del paquete aunque el alias Launcher este oculto. El vencimiento de mantenimiento vuelve a ocultar el alias automaticamente.
 - Compatibilidad elegida: Android normal desde el minimo soportado, sin Knox, root, Device Owner ni restablecimiento. El comportamiento visual exacto del launcher puede variar por fabricante y no se promete un bloqueo de sistema equivalente a MDM.
 - Validacion: tests de decision visible/oculto, compilacion, manifiesto combinado, tests DEV y formato de Usuario/VPN correctos. Falta validar icono, notificacion, mantenimiento y reinicio en Samsung SM-S908E; no hubo publicacion intermedia.
+- Revision DEV 242: ocultar el alias dejo al SM-S908E sin una ruta obvia a Usuario y, al no existir Admin todavia, el bloqueo correcto del instalador de Chrome impidio completar el alta de Admin. El alias queda siempre visible. App Usuario incorpora un bootstrap Admin que valida manifiesto, SHA-256, packageName y firma antes de abrir la autorizacion interna; Android sigue mostrando su confirmacion normal. El instalador directo del navegador permanece bloqueado.
 
 ### Checklist de mejoras visuales y navegacion DAG
 
@@ -647,7 +648,7 @@ Flujo de una entrada:
 - Compatibilidad: Android 10 o posterior, igual que las apps existentes. Android 13 o posterior pide permiso de notificaciones; si se rechaza, la bandeja sigue funcionando al abrir la app.
 - Correccion posterior: la prueba autenticada descubrio que las RPC referenciaban el helper inexistente `is_current_user_super_admin`. La migracion DEV `20260716181500_fix_super_admin_announcement_authorization.sql` agrega un alias endurecido sobre `is_super_admin`; `anon` no puede ejecutarlo y `authenticated` sigue sujeto a la comprobacion real de Super Admin.
 - Validacion fisica: se creo por RPC un aviso `Prueba DEV 241` para ambos roles con vencimiento automatico de 30 minutos. Admin y Usuario lo recibieron al actualizar y la accion de apertura directa mostro la bandeja correcta. No se borro el aviso; queda como historial vencido.
-- Pendiente: el navegador integrado no logro navegar fuera de una pestaña vacia, por lo que no se extrajeron sesiones ni credenciales. Falta invocar `send-announcement` desde una sesion Superweb firmada y confirmar la notificacion FCM normal; la bandeja autenticada ya esta comprobada. Publicacion final agrupada pendiente.
+- Pendiente: el navegador integrado no logro navegar fuera de una pestaña vacia, por lo que no se extrajeron sesiones ni credenciales. Falta publicar la fuente Superweb cuando el hosting externo vuelva a aceptar despliegues, invocar `send-announcement` desde una sesion firmada y confirmar la notificacion FCM normal; las bandejas Android DEV 241 ya estan publicadas y comprobadas.
 
 ### ALERT-ROUTING-01 - Enrutamiento por intento o desactivacion efectiva
 
@@ -705,7 +706,7 @@ Flujo de una entrada:
 
 ### SUPERADMIN-DAG-ENTITLEMENT-01 - DAG como funcion premium
 
-- Estado: `Implementado candidato DEV 241; pendiente prueba fisica y publicacion final`. Aprobado por el usuario al ordenar ejecutar todos los tickets el 2026-07-16.
+- Estado: `Backend DEV y Android DEV 241 publicados; Superweb pendiente de hosting y prueba fisica`. Aprobado por el usuario al ordenar ejecutar todos los tickets el 2026-07-16.
 - Tipo: monetizacion, licencias y control Super Admin.
 - Prioridad: P1.
 - Problema: DAG es una funcion premium y su disponibilidad no debe depender unicamente del control por dispositivo que usa App Admin.

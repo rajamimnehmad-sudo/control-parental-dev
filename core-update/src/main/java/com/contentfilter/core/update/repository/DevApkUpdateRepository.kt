@@ -36,11 +36,16 @@ class DevApkUpdateRepository
                 .build()
 
         override suspend fun checkForUpdate(currentVersionCode: Int): UpdateCheckResult =
-            withContext(Dispatchers.IO) {
-                val url = configProvider.manifestUrl()
-                if (url.isBlank()) return@withContext UpdateCheckResult.NotConfigured
+            checkForUpdate(configProvider.manifestUrl(), currentVersionCode)
 
-                val manifest = fetchManifest(url) ?: return@withContext UpdateCheckResult.NetworkError
+        override suspend fun checkForUpdate(
+            manifestUrl: String,
+            currentVersionCode: Int,
+        ): UpdateCheckResult =
+            withContext(Dispatchers.IO) {
+                if (manifestUrl.isBlank()) return@withContext UpdateCheckResult.NotConfigured
+
+                val manifest = fetchManifest(manifestUrl) ?: return@withContext UpdateCheckResult.NetworkError
                 if (manifest.versionCode > currentVersionCode) {
                     UpdateCheckResult.Available(manifest)
                 } else {

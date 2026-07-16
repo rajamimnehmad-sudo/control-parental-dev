@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
@@ -60,6 +61,33 @@ class AndroidApkInstaller
             }
         }
 
+        override fun openVerifiedCompanionInstaller(
+            apk: File,
+            expectedPackageName: String,
+        ): Boolean {
+            if (!isExpectedSignedApk(apk, expectedPackageName)) return false
+            openPackageInstaller(apk)
+            return true
+        }
+
+        @Suppress("DEPRECATION")
+        private fun isExpectedSignedApk(
+            apk: File,
+            expectedPackageName: String,
+        ): Boolean {
+            val flags = PackageManager.GET_SIGNING_CERTIFICATES
+            val archive = context.packageManager.getPackageArchiveInfo(apk.absolutePath, flags) ?: return false
+            val current = context.packageManager.getPackageInfo(context.packageName, flags)
+            val archiveSigners = archive.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet().orEmpty()
+            val currentSigners = current.signingInfo?.apkContentsSigners?.map { it.toCharsString() }?.toSet().orEmpty()
+            return isTrustedCompanionArchive(
+                archivePackageName = archive.packageName,
+                expectedPackageName = expectedPackageName,
+                archiveSigners = archiveSigners,
+                currentSigners = currentSigners,
+            )
+        }
+
         @Suppress("DEPRECATION")
         private fun withTrustedInstallAuthorization(action: () -> Unit) {
             val receiver =
@@ -95,3 +123,13 @@ class AndroidApkInstaller
             const val TrustedInstallPermission = "com.contentfilter.permission.AUTHORIZE_TRUSTED_INSTALL"
         }
     }
+
+internal fun isTrustedCompanionArchive(
+    archivePackageName: String,
+    expectedPackageName: String,
+    archiveSigners: Set<String>,
+    currentSigners: Set<String>,
+): Boolean =
+    archivePackageName == expectedPackageName &&
+        archiveSigners.isNotEmpty() &&
+        archiveSigners == currentSigners

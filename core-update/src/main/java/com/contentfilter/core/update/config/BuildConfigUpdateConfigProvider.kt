@@ -12,6 +12,9 @@ class BuildConfigUpdateConfigProvider
     ) : UpdateConfigProvider {
         override fun manifestUrl(): String = appSpecificManifestUrl().ifBlank { BuildConfig.UPDATE_MANIFEST_URL }
 
+        override fun adminManifestUrl(): String =
+            BuildConfig.UPDATE_MANIFEST_URL_ADMIN.ifBlank { BuildConfig.UPDATE_MANIFEST_URL }
+
         private fun appSpecificManifestUrl(): String =
             if (context.packageName.contains(AdminPackageMarker)) {
                 BuildConfig.UPDATE_MANIFEST_URL_ADMIN

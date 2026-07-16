@@ -71,6 +71,8 @@ fun UpdatesRoute(
         onDownload = viewModel::downloadUpdate,
         onInstall = viewModel::installDownloadedUpdate,
         onInstallPermission = viewModel::openInstallPermissionSettings,
+        onPrepareAdminInstall = viewModel::prepareAdminInstall,
+        onInstallAdmin = viewModel::installDownloadedAdmin,
         onBack = onBack,
         protectionSummary = protectionSummary,
         communityName = communityName,
@@ -108,6 +110,8 @@ private fun UpdatesScreen(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onInstallPermission: () -> Unit,
+    onPrepareAdminInstall: () -> Unit,
+    onInstallAdmin: () -> Unit,
     onBack: (() -> Unit)?,
     protectionSummary: String,
     communityName: String,
@@ -386,6 +390,46 @@ private fun UpdatesScreen(
         ) {
             Text("Buscar actualizacion")
         }
+        ProductLargeFeatureCard(
+            title = "App Administrador",
+            subtitle = "Instalá la app oficial desde un APK verificado, sin habilitar descargas arbitrarias.",
+            accent = ProductMint,
+        )
+        ProductCard {
+            Text(
+                text = state.adminInstallStatus.message(),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (state.adminInstallStatus == AdminInstallStatus.Downloading) {
+                LinearProgressIndicator(
+                    progress = { (state.adminDownloadProgressPercent ?: 0) / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            when (state.adminInstallStatus) {
+                AdminInstallStatus.ReadyToInstall -> {
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = onInstallAdmin) {
+                        Text("Instalar App Administrador")
+                    }
+                }
+                AdminInstallStatus.NeedsInstallPermission -> {
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = onInstallPermission) {
+                        Text("Permitir instalación oficial")
+                    }
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onInstallAdmin) {
+                        Text("Continuar instalación")
+                    }
+                }
+                AdminInstallStatus.Checking,
+                AdminInstallStatus.Downloading,
+                -> Unit
+                else -> {
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onPrepareAdminInstall) {
+                        Text("Comprobar e instalar Admin")
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -434,4 +478,16 @@ private fun UpdatesStatus.versionLabel(): String =
         UpdatesStatus.NeedsInstallPermission,
         -> "Ultima version descargada"
         else -> "Version disponible"
+    }
+
+private fun AdminInstallStatus.message(): String =
+    when (this) {
+        AdminInstallStatus.Idle -> "Comprobá la versión oficial de App Administrador."
+        AdminInstallStatus.Checking -> "Comprobando App Administrador."
+        AdminInstallStatus.Downloading -> "Descargando y verificando App Administrador."
+        AdminInstallStatus.ReadyToInstall -> "APK oficial verificado. Android pedirá confirmación para instalar."
+        AdminInstallStatus.NeedsInstallPermission -> "Android requiere autorizar a Content Filter como instalador."
+        AdminInstallStatus.AlreadyInstalled -> "App Administrador ya está instalada y actualizada."
+        AdminInstallStatus.VerificationFailed -> "El APK no coincide con el manifiesto o la firma de Content Filter."
+        AdminInstallStatus.Failed -> "No se pudo preparar App Administrador. Intentá nuevamente."
     }

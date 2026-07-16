@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 240
-App Admin versionCode 240
+App Usuario versionCode 241
+App Admin versionCode 241
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,24 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-240-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-240-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-241-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-241-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 519b911b5d6e5489f30e64bfc37d2e409794fdc37d9f2a159b1662e9687b2875
-Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
+Usuario 5c5fc702692e044db5973992afbfd27af4438672ca2eeaaf15cf2b46e102c1fe
+Admin   bee3f0aa3e86174d4110c43c2d392cfd6e3a90ad2f61da127abfe6ea1d9fe642
 ```
+
+## Publicacion agrupada DEV 241 - 2026-07-16
+
+- El workflow `Publicar APKs DEV` `29521944617` termino correctamente y publico una sola vez ambos APK exclusivamente en Supabase DEV `syeycayasyufedwoprea`.
+- Los dos manifiestos publicos declaran `versionCode 241` y `versionName 1.0.1-dev`. Las descargas publicas volvieron a calcular exactamente los SHA-256 anteriores; `aapt` confirmo paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev` con `minSdkVersion 29`.
+- `apksigner` confirmo en ambos APK el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- El primer Android CI de cierre `29521944840` completo build y tests pero encontro una unica deuda de formato en `EncryptedProtectionStateStore`. El commit correctivo `d86c465` pasa `ktlintCheck` y `detekt` locales y usa `[skip dev publish]`; el workflow `29523143482` quedo saltado, por lo que no existio una segunda publicacion.
+- Superweb compila correctamente con TypeScript, ESLint de `src`, Next y el bundle Sites. La URL oficial Vercel seguia respondiendo HTTP 404 para `/announcements`, y el repositorio remoto de Sites rechazo repetidamente el push con HTTP 500. La fuente y el backend DEV estan listos, pero la publicacion Superweb queda bloqueada por hosting externo; no se la declara publicada.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 SUPERADMIN-MSG-01
 
@@ -88,7 +96,15 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - `send-announcement` se desplego solo en Supabase DEV `syeycayasyufedwoprea`; usa credenciales servidor para seleccionar tokens y enviar datos FCM de prioridad normal. Si el push falla, el aviso ya guardado permanece disponible en la bandeja.
 - Migraciones aplicadas solo en DEV: `20260716162000_super_admin_announcements.sql`, `20260716162500_device_push_registration_all_roles.sql` y `20260716181500_fix_super_admin_announcement_authorization.sql`. La prueba real detecto que las RPC llamaban a un helper inexistente; la tercera migracion agrega el alias endurecido a `is_super_admin`. `anon` no lo ejecuta y `authenticated` sigue sujeto al rol Super Admin.
 - Validacion: tests unitarios, ktlint y builds DEV optimizados de ambos APK correctos; Superweb paso TypeScript, ESLint de `src` y build optimizado. El lint global de Superweb sigue incluyendo deuda ajena en `.open-next` generado.
-- Prueba fisica SM-A235M: un aviso temporal para ambos roles fue creado por la RPC y aparecio en las bandejas Admin y Usuario al actualizar. La accion de apertura directa navega a Avisos. Falta confirmar el push FCM desde una sesion Superweb utilizable; el navegador integrado solo expuso pestañas vacias y no se extrajeron credenciales. No se publico APK ni Superweb intermedia; los manifiestos publicos permanecen en DEV 240.
+- Prueba fisica SM-A235M: un aviso temporal para ambos roles fue creado por la RPC y aparecio en las bandejas Admin y Usuario al actualizar. La accion de apertura directa navega a Avisos. Falta confirmar el push FCM desde una sesion Superweb utilizable; el navegador integrado solo expuso pestañas vacias y no se extrajeron credenciales. Android DEV 241 quedo publicado en el cierre agrupado; Superweb sigue pendiente por el bloqueo de hosting documentado arriba.
+
+## Correccion 2026-07-16 - candidato DEV 242 acceso Usuario e instalacion Admin
+
+- El reporte corresponde al Samsung SM-S908E personal: con la barrera armada, DEV 241 ocultaba el launcher de App Usuario y bloqueaba correctamente el instalador abierto desde el navegador. Como Admin aun no estaba instalado, no existia una ruta practica para autorizar mantenimiento y se producia un circulo cerrado.
+- DEV 242 mantiene siempre visible el icono de App Usuario. Se revierte la estrategia visual de `BARRIER-LAUNCHER-01`; la proteccion posterior de desinstalacion mediante Accessibility y Device Admin permanece, sin prometer capacidad MDM en Android normal.
+- Ajustes de App Usuario agrega `App Administrador`: consulta el manifiesto Admin oficial, descarga el APK, verifica SHA-256, packageName exacto de la variante y que la firma sea la misma que App Usuario. Solo entonces abre la ventana interna firmada de dos minutos; Android conserva el permiso por origen y la confirmacion normal de instalacion.
+- Una descarga o instalacion iniciada directamente desde Chrome sigue bloqueada deliberadamente. No se habilitan APK arbitrarios, no se incorpora ningun secreto y no se usa Service Role en Android.
+- Usuario y Admin suben juntos a `versionCode 242`. Tests de confianza para paquete/firma, tests Usuario, ktlint de Usuario/core-update y builds DEV de ambos APK correctos. Prueba fisica en SM-A235M: actualizacion in-place sin borrar datos, ambos paquetes en 242, alias Usuario restaurado, MainActivity abre y la tarjeta Admin informa correctamente que la version instalada ya esta actualizada. Falta ejecutar el bootstrap real en el SM-S908E, donde Admin no esta instalado.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 DATA-DELETE-01
 
@@ -123,7 +139,7 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Solo `Activa`, `Por vencer` y `Periodo de gracia` habilitan proteccion. Una licencia programada, vencida o suspendida desactiva el enforcement sin borrar reglas, controles ni configuracion; una renovacion valida los restaura en la siguiente sincronizacion.
 - Se elimino el atajo que convertia cualquier activacion preexistente en licencia activa. VPN comprueba la licencia antes de reglas explicitas, Accessibility respeta el mismo criterio y el monitor de salud actualiza el estado temporal en cada comprobacion.
 - La migracion `20260716152914_device_license_entitlement.sql` fue aplicada exclusivamente en Supabase DEV `syeycayasyufedwoprea`. Se verificaron `SECURITY DEFINER`, revocacion a `PUBLIC` y acceso deliberado de `anon/authenticated` protegido por `device_token_matches_device`; no modifica ni borra filas.
-- Validacion local correcta: tests de dominio, sincronizacion, Accessibility, VPN, Usuario y Admin; `ktlintCheck`; builds DEV optimizados de ambos APK, siempre excluyendo las tareas de publicacion. El APK/manifiesto publico permanece en DEV 240; DEV 241 se publicara una sola vez al finalizar el paquete de tickets. Falta prueba fisica de vencimiento/renovacion en Samsung SM-S908E.
+- Validacion local correcta: tests de dominio, sincronizacion, Accessibility, VPN, Usuario y Admin; `ktlintCheck`; builds DEV optimizados de ambos APK, siempre excluyendo las tareas de publicacion intermedia. El cierre agrupado DEV 241 ya esta publicado. Falta prueba fisica de vencimiento/renovacion en Samsung SM-S908E.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 SUPERADMIN-DAG-ENTITLEMENT-01
 
@@ -133,7 +149,7 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - El derecho se entrega dentro de la misma RPC autenticada por token de dispositivo y se conserva en Room 13 para reinicios y periodos offline. Al renovar o reactivar vuelve en la siguiente sincronizacion sin reinstalar ni reconstruir reglas.
 - `dag_search_authorized` exige simultaneamente licencia efectiva activa, `dag_entitled=true`, dispositivo Usuario valido y regla DAG activa antes de consumir cuota o llamar a Brave. Asi una sesion obsoleta tampoco elude la decision del servidor.
 - Migraciones `20260716154242_dag_community_entitlement.sql` y `20260716154403_dag_entitlement_audit_read_policy.sql` aplicadas solo en Supabase DEV `syeycayasyufedwoprea`. La unica licencia existente conservo DAG habilitado; las nuevas licencias comienzan deshabilitadas. No se borro ni reinicio consumo.
-- Validacion: tests Usuario/Admin/dominio y formato correctos; Superweb paso ESLint de `src`, TypeScript y build optimizado; funciones y privilegios verificados en DEV. Los advisors conservan deuda previa de RPC anon autenticadas por token y politicas multiples. No se publico APK ni Superweb; el manifiesto publico sigue en DEV 240.
+- Validacion: tests Usuario/Admin/dominio y formato correctos; Superweb paso ESLint de `src`, TypeScript y build optimizado; funciones y privilegios verificados en DEV. Los advisors conservan deuda previa de RPC anon autenticadas por token y politicas multiples. Android quedo publicado en el cierre agrupado DEV 241; Superweb permanece bloqueada por hosting externo.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 REQUESTS-UX-01
 
@@ -190,6 +206,7 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - La notificacion foreground de VPN incorpora una accion interna del paquete que abre `MainActivity` aun cuando el alias Launcher esta oculto. Esto mantiene una ruta clara de acceso y recuperacion.
 - El alcance elegido prioriza Android normal y la mayoria de fabricantes, sin Knox, root, Device Owner ni restablecimiento. No equivale al bloqueo de desinstalacion garantizado por MDM y debe comprobarse por launcher/OEM.
 - Validacion: tests de la politica de visibilidad, core-security y App Usuario; manifiesto combinado, compilacion y formato Usuario/VPN correctos. Falta prueba fisica en Samsung SM-S908E y no hubo publicacion intermedia.
+- Revision posterior: el reporte real del SM-S908E demostro que la ruta alternativa no era suficientemente visible y bloqueaba el bootstrap de Admin. DEV 242 conserva el icono Usuario permanentemente y agrega el instalador verificado de Admin descrito arriba.
 
 ## Implementacion 2026-07-16 - candidato DEV 241 APP-INSTALL-APPROVAL-01
 
@@ -217,7 +234,7 @@ Admin   ed924aca9fdd6dcc813850a61689b7db87676f475dbeb5c985db6b77003464c2
 - Correccion: el servicio escucha clics solo para decidir sobre Ajustes, instaladores o desinstaladores protegibles. Un clic dentro de una pantalla critica y sin mantenimiento autorizado ejecuta una salida urgente a Home; los demas eventos conservan la secuencia Back/Back/Home. Los clics del resto de las aplicaciones se descartan antes de evaluar uso o politica para no reintroducir trabajo global por toque.
 - Mantenimiento: una autorizacion vigente de Ajustes o retiro conserva prioridad y no dispara la salida urgente. Ajustes normales y pantallas de otras aplicaciones siguen disponibles.
 - Validacion local: 789 tareas correctas para tests de `feature-accessibility`, tests DEV Usuario/Admin, ktlint de las areas y builds de ambos APK. Pruebas nuevas cubren la suscripcion a clics y la salida urgente. Commit funcional `f1f6bfc`; Android CI `29508703556` y workflow `Publicar APKs DEV` `29508704344` exitosos. APKs publicos descargados y verificados contra sus manifiestos: Usuario 47.828.636 bytes y Admin 27.917.808 bytes, con los SHA-256 documentados arriba.
-- Pendiente fisico: instalar DEV 240 in-place en el SM-S908E y realizar veinte intentos rapidos de apagar Accessibility con barrera armada, mas un control positivo dentro de una ventana de mantenimiento autorizada. No se promete resistencia absoluta de Device Owner en Android normal.
+- Pendiente fisico: instalar DEV 241 in-place en el SM-S908E y realizar veinte intentos rapidos de apagar Accessibility con barrera armada, mas un control positivo dentro de una ventana de mantenimiento autorizada. No se promete resistencia absoluta de Device Owner en Android normal.
 
 ## Implementacion 2026-07-16 - DEV 239 correcciones de prueba fisica DAG
 

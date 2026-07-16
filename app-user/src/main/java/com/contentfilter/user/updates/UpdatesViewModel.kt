@@ -1,14 +1,19 @@
 package com.contentfilter.user.updates
 
+import android.content.Context
+import android.content.pm.PackageManager
+import android.os.Build
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.contentfilter.core.update.config.UpdateConfigProvider
 import com.contentfilter.core.update.install.ApkInstaller
 import com.contentfilter.core.update.model.UpdateCheckResult
 import com.contentfilter.core.update.model.UpdateDownloadResult
 import com.contentfilter.core.update.repository.ApkUpdateRepository
 import com.contentfilter.user.BuildConfig
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -21,12 +26,15 @@ import javax.inject.Inject
 class UpdatesViewModel
     @Inject
     constructor(
+        @ApplicationContext private val context: Context,
         private val updateRepository: ApkUpdateRepository,
+        private val updateConfigProvider: UpdateConfigProvider,
         private val apkInstaller: ApkInstaller,
     ) : ViewModel() {
         private val _uiState = MutableStateFlow(UpdatesUiState())
         val uiState: StateFlow<UpdatesUiState> = _uiState.asStateFlow()
         private var downloadedApk: File? = null
+        private var downloadedAdminApk: File? = null
         private var autoCheckStarted = false
 
         fun autoCheckAndDownload() {
@@ -111,6 +119,107 @@ class UpdatesViewModel
                 Log.e(LogTag, "Open install permission settings failed: ${exception.message}", exception)
             }
         }
+
+        fun prepareAdminInstall() {
+            viewModelScope.launch {
+                _uiState.update {
+                    it.copy(
+                        adminInstallStatus = AdminInstallStatus.Checking,
+                        adminDownloadProgressPercent = null,
+                    )
+                }
+                runCatching {
+                    when (
+                        val result =
+                            updateRepository.checkForUpdate(
+                                updateConfigProvider.adminManifestUrl(),
+                                installedAdminVersionCode(),
+                            )
+                    ) {
+                        is UpdateCheckResult.Available -> downloadAdmin(result.manifest)
+                        UpdateCheckResult.UpToDate -> {
+                            _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.AlreadyInstalled) }
+                        }
+                        UpdateCheckResult.NetworkError,
+                        UpdateCheckResult.NotConfigured,
+                        -> _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.Failed) }
+                    }
+                }.onFailure { exception ->
+                    Log.e(LogTag, "Admin bootstrap failed: ${exception.message}", exception)
+                    _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.Failed) }
+                }
+            }
+        }
+
+        fun installDownloadedAdmin() {
+            val apk = downloadedAdminApk ?: return
+            if (!apkInstaller.canRequestPackageInstalls()) {
+                _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.NeedsInstallPermission) }
+                return
+            }
+            val opened = apkInstaller.openVerifiedCompanionInstaller(apk, adminPackageName())
+            if (!opened) {
+                _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.VerificationFailed) }
+            }
+        }
+
+        private suspend fun downloadAdmin(manifest: com.contentfilter.core.update.model.UpdateManifest) {
+            _uiState.update {
+                it.copy(
+                    adminInstallStatus = AdminInstallStatus.Downloading,
+                    adminDownloadProgressPercent = 0,
+                )
+            }
+            when (
+                val result =
+                    updateRepository.download(manifest) { progress ->
+                        _uiState.update { it.copy(adminDownloadProgressPercent = progress) }
+                    }
+            ) {
+                is UpdateDownloadResult.Success -> {
+                    downloadedAdminApk = result.apk
+                    _uiState.update {
+                        it.copy(
+                            adminInstallStatus =
+                                if (apkInstaller.canRequestPackageInstalls()) {
+                                    AdminInstallStatus.ReadyToInstall
+                                } else {
+                                    AdminInstallStatus.NeedsInstallPermission
+                                },
+                            adminDownloadProgressPercent = 100,
+                        )
+                    }
+                }
+                UpdateDownloadResult.DownloadError -> {
+                    _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.Failed) }
+                }
+                UpdateDownloadResult.InvalidChecksum -> {
+                    _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.VerificationFailed) }
+                }
+            }
+        }
+
+        @Suppress("DEPRECATION")
+        private fun installedAdminVersionCode(): Int =
+            runCatching {
+                val packageInfo =
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        context.packageManager.getPackageInfo(
+                            adminPackageName(),
+                            PackageManager.PackageInfoFlags.of(0),
+                        )
+                    } else {
+                        context.packageManager.getPackageInfo(adminPackageName(), 0)
+                    }
+                packageInfo.longVersionCode.toInt()
+            }.getOrDefault(0)
+
+        private fun adminPackageName(): String =
+            when {
+                context.packageName.endsWith(".dev") -> "com.contentfilter.admin.dev"
+                context.packageName.endsWith(".beta") -> "com.contentfilter.admin.beta"
+                else -> "com.contentfilter.admin"
+            }
 
         private suspend fun downloadAndMaybeInstall(manifest: com.contentfilter.core.update.model.UpdateManifest) {
             when (

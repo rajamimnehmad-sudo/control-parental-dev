@@ -8,4 +8,9 @@ interface ApkInstaller {
     fun openInstallPermissionSettings()
 
     fun openPackageInstaller(apk: File)
+
+    fun openVerifiedCompanionInstaller(
+        apk: File,
+        expectedPackageName: String,
+    ): Boolean
 }

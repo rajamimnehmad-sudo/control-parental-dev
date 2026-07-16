@@ -53,5 +53,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.coroutines.core)
+    testImplementation(libs.kotlin.test)
     kapt(libs.hilt.compiler)
 }
