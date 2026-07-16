@@ -159,6 +159,7 @@ Flujo de una entrada:
 | DAG-ANALYSIS-UX-01 | Resuelto DEV 226 | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Resuelto DEV 226 | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
 | DAG-REVIEW-STAGING-01 | En progreso | P1 | Analizar pagina completa antes de pedir revision por un resultado incierto | M | Medio |
+| DAG-BACK-NAV-01 | Idea | P2 | Atras respeta paginas y resultados antes de volver a Home | S | Medio |
 | USER-GREETING-01 | Idea | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
@@ -363,6 +364,27 @@ Flujo de una entrada:
 - Duplicados y relacion: se relaciona con `WEB-CACHE-01`, que propone cache local acotada de reputacion sin URL ni historial. No se marca como duplicado hasta definir si la aprobacion aplica a dominio, URL exacta o decision administrativa persistida.
 - Criterios de aceptacion propuestos: una aprobacion vigente evita revisiones repetidas solo dentro de su alcance exacto; toda entrada tiene origen, momento y vencimiento; cambios de politica, revocacion, version incompatible o indicadores de riesgo invalidan la reutilizacion; al vencer se vuelve a analizar o revisar; no se guarda contenido, HTML ni consultas; el administrador puede conocer y revocar la aprobacion aplicable.
 - Decisiones cerradas: siete dias; URL exacta; solo decisiones locales permitidas; almacenamiento cifrado en el dispositivo; huella de URL/titulo/texto/resumen visual; invalidacion por contenido, tiempo/reloj, politica o modelo; comprobacion dura de dominio y reglas en cada carga. Se puede borrar por separado sin borrar historial, sesiones ni pestanas.
+
+#### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
+
+- Estado: `Idea`; no aprobado para codigo.
+- Tipo: bug/UX de navegacion DAG.
+- Prioridad: P2.
+- Problema: al usar Atras desde una pagina, DAG puede volver directamente a Home y omitir el listado de resultados desde el que se abrio.
+- Solucion propuesta: respetar la pila de navegacion visible. Desde una pagina, Atras vuelve una pagina; cuando el origen fue una busqueda, debe volver primero al listado de resultados y solo el siguiente Atras debe regresar a Home.
+- Evidencia: comportamiento esperado definido por el usuario el 2026-07-15.
+- Esfuerzo: S.
+- Riesgo: medio; WebView, resultados Compose, multiples pestanas y cierre del teclado mantienen historiales distintos que pueden desincronizarse.
+- Dependencias: historial WebView por pestana; estado de resultados; Home DAG; boton fisico y accion del menu; teclado; `DAG-NAV-UX-01` y `DAG-TABS-UX-01`.
+- Duplicados y relacion: precisa la semantica de Atras pendiente en `DAG-NAV-UX-01`; se conserva como entrada separada para no perder el fallo observable.
+- Criterios de aceptacion propuestos:
+  - pagina abierta desde resultados -> Atras muestra esos mismos resultados -> Atras muestra Home;
+  - varias paginas navegadas retroceden en orden antes de volver a resultados;
+  - cada pestana conserva su propia pila y no muestra resultados de otra;
+  - cerrar el teclado tiene prioridad cuando corresponde y no consume un paso de historial;
+  - recarga, aprobacion, bloqueo o recuperacion del renderer no crean saltos ni bucles;
+  - Home sin historial aplica el comportamiento de salida definido para DAG.
+- Decisiones pendientes para el ticket: comportamiento exacto al abrir URL directa, historial local, enlaces en nueva pestana, pagina bloqueada y cierre de la ultima pestana.
 
 ### USER-GREETING-01 - Saludo personalizado en App Usuario
 
