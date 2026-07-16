@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario 8cc96c0eee73652ce8489e1e4993eb496d73396272b314353c226af12ee12271
+Admin   ac843c3db2d90fe834a26cb39bd7e43b54d0a1bebb15c920e07995e1d13efa42
 ```
 
 ## Implementacion 2026-07-15 - DEV 225 Home y revision por etapas
@@ -86,7 +86,7 @@ Admin   pendiente de publicacion
 - Los resultados inciertos por titulo o fragmento ya no piden aprobacion inmediata. DAG abre la pagina oculta, mantiene dominios/listas/barreras antes de WebView y decide con el contenido completo; solo si esa segunda etapa sigue incierta ofrece revision humana.
 - Las paginas JavaScript sin texto inmediato reciben dos reintentos locales acotados antes de declararse ilegibles, reduciendo revisiones falsas por hidratacion tardia.
 - Una palabra ambigua aislada dentro de una pagina extensa ya no fuerza revision por si sola: pasa al modelo contextual. En consultas cortas conserva el criterio conservador; terminos explicitos, categorias no anulables, dominios bloqueados e imagenes inseguras mantienen prioridad.
-- Validacion local: ktlint, tests DEV Usuario/Admin y builds optimizados de ambos APK correctos, incluida una regresion para menciones ambiguas incidentales. Falta publicacion DEV y prueba fisica.
+- Validacion local: ktlint, tests DEV Usuario/Admin y builds optimizados de ambos APK correctos, incluida una regresion para menciones ambiguas incidentales. APKs y manifiestos DEV 225 publicados y verificados; falta prueba fisica.
 
 ## Implementacion 2026-07-15 - DEV 224 paquete visual DAG
 
