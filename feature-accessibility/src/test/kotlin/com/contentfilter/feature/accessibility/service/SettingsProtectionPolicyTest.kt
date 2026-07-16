@@ -50,6 +50,18 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun adminAppInfoIsNotBlocked() {
+        assertFalse(
+            decide(
+                className = "com.android.settings.applications.InstalledAppDetails",
+                ownAppIdentityVisible = false,
+                adminAppIdentityVisible = true,
+                dangerousSettingsActionVisible = true,
+            ),
+        )
+    }
+
+    @Test
     fun resolvedOemUninstallerIsProtected() {
         assertTrue(
             decide(
@@ -286,6 +298,17 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun adminExternalSourceSettingsRemainAvailableWithoutTrustedWindow() {
+        assertFalse(
+            decide(
+                className = "com.android.settings.Settings\$ExternalSourcesDetailsActivity",
+                ownAppIdentityVisible = false,
+                adminAppIdentityVisible = true,
+            ),
+        )
+    }
+
+    @Test
     fun unknownSourceSettingsAreBlockedWithoutTrustedInstallWindow() {
         assertTrue(
             decide(
@@ -330,10 +353,22 @@ class SettingsProtectionPolicyTest {
         )
     }
 
+    @Test
+    fun adminLabelDoesNotIdentifyUserApp() {
+        assertFalse(
+            "Content Filter Admin".matchesOwnAppIdentity(
+                ownPackage = "com.contentfilter.user.dev",
+                appLabel = "Content Filter",
+            ),
+        )
+        assertTrue("Content Filter Admin".matchesAdminAppIdentity())
+    }
+
     private fun decide(
         packageName: String = "com.android.settings",
         className: String,
         ownAppIdentityVisible: Boolean = true,
+        adminAppIdentityVisible: Boolean = false,
         resolvedOwnUninstaller: Boolean = false,
         dangerousSettingsActionVisible: Boolean = false,
         deviceAdminEnabled: Boolean = true,
@@ -346,6 +381,7 @@ class SettingsProtectionPolicyTest {
             packageName = packageName,
             className = className,
             ownAppIdentityVisible = ownAppIdentityVisible,
+            adminAppIdentityVisible = adminAppIdentityVisible,
             resolvedOwnUninstaller = resolvedOwnUninstaller,
             dangerousSettingsActionVisible = dangerousSettingsActionVisible,
             deviceAdminEnabled = deviceAdminEnabled,
@@ -361,6 +397,7 @@ class SettingsProtectionPolicyTest {
             packageName = "com.android.settings",
             className = "com.samsung.android.settings.applications.specialaccess.SecDeviceAdminAdd",
             ownAppIdentityVisible = false,
+            adminAppIdentityVisible = false,
             resolvedOwnUninstaller = false,
             dangerousSettingsActionVisible = false,
             deviceAdminEnabled = true,

@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 244 y App Admin DEV 244, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 245 y App Admin DEV 245, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -698,7 +698,7 @@ Flujo de una entrada:
 
 ### APP-INSTALL-APPROVAL-01 - Aprobacion previa para instalar apps
 
-- Estado: `Publicado DEV 244; correccion Samsung validada tecnicamente y pendiente prueba final en SM-S908E`. Aprobado por el usuario al ordenar todos los tickets y definido el 2026-07-16 para Android normal compatible con la mayoria de equipos, sin Android Enterprise ni cambios de cuenta Google.
+- Estado: `Publicado DEV 245; correccion Samsung validada tecnicamente y pendiente prueba final en SM-S908E`. Aprobado por el usuario al ordenar todos los tickets y definido el 2026-07-16 para Android normal compatible con la mayoria de equipos, sin Android Enterprise ni cambios de cuenta Google.
 - Tipo: control de aplicaciones, seguridad y solicitudes.
 - Prioridad: P1.
 - Problema: se quiere conservar Play Store disponible para explorar aplicaciones, pero impedir que una app se instale hasta recibir permiso explicito del administrador. Tambien se deben impedir la descarga y la instalacion lateral de archivos APK.
@@ -729,7 +729,8 @@ Flujo de una entrada:
 - Decisiones aplicadas: mismo comportamiento para apps gratuitas o pagas; actualizaciones de paquetes existentes no solicitan permiso; una reinstalacion conserva una aprobacion Allow previa y, sin ella, vuelve a cuarentena; tiendas, adjuntos, gestores de archivos y ADB quedan cubiertos por bloqueo observable del instalador mas cuarentena posterior. Apps del sistema y los dos paquetes Content Filter quedan excluidos.
 - Limite real: es best-effort en Android normal. Sin Device Owner no se promete impedir materialmente toda instalacion en todos los OEM, pero una app nueva detectada no puede usarse sin aprobacion mientras Accessibility funciona. La garantia de sistema queda como modalidad empresarial futura y requeriria aprovisionamiento administrado.
 - Correccion DEV 244: la autorizacion usa el componente exacto del receptor firmado, el APK pendiente se retoma al volver del permiso por origen y la politica reconoce variantes Samsung/OEM del instalador y de fuentes desconocidas. La matriz integral de 1.011 tareas fue correcta y ambos APK se instalaron in-place en SM-A235M conservando Accessibility, Device Admin y VPN.
-- Validacion pendiente: reproducir en el Samsung SM-S908E personal el recorrido que originaba `Este ajuste esta restringido`, instalar Usuario y Admin 244 y confirmar que la autorizacion se cierra al terminar. Sigue pendiente la prueba completa Play Store/APK/aprobacion del alcance mayor del ticket.
+- Correccion DEV 245: el detector separa la identidad exacta de App Admin de la etiqueta generica de Usuario. La ficha de aplicacion y el permiso por origen de Admin quedan accesibles permanentemente; los Ajustes sensibles de Usuario y las fuentes desconocidas de terceros siguen protegidos. Las regresiones, la matriz integral y la instalacion in-place auxiliar fueron correctas.
+- Validacion pendiente: reproducir en el Samsung SM-S908E personal el recorrido que originaba `Este ajuste esta restringido`, instalar Usuario y Admin 245 y confirmar las actualizaciones siguientes desde ambas apps. Sigue pendiente la prueba completa Play Store/APK/aprobacion del alcance mayor del ticket.
 
 ### SUPERADMIN-DAG-ENTITLEMENT-01 - DAG como funcion premium
 

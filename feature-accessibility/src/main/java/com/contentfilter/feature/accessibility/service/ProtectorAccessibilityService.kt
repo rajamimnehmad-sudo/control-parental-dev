@@ -255,12 +255,15 @@ class ProtectorAccessibilityService : AccessibilityService() {
         if (!settingsProtectionPolicy.couldContainProtectedScreen(packageName, resolvedOwnUninstaller)) return false
         val ownAppIdentityVisible =
             rootInActiveWindow.containsOwnAppIdentity() || eventContainsOwnAppIdentity(event)
+        val adminAppIdentityVisible =
+            rootInActiveWindow.containsAdminAppIdentity() || eventContainsAdminAppIdentity(event)
         val dangerousSettingsActionVisible = rootInActiveWindow.containsDangerousSettingsAction()
         if (
             !settingsProtectionPolicy.shouldLeaveProtectedScreen(
                 packageName = packageName,
                 className = className,
                 ownAppIdentityVisible = ownAppIdentityVisible,
+                adminAppIdentityVisible = adminAppIdentityVisible,
                 resolvedOwnUninstaller = resolvedOwnUninstaller,
                 dangerousSettingsActionVisible = dangerousSettingsActionVisible,
                 deviceAdminEnabled = DeviceAdminController.isEnabled(this),
@@ -324,6 +327,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             packageName = packageName,
             className = className,
             ownAppIdentityVisible = root.containsOwnAppIdentity(),
+            adminAppIdentityVisible = root.containsAdminAppIdentity(),
             resolvedOwnUninstaller = packageName in ownUninstallerPackages,
             dangerousSettingsActionVisible = root.containsDangerousSettingsAction(),
             deviceAdminEnabled = DeviceAdminController.isEnabled(this),
@@ -400,6 +404,21 @@ class ProtectorAccessibilityService : AccessibilityService() {
         return false
     }
 
+    private fun AccessibilityNodeInfo?.containsAdminAppIdentity(): Boolean {
+        val root = this ?: return false
+        val pending = ArrayDeque<AccessibilityNodeInfo>()
+        pending.add(root)
+        var visited = 0
+        while (pending.isNotEmpty() && visited < MaxIdentityNodes) {
+            val node = pending.removeFirst()
+            visited += 1
+            val values = listOf(node.text?.toString(), node.contentDescription?.toString(), node.viewIdResourceName)
+            if (values.any { it.matchesAdminAppIdentity() }) return true
+            repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
+        }
+        return false
+    }
+
     @Suppress("DEPRECATION")
     private fun resolveOwnUninstallerPackages(): Set<String> =
         listOf(Intent.ACTION_DELETE, Intent.ACTION_UNINSTALL_PACKAGE)
@@ -416,6 +435,11 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val ownPackage = applicationContext.packageName
         val values = event.text.map(CharSequence::toString) + listOfNotNull(event.contentDescription?.toString())
         return values.any { value -> value.matchesOwnAppIdentity(ownPackage, appLabel) }
+    }
+
+    private fun eventContainsAdminAppIdentity(event: AccessibilityEvent): Boolean {
+        val values = event.text.map(CharSequence::toString) + listOfNotNull(event.contentDescription?.toString())
+        return values.any { it.matchesAdminAppIdentity() }
     }
 
     private fun handleSearchEngineProtection(

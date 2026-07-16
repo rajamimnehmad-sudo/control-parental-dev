@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 244
-App Admin versionCode 244
+App Usuario versionCode 245
+App Admin versionCode 245
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,23 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-244-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-244-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-245-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-245-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 4c0bdb6cee0d3b1a4788542871d6567eab193c205ec6c832b2fbb5e7aae27914
-Admin   90b08b1f283096084fe626845ff19922fc3868b4cc50b6c1b9a3459cd61eecd3
+Usuario 199c04dc656c12158d04004f33e9552a6653c7835a504f922e76838ae66ed1cc
+Admin   031309c11651dc77c7bc08250c23d3fb4884d2ccf70416803dbb6844dc5aa7a2
 ```
+
+## Correccion de identidad Admin DEV 245 - 2026-07-16
+
+- Causa confirmada por el reporte del Samsung SM-S908E: la pantalla de Ajustes mostraba `Content Filter Admin`, pero el detector buscaba la etiqueta generica `Content Filter` y la confundia con App Usuario. La pantalla de permiso `Instalar apps desconocidas` tampoco distinguia para que aplicacion se estaba configurando.
+- La identidad Admin se reconoce ahora por sus tres package names y por su etiqueta exacta. Su ficha de aplicacion y su permiso por origen permanecen accesibles sin autorizacion temporal; no se desarma ni se relaja la proteccion de App Usuario, Accessibility, VPN o Device Admin.
+- Se agregaron regresiones para ficha Admin, permiso por origen Admin y separacion de etiquetas. App Usuario conserva el bloqueo de su propia ficha y de fuentes desconocidas de terceros.
+- Usuario y Admin subieron juntos a `versionCode 245`. La matriz integral paso con 1.011 tareas y ambos APK se instalaron in-place en SM-A235M conservando Accessibility, Device Admin y VPN. La validacion funcional determinante queda pendiente en el SM-S908E personal.
 
 ## Correccion de actualizaciones Samsung DEV 244 - 2026-07-16
 

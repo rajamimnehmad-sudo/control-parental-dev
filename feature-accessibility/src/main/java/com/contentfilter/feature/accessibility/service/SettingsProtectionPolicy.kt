@@ -16,6 +16,7 @@ class SettingsProtectionPolicy {
         packageName: String,
         className: String?,
         ownAppIdentityVisible: Boolean,
+        adminAppIdentityVisible: Boolean,
         resolvedOwnUninstaller: Boolean,
         dangerousSettingsActionVisible: Boolean,
         deviceAdminEnabled: Boolean,
@@ -37,6 +38,9 @@ class SettingsProtectionPolicy {
         val criticalSettingsScreen = isCriticalSettingsScreen(packageName, className)
         val packageInstallScreen = isPackageInstallScreen(packageName, className)
         val unknownSourcesScreen = isUnknownSourcesScreen(packageName, className)
+        if (adminAppIdentityVisible && (unknownSourcesScreen || requiredScope == ProtectionAuthorizationScope.Removal)) {
+            return false
+        }
         if (deviceAdminRemovalScreen && !deviceAdminEnabled) return false
         if (trustedInstallAuthorized && (packageInstallScreen || unknownSourcesScreen)) return false
         if (
@@ -235,6 +239,21 @@ internal fun String?.matchesOwnAppIdentity(
     appLabel: String,
 ): Boolean {
     val value = this ?: return false
+    if (value.matchesAdminAppIdentity()) return false
     return value.contains(ownPackage, ignoreCase = true) ||
         (appLabel.isNotBlank() && value.contains(appLabel, ignoreCase = true))
 }
+
+internal fun String?.matchesAdminAppIdentity(): Boolean {
+    val value = this ?: return false
+    return AdminPackageNames.any { value.contains(it, ignoreCase = true) } ||
+        value.contains(AdminAppLabel, ignoreCase = true)
+}
+
+private val AdminPackageNames =
+    setOf(
+        "com.contentfilter.admin",
+        "com.contentfilter.admin.dev",
+        "com.contentfilter.admin.beta",
+    )
+private const val AdminAppLabel = "Content Filter Admin"
