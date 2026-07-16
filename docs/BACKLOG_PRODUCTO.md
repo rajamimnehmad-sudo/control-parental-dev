@@ -172,7 +172,7 @@ Flujo de una entrada:
 | DAG-REVIEW-STAGING-01 | Resuelto DEV 225 | P1 | Analizar pagina completa antes de pedir revision por un resultado incierto | M | Medio |
 | DAG-BACK-NAV-01 | Resuelto DEV 233 | P2 | Atras respeta paginas y resultados antes de volver a Home | S | Medio |
 | DAG-APPROVAL-POLICY-01 | Implementado DEV 238; pendiente prueba fisica | P0 | Evitar que aprobar un sitio desde App Admin desactive DAG | M | Alto |
-| DAG-REQUEST-STATUS-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Confirmar solicitudes enviadas y mostrar pendientes de revision desde el menu DAG | M | Medio |
+| DAG-REQUEST-STATUS-01 | Implementado parcial DEV 238; ampliacion pendiente | P1 | Deduplicar pedidos, restringir reenvio y avisar visualmente/push cuando Admin resuelve | L | Medio |
 | DAG-SHARE-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Compartir de forma segura el enlace de la pagina actual desde DAG | S | Medio |
 | DAG-AUTOCOMPLETE-02 | Implementado DEV 238; pendiente prueba fisica | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
 | DAG-CAPTCHA-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
@@ -478,23 +478,28 @@ Flujo de una entrada:
 
 #### DAG-REQUEST-STATUS-01 - Confirmacion y pendientes de revision
 
-- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: UX de solicitudes y navegacion DAG. Prioridad: P1.
-- Problema: despues de pedir revision de una pagina no queda claro que la solicitud fue enviada ni cual es su estado. El usuario tampoco tiene un lugar dentro de DAG para consultar las revisiones que siguen pendientes.
-- Solucion propuesta: mostrar una confirmacion persistente e inequivoca inmediatamente despues del envio y agregar en el menu de tres puntos un apartado `Pendientes de revision` con las solicitudes del usuario, su sitio y estado. Evitar reenvios duplicados mientras una solicitud equivalente siga pendiente.
+- Estado: `Implementado parcialmente en DEV 238; ampliacion pendiente, no aprobada todavia para codigo`. Tipo: UX de solicitudes, navegacion DAG y notificaciones. Prioridad: P1.
+- Problema: despues de pedir revision de una pagina debe quedar inequívocamente claro que la solicitud fue enviada y no debe poder duplicarse. Cuando Admin aprueba una pagina, DAG necesita comunicar que existe una novedad, identificar visualmente la pagina habilitada y avisar al usuario aunque DAG no este abierto.
+- Solucion propuesta: deduplicar solicitudes equivalentes; restringir el boton de pedir aprobacion mientras exista una solicitud activa y reemplazarlo por un estado `Solicitud enviada`; mantener una seccion `Pedidos` en el menu; encender un indicador verde de novedades en DAG cuando cambie un estado; mostrar en verde la pagina aprobada dentro de esa seccion; y enviar un push al dispositivo Usuario cuando Admin la habilite.
 - Resultado DEV 238: DAG confirma `Solicitud enviada y pendiente de revision`, observa solo las solicitudes locales de dominio, ofrece la bandeja desde Home y navegacion, distingue pendiente de envio, pendiente remota, aprobada, rechazada o expirada y evita otro envio del mismo dominio mientras exista una equivalente pendiente. Solo una aprobada permite volver a abrir el dominio, que se analiza nuevamente.
-- Evidencia: observacion de uso del usuario el 2026-07-16.
-- Esfuerzo: M estimado. Riesgo: medio; la pantalla puede exponer mas historial del necesario, mostrar estados obsoletos o confundir una solicitud enviada con una aprobacion.
-- Dependencias: solicitudes de dominio DAG; sincronizacion y estados pendiente/aprobada/rechazada; menu de tres puntos; navegacion por pestana; privacidad del historial local; `DAG-APPROVAL-POLICY-01` para el resultado aprobado.
+- Evidencia: observacion de uso del usuario y ampliacion funcional definidas el 2026-07-16.
+- Esfuerzo: L estimado para completar interfaz, estado de novedad y push. Riesgo: medio; la pantalla puede exponer mas historial del necesario, mostrar estados obsoletos, repetir notificaciones o confundir una solicitud enviada con una aprobacion efectiva.
+- Dependencias: solicitudes de dominio DAG; sincronizacion y estados pendiente/aprobada/rechazada; menu de tres puntos; navegacion por pestana; privacidad del historial local; `DAG-APPROVAL-POLICY-01`; token y permiso FCM de App Usuario; entrega deduplicada y apertura profunda hacia `Pedidos`.
 - Duplicados y relacion: especializa `REQUESTS-UX-01` para la experiencia dentro de DAG y se relaciona con `POLICY-EXPLAIN-01`; se mantiene separado de la bandeja de solicitudes de App Admin porque aqui el destinatario visual es el usuario que envio la pagina.
 - Criterios de aceptacion propuestos:
   - al enviar una solicitud, DAG confirma claramente que fue enviada y que esta pendiente;
-  - repetir la misma accion no genera solicitudes duplicadas mientras exista una equivalente activa;
-  - el menu de tres puntos ofrece `Pendientes de revision` aun desde Home;
+  - el boton queda restringido y muestra el estado enviado mientras exista una solicitud equivalente activa;
+  - toques repetidos, reintentos, reinicios y sincronizaciones no generan pedidos duplicados;
+  - el menu de tres puntos ofrece `Pedidos` aun desde Home;
   - la lista distingue al menos pendiente, aprobada y rechazada sin prometer aprobacion antes de sincronizarla;
+  - cuando llega una novedad, DAG muestra un indicador verde visible pero no invasivo hasta que el usuario abre o reconoce `Pedidos`;
+  - una pagina aprobada se identifica en verde dentro de `Pedidos`, sin aplicar ese color a pendientes o rechazos;
+  - la aprobacion genera un unico push al dispositivo correcto, con texto claro y apertura directa de `Pedidos`;
+  - si el permiso de notificaciones esta rechazado o el push falla, la novedad y el estado aprobado siguen disponibles al abrir DAG;
   - tocar una entrada permite volver al contexto seguro correspondiente sin mostrar contenido no aprobado;
   - los cambios de estado se actualizan de forma consistente y sobreviven al reinicio previsto;
   - no se expone la consulta completa, contenido de pagina ni historial adicional al administrador o a servicios remotos.
-- Decisiones pendientes para la entrevista del ticket: texto y duracion de la confirmacion; si la bandeja muestra solo pendientes o tambien resueltas; datos visibles por fila; retencion; accion al tocar una aprobada o rechazada; agrupacion por dominio o URL; comportamiento offline y entre pestanas.
+- Decisiones pendientes para la entrevista del ticket: forma y ubicacion de la luz verde; momento de marcar la novedad como vista; texto exacto del push; si tambien se notifica rechazo; datos visibles por fila; retencion; accion al tocar una aprobada o rechazada; agrupacion por dominio o URL; comportamiento offline y entre pestanas.
 
 #### DAG-SHARE-01 - Compartir enlace actual
 
