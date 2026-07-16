@@ -147,6 +147,7 @@ Flujo de una entrada:
 | SUPERADMIN-MSG-01 | Idea | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Idea | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Idea | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
+| ALERT-ROUTING-01 | Idea | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | BARRIER-LAUNCHER-01 | Idea | P2 | Ocultar o neutralizar la accion rapida de desinstalacion sin Device Owner ni restablecer el telefono | M | Medio |
 | DAG-NAV-UX-01 | En progreso | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | En progreso | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
@@ -391,6 +392,26 @@ Flujo de una entrada:
   - no se duplican eventos ni se debilitan las alertas existentes de App Admin;
   - el alcance final documenta canal, inmediatez, retencion y tratamiento de eventos repetidos.
 - Decisiones pendientes: bandeja web, notificacion del navegador u otro canal; destinatarios; eventos exactos incluidos; aviso inmediato o diferido; retencion, lectura y agrupacion; integracion o separacion respecto de `SUPERADMIN-MSG-01`.
+
+### ALERT-ROUTING-01 - Enrutamiento por intento o desactivacion efectiva
+
+- Estado: `Idea`; no aprobado para codigo ni cambios de notificaciones.
+- Tipo: seguridad, alertas y politica de destinatarios.
+- Prioridad: P1.
+- Problema: intentos bloqueados y desactivaciones efectivas tienen distinta gravedad y no deberian necesariamente notificarse a los mismos destinatarios.
+- Solucion propuesta: mostrar los intentos bloqueados unicamente en Super Admin; cuando una app o componente de proteccion se desactive realmente, avisar tanto a Super Admin como a App Admin.
+- Evidencia: decision de producto expresada por el usuario el 2026-07-15.
+- Esfuerzo: M.
+- Riesgo: alto; ocultar intentos a Admin cambia el comportamiento urgente ya implementado y una definicion imprecisa de desactivacion puede omitir incidentes reales o generar falsas alarmas.
+- Dependencias: eventos de proteccion, FCM, bandejas `SUPERADMIN-ALERTS-01` y `ADMIN-ALERTS-UX-01`, watchdog, estado real de Accessibility/VPN/Device Admin y permisos por comunidad.
+- Duplicados y relacion: no duplica las bandejas visuales; define su politica de destinatarios. Entra en tension con `PUSH-REAL-01`, que actualmente entrega intentos de manipulacion a App Admin, y con la formulacion inicial de `ADMIN-ALERTS-UX-01`; no se reescriben ni archivan esos registros hasta preparar el ticket.
+- Criterios de aceptacion propuestos:
+  - un intento bloqueado queda visible para Super Admin y no genera aviso de intento en App Admin;
+  - una desactivacion efectiva genera un unico evento atribuible al dispositivo correcto y llega a Super Admin y Admin;
+  - reintentos, watchdog y FCM no duplican el incidente;
+  - ningun aviso contiene historial de navegacion, consultas ni datos sensibles;
+  - el estado distingue intento impedido, componente degradado y desactivacion confirmada.
+- Decisiones pendientes para el ticket: significado exacto de `app desactivada`; componentes y apps incluidos; canal e inmediatez; responsables por comunidad; retencion, lectura, agrupacion y escalamiento si no se repara.
 
 ## Roadmap DAG, Web e IA local
 
