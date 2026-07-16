@@ -154,7 +154,7 @@ Flujo de una entrada:
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
-| DAG-THEME-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Corregir barra superior blanca en modo oscuro y mantener temas claro, oscuro o segun dispositivo | S | Bajo |
+| DAG-THEME-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Hacer coincidir la barra superior de la camara con el color efectivo de DAG | S | Bajo |
 | DAG-THEME-02 | Resuelto DEV 230 | P1 | Corregir texto negro sobre fondo negro y fondo transparente del WebView | S | Bajo |
 | DAG-VISUAL-KOSHER-03 | Resuelto DEV 230 | P0 | Abrir tiendas normales y ocultar selectivamente imagenes intimas o visualmente no aptas | M | Alto |
 | DAG-VISUAL-CALIBRATION-01 | Resuelto DEV 231 | P0 | Reducir falsos positivos con salida normal, blur fuerte u ocultamiento por imagen | M | Alto |
@@ -326,15 +326,15 @@ Flujo de una entrada:
 #### DAG-THEME-01 - Contraste y tema visual
 
 - Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: bug visual, accesibilidad visual y personalizacion. Prioridad: P2.
-- Problema: en modo oscuro, la barra superior del sistema ubicada alrededor de la camara permanece blanca y rompe la continuidad visual de DAG. El contraste general y las opciones de tema ya existen, pero no alcanzan correctamente esta superficie.
-- Solucion propuesta: hacer que la barra superior del sistema siga el tema efectivo de DAG y elegir iconos claros u oscuros segun el fondo, conservando las opciones `Claro`, `Oscuro` y `Segun el dispositivo`.
+- Problema: la barra superior del sistema ubicada alrededor de la camara puede permanecer blanca y cortar visualmente la interfaz. No debe tener un color fijo distinto de la pantalla DAG que se encuentra debajo.
+- Solucion propuesta: hacer que toda la zona superior alrededor de la camara coincida con el color efectivo de la interfaz DAG en la pantalla y tema actuales, y elegir iconos claros u oscuros segun ese fondo. Se conservan las opciones `Claro`, `Oscuro` y `Segun el dispositivo`.
 - Resultado DEV 238: DAG aplica el color de fondo del tema efectivo a las barras de estado y navegacion, ajusta el contraste de sus iconos y restaura los colores previos al salir de la experiencia DAG.
-- Evidencia: observacion inicial del usuario el 2026-07-15 y prueba fisica negativa informada el 2026-07-16: con DAG en modo oscuro, la zona superior de la camara sigue blanca y no queda integrada.
+- Evidencia: observacion inicial del usuario el 2026-07-15 y prueba fisica negativa informada el 2026-07-16: la zona superior de la camara sigue blanca y no queda integrada. El usuario preciso el mismo dia que debe coincidir con el color de DAG, no limitarse a cambiar entre blanco y negro.
 - Esfuerzo: S estimado. Riesgo: bajo; una correccion incompleta puede dejar iconos ilegibles o comportamientos distintos segun version Android, recorte o fabricante.
 - Dependencias: tema Compose, barras del sistema, iconos, WebView y persistencia local de preferencia.
 - Duplicados y relacion: no se crea un ID nuevo porque es el mismo problema cubierto por `DAG-THEME-01`; la evidencia fisica invalida su cierre completo. Puede agruparse con `UI-POLISH-01`, pero se conserva separado por afectar especificamente DAG y las barras del sistema.
-- Criterios de aceptacion propuestos: en modo oscuro la zona superior alrededor de la camara usa un fondo oscuro coherente y los iconos del sistema son legibles; en modo claro usa fondo e iconos coherentes; `Segun el dispositivo` sigue el cambio del sistema sin requerir reiniciar DAG; la preferencia persiste; Home, resultados, pagina Web, historial, pestanas y estados de analisis no producen destellos blancos al navegar; se valida fisicamente en el dispositivo afectado y al menos con los tipos de recorte soportados.
-- Decisiones pendientes para la entrevista del ticket: dispositivo y version Android donde se observo; si ocurre en todas las pantallas DAG o solo al navegar; color final de la barra; comportamiento sobre paginas Web claras en modo oscuro; matriz minima de dispositivos con perforacion o notch.
+- Criterios de aceptacion propuestos: la zona superior alrededor de la camara coincide visualmente con el fondo efectivo de DAG en Home, resultados, pagina Web, historial, selector de pestanas y estados de analisis; los iconos del sistema permanecen legibles; `Segun el dispositivo` sigue el cambio del sistema sin reiniciar DAG; la preferencia persiste; no aparecen franjas ni destellos blancos al navegar; se valida fisicamente en el dispositivo afectado y al menos con los tipos de recorte soportados.
+- Decisiones pendientes para la entrevista del ticket: dispositivo y version Android donde se observo; si ocurre en todas las pantallas DAG o solo al navegar; comportamiento sobre paginas Web claras en modo oscuro; matriz minima de dispositivos con perforacion o notch.
 
 #### DAG-HISTORY-UX-01 - Historial minimalista
 
