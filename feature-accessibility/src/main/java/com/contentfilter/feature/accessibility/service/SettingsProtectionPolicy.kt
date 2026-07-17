@@ -38,6 +38,11 @@ class SettingsProtectionPolicy {
         val criticalSettingsScreen = isCriticalSettingsScreen(packageName, className)
         val packageInstallScreen = isPackageInstallScreen(packageName, className)
         val unknownSourcesScreen = isUnknownSourcesScreen(packageName, className)
+        val removalActionScreen =
+            requiredScope == ProtectionAuthorizationScope.Removal || dangerousSettingsActionVisible
+        if (removalActionScreen && !deviceAdminRemovalScreen && !ownAppIdentityVisible) {
+            return false
+        }
         if (adminAppIdentityVisible && (unknownSourcesScreen || requiredScope == ProtectionAuthorizationScope.Removal)) {
             return false
         }
@@ -101,7 +106,10 @@ class SettingsProtectionPolicy {
         val normalizedClass = className.orEmpty()
         if (
             (packageName in PackageInstallerPackages || resolvedOwnUninstaller) &&
-            UninstallClassHints.any { normalizedClass.contains(it, true) }
+            (
+                dangerousSettingsActionVisible ||
+                    UninstallClassHints.any { normalizedClass.contains(it, true) }
+            )
         ) {
             return ProtectionAuthorizationScope.Removal
         }

@@ -274,6 +274,14 @@ Flujo de una entrada:
 - Decision aplicada: eliminacion logica inmediata de datos operativos y retencion de auditoria, alertas y contadores. No se hace `DELETE` fisico ni se borra la cuenta/comunidad.
 - Cierre: la cuenta tecnica se conserva como exige la decision de retencion; dispositivo y datos operativos quedan archivados. No se borro fisicamente ninguna fila.
 
+### BARRIER-UNINSTALL-SCOPE-01 - Proteger solo la desinstalacion de Usuario
+
+- Estado: `Implementado candidato DEV 248; pendiente publicacion y prueba fisica`. Aprobado por el reporte correctivo explicito del usuario el 2026-07-16. Prioridad: P0. Riesgo: alto.
+- Problema: Samsung bloqueaba la desinstalacion de cualquier app cuando la barrera estaba armada, aunque la proteccion debe alcanzar exclusivamente App Usuario.
+- Causa: instaladores OEM pueden reutilizar una clase generica de Package Installer para instalar y quitar; esa clase omitia el filtro posterior por identidad de la app objetivo.
+- Resultado: una accion de quitar, desactivar o forzar cierre solo se intercepta cuando la pantalla identifica positivamente App Usuario. Admin y otras apps quedan fuera. La proteccion propia de Device Admin Usuario y la politica separada de instalaciones permanecen.
+- Aceptacion: desinstalar una app ajena abre la confirmacion normal; Admin puede quitarse; Usuario sigue protegido sin autorizacion de remocion; con autorizacion vigente puede quitarse; tests Samsung genericos, Accessibility, formato y builds de ambas APK correctos.
+
 ### BARRIER-A11Y-RACE-01 - Bypass rapido para apagar Accessibility
 
 - Estado: `Implementado en DEV 240; pendiente prueba fisica`. El usuario aprobo avanzar el 2026-07-16 y confirmo que el incidente ocurre en Samsung SM-S908E.

@@ -88,6 +88,14 @@ Admin   19b75f9a07cb61c22bab19ca3362b1dd314f2da47ec07aa12e32eb701e976d71
 - El commit `5f92ee1` fue publicado una sola vez exclusivamente en Supabase DEV por el workflow `29550036969`. Android CI `29550036945` completo build, tests, ktlint, lint y detekt correctamente.
 - Ambos manifiestos publicos declaran 247; las descargas recalculan exactamente los SHA-256 registrados arriba. `aapt` confirma paquetes DEV correctos, `versionCode 247` y `minSdk 29`. Queda pendiente el recorrido visual fisico.
 
+## Candidato DEV 248 - Desinstalacion limitada solo a App Usuario - 2026-07-16
+
+- Reporte grave: con la barrera armada, Samsung impedia desinstalar cualquier aplicacion. El comportamiento requerido es proteger exclusivamente App Usuario; Admin y todas las demas apps deben poder quitarse normalmente.
+- Causa: algunos instaladores OEM reutilizan una clase generica `PackageInstallerActivity` para instalar y desinstalar. La politica la trataba como instalacion protegida antes de comprobar que la identidad visible perteneciera a App Usuario.
+- Correccion: cualquier accion visible de desinstalar, desactivar o forzar cierre requiere ahora identidad positiva de App Usuario antes de escapar de la pantalla. Las instalaciones de terceros conservan su politica existente y la desactivacion del Device Admin de Usuario conserva su proteccion propia.
+- Regresiones: el instalador generico Samsung permite quitar otra app y sigue bloqueando la remocion de Usuario. Tests de `feature-accessibility`, ktlint y builds DEV optimizados de Usuario/Admin correctos: 851 tareas.
+- Usuario y Admin suben juntos a `versionCode 248`. Pendiente: publicacion unica DEV, manifiestos/hashes y prueba fisica de desinstalar una app ajena sin afectar Usuario.
+
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 
 - El usuario aprobo ejecutar juntos `SUPERWEB-DEPLOY-SYNC-01`, `UI-BANNER-UNIFY-01`, `SUPERWEB-FUNCTIONAL-VERIFY-01` y `ANDROID-PHYSICAL-CLOSEOUT-01`, conservando tickets verificables y una sola publicacion final.

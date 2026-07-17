@@ -84,6 +84,32 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun samsungGenericInstallerAllowsUninstallingAnotherApp() {
+        assertFalse(
+            decide(
+                packageName = "com.samsung.android.packageinstaller",
+                className = "com.samsung.android.packageinstaller.PackageInstallerActivity",
+                ownAppIdentityVisible = false,
+                resolvedOwnUninstaller = true,
+                dangerousSettingsActionVisible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun samsungGenericInstallerStillProtectsUserAppRemoval() {
+        assertTrue(
+            decide(
+                packageName = "com.samsung.android.packageinstaller",
+                className = "com.samsung.android.packageinstaller.PackageInstallerActivity",
+                ownAppIdentityVisible = true,
+                resolvedOwnUninstaller = true,
+                dangerousSettingsActionVisible = true,
+            ),
+        )
+    }
+
+    @Test
     fun dangerousActionProtectsUnknownOemAppInfoClass() {
         assertTrue(
             decide(
