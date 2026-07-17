@@ -19,6 +19,7 @@ class SettingsProtectionPolicy {
         adminAppIdentityVisible: Boolean,
         resolvedOwnUninstaller: Boolean,
         dangerousSettingsActionVisible: Boolean,
+        installSourceSettingsVisible: Boolean,
         deviceAdminEnabled: Boolean,
         armed: Boolean,
         settingsAuthorized: Boolean,
@@ -33,12 +34,15 @@ class SettingsProtectionPolicy {
                 ownAppIdentityVisible = ownAppIdentityVisible,
                 resolvedOwnUninstaller = resolvedOwnUninstaller,
                 dangerousSettingsActionVisible = dangerousSettingsActionVisible,
+                installSourceSettingsVisible = installSourceSettingsVisible,
             ) ?: return false
         if (!armed && !deviceAdminEnabled) return false
         val deviceAdminRemovalScreen = isDeviceAdminRemovalScreen(packageName, className)
         val criticalSettingsScreen = isCriticalSettingsScreen(packageName, className)
         val packageInstallScreen = isPackageInstallScreen(packageName, className)
-        val unknownSourcesScreen = isUnknownSourcesScreen(packageName, className)
+        val unknownSourcesScreen =
+            isUnknownSourcesScreen(packageName, className) ||
+                (packageName == AndroidSettingsPackage && installSourceSettingsVisible)
         val removalActionScreen =
             requiredScope == ProtectionAuthorizationScope.Removal || dangerousSettingsActionVisible
         if (removalActionScreen && !deviceAdminRemovalScreen && !ownAppIdentityVisible) {
@@ -120,6 +124,7 @@ class SettingsProtectionPolicy {
         ownAppIdentityVisible: Boolean,
         resolvedOwnUninstaller: Boolean,
         dangerousSettingsActionVisible: Boolean,
+        installSourceSettingsVisible: Boolean,
     ): ProtectionAuthorizationScope? {
         val normalizedClass = className.orEmpty()
         if (
@@ -144,6 +149,7 @@ class SettingsProtectionPolicy {
             return ProtectionAuthorizationScope.Settings
         }
         if (packageName != AndroidSettingsPackage) return null
+        if (installSourceSettingsVisible) return ProtectionAuthorizationScope.Settings
         if (isOwnAppSubSettings(packageName, className, ownAppIdentityVisible)) {
             return ProtectionAuthorizationScope.Settings
         }
@@ -236,6 +242,15 @@ internal fun isDangerousSettingsAction(
     return DangerousActionLabels.any { label.orEmpty().trim().equals(it, ignoreCase = true) }
 }
 
+internal fun isInstallSourceSettingsIndicator(
+    viewId: String?,
+    label: String?,
+): Boolean {
+    if (InstallSourceSettingsIdHints.any { viewId.orEmpty().contains(it, ignoreCase = true) }) return true
+    val normalized = label.orEmpty().trim().lowercase()
+    return InstallSourceSettingsLabelHints.any { normalized.contains(it) }
+}
+
 private val DangerousActionIdHints =
     listOf(
         "force_stop_button",
@@ -252,6 +267,24 @@ private val DangerousActionLabels =
         "forzar detencion",
         "desinstalar",
         "desactivar",
+    )
+
+private val InstallSourceSettingsIdHints =
+    listOf(
+        "external_sources",
+        "install_unknown_apps",
+        "unknown_app_sources",
+    )
+
+private val InstallSourceSettingsLabelHints =
+    listOf(
+        "permitir desde esta fuente",
+        "instalar aplicaciones desconocidas",
+        "instalar aplic. desconocidas",
+        "allow from this source",
+        "install unknown apps",
+        "permitir desta fonte",
+        "instalar apps desconhecidos",
     )
 
 internal enum class SettingsEscapeAction {

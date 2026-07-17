@@ -79,6 +79,14 @@ Usuario 9febc765493bd1b19b8864f4355da4616136c10183cb0126aa420e73b25dfe12
 Admin   76c51b8d781ea18338c6a92724a641ba0e61d741b238f8350baeb253c749e259
 ```
 
+## Candidato DEV 254 - actualizaciones confiables sin habilitar Ajustes - 2026-07-17
+
+- `UPDATE-TRUSTED-INSTALL-02` corrige el reporte de Samsung donde una actualizacion iniciada desde App Usuario o App Admin era expulsada por la barrera hasta autorizar Ajustes manualmente desde Admin.
+- Causa: la entrega Admin -> Usuario dependia de un filtro redundante de permiso sobre el receptor que puede variar entre instalaciones OEM. Ademas, Samsung puede presentar el permiso por origen con una actividad generica `SubSettings`; la autorizacion confiable existente solo reconocia nombres explicitos de fuentes desconocidas.
+- Correccion: el broadcast sigue dirigido al componente exacto y el receptor sigue exigiendo el permiso `signature`, pero la entrega ya no filtra adicionalmente al receptor. App Usuario declara tambien el uso del permiso. Accessibility reconoce indicadores especificos de `Instalar apps desconocidas` aun dentro de `SubSettings` y solo los permite durante la ventana confiable de cinco minutos iniciada por las apps Content Filter.
+- Seguridad conservada: APK externos y fuentes desconocidas sin ventana confiable siguen bloqueados; VPN, Accessibility, Device Admin, ficha y desinstalacion de App Usuario no se habilitan por esta ventana. Android normal mantiene su confirmacion de instalacion y el permiso por origen cuando aun no fue concedido.
+- Validacion local dirigida: tests Debug/Release de `feature-accessibility`, ktlint de `feature-accessibility` y `core-update`, tests DEV y ktlint de ambas apps, manifiestos fusionados y builds optimizados Usuario/Admin correctos. Usuario y Admin suben juntos a `versionCode 254`. Pendiente publicacion DEV, verificacion publica y prueba final en el Samsung personal.
+
 ## Publicacion DEV 247 - Paridad UX de App Usuario - 2026-07-16
 
 - `USER-UX-PARITY-01` fue aprobado con cuatro destinos principales: Inicio, Mis apps, Internet y Ajustes. Internet permanece separado de Mis apps.

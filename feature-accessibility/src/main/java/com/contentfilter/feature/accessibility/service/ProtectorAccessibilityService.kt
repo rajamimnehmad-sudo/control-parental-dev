@@ -258,6 +258,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val adminAppIdentityVisible =
             rootInActiveWindow.containsAdminAppIdentity() || eventContainsAdminAppIdentity(event)
         val dangerousSettingsActionVisible = rootInActiveWindow.containsDangerousSettingsAction()
+        val installSourceSettingsVisible = rootInActiveWindow.containsInstallSourceSettingsIndicator()
         if (
             !settingsProtectionPolicy.shouldLeaveProtectedScreen(
                 packageName = packageName,
@@ -266,6 +267,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 adminAppIdentityVisible = adminAppIdentityVisible,
                 resolvedOwnUninstaller = resolvedOwnUninstaller,
                 dangerousSettingsActionVisible = dangerousSettingsActionVisible,
+                installSourceSettingsVisible = installSourceSettingsVisible,
                 deviceAdminEnabled = DeviceAdminController.isEnabled(this),
                 armed = protectionStateStore.isArmed(),
                 settingsAuthorized =
@@ -339,6 +341,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
             adminAppIdentityVisible = root.containsAdminAppIdentity(),
             resolvedOwnUninstaller = packageName in ownUninstallerPackages,
             dangerousSettingsActionVisible = root.containsDangerousSettingsAction(),
+            installSourceSettingsVisible = root.containsInstallSourceSettingsIndicator(),
             deviceAdminEnabled = DeviceAdminController.isEnabled(this),
             armed = protectionStateStore.isArmed(),
             settingsAuthorized =
@@ -408,6 +411,21 @@ class ProtectorAccessibilityService : AccessibilityService() {
             ) {
                 return true
             }
+            repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
+        }
+        return false
+    }
+
+    private fun AccessibilityNodeInfo?.containsInstallSourceSettingsIndicator(): Boolean {
+        val root = this ?: return false
+        val pending = ArrayDeque<AccessibilityNodeInfo>()
+        pending.add(root)
+        var visited = 0
+        while (pending.isNotEmpty() && visited < MaxIdentityNodes) {
+            val node = pending.removeFirst()
+            visited += 1
+            val labels = listOf(node.text?.toString(), node.contentDescription?.toString())
+            if (labels.any { isInstallSourceSettingsIndicator(node.viewIdResourceName, it) }) return true
             repeat(node.childCount) { index -> node.getChild(index)?.let(pending::addLast) }
         }
         return false

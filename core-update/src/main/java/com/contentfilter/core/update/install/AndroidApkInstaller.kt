@@ -111,7 +111,7 @@ class AndroidApkInstaller
                         TrustedInstallReceiverClass,
                     ),
                 ),
-                TrustedInstallPermission,
+                null,
                 receiver,
                 null,
                 Activity.RESULT_OK,
@@ -132,7 +132,6 @@ class AndroidApkInstaller
         private companion object {
             const val LogTag = "ApkInstaller"
             const val TrustedInstallAction = "com.contentfilter.action.AUTHORIZE_TRUSTED_INSTALL"
-            const val TrustedInstallPermission = "com.contentfilter.permission.AUTHORIZE_TRUSTED_INSTALL"
             const val TrustedInstallReceiverClass =
                 "com.contentfilter.user.apps.TrustedInstallAuthorizationReceiver"
             const val TrustedInstallWindowMillis = 5 * 60_000L

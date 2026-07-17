@@ -314,6 +314,37 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun signedTrustedInstallWindowAllowsGenericSamsungInstallSourceSettings() {
+        assertFalse(
+            decide(
+                className = "com.android.settings.SubSettings",
+                ownAppIdentityVisible = true,
+                installSourceSettingsVisible = true,
+                trustedInstallAuthorized = true,
+            ),
+        )
+    }
+
+    @Test
+    fun genericSamsungInstallSourceSettingsStayBlockedWithoutTrustedWindow() {
+        assertTrue(
+            decide(
+                className = "com.android.settings.SubSettings",
+                ownAppIdentityVisible = true,
+                installSourceSettingsVisible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun installSourceIndicatorDoesNotConfuseVpnOrAccessibilitySettings() {
+        assertTrue(isInstallSourceSettingsIndicator(null, "Permitir desde esta fuente"))
+        assertTrue(isInstallSourceSettingsIndicator(null, "Install unknown apps"))
+        assertFalse(isInstallSourceSettingsIndicator(null, "Content Filter VPN"))
+        assertFalse(isInstallSourceSettingsIndicator("android:id/switch_widget", "Activado"))
+    }
+
+    @Test
     fun samsungExternalSourceSettingsStayBlockedWithoutTrustedWindow() {
         assertTrue(
             decide(
@@ -482,6 +513,7 @@ class SettingsProtectionPolicyTest {
         settingsAuthorized: Boolean = false,
         removalAuthorized: Boolean = false,
         trustedInstallAuthorized: Boolean = false,
+        installSourceSettingsVisible: Boolean = false,
     ): Boolean =
         SettingsProtectionPolicy().shouldLeaveProtectedScreen(
             packageName = packageName,
@@ -490,6 +522,7 @@ class SettingsProtectionPolicyTest {
             adminAppIdentityVisible = adminAppIdentityVisible,
             resolvedOwnUninstaller = resolvedOwnUninstaller,
             dangerousSettingsActionVisible = dangerousSettingsActionVisible,
+            installSourceSettingsVisible = installSourceSettingsVisible,
             deviceAdminEnabled = deviceAdminEnabled,
             armed = armed,
             settingsAuthorized = settingsAuthorized,
@@ -506,6 +539,7 @@ class SettingsProtectionPolicyTest {
             adminAppIdentityVisible = false,
             resolvedOwnUninstaller = false,
             dangerousSettingsActionVisible = false,
+            installSourceSettingsVisible = false,
             deviceAdminEnabled = true,
             armed = false,
             settingsAuthorized = false,
