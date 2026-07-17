@@ -322,7 +322,15 @@ export async function clearDagCalibrationReviewsAction(_prevState: ActionState):
   const { data, error } = await supabase.functions.invoke("dag-calibration", {
     body: { action: "clear" },
   });
-  if (error || data?.error) return errorState(error ?? new Error(String(data.error)));
+  if (error) {
+    const context = "context" in error ? error.context : null;
+    if (context instanceof Response) {
+      const payload = await context.clone().json().catch(() => null) as { error?: unknown } | null;
+      if (typeof payload?.error === "string") return { ok: false, message: payload.error };
+    }
+    return errorState(error);
+  }
+  if (data?.error) return errorState(new Error(String(data.error)));
   const cleared = Number(data?.cleared ?? 0);
   revalidatePath("/dag-calibration");
   return {

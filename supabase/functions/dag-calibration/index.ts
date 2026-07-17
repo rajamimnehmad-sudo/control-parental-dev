@@ -30,7 +30,7 @@ Deno.serve(async (request) => {
   const serviceClient = createClient(supabaseUrl, requiredEnv("SUPABASE_SERVICE_ROLE_KEY"), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
-  if (payload.action === "clear") return clearCalibrationQueue(request, supabaseUrl, serviceClient);
+  if (payload.action === "clear") return clearCalibrationQueue(request, serviceClient);
 
   const deviceId = payload.device_id?.trim() ?? "";
   if (!isUuid(deviceId)) return json({ error: "Dispositivo inválido." }, 400);
@@ -153,20 +153,23 @@ Deno.serve(async (request) => {
 
 async function clearCalibrationQueue(
   request: Request,
-  supabaseUrl: string,
   serviceClient: ReturnType<typeof createClient>,
 ): Promise<Response> {
-  const authorization = request.headers.get("authorization") ?? "";
-  const authenticated = createClient(supabaseUrl, requiredEnv("SUPABASE_ANON_KEY"), {
-    auth: { persistSession: false, autoRefreshToken: false },
-    global: { headers: { authorization } },
-  });
-  const [{ data: userData, error: userError }, { data: isSuperAdmin, error: roleError }] = await Promise.all([
-    authenticated.auth.getUser(),
-    authenticated.rpc("is_super_admin"),
-  ]);
+  const jwt = bearerToken(request.headers.get("authorization"));
+  if (!jwt) return json({ error: "La sesión de Super Admin no es válida." }, 401);
+  const { data: userData, error: userError } = await serviceClient.auth.getUser(jwt);
   const actorId = userData.user?.id;
-  if (userError || roleError || !actorId || isSuperAdmin !== true) {
+  if (userError || !actorId) return json({ error: "La sesión de Super Admin expiró." }, 401);
+
+  const { data: superAdmin, error: roleError } = await serviceClient
+    .from("super_admins")
+    .select("user_id")
+    .eq("user_id", actorId)
+    .eq("enabled", true)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (roleError) return json({ error: "No se pudo comprobar el permiso de Super Admin." }, 503);
+  if (!superAdmin) {
     return json({ error: "No autorizado para borrar Calibración DAG." }, 403);
   }
 
@@ -214,6 +217,12 @@ async function clearCalibrationQueue(
   });
   if (auditError) return json({ error: "La cola se vació, pero no se pudo registrar la acción." }, 503);
   return json({ cleared: reviews.length }, 200);
+}
+
+function bearerToken(authorization: string | null): string | null {
+  if (!authorization?.startsWith("Bearer ")) return null;
+  const token = authorization.slice("Bearer ".length).trim();
+  return token.length > 0 ? token : null;
 }
 
 function isClearlyBlocked(

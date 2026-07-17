@@ -79,6 +79,13 @@ Usuario 1a293595be0aff2075db17430af335ef405f364622825b400983b5bcb2125e28
 Admin   433d2a723bf16a6dc36375b505fb70a429abc2700048b5a35125f600021852a0
 ```
 
+## Hotfix Calibracion DAG - borrado autenticado - 2026-07-17
+
+- Reporte: `Borrar todas` respondia `Edge Function returned a non-2xx status code` y no retiraba las fotos.
+- Evidencia DEV: los logs de invocacion mostraron llamadas de la Superweb con JWT ES256 valido y `auth_user` correcto, pero Edge devolvia 403. La comprobacion paralela mediante un segundo cliente y `is_super_admin()` perdia el contexto de `auth.uid()` antes de Storage.
+- Correccion: Edge valida explicitamente el Bearer JWT con Supabase Auth y comprueba el registro activo de `super_admins` mediante su cliente backend. La Service Role permanece exclusivamente en Edge y no se incorpora a Android ni a la Superweb. Los errores HTTP ahora muestran en la interfaz el motivo devuelto por el backend.
+- Verificacion: el usuario de la llamada fallida existe como Super Admin activo; Edge Function `dag-calibration` v7 esta activa; una llamada sin JWT devuelve 401. Los intentos fallidos preservaron 106 revisiones visibles y dejaron cero archivadas, sin borrado parcial. TypeScript, ESLint y build Next correctos. No cambia Android, `versionCode` ni APK.
+
 ## Publicacion DEV 255 - Calibracion DAG solo para dudas reales - 2026-07-17
 
 - `DAG-CALIBRATION-QUALITY-06` evita que evidencia visual claramente bloqueable llegue a la cola humana. El clasificador de modestia distingue ahora entre cruce leve del umbral, que sigue como incertidumbre, y evidencia fuerte, que se difumina localmente. La comprobacion se ejecuta tambien cuando el clasificador profesional queda incierto.
