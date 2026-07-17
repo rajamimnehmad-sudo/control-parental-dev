@@ -146,6 +146,7 @@ Flujo de una entrada:
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
 | SUPERWEB-OPS-UX-01 | Archivo seguro, agrupacion y claridad Base implementados; busqueda/filtros pendientes | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
+| APP-UPDATE-CHANGELOG-01 | Idea | P2 | Mostrar en Usuario y Admin las novedades especificas de la actualizacion ofrecida | M | Medio |
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 248; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
@@ -239,6 +240,26 @@ Flujo de una entrada:
 - Decision de seguridad: no implementar `borrar alerta` como eliminacion fisica. Los eventos son auditoria retenida y los tickets de alertas dejan pendiente la politica de retencion. La alternativa propuesta es lectura y archivo reversible, manteniendo trazabilidad.
 - Requiere aprobacion separada antes de tocar Supabase: definir retencion, quien puede archivar/restaurar, si el archivo es global o por Super Admin, paginacion y tratamiento de avisos ya entregados.
 - Aceptacion propuesta: operar listas grandes desde celular; filtros no cambian datos; archivar no borra evidencia; toda mutacion queda auditada; ninguna vista expone historial de navegacion, consultas o secretos.
+
+### APP-UPDATE-CHANGELOG-01 - Novedades de actualizacion por aplicacion
+
+- Estado: `Idea`; no aprobado para codigo. Tipo: UX de actualizaciones, comunicacion de producto y publicacion DEV. Prioridad: P2.
+- Problema: App Usuario y App Admin pueden informar que existe una version nueva, pero no explican de forma clara que cambia para la aplicacion correspondiente antes de instalarla.
+- Solucion propuesta: mostrar en la pantalla de Actualizaciones un bloque `Novedades` asociado a la version ofrecida. App Usuario recibe exclusivamente cambios relevantes para Usuario y DAG; App Admin recibe exclusivamente cambios de administracion. Si se saltaron varias versiones, presentar un resumen acumulado y legible sin mezclar detalles tecnicos internos.
+- Evidencia: pedido explicito del usuario del 2026-07-17.
+- Esfuerzo: M estimado. Riesgo: medio; notas desactualizadas, cruzadas entre apps o no vinculadas criptograficamente al APK pueden inducir a instalar una version con informacion incorrecta.
+- Dependencias: `core-update`; pantallas Actualizaciones de Usuario/Admin; manifiestos publicos DEV; scripts y workflow de publicacion; versionCode/versionName; integridad SHA-256; textos accesibles y compatibilidad con clientes anteriores.
+- Duplicados y relacion: complementa `DAG-UPDATE-01` y el bloque de versiones de Superweb, pero no duplica el mecanismo de descarga/instalacion. Esta entrada define comunicacion de cambios por APK.
+- Criterios de aceptacion propuestos:
+  - Usuario muestra solo novedades de App Usuario y DAG aplicables a la version ofrecida;
+  - Admin muestra solo novedades de App Admin aplicables a la version ofrecida;
+  - las notas declaran versionCode y corresponden al mismo manifiesto, URL, hash y paquete del APK verificado;
+  - saltar varias versiones produce un resumen acumulado sin duplicados ni una lista tecnica inmanejable;
+  - una version sin notas usa un mensaje neutro y no bloquea la actualizacion;
+  - las notas pueden leerse antes de descargar y siguen disponibles durante el flujo de instalacion;
+  - no incluyen secretos, nombres internos sensibles, datos de usuarios ni promesas que excedan lo realmente publicado;
+  - clientes antiguos ignoran el campo nuevo sin romper la comprobacion de actualizaciones.
+- Decisiones pendientes para la entrevista del ticket: notas dentro del manifiesto o archivo versionado separado; extension maxima; categorias visibles; acumulacion entre versiones; conservar historial despues de instalar; autor y proceso de revision de cada texto.
 
 ### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
 
