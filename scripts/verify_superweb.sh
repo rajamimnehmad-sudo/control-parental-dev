@@ -27,7 +27,7 @@ if [[ -n "$expected_commit" ]]; then
   fi
 fi
 
-for route in communities dag-usage alerts announcements; do
+for route in communities dag-usage dag-calibration alerts announcements; do
   headers="$(curl --silent --show-error --head "$base_url/$route")"
   status_code="$(awk 'toupper($1) ~ /^HTTP\// { code=$2 } END { print code }' <<<"$headers")"
   location="$(awk 'tolower($1) == "location:" { print $2 }' <<<"$headers" | tr -d '\r')"

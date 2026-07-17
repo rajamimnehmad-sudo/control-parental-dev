@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-17:
 
 ```text
-App Usuario versionCode 252
-App Admin versionCode 252
+App Usuario versionCode 253
+App Admin versionCode 253
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-252-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-252-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-253-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-253-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario f456cc398b5788463090738c6e247569fbd1b751b8747bd480870c05a4b56ad0
-Admin   582522d4710d9b4a9b3f39b66d86336f52d33362e5757a783d1ef156f290a987
+Usuario 9febc765493bd1b19b8864f4355da4616136c10183cb0126aa420e73b25dfe12
+Admin   76c51b8d781ea18338c6a92724a641ba0e61d741b238f8350baeb253c749e259
 ```
 
 ## Publicacion DEV 247 - Paridad UX de App Usuario - 2026-07-16
@@ -142,7 +142,7 @@ Admin   582522d4710d9b4a9b3f39b66d86336f52d33362e5757a783d1ef156f290a987
 - No se consumieron consultas Brave: todas las pruebas fueron navegaciones directas. Con ambos `versionCode` en 252, la matriz final de tests unitarios DEV, ktlint y builds optimizados de Usuario/Admin completo 773 tareas correctamente.
 - El commit `b8637d8` se publico una sola vez exclusivamente en Supabase DEV mediante `Publicar APKs DEV` `29590258165`. Android CI `29590258075` completo build, tests, ktlint, Android Lint y Detekt. Ambos manifiestos declaran 252; las descargas publicas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`. Ambos APK comparten el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
-## Candidato DEV 253 - Calibracion DAG - 2026-07-17
+## Publicacion DEV 253 - Calibracion DAG - 2026-07-17
 
 - Todo el bloque queda identificado como `Calibracion DAG` en Android, Supabase, Super Admin, tickets y documentacion. No es entrenamiento automatico del modelo: ajusta umbrales versionados sobre las respuestas humanas y mantiene separado el registro de modelos para una futura etapa de entrenamiento validado.
 - App Usuario conserva la clasificacion en el dispositivo y solo para una decision visual `Incierta` genera una miniatura JPEG de hasta 512 px y 128 KiB. No envia URL, consulta, texto de pagina ni imagen original. La miniatura se autentica con el token del dispositivo, se deduplica por hash y queda en el bucket privado `dag-calibration`; no se usa Service Role en Android. El backend limita cada dispositivo a 100 casos nuevos por 24 horas y 250 pendientes vigentes para evitar saturacion.
@@ -151,7 +151,10 @@ Admin   582522d4710d9b4a9b3f39b66d86336f52d33362e5757a783d1ef156f290a987
 - Android consulta la calibracion activa al iniciar DAG, valida los limites recibidos y aplica los umbrales localmente sin descargar ni reemplazar el modelo. La barra de analisis usa etapas reales y el progreso de imagenes visibles, es monotona y expone porcentaje accesible; deja de usar el avance ficticio repetitivo.
 - Backend aplicado exclusivamente a Supabase DEV `syeycayasyufedwoprea`: migraciones `20260717175505_dag_calibration`, `20260717181351_dag_calibration_model_scope` y `20260717181541_dag_calibration_service_auth`, Edge Function `dag-calibration` v3 y bucket privado. Las cuatro tablas tienen RLS y niegan lectura directa a `anon` y `authenticated`; la autorizacion de dispositivo tampoco es ejecutable por esos roles y Super Admin opera mediante RPC endurecidas. Los casos vencidos se ocultan de la cola pero no se borran automaticamente.
 - Limite honesto: registrar y calibrar no cambia los pesos de la IA. Entrenar o cambiar un modelo requerira un corpus etiquetado suficiente, artefacto firmado, conjunto de validacion, metricas y compatibilidad Android; la interfaz no simula ese proceso antes de que exista.
-- Estado de cierre: falta completar la matriz final Usuario/Admin, validar el candidato fisico, subir ambos `versionCode` juntos, publicar una sola vez en DEV, verificar manifiestos/hashes y confirmar el despliegue Vercel antes de declarar DEV 253 publicado.
+- Validacion: la matriz local final completo tests Usuario/Admin, ktlint, Android Lint, Detekt y ambos builds; una segunda matriz dirigida repitio tests, formato, Detekt y builds despues de restaurar el fallo cerrado del detector de modestia. TypeScript, ESLint y Next fueron correctos y el build contiene `/dag-calibration`.
+- Evidencia fisica SM-A235M: Usuario y Admin 253 se instalaron in-place sin borrar datos; Device Admin y la VPN siguieron activos. Accessibility ya estaba desactivado antes de la comprobacion y no se activo automaticamente. DAG abrio una URL directa sin consumir Brave, obtuvo la configuracion desde `dag-calibration` v3 con HTTP 200 y genero tres casos inciertos reales aceptados con HTTP 202; un dispositivo/token invalido recibio 403.
+- Publicacion: commit `bfab78d`; workflow `Publicar APKs DEV` `29604076782` y Android CI `29604076758` correctos. Los manifiestos publicos declaran 253 y los APK recalculan exactamente los SHA-256 de este handoff; `aapt` confirma paquetes DEV, `minSdk 29`, `targetSdk 36` y ambas firmas coinciden con el certificado esperado `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- Superweb: Vercel publico `bfab78d` en estado `Ready`; health declara DEV y el commit esperado. `/dag-calibration` existe y redirige a Login sin sesion. Queda pendiente solamente recorrer y etiquetar visualmente los tres casos con una sesion Super Admin; no se usaron ni inventaron credenciales.
 
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 

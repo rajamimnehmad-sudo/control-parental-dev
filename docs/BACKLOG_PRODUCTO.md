@@ -187,11 +187,11 @@ Flujo de una entrada:
 | DAG-CAPTCHA-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
-| DAG-CALIBRATION-PROGRESS-01 | Candidato DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
-| DAG-CALIBRATION-QUEUE-02 | Candidato DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
-| DAG-CALIBRATION-REVIEW-03 | Candidato DEV 253 | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
-| DAG-CALIBRATION-VERSIONS-04 | Candidato DEV 253 | P0 | Calcular, activar y revertir umbrales versionados de Calibracion DAG | L | Alto |
-| DAG-CALIBRATION-MODELS-05 | Candidato DEV 253 | P1 | Registrar modelos y separar calibracion de entrenamiento real | M | Alto |
+| DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
+| DAG-CALIBRATION-QUEUE-02 | Resuelto DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
+| DAG-CALIBRATION-REVIEW-03 | Publicado DEV 253; recorrido autenticado pendiente | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
+| DAG-CALIBRATION-VERSIONS-04 | Resuelto DEV 253 | P0 | Calcular, activar y revertir umbrales versionados de Calibracion DAG | L | Alto |
+| DAG-CALIBRATION-MODELS-05 | Resuelto DEV 253 | P1 | Registrar modelos y separar calibracion de entrenamiento real | M | Alto |
 | USER-GREETING-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### SUPERWEB-DEPLOY-SYNC-01 - Publicacion oficial verificable
@@ -974,7 +974,7 @@ Flujo de una entrada:
 
 ### Calibracion DAG - cola, criterio humano, versiones y modelos
 
-- Estado conjunto: `Candidato DEV 253`; aprobado explicitamente por el usuario el 2026-07-17 para ejecutar los tickets seguidos y publicar una sola vez al final.
+- Estado conjunto: `Publicado en DEV 253`; aprobado explicitamente por el usuario el 2026-07-17 para ejecutar los tickets seguidos y publicar una sola vez al final. Solo queda el recorrido visual autenticado de la cola Super Admin.
 - `DAG-CALIBRATION-PROGRESS-01`: reemplaza la animacion ficticia por etapas reales de busqueda, inicio de pagina, analisis de texto e imagenes visibles. El porcentaje nunca retrocede, llega a 100 % solamente al resolver la compuerta y se comunica a accesibilidad.
 - `DAG-CALIBRATION-QUEUE-02`: solamente una clasificacion visual incierta produce una miniatura JPEG de hasta 512 px y 128 KiB. Se envia autenticada y deduplicada por hash al bucket privado DEV; no contiene URL, consulta, texto ni la imagen original. Una falla de red no bloquea ni modifica la decision local. El backend limita 100 casos nuevos por dispositivo cada 24 horas y 250 pendientes vigentes.
 - `DAG-CALIBRATION-REVIEW-03`: Super Admin muestra los casos mediante URL firmada de cinco minutos y exige `Permitir` o `Difuminar`, motivo estructurado y nota opcional. Puntajes, actor, fecha, decision y motivo quedan auditados. No existe lectura directa de tablas para clientes.
@@ -982,7 +982,7 @@ Flujo de una entrada:
 - `DAG-CALIBRATION-MODELS-05`: registra el modelo profesional actualmente embebido y reserva estados, hash de artefacto y metricas para modelos futuros. Calibrar ajusta umbrales, no pesos. Entrenar o cambiar la IA queda bloqueado hasta disponer de corpus suficiente, validacion independiente, artefacto firmado y compatibilidad Android; la Superweb explica esa diferencia y no simula un entrenamiento inexistente.
 - Privacidad actualizada: las versiones historicas de `DAG-IMAGES-01` no sincronizaban ningun dato visual. Este bloque posterior, aprobado por el usuario, agrega exclusivamente miniaturas inciertas bajo el contrato anterior; la clasificacion completa y las imagenes normales permanecen locales.
 - Backend DEV: migraciones `20260717175505_dag_calibration`, `20260717181351_dag_calibration_model_scope` y `20260717181541_dag_calibration_service_auth`, cuatro tablas con RLS, RPC Super Admin, bucket privado `dag-calibration` y Edge Function `dag-calibration` v3 con autenticacion propia del dispositivo. La RPC de autorizacion queda reservada al backend; cada calibracion usa etiquetas del mismo modelo. No se borra informacion automaticamente; `expires_at` solo retira casos vencidos de la cola operativa.
-- Criterios de cierre: tests Android y Web correctos; validacion del flujo autenticado; ambos `versionCode` iguales; una sola publicacion Supabase DEV; manifiestos, hashes, paquetes y firma verificados; Superweb Vercel desplegada con `/dag-calibration`; handoff y backlog reconciliados; repositorio limpio.
+- Cierre tecnico: tests Android y Web correctos; ambos `versionCode` en 253; una sola publicacion Supabase DEV; manifiestos, hashes, paquetes y firma verificados; Edge v3 recibe lectura autenticada y tres casos reales; Superweb Vercel `bfab78d` desplegada con `/dag-calibration`; acceso anonimo redirige a Login. Pendiente operativo: iniciar sesion como Super Admin, revisar los tres casos y calibrar recien al llegar al minimo documentado.
 
 ### AI-SEARCH-01A - Intencion semantica local compacta
 
