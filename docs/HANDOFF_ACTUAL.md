@@ -115,6 +115,13 @@ Admin   23a1695ed283c739577fc7e31cab55c70a480f26603e2f2faf325b2b4cee6d4d
 - Los manifiestos publicos declaran 249; las descargas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV correctos y `minSdk 29`.
 - Validacion SM-A235M Android 13: ambas apps actualizaron in-place a 249 sin borrar datos; Accessibility, Device Admin y VPN siguieron activos. Admin conservo confirmacion normal de desinstalacion y su ficha; Usuario, su ficha, su detalle Accessibility y la configuracion VPN fueron expulsados al launcher en menos de la primera comprobacion a 300 ms. Tras dejar finalizar los reintentos, las fichas de WhatsApp y Chrome permanecieron disponibles. Pendiente repetir el bypass manual rapido en SM-S908E.
 
+## Candidato DEV 250 - Ruta VPN Samsung generica - 2026-07-17
+
+- Reporte fisico personal con DEV 249: Ajustes permitia abrir la VPN y mover su switch; el watchdog recuperaba Content Filter al rato. Al iniciar Proton VPN, Android reemplazaba temporalmente Content Filter porque solo admite una VPN activa por usuario, y el watchdog restauraba despues la VPN protegida.
+- Causa: algunos recorridos Samsung alojan el detalle VPN dentro de `com.android.settings.SubSettings`, sin `VpnSettings` en la clase. DEV 249 cubria la actividad directa pero no podia clasificar esa variante generica.
+- Correccion: una `SubSettings` Android entra a proteccion y salida urgente solo si la ventana identifica positivamente App Usuario. Admin y otras apps/VPN no coinciden y permanecen accesibles. Tests cubren Usuario, otra identidad, Admin y salida inmediata.
+- Usuario y Admin suben juntos a `versionCode 250`. Tests Debug/Release y ktlint de Accessibility correctos; pendiente build, publicacion unica DEV, manifiestos/hashes y prueba fisica en el Samsung personal.
+
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 
 - El usuario aprobo ejecutar juntos `SUPERWEB-DEPLOY-SYNC-01`, `UI-BANNER-UNIFY-01`, `SUPERWEB-FUNCTIONAL-VERIFY-01` y `ANDROID-PHYSICAL-CLOSEOUT-01`, conservando tickets verificables y una sola publicacion final.

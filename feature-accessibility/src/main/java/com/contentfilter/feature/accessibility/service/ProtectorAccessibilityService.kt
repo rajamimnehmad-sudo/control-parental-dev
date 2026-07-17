@@ -290,6 +290,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                     settingsProtectionPolicy.requiresImmediateEscape(
                         packageName = packageName,
                         className = className,
+                        ownAppIdentityVisible = ownAppIdentityVisible,
                         dangerousSettingsActionVisible = dangerousSettingsActionVisible,
                     ),
         )

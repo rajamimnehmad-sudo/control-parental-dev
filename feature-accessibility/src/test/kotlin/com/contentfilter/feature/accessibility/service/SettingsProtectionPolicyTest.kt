@@ -367,6 +367,7 @@ class SettingsProtectionPolicyTest {
             policy.requiresImmediateEscape(
                 packageName = "com.android.settings",
                 className = "com.android.settings.applications.InstalledAppDetails",
+                ownAppIdentityVisible = true,
                 dangerousSettingsActionVisible = true,
             ),
         )
@@ -374,6 +375,7 @@ class SettingsProtectionPolicyTest {
             policy.requiresImmediateEscape(
                 packageName = "com.android.settings",
                 className = "com.android.settings.Settings\$AccessibilityDetailsSettingsActivity",
+                ownAppIdentityVisible = true,
                 dangerousSettingsActionVisible = false,
             ),
         )
@@ -381,6 +383,7 @@ class SettingsProtectionPolicyTest {
             policy.requiresImmediateEscape(
                 packageName = "com.android.settings",
                 className = "com.android.settings.Settings\$VpnSettingsActivity",
+                ownAppIdentityVisible = true,
                 dangerousSettingsActionVisible = false,
             ),
         )
@@ -392,6 +395,7 @@ class SettingsProtectionPolicyTest {
             SettingsProtectionPolicy().requiresImmediateEscape(
                 packageName = "com.google.android.packageinstaller",
                 className = "com.android.packageinstaller.InstallStart",
+                ownAppIdentityVisible = false,
                 dangerousSettingsActionVisible = false,
             ),
         )
@@ -402,6 +406,37 @@ class SettingsProtectionPolicyTest {
         assertEquals(SettingsEscapeAction.Home, SettingsEscapeStrategy.actionForAttempt(1, urgent = true))
         assertEquals(SettingsEscapeAction.Home, SettingsEscapeStrategy.actionForAttempt(2, urgent = true))
         assertEquals(SettingsEscapeAction.Home, SettingsEscapeStrategy.actionForAttempt(3, urgent = true))
+    }
+
+    @Test
+    fun samsungGenericSubSettingsProtectsOnlyUserIdentity() {
+        assertTrue(
+            decide(
+                className = "com.android.settings.SubSettings",
+                ownAppIdentityVisible = true,
+            ),
+        )
+        assertFalse(
+            decide(
+                className = "com.android.settings.SubSettings",
+                ownAppIdentityVisible = false,
+            ),
+        )
+        assertFalse(
+            decide(
+                className = "com.android.settings.SubSettings",
+                ownAppIdentityVisible = false,
+                adminAppIdentityVisible = true,
+            ),
+        )
+        assertTrue(
+            SettingsProtectionPolicy().requiresImmediateEscape(
+                packageName = "com.android.settings",
+                className = "com.android.settings.SubSettings",
+                ownAppIdentityVisible = true,
+                dangerousSettingsActionVisible = false,
+            ),
+        )
     }
 
     @Test

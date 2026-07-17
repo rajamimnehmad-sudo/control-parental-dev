@@ -30,6 +30,7 @@ class SettingsProtectionPolicy {
             protectedScope(
                 packageName = packageName,
                 className = className,
+                ownAppIdentityVisible = ownAppIdentityVisible,
                 resolvedOwnUninstaller = resolvedOwnUninstaller,
                 dangerousSettingsActionVisible = dangerousSettingsActionVisible,
             ) ?: return false
@@ -68,12 +69,14 @@ class SettingsProtectionPolicy {
     fun requiresImmediateEscape(
         packageName: String,
         className: String?,
+        ownAppIdentityVisible: Boolean,
         dangerousSettingsActionVisible: Boolean,
     ): Boolean {
         val normalizedClass = className.orEmpty()
         return dangerousSettingsActionVisible ||
             isDeviceAdminRemovalScreen(packageName, className) ||
             isCriticalSettingsScreen(packageName, className) ||
+            isOwnAppSubSettings(packageName, className, ownAppIdentityVisible) ||
             UninstallClassHints.any { normalizedClass.contains(it, ignoreCase = true) } ||
             packageName == AndroidSettingsPackage &&
             RemovalClassHints.any { normalizedClass.contains(it, ignoreCase = true) }
@@ -114,6 +117,7 @@ class SettingsProtectionPolicy {
     private fun protectedScope(
         packageName: String,
         className: String?,
+        ownAppIdentityVisible: Boolean,
         resolvedOwnUninstaller: Boolean,
         dangerousSettingsActionVisible: Boolean,
     ): ProtectionAuthorizationScope? {
@@ -140,11 +144,23 @@ class SettingsProtectionPolicy {
             return ProtectionAuthorizationScope.Settings
         }
         if (packageName != AndroidSettingsPackage) return null
+        if (isOwnAppSubSettings(packageName, className, ownAppIdentityVisible)) {
+            return ProtectionAuthorizationScope.Settings
+        }
         if (dangerousSettingsActionVisible) return ProtectionAuthorizationScope.Removal
         if (RemovalClassHints.any { normalizedClass.contains(it, true) }) return ProtectionAuthorizationScope.Removal
         if (SettingsClassHints.any { normalizedClass.contains(it, true) }) return ProtectionAuthorizationScope.Settings
         return null
     }
+
+    private fun isOwnAppSubSettings(
+        packageName: String,
+        className: String?,
+        ownAppIdentityVisible: Boolean,
+    ): Boolean =
+        packageName == AndroidSettingsPackage &&
+            ownAppIdentityVisible &&
+            className.orEmpty().contains(GenericSubSettingsClassHint, ignoreCase = true)
 
     private var lastActionAtElapsedMillis: Long = -MinActionIntervalMillis
 
@@ -152,6 +168,7 @@ class SettingsProtectionPolicy {
         const val AndroidSettingsPackage = "com.android.settings"
         const val SamsungAccessibilityPackage = "com.samsung.accessibility"
         const val SamsungSubSettingsClassHint = "SubSettings"
+        const val GenericSubSettingsClassHint = "SubSettings"
         const val MinActionIntervalMillis = 2_000L
         val PackageInstallerPackages =
             setOf(

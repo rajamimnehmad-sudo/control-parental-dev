@@ -284,10 +284,11 @@ Flujo de una entrada:
 
 ### BARRIER-USER-HARDENING-01 - Refuerzo de Accessibility, VPN y desinstalacion Usuario
 
-- Estado: `Publicado y validado en SM-A235M DEV 249; pendiente prueba manual rapida en SM-S908E`. Aprobado explicitamente por el usuario el 2026-07-17. Prioridad: P0. Riesgo: alto.
+- Estado: `Correccion VPN Samsung candidata DEV 250; pendiente publicacion y prueba en el celular personal`. Aprobado explicitamente por el usuario el 2026-07-17. Prioridad: P0. Riesgo: alto.
 - Causa: la barrera ya impedia completar acciones peligrosas, pero al abrir una pantalla protegida intentaba primero `Atras` y usaba Inicio como respaldo. Ese intervalo podia dejar visible brevemente el boton nativo y conservar una ventana para un toque rapido.
 - Resultado: las pantallas protegidas de desinstalacion, desactivacion, cierre forzado, Device Admin, Accessibility y VPN pasan directamente a Inicio desde el primer evento. Si Android conserva la ventana, se repite Inicio cada 100 ms hasta tres veces. Instalaciones normales, actualizaciones autorizadas, mantenimiento y fichas de Admin u otras apps conservan sus rutas separadas.
 - Limite Android: sin Device Owner, root o administracion empresarial no existe una API para quitar el boton nativo de Ajustes. El refuerzo reduce su exposicion y neutraliza su uso; no promete que todos los OEM eviten dibujarlo durante cada cuadro de la transicion.
+- Seguimiento DEV 250: el usuario confirmo en su Samsung personal con DEV 249 que la ruta manual de VPN permitia mover el switch y el watchdog la reactivaba despues. Causa: esa variante usa una clase generica Android `SubSettings`, no `VpnSettings`. Se protege ahora solo cuando la misma ventana identifica positivamente App Usuario; una `SubSettings` de Admin u otra app sigue disponible.
 - Aceptacion: solo Usuario queda protegido; Admin y otras apps mantienen ficha/desinstalacion; Accessibility, VPN y Device Admin no pueden apagarse con toques rapidos; autorizaciones vigentes funcionan; tests cubren salida urgente y separacion del instalador normal; prueba fisica Samsung sin borrar datos.
 
 ### BARRIER-A11Y-RACE-01 - Bypass rapido para apagar Accessibility
