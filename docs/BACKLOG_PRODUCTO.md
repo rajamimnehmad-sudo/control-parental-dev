@@ -207,6 +207,15 @@ Flujo de una entrada:
 - Alcance deliberado: los mensajes accionables internos de DAG conservan su contenedor con `Pedir revision`; no se convierte informacion estatica o contenido de tarjetas en banners.
 - Aceptacion: no quedan dos estilos de feedback; errores, progreso y resultados transitorios usan el componente compartido; textos largos no se recortan; Usuario y Admin compilan y pasan formato/lint. En SM-A235M, Alertas Admin mostro completo el estado vacio en el banner premium y Actualizaciones Usuario/Admin mostro completo el estado de ultima version.
 
+### USER-UX-PARITY-01 - Navegacion Usuario alineada con Admin
+
+- Estado: `Implementado candidato DEV 247; pendiente publicacion y prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-16, con Internet separado de Mis apps y mejora de iconos.
+- Causa: App Usuario ya compartia tarjetas, fondo y banners premium con Admin, pero sus destinos principales acumulaban historial entre pestanas, mostraban Volver en superficies raiz y reutilizaban la lupa o la campana para funciones distintas.
+- Resultado: el nav conserva cuatro destinos independientes —Inicio, Mis apps, Internet y Ajustes—; cambiar de pestana limpia la pila secundaria como en Admin; Mis apps, Internet y Ajustes son raices sin Volver redundante; Solicitudes y Avisos siguen como secciones internas con regreso fijo.
+- Iconografia: Mis apps usa una cuadricula propia, Solicitudes una lista de pedidos, Internet el globo y Avisos la campana. El destino Web pasa a mostrarse como `Internet` sin cambiar VPN, Accessibility, DAG, politicas ni datos.
+- Validacion candidata: `core-ui:ktlintCheck`, tests DEV Usuario/Admin y builds optimizados de ambas APK correctos. Riesgo residual: recorrido visual y navegacion fisica en Samsung.
+- Aceptacion: cuatro destinos claros sin duplicados; Internet separado; iconos distinguibles; las raices no muestran Volver; secciones internas, notificaciones y Atrás conservan su destino; Android 10 o posterior sigue soportado.
+
 ### SUPERWEB-FUNCTIONAL-VERIFY-01 - Recorrido funcional del propietario
 
 - Estado: `Validacion automatizada DEV correcta; pendiente sesion autenticada publicada`; aprobado explicitamente el 2026-07-16.

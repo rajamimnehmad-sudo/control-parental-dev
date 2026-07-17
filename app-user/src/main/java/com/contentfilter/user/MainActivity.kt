@@ -258,6 +258,12 @@ private fun UserAppRoot(
         destination = target
     }
 
+    fun selectTopLevel(target: UserDestination) {
+        if (target == destination) return
+        backStack = emptyList()
+        destination = target
+    }
+
     fun goBack() {
         val previous = backStack.lastOrNull() ?: UserDestination.Home
         backStack = backStack.dropLast(1)
@@ -273,7 +279,7 @@ private fun UserAppRoot(
                 UserDestination.entries.filter { it.showInNav }.forEach { item ->
                     NavigationBarItem(
                         selected = destination == item,
-                        onClick = { navigateTo(item) },
+                        onClick = { selectTopLevel(item) },
                         icon = { ProductNavGlyph(icon = item.icon, selected = destination == item) },
                         label = { Text(item.label) },
                     )
@@ -288,14 +294,14 @@ private fun UserAppRoot(
                         onRequests = { navigateTo(UserDestination.Requests) },
                         onAnnouncements = { navigateTo(UserDestination.Announcements) },
                     )
-                UserDestination.MyApps -> MyAppsRoute(onBack = ::goBack)
+                UserDestination.MyApps -> MyAppsRoute()
                 UserDestination.Requests -> RequestsRoute(onBack = ::goBack)
                 UserDestination.Announcements -> UserAnnouncementsRoute(onBack = ::goBack)
                 UserDestination.Web -> {
                     val statusViewModel: SystemStatusViewModel = hiltViewModel()
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
                     UserWebTab(
-                        onBack = ::goBack,
+                        onBack = null,
                         onOpenDag = { DagActivity.open(context) },
                         vpnActive = statusState.isVpnActive,
                         accessibilityActive = statusState.accessibilityState == "Activa",
@@ -316,7 +322,7 @@ private fun UserAppRoot(
                     val protectionViewModel: ProtectionViewModel = hiltViewModel()
                     val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
                     UpdatesRoute(
-                        onBack = ::goBack,
+                        onBack = null,
                         protectionSummary = statusState.summary,
                         communityName = statusState.communityName,
                         guideName = statusState.guideName,
@@ -564,7 +570,7 @@ private fun UserHomeTab(
         }
         item {
             ProductFeatureTile(
-                icon = ProductIcon.Bell,
+                icon = ProductIcon.Requests,
                 title = "Solicitudes pendientes",
                 subtitle =
                     if (pendingRequests == 0) {
@@ -590,7 +596,7 @@ private fun UserHomeTab(
 
 @Composable
 private fun UserWebTab(
-    onBack: () -> Unit,
+    onBack: (() -> Unit)?,
     onOpenDag: () -> Unit,
     vpnActive: Boolean,
     accessibilityActive: Boolean,
@@ -601,8 +607,8 @@ private fun UserWebTab(
     val blocked = state.webNavigationBlocked
     val protectionActive = vpnActive && accessibilityActive
     ProductLazyVisualPage(
-        title = "Web",
-        subtitle = if (blocked) "Internet bloqueado" else "Internet abierto",
+        title = "Internet",
+        subtitle = if (blocked) "Navegación bloqueada" else "Navegación protegida",
         onBack = onBack,
     ) {
         item {
@@ -776,11 +782,11 @@ private enum class UserDestination(
     val icon: ProductIcon,
     val showInNav: Boolean = true,
 ) {
-    Home("Home", ProductIcon.Home),
-    MyApps("Mis apps", ProductIcon.Search),
-    Web("Web", ProductIcon.Web),
+    Home("Inicio", ProductIcon.Home),
+    MyApps("Mis apps", ProductIcon.Apps),
+    Web("Internet", ProductIcon.Web),
     Dag("DAG", ProductIcon.Search, showInNav = false),
-    Requests("Solicitudes", ProductIcon.Bell, showInNav = false),
+    Requests("Solicitudes", ProductIcon.Requests, showInNav = false),
     Announcements("Avisos", ProductIcon.Bell, showInNav = false),
     Updates("Ajustes", ProductIcon.Settings),
 }

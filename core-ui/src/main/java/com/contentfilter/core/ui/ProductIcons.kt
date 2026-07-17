@@ -36,6 +36,8 @@ enum class ProductIcon {
     Panel,
     Update,
     Web,
+    Apps,
+    Requests,
 }
 
 @Composable
@@ -51,6 +53,42 @@ fun ProductGlyph(
     Canvas(modifier = modifier) {
         val stroke = 2.2.dp.toPx()
         when (icon) {
+            ProductIcon.Apps -> {
+                val cellSize = size.minDimension * 0.22f
+                val gap = size.minDimension * 0.12f
+                val startX = (size.width - cellSize * 2f - gap) / 2f
+                val startY = (size.height - cellSize * 2f - gap) / 2f
+                repeat(2) { row ->
+                    repeat(2) { column ->
+                        drawRoundRect(
+                            color = color,
+                            topLeft = Offset(startX + column * (cellSize + gap), startY + row * (cellSize + gap)),
+                            size = Size(cellSize, cellSize),
+                            cornerRadius = androidx.compose.ui.geometry.CornerRadius(3.dp.toPx()),
+                            style = Stroke(width = stroke),
+                        )
+                    }
+                }
+            }
+            ProductIcon.Requests -> {
+                drawRoundRect(
+                    color = color,
+                    topLeft = Offset(size.width * 0.22f, size.height * 0.18f),
+                    size = Size(size.width * 0.56f, size.height * 0.66f),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(4.dp.toPx()),
+                    style = Stroke(width = stroke),
+                )
+                listOf(0.40f, 0.58f).forEach { y ->
+                    drawCircle(color, 1.4.dp.toPx(), Offset(size.width * 0.34f, size.height * y))
+                    drawLine(
+                        color,
+                        Offset(size.width * 0.43f, size.height * y),
+                        Offset(size.width * 0.67f, size.height * y),
+                        stroke,
+                        cap = StrokeCap.Round,
+                    )
+                }
+            }
             ProductIcon.Web -> {
                 val center = Offset(size.width * 0.50f, size.height * 0.50f)
                 val radius = size.minDimension * 0.34f
@@ -376,4 +414,6 @@ private fun ProductIcon.materialVector(): ImageVector? =
         ProductIcon.Panel -> Icons.Filled.List
         ProductIcon.Update -> Icons.Filled.Refresh
         ProductIcon.Web -> null
+        ProductIcon.Apps -> null
+        ProductIcon.Requests -> null
     }

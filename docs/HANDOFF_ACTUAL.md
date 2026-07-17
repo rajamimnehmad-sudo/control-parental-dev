@@ -79,6 +79,14 @@ Usuario 5ed0bf43507b764295eb589da2ccd0b526df118b04116c5cf37c3286aa026b0e
 Admin   4d9632957b8139c32a47ba2a2f03f8822ff1aed10c1e1e33509bc07673efc8d9
 ```
 
+## Candidato DEV 247 - Paridad UX de App Usuario - 2026-07-16
+
+- `USER-UX-PARITY-01` fue aprobado con cuatro destinos principales: Inicio, Mis apps, Internet y Ajustes. Internet permanece separado de Mis apps.
+- Cambiar una pestana principal limpia la pila secundaria como en App Admin. Mis apps, Internet y Ajustes dejan de mostrar Volver por ser raices; Solicitudes y Avisos conservan encabezado fijo y regreso interno.
+- La iconografia deja de reutilizar conceptos: Mis apps tiene cuadricula, Solicitudes lista de pedidos, Internet globo, Avisos campana, Inicio casa y Ajustes engranaje. `Web` se presenta como `Internet` sin modificar el comportamiento de VPN, Accessibility, DAG o politicas.
+- Usuario y Admin suben juntos a `versionCode 247` porque los iconos viven en `core-ui`, compartido por ambas APK. Antes del bump pasaron `core-ui:ktlintCheck`, tests unitarios DEV de ambas apps y builds optimizados: 764 tareas correctas.
+- Pendiente de este cierre: commit/push, una unica publicacion Supabase DEV, verificacion de manifiestos/hashes y recorrido visual fisico.
+
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 
 - El usuario aprobo ejecutar juntos `SUPERWEB-DEPLOY-SYNC-01`, `UI-BANNER-UNIFY-01`, `SUPERWEB-FUNCTIONAL-VERIFY-01` y `ANDROID-PHYSICAL-CLOSEOUT-01`, conservando tickets verificables y una sola publicacion final.
