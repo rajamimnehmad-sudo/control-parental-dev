@@ -111,6 +111,14 @@ Admin   4d9632957b8139c32a47ba2a2f03f8822ff1aed10c1e1e33509bc07673efc8d9
 - TypeScript, ESLint de `src`, build Next y `git diff --check` correctos. Pendiente publicar la Superweb y probar el switch con sesion autenticada y autorizacion explicita sobre un usuario de prueba o real.
 - No cambia Android, `versionCode` ni APK.
 
+## Automatizacion GitHub -> Vercel confirmada - 2026-07-16
+
+- El proyecto Vercel `web-super-admin` quedo conectado a `rajamimnehmad-sudo/control-parental-dev`, rama de produccion `main` y Root Directory `web-super-admin`.
+- Las variables Production publicas fueron corregidas porque existian vacias. La URL apunta exclusivamente a Supabase DEV `syeycayasyufedwoprea` y se configuro una publishable key vigente sin imprimirla ni guardarla en Git.
+- El push `685a3b3` inicio automaticamente un deployment Production desde GitHub. Vercel clono exactamente ese commit, compilo Next y actualizo `https://web-super-admin-nine.vercel.app`.
+- `scripts/verify_superweb.sh` confirmo health DEV, commit y redireccion anonima a Login en Comunidades, Uso DAG, Alertas y Avisos.
+- El workflow `Publicar APKs DEV` quedo `skipped` por `[skip dev publish]`; no se compilo ni publico Android. Este cambio documental posterior sirve como segunda prueba de despliegue automatico sin disparar workflows Android por `paths-ignore`.
+
 ## Correccion de identidad Admin DEV 245 - 2026-07-16
 
 - Causa confirmada por el reporte del Samsung SM-S908E: la pantalla de Ajustes mostraba `Content Filter Admin`, pero el detector buscaba la etiqueta generica `Content Filter` y la confundia con App Usuario. La pantalla de permiso `Instalar apps desconocidas` tampoco distinguia para que aplicacion se estaba configurando.

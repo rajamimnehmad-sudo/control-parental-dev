@@ -141,10 +141,10 @@ Flujo de una entrada:
 | OPS-METRICS-01 | Candidato DEV 241 optimizado y con linea base corta; pendiente muestra de 24 h | P1 | Medicion prolongada de bateria, trafico y estabilidad | M | Medio |
 | USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
-| SUPERWEB-DEPLOY-SYNC-01 | En progreso; fuente verificable lista, pendiente reconectar y publicar Vercel oficial | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
+| SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
-| SUPERWEB-MOBILE-UX-01 | Implementado en fuente; pendiente publicar y validar autenticado | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
+| SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
 | SUPERWEB-OPS-UX-01 | Propuesto tras auditoria funcional | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial SM-A235M correcto en DEV 246; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
@@ -156,7 +156,7 @@ Flujo de una entrada:
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Implementado candidato DEV 241; pendiente prueba fisica | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
-| SUPERADMIN-DAG-USER-01 | Implementado en fuente y backend DEV; pendiente publicar y prueba funcional | P1 | Habilitar o deshabilitar DAG por Usuario desde Superweb | S | Alto |
+| SUPERADMIN-DAG-USER-01 | Publicado en Superweb y backend DEV; pendiente prueba funcional autenticada | P1 | Habilitar o deshabilitar DAG por Usuario desde Superweb | S | Alto |
 | BARRIER-LAUNCHER-01 | Resuelto y validado DEV 242 en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
