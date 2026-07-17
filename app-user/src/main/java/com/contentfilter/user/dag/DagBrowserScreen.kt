@@ -9,6 +9,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
 import android.net.http.SslError
+import android.os.SystemClock
 import android.provider.Settings
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
@@ -636,6 +637,7 @@ private fun DagBrowserContent(
                         onNavigate = viewModel::requestNavigation,
                         onPageStarted = viewModel::onPageStarted,
                         onPageTextReady = viewModel::onPageTextReady,
+                        onViewportImagesReady = viewModel::onViewportImagesReady,
                         onBlockedAction = viewModel::onBrowserBlockedAction,
                         onPageBlocked = viewModel::onPageBlocked,
                         onRendererGone = viewModel::onBrowserRendererGone,
@@ -861,9 +863,37 @@ private fun DagAnalysisFrame(
                 ),
             label = "dag-analysis-angle",
         )
+    val progress by
+        transition.animateFloat(
+            initialValue = 0.08f,
+            targetValue = 0.92f,
+            animationSpec =
+                infiniteRepeatable(
+                    animation = tween(durationMillis = 1_600, easing = LinearEasing),
+                    repeatMode = RepeatMode.Reverse,
+                ),
+            label = "dag-analysis-progress",
+        )
     Box(modifier = modifier) {
         content()
         Canvas(modifier = Modifier.fillMaxSize()) {
+            drawRoundRect(
+                brush =
+                    Brush.horizontalGradient(
+                        colors =
+                            listOf(
+                                DagNeonCyan.copy(alpha = 0.03f),
+                                DagNeonViolet.copy(alpha = 0.13f),
+                                Color(0xFFFF4FD8).copy(alpha = 0.06f),
+                            ),
+                    ),
+                size = androidx.compose.ui.geometry.Size(size.width * progress, size.height),
+                cornerRadius =
+                    androidx.compose.ui.geometry.CornerRadius(
+                        cornerRadius.toPx(),
+                        cornerRadius.toPx(),
+                    ),
+            )
             val radians = Math.toRadians(angle.toDouble())
             val direction =
                 Offset(
@@ -1387,6 +1417,7 @@ private fun DagWebContent(
     onNavigate: (String, String) -> Unit,
     onPageStarted: (String) -> Boolean,
     onPageTextReady: (String, String, String?, DagImagePageSummary) -> Unit,
+    onViewportImagesReady: (String) -> Unit,
     onBlockedAction: (String) -> Unit,
     onPageBlocked: (String) -> Unit,
     onRendererGone: () -> Unit,
@@ -1400,6 +1431,7 @@ private fun DagWebContent(
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var inspectedUrl by remember { mutableStateOf<String?>(null) }
+    var preparedUrl by remember { mutableStateOf<String?>(null) }
 
     BackHandler {
         if (webView?.canGoBack() == true) webView?.goBack() else onBackFromBrowser()
@@ -1412,7 +1444,10 @@ private fun DagWebContent(
     }
     LaunchedEffect(webView, state.navigationRevision, state.requestedUrl) {
         state.requestedUrl?.let { url ->
-            if (url.startsWith("https://", ignoreCase = true) && webView?.url != url) webView?.loadUrl(url)
+            if (url.startsWith("https://", ignoreCase = true) && webView?.url != url) {
+                webView?.settings?.blockNetworkImage = true
+                webView?.loadUrl(url)
+            }
         }
     }
     DisposableEffect(Unit) {
@@ -1441,24 +1476,60 @@ private fun DagWebContent(
                         setAcceptThirdPartyCookies(dagWebView, false)
                     }
                     webChromeClient = DagChromeClient(onBlockedAction)
+
+                    fun prepareViewport(
+                        view: WebView,
+                        url: String,
+                    ) {
+                        if (preparedUrl == url) return
+                        preparedUrl = url
+                        view.sanitizeAndExtractVisibleText {
+                            view.awaitDagViewportImages {
+                                view.postDelayed(
+                                    {
+                                        if (preparedUrl == url) onViewportImagesReady(url)
+                                    },
+                                    DagViewportReadinessPolicy.VisualSettleMillis,
+                                )
+                            }
+                        }
+                    }
+
+                    fun inspectPage(
+                        view: WebView,
+                        url: String,
+                    ) {
+                        if (inspectedUrl == url) return
+                        inspectedUrl = url
+                        prepareViewport(view, url)
+                        view.sanitizeAndExtractVisibleText { text ->
+                            onPageTextReady(url, view.title.orEmpty(), text, imageLoader.pageSummary())
+                        }
+                    }
                     webViewClient =
                         DagWebViewClient(
                             onNavigate = onNavigate,
                             onStarted = { url ->
+                                settings.blockNetworkImage = true
                                 inspectedUrl = null
+                                preparedUrl = null
                                 imageLoader.resetPage()
                                 onPageStarted(url)
+                            },
+                            onCommitted = { view, url ->
+                                prepareViewport(view, url)
+                                view.postDelayed(
+                                    {
+                                        if (view.url == url && inspectedUrl != url) inspectPage(view, url)
+                                    },
+                                    PageCommitInspectionDelayMillis,
+                                )
                             },
                             onFinished = { view, url ->
                                 canGoBack = view.canGoBack()
                                 canGoForward = view.canGoForward()
                                 onNavigationStateChanged(canGoBack, canGoForward)
-                                if (inspectedUrl != url) {
-                                    inspectedUrl = url
-                                    view.sanitizeAndExtractVisibleText { text ->
-                                        onPageTextReady(url, view.title.orEmpty(), text, imageLoader.pageSummary())
-                                    }
-                                }
+                                inspectPage(view, url)
                             },
                             onBlocked = onPageBlocked,
                             onRendererGone = { failedView ->
@@ -1510,7 +1581,7 @@ private fun WebView.configureDagSettings() {
     settings.allowFileAccess = false
     settings.allowContentAccess = false
     settings.loadsImagesAutomatically = true
-    settings.blockNetworkImage = false
+    settings.blockNetworkImage = true
     settings.mediaPlaybackRequiresUserGesture = true
     settings.javaScriptCanOpenWindowsAutomatically = false
     settings.setSupportMultipleWindows(false)
@@ -1578,6 +1649,7 @@ private class DagChromeClient(
 private class DagWebViewClient(
     private val onNavigate: (String, String) -> Unit,
     private val onStarted: (String) -> Boolean,
+    private val onCommitted: (WebView, String) -> Unit,
     private val onFinished: (WebView, String) -> Unit,
     private val onBlocked: (String) -> Unit,
     private val onRendererGone: (WebView) -> Unit,
@@ -1616,6 +1688,13 @@ private class DagWebViewClient(
         url: String,
     ) {
         if (url.startsWith("https://")) onFinished(view, url)
+    }
+
+    override fun onPageCommitVisible(
+        view: WebView,
+        url: String,
+    ) {
+        if (url.startsWith("https://")) onCommitted(view, url)
     }
 
     override fun onReceivedSslError(
@@ -1714,6 +1793,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
             var pictureSource = image.closest && image.closest('picture');
             pictureSource = pictureSource && pictureSource.querySelector('source[data-srcset],source[data-lazy-srcset],source[srcset]');
             var candidates = [
+              image.getAttribute('data-dag-held-src'),
               image.getAttribute('data-src'),
               image.getAttribute('data-lazy-src'),
               image.getAttribute('data-lazy-srcset'),
@@ -1749,11 +1829,13 @@ private fun WebView.sanitizeAndExtractVisibleText(
             var source = dagHttpsImageSource(image);
             if (!source) {
               image.style.setProperty('visibility', 'hidden', 'important');
+              image.setAttribute('data-dag-image-terminal', 'unavailable');
               return;
             }
             image.removeAttribute('srcset');
             image.removeAttribute('data-srcset');
             image.removeAttribute('data-lazy-srcset');
+            image.removeAttribute('data-dag-held-src');
             image.style.removeProperty('visibility');
             if (image.getAttribute('src') !== source) image.src = source;
             image.setAttribute('data-dag-image-ready', 'true');
@@ -1763,22 +1845,80 @@ private fun WebView.sanitizeAndExtractVisibleText(
             dagBlurIntimateImage(image);
             var lazy = image.getAttribute('loading') === 'lazy' ||
               image.hasAttribute('data-src') || image.hasAttribute('data-lazy-src') ||
-              image.hasAttribute('data-srcset') || image.hasAttribute('data-lazy-srcset');
+              image.hasAttribute('data-srcset') || image.hasAttribute('data-lazy-srcset') ||
+              image.hasAttribute('data-dag-held-src');
             if (lazy && window.IntersectionObserver && image.getAttribute('data-dag-image-ready') !== 'true') {
               if (!window.__dagImageObserver) {
+                var dagPrefetchMargin = Math.max((window.innerHeight || 0) * 2, 1200);
                 window.__dagImageObserver = new IntersectionObserver(function(entries) {
                   entries.forEach(function(entry) {
                     if (!entry.isIntersecting) return;
                     window.__dagImageObserver.unobserve(entry.target);
                     dagLoadImage(entry.target);
                   });
-                }, { rootMargin: '1200px 0px' });
+                }, { rootMargin: dagPrefetchMargin + 'px 0px' });
               }
               window.__dagImageObserver.observe(image);
               return;
             }
             dagLoadImage(image);
           }
+          window.__dagPrepareViewportImages = function(hidePending) {
+            var viewportHeight = Math.max(window.innerHeight || 0, 1);
+            var preparationLimit = viewportHeight * ${DagViewportReadinessPolicy.PreparedViewportCount};
+            var total = 0;
+            var pending = 0;
+            document.querySelectorAll('img').forEach(function(image) {
+              if (!image || !image.isConnected) return;
+              var rect;
+              try { rect = image.getBoundingClientRect(); } catch (_) { return; }
+              if (rect.bottom < 0 || rect.top > preparationLimit) return;
+              var style;
+              try { style = window.getComputedStyle(image); } catch (_) { return; }
+              if (style.display === 'none' || rect.width < 24 || rect.height < 24) {
+                return;
+              }
+              if (rect.top > preparationLimit) {
+                var heldSource = dagHttpsImageSource(image);
+                if (heldSource) {
+                  image.setAttribute('data-dag-held-src', heldSource);
+                  image.removeAttribute('src');
+                  image.removeAttribute('srcset');
+                  var picture = image.closest && image.closest('picture');
+                  picture && picture.querySelectorAll('source').forEach(function(source) {
+                    source.removeAttribute('srcset');
+                    source.removeAttribute('data-srcset');
+                    source.removeAttribute('data-lazy-srcset');
+                  });
+                  image.removeAttribute('data-dag-image-ready');
+                  dagQueueImage(image);
+                }
+                return;
+              }
+              var visibleNow = rect.top <= viewportHeight && rect.bottom >= 0;
+              dagLoadImage(image);
+              if (!visibleNow) return;
+              total += 1;
+              if (image.hasAttribute('data-dag-image-terminal')) return;
+              if (image.complete && image.naturalWidth > 0) return;
+              if (image.complete && image.naturalWidth === 0) {
+                if (!hidePending) {
+                  pending += 1;
+                  return;
+                }
+                image.style.setProperty('visibility', 'hidden', 'important');
+                image.setAttribute('data-dag-image-terminal', 'unavailable');
+                return;
+              }
+              if (hidePending) {
+                image.style.setProperty('visibility', 'hidden', 'important');
+                image.setAttribute('data-dag-image-terminal', 'timeout');
+                return;
+              }
+              pending += 1;
+            });
+            return JSON.stringify({ total: total, pending: pending });
+          };
           function dagSecureBackground(node) {
             if (!node || node.nodeType !== 1) return;
             var background = '';
@@ -1887,6 +2027,61 @@ private fun WebView.sanitizeAndExtractVisibleText(
     }
 }
 
+private fun WebView.awaitDagViewportImages(
+    startedAtMillis: Long = SystemClock.elapsedRealtime(),
+    networkImagesEnabled: Boolean = false,
+    callback: () -> Unit,
+) {
+    evaluateJavascript(
+        "(function(){ return window.__dagPrepareViewportImages ? window.__dagPrepareViewportImages(false) : null; })();",
+    ) { encoded ->
+        if (!networkImagesEnabled) settings.blockNetworkImage = false
+        val status =
+            encoded.decodeJavascriptString()?.let { value ->
+                runCatching { org.json.JSONObject(value) }.getOrNull()
+            }
+        val pending = status?.optInt("pending", 0) ?: 0
+        val elapsed = SystemClock.elapsedRealtime() - startedAtMillis
+        when (dagViewportReadinessAction(pending, elapsed)) {
+            DagViewportReadinessAction.Ready -> callback()
+            DagViewportReadinessAction.Wait ->
+                if (isAttachedToWindow) {
+                    postDelayed(
+                        { awaitDagViewportImages(startedAtMillis, networkImagesEnabled = true, callback) },
+                        DagViewportReadinessPolicy.PollDelayMillis,
+                    )
+                }
+            DagViewportReadinessAction.HidePending ->
+                evaluateJavascript(
+                    "(function(){ return window.__dagPrepareViewportImages ? window.__dagPrepareViewportImages(true) : null; })();",
+                ) { callback() }
+        }
+    }
+}
+
+internal enum class DagViewportReadinessAction {
+    Ready,
+    Wait,
+    HidePending,
+}
+
+internal fun dagViewportReadinessAction(
+    pendingImages: Int,
+    elapsedMillis: Long,
+): DagViewportReadinessAction =
+    when {
+        pendingImages <= 0 -> DagViewportReadinessAction.Ready
+        elapsedMillis >= DagViewportReadinessPolicy.MaximumWaitMillis -> DagViewportReadinessAction.HidePending
+        else -> DagViewportReadinessAction.Wait
+    }
+
+internal object DagViewportReadinessPolicy {
+    const val PreparedViewportCount = 3
+    const val MaximumWaitMillis = 8_000L
+    const val PollDelayMillis = 150L
+    const val VisualSettleMillis = 1_200L
+}
+
 private fun String?.decodeJavascriptString(): String? {
     if (this == null || this == "null") return null
     return runCatching { JSONArray("[$this]").optString(0).takeIf { it.isNotBlank() } }.getOrNull()
@@ -1894,3 +2089,4 @@ private fun String?.decodeJavascriptString(): String? {
 
 private const val MaximumTextExtractionRetries = 2
 private const val TextExtractionRetryDelayMillis = 700L
+private const val PageCommitInspectionDelayMillis = 1_000L

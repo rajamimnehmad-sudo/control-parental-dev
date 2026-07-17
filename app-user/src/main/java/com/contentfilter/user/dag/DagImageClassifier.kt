@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.os.SystemClock
+import android.util.Log
 import org.tensorflow.lite.Interpreter
 import java.io.Closeable
 import java.io.FileInputStream
@@ -43,14 +45,7 @@ internal fun dagProfessionalImageDecision(unsafeProbability: Float): DagImageDec
 internal fun dagEnsembleImageDecision(
     professional: DagImageDecision,
     legacy: DagImageDecision,
-): DagImageDecision =
-    when {
-        professional == DagImageDecision.Allowed && legacy == DagImageDecision.Allowed -> DagImageDecision.Allowed
-        professional == DagImageDecision.Blocked && legacy == DagImageDecision.Blocked -> DagImageDecision.Blocked
-        professional == DagImageDecision.Blocked && legacy == DagImageDecision.Uncertain -> DagImageDecision.Blocked
-        professional == DagImageDecision.Uncertain && legacy == DagImageDecision.Blocked -> DagImageDecision.Blocked
-        else -> DagImageDecision.Uncertain
-    }
+): DagImageDecision = if (professional != DagImageDecision.Uncertain) professional else legacy
 
 internal class DagImageClassifier(
     context: Context,
@@ -72,26 +67,41 @@ internal class DagImageClassifier(
             }
             val bitmap = decodeForClassification(bytes) ?: return@synchronized DagImageClassification(DagImageDecision.Uncertain)
             try {
-                val professional = professionalClassifier.classify(bitmap)
-                val output = Array(1) { FloatArray(OutputClasses) }
-                model().run(bitmapToInput(bitmap), output)
-                val legacyScore = output[0][UnsafeOutputIndex]
-                val legacyDecision = dagImageDecision(legacyScore)
-                val ensembleDecision =
-                    if (professionalClassifier.isAvailable()) {
-                        dagEnsembleImageDecision(professional.decision, legacyDecision)
+                val classificationStartedAt = SystemClock.elapsedRealtime()
+                val professionalAvailable = professionalClassifier.isAvailable()
+                val professional =
+                    if (professionalAvailable) {
+                        professionalClassifier.classify(bitmap)
                     } else {
-                        legacyDecision
+                        DagImageClassification(DagImageDecision.Uncertain)
                     }
+                var legacyScore: Float? = null
+                val ensembleDecision =
+                    if (professionalAvailable && professional.decision != DagImageDecision.Uncertain) {
+                        professional.decision
+                    } else {
+                        val output = Array(1) { FloatArray(OutputClasses) }
+                        model().run(bitmapToInput(bitmap), output)
+                        legacyScore = output[0][UnsafeOutputIndex]
+                        dagEnsembleImageDecision(professional.decision, dagImageDecision(legacyScore))
+                    }
+                val modestyRequiresBlur =
+                    ensembleDecision == DagImageDecision.Allowed && modestyClassifier.requiresBlur(bitmap)
                 val decision =
-                    if (ensembleDecision == DagImageDecision.Allowed && modestyClassifier.requiresBlur(bitmap)) {
+                    if (modestyRequiresBlur) {
                         DagImageDecision.Uncertain
                     } else {
                         ensembleDecision
                     }
+                Log.d(
+                    ImageMetricsTag,
+                    "decision=${decision.name.lowercase()} elapsed_ms=" +
+                        (SystemClock.elapsedRealtime() - classificationStartedAt) +
+                        " fallback=${legacyScore != null} modesty=$modestyRequiresBlur",
+                )
                 DagImageClassification(
                     decision = decision,
-                    unsafeScore = maxOf(professional.unsafeScore ?: 0f, legacyScore),
+                    unsafeScore = maxOf(professional.unsafeScore ?: 0f, legacyScore ?: 0f),
                     mimeType = detectedMime,
                 )
             } catch (_: RuntimeException) {
@@ -241,6 +251,7 @@ internal class DagImageClassifier(
         private const val OutputClasses = 2
         private const val UnsafeOutputIndex = 1
         private const val ModelThreads = 2
+        private const val ImageMetricsTag = "DagImageMetrics"
         private const val MinimumBytes = 32
         private const val MinimumDimension = 24
         private const val MaximumSourceDimension = 16_384

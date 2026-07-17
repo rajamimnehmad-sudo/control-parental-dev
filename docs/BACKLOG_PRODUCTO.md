@@ -953,11 +953,19 @@ Flujo de una entrada:
 
 ### DAG-IMAGE-QUEUE-03 - Entrega continua, lazy, iconos y SVG seguro
 
-- Estado: `Publicado en DEV 251; pendiente prueba fisica visual`; aprobado por el usuario el 2026-07-17.
+- Estado: `Validado fisicamente; integrado en candidato DEV 252`; aprobado por el usuario el 2026-07-17.
 - Causa: tres interceptores sincronicos y la promocion simultanea de todas las fuentes lazy podian ocupar el pool de recursos WebView y dejar en blanco las imagenes posteriores al primer grupo.
 - Implementacion: ocho trabajos acotados, timeout de 15 segundos y carga por proximidad al viewport. Se cubren `picture`, fuentes lazy/srcset adicionales, favicon ICO y SVG estatico con simbolos o gradientes internos.
 - Seguridad: cada raster conserva clasificacion local antes de mostrarse; SVG con scripts, eventos, embeds, estilos activos o referencias externas falla cerrado; video y audio siguen bloqueados.
-- Aceptacion pendiente: desplazar una pagina de al menos 30 imagenes y confirmar que las posteriores resuelven como visibles o desenfocadas; validar iconos/SVG y ausencia de mezcla al navegar.
+- Aceptacion: Samsung se recorrio durante diez desplazamientos; las imagenes posteriores continuaron resolviendo, los telefonos seguros quedaron visibles y la categoria sensible de H&M permanecio desenfocada. Iconos y SVG seguros conservan el soporte publicado en DEV 251.
+
+### DAG-VIEWPORT-READY-01 - Apertura con pantalla inicial resuelta
+
+- Estado: `Validado fisicamente; candidato DEV 252`; aprobado explicitamente por el usuario el 2026-07-17.
+- Causa: DAG revelaba el documento cuando terminaba el texto, sin coordinar las imagenes visibles; ademas descargaba recursos lejanos antes de priorizar la pantalla actual y esperaba cinco segundos fijos para iniciar el analisis del DOM.
+- Implementacion: compuerta conjunta de texto e imagenes iniciales; precarga de las dos pantallas siguientes; diferimiento de imagenes lejanas; limite terminal de ocho segundos; animacion de progreso en la barra; evaluacion temprana del DOM con reintentos; metricas locales sin contenido.
+- Clasificacion: el modelo profesional decide primero, el modelo legado queda como fallback de incertidumbre y el detector de modestia conserva la ultima palabra sobre imagenes que de otro modo serian permitidas.
+- Aceptacion fisica SM-A235M: apertura Samsung con fotos iniciales listas en aproximadamente 6-8 segundos, sin falsos desenfoques de telefonos; diez desplazamientos cargan imagenes posteriores; H&M trajes de bano conserva desenfoque fuerte; cero consultas Brave al usar URL directa.
 
 ### AI-SEARCH-01A - Intencion semantica local compacta
 

@@ -55,17 +55,17 @@ class DagImagePolicyTest {
     }
 
     @Test
-    fun `ensemble shows safe images blurs disagreement and blocks corroborated risk`() {
+    fun `professional decision is authoritative and legacy resolves uncertainty`() {
         assertEquals(
             DagImageDecision.Allowed,
             dagEnsembleImageDecision(DagImageDecision.Allowed, DagImageDecision.Allowed),
         )
         assertEquals(
-            DagImageDecision.Uncertain,
+            DagImageDecision.Blocked,
             dagEnsembleImageDecision(DagImageDecision.Blocked, DagImageDecision.Allowed),
         )
         assertEquals(
-            DagImageDecision.Uncertain,
+            DagImageDecision.Allowed,
             dagEnsembleImageDecision(DagImageDecision.Allowed, DagImageDecision.Uncertain),
         )
         assertEquals(
@@ -74,7 +74,7 @@ class DagImagePolicyTest {
         )
         assertEquals(
             DagImageDecision.Blocked,
-            dagEnsembleImageDecision(DagImageDecision.Blocked, DagImageDecision.Uncertain),
+            dagEnsembleImageDecision(DagImageDecision.Uncertain, DagImageDecision.Blocked),
         )
     }
 
@@ -86,6 +86,17 @@ class DagImagePolicyTest {
         assertTrue(isProbableImageRequest("https://cdn.example/favicon.ico", emptyMap()))
         assertFalse(isProbableImageRequest("https://cdn.example/site.css", mapOf("Accept" to "text/css")))
         assertTrue(DagImageDeliveryPolicy.MaximumConcurrentImages > 3)
+    }
+
+    @Test
+    fun `viewport waits for pending images and fails closed at its deadline`() {
+        assertEquals(DagViewportReadinessAction.Ready, dagViewportReadinessAction(0, 0L))
+        assertEquals(DagViewportReadinessAction.Wait, dagViewportReadinessAction(2, 1_000L))
+        assertEquals(
+            DagViewportReadinessAction.HidePending,
+            dagViewportReadinessAction(2, DagViewportReadinessPolicy.MaximumWaitMillis),
+        )
+        assertEquals(3, DagViewportReadinessPolicy.PreparedViewportCount)
     }
 
     @Test

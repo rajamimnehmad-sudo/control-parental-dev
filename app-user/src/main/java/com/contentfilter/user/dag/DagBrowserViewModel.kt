@@ -348,6 +348,8 @@ class DagBrowserViewModel
                             address = url,
                             view = DagView.Browser,
                             pageStatus = DagPageStatus.Loading,
+                            pageAnalysisReady = false,
+                            viewportImagesReady = false,
                             requestedUrl = url,
                             navigationRevision = it.navigationRevision + 1,
                             message = "Analizando la página antes de mostrarla…",
@@ -408,11 +410,12 @@ class DagBrowserViewModel
                             mutableState.update {
                                 it.copy(
                                     address = url,
-                                    pageStatus = DagPageStatus.Visible,
+                                    pageAnalysisReady = true,
                                     message = "",
                                     reviewCandidate = null,
                                 )
                             }
+                            revealPageIfReady(url)
                         }
                         DagAdaptivePageDecision.Protected -> showProtectedPage(url, title, recordHistory = false)
                         DagAdaptivePageDecision.Blocked ->
@@ -438,10 +441,32 @@ class DagBrowserViewModel
             mutableState.update {
                 it.copy(
                     address = url,
-                    pageStatus = DagPageStatus.Visible,
+                    pageAnalysisReady = true,
                     message = "Abierto con protección adicional.",
                     reviewCandidate = null,
                 )
+            }
+            revealPageIfReady(url)
+        }
+
+        fun onViewportImagesReady(url: String) {
+            if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
+            mutableState.update { it.copy(viewportImagesReady = true) }
+            revealPageIfReady(url)
+        }
+
+        private fun revealPageIfReady(url: String) {
+            mutableState.update { state ->
+                if (
+                    state.requestedUrl == url &&
+                    state.pageAnalysisReady &&
+                    state.viewportImagesReady &&
+                    state.pageStatus == DagPageStatus.Loading
+                ) {
+                    state.copy(pageStatus = DagPageStatus.Visible)
+                } else {
+                    state
+                }
             }
         }
 
@@ -463,6 +488,8 @@ class DagBrowserViewModel
                     requestedUrl = url,
                     view = DagView.Browser,
                     pageStatus = DagPageStatus.Loading,
+                    pageAnalysisReady = false,
+                    viewportImagesReady = false,
                     message = "Analizando la página antes de mostrarla…",
                     reviewCandidate = null,
                 )
@@ -637,6 +664,8 @@ class DagBrowserViewModel
                     address = tab.address,
                     view = tab.view,
                     pageStatus = if (tab.view == DagView.Browser) DagPageStatus.Loading else tab.pageStatus,
+                    pageAnalysisReady = false,
+                    viewportImagesReady = false,
                     results = tab.results,
                     searchQuery = tab.searchQuery,
                     searchPage = tab.searchPage,
@@ -657,6 +686,8 @@ class DagBrowserViewModel
                     address = "",
                     view = DagView.Start,
                     pageStatus = DagPageStatus.Idle,
+                    pageAnalysisReady = false,
+                    viewportImagesReady = false,
                     results = emptyList(),
                     searchQuery = "",
                     searchPage = 0,
@@ -813,6 +844,8 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 address = "",
                 view = DagView.Start,
                 pageStatus = DagPageStatus.Idle,
+                pageAnalysisReady = false,
+                viewportImagesReady = false,
                 results = emptyList(),
                 searchQuery = "",
                 searchPage = 0,
@@ -831,6 +864,8 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 address = "",
                 view = DagView.Start,
                 pageStatus = DagPageStatus.Idle,
+                pageAnalysisReady = false,
+                viewportImagesReady = false,
                 results = emptyList(),
                 searchQuery = "",
                 searchPage = 0,
@@ -848,6 +883,8 @@ internal fun DagBrowserUiState.toDagStart(): DagBrowserUiState =
         address = "",
         view = DagView.Start,
         pageStatus = DagPageStatus.Idle,
+        pageAnalysisReady = false,
+        viewportImagesReady = false,
         results = emptyList(),
         searchQuery = "",
         searchPage = 0,
@@ -865,6 +902,8 @@ internal fun DagBrowserUiState.toDagResults(): DagBrowserUiState =
         address = "",
         view = DagView.Results,
         pageStatus = DagPageStatus.Idle,
+        pageAnalysisReady = false,
+        viewportImagesReady = false,
         suggestions = emptyList(),
         requestedUrl = null,
         navigationRevision = navigationRevision + 1,

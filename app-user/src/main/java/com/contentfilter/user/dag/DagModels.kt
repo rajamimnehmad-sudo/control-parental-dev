@@ -76,6 +76,8 @@ data class DagBrowserUiState(
     val address: String = "",
     val view: DagView = DagView.Start,
     val pageStatus: DagPageStatus = DagPageStatus.Idle,
+    val pageAnalysisReady: Boolean = false,
+    val viewportImagesReady: Boolean = false,
     val results: List<DagSearchResult> = emptyList(),
     val searchQuery: String = "",
     val searchPage: Int = 0,
