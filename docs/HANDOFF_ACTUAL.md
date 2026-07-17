@@ -97,6 +97,14 @@ Admin   0b952c4b78c72703d63b44b7b74f303d62952e43edea679a1db5d047492e4be3
 - Usuario y Admin subieron juntos a `versionCode 248`. El commit `7e68177` se publico una sola vez exclusivamente en Supabase DEV mediante el workflow `29550738758`.
 - Ambos manifiestos publicos declaran 248. Las descargas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV correctos, `versionCode 248` y `minSdk 29`. Queda pendiente la prueba fisica de desinstalar una app ajena y Admin sin afectar la proteccion de Usuario.
 
+## Validacion fisica SM-A235M DEV 248 - 2026-07-17
+
+- Usuario y Admin actualizaron in-place de DEV 246 a DEV 248 por ADB, sin borrar datos. Despues de la actualizacion siguieron activos Accessibility, Device Admin y `FilterVpnService`; ambas apps informaron 248 y ultima version.
+- La prueba no destructiva de desinstalacion abrio la confirmacion normal de Android para App Admin y WhatsApp y se cancelo sin quitar ninguna. El mismo intento sobre App Usuario fue expulsado al launcher antes de mostrar confirmacion. La ficha Android de Admin permanecio accesible y la ficha de Usuario fue interceptada.
+- App Usuario mostro los cuatro destinos raiz sin Volver redundante: Inicio, Mis apps, Internet y Ajustes. Internet permanecio separado, con SafeSearch y DAG activos. Mis apps completo su carga y mostro 156 aplicaciones con iconos y estados; el cero inicial correspondio al estado transitorio `Buscando aplicaciones`.
+- App Admin mostro Home, campana superior, tarjetas de Usuarios, Solicitudes, Alertas y Avisos; Ajustes mostro version 248 y Actualizaciones confirmo `Ya tenes la ultima version`. La bandeja de Alertas mostro su header con regreso y el banner premium completo.
+- Esta validacion no confirma una desinstalacion efectiva de Admin/otra app porque se evito la accion destructiva. Siguen pendientes SM-S908E, bypass rapido de Accessibility, flujo de actualizacion iniciado dentro de cada app, Play Store/APK con aprobacion, licencia/renovacion y recorridos DAG que consumen Brave o requieren decisiones Admin/push.
+
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 
 - El usuario aprobo ejecutar juntos `SUPERWEB-DEPLOY-SYNC-01`, `UI-BANNER-UNIFY-01`, `SUPERWEB-FUNCTIONAL-VERIFY-01` y `ANDROID-PHYSICAL-CLOSEOUT-01`, conservando tickets verificables y una sola publicacion final.

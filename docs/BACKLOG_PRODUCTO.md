@@ -146,13 +146,13 @@ Flujo de una entrada:
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
 | SUPERWEB-OPS-UX-01 | Archivo seguro, agrupacion y claridad Base implementados; busqueda/filtros pendientes | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
-| ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial SM-A235M correcto en DEV 246; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
+| ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 248; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
-| ADMIN-ALERTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
+| ADMIN-ALERTS-UX-01 | Validado visualmente en SM-A235M DEV 248; pendiente evento real | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Implementado candidato DEV 241; pendiente prueba fisica | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
@@ -209,7 +209,7 @@ Flujo de una entrada:
 
 ### USER-UX-PARITY-01 - Navegacion Usuario alineada con Admin
 
-- Estado: `Publicado DEV 247; pendiente prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-16, con Internet separado de Mis apps y mejora de iconos.
+- Estado: `Validado fisicamente en SM-A235M DEV 248`. Aprobado explicitamente por el usuario el 2026-07-16, con Internet separado de Mis apps y mejora de iconos. Pendiente el recorrido en SM-S908E.
 - Causa: App Usuario ya compartia tarjetas, fondo y banners premium con Admin, pero sus destinos principales acumulaban historial entre pestanas, mostraban Volver en superficies raiz y reutilizaban la lupa o la campana para funciones distintas.
 - Resultado: el nav conserva cuatro destinos independientes —Inicio, Mis apps, Internet y Ajustes—; cambiar de pestana limpia la pila secundaria como en Admin; Mis apps, Internet y Ajustes son raices sin Volver redundante; Solicitudes y Avisos siguen como secciones internas con regreso fijo.
 - Iconografia: Mis apps usa una cuadricula propia, Solicitudes una lista de pedidos, Internet el globo y Avisos la campana. El destino Web pasa a mostrarse como `Internet` sin cambiar VPN, Accessibility, DAG, politicas ni datos.
@@ -242,7 +242,7 @@ Flujo de una entrada:
 
 ### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
 
-- Estado: `Cierre parcial SM-A235M correcto en DEV 246; quedan recorridos especificos y SM-S908E`; aprobado explicitamente el 2026-07-16. El telefono auxiliar estuvo disponible despues de la publicacion.
+- Estado: `Cierre parcial SM-A235M ampliado correctamente en DEV 248; quedan recorridos especificos y SM-S908E`; aprobado explicitamente el 2026-07-16. El telefono auxiliar estuvo disponible despues de la publicacion.
 - Tipo: QA Android, compatibilidad y cierre de candidatos. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Alcance automatizado completado: tests, ktlint, detekt, lint y builds DEV de Usuario/Admin pasaron localmente con el mismo versionCode. La unica publicacion DEV termino correctamente; manifiestos y APK publicos 246 coinciden en version, paquetes, `minSdk 29`, firma y SHA-256.
 - Alcance fisico planificado: banners y fuentes/modo oscuro; actualizacion Usuario/Admin; Play Store/APK/aprobacion; bypass rapido Accessibility; licencia/renovacion; estados DAG candidatos y notificacion push. Cada recorrido se declara solo cuando existe evidencia en el dispositivo correspondiente.
@@ -276,7 +276,7 @@ Flujo de una entrada:
 
 ### BARRIER-UNINSTALL-SCOPE-01 - Proteger solo la desinstalacion de Usuario
 
-- Estado: `Publicado en DEV 248; pendiente prueba fisica`. Aprobado por el reporte correctivo explicito del usuario el 2026-07-16. Prioridad: P0. Riesgo: alto.
+- Estado: `Validacion fisica no destructiva correcta en SM-A235M DEV 248; pendiente SM-S908E y desinstalacion efectiva autorizada`. Aprobado por el reporte correctivo explicito del usuario el 2026-07-16. Prioridad: P0. Riesgo: alto.
 - Problema: Samsung bloqueaba la desinstalacion de cualquier app cuando la barrera estaba armada, aunque la proteccion debe alcanzar exclusivamente App Usuario.
 - Causa: instaladores OEM pueden reutilizar una clase generica de Package Installer para instalar y quitar; esa clase omitia el filtro posterior por identidad de la app objetivo.
 - Resultado: una accion de quitar, desactivar o forzar cierre solo se intercepta cuando la pantalla identifica positivamente App Usuario. Admin y otras apps quedan fuera. La proteccion propia de Device Admin Usuario y la politica separada de instalaciones permanecen.
@@ -350,7 +350,7 @@ Flujo de una entrada:
 
 ### ADMIN-ALERTS-UX-01 - Campanita de alertas de seguridad en App Admin
 
-- Estado: `Implementado candidato DEV 241; pendiente prueba fisica`. Aprobado por el usuario al ordenar ejecutar todos los tickets el 2026-07-16.
+- Estado: `Validado visualmente en SM-A235M DEV 248; pendiente comprobar un evento confirmado real`. Aprobado por el usuario al ordenar ejecutar todos los tickets el 2026-07-16.
 - Tipo: seguridad, notificaciones y UX de App Admin.
 - Prioridad: P2.
 - Problema: las alertas de proteccion no tienen una bandeja visual dedicada y persistente dentro de App Admin.
