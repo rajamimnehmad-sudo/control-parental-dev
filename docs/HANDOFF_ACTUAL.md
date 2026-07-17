@@ -50,11 +50,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-16:
+Version publicada real al 2026-07-17:
 
 ```text
-App Usuario versionCode 251
-App Admin versionCode 251
+App Usuario versionCode 252
+App Admin versionCode 252
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-251-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-251-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-252-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-252-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 203eeb0bc1544071d9f44ecfd78d3a20dae9b92302e4bbd40b4017985a5f2d6b
-Admin   4e17ef340abfd82beda99c5a73322bc5a2aa7711623d40c2ce13c59d2caa7b7a
+Usuario f456cc398b5788463090738c6e247569fbd1b751b8747bd480870c05a4b56ad0
+Admin   582522d4710d9b4a9b3f39b66d86336f52d33362e5757a783d1ef156f290a987
 ```
 
 ## Publicacion DEV 247 - Paridad UX de App Usuario - 2026-07-16
@@ -133,13 +133,14 @@ Admin   4e17ef340abfd82beda99c5a73322bc5a2aa7711623d40c2ce13c59d2caa7b7a
 - Usuario y Admin subieron juntos a `versionCode 251` en el commit `b2dad47`. `Publicar APKs DEV` `29583348841` publico una sola vez exclusivamente en Supabase DEV y Android CI `29583348861` completo build, tests, ktlint, Android Lint y Detekt.
 - Ambos manifiestos publicos declaran 251. Los APK descargados recalculan exactamente los SHA-256 registrados arriba; `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`. Ambos comparten el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
-## Candidato DEV 252 - viewport listo y clasificacion visual DAG - 2026-07-17
+## Publicacion DEV 252 - viewport listo y clasificacion visual DAG - 2026-07-17
 
 - `DAG-VIEWPORT-READY-01` impide revelar una pagina hasta completar el analisis textual y resolver las imagenes de la pantalla inicial. DAG precarga las dos pantallas siguientes por proximidad, difiere imagenes lejanas y oculta de forma terminal cualquier recurso visible que no resuelva dentro de ocho segundos.
 - La barra de direccion muestra una animacion progresiva sutil mientras analiza. El texto comienza a evaluarse un segundo despues del primer contenido confirmado, con reintentos si el DOM sigue vacio, eliminando la espera fija anterior de cinco segundos.
 - El modelo profesional pasa a ser la decision visual principal; el clasificador legado solo resuelve incertidumbre y el detector especifico de modestia sigue evaluando toda imagen permitida. Esto elimina los falsos desenfoques observados en telefonos sin debilitar la proteccion de escotes, ropa interior o trajes de bano.
 - Validacion fisica SM-A235M, Android 13: Samsung abre con las fotos iniciales resueltas en aproximadamente 6-8 segundos, diez desplazamientos continuan incorporando imagenes posteriores y las fotos de telefonos dejan de aparecer desenfocadas. La categoria de trajes de bano de H&M conserva desenfoque fuerte. Las metricas locales observadas fueron 0,35-0,6 segundos por imagen luego del calentamiento y no contienen URL, imagen ni texto.
-- No se consumieron consultas Brave: todas las pruebas fueron navegaciones directas. Con ambos `versionCode` en 252, la matriz final de tests unitarios DEV, ktlint y builds optimizados de Usuario/Admin completo 773 tareas correctamente. La publicacion y verificacion publica de Usuario/Admin 252 quedan pendientes en este mismo cierre.
+- No se consumieron consultas Brave: todas las pruebas fueron navegaciones directas. Con ambos `versionCode` en 252, la matriz final de tests unitarios DEV, ktlint y builds optimizados de Usuario/Admin completo 773 tareas correctamente.
+- El commit `b8637d8` se publico una sola vez exclusivamente en Supabase DEV mediante `Publicar APKs DEV` `29590258165`. Android CI `29590258075` completo build, tests, ktlint, Android Lint y Detekt. Ambos manifiestos declaran 252; las descargas publicas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`. Ambos APK comparten el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 
