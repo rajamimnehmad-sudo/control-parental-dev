@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-17:
 
 ```text
-App Usuario versionCode 255
-App Admin versionCode 255
+App Usuario versionCode 256
+App Admin versionCode 256
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-255-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-255-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-256-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-256-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 1a293595be0aff2075db17430af335ef405f364622825b400983b5bcb2125e28
-Admin   433d2a723bf16a6dc36375b505fb70a429abc2700048b5a35125f600021852a0
+Usuario 2f2399839e456de760ba66729163ec731884a92921fc2e2a3efc5ba98680354b
+Admin   47a121561d5c18fde90608a70b693d69171e8e935490a48c318ebe14200c354f
 ```
 
 ## Publicacion DEV 256 - Marcacion visual para Calibracion DAG - 2026-07-17
@@ -86,6 +86,7 @@ Admin   433d2a723bf16a6dc36375b505fb70a429abc2700048b5a35125f600021852a0
 - Un reporte manual entra como `pending` y `submission_source=manual_dag`; no cambia umbrales ni cuenta como etiqueta revisada hasta que Super Admin elige un motivo y confirma Permitir/Difuminar. La Superweb muestra la insignia `Marcada desde DAG` y el registro de auditoria distingue `manual_image_reported`.
 - Backend aplicado exclusivamente en Supabase DEV: migracion `20260717204621_dag_visual_calibration_reports` y Edge Function `dag-calibration` v8. La migracion preservo las 106 filas historicas, ya archivadas por la accion de borrado anterior. Una llamada invalida fue rechazada con HTTP 400.
 - Validacion: TypeScript, ESLint y build Next correctos; matriz final Android de Usuario/Admin completo 903 tareas y la repeticion Usuario posterior al ajuste fisico completo 690. En SM-A235M ambas APK se instalaron in-place como 256. La prueba real mostro X sobre imagenes Samsung, difumino un telefono al tocarla y creo exactamente un pendiente manual auditable en DEV. Ese caso de prueba permanece para poder revisarlo desde Super Admin; no se borro ningun dato.
+- Android CI run `29613319823` completo correctamente build, tests, ktlint, Android Lint y Detekt. La publicacion automatica `Publicar APKs DEV` run `29613319792` fue correcta y limitada a Supabase DEV. Los manifiestos publicos y las descargas declaran 256 y coinciden con los SHA-256 documentados arriba; `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`, y ambos APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. La Superweb sirve `6b12a60` con salud DEV y rutas privadas verificadas.
 
 ## Hotfix Calibracion DAG - borrado autenticado - 2026-07-17
 
