@@ -105,6 +105,14 @@ Admin   0b952c4b78c72703d63b44b7b74f303d62952e43edea679a1db5d047492e4be3
 - App Admin mostro Home, campana superior, tarjetas de Usuarios, Solicitudes, Alertas y Avisos; Ajustes mostro version 248 y Actualizaciones confirmo `Ya tenes la ultima version`. La bandeja de Alertas mostro su header con regreso y el banner premium completo.
 - Esta validacion no confirma una desinstalacion efectiva de Admin/otra app porque se evito la accion destructiva. Siguen pendientes SM-S908E, bypass rapido de Accessibility, flujo de actualizacion iniciado dentro de cada app, Play Store/APK con aprobacion, licencia/renovacion y recorridos DAG que consumen Brave o requieren decisiones Admin/push.
 
+## Candidato DEV 249 - Refuerzo antimanipulacion Usuario - 2026-07-17
+
+- `BARRIER-USER-HARDENING-01` refuerza exclusivamente App Usuario contra desactivacion de Accessibility, VPN, Device Admin y desinstalacion/desactivacion/cierre forzado. Admin y otras apps quedan fuera por la identidad objetivo ya validada en DEV 248.
+- Causa: una pantalla protegida abierta por evento de ventana empezaba con `Atras` y reservaba Inicio para el segundo respaldo. Aunque la accion terminaba bloqueada, el control nativo podia quedar visible brevemente y permitir una carrera de toques.
+- Correccion: desinstalacion, ficha Usuario, Device Admin, Accessibility y VPN usan Inicio desde el primer evento y repiten la salida cada 100 ms hasta tres veces si Android conserva la ventana. Instalaciones comunes y actualizaciones firmadas/autorizadas no se confunden con remocion.
+- Limite honesto: Android normal no permite ocultar de manera garantizada el boton nativo de desinstalacion sin Device Owner, root o tienda administrada. La defensa evita utilizarlo y minimiza su exposicion, sin prometer que ningun OEM lo dibuje durante un cuadro.
+- Usuario y Admin suben juntos a `versionCode 249`. Tests Debug/Release y ktlint de `feature-accessibility` correctos; pendiente build de ambas APK, publicacion unica DEV, manifiestos/hashes y prueba fisica Samsung.
+
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 
 - El usuario aprobo ejecutar juntos `SUPERWEB-DEPLOY-SYNC-01`, `UI-BANNER-UNIFY-01`, `SUPERWEB-FUNCTIONAL-VERIFY-01` y `ANDROID-PHYSICAL-CLOSEOUT-01`, conservando tickets verificables y una sola publicacion final.

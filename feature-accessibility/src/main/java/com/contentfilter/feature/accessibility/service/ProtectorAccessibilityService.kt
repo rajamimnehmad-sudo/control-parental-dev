@@ -284,7 +284,15 @@ class ProtectorAccessibilityService : AccessibilityService() {
         ) {
             return false
         }
-        leaveProtectedSettings(urgent = event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED)
+        leaveProtectedSettings(
+            urgent =
+                event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED ||
+                    settingsProtectionPolicy.requiresImmediateEscape(
+                        packageName = packageName,
+                        className = className,
+                        dangerousSettingsActionVisible = dangerousSettingsActionVisible,
+                    ),
+        )
         Toast.makeText(this, "Este ajuste está protegido", Toast.LENGTH_SHORT).show()
         serviceScope?.launch {
             telemetryReporter.recordSettingsProtection()
@@ -310,7 +318,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 for (attempt in 1..SettingsEscapeFallbackAttempt) {
                     delay(SettingsEscapeRecheckDelayMillis)
                     if (!isProtectedSettingsStillVisible()) break
-                    performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt, urgent = false))
+                    performSettingsEscapeAction(SettingsEscapeStrategy.actionForAttempt(attempt, urgent = urgent))
                 }
                 settingsEscapeJob = null
             }
@@ -776,8 +784,8 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 120L
         const val BlockHomeRetries = 2
-        const val SettingsEscapeRecheckDelayMillis = 200L
-        const val SettingsEscapeFallbackAttempt = 2
+        const val SettingsEscapeRecheckDelayMillis = 100L
+        const val SettingsEscapeFallbackAttempt = 3
         const val PolicyChangedEventLabel = "POLICY_CHANGED"
         const val ExplicitSearchNoticeDebounceMillis = 2_000L
         const val TamperAlertDebounceMillis = 5 * 60_000L

@@ -360,6 +360,51 @@ class SettingsProtectionPolicyTest {
     }
 
     @Test
+    fun protectedRemovalAccessibilityAndVpnEscapeImmediately() {
+        val policy = SettingsProtectionPolicy()
+
+        assertTrue(
+            policy.requiresImmediateEscape(
+                packageName = "com.android.settings",
+                className = "com.android.settings.applications.InstalledAppDetails",
+                dangerousSettingsActionVisible = true,
+            ),
+        )
+        assertTrue(
+            policy.requiresImmediateEscape(
+                packageName = "com.android.settings",
+                className = "com.android.settings.Settings\$AccessibilityDetailsSettingsActivity",
+                dangerousSettingsActionVisible = false,
+            ),
+        )
+        assertTrue(
+            policy.requiresImmediateEscape(
+                packageName = "com.android.settings",
+                className = "com.android.settings.Settings\$VpnSettingsActivity",
+                dangerousSettingsActionVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun normalInstallScreenDoesNotUseRemovalRaceEscape() {
+        assertFalse(
+            SettingsProtectionPolicy().requiresImmediateEscape(
+                packageName = "com.google.android.packageinstaller",
+                className = "com.android.packageinstaller.InstallStart",
+                dangerousSettingsActionVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun urgentFallbacksKeepEscapingHome() {
+        assertEquals(SettingsEscapeAction.Home, SettingsEscapeStrategy.actionForAttempt(1, urgent = true))
+        assertEquals(SettingsEscapeAction.Home, SettingsEscapeStrategy.actionForAttempt(2, urgent = true))
+        assertEquals(SettingsEscapeAction.Home, SettingsEscapeStrategy.actionForAttempt(3, urgent = true))
+    }
+
+    @Test
     fun samsungAdminLabelIdentifiesOwnApp() {
         assertTrue(
             "Protección de Content Filter".matchesOwnAppIdentity(

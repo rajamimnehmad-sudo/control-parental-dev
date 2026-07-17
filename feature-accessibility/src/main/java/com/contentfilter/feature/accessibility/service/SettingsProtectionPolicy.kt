@@ -65,6 +65,20 @@ class SettingsProtectionPolicy {
         return true
     }
 
+    fun requiresImmediateEscape(
+        packageName: String,
+        className: String?,
+        dangerousSettingsActionVisible: Boolean,
+    ): Boolean {
+        val normalizedClass = className.orEmpty()
+        return dangerousSettingsActionVisible ||
+            isDeviceAdminRemovalScreen(packageName, className) ||
+            isCriticalSettingsScreen(packageName, className) ||
+            UninstallClassHints.any { normalizedClass.contains(it, ignoreCase = true) } ||
+            packageName == AndroidSettingsPackage &&
+            RemovalClassHints.any { normalizedClass.contains(it, ignoreCase = true) }
+    }
+
     private fun isDeviceAdminRemovalScreen(
         packageName: String,
         className: String?,

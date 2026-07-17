@@ -282,6 +282,14 @@ Flujo de una entrada:
 - Resultado: una accion de quitar, desactivar o forzar cierre solo se intercepta cuando la pantalla identifica positivamente App Usuario. Admin y otras apps quedan fuera. La proteccion propia de Device Admin Usuario y la politica separada de instalaciones permanecen.
 - Aceptacion: desinstalar una app ajena abre la confirmacion normal; Admin puede quitarse; Usuario sigue protegido sin autorizacion de remocion; con autorizacion vigente puede quitarse; tests Samsung genericos, Accessibility, formato y builds de ambas APK correctos.
 
+### BARRIER-USER-HARDENING-01 - Refuerzo de Accessibility, VPN y desinstalacion Usuario
+
+- Estado: `Implementado candidato DEV 249; pendiente publicacion y prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-17. Prioridad: P0. Riesgo: alto.
+- Causa: la barrera ya impedia completar acciones peligrosas, pero al abrir una pantalla protegida intentaba primero `Atras` y usaba Inicio como respaldo. Ese intervalo podia dejar visible brevemente el boton nativo y conservar una ventana para un toque rapido.
+- Resultado: las pantallas protegidas de desinstalacion, desactivacion, cierre forzado, Device Admin, Accessibility y VPN pasan directamente a Inicio desde el primer evento. Si Android conserva la ventana, se repite Inicio cada 100 ms hasta tres veces. Instalaciones normales, actualizaciones autorizadas, mantenimiento y fichas de Admin u otras apps conservan sus rutas separadas.
+- Limite Android: sin Device Owner, root o administracion empresarial no existe una API para quitar el boton nativo de Ajustes. El refuerzo reduce su exposicion y neutraliza su uso; no promete que todos los OEM eviten dibujarlo durante cada cuadro de la transicion.
+- Aceptacion: solo Usuario queda protegido; Admin y otras apps mantienen ficha/desinstalacion; Accessibility, VPN y Device Admin no pueden apagarse con toques rapidos; autorizaciones vigentes funcionan; tests cubren salida urgente y separacion del instalador normal; prueba fisica Samsung sin borrar datos.
+
 ### BARRIER-A11Y-RACE-01 - Bypass rapido para apagar Accessibility
 
 - Estado: `Implementado en DEV 240; pendiente prueba fisica`. El usuario aprobo avanzar el 2026-07-16 y confirmo que el incidente ocurre en Samsung SM-S908E.
