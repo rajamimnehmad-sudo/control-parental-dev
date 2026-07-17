@@ -912,7 +912,7 @@ Flujo de una entrada:
 
 ### DAG-IMAGE-QUEUE-03 - Entrega continua, lazy, iconos y SVG seguro
 
-- Estado: `Candidato DEV 251 validado localmente; pendiente publicacion y prueba fisica visual`; aprobado por el usuario el 2026-07-17.
+- Estado: `Publicado en DEV 251; pendiente prueba fisica visual`; aprobado por el usuario el 2026-07-17.
 - Causa: tres interceptores sincronicos y la promocion simultanea de todas las fuentes lazy podian ocupar el pool de recursos WebView y dejar en blanco las imagenes posteriores al primer grupo.
 - Implementacion: ocho trabajos acotados, timeout de 15 segundos y carga por proximidad al viewport. Se cubren `picture`, fuentes lazy/srcset adicionales, favicon ICO y SVG estatico con simbolos o gradientes internos.
 - Seguridad: cada raster conserva clasificacion local antes de mostrarse; SVG con scripts, eventos, embeds, estilos activos o referencias externas falla cerrado; video y audio siguen bloqueados.
@@ -929,7 +929,7 @@ Flujo de una entrada:
 
 ### DAG-ADAPTIVE-DECISION-01 - Decision local sin revision Admin obligatoria
 
-- Estado: `Candidato DEV 251 validado localmente; pendiente publicacion y prueba fisica de calidad`; aprobado por el usuario el 2026-07-17.
+- Estado: `Publicado en DEV 251; pendiente prueba fisica de calidad`; aprobado por el usuario el 2026-07-17.
 - Problema: la zona incierta del modelo y las paginas con poco texto terminaban en `necesita revision`, aun sin una regla explicita ni evidencia fuerte.
 - Implementacion: resultado adaptativo `permitido/protegido/bloqueado`. Incertidumbre y señal semantica moderada abren con filtrado visual, sin video, descargas, ventanas nuevas ni persistir aprobacion completa; reglas Admin, dominios prohibidos, categorias explicitas y evidencia semantica fuerte bloquean.
 - Consulta Admin: deja de ser la salida automatica de una duda. La navegacion protegida decide localmente; una revision puede mantenerse como accion manual separada donde corresponda.

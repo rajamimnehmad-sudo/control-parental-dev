@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 250
-App Admin versionCode 250
+App Usuario versionCode 251
+App Admin versionCode 251
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-250-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-250-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-251-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-251-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 22dd65ae0a81909b3a19826db9dbeba7803f97309dc130517e4564c886ecea44
-Admin   568b28e2363b5166760d956ed95586ad9b837531c1f845757c8eedd757ef0f0f
+Usuario 203eeb0bc1544071d9f44ecfd78d3a20dae9b92302e4bbd40b4017985a5f2d6b
+Admin   4e17ef340abfd82beda99c5a73322bc5a2aa7711623d40c2ce13c59d2caa7b7a
 ```
 
 ## Publicacion DEV 247 - Paridad UX de App Usuario - 2026-07-16
@@ -124,13 +124,14 @@ Admin   568b28e2363b5166760d956ed95586ad9b837531c1f845757c8eedd757ef0f0f
 - Los manifiestos publicos declaran 250; las descargas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV correctos y `minSdk 29`.
 - SM-A235M actualizo in-place a 250 sin borrar datos: la ruta VPN directa siguio expulsada, la ficha Admin permanecio disponible y Accessibility, Device Admin y VPN continuaron activos. La prueba determinante de `SubSettings` queda pendiente en el Samsung personal que reporto el bypass.
 
-## Candidato DEV 251 - imagenes continuas y decision adaptativa DAG - 2026-07-17
+## Publicacion DEV 251 - imagenes continuas y decision adaptativa DAG - 2026-07-17
 
 - `DAG-IMAGE-QUEUE-03` corrige el atasco observado despues de las primeras dos o tres fotos. La causa combinaba solo tres interceptores sincronicos con la activacion simultanea de todas las fuentes lazy al terminar la pagina. El candidato usa ocho cupos acotados, timeout de 15 segundos y un `IntersectionObserver` con precarga cercana para incorporar imagenes a medida que se desplaza.
 - La compatibilidad incluye `picture`, variantes lazy de `srcset`, favicon ICO y SVG estatico con declaracion XML, simbolos internos y gradientes internos. Scripts, eventos, contenido embebido, estilos activos y referencias SVG externas siguen rechazados.
 - `DAG-ADAPTIVE-DECISION-01` deja de convertir automaticamente toda incertidumbre en revision Admin. Una pagina incierta o con señal semantica moderada se muestra bajo las protecciones Web existentes; reglas explicitas, dominios prohibidos y evidencia semantica fuerte conservan bloqueo. Una pagina sin texto tras los reintentos tambien abre protegida, sin aprobacion persistente.
 - Validacion local: ktlint, tests DEV y builds optimizados de Usuario/Admin correctos en una matriz de 773 tareas; instalacion in-place previa en SM-A235M correcta, conservando datos. Falta prueba visual manual con una pagina densa, desplazamiento prolongado, SVG/iconos y casos seguros/riesgosos.
-- Usuario y Admin suben juntos a `versionCode 251`. Al preparar este commit los manifiestos y APK publicos permanecen en DEV 250; la publicacion y verificacion DEV 251 se cierran despues del push.
+- Usuario y Admin subieron juntos a `versionCode 251` en el commit `b2dad47`. `Publicar APKs DEV` `29583348841` publico una sola vez exclusivamente en Supabase DEV y Android CI `29583348861` completo build, tests, ktlint, Android Lint y Detekt.
+- Ambos manifiestos publicos declaran 251. Los APK descargados recalculan exactamente los SHA-256 registrados arriba; `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`. Ambos comparten el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 
