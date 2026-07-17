@@ -138,7 +138,12 @@ function CommunityUsageCard({ summary, devices }: { summary: DagUsageSummary; de
       {devices.length === 0 ? (
         <p className="border-t border-line px-4 py-5 text-sm text-slate-500">No hay dispositivos DAG activos ni consumo registrado este mes.</p>
       ) : (
-        <div className="overflow-x-auto border-t border-line">
+        <div className="grid gap-3 border-t border-line p-4 md:hidden">
+          {devices.map((device) => <DeviceUsageCard key={device.device_id} device={device} />)}
+        </div>
+      )}
+      {devices.length > 0 ? (
+        <div className="hidden overflow-x-auto border-t border-line md:block">
           <table className="min-w-full">
             <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
               <tr>
@@ -155,8 +160,30 @@ function CommunityUsageCard({ summary, devices }: { summary: DagUsageSummary; de
             </tbody>
           </table>
         </div>
-      )}
+      ) : null}
     </article>
+  );
+}
+
+function DeviceUsageCard({ device }: { device: DagUsageDevice }) {
+  const usagePercent = percent(device.request_count, device.monthly_limit);
+  const warningClass = usagePercent >= 100 ? "text-red-700" : usagePercent >= 80 ? "text-amber-700" : "text-ink";
+
+  return (
+    <div className="rounded-2xl bg-slate-50 p-4 ring-1 ring-slate-100">
+      <div className="flex items-start justify-between gap-3">
+        <p className="font-bold text-ink">{device.display_name}</p>
+        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${device.dag_enabled ? "bg-teal-100 text-teal-800" : "bg-slate-200 text-slate-600"}`}>
+          {device.dag_enabled ? "DAG abierto" : "DAG cerrado"}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div><p className="text-xs text-slate-500">Usadas</p><p className={`mt-1 font-bold ${warningClass}`}>{compactNumber(device.request_count)} / {compactNumber(device.monthly_limit)}</p></div>
+        <div><p className="text-xs text-slate-500">Restantes</p><p className="mt-1 font-bold text-ink">{compactNumber(device.remaining_count)}</p></div>
+        <div><p className="text-xs text-slate-500">Última consulta</p><p className="mt-1 text-slate-700">{formatDate(device.last_usage_at)}</p></div>
+        <div><p className="text-xs text-slate-500">Última conexión</p><p className="mt-1 text-slate-700">{formatDate(device.last_seen_at)}</p></div>
+      </div>
+    </div>
   );
 }
 

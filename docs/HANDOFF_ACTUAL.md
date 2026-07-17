@@ -92,6 +92,25 @@ Admin   4d9632957b8139c32a47ba2a2f03f8822ff1aed10c1e1e33509bc07673efc8d9
 - Barrera fisica DEV 246: la ficha de Admin permanecio accesible. Samsung abre `Instalar apps desconocidas` como lista general aun cuando recibe el package de Admin; la lista quedo abierta y mostro `Content Filter Admin` con su control disponible. La ficha Usuario fue interceptada. La portada general de Accessibility puede abrirse, pero la entrada `Aplicaciones instaladas` fue interceptada antes de alcanzar el interruptor del servicio; intentos repetidos conservaron Accessibility habilitado. No se modifico ningun permiso durante la prueba.
 - DAG fisico DEV 246 sin consumir Brave: Home integro el area de camara con el fondo tanto en tema claro como oscuro; se restauro `segun dispositivo` al terminar. El campo largo fue desplazable. Desde Historial se abrio Wikipedia Apple; tras desplazar, cargaron varias imagenes seguras, incluidas manzanas y flores, no solo la primera. La calibracion visual sensible, `Mas resultados`, aprobaciones, push y actualizacion desde una version futura siguen pendientes de un recorrido especifico.
 
+## Superweb mobile-first y auditoria funcional - 2026-07-16
+
+- La navegacion Super Admin pasa a ser adaptable: barra inferior fija con cinco destinos y estado activo en celular; navegacion horizontal separada en escritorio; header compacto y controles tactiles de al menos 44 px.
+- Uso DAG deja de exigir desplazamiento horizontal en celular: cada dispositivo se presenta como tarjeta con estado, consumo, restantes y fechas. La tabla completa se conserva desde el breakpoint de escritorio.
+- La base visual incorpora tipografia de sistema moderna, fondo suave, foco visible y controles redondeados sin cambiar contratos, datos ni permisos.
+- Auditoria de funciones: Comunidades cubre alta, licencia, DAG premium, admins/tokens, usuarios y estado de actualizaciones; Uso DAG cubre cupos; Avisos cubre creacion, destinatarios, vencimiento e historial; Alertas cubre lectura reciente y severidad. Faltan busqueda/filtros operativos, ciclo de lectura/archivo de alertas y gestion de avisos vigentes. No existe borrado de alertas y no se agrega: son auditoria retenida y la politica de retencion sigue pendiente.
+- Validacion local: TypeScript, ESLint de `src` y build Next correctos. La prueba visual autenticada sigue ligada a `SUPERWEB-FUNCTIONAL-VERIFY-01`; el servidor local falla cerrado sin variables DEV y no se crearon archivos `.env.local` ni se mostraron claves.
+- No cambia Android, Supabase ni APK. La publicacion Vercel y su automatizacion siguen pendientes de `SUPERWEB-DEPLOY-SYNC-01`.
+
+## Habilitacion DAG por usuario desde Superweb - 2026-07-16
+
+- La ficha de cada Usuario protegido activado incorpora `Habilitar/Deshabilitar DAG`. Los tokens pendientes muestran el control deshabilitado hasta que exista un dispositivo real.
+- El control reutiliza la regla canonica por dispositivo `Domain / __dag_enabled__ / Allow`; no agrega otra fuente de verdad ni requiere cambios Android. App Admin y Superweb observan el mismo estado.
+- Habilitar exige simultaneamente licencia efectiva activa y `DAG premium` habilitado para la comunidad. Deshabilitar conserva reglas, historial y consumo para una futura reactivacion.
+- La nueva RPC valida rol Super Admin, comunidad, dispositivo Usuario activo y licencia. Cada cambio efectivo incrementa la version de policy y queda registrado sin secretos en `device_policy_audit`; `anon` no ejecuta las RPC y la tabla tiene RLS.
+- Migracion `20260717014053_super_admin_set_device_dag_enabled.sql` aplicada exclusivamente en Supabase DEV `syeycayasyufedwoprea`. No se cambio el estado DAG de ninguno de los 2 dispositivos Usuario activos durante la verificacion.
+- TypeScript, ESLint de `src`, build Next y `git diff --check` correctos. Pendiente publicar la Superweb y probar el switch con sesion autenticada y autorizacion explicita sobre un usuario de prueba o real.
+- No cambia Android, `versionCode` ni APK.
+
 ## Correccion de identidad Admin DEV 245 - 2026-07-16
 
 - Causa confirmada por el reporte del Samsung SM-S908E: la pantalla de Ajustes mostraba `Content Filter Admin`, pero el detector buscaba la etiqueta generica `Content Filter` y la confundia con App Usuario. La pantalla de permiso `Instalar apps desconocidas` tampoco distinguia para que aplicacion se estaba configurando.

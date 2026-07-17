@@ -144,6 +144,8 @@ Flujo de una entrada:
 | SUPERWEB-DEPLOY-SYNC-01 | En progreso; fuente verificable lista, pendiente reconectar y publicar Vercel oficial | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
+| SUPERWEB-MOBILE-UX-01 | Implementado en fuente; pendiente publicar y validar autenticado | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
+| SUPERWEB-OPS-UX-01 | Propuesto tras auditoria funcional | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial SM-A235M correcto en DEV 246; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
@@ -154,6 +156,7 @@ Flujo de una entrada:
 | ALERT-ROUTING-01 | Implementado backend DEV; pendiente prueba fisica | P1 | Intentos bloqueados solo en Super Admin; desactivaciones efectivas en Super Admin y Admin | M | Alto |
 | APP-INSTALL-APPROVAL-01 | Implementado candidato DEV 241; pendiente prueba fisica | P1 | Play Store visible con aprobacion por app y bloqueo de descarga/instalacion de APK externos | L | Alto |
 | SUPERADMIN-DAG-ENTITLEMENT-01 | Implementado candidato DEV 241; pendiente prueba funcional | P1 | Habilitar o deshabilitar DAG como funcion premium desde Super Admin | M | Alto |
+| SUPERADMIN-DAG-USER-01 | Implementado en fuente y backend DEV; pendiente publicar y prueba funcional | P1 | Habilitar o deshabilitar DAG por Usuario desde Superweb | S | Alto |
 | BARRIER-LAUNCHER-01 | Resuelto y validado DEV 242 en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
@@ -211,6 +214,22 @@ Flujo de una entrada:
 - Cobertura automatizada: TypeScript, ESLint, Next y bundle Sites incluyen Comunidades, Uso DAG, Alertas, Avisos y health; las rutas privadas redirigen a Login. DEV confirma `dag-search` v8, `send-protection-alert` v13 y `send-announcement` v1 activas. Las RPC sensibles rechazan `anon` y los manifiestos publicos de Usuario/Admin son legibles.
 - Pendiente autenticado: desde la URL oficial publicada, comprobar lectura de licencia efectiva, token de una sola visualizacion/revocacion, DAG premium, estado de versiones, alertas, creacion de aviso y resultado del push. No se alteraran comunidades reales para simular casos ni se borraran datos.
 - Aceptacion: cada modulo carga con el rol Super Admin correcto; acciones muestran exito o fallo real; un usuario anonimo o autenticado sin rol no accede; Avisos conserva el registro aunque FCM no este disponible; toda prueba usa exclusivamente DEV.
+
+### SUPERWEB-MOBILE-UX-01 - Superweb mobile-first
+
+- Estado: `Implementado en fuente; pendiente publicar y validar autenticado`; solicitado explicitamente por el usuario el 2026-07-16.
+- Tipo: UX responsive y accesibilidad. Prioridad: P1. Esfuerzo: S. Riesgo: bajo.
+- Causa: la navegacion completa ocupaba una fila horizontal en el header, no indicaba el destino activo y Uso DAG dependia de una tabla ancha con desplazamiento lateral.
+- Resultado: barra inferior segura en celular, navegacion separada en escritorio, header compacto, objetivos tactiles de 44 px o mas y tarjetas de dispositivo DAG en mobile; escritorio conserva su tabla.
+- Aceptacion tecnica: TypeScript, ESLint de `src` y build Next correctos. Pendiente: recorrido visual con sesion Super Admin en la URL oficial publicada, sin modificar datos reales.
+
+### SUPERWEB-OPS-UX-01 - Operacion cotidiana de alertas y avisos
+
+- Estado: `Propuesto tras auditoria funcional`. Tipo: UX operativa y ciclo de vida de auditoria. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Faltantes confirmados: busqueda y filtros por comunidad/dispositivo/severidad/fecha; estado leido/no leido; archivo reversible; filtros de avisos vigentes/vencidos y accion de expirar un aviso vigente. Las listas actuales estan acotadas a 200 alertas y 100 avisos sin paginacion visible.
+- Decision de seguridad: no implementar `borrar alerta` como eliminacion fisica. Los eventos son auditoria retenida y los tickets de alertas dejan pendiente la politica de retencion. La alternativa propuesta es lectura y archivo reversible, manteniendo trazabilidad.
+- Requiere aprobacion separada antes de tocar Supabase: definir retencion, quien puede archivar/restaurar, si el archivo es global o por Super Admin, paginacion y tratamiento de avisos ya entregados.
+- Aceptacion propuesta: operar listas grandes desde celular; filtros no cambian datos; archivar no borra evidencia; toda mutacion queda auditada; ninguna vista expone historial de navegacion, consultas o secretos.
 
 ### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
 

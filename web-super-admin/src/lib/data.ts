@@ -53,12 +53,13 @@ export async function listCommunities() {
 
 export async function getCommunityBundle(communityId: string) {
   const supabase = await createClient();
-  const [detailResult, adminsResult, protectedUsersResult, devicesResult, dagEntitlementResult, userVersion, adminVersion] = await Promise.all([
+  const [detailResult, adminsResult, protectedUsersResult, devicesResult, dagEntitlementResult, dagDevicesResult, userVersion, adminVersion] = await Promise.all([
     supabase.rpc("super_admin_get_community_detail", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_community_admins", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_protected_users", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_community_devices", { target_community_id: communityId }),
     supabase.rpc("super_admin_get_dag_entitlement", { target_community_id: communityId }),
+    supabase.rpc("super_admin_list_community_dag_devices", { target_community_id: communityId }),
     readDevVersion("user"),
     readDevVersion("admin"),
   ]);
@@ -68,6 +69,7 @@ export async function getCommunityBundle(communityId: string) {
   if (protectedUsersResult.error) raise(protectedUsersResult.error);
   if (devicesResult.error) raise(devicesResult.error);
   if (dagEntitlementResult.error) raise(dagEntitlementResult.error);
+  if (dagDevicesResult.error) raise(dagDevicesResult.error);
 
   const detailRow = (detailResult.data ?? [])[0] as Omit<CommunityDetail, "dag_entitled"> | undefined;
   const detail = detailRow
@@ -75,10 +77,17 @@ export async function getCommunityBundle(communityId: string) {
     : undefined;
   if (!detail) notFound();
 
+  const dagByDevice = new Map<string, boolean>(
+    ((dagDevicesResult.data ?? []) as Array<{ device_id: string; dag_enabled: boolean }>).map((row) => [row.device_id, row.dag_enabled]),
+  );
+
   return {
     detail,
     admins: (adminsResult.data ?? []) as CommunityAdmin[],
-    protectedUsers: (protectedUsersResult.data ?? []) as ProtectedUser[],
+    protectedUsers: ((protectedUsersResult.data ?? []) as Omit<ProtectedUser, "dag_enabled">[]).map((user) => ({
+      ...user,
+      dag_enabled: user.device_id ? (dagByDevice.get(user.device_id) ?? false) : false,
+    })),
     devices: (devicesResult.data ?? []) as CommunityDevice[],
     devVersions: { user: userVersion, admin: adminVersion },
   };

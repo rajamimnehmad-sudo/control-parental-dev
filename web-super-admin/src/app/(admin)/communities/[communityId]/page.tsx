@@ -6,6 +6,7 @@ import { DeleteCommunityButton } from "@/components/DeleteCommunityButton";
 import { DeleteAdminButton } from "@/components/DeleteAdminButton";
 import { DeleteProtectedUserButton } from "@/components/DeleteProtectedUserButton";
 import { DagEntitlementForm } from "@/components/DagEntitlementForm";
+import { DeviceDagForm } from "@/components/DeviceDagForm";
 import { EmptyState } from "@/components/EmptyState";
 import { LicenseBadge, ProtectedUserBadge } from "@/components/Badge";
 import { LicenseForm } from "@/components/LicenseForm";
@@ -70,7 +71,7 @@ export default async function CommunityDetailPage({ params }: Props) {
         ) : (
           <div className="grid gap-3">
             {protectedUsers.map((user) => (
-              <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} />
+              <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} dagEntitled={detail.dag_entitled} />
             ))}
           </div>
         )}
@@ -211,7 +212,7 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
   );
 }
 
-function ProtectedUserCard({ user, communityId }: { user: ProtectedUser; communityId: string }) {
+function ProtectedUserCard({ user, communityId, dagEntitled }: { user: ProtectedUser; communityId: string; dagEntitled: boolean }) {
   return (
     <article className="rounded-md border border-line bg-white p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
@@ -232,6 +233,7 @@ function ProtectedUserCard({ user, communityId }: { user: ProtectedUser; communi
         <InfoLine icon={KeyRound} label={`Token vence: ${formatDate(user.token_expires_at)}`} />
         <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(user.last_seen_at)}`} />
       </div>
+      <DeviceDagForm communityId={communityId} deviceId={user.device_id} enabled={user.dag_enabled} entitled={dagEntitled} />
     </article>
   );
 }

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { BarChart3, BellRing, Building2, Database, LogOut, Megaphone, ShieldCheck } from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
+import { AdminNavigation } from "@/components/AdminNavigation";
 import { requireSuperAdmin } from "@/lib/auth";
 import { signOutAction } from "@/lib/actions";
 
@@ -11,41 +12,19 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 
   return (
     <div className="min-h-screen bg-canvas">
-      <header className="border-b border-line bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-6">
+      <header className="sticky top-0 z-40 border-b border-white/70 bg-white/90 shadow-sm backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3 lg:px-6">
           <Link href="/communities" className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-teal-50 text-accent">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-teal-50 to-cyan-100 text-accent shadow-sm">
               <ShieldCheck className="h-5 w-5" />
             </div>
             <div>
               <p className="text-base font-semibold text-ink">Super Admin</p>
-              <p className="text-xs text-slate-500">Comunidades, licencias y dispositivos</p>
+              <p className="hidden text-xs text-slate-500 sm:block">Comunidades, licencias y dispositivos</p>
             </div>
           </Link>
-          <div className="flex flex-wrap items-center gap-3">
-            <nav className="flex items-center gap-2 text-sm font-medium text-slate-600">
-              <Link className="button button-secondary" href="/communities">
-                <Building2 className="h-4 w-4" />
-                Comunidades
-              </Link>
-              <Link className="button button-secondary" href="/web-protection/domain-list">
-                <Database className="h-4 w-4" />
-                Base Web
-              </Link>
-              <Link className="button button-secondary" href="/dag-usage">
-                <BarChart3 className="h-4 w-4" />
-                Uso DAG
-              </Link>
-              <Link className="button button-secondary" href="/alerts">
-                <BellRing className="h-4 w-4" />
-                Alertas
-              </Link>
-              <Link className="button button-secondary" href="/announcements">
-                <Megaphone className="h-4 w-4" />
-                Avisos
-              </Link>
-            </nav>
-            <span className="max-w-64 truncate text-sm text-slate-500">{email}</span>
+          <div className="flex items-center gap-2">
+            <span className="hidden max-w-48 truncate text-sm text-slate-500 lg:block">{email}</span>
             <form action={signOutAction}>
               <button className="button button-secondary" type="submit" aria-label="Cerrar sesion">
                 <LogOut className="h-4 w-4" />
@@ -54,7 +33,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </div>
       </header>
-      {children}
+      <div className="hidden border-b border-line/70 bg-white md:block">
+        <div className="mx-auto max-w-7xl px-4 lg:px-6"><AdminNavigation /></div>
+      </div>
+      <div className="pb-24 md:pb-0">{children}</div>
+      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl md:hidden">
+        <AdminNavigation />
+      </div>
     </div>
   );
 }

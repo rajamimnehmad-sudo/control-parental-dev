@@ -72,6 +72,7 @@ export type ProtectedUser = {
   activated_at: string | null;
   last_seen_at: string | null;
   updated_at: string;
+  dag_enabled: boolean;
 };
 
 export type DagUsageSummary = {

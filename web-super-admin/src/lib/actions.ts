@@ -45,6 +45,12 @@ const dagEntitlementSchema = z.object({
   enabled: z.enum(["true", "false"]).transform((value) => value === "true"),
 });
 
+const deviceDagSchema = z.object({
+  communityId: z.string().uuid(),
+  deviceId: z.string().uuid(),
+  enabled: z.enum(["true", "false"]).transform((value) => value === "true"),
+});
+
 const announcementSchema = z.object({
   communityId: z.string().uuid(),
   targetRole: z.enum(["admin", "user", "all"]),
@@ -200,6 +206,28 @@ export async function updateDagEntitlementAction(_prevState: ActionState, formDa
   revalidatePath(`/communities/${parsed.data.communityId}`);
   revalidatePath("/dag-usage");
   return { ok: true, message: parsed.data.enabled ? "DAG habilitado para la comunidad" : "DAG deshabilitado para la comunidad" };
+}
+
+export async function updateDeviceDagAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = deviceDagSchema.safeParse({
+    communityId: formValue(formData, "communityId"),
+    deviceId: formValue(formData, "deviceId"),
+    enabled: formValue(formData, "enabled"),
+  });
+
+  if (!parsed.success) return { ok: false, message: "Usuario DAG inválido" };
+
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("super_admin_set_device_dag_enabled", {
+    target_community_id: parsed.data.communityId,
+    target_device_id: parsed.data.deviceId,
+    new_dag_enabled: parsed.data.enabled,
+  });
+
+  if (error) return errorState(error);
+  revalidatePath(`/communities/${parsed.data.communityId}`);
+  revalidatePath("/dag-usage");
+  return { ok: true, message: parsed.data.enabled ? "DAG habilitado para este usuario" : "DAG deshabilitado para este usuario" };
 }
 
 export async function createAnnouncementAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
