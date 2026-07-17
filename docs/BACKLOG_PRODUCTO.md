@@ -172,6 +172,7 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
+| DAG-ULTRA-KOSHER-01 | Idea | P1 | Elegir entre fotos filtradas con advertencia o modo Ultra kosher con todas las fotos desenfocadas | M | Alto |
 | DAG-RESULTS-DIAG-01 | Resuelto DEV 237 | P1 | Contabilizar localmente el embudo de resultados Brave y los descartes DAG sin guardar contenido | S | Bajo |
 | DAG-RESULTS-PAGE-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Ofrecer una unica pagina adicional cuando Brave informa mas resultados, con costo explicito | S | Medio |
 | DAG-HISTORY-UX-01 | Resuelto DEV 234 | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
@@ -521,6 +522,25 @@ Flujo de una entrada:
 - Alcance: espera justa sin vencimiento interno del turno, cancelacion por generacion al cambiar o cerrar pagina, presupuesto de 400 recursos y cache efimera de 64 entradas/16 MiB. Persisten el timeout de red de ocho segundos, HTTPS, defensa SSRF, maximo de descarga, clasificacion previa y fallo cerrado.
 - Riesgos: una pagina muy grande puede tardar mas en completar su cola y usar mas memoria efimera; los topes siguen acotados y abandonar la pagina cancela el trabajo pendiente.
 - Criterios de aceptacion: al desplazarse por una tienda densa se procesan tambien las fotos posteriores; ninguna imagen se muestra antes de clasificarse; cambiar de pagina no mezcla resultados ni deja trabajo viejo; fallos reales de red o formato permanecen neutros y seguros.
+
+#### DAG-ULTRA-KOSHER-01 - Modos de imagenes administrables
+
+- Estado: `Idea`; no aprobado para codigo. Tipo: seguridad visual, configuracion Admin y UX DAG. Prioridad: P1.
+- Problema: el filtrado visual probabilistico mejora la navegacion, pero no puede asegurar 100 % de aciertos. Eliminar imagenes por completo deja huecos y produce una experiencia visual pobre; algunas comunidades o familias necesitan una opcion mas estricta sin romper la estructura de las paginas.
+- Solucion propuesta: ofrecer al administrador dos modos excluyentes por Usuario o dispositivo: `Fotos filtradas`, que conserva el analisis local actual y muestra una nota clara de que DAG no garantiza 100 %; y `Ultra kosher`, que mantiene los espacios y dimensiones de la pagina pero presenta todas las fotografias con blur fuerte e irreversible, sin accion del Usuario para revelarlas.
+- Evidencia: propuesta explicita del usuario del 2026-07-17.
+- Esfuerzo: M estimado. Riesgo: alto; distinguir fotografias de logos, iconos, mapas, CAPTCHA y controles funcionales puede afectar navegacion o permitir excepciones inconsistentes. Un blur aplicado solo por CSS podria ser reversible y no cumple el objetivo.
+- Dependencias: politica visual DAG; rasterizacion/blur irreversible existente; carga lazy y recursos dinamicos; App Admin y reglas por dispositivo; sincronizacion y auditoria; accesibilidad; CAPTCHA; SVG/iconos seguros; rendimiento y memoria.
+- Duplicados y relacion: no revive la regla historica `Bloquear imagenes`, eliminada porque ocultaba recursos y empeoraba la experiencia. Es un modo opcional nuevo que conserva el diseño mediante blur. Complementa `DAG-IMAGES-01` y las capas de modestia existentes; no reemplaza los bloqueos de video, descargas o dominios.
+- Criterios de aceptacion propuestos:
+  - Admin puede elegir exactamente un modo de imagenes para el Usuario o dispositivo autorizado;
+  - `Fotos filtradas` mantiene el comportamiento actual y muestra una advertencia breve y honesta de que la clasificacion no garantiza 100 %;
+  - `Ultra kosher` desenfoca todas las fotografias antes de entregarlas al WebView y conserva su espacio, proporcion y flujo de pagina;
+  - el Usuario no puede quitar el blur, recuperar el raster original desde la pagina ni cambiar el modo localmente;
+  - cambiar el modo se sincroniza, queda auditable y se aplica a nuevas cargas sin borrar historial, sesiones ni preferencias ajenas;
+  - recursos dudosos, fallidos o tecnicamente inseguros continúan fallando cerrados y nunca se vuelven visibles por elegir un modo;
+  - se validan paginas densas, lazy loading, tiendas, noticias, CAPTCHA, logos, iconos, formularios, temas y varias pestanas sin huecos ni mezcla de politicas.
+- Decisiones pendientes para la entrevista del ticket: alcance por comunidad o dispositivo; modo predeterminado; tratamiento de logos, iconos, mapas, QR, CAPTCHA y dibujos; intensidad exacta del blur; texto y ubicacion de la advertencia; autoridad Admin o Super Admin; comportamiento offline y migracion de dispositivos actuales.
 
 #### DAG-HISTORY-UX-01 - Historial minimalista
 
