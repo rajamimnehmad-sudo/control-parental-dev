@@ -831,7 +831,7 @@ Flujo de una entrada:
 
 ### APP-INSTALL-APPROVAL-01 - Aprobacion previa para instalar apps
 
-- Estado: `Candidato DEV 254; correccion definitiva del flujo confiable validada localmente y pendiente publicacion/prueba final en SM-S908E`. Aprobado por el usuario al ordenar todos los tickets y definido el 2026-07-16 para Android normal compatible con la mayoria de equipos, sin Android Enterprise ni cambios de cuenta Google.
+- Estado: `Publicado DEV 254; correccion definitiva del flujo confiable validada tecnica y auxiliarmente, pendiente prueba final en SM-S908E`. Aprobado por el usuario al ordenar todos los tickets y definido el 2026-07-16 para Android normal compatible con la mayoria de equipos, sin Android Enterprise ni cambios de cuenta Google.
 - Tipo: control de aplicaciones, seguridad y solicitudes.
 - Prioridad: P1.
 - Problema: se quiere conservar Play Store disponible para explorar aplicaciones, pero impedir que una app se instale hasta recibir permiso explicito del administrador. Tambien se deben impedir la descarga y la instalacion lateral de archivos APK.
@@ -863,8 +863,8 @@ Flujo de una entrada:
 - Limite real: es best-effort en Android normal. Sin Device Owner no se promete impedir materialmente toda instalacion en todos los OEM, pero una app nueva detectada no puede usarse sin aprobacion mientras Accessibility funciona. La garantia de sistema queda como modalidad empresarial futura y requeriria aprovisionamiento administrado.
 - Correccion DEV 244: la autorizacion usa el componente exacto del receptor firmado, el APK pendiente se retoma al volver del permiso por origen y la politica reconoce variantes Samsung/OEM del instalador y de fuentes desconocidas. La matriz integral de 1.011 tareas fue correcta y ambos APK se instalaron in-place en SM-A235M conservando Accessibility, Device Admin y VPN.
 - Correccion DEV 245: el detector separa la identidad exacta de App Admin de la etiqueta generica de Usuario. La ficha de aplicacion y el permiso por origen de Admin quedan accesibles permanentemente; los Ajustes sensibles de Usuario y las fuentes desconocidas de terceros siguen protegidos. Las regresiones, la matriz integral y la instalacion in-place auxiliar fueron correctas.
-- Correccion candidata DEV 254 (`UPDATE-TRUSTED-INSTALL-02`): la entrega firmada Admin -> Usuario deja de depender de un filtro redundante sobre el receptor y Samsung `SubSettings` se reconoce mediante indicadores especificos de fuentes desconocidas. La ventana de cinco minutos no habilita VPN, Accessibility, Device Admin ni remocion, y sin ventana confiable la fuente permanece bloqueada.
-- Validacion pendiente: publicar 254, instalarla una ultima vez con el mecanismo disponible y confirmar que las actualizaciones siguientes se inician desde Usuario y Admin sin autorizar Ajustes manualmente. Sigue pendiente la prueba completa Play Store/APK/aprobacion del alcance mayor del ticket.
+- Correccion DEV 254 (`UPDATE-TRUSTED-INSTALL-02`): la entrega firmada Admin -> Usuario deja de depender de un filtro redundante sobre el receptor y Samsung `SubSettings` se reconoce mediante indicadores especificos de fuentes desconocidas. La ventana de cinco minutos no habilita VPN, Accessibility, Device Admin ni remocion, y sin ventana confiable la fuente permanece bloqueada.
+- Validacion DEV 254: tests, formato, builds, CI, publicacion unica, manifiestos, hashes y firma correctos; ambas APK se instalaron in-place en SM-A235M y recibieron el permiso de firma. Pendiente instalar 254 una ultima vez en el Samsung personal y confirmar que las actualizaciones siguientes se inician desde Usuario y Admin sin autorizar Ajustes manualmente. Sigue pendiente la prueba completa Play Store/APK/aprobacion del alcance mayor del ticket.
 
 ### SUPERADMIN-DAG-ENTITLEMENT-01 - DAG como funcion premium
 

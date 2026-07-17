@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-17:
 
 ```text
-App Usuario versionCode 253
-App Admin versionCode 253
+App Usuario versionCode 254
+App Admin versionCode 254
 versionName 1.0.1-dev
 ```
 
@@ -68,24 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-253-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-253-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-254-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-254-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 9febc765493bd1b19b8864f4355da4616136c10183cb0126aa420e73b25dfe12
-Admin   76c51b8d781ea18338c6a92724a641ba0e61d741b238f8350baeb253c749e259
+Usuario 5fdb3a4267065c9638efbed7c12275cff152ce370de50a6d33069329a52cb3c5
+Admin   09f309e66b3d821d0d9a7d2a1faccdfac16534381d196dbc94cabfc8ab564efb
 ```
 
-## Candidato DEV 254 - actualizaciones confiables sin habilitar Ajustes - 2026-07-17
+## Publicacion DEV 254 - actualizaciones confiables sin habilitar Ajustes - 2026-07-17
 
 - `UPDATE-TRUSTED-INSTALL-02` corrige el reporte de Samsung donde una actualizacion iniciada desde App Usuario o App Admin era expulsada por la barrera hasta autorizar Ajustes manualmente desde Admin.
 - Causa: la entrega Admin -> Usuario dependia de un filtro redundante de permiso sobre el receptor que puede variar entre instalaciones OEM. Ademas, Samsung puede presentar el permiso por origen con una actividad generica `SubSettings`; la autorizacion confiable existente solo reconocia nombres explicitos de fuentes desconocidas.
 - Correccion: el broadcast sigue dirigido al componente exacto y el receptor sigue exigiendo el permiso `signature`, pero la entrega ya no filtra adicionalmente al receptor. App Usuario declara tambien el uso del permiso. Accessibility reconoce indicadores especificos de `Instalar apps desconocidas` aun dentro de `SubSettings` y solo los permite durante la ventana confiable de cinco minutos iniciada por las apps Content Filter.
 - Seguridad conservada: APK externos y fuentes desconocidas sin ventana confiable siguen bloqueados; VPN, Accessibility, Device Admin, ficha y desinstalacion de App Usuario no se habilitan por esta ventana. Android normal mantiene su confirmacion de instalacion y el permiso por origen cuando aun no fue concedido.
-- Validacion local dirigida: tests Debug/Release de `feature-accessibility`, ktlint de `feature-accessibility` y `core-update`, tests DEV y ktlint de ambas apps, manifiestos fusionados y builds optimizados Usuario/Admin correctos. Usuario y Admin suben juntos a `versionCode 254`. Pendiente publicacion DEV, verificacion publica y prueba final en el Samsung personal.
+- Validacion: tests Debug/Release de `feature-accessibility`, ktlint de `feature-accessibility` y `core-update`, tests DEV y ktlint de ambas apps, manifiestos fusionados y builds optimizados Usuario/Admin correctos. Android CI `29606038884` completo build, tests, ktlint, lint y Detekt; `Publicar APKs DEV` `29606038832` publico una sola vez exclusivamente en Supabase DEV.
+- Usuario y Admin 254 se instalaron in-place por ADB en SM-A235M sin borrar datos. Device Admin continuo registrado y Android concedio el permiso de firma a ambos paquetes. Accessibility estaba desactivado previamente, por lo que la prueba determinante del recorrido protegido queda pendiente en el Samsung personal.
+- Los manifiestos publicos declaran 254 y sus hashes coinciden con las descargas. `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`; ambas APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
 ## Publicacion DEV 247 - Paridad UX de App Usuario - 2026-07-16
 
