@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 249
-App Admin versionCode 249
+App Usuario versionCode 250
+App Admin versionCode 250
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-249-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-249-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-250-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-250-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 56ff6449dad31be81cff983be094d58015bfa859b39bc1c4cd5cc388c359d774
-Admin   23a1695ed283c739577fc7e31cab55c70a480f26603e2f2faf325b2b4cee6d4d
+Usuario 22dd65ae0a81909b3a19826db9dbeba7803f97309dc130517e4564c886ecea44
+Admin   568b28e2363b5166760d956ed95586ad9b837531c1f845757c8eedd757ef0f0f
 ```
 
 ## Publicacion DEV 247 - Paridad UX de App Usuario - 2026-07-16
@@ -115,12 +115,14 @@ Admin   23a1695ed283c739577fc7e31cab55c70a480f26603e2f2faf325b2b4cee6d4d
 - Los manifiestos publicos declaran 249; las descargas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV correctos y `minSdk 29`.
 - Validacion SM-A235M Android 13: ambas apps actualizaron in-place a 249 sin borrar datos; Accessibility, Device Admin y VPN siguieron activos. Admin conservo confirmacion normal de desinstalacion y su ficha; Usuario, su ficha, su detalle Accessibility y la configuracion VPN fueron expulsados al launcher en menos de la primera comprobacion a 300 ms. Tras dejar finalizar los reintentos, las fichas de WhatsApp y Chrome permanecieron disponibles. Pendiente repetir el bypass manual rapido en SM-S908E.
 
-## Candidato DEV 250 - Ruta VPN Samsung generica - 2026-07-17
+## Publicacion DEV 250 - Ruta VPN Samsung generica - 2026-07-17
 
 - Reporte fisico personal con DEV 249: Ajustes permitia abrir la VPN y mover su switch; el watchdog recuperaba Content Filter al rato. Al iniciar Proton VPN, Android reemplazaba temporalmente Content Filter porque solo admite una VPN activa por usuario, y el watchdog restauraba despues la VPN protegida.
 - Causa: algunos recorridos Samsung alojan el detalle VPN dentro de `com.android.settings.SubSettings`, sin `VpnSettings` en la clase. DEV 249 cubria la actividad directa pero no podia clasificar esa variante generica.
 - Correccion: una `SubSettings` Android entra a proteccion y salida urgente solo si la ventana identifica positivamente App Usuario. Admin y otras apps/VPN no coinciden y permanecen accesibles. Tests cubren Usuario, otra identidad, Admin y salida inmediata.
-- Usuario y Admin suben juntos a `versionCode 250`. Tests Debug/Release y ktlint de Accessibility correctos; pendiente build, publicacion unica DEV, manifiestos/hashes y prueba fisica en el Samsung personal.
+- Usuario y Admin subieron juntos a `versionCode 250`. Tests Debug/Release, ktlint y builds optimizados correctos. El commit `655683d` se publico una sola vez exclusivamente en Supabase DEV mediante el workflow `29580417338`; Android CI `29580417480` completo build, tests, ktlint, lint y detekt.
+- Los manifiestos publicos declaran 250; las descargas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV correctos y `minSdk 29`.
+- SM-A235M actualizo in-place a 250 sin borrar datos: la ruta VPN directa siguio expulsada, la ficha Admin permanecio disponible y Accessibility, Device Admin y VPN continuaron activos. La prueba determinante de `SubSettings` queda pendiente en el Samsung personal que reporto el bypass.
 
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 
