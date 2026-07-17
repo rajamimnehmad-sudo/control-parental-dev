@@ -2,12 +2,13 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { BarChart3, BellRing, Building2, Database, Megaphone } from "lucide-react";
+import { BarChart3, BellRing, BrainCircuit, Building2, Database, Megaphone } from "lucide-react";
 
 const items = [
   { href: "/communities", label: "Comunidades", shortLabel: "Inicio", icon: Building2 },
   { href: "/web-protection/domain-list", label: "Base Web", shortLabel: "Base", icon: Database },
   { href: "/dag-usage", label: "Uso DAG", shortLabel: "DAG", icon: BarChart3 },
+  { href: "/dag-calibration", label: "Calibración DAG", shortLabel: "Calibrar", icon: BrainCircuit },
   { href: "/alerts", label: "Alertas", shortLabel: "Alertas", icon: BellRing },
   { href: "/announcements", label: "Avisos", shortLabel: "Avisos", icon: Megaphone },
 ] as const;

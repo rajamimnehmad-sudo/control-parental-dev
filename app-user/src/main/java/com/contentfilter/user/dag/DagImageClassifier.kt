@@ -24,21 +24,28 @@ internal data class DagImageClassification(
     val decision: DagImageDecision,
     val unsafeScore: Float? = null,
     val mimeType: String? = null,
+    val scores: Map<String, Float> = emptyMap(),
 )
 
-internal fun dagImageDecision(unsafeScore: Float): DagImageDecision =
+internal fun dagImageDecision(
+    unsafeScore: Float,
+    calibration: DagImageCalibration = DagImageCalibration(),
+): DagImageDecision =
     when {
         !unsafeScore.isFinite() || unsafeScore < 0f || unsafeScore > 1f -> DagImageDecision.Uncertain
-        unsafeScore <= DagImageClassifier.SafeThreshold -> DagImageDecision.Allowed
-        unsafeScore >= DagImageClassifier.BlockThreshold -> DagImageDecision.Blocked
+        unsafeScore <= calibration.professionalSafe -> DagImageDecision.Allowed
+        unsafeScore >= calibration.professionalBlock -> DagImageDecision.Blocked
         else -> DagImageDecision.Uncertain
     }
 
-internal fun dagProfessionalImageDecision(unsafeProbability: Float): DagImageDecision =
+internal fun dagProfessionalImageDecision(
+    unsafeProbability: Float,
+    calibration: DagImageCalibration = DagImageCalibration(),
+): DagImageDecision =
     when {
         !unsafeProbability.isFinite() || unsafeProbability !in 0f..1f -> DagImageDecision.Uncertain
-        unsafeProbability <= DagProfessionalImageClassifier.SafeThreshold -> DagImageDecision.Allowed
-        unsafeProbability >= DagProfessionalImageClassifier.BlockThreshold -> DagImageDecision.Blocked
+        unsafeProbability <= calibration.professionalSafe -> DagImageDecision.Allowed
+        unsafeProbability >= calibration.professionalBlock -> DagImageDecision.Blocked
         else -> DagImageDecision.Uncertain
     }
 
@@ -55,6 +62,7 @@ internal class DagImageClassifier(
     private var interpreter: Interpreter? = null
     private val professionalClassifier = DagProfessionalImageClassifier(applicationContext)
     private val modestyClassifier = DagModestyImageClassifier(applicationContext)
+    private val calibrationStore = DagImageCalibrationStore(applicationContext)
 
     fun classify(
         bytes: ByteArray,
@@ -65,13 +73,16 @@ internal class DagImageClassifier(
             if (detectedMime == null) {
                 return@synchronized DagImageClassification(DagImageDecision.Uncertain)
             }
-            val bitmap = decodeForClassification(bytes) ?: return@synchronized DagImageClassification(DagImageDecision.Uncertain)
+            val bitmap =
+                decodeForClassification(bytes)
+                    ?: return@synchronized DagImageClassification(DagImageDecision.Uncertain)
             try {
                 val classificationStartedAt = SystemClock.elapsedRealtime()
+                val calibration = calibrationStore.current()
                 val professionalAvailable = professionalClassifier.isAvailable()
                 val professional =
                     if (professionalAvailable) {
-                        professionalClassifier.classify(bitmap)
+                        professionalClassifier.classify(bitmap, calibration)
                     } else {
                         DagImageClassification(DagImageDecision.Uncertain)
                     }
@@ -83,10 +94,17 @@ internal class DagImageClassifier(
                         val output = Array(1) { FloatArray(OutputClasses) }
                         model().run(bitmapToInput(bitmap), output)
                         legacyScore = output[0][UnsafeOutputIndex]
-                        dagEnsembleImageDecision(professional.decision, dagImageDecision(legacyScore))
+                        dagEnsembleImageDecision(professional.decision, dagImageDecision(legacyScore, calibration))
                     }
-                val modestyRequiresBlur =
-                    ensembleDecision == DagImageDecision.Allowed && modestyClassifier.requiresBlur(bitmap)
+                val modestyScores =
+                    if (ensembleDecision == DagImageDecision.Allowed) {
+                        modestyClassifier.classify(
+                            bitmap,
+                        )
+                    } else {
+                        null
+                    }
+                val modestyRequiresBlur = modestyScores?.let { requiresKosherModestyBlur(it, calibration) } == true
                 val decision =
                     if (modestyRequiresBlur) {
                         DagImageDecision.Uncertain
@@ -103,6 +121,12 @@ internal class DagImageClassifier(
                     decision = decision,
                     unsafeScore = maxOf(professional.unsafeScore ?: 0f, legacyScore ?: 0f),
                     mimeType = detectedMime,
+                    scores =
+                        buildMap {
+                            professional.unsafeScore?.let { put("professional", it) }
+                            legacyScore?.let { put("legacy", it) }
+                            modestyScores?.toCalibrationScores()?.let(::putAll)
+                        },
                 )
             } catch (_: RuntimeException) {
                 DagImageClassification(DagImageDecision.Uncertain)

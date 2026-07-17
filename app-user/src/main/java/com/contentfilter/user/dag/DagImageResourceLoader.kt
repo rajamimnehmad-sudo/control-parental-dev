@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicInteger
 
 internal class DagImageResourceLoader(
     private val classifier: DagImageClassifier,
+    private val onCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit = { _, _ -> },
     private val cookieManager: CookieManager = CookieManager.getInstance(),
     private val client: OkHttpClient =
         OkHttpClient.Builder()
@@ -142,6 +143,9 @@ internal class DagImageResourceLoader(
                 DagImageDecision.Uncertain -> uncertainCount.incrementAndGet()
             }
             if (classification.decision != DagImageDecision.Allowed) {
+                if (classification.decision == DagImageDecision.Uncertain) {
+                    dagCalibrationThumbnail(bytes)?.let { onCalibrationCandidate(it, classification) }
+                }
                 return blurredImageResource(request.url.toString(), bytes) ?: unavailableImageResource()
             }
 
@@ -173,6 +177,33 @@ internal class DagImageResourceLoader(
             } finally {
                 if (blurred !== tiny && blurred !== source) blurred.recycle()
                 if (tiny !== source) tiny.recycle()
+            }
+        } finally {
+            source.recycle()
+        }
+    }
+
+    private fun dagCalibrationThumbnail(bytes: ByteArray): ByteArray? {
+        val source = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
+        return try {
+            val scale = minOf(1f, CalibrationThumbnailDimension.toFloat() / maxOf(source.width, source.height))
+            val width = maxOf(1, (source.width * scale).toInt())
+            val height = maxOf(1, (source.height * scale).toInt())
+            val thumbnail = Bitmap.createScaledBitmap(source, width, height, true)
+            try {
+                ByteArrayOutputStream().use { output ->
+                    if (!thumbnail.compress(
+                            Bitmap.CompressFormat.JPEG,
+                            CalibrationThumbnailQuality,
+                            output,
+                        )
+                    ) {
+                        return null
+                    }
+                    output.toByteArray().takeIf { it.size <= CalibrationThumbnailMaximumBytes }
+                }
+            } finally {
+                if (thumbnail !== source) thumbnail.recycle()
             }
         } finally {
             source.recycle()
@@ -247,6 +278,9 @@ internal class DagImageResourceLoader(
         const val MaximumBlurredDimension = 480
         const val BlurSampleSide = 4
         const val BlurJpegQuality = 72
+        const val CalibrationThumbnailDimension = 512
+        const val CalibrationThumbnailQuality = 65
+        const val CalibrationThumbnailMaximumBytes = 128 * 1024
         const val MaximumCachedImages = 64
         const val MaximumCachedImageBytes = 1024 * 1024
         const val MaximumResponseCacheBytes = 16 * 1024 * 1024

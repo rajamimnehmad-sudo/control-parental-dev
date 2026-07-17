@@ -79,6 +79,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -97,6 +98,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -121,6 +123,7 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.UUID
 import kotlin.math.cos
+import kotlin.math.roundToInt
 import kotlin.math.sin
 import androidx.compose.foundation.lazy.grid.items as gridItems
 
@@ -414,6 +417,7 @@ private fun DagBrowserContent(
                     }
                     DagAnalysisFrame(
                         analyzing = analyzing,
+                        progress = state.analysisProgress,
                         modifier =
                             Modifier
                                 .weight(1f)
@@ -606,6 +610,7 @@ private fun DagBrowserContent(
                         address = state.address,
                         suggestions = state.suggestions,
                         analyzing = analyzing,
+                        analysisProgress = state.analysisProgress,
                         onAddressChanged = viewModel::onAddressChanged,
                         onSuggestionSelected = viewModel::selectSuggestion,
                         onSubmit = viewModel::submitAddress,
@@ -638,6 +643,8 @@ private fun DagBrowserContent(
                         onPageStarted = viewModel::onPageStarted,
                         onPageTextReady = viewModel::onPageTextReady,
                         onViewportImagesReady = viewModel::onViewportImagesReady,
+                        onViewportImageProgress = viewModel::onViewportImageProgress,
+                        onCalibrationCandidate = viewModel::submitDagCalibrationCandidate,
                         onBlockedAction = viewModel::onBrowserBlockedAction,
                         onPageBlocked = viewModel::onPageBlocked,
                         onRendererGone = viewModel::onBrowserRendererGone,
@@ -843,6 +850,7 @@ private const val DagThemePreferenceKey = "theme_preference"
 @Composable
 private fun DagAnalysisFrame(
     analyzing: Boolean,
+    progress: Float,
     modifier: Modifier = Modifier,
     cornerRadius: Dp,
     content: @Composable () -> Unit,
@@ -863,17 +871,7 @@ private fun DagAnalysisFrame(
                 ),
             label = "dag-analysis-angle",
         )
-    val progress by
-        transition.animateFloat(
-            initialValue = 0.08f,
-            targetValue = 0.92f,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(durationMillis = 1_600, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-            label = "dag-analysis-progress",
-        )
+    val visibleProgress = progress.coerceIn(0f, 1f)
     Box(modifier = modifier) {
         content()
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -887,7 +885,7 @@ private fun DagAnalysisFrame(
                                 Color(0xFFFF4FD8).copy(alpha = 0.06f),
                             ),
                     ),
-                size = androidx.compose.ui.geometry.Size(size.width * progress, size.height),
+                size = androidx.compose.ui.geometry.Size(size.width * visibleProgress, size.height),
                 cornerRadius =
                     androidx.compose.ui.geometry.CornerRadius(
                         cornerRadius.toPx(),
@@ -1082,6 +1080,7 @@ private fun DagStartContent(
     address: String,
     suggestions: List<String>,
     analyzing: Boolean,
+    analysisProgress: Float,
     onAddressChanged: (String) -> Unit,
     onSuggestionSelected: (String) -> Unit,
     onSubmit: () -> Unit,
@@ -1102,7 +1101,16 @@ private fun DagStartContent(
         Spacer(Modifier.height(24.dp))
         DagAnalysisFrame(
             analyzing = analyzing,
-            modifier = Modifier.fillMaxWidth().height(56.dp),
+            progress = if (analyzing) analysisProgress else 0f,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .semantics {
+                        if (analyzing) {
+                            stateDescription = "${(analysisProgress * 100).roundToInt()} por ciento analizado"
+                        }
+                    },
             cornerRadius = 28.dp,
         ) {
             OutlinedTextField(
@@ -1418,6 +1426,8 @@ private fun DagWebContent(
     onPageStarted: (String) -> Boolean,
     onPageTextReady: (String, String, String?, DagImagePageSummary) -> Unit,
     onViewportImagesReady: (String) -> Unit,
+    onViewportImageProgress: (String, Int, Int) -> Unit,
+    onCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit,
     onBlockedAction: (String) -> Unit,
     onPageBlocked: (String) -> Unit,
     onRendererGone: () -> Unit,
@@ -1426,7 +1436,16 @@ private fun DagWebContent(
 ) {
     val context = LocalContext.current
     val imageClassifier = remember(context) { DagImageClassifier(context) }
-    val imageLoader = remember(imageClassifier) { DagImageResourceLoader(imageClassifier) }
+    val currentCalibrationCandidate by rememberUpdatedState(onCalibrationCandidate)
+    val imageLoader =
+        remember(imageClassifier) {
+            DagImageResourceLoader(
+                classifier = imageClassifier,
+                onCalibrationCandidate = { image, classification ->
+                    currentCalibrationCandidate(image, classification)
+                },
+            )
+        }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
@@ -1484,7 +1503,9 @@ private fun DagWebContent(
                         if (preparedUrl == url) return
                         preparedUrl = url
                         view.sanitizeAndExtractVisibleText {
-                            view.awaitDagViewportImages {
+                            view.awaitDagViewportImages(
+                                onProgress = { resolved, total -> onViewportImageProgress(url, resolved, total) },
+                            ) {
                                 view.postDelayed(
                                     {
                                         if (preparedUrl == url) onViewportImagesReady(url)
@@ -2030,10 +2051,14 @@ private fun WebView.sanitizeAndExtractVisibleText(
 private fun WebView.awaitDagViewportImages(
     startedAtMillis: Long = SystemClock.elapsedRealtime(),
     networkImagesEnabled: Boolean = false,
+    onProgress: (Int, Int) -> Unit,
     callback: () -> Unit,
 ) {
+    val prepareViewportScript =
+        "(function(){ return window.__dagPrepareViewportImages " +
+            "? window.__dagPrepareViewportImages(false) : null; })();"
     evaluateJavascript(
-        "(function(){ return window.__dagPrepareViewportImages ? window.__dagPrepareViewportImages(false) : null; })();",
+        prepareViewportScript,
     ) { encoded ->
         if (!networkImagesEnabled) settings.blockNetworkImage = false
         val status =
@@ -2041,19 +2066,29 @@ private fun WebView.awaitDagViewportImages(
                 runCatching { org.json.JSONObject(value) }.getOrNull()
             }
         val pending = status?.optInt("pending", 0) ?: 0
+        val total = status?.optInt("total", 0) ?: 0
+        onProgress((total - pending).coerceAtLeast(0), total)
         val elapsed = SystemClock.elapsedRealtime() - startedAtMillis
         when (dagViewportReadinessAction(pending, elapsed)) {
             DagViewportReadinessAction.Ready -> callback()
             DagViewportReadinessAction.Wait ->
                 if (isAttachedToWindow) {
                     postDelayed(
-                        { awaitDagViewportImages(startedAtMillis, networkImagesEnabled = true, callback) },
+                        {
+                            awaitDagViewportImages(
+                                startedAtMillis,
+                                networkImagesEnabled = true,
+                                onProgress,
+                                callback,
+                            )
+                        },
                         DagViewportReadinessPolicy.PollDelayMillis,
                     )
                 }
             DagViewportReadinessAction.HidePending ->
                 evaluateJavascript(
-                    "(function(){ return window.__dagPrepareViewportImages ? window.__dagPrepareViewportImages(true) : null; })();",
+                    "(function(){ return window.__dagPrepareViewportImages " +
+                        "? window.__dagPrepareViewportImages(true) : null; })();",
                 ) { callback() }
         }
     }

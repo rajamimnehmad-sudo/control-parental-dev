@@ -63,6 +63,17 @@ const announcementSchema = z.object({
 );
 
 const archiveSchema = z.object({ id: z.string().uuid() });
+const dagReviewSchema = z.object({
+  reviewId: z.string().uuid(),
+  decision: z.enum(["allow", "block"]),
+  reason: z.enum([
+    "acceptable_clothing", "pronounced_neckline", "exposed_shoulders", "tight_or_transparent",
+    "swimwear", "lingerie", "nudity", "product_without_person", "mannequin",
+    "false_positive", "ambiguous", "other",
+  ]),
+  note: z.string().trim().max(500).optional(),
+});
+const dagCalibrationIdSchema = z.object({ calibrationId: z.string().uuid() });
 
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -283,4 +294,112 @@ export async function archiveAnnouncementAction(_prevState: ActionState, formDat
   if (error) return errorState(error);
   revalidatePath("/announcements");
   return { ok: true, message: "Aviso borrado del historial" };
+}
+
+export async function labelDagCalibrationReviewAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = dagReviewSchema.safeParse({
+    reviewId: formValue(formData, "reviewId"),
+    decision: formValue(formData, "decision"),
+    reason: formValue(formData, "reason"),
+    note: formValue(formData, "note"),
+  });
+  if (!parsed.success) return { ok: false, message: "Completá la decisión y el motivo." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("super_admin_label_dag_calibration_review", {
+    target_review_id: parsed.data.reviewId,
+    new_decision: parsed.data.decision,
+    new_reason: parsed.data.reason,
+    new_note: parsed.data.note || null,
+  });
+  if (error) return errorState(error);
+  revalidatePath("/dag-calibration");
+  return { ok: true, message: "Respuesta registrada para Calibración DAG." };
+}
+
+export async function prepareDagCalibrationAction(_prevState: ActionState): Promise<ActionState> {
+  void _prevState;
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("super_admin_list_dag_calibration_reviews", {
+    requested_status: "reviewed",
+    max_rows: 500,
+  });
+  if (error) return errorState(error);
+  const allReviews = (data ?? []) as Array<{
+    review_decision: "allow" | "block";
+    review_reason: string;
+    scores: Record<string, number>;
+    model_version: string;
+  }>;
+  const modelVersion = allReviews[0]?.model_version ?? "unknown";
+  const reviews = allReviews.filter((review) => review.model_version === modelVersion);
+  const allowCount = reviews.filter((review) => review.review_decision === "allow").length;
+  const blockCount = reviews.length - allowCount;
+  if (reviews.length < 12 || allowCount < 3 || blockCount < 3) {
+    return { ok: false, message: `Faltan ejemplos: hay ${reviews.length}/12, con ${allowCount} permitidos y ${blockCount} bloqueados (mínimo 3 de cada uno).` };
+  }
+  const professional = bestThreshold(reviews, "professional", 0.65);
+  const thresholds = {
+    professional_safe: Math.max(0.05, round4(professional.threshold - 0.15)),
+    professional_block: professional.threshold,
+    female_face: bestThreshold(reviews, "female_face", 0.30).threshold,
+    female_breast_covered: bestThreshold(reviews, "female_breast_covered", 0.18, ["acceptable_clothing", "pronounced_neckline", "tight_or_transparent", "swimwear", "lingerie", "nudity"]).threshold,
+    female_genitalia_covered: bestThreshold(reviews, "female_genitalia_covered", 0.18, ["acceptable_clothing", "tight_or_transparent", "swimwear", "lingerie", "nudity"]).threshold,
+    buttocks_covered: bestThreshold(reviews, "buttocks_covered", 0.18, ["acceptable_clothing", "tight_or_transparent", "swimwear", "lingerie", "nudity"]).threshold,
+    armpits_exposed: bestThreshold(reviews, "armpits_exposed", 0.20, ["acceptable_clothing", "exposed_shoulders", "swimwear", "lingerie"]).threshold,
+    belly_exposed: bestThreshold(reviews, "belly_exposed", 0.20, ["acceptable_clothing", "tight_or_transparent", "swimwear", "lingerie", "nudity"]).threshold,
+    explicit_region: bestThreshold(reviews, "explicit_region", 0.20, ["swimwear", "lingerie", "nudity"]).threshold,
+  };
+  const metrics = {
+    reviewed: reviews.length,
+    allowed: allowCount,
+    blocked: blockCount,
+    false_positive: professional.falsePositive,
+    false_negative: professional.falseNegative,
+    weighted_error: professional.weightedError,
+  };
+  const { error: createError } = await supabase.rpc("super_admin_create_dag_calibration", {
+    new_thresholds: thresholds,
+    new_metrics: metrics,
+    calibration_model_version: modelVersion,
+    calibration_explanation: "Umbrales candidatos calculados con falsos negativos ponderados 3× y falsos positivos 1×. Requiere activación manual y admite reversión.",
+  });
+  if (createError) return errorState(createError);
+  revalidatePath("/dag-calibration");
+  return { ok: true, message: "Calibración candidata creada. Revisá las métricas antes de activarla." };
+}
+
+export async function activateDagCalibrationAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = dagCalibrationIdSchema.safeParse({ calibrationId: formValue(formData, "calibrationId") });
+  if (!parsed.success) return { ok: false, message: "Calibración inválida." };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("super_admin_activate_dag_calibration", { target_calibration_id: parsed.data.calibrationId });
+  if (error) return errorState(error);
+  revalidatePath("/dag-calibration");
+  return { ok: true, message: "Calibración activada. Los dispositivos la recibirán en su próxima comprobación." };
+}
+
+function bestThreshold(
+  reviews: Array<{ review_decision: "allow" | "block"; review_reason: string; scores: Record<string, number> }>,
+  key: string,
+  fallback: number,
+  relevantReasons?: string[],
+) {
+  const relevantReviews = relevantReasons
+    ? reviews.filter((review) => relevantReasons.includes(review.review_reason))
+    : reviews;
+  const samples = relevantReviews.flatMap((review) => {
+    const score = review.scores?.[key];
+    return typeof score === "number" && Number.isFinite(score) ? [{ score, decision: review.review_decision }] : [];
+  });
+  if (samples.length < 6) return { threshold: fallback, falsePositive: 0, falseNegative: 0, weightedError: 0 };
+  const candidates = [...new Set([0.05, 0.95, ...samples.map((sample) => round4(sample.score))])].sort((a, b) => a - b);
+  return candidates.map((threshold) => {
+    const falsePositive = samples.filter((sample) => sample.decision === "allow" && sample.score >= threshold).length;
+    const falseNegative = samples.filter((sample) => sample.decision === "block" && sample.score < threshold).length;
+    return { threshold, falsePositive, falseNegative, weightedError: falsePositive + falseNegative * 3 };
+  }).sort((left, right) => left.weightedError - right.weightedError || left.falseNegative - right.falseNegative || left.threshold - right.threshold)[0];
+}
+
+function round4(value: number) {
+  return Math.round(Math.max(0, Math.min(1, value)) * 10000) / 10000;
 }

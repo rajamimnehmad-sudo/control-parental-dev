@@ -10,6 +10,10 @@ import type {
   ProtectedUser,
   ProtectionAlertEvent,
   Announcement,
+  DagCalibrationAudit,
+  DagCalibrationReview,
+  DagCalibrationVersion,
+  DagCalibrationModel,
 } from "@/lib/types";
 
 const devUpdateBase = "https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates";
@@ -106,6 +110,35 @@ export async function getDagUsageBundle(): Promise<{ summaries: DagUsageSummary[
   return {
     summaries: (summaryResult.data ?? []).map((row: Record<string, unknown>) => normalizeDagSummary(row)),
     devices: (devicesResult.data ?? []).map((row: Record<string, unknown>) => normalizeDagDevice(row)),
+  };
+}
+
+export async function getDagCalibrationBundle() {
+  const supabase = await createClient();
+  const [pendingResult, reviewedResult, versionsResult, auditResult, modelsResult] = await Promise.all([
+    supabase.rpc("super_admin_list_dag_calibration_reviews", { requested_status: "pending", max_rows: 200 }),
+    supabase.rpc("super_admin_list_dag_calibration_reviews", { requested_status: "reviewed", max_rows: 500 }),
+    supabase.rpc("super_admin_list_dag_calibrations"),
+    supabase.rpc("super_admin_list_dag_calibration_audit", { max_rows: 200 }),
+    supabase.rpc("super_admin_list_dag_calibration_models"),
+  ]);
+  if (pendingResult.error) raise(pendingResult.error);
+  if (reviewedResult.error) raise(reviewedResult.error);
+  if (versionsResult.error) raise(versionsResult.error);
+  if (auditResult.error) raise(auditResult.error);
+  if (modelsResult.error) raise(modelsResult.error);
+
+  const pending = (pendingResult.data ?? []) as Omit<DagCalibrationReview, "image_url">[];
+  const withUrls = await Promise.all(pending.map(async (review) => {
+    const { data } = await supabase.storage.from("dag-calibration").createSignedUrl(review.storage_path, 300);
+    return { ...review, image_url: data?.signedUrl ?? null };
+  }));
+  return {
+    pending: withUrls,
+    reviewed: ((reviewedResult.data ?? []) as Omit<DagCalibrationReview, "image_url">[]).map((review) => ({ ...review, image_url: null })),
+    versions: (versionsResult.data ?? []) as DagCalibrationVersion[],
+    audit: (auditResult.data ?? []) as DagCalibrationAudit[],
+    models: (modelsResult.data ?? []) as DagCalibrationModel[],
   };
 }
 

@@ -15,7 +15,10 @@ internal class DagProfessionalImageClassifier(
     private val environment by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { OrtEnvironment.getEnvironment() }
     private var session: OrtSession? = null
 
-    fun classify(bitmap: Bitmap): DagImageClassification {
+    fun classify(
+        bitmap: Bitmap,
+        calibration: DagImageCalibration = DagImageCalibration(),
+    ): DagImageClassification {
         if (!supportsOnnxRuntime()) return DagImageClassification(DagImageDecision.Allowed)
         return runCatching {
             val input = bitmap.toModelInput()
@@ -31,7 +34,7 @@ internal class DagProfessionalImageClassifier(
                     if (logits.size != OutputClasses) return@use DagImageClassification(DagImageDecision.Uncertain)
                     val unsafeProbability = binarySoftmaxFirst(logits[0], logits[1])
                     DagImageClassification(
-                        decision = dagProfessionalImageDecision(unsafeProbability),
+                        decision = dagProfessionalImageDecision(unsafeProbability, calibration),
                         unsafeScore = unsafeProbability,
                     )
                 }

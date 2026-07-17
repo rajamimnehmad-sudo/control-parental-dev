@@ -120,3 +120,58 @@ export type Announcement = {
   created_at: string;
   expires_at: string | null;
 };
+
+export type DagCalibrationReview = {
+  review_id: string;
+  community_id: string;
+  community_name: string;
+  device_id: string;
+  device_name: string;
+  storage_path: string;
+  image_url: string | null;
+  model_version: string;
+  initial_decision: "blocked" | "uncertain";
+  scores: Record<string, number>;
+  status: "pending" | "reviewed";
+  review_decision: "allow" | "block" | null;
+  review_reason: string | null;
+  review_note: string | null;
+  created_at: string;
+  expires_at: string;
+  reviewed_at: string | null;
+};
+
+export type DagCalibrationVersion = {
+  calibration_id: string;
+  version_number: number;
+  status: "candidate" | "active" | "retired";
+  thresholds: Record<string, number>;
+  metrics: Record<string, number>;
+  labeled_item_count: number;
+  model_version: string;
+  explanation: string;
+  created_at: string;
+  activated_at: string | null;
+};
+
+export type DagCalibrationAudit = {
+  audit_id: string;
+  action: string;
+  review_id: string | null;
+  calibration_id: string | null;
+  details: Record<string, unknown>;
+  created_at: string;
+};
+
+export type DagCalibrationModel = {
+  model_id: string;
+  model_version: string;
+  status: "registered" | "training" | "candidate" | "active" | "retired" | "failed";
+  artifact_path: string | null;
+  artifact_sha256: string | null;
+  training_example_count: number;
+  validation_metrics: Record<string, number>;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+};

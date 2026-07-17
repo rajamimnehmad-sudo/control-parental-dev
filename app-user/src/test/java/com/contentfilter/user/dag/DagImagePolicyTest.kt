@@ -49,6 +49,31 @@ class DagImagePolicyTest {
     }
 
     @Test
+    fun `active DAG calibration changes thresholds without replacing the model`() {
+        val calibration =
+            DagImageCalibration(
+                professionalSafe = 0.25f,
+                professionalBlock = 0.55f,
+                femaleBreastCovered = 0.40f,
+            )
+
+        assertEquals(DagImageDecision.Allowed, dagProfessionalImageDecision(0.20f, calibration))
+        assertEquals(DagImageDecision.Blocked, dagProfessionalImageDecision(0.60f, calibration))
+        assertFalse(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleBreastCovered = 0.35f),
+                calibration,
+            ),
+        )
+        assertTrue(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleBreastCovered = 0.45f),
+                calibration,
+            ),
+        )
+    }
+
+    @Test
     fun `professional probability conversion is stable`() {
         assertTrue(binarySoftmaxFirst(4f, -4f) > 0.99f)
         assertTrue(binarySoftmaxFirst(-4f, 4f) < 0.01f)

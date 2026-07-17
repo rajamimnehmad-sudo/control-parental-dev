@@ -20,14 +20,28 @@ internal data class DagModestyScores(
     val explicitRegion: Float = 0f,
 )
 
-internal fun requiresKosherModestyBlur(scores: DagModestyScores): Boolean {
-    val femaleContext = scores.femaleFace >= FemaleFaceThreshold
-    return scores.explicitRegion >= ExplicitThreshold ||
-        scores.femaleBreastCovered >= CoveredRegionThreshold ||
-        scores.femaleGenitaliaCovered >= CoveredRegionThreshold ||
-        scores.buttocksCovered >= CoveredRegionThreshold ||
-        (femaleContext && scores.armpitsExposed >= ExposedRegionThreshold) ||
-        (femaleContext && scores.bellyExposed >= ExposedRegionThreshold)
+internal fun DagModestyScores.toCalibrationScores(): Map<String, Float> =
+    mapOf(
+        "female_face" to femaleFace,
+        "female_breast_covered" to femaleBreastCovered,
+        "female_genitalia_covered" to femaleGenitaliaCovered,
+        "buttocks_covered" to buttocksCovered,
+        "armpits_exposed" to armpitsExposed,
+        "belly_exposed" to bellyExposed,
+        "explicit_region" to explicitRegion,
+    )
+
+internal fun requiresKosherModestyBlur(
+    scores: DagModestyScores,
+    calibration: DagImageCalibration = DagImageCalibration(),
+): Boolean {
+    val femaleContext = scores.femaleFace >= calibration.femaleFace
+    return scores.explicitRegion >= calibration.explicitRegion ||
+        scores.femaleBreastCovered >= calibration.femaleBreastCovered ||
+        scores.femaleGenitaliaCovered >= calibration.femaleGenitaliaCovered ||
+        scores.buttocksCovered >= calibration.buttocksCovered ||
+        (femaleContext && scores.armpitsExposed >= calibration.armpitsExposed) ||
+        (femaleContext && scores.bellyExposed >= calibration.bellyExposed)
 }
 
 internal class DagModestyImageClassifier(
@@ -37,8 +51,8 @@ internal class DagModestyImageClassifier(
     private val environment by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { OrtEnvironment.getEnvironment() }
     private var session: OrtSession? = null
 
-    fun requiresBlur(bitmap: Bitmap): Boolean {
-        if (!isAvailable()) return false
+    fun classify(bitmap: Bitmap): DagModestyScores? {
+        if (!isAvailable()) return null
         return runCatching {
             OnnxTensor.createTensor(
                 environment,
@@ -46,12 +60,12 @@ internal class DagModestyImageClassifier(
                 longArrayOf(1, Channels.toLong(), InputSize.toLong(), InputSize.toLong()),
             ).use { tensor ->
                 model().run(mapOf(InputName to tensor)).use { output ->
-                    val batch = output[0].value as? Array<*> ?: return@use true
-                    val channels = batch.firstOrNull() as? Array<*> ?: return@use true
-                    requiresKosherModestyBlur(channels.toModestyScores())
+                    val batch = output[0].value as? Array<*> ?: return@use FailedInferenceScores
+                    val channels = batch.firstOrNull() as? Array<*> ?: return@use FailedInferenceScores
+                    channels.toModestyScores()
                 }
             }
-        }.getOrDefault(true)
+        }.getOrDefault(FailedInferenceScores)
     }
 
     override fun close() {
@@ -118,10 +132,6 @@ internal class DagModestyImageClassifier(
         const val FemaleBreastCovered = 16
         const val ButtocksCovered = 17
         val ExplicitClasses = listOf(2, 3, 4, 6, 13, 14)
+        val FailedInferenceScores = DagModestyScores(explicitRegion = 1f)
     }
 }
-
-private const val FemaleFaceThreshold = 0.30f
-private const val CoveredRegionThreshold = 0.18f
-private const val ExposedRegionThreshold = 0.20f
-private const val ExplicitThreshold = 0.20f

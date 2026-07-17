@@ -43,6 +43,7 @@ class DagBrowserViewModel
         private val activationRepository: DeviceActivationRepository,
         private val accessRequestRepository: AccessRequestRepository,
         private val searchRepository: DagSearchRepository,
+        private val calibrationRepository: DagCalibrationRepository,
         private val classifier: DagContentClassifier,
         private val historyStore: DagHistoryStore,
         private val syncScheduler: SyncScheduler,
@@ -65,6 +66,11 @@ class DagBrowserViewModel
             viewModelScope.launch {
                 syncScheduler.requestSync()
                 withContext(Dispatchers.IO) { runCatching { syncEngine.syncOnce() } }
+                withContext(Dispatchers.IO) {
+                    activationRepository.currentActivation()?.let { activation ->
+                        runCatching { calibrationRepository.refresh(activation.deviceId) }
+                    }
+                }
             }
             viewModelScope.launch {
                 combine(
@@ -113,6 +119,19 @@ class DagBrowserViewModel
                         mutableState.update { it.copy(suggestions = suggestions) }
                     }
                 }
+        }
+
+        internal fun submitDagCalibrationCandidate(
+            thumbnail: ByteArray,
+            classification: DagImageClassification,
+        ) {
+            if (!mutableState.value.dagEnabled || classification.decision != DagImageDecision.Uncertain) return
+            viewModelScope.launch(Dispatchers.IO) {
+                val activation = activationRepository.currentActivation() ?: return@launch
+                runCatching {
+                    calibrationRepository.submitReview(activation.deviceId, thumbnail, classification)
+                }.onFailure { Log.d("DagCalibration", "candidate_upload_failed") }
+            }
         }
 
         fun submitAddress() {
@@ -167,6 +186,7 @@ class DagBrowserViewModel
                 mutableState.update {
                     it.copy(
                         loading = true,
+                        analysisProgress = 0.05f,
                         message = "",
                         reviewCandidate = null,
                         pageStatus = DagPageStatus.Idle,
@@ -178,6 +198,7 @@ class DagBrowserViewModel
                     mutableState.update {
                         it.copy(
                             loading = false,
+                            analysisProgress = 0f,
                             message = "DAG no está vinculado a este dispositivo.",
                         )
                     }
@@ -193,7 +214,13 @@ class DagBrowserViewModel
                         )
                 ) {
                     is RemoteResult.Failure -> {
-                        mutableState.update { it.copy(loading = false, message = response.reason) }
+                        mutableState.update {
+                            it.copy(
+                                loading = false,
+                                analysisProgress = 0f,
+                                message = response.reason,
+                            )
+                        }
                     }
                     is RemoteResult.Success -> {
                         val classifiedWithReasons =
@@ -265,13 +292,19 @@ class DagBrowserViewModel
                             state.copy(
                                 address = query,
                                 loading = false,
+                                analysisProgress = 1f,
                                 view = DagView.Results,
                                 results = combined,
                                 searchQuery = query,
                                 searchPage = page,
                                 canLoadMoreResults = dagCanLoadMoreResults(page, response.value.hasMoreResults),
                                 suggestions = emptyList(),
-                                message = if (combined.isEmpty()) "DAG no encontró resultados que pueda mostrar." else "",
+                                message =
+                                    if (combined.isEmpty()) {
+                                        "DAG no encontró resultados que pueda mostrar."
+                                    } else {
+                                        ""
+                                    },
                             )
                         }
                     }
@@ -291,7 +324,13 @@ class DagBrowserViewModel
             val accepted =
                 mutableState.compareAndSet(
                     state,
-                    state.copy(address = suggestion, loading = true, message = "", suggestions = emptyList()),
+                    state.copy(
+                        address = suggestion,
+                        loading = true,
+                        analysisProgress = 0.05f,
+                        message = "",
+                        suggestions = emptyList(),
+                    ),
                 )
             if (accepted) search(suggestion)
         }
@@ -350,6 +389,7 @@ class DagBrowserViewModel
                             pageStatus = DagPageStatus.Loading,
                             pageAnalysisReady = false,
                             viewportImagesReady = false,
+                            analysisProgress = 0.10f,
                             requestedUrl = url,
                             navigationRevision = it.navigationRevision + 1,
                             message = "Analizando la página antes de mostrarla…",
@@ -411,6 +451,7 @@ class DagBrowserViewModel
                                 it.copy(
                                     address = url,
                                     pageAnalysisReady = true,
+                                    analysisProgress = maxOf(it.analysisProgress, 0.65f),
                                     message = "",
                                     reviewCandidate = null,
                                 )
@@ -442,6 +483,7 @@ class DagBrowserViewModel
                 it.copy(
                     address = url,
                     pageAnalysisReady = true,
+                    analysisProgress = maxOf(it.analysisProgress, 0.65f),
                     message = "Abierto con protección adicional.",
                     reviewCandidate = null,
                 )
@@ -451,8 +493,21 @@ class DagBrowserViewModel
 
         fun onViewportImagesReady(url: String) {
             if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
-            mutableState.update { it.copy(viewportImagesReady = true) }
+            mutableState.update {
+                it.copy(viewportImagesReady = true, analysisProgress = maxOf(it.analysisProgress, 0.95f))
+            }
             revealPageIfReady(url)
+        }
+
+        fun onViewportImageProgress(
+            url: String,
+            resolved: Int,
+            total: Int,
+        ) {
+            if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
+            val ratio = if (total <= 0) 1f else (resolved.toFloat() / total).coerceIn(0f, 1f)
+            val progress = (0.65f + ratio * 0.30f).coerceAtMost(0.95f)
+            mutableState.update { it.copy(analysisProgress = maxOf(it.analysisProgress, progress)) }
         }
 
         private fun revealPageIfReady(url: String) {
@@ -463,7 +518,7 @@ class DagBrowserViewModel
                     state.viewportImagesReady &&
                     state.pageStatus == DagPageStatus.Loading
                 ) {
-                    state.copy(pageStatus = DagPageStatus.Visible)
+                    state.copy(pageStatus = DagPageStatus.Visible, analysisProgress = 1f)
                 } else {
                     state
                 }
@@ -490,6 +545,7 @@ class DagBrowserViewModel
                     pageStatus = DagPageStatus.Loading,
                     pageAnalysisReady = false,
                     viewportImagesReady = false,
+                    analysisProgress = 0.15f,
                     message = "Analizando la página antes de mostrarla…",
                     reviewCandidate = null,
                 )

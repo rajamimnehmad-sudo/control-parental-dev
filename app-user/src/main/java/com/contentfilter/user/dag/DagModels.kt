@@ -78,6 +78,7 @@ data class DagBrowserUiState(
     val pageStatus: DagPageStatus = DagPageStatus.Idle,
     val pageAnalysisReady: Boolean = false,
     val viewportImagesReady: Boolean = false,
+    val analysisProgress: Float = 0f,
     val results: List<DagSearchResult> = emptyList(),
     val searchQuery: String = "",
     val searchPage: Int = 0,
