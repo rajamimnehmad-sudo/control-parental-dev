@@ -142,9 +142,9 @@ Flujo de una entrada:
 | USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERWEB-DEPLOY-SYNC-01 | En progreso; fuente verificable lista, pendiente reconectar y publicar Vercel oficial | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
-| UI-BANNER-UNIFY-01 | Publicado DEV 246; pendiente comprobacion visual | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
+| UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
-| ANDROID-PHYSICAL-CLOSEOUT-01 | Automatizacion y publicacion DEV 246 correctas; prueba fisica diferida sin ADB | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
+| ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial SM-A235M correcto en DEV 246; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
@@ -197,12 +197,12 @@ Flujo de una entrada:
 
 ### UI-BANNER-UNIFY-01 - Feedback premium compartido
 
-- Estado: `Publicado DEV 246; pendiente comprobacion visual`; aprobado explicitamente el 2026-07-16.
+- Estado: `Publicado y validado visualmente en SM-A235M DEV 246`; aprobado explicitamente el 2026-07-16.
 - Tipo: UX y accesibilidad Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Causa: coexistian el banner premium y el banner legado; Mis apps seguia usando el legado y las bandejas nuevas de Avisos/Alertas, Actualizaciones Admin y reseteo Admin mostraban feedback como texto plano.
 - Resultado: el API legado delega en el banner premium y las superficies nuevas lo usan directamente. La altura deja de ser fija: conserva 42 dp minimos y crece para mensajes largos, con degradado, texto blanco, pez y estado de error consistente.
 - Alcance deliberado: los mensajes accionables internos de DAG conservan su contenedor con `Pedir revision`; no se convierte informacion estatica o contenido de tarjetas en banners.
-- Aceptacion: no quedan dos estilos de feedback; errores, progreso y resultados transitorios usan el componente compartido; textos largos no se recortan; Usuario y Admin compilan y pasan formato/lint; comprobacion visual fisica diferida por ausencia de ADB.
+- Aceptacion: no quedan dos estilos de feedback; errores, progreso y resultados transitorios usan el componente compartido; textos largos no se recortan; Usuario y Admin compilan y pasan formato/lint. En SM-A235M, Alertas Admin mostro completo el estado vacio en el banner premium y Actualizaciones Usuario/Admin mostro completo el estado de ultima version.
 
 ### SUPERWEB-FUNCTIONAL-VERIFY-01 - Recorrido funcional del propietario
 
@@ -214,10 +214,12 @@ Flujo de una entrada:
 
 ### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
 
-- Estado: `Automatizacion y publicacion DEV 246 correctas; prueba fisica diferida sin ADB`; aprobado explicitamente el 2026-07-16. El usuario indico que no hay telefono ADB disponible durante esta ejecucion.
+- Estado: `Cierre parcial SM-A235M correcto en DEV 246; quedan recorridos especificos y SM-S908E`; aprobado explicitamente el 2026-07-16. El telefono auxiliar estuvo disponible despues de la publicacion.
 - Tipo: QA Android, compatibilidad y cierre de candidatos. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Alcance automatizado completado: tests, ktlint, detekt, lint y builds DEV de Usuario/Admin pasaron localmente con el mismo versionCode. La unica publicacion DEV termino correctamente; manifiestos y APK publicos 246 coinciden en version, paquetes, `minSdk 29`, firma y SHA-256.
-- Alcance fisico diferido: banners y fuentes/modo oscuro; actualizacion Usuario/Admin; Play Store/APK/aprobacion; bypass rapido Accessibility; licencia/renovacion; estados DAG candidatos y notificacion push. No se usa ADB ni se declara validacion fisica inexistente.
+- Alcance fisico planificado: banners y fuentes/modo oscuro; actualizacion Usuario/Admin; Play Store/APK/aprobacion; bypass rapido Accessibility; licencia/renovacion; estados DAG candidatos y notificacion push. Cada recorrido se declara solo cuando existe evidencia en el dispositivo correspondiente.
+- Evidencia fisica SM-A235M: actualizacion in-place 245 a 246 de ambas apps; firma/datos y las tres protecciones preservados; banner premium, campana Admin y header fijo correctos; ficha y control de fuentes desconocidas Admin accesibles; ficha Usuario y ruta hacia el interruptor Accessibility interceptadas. DAG cargo desde Historial varias imagenes seguras de Wikipedia sin consumir Brave.
+- Pendiente fisico: repetir la instalacion iniciada dentro de cada app cuando exista 247 o superior; flujo Play Store/APK/aprobacion; licencia/renovacion; `Mas resultados`; aprobaciones/rechazos DAG y push; calibracion visual sensible; recorrido determinante en SM-S908E.
 - Aceptacion: matriz automatizada y CI correctos; publicacion DEV unica; manifiestos/hashes verificables; una lista reproducible conserva cada recorrido fisico pendiente para el proximo acceso al Samsung.
 
 ### DATA-DELETE-01 - Borrado definitivo y auditable de usuario
