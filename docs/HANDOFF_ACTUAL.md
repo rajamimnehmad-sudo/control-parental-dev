@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 248
-App Admin versionCode 248
+App Usuario versionCode 249
+App Admin versionCode 249
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-248-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-248-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-249-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-249-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 796b2ba0548c558f298b22b73fb0e22d18c03ad1dce4fde9060ed7068d9930d8
-Admin   0b952c4b78c72703d63b44b7b74f303d62952e43edea679a1db5d047492e4be3
+Usuario 56ff6449dad31be81cff983be094d58015bfa859b39bc1c4cd5cc388c359d774
+Admin   23a1695ed283c739577fc7e31cab55c70a480f26603e2f2faf325b2b4cee6d4d
 ```
 
 ## Publicacion DEV 247 - Paridad UX de App Usuario - 2026-07-16
@@ -105,13 +105,15 @@ Admin   0b952c4b78c72703d63b44b7b74f303d62952e43edea679a1db5d047492e4be3
 - App Admin mostro Home, campana superior, tarjetas de Usuarios, Solicitudes, Alertas y Avisos; Ajustes mostro version 248 y Actualizaciones confirmo `Ya tenes la ultima version`. La bandeja de Alertas mostro su header con regreso y el banner premium completo.
 - Esta validacion no confirma una desinstalacion efectiva de Admin/otra app porque se evito la accion destructiva. Siguen pendientes SM-S908E, bypass rapido de Accessibility, flujo de actualizacion iniciado dentro de cada app, Play Store/APK con aprobacion, licencia/renovacion y recorridos DAG que consumen Brave o requieren decisiones Admin/push.
 
-## Candidato DEV 249 - Refuerzo antimanipulacion Usuario - 2026-07-17
+## Publicacion DEV 249 - Refuerzo antimanipulacion Usuario - 2026-07-17
 
 - `BARRIER-USER-HARDENING-01` refuerza exclusivamente App Usuario contra desactivacion de Accessibility, VPN, Device Admin y desinstalacion/desactivacion/cierre forzado. Admin y otras apps quedan fuera por la identidad objetivo ya validada en DEV 248.
 - Causa: una pantalla protegida abierta por evento de ventana empezaba con `Atras` y reservaba Inicio para el segundo respaldo. Aunque la accion terminaba bloqueada, el control nativo podia quedar visible brevemente y permitir una carrera de toques.
 - Correccion: desinstalacion, ficha Usuario, Device Admin, Accessibility y VPN usan Inicio desde el primer evento y repiten la salida cada 100 ms hasta tres veces si Android conserva la ventana. Instalaciones comunes y actualizaciones firmadas/autorizadas no se confunden con remocion.
 - Limite honesto: Android normal no permite ocultar de manera garantizada el boton nativo de desinstalacion sin Device Owner, root o tienda administrada. La defensa evita utilizarlo y minimiza su exposicion, sin prometer que ningun OEM lo dibuje durante un cuadro.
-- Usuario y Admin suben juntos a `versionCode 249`. Tests Debug/Release y ktlint de `feature-accessibility` correctos; pendiente build de ambas APK, publicacion unica DEV, manifiestos/hashes y prueba fisica Samsung.
+- Usuario y Admin subieron juntos a `versionCode 249`. Tests Debug/Release, ktlint y builds optimizados de ambas APK correctos. El commit `06eb5a3` se publico una sola vez exclusivamente en Supabase DEV mediante el workflow `29578135318`.
+- Los manifiestos publicos declaran 249; las descargas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV correctos y `minSdk 29`.
+- Validacion SM-A235M Android 13: ambas apps actualizaron in-place a 249 sin borrar datos; Accessibility, Device Admin y VPN siguieron activos. Admin conservo confirmacion normal de desinstalacion y su ficha; Usuario, su ficha, su detalle Accessibility y la configuracion VPN fueron expulsados al launcher en menos de la primera comprobacion a 300 ms. Tras dejar finalizar los reintentos, las fichas de WhatsApp y Chrome permanecieron disponibles. Pendiente repetir el bypass manual rapido en SM-S908E.
 
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 

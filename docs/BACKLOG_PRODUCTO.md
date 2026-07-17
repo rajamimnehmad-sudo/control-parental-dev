@@ -284,7 +284,7 @@ Flujo de una entrada:
 
 ### BARRIER-USER-HARDENING-01 - Refuerzo de Accessibility, VPN y desinstalacion Usuario
 
-- Estado: `Implementado candidato DEV 249; pendiente publicacion y prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-17. Prioridad: P0. Riesgo: alto.
+- Estado: `Publicado y validado en SM-A235M DEV 249; pendiente prueba manual rapida en SM-S908E`. Aprobado explicitamente por el usuario el 2026-07-17. Prioridad: P0. Riesgo: alto.
 - Causa: la barrera ya impedia completar acciones peligrosas, pero al abrir una pantalla protegida intentaba primero `Atras` y usaba Inicio como respaldo. Ese intervalo podia dejar visible brevemente el boton nativo y conservar una ventana para un toque rapido.
 - Resultado: las pantallas protegidas de desinstalacion, desactivacion, cierre forzado, Device Admin, Accessibility y VPN pasan directamente a Inicio desde el primer evento. Si Android conserva la ventana, se repite Inicio cada 100 ms hasta tres veces. Instalaciones normales, actualizaciones autorizadas, mantenimiento y fichas de Admin u otras apps conservan sus rutas separadas.
 - Limite Android: sin Device Owner, root o administracion empresarial no existe una API para quitar el boton nativo de Ajustes. El refuerzo reduce su exposicion y neutraliza su uso; no promete que todos los OEM eviten dibujarlo durante cada cuadro de la transicion.
