@@ -3,6 +3,8 @@ import { AnnouncementForm } from "@/components/AnnouncementForm";
 import { EmptyState } from "@/components/EmptyState";
 import { listAnnouncements, listCommunities } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
+import { ArchiveButton } from "@/components/ArchiveButton";
+import { archiveAnnouncementAction } from "@/lib/actions";
 
 const roleLabel = { all: "Usuarios y administradores", user: "Usuarios", admin: "Administradores" } as const;
 
@@ -24,6 +26,7 @@ export default async function AnnouncementsPage() {
               <span className="rounded-full bg-teal-50 px-2.5 py-1 text-xs font-bold text-teal-700">{roleLabel[item.target_role]}</span>
             </div>
             <p className="mt-3 text-xs text-slate-500">{item.community_name} · {formatDate(item.created_at)}{item.expires_at ? ` · vence ${formatDate(item.expires_at)}` : ""}</p>
+            <div className="mt-3"><ArchiveButton id={item.announcement_id} action={archiveAnnouncementAction} label="Borrar aviso" /></div>
           </article>
         ))}
       </section>

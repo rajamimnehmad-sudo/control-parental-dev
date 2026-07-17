@@ -145,7 +145,7 @@ Flujo de una entrada:
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
-| SUPERWEB-OPS-UX-01 | Propuesto tras auditoria funcional | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
+| SUPERWEB-OPS-UX-01 | Archivo seguro, agrupacion y claridad Base implementados; busqueda/filtros pendientes | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial SM-A235M correcto en DEV 246; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |

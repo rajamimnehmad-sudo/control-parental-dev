@@ -119,6 +119,16 @@ Admin   4d9632957b8139c32a47ba2a2f03f8822ff1aed10c1e1e33509bc07673efc8d9
 - `scripts/verify_superweb.sh` confirmo health DEV, commit y redireccion anonima a Login en Comunidades, Uso DAG, Alertas y Avisos.
 - El workflow `Publicar APKs DEV` quedo `skipped` por `[skip dev publish]`; no se compilo ni publico Android. Este cambio documental posterior sirve como segunda prueba de despliegue automatico sin disparar workflows Android por `paths-ignore`.
 
+## Superweb operativa por usuario - 2026-07-16
+
+- El detalle de comunidad oculta el header global de identidad para que el nombre de la comunidad no quede debajo de otro `sticky`; conserva Volver y la navegacion principal.
+- La actualizacion de App Usuario aparece dentro de la tarjeta del Usuario correspondiente. Las actualizaciones de App Admin permanecen en un bloque separado.
+- Alertas se agrupan por dispositivo/Usuario: muestran cantidad total, `Intento N veces`, ultimo evento y una marca roja cuando existe desactivacion o degradacion confirmada.
+- `Borrar alertas` archiva en conjunto los eventos visibles de ese Usuario. `Borrar aviso` archiva una entrada del historial. No existe `DELETE` fisico: se conservan fecha y actor, y las filas archivadas dejan de aparecer tanto en Superweb como en las bandejas Android.
+- Migraciones DEV `20260717020618_superweb_archive_alerts_announcements.sql` y `20260717020938_hide_archived_alerts_from_admin.sql` aplicadas solo en `syeycayasyufedwoprea`. `anon` no ejecuta las acciones de archivo. La verificacion no archivo ninguna alerta ni aviso real.
+- Base Web pasa a explicar primero estado, cantidad de sitios, ultima actualizacion y descarga por telefono; fuente, version, categorias y prueba interna quedan en detalles tecnicos desplegables.
+- TypeScript, ESLint y build Next correctos. No cambia Android, versionCode ni APK.
+
 ## Correccion de identidad Admin DEV 245 - 2026-07-16
 
 - Causa confirmada por el reporte del Samsung SM-S908E: la pantalla de Ajustes mostraba `Content Filter Admin`, pero el detector buscaba la etiqueta generica `Content Filter` y la confundia con App Usuario. La pantalla de permiso `Instalar apps desconocidas` tampoco distinguia para que aplicacion se estaba configurando.

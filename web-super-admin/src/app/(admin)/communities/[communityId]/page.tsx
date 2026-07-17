@@ -26,7 +26,7 @@ export default async function CommunityDetailPage({ params }: Props) {
   const activatedUsers = protectedUsers.filter((user) => user.status === "activated").length;
 
   return (
-    <main className="mx-auto grid max-w-4xl gap-5 px-4 py-5 lg:px-6">
+    <main className="community-detail mx-auto grid max-w-4xl gap-5 px-4 py-5 lg:px-6">
       <div className="sticky top-0 z-30 -mx-4 flex flex-col gap-4 border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur lg:-mx-6 lg:px-6">
         <Link className="inline-flex items-center gap-2 text-sm font-semibold text-accent" href="/communities">
           <ArrowLeft className="h-4 w-4" />
@@ -71,22 +71,22 @@ export default async function CommunityDetailPage({ params }: Props) {
         ) : (
           <div className="grid gap-3">
             {protectedUsers.map((user) => (
-              <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} dagEntitled={detail.dag_entitled} />
+              <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} dagEntitled={detail.dag_entitled} device={devices.find((item) => item.device_id === user.device_id)} versions={devVersions} />
             ))}
           </div>
         )}
       </section>
 
       <section className="grid gap-3">
-        <SectionTitle title="Actualizaciones" count={devices.length} />
+        <SectionTitle title="Actualizaciones App Admin" count={devices.filter((device) => device.app_role === "admin").length} />
         <p className="text-sm text-slate-500">
           Estado informado por cada dispositivo frente a la publicación DEV vigente. Android pide confirmación para instalar.
         </p>
-        {devices.length === 0 ? (
-          <EmptyState title="Sin dispositivos activos" body="El estado aparecerá cuando una App Usuario o Admin complete su activación." />
+        {devices.filter((device) => device.app_role === "admin").length === 0 ? (
+          <EmptyState title="Sin administradores activos" body="El estado aparecerá cuando una App Admin complete su activación." />
         ) : (
           <div className="grid gap-3 sm:grid-cols-2">
-            {devices.map((device) => (
+            {devices.filter((device) => device.app_role === "admin").map((device) => (
               <DeviceUpdateCard key={device.device_id} device={device} versions={devVersions} />
             ))}
           </div>
@@ -147,7 +147,7 @@ function DeviceUpdateCard({ device, versions }: { device: CommunityDevice; versi
   const needsUpdate = latest !== null && current < latest;
   const badgeStyle = latest === null ? "bg-slate-100 text-slate-600" : needsUpdate ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800";
   return (
-    <article className="rounded-md border border-line bg-white p-4 shadow-soft">
+    <div className="rounded-md border border-line bg-white p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-ink">{device.display_name}</p>
@@ -159,7 +159,7 @@ function DeviceUpdateCard({ device, versions }: { device: CommunityDevice; versi
         </span>
       </div>
       <p className="mt-3 text-xs text-slate-500">Última conexión: {formatDate(device.last_seen_at)}</p>
-    </article>
+    </div>
   );
 }
 
@@ -212,7 +212,7 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
   );
 }
 
-function ProtectedUserCard({ user, communityId, dagEntitled }: { user: ProtectedUser; communityId: string; dagEntitled: boolean }) {
+function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }: { user: ProtectedUser; communityId: string; dagEntitled: boolean; device?: CommunityDevice; versions: DevAppVersions }) {
   return (
     <article className="rounded-md border border-line bg-white p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
@@ -234,6 +234,7 @@ function ProtectedUserCard({ user, communityId, dagEntitled }: { user: Protected
         <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(user.last_seen_at)}`} />
       </div>
       <DeviceDagForm communityId={communityId} deviceId={user.device_id} enabled={user.dag_enabled} entitled={dagEntitled} />
+      {device ? <div className="mt-3"><DeviceUpdateCard device={device} versions={versions} /></div> : null}
     </article>
   );
 }

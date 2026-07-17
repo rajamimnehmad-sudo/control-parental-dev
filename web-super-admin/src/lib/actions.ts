@@ -62,6 +62,8 @@ const announcementSchema = z.object({
   { message: "El vencimiento debe ser futuro", path: ["expiresAt"] },
 );
 
+const archiveSchema = z.object({ id: z.string().uuid() });
+
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
@@ -261,4 +263,24 @@ export async function createAnnouncementAction(_prevState: ActionState, formData
   }
   const sent = Number(delivery?.sent ?? 0);
   return { ok: true, message: sent > 0 ? `Aviso guardado y enviado a ${sent} dispositivo(s)` : "Aviso guardado; no había dispositivos con push registrado" };
+}
+
+export async function archiveAlertGroupAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = archiveSchema.safeParse({ id: formValue(formData, "id") });
+  if (!parsed.success) return { ok: false, message: "Alerta inválida" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("super_admin_archive_protection_alerts", { target_device_id: parsed.data.id });
+  if (error) return errorState(error);
+  revalidatePath("/alerts");
+  return { ok: true, message: "Alertas borradas de la bandeja" };
+}
+
+export async function archiveAnnouncementAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = archiveSchema.safeParse({ id: formValue(formData, "id") });
+  if (!parsed.success) return { ok: false, message: "Aviso inválido" };
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("super_admin_archive_announcement", { target_announcement_id: parsed.data.id });
+  if (error) return errorState(error);
+  revalidatePath("/announcements");
+  return { ok: true, message: "Aviso borrado del historial" };
 }
