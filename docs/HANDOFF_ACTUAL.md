@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-16
+Fecha de corte: 2026-07-17
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -123,6 +123,14 @@ Admin   568b28e2363b5166760d956ed95586ad9b837531c1f845757c8eedd757ef0f0f
 - Usuario y Admin subieron juntos a `versionCode 250`. Tests Debug/Release, ktlint y builds optimizados correctos. El commit `655683d` se publico una sola vez exclusivamente en Supabase DEV mediante el workflow `29580417338`; Android CI `29580417480` completo build, tests, ktlint, lint y detekt.
 - Los manifiestos publicos declaran 250; las descargas recalculan exactamente los SHA-256 registrados arriba y `aapt` confirma paquetes DEV correctos y `minSdk 29`.
 - SM-A235M actualizo in-place a 250 sin borrar datos: la ruta VPN directa siguio expulsada, la ficha Admin permanecio disponible y Accessibility, Device Admin y VPN continuaron activos. La prueba determinante de `SubSettings` queda pendiente en el Samsung personal que reporto el bypass.
+
+## Candidato DEV 251 - imagenes continuas y decision adaptativa DAG - 2026-07-17
+
+- `DAG-IMAGE-QUEUE-03` corrige el atasco observado despues de las primeras dos o tres fotos. La causa combinaba solo tres interceptores sincronicos con la activacion simultanea de todas las fuentes lazy al terminar la pagina. El candidato usa ocho cupos acotados, timeout de 15 segundos y un `IntersectionObserver` con precarga cercana para incorporar imagenes a medida que se desplaza.
+- La compatibilidad incluye `picture`, variantes lazy de `srcset`, favicon ICO y SVG estatico con declaracion XML, simbolos internos y gradientes internos. Scripts, eventos, contenido embebido, estilos activos y referencias SVG externas siguen rechazados.
+- `DAG-ADAPTIVE-DECISION-01` deja de convertir automaticamente toda incertidumbre en revision Admin. Una pagina incierta o con señal semantica moderada se muestra bajo las protecciones Web existentes; reglas explicitas, dominios prohibidos y evidencia semantica fuerte conservan bloqueo. Una pagina sin texto tras los reintentos tambien abre protegida, sin aprobacion persistente.
+- Validacion local: ktlint, tests DEV y builds optimizados de Usuario/Admin correctos en una matriz de 773 tareas; instalacion in-place previa en SM-A235M correcta, conservando datos. Falta prueba visual manual con una pagina densa, desplazamiento prolongado, SVG/iconos y casos seguros/riesgosos.
+- Usuario y Admin suben juntos a `versionCode 251`. Al preparar este commit los manifiestos y APK publicos permanecen en DEV 250; la publicacion y verificacion DEV 251 se cierran despues del push.
 
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 

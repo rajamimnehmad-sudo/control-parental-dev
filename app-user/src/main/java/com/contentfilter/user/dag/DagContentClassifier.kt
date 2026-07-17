@@ -361,3 +361,23 @@ class DagContentClassifier
             }
         }
     }
+
+internal enum class DagAdaptivePageDecision {
+    Allowed,
+    Protected,
+    Blocked,
+}
+
+internal fun dagAdaptivePageDecision(result: DagClassificationResult): DagAdaptivePageDecision =
+    when (result.decision) {
+        DagClassification.Allowed -> DagAdaptivePageDecision.Allowed
+        DagClassification.Uncertain -> DagAdaptivePageDecision.Protected
+        DagClassification.Blocked ->
+            if (result.category.startsWith("semantic_") && result.confidence < AdaptiveSemanticPageBlockThreshold) {
+                DagAdaptivePageDecision.Protected
+            } else {
+                DagAdaptivePageDecision.Blocked
+            }
+    }
+
+private const val AdaptiveSemanticPageBlockThreshold = 0.82f

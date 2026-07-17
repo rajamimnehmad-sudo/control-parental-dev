@@ -66,6 +66,26 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `uncertain pages open with additional protection instead of requiring admin review`() {
+        val uncertain = DagClassificationResult(DagClassification.Uncertain, "sensitive_context", 0.64f, "test")
+        val weakSemanticBlock = DagClassificationResult(DagClassification.Blocked, "semantic_sexual", 0.70f, "test")
+
+        assertEquals(DagAdaptivePageDecision.Protected, dagAdaptivePageDecision(uncertain))
+        assertEquals(DagAdaptivePageDecision.Protected, dagAdaptivePageDecision(weakSemanticBlock))
+    }
+
+    @Test
+    fun `explicit policy and strong unsafe evidence still block pages`() {
+        val explicit = DagClassificationResult(DagClassification.Blocked, "sexual", 0.97f, "test")
+        val strongSemantic = DagClassificationResult(DagClassification.Blocked, "semantic_sexual", 0.91f, "test")
+        val safe = DagClassificationResult(DagClassification.Allowed, "general", 0.82f, "test")
+
+        assertEquals(DagAdaptivePageDecision.Blocked, dagAdaptivePageDecision(explicit))
+        assertEquals(DagAdaptivePageDecision.Blocked, dagAdaptivePageDecision(strongSemantic))
+        assertEquals(DagAdaptivePageDecision.Allowed, dagAdaptivePageDecision(safe))
+    }
+
+    @Test
     fun `explicit unsafe intent is blocked in all initial languages`() {
         assertEquals(DagClassification.Blocked, classifier.classifyQuery("video porno").decision)
         assertEquals(DagClassification.Blocked, classifier.classifyQuery("online casino").decision)

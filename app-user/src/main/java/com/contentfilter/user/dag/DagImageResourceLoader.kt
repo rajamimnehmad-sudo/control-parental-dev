@@ -43,7 +43,7 @@ internal class DagImageResourceLoader(
     private val uncertainCount = AtomicInteger(0)
     private val pageGeneration = AtomicInteger(0)
     private val closed = AtomicBoolean(false)
-    private val imageSlots = Semaphore(MaximumConcurrentImages, true)
+    private val imageSlots = Semaphore(DagImageDeliveryPolicy.MaximumConcurrentImages, true)
     private val responseCache = LinkedHashMap<String, CachedImageResource>(16, 0.75f, true)
     private var responseCacheBytes = 0
 
@@ -241,8 +241,7 @@ internal class DagImageResourceLoader(
 
     private companion object {
         const val MaximumImagesPerPage = 400
-        const val MaximumConcurrentImages = 3
-        const val RequestTimeoutSeconds = 8L
+        const val RequestTimeoutSeconds = 15L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
         const val MaximumBlurredDimension = 480
@@ -268,9 +267,24 @@ internal fun isSafeStaticSvg(
     if (bytes.size !in 32..MaximumSafeSvgBytes) return false
     if (!mimeType.orEmpty().substringBefore(';').trim().equals("image/svg+xml", ignoreCase = true)) return false
     val svg = bytes.toString(Charsets.UTF_8)
-    if (!svg.trimStart().startsWith("<svg", ignoreCase = true)) return false
+    if (!SvgRootPattern.containsMatchIn(svg)) return false
     if (!svg.contains("</svg>", ignoreCase = true)) return false
-    return ForbiddenSvgPattern.none { it.containsMatchIn(svg) }
+    if (ForbiddenSvgPattern.any { it.containsMatchIn(svg) }) return false
+    if (
+        SvgHrefPattern.findAll(svg).any { match ->
+            match.groupValues.drop(1).firstOrNull(String::isNotBlank)?.trim()?.startsWith('#') != true
+        }
+    ) {
+        return false
+    }
+    val withoutInternalPaintReferences = svg.replace(InternalSvgPaintReferencePattern, "")
+    return !ExternalSvgUrlPattern.containsMatchIn(withoutInternalPaintReferences)
+}
+
+internal object DagImageDeliveryPolicy {
+    // WebView has its own bounded resource pool. Keeping only three synchronous
+    // callbacks occupied starves lazy-loaded pages after their first viewport.
+    const val MaximumConcurrentImages = 8
 }
 
 internal data class DagImagePageSummary(
@@ -357,6 +371,7 @@ private val ImageExtensions =
         ".avif",
         ".heic",
         ".heif",
+        ".ico",
     )
 
 private val BlockedMediaExtensions =
@@ -376,10 +391,18 @@ private val ForbiddenSvgPattern =
     listOf(
         Regex("<!DOCTYPE|<!ENTITY", RegexOption.IGNORE_CASE),
         Regex(
-            "<(script|foreignObject|image|iframe|object|embed|video|audio|use|animate|set)\\b",
+            "<(script|style|foreignObject|image|iframe|object|embed|video|audio|animate|set)\\b",
             RegexOption.IGNORE_CASE,
         ),
         Regex("\\bon[a-z]+\\s*=", RegexOption.IGNORE_CASE),
-        Regex("\\b(xlink:href|href)\\s*=", RegexOption.IGNORE_CASE),
-        Regex("url\\s*\\(|@import|javascript:|data:", RegexOption.IGNORE_CASE),
+        Regex("@import|javascript:|data:", RegexOption.IGNORE_CASE),
     )
+private val SvgRootPattern = Regex("^\\s*(?:<\\?xml[^>]*>\\s*)?<svg\\b", RegexOption.IGNORE_CASE)
+private val SvgHrefPattern =
+    Regex(
+        """\b(?:xlink:href|href)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))""",
+        RegexOption.IGNORE_CASE,
+    )
+private val InternalSvgPaintReferencePattern =
+    Regex("url\\s*\\(\\s*(['\"]?)#[A-Za-z_][A-Za-z0-9_.:-]*\\1\\s*\\)", RegexOption.IGNORE_CASE)
+private val ExternalSvgUrlPattern = Regex("url\\s*\\(", RegexOption.IGNORE_CASE)

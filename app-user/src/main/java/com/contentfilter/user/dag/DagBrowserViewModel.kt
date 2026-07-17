@@ -365,7 +365,7 @@ class DagBrowserViewModel
         ) {
             if (!mutableState.value.dagEnabled || url != mutableState.value.requestedUrl) return
             if (text == null || text.isBlank()) {
-                showUncertainPage(url, title, "unreadable")
+                showProtectedPage(url, title)
                 return
             }
             viewModelScope.launch(Dispatchers.Default) {
@@ -387,9 +387,10 @@ class DagBrowserViewModel
                     } else {
                         applyExplicitRule(domain, classifier.classifyPage(url, title, text, images))
                     }
-                if (result.decision == DagClassification.Allowed) {
+                val pageDecision = dagAdaptivePageDecision(result)
+                if (pageDecision != DagAdaptivePageDecision.Blocked) {
                     withContext(Dispatchers.IO) {
-                        if (!cachedApproval) {
+                        if (!cachedApproval && pageDecision == DagAdaptivePageDecision.Allowed) {
                             historyStore.savePageApproval(
                                 url = url,
                                 fingerprint = fingerprint,
@@ -402,8 +403,8 @@ class DagBrowserViewModel
                 }
                 withContext(Dispatchers.Main) {
                     if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return@withContext
-                    when (result.decision) {
-                        DagClassification.Allowed -> {
+                    when (pageDecision) {
+                        DagAdaptivePageDecision.Allowed -> {
                             mutableState.update {
                                 it.copy(
                                     address = url,
@@ -413,7 +414,8 @@ class DagBrowserViewModel
                                 )
                             }
                         }
-                        DagClassification.Blocked ->
+                        DagAdaptivePageDecision.Protected -> showProtectedPage(url, title, recordHistory = false)
+                        DagAdaptivePageDecision.Blocked ->
                             mutableState.update {
                                 it.copy(
                                     pageStatus = DagPageStatus.Blocked,
@@ -421,9 +423,25 @@ class DagBrowserViewModel
                                     reviewCandidate = null,
                                 )
                             }
-                        DagClassification.Uncertain -> showUncertainPage(url, title, result.category)
                     }
                 }
+            }
+        }
+
+        private fun showProtectedPage(
+            url: String,
+            title: String,
+            recordHistory: Boolean = true,
+        ) {
+            if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
+            if (recordHistory) viewModelScope.launch(Dispatchers.IO) { historyStore.addPage(url, title) }
+            mutableState.update {
+                it.copy(
+                    address = url,
+                    pageStatus = DagPageStatus.Visible,
+                    message = "Abierto con protección adicional.",
+                    reviewCandidate = null,
+                )
             }
         }
 

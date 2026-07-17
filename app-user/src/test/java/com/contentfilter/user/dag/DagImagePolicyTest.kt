@@ -83,7 +83,9 @@ class DagImagePolicyTest {
         assertTrue(isProbableImageRequest("https://cdn.example/resource", mapOf("Accept" to "image/avif,image/webp")))
         assertTrue(isProbableImageRequest("https://cdn.example/photo.JPG?width=200", emptyMap()))
         assertTrue(isProbableImageRequest("https://cdn.example/photo.heic", emptyMap()))
+        assertTrue(isProbableImageRequest("https://cdn.example/favicon.ico", emptyMap()))
         assertFalse(isProbableImageRequest("https://cdn.example/site.css", mapOf("Accept" to "text/css")))
+        assertTrue(DagImageDeliveryPolicy.MaximumConcurrentImages > 3)
     }
 
     @Test
@@ -106,12 +108,22 @@ class DagImagePolicyTest {
     @Test
     fun `safe static svg icons pass and executable svg fails closed`() {
         val safe = "<svg viewBox=\"0 0 24 24\"><path d=\"M1 1h20v20z\"/></svg>".encodeToByteArray()
+        val xmlSafe = "<?xml version=\"1.0\"?><svg><circle cx=\"2\" cy=\"2\" r=\"1\"/></svg>".encodeToByteArray()
+        val sprite = "<svg><defs><path id=\"check\" d=\"M1 2l2 2\"/></defs><use href=\"#check\"/></svg>".encodeToByteArray()
+        val gradient = "<svg><defs><linearGradient id=\"g\"/></defs><path fill=\"url(#g)\" d=\"M0 0h2v2z\"/></svg>".encodeToByteArray()
         val script = "<svg><script>alert(1)</script></svg>".encodeToByteArray()
         val external = "<svg><use href=\"https://evil.example/a.svg#x\"/></svg>".encodeToByteArray()
+        val unquotedExternal = "<svg><use href=https://evil.example/a.svg#x /></svg>".encodeToByteArray()
+        val externalPaint = "<svg><path fill=\"url(https://evil.example/a.svg#g)\"/></svg>".encodeToByteArray()
 
         assertTrue(isSafeStaticSvg(safe, "image/svg+xml; charset=utf-8"))
+        assertTrue(isSafeStaticSvg(xmlSafe, "image/svg+xml"))
+        assertTrue(isSafeStaticSvg(sprite, "image/svg+xml"))
+        assertTrue(isSafeStaticSvg(gradient, "image/svg+xml"))
         assertFalse(isSafeStaticSvg(script, "image/svg+xml"))
         assertFalse(isSafeStaticSvg(external, "image/svg+xml"))
+        assertFalse(isSafeStaticSvg(unquotedExternal, "image/svg+xml"))
+        assertFalse(isSafeStaticSvg(externalPaint, "image/svg+xml"))
         assertFalse(isSafeStaticSvg(safe, "text/html"))
     }
 

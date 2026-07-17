@@ -1711,10 +1711,14 @@ private fun WebView.sanitizeAndExtractVisibleText(
             return true;
           }
           function dagHttpsImageSource(image) {
+            var pictureSource = image.closest && image.closest('picture');
+            pictureSource = pictureSource && pictureSource.querySelector('source[data-srcset],source[data-lazy-srcset],source[srcset]');
             var candidates = [
               image.getAttribute('data-src'),
               image.getAttribute('data-lazy-src'),
+              image.getAttribute('data-lazy-srcset'),
               image.getAttribute('data-original'),
+              image.getAttribute('data-original-set'),
               image.getAttribute('data-lazy'),
               image.getAttribute('data-url'),
               image.getAttribute('data-image'),
@@ -1722,6 +1726,9 @@ private fun WebView.sanitizeAndExtractVisibleText(
               image.getAttribute('data-src-large'),
               image.getAttribute('data-flickity-lazyload'),
               image.getAttribute('data-srcset'),
+              pictureSource && pictureSource.getAttribute('data-srcset'),
+              pictureSource && pictureSource.getAttribute('data-lazy-srcset'),
+              pictureSource && pictureSource.getAttribute('srcset'),
               image.getAttribute('src'),
               image.currentSrc
             ];
@@ -1735,6 +1742,42 @@ private fun WebView.sanitizeAndExtractVisibleText(
               } catch (_) {}
             }
             return '';
+          }
+          function dagLoadImage(image) {
+            if (!image || !image.isConnected) return;
+            dagBlurIntimateImage(image);
+            var source = dagHttpsImageSource(image);
+            if (!source) {
+              image.style.setProperty('visibility', 'hidden', 'important');
+              return;
+            }
+            image.removeAttribute('srcset');
+            image.removeAttribute('data-srcset');
+            image.removeAttribute('data-lazy-srcset');
+            image.style.removeProperty('visibility');
+            if (image.getAttribute('src') !== source) image.src = source;
+            image.setAttribute('data-dag-image-ready', 'true');
+          }
+          function dagQueueImage(image) {
+            if (!image) return;
+            dagBlurIntimateImage(image);
+            var lazy = image.getAttribute('loading') === 'lazy' ||
+              image.hasAttribute('data-src') || image.hasAttribute('data-lazy-src') ||
+              image.hasAttribute('data-srcset') || image.hasAttribute('data-lazy-srcset');
+            if (lazy && window.IntersectionObserver && image.getAttribute('data-dag-image-ready') !== 'true') {
+              if (!window.__dagImageObserver) {
+                window.__dagImageObserver = new IntersectionObserver(function(entries) {
+                  entries.forEach(function(entry) {
+                    if (!entry.isIntersecting) return;
+                    window.__dagImageObserver.unobserve(entry.target);
+                    dagLoadImage(entry.target);
+                  });
+                }, { rootMargin: '1200px 0px' });
+              }
+              window.__dagImageObserver.observe(image);
+              return;
+            }
+            dagLoadImage(image);
           }
           function dagSecureBackground(node) {
             if (!node || node.nodeType !== 1) return;
@@ -1794,20 +1837,12 @@ private fun WebView.sanitizeAndExtractVisibleText(
               return;
             }
             if (tag === 'img') {
-              dagBlurIntimateImage(node);
-              var source = dagHttpsImageSource(node);
-              if (!source) {
-                node.remove();
-                return;
-              }
-              node.removeAttribute('srcset');
-              node.removeAttribute('data-srcset');
-              if (node.getAttribute('src') !== source) node.src = source;
+              dagQueueImage(node);
             }
             dagSecureBackground(node);
             node.querySelectorAll && node.querySelectorAll('video,audio,video source,audio source,canvas,iframe').forEach(dagSecureNode);
             node.querySelectorAll && node.querySelectorAll('img').forEach(function(image) {
-              dagSecureNode(image);
+              dagQueueImage(image);
             });
             node.querySelectorAll && node.querySelectorAll('*').forEach(dagSecureBackground);
           }
@@ -1830,7 +1865,10 @@ private fun WebView.sanitizeAndExtractVisibleText(
               childList: true,
               subtree: true,
               attributes: true,
-              attributeFilter: ['src', 'srcset', 'style', 'class', 'alt', 'title', 'aria-label']
+              attributeFilter: [
+                'src', 'srcset', 'data-src', 'data-lazy-src', 'data-srcset', 'data-lazy-srcset',
+                'style', 'class', 'alt', 'title', 'aria-label', 'loading'
+              ]
             });
           }
           return document.body ? document.body.innerText.substring(0,24000) : '';

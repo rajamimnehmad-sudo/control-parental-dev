@@ -910,6 +910,14 @@ Flujo de una entrada:
 - Evidencia: pruebas unitarias de politica/red, validacion Gradle integral y carga fisica de fotos seguras en SM-A235M con APK publico DEV 210. Actualizacion in-place con Device Admin, Accessibility y VPN preservados; cero consultas Brave.
 - Limitacion explicita: el modelo es probabilistico y no puede garantizar 100 % de aciertos. Clasificar video requiere `DAG-VIDEO-01`, aun no aprobado.
 
+### DAG-IMAGE-QUEUE-03 - Entrega continua, lazy, iconos y SVG seguro
+
+- Estado: `Candidato DEV 251 validado localmente; pendiente publicacion y prueba fisica visual`; aprobado por el usuario el 2026-07-17.
+- Causa: tres interceptores sincronicos y la promocion simultanea de todas las fuentes lazy podian ocupar el pool de recursos WebView y dejar en blanco las imagenes posteriores al primer grupo.
+- Implementacion: ocho trabajos acotados, timeout de 15 segundos y carga por proximidad al viewport. Se cubren `picture`, fuentes lazy/srcset adicionales, favicon ICO y SVG estatico con simbolos o gradientes internos.
+- Seguridad: cada raster conserva clasificacion local antes de mostrarse; SVG con scripts, eventos, embeds, estilos activos o referencias externas falla cerrado; video y audio siguen bloqueados.
+- Aceptacion pendiente: desplazar una pagina de al menos 30 imagenes y confirmar que las posteriores resuelven como visibles o desenfocadas; validar iconos/SVG y ausencia de mezcla al navegar.
+
 ### AI-SEARCH-01A - Intencion semantica local compacta
 
 - Estado: `En progreso` en DEV 212; aprobado por el usuario al pedir continuar con IA local. Falta prueba fisica.
@@ -918,6 +926,14 @@ Flujo de una entrada:
 - Decision: una categoria riesgosa con confianza alta bloquea; confianza media o contexto sensible quedan inciertos; general permite solo si ninguna capa anterior bloqueo. Modelo ausente o invalido falla cerrado.
 - Datos y costo: 636 ejemplos controlados, 69 casos separados de verificacion, entrenamiento reproducible sin dependencias externas y cero costo/API adicional. DEV 226 corrige cinco evasiones detectadas por el control, principalmente en hebreo, y publica `dag-local-text-3` con SHA-256 `8ffb797ab8976f4a4cd18728c8a64ff5973392e30562a3e4291783f00cb9e612`. Consultas, texto, scores y decisiones permanecen locales.
 - Aceptacion tecnica cumplida: pruebas dirigidas, build/test/lint local integral, publicacion DEV 212 y hashes publicos verificados. Aceptacion fisica pendiente: calidad en busquedas cotidianas/riesgosas, ausencia de falsos positivos graves y fluidez en el Samsung personal.
+
+### DAG-ADAPTIVE-DECISION-01 - Decision local sin revision Admin obligatoria
+
+- Estado: `Candidato DEV 251 validado localmente; pendiente publicacion y prueba fisica de calidad`; aprobado por el usuario el 2026-07-17.
+- Problema: la zona incierta del modelo y las paginas con poco texto terminaban en `necesita revision`, aun sin una regla explicita ni evidencia fuerte.
+- Implementacion: resultado adaptativo `permitido/protegido/bloqueado`. Incertidumbre y señal semantica moderada abren con filtrado visual, sin video, descargas, ventanas nuevas ni persistir aprobacion completa; reglas Admin, dominios prohibidos, categorias explicitas y evidencia semantica fuerte bloquean.
+- Consulta Admin: deja de ser la salida automatica de una duda. La navegacion protegida decide localmente; una revision puede mantenerse como accion manual separada donde corresponda.
+- Aceptacion pendiente: paginas cotidianas ambiguas o con poco texto abren protegidas; contenido explicito y reglas duras siguen bloqueados; validar español, ingles y hebreo en el telefono.
 
 ### DAG-USAGE-01 - Contador mensual en Super Web
 
