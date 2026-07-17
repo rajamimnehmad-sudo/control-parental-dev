@@ -276,7 +276,7 @@ Flujo de una entrada:
 
 ### BARRIER-UNINSTALL-SCOPE-01 - Proteger solo la desinstalacion de Usuario
 
-- Estado: `Implementado candidato DEV 248; pendiente publicacion y prueba fisica`. Aprobado por el reporte correctivo explicito del usuario el 2026-07-16. Prioridad: P0. Riesgo: alto.
+- Estado: `Publicado en DEV 248; pendiente prueba fisica`. Aprobado por el reporte correctivo explicito del usuario el 2026-07-16. Prioridad: P0. Riesgo: alto.
 - Problema: Samsung bloqueaba la desinstalacion de cualquier app cuando la barrera estaba armada, aunque la proteccion debe alcanzar exclusivamente App Usuario.
 - Causa: instaladores OEM pueden reutilizar una clase generica de Package Installer para instalar y quitar; esa clase omitia el filtro posterior por identidad de la app objetivo.
 - Resultado: una accion de quitar, desactivar o forzar cierre solo se intercepta cuando la pantalla identifica positivamente App Usuario. Admin y otras apps quedan fuera. La proteccion propia de Device Admin Usuario y la politica separada de instalaciones permanecen.
