@@ -75,8 +75,8 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 SHA-256 publicados:
 
 ```text
-Usuario pendiente de publicacion
-Admin   pendiente de publicacion
+Usuario 1a293595be0aff2075db17430af335ef405f364622825b400983b5bcb2125e28
+Admin   433d2a723bf16a6dc36375b505fb70a429abc2700048b5a35125f600021852a0
 ```
 
 ## Publicacion DEV 255 - Calibracion DAG solo para dudas reales - 2026-07-17
@@ -85,7 +85,8 @@ Admin   pendiente de publicacion
 - La Edge Function DEV conserva una segunda barrera con los umbrales activos: solo acepta `initial_decision=uncertain` y rechaza casos claramente bloqueables antes de subir la miniatura. No se agregan datos de navegacion ni claves privilegiadas a Android.
 - `DAG-CALIBRATION-CLEAR-07` agrega `Borrar todas` a Super Admin con confirmacion explicita. El borrado elimina las miniaturas mediante Storage API, archiva pendientes y revisadas para retirarlas de la cola y conserva un evento de auditoria; calibraciones versionadas ya creadas no se eliminan. Si la misma duda reaparece en una navegacion futura, puede ingresar nuevamente sin quedar bloqueada por la deduplicacion historica.
 - Las migraciones `20260717191627_dag_calibration_clear_queue` y `20260717193420_dag_calibration_archive_indexes` se aplicaron exclusivamente en Supabase DEV. La primera preservo las 106 revisiones existentes: cero se archivaron o borraron durante el despliegue. La segunda agrega indices parciales para la cola activa y la nueva clave foranea. El endpoint de borrado rechazo correctamente una llamada no autenticada con HTTP 403.
-- Validacion local: la matriz final de tests unitarios, ktlint, Android Lint, Detekt y builds DEV de Usuario/Admin completo 903 tareas correctamente. TypeScript, ESLint y build Next tambien pasaron. `aapt` confirma ambos paquetes DEV en 255, `minSdk 29` y `targetSdk 36`; ambos APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Edge Function `dag-calibration` v6 quedo activa. Pendiente la publicacion unica DEV 255 y registrar manifiestos, hashes y workflows.
+- Validacion: la matriz local de tests unitarios, ktlint, Android Lint, Detekt y builds DEV de Usuario/Admin completo 903 tareas correctamente. TypeScript, ESLint y build Next tambien pasaron. Android CI `29608399118` completo build, tests, ktlint, lint y Detekt; `Publicar APKs DEV` `29608399103` publico una sola vez exclusivamente en Supabase DEV.
+- Los dos manifiestos publicos declaran 255 y las descargas recalculan exactamente los SHA-256 documentados arriba. `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`; ambos APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Edge Function `dag-calibration` v6 esta activa. La Superweb sirve el commit `b54f7cd` con salud DEV y rutas privadas verificadas. No habia telefono ADB visible para una prueba fisica de 255.
 
 ## Publicacion DEV 254 - actualizaciones confiables sin habilitar Ajustes - 2026-07-17
 
