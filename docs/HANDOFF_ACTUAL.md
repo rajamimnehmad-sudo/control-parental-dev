@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-17:
 
 ```text
-App Usuario versionCode 254
-App Admin versionCode 254
+App Usuario versionCode 255
+App Admin versionCode 255
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,24 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-254-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-254-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-255-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-255-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 5fdb3a4267065c9638efbed7c12275cff152ce370de50a6d33069329a52cb3c5
-Admin   09f309e66b3d821d0d9a7d2a1faccdfac16534381d196dbc94cabfc8ab564efb
+Usuario pendiente de publicacion
+Admin   pendiente de publicacion
 ```
+
+## Publicacion DEV 255 - Calibracion DAG solo para dudas reales - 2026-07-17
+
+- `DAG-CALIBRATION-QUALITY-06` evita que evidencia visual claramente bloqueable llegue a la cola humana. El clasificador de modestia distingue ahora entre cruce leve del umbral, que sigue como incertidumbre, y evidencia fuerte, que se difumina localmente. La comprobacion se ejecuta tambien cuando el clasificador profesional queda incierto.
+- La Edge Function DEV conserva una segunda barrera con los umbrales activos: solo acepta `initial_decision=uncertain` y rechaza casos claramente bloqueables antes de subir la miniatura. No se agregan datos de navegacion ni claves privilegiadas a Android.
+- `DAG-CALIBRATION-CLEAR-07` agrega `Borrar todas` a Super Admin con confirmacion explicita. El borrado elimina las miniaturas mediante Storage API, archiva pendientes y revisadas para retirarlas de la cola y conserva un evento de auditoria; calibraciones versionadas ya creadas no se eliminan. Si la misma duda reaparece en una navegacion futura, puede ingresar nuevamente sin quedar bloqueada por la deduplicacion historica.
+- Las migraciones `20260717191627_dag_calibration_clear_queue` y `20260717193420_dag_calibration_archive_indexes` se aplicaron exclusivamente en Supabase DEV. La primera preservo las 106 revisiones existentes: cero se archivaron o borraron durante el despliegue. La segunda agrega indices parciales para la cola activa y la nueva clave foranea. El endpoint de borrado rechazo correctamente una llamada no autenticada con HTTP 403.
+- Validacion local: la matriz final de tests unitarios, ktlint, Android Lint, Detekt y builds DEV de Usuario/Admin completo 903 tareas correctamente. TypeScript, ESLint y build Next tambien pasaron. `aapt` confirma ambos paquetes DEV en 255, `minSdk 29` y `targetSdk 36`; ambos APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Edge Function `dag-calibration` v6 quedo activa. Pendiente la publicacion unica DEV 255 y registrar manifiestos, hashes y workflows.
 
 ## Publicacion DEV 254 - actualizaciones confiables sin habilitar Ajustes - 2026-07-17
 

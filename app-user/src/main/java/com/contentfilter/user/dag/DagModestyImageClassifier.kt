@@ -44,6 +44,43 @@ internal fun requiresKosherModestyBlur(
         (femaleContext && scores.bellyExposed >= calibration.bellyExposed)
 }
 
+internal fun dagModestyImageDecision(
+    scores: DagModestyScores,
+    calibration: DagImageCalibration = DagImageCalibration(),
+): DagImageDecision {
+    if (!requiresKosherModestyBlur(scores, calibration)) return DagImageDecision.Allowed
+    val femaleContext = scores.femaleFace >= calibration.femaleFace
+    val clearlyBlocked =
+        scores.explicitRegion >= calibration.explicitRegion.strongThreshold() ||
+            scores.femaleBreastCovered >= calibration.femaleBreastCovered.strongThreshold() ||
+            scores.femaleGenitaliaCovered >= calibration.femaleGenitaliaCovered.strongThreshold() ||
+            scores.buttocksCovered >= calibration.buttocksCovered.strongThreshold() ||
+            (
+                femaleContext &&
+                    (
+                        scores.armpitsExposed >= calibration.armpitsExposed.strongThreshold() ||
+                            scores.bellyExposed >= calibration.bellyExposed.strongThreshold()
+                    )
+            )
+    return if (clearlyBlocked) DagImageDecision.Blocked else DagImageDecision.Uncertain
+}
+
+internal fun dagCombinedImageDecision(
+    ensembleDecision: DagImageDecision,
+    modestyDecision: DagImageDecision,
+): DagImageDecision =
+    when {
+        ensembleDecision == DagImageDecision.Blocked || modestyDecision == DagImageDecision.Blocked -> {
+            DagImageDecision.Blocked
+        }
+        ensembleDecision == DagImageDecision.Uncertain || modestyDecision == DagImageDecision.Uncertain -> {
+            DagImageDecision.Uncertain
+        }
+        else -> DagImageDecision.Allowed
+    }
+
+private fun Float.strongThreshold(): Float = (this + StrongDecisionMargin).coerceAtMost(1f)
+
 internal class DagModestyImageClassifier(
     context: Context,
 ) : Closeable {
@@ -135,3 +172,5 @@ internal class DagModestyImageClassifier(
         val FailedInferenceScores = DagModestyScores(explicitRegion = 1f)
     }
 }
+
+private const val StrongDecisionMargin = 0.15f

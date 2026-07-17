@@ -316,6 +316,21 @@ export async function labelDagCalibrationReviewAction(_prevState: ActionState, f
   return { ok: true, message: "Respuesta registrada para Calibración DAG." };
 }
 
+export async function clearDagCalibrationReviewsAction(_prevState: ActionState): Promise<ActionState> {
+  void _prevState;
+  const supabase = await createClient();
+  const { data, error } = await supabase.functions.invoke("dag-calibration", {
+    body: { action: "clear" },
+  });
+  if (error || data?.error) return errorState(error ?? new Error(String(data.error)));
+  const cleared = Number(data?.cleared ?? 0);
+  revalidatePath("/dag-calibration");
+  return {
+    ok: true,
+    message: cleared > 0 ? `Se borraron ${cleared} fotos de Calibración DAG.` : "No había fotos para borrar.",
+  };
+}
+
 export async function prepareDagCalibrationAction(_prevState: ActionState): Promise<ActionState> {
   void _prevState;
   const supabase = await createClient();

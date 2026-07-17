@@ -1,5 +1,5 @@
 import { BrainCircuit, ClipboardCheck, History, Images, ShieldCheck } from "lucide-react";
-import { ActivateDagCalibrationButton, PrepareDagCalibrationButton } from "@/components/DagCalibrationActions";
+import { ActivateDagCalibrationButton, ClearDagCalibrationButton, PrepareDagCalibrationButton } from "@/components/DagCalibrationActions";
 import { DagCalibrationReviewForm } from "@/components/DagCalibrationReviewForm";
 import { EmptyState } from "@/components/EmptyState";
 import { getDagCalibrationBundle } from "@/lib/data";
@@ -18,7 +18,10 @@ export default async function DagCalibrationPage() {
           <div className="flex items-center gap-2"><BrainCircuit className="h-6 w-6 text-accent" /><h1 className="text-2xl font-semibold text-ink">Calibración DAG</h1></div>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">Revisá casos dudosos, registrá tu criterio y creá calibraciones medibles y reversibles. Calibrar ajusta umbrales; entrenar un modelo nuevo será una etapa separada.</p>
         </div>
-        <PrepareDagCalibrationButton />
+        <div className="flex flex-wrap gap-2">
+          <ClearDagCalibrationButton disabled={pending.length + reviewed.length === 0} />
+          <PrepareDagCalibrationButton />
+        </div>
       </section>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -35,7 +38,7 @@ export default async function DagCalibrationPage() {
 
       <section className="grid gap-3">
         <h2 className="text-lg font-semibold text-ink">Fotos para revisar</h2>
-        {pending.length === 0 ? <EmptyState title="No hay imágenes dudosas pendientes" body="DAG seguirá enviando solamente casos inciertos y difuminados." /> : (
+        {pending.length === 0 ? <EmptyState title="No hay imágenes dudosas pendientes" body="DAG enviará únicamente casos dentro de la franja real de incertidumbre." /> : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {pending.map((review) => (
               <article key={review.review_id} className="overflow-hidden rounded-md border border-line bg-white shadow-soft">
@@ -80,4 +83,4 @@ export default async function DagCalibrationPage() {
 }
 
 function Metric({ label, value, icon: Icon }: { label: string; value: number; icon: typeof Images }) { return <div className="rounded-md border border-line bg-white p-4 shadow-soft"><div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-500">{label}</p><Icon className="h-4 w-4 text-accent" /></div><p className="mt-2 text-2xl font-bold text-ink">{value}</p></div>; }
-function actionLabel(action: string) { return ({ review_labeled: "Foto etiquetada", calibration_created: "Calibración creada", calibration_activated: "Calibración activada", calibration_rollback: "Cambio de calibración", model_registered: "Modelo registrado" } as Record<string, string>)[action] ?? action; }
+function actionLabel(action: string) { return ({ review_labeled: "Foto etiquetada", reviews_cleared: "Fotos borradas", calibration_created: "Calibración creada", calibration_activated: "Calibración activada", calibration_rollback: "Cambio de calibración", model_registered: "Modelo registrado" } as Record<string, string>)[action] ?? action; }

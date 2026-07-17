@@ -97,25 +97,21 @@ internal class DagImageClassifier(
                         dagEnsembleImageDecision(professional.decision, dagImageDecision(legacyScore, calibration))
                     }
                 val modestyScores =
-                    if (ensembleDecision == DagImageDecision.Allowed) {
+                    if (ensembleDecision != DagImageDecision.Blocked) {
                         modestyClassifier.classify(
                             bitmap,
                         )
                     } else {
                         null
                     }
-                val modestyRequiresBlur = modestyScores?.let { requiresKosherModestyBlur(it, calibration) } == true
-                val decision =
-                    if (modestyRequiresBlur) {
-                        DagImageDecision.Uncertain
-                    } else {
-                        ensembleDecision
-                    }
+                val modestyDecision =
+                    modestyScores?.let { dagModestyImageDecision(it, calibration) } ?: DagImageDecision.Allowed
+                val decision = dagCombinedImageDecision(ensembleDecision, modestyDecision)
                 Log.d(
                     ImageMetricsTag,
                     "decision=${decision.name.lowercase()} elapsed_ms=" +
                         (SystemClock.elapsedRealtime() - classificationStartedAt) +
-                        " fallback=${legacyScore != null} modesty=$modestyRequiresBlur",
+                        " fallback=${legacyScore != null} modesty=${modestyDecision.name.lowercase()}",
                 )
                 DagImageClassification(
                     decision = decision,

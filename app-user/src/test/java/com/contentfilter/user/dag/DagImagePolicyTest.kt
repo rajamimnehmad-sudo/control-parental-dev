@@ -194,6 +194,34 @@ class DagImagePolicyTest {
     }
 
     @Test
+    fun `only genuinely doubtful modesty scores enter calibration`() {
+        assertEquals(
+            DagImageDecision.Uncertain,
+            dagModestyImageDecision(DagModestyScores(femaleBreastCovered = 0.25f)),
+        )
+        assertEquals(
+            DagImageDecision.Blocked,
+            dagModestyImageDecision(DagModestyScores(femaleBreastCovered = 0.35f)),
+        )
+        assertEquals(
+            DagImageDecision.Allowed,
+            dagModestyImageDecision(DagModestyScores(femaleFace = 0.90f)),
+        )
+    }
+
+    @Test
+    fun `strong modesty evidence blocks even when professional model is uncertain`() {
+        assertEquals(
+            DagImageDecision.Blocked,
+            dagCombinedImageDecision(DagImageDecision.Uncertain, DagImageDecision.Blocked),
+        )
+        assertEquals(
+            DagImageDecision.Uncertain,
+            dagCombinedImageDecision(DagImageDecision.Allowed, DagImageDecision.Uncertain),
+        )
+    }
+
+    @Test
     fun `modesty model artifact is pinned`() {
         val relative = "src/main/assets/dag/nudenet_modesty_320n_uint8.onnx"
         val model = listOf(File(relative), File("app-user/$relative")).first(File::isFile)
