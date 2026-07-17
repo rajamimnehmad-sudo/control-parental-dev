@@ -114,6 +114,14 @@ class DagImagePolicyTest {
     }
 
     @Test
+    fun `manual calibration lookup ignores only the image fragment`() {
+        assertEquals(
+            "https://cdn.example/photo.jpg?size=large",
+            normalizeImageUrl("https://cdn.example/photo.jpg?size=large#preview"),
+        )
+    }
+
+    @Test
     fun `viewport waits for pending images and fails closed at its deadline`() {
         assertEquals(DagViewportReadinessAction.Ready, dagViewportReadinessAction(0, 0L))
         assertEquals(DagViewportReadinessAction.Wait, dagViewportReadinessAction(2, 1_000L))

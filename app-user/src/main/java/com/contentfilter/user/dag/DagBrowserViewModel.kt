@@ -134,6 +134,35 @@ class DagBrowserViewModel
             }
         }
 
+        internal fun submitDagManualCalibrationCandidate(
+            thumbnail: ByteArray,
+            classification: DagImageClassification,
+        ) {
+            if (!mutableState.value.dagEnabled || classification.scores.isEmpty()) return
+            viewModelScope.launch(Dispatchers.IO) {
+                val activation = activationRepository.currentActivation() ?: return@launch
+                runCatching {
+                    calibrationRepository.submitManualBlock(activation.deviceId, thumbnail, classification)
+                }.onSuccess { result ->
+                    mutableState.update {
+                        it.copy(
+                            message =
+                                if (result is RemoteResult.Success) {
+                                    "Foto marcada para revisar en Calibración DAG."
+                                } else {
+                                    "La foto quedó difuminada, pero no se pudo enviar para revisión."
+                                },
+                        )
+                    }
+                }.onFailure {
+                    Log.d("DagCalibration", "manual_report_upload_failed")
+                    mutableState.update {
+                        it.copy(message = "La foto quedó difuminada, pero no se pudo enviar para revisión.")
+                    }
+                }
+            }
+        }
+
         fun submitAddress() {
             val input = mutableState.value.address.trim()
             if (!mutableState.value.dagEnabled || input.isBlank() || mutableState.value.loading) return

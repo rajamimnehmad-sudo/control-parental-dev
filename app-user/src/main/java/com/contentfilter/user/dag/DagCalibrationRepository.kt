@@ -54,4 +54,25 @@ class DagCalibrationRepository
                     .put("scores", scoreJson)
             return client.invokeFunction("dag-calibration", payload)
         }
+
+        internal suspend fun submitManualBlock(
+            deviceId: String,
+            thumbnail: ByteArray,
+            classification: DagImageClassification,
+        ): RemoteResult<Unit> {
+            if (classification.scores.isEmpty()) return RemoteResult.Success(Unit)
+            val hash = MessageDigest.getInstance("SHA-256").digest(thumbnail).joinToString("") { "%02x".format(it) }
+            val scoreJson = JSONObject()
+            classification.scores.forEach { (name, score) -> scoreJson.put(name, score.toDouble()) }
+            val payload =
+                JSONObject()
+                    .put("action", "submit_manual_block")
+                    .put("device_id", deviceId)
+                    .put("image_base64", Base64.encodeToString(thumbnail, Base64.NO_WRAP))
+                    .put("image_hash", hash)
+                    .put("model_version", DagProfessionalImageClassifier.ModelVersion)
+                    .put("initial_decision", classification.decision.name.lowercase())
+                    .put("scores", scoreJson)
+            return client.invokeFunction("dag-calibration", payload)
+        }
     }

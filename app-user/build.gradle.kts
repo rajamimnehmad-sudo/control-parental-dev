@@ -40,23 +40,26 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 255
+            versionCode = 256
             versionNameSuffix = "-dev"
             buildConfigField(
                 "String",
                 "DAG_NEURAL_MODEL_URL",
                 "\"https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/dag-models/\"",
             )
+            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "true")
         }
         create("beta") {
             dimension = "distribution"
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
             buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
+            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
         }
         create("prod") {
             dimension = "distribution"
             buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
+            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
         }
     }
 

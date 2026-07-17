@@ -50,7 +50,14 @@ export default async function DagCalibrationPage() {
                   ) : <div className="grid h-full place-items-center text-sm text-slate-500">Miniatura no disponible</div>}
                 </div>
                 <div className="grid gap-3 p-4">
-                  <div><p className="font-bold text-ink">{review.community_name}</p><p className="text-xs text-slate-500">{review.device_name} · {formatDate(review.created_at)}</p></div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-bold text-ink">{review.community_name}</p>
+                      {review.submission_source === "manual_dag" ? <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700">Marcada desde DAG</span> : null}
+                    </div>
+                    <p className="text-xs text-slate-500">{review.device_name} · {formatDate(review.created_at)}</p>
+                    {review.submission_source === "manual_dag" ? <p className="mt-1 text-xs text-slate-600">La X indicó “inapropiada”. Elegí el motivo antes de incorporarla a una calibración.</p> : null}
+                  </div>
                   <details className="text-xs text-slate-600"><summary className="cursor-pointer font-semibold">Ver puntajes del modelo</summary><pre className="mt-2 overflow-x-auto rounded bg-slate-50 p-2">{JSON.stringify(review.scores, null, 2)}</pre></details>
                   <DagCalibrationReviewForm reviewId={review.review_id} />
                 </div>
@@ -83,4 +90,4 @@ export default async function DagCalibrationPage() {
 }
 
 function Metric({ label, value, icon: Icon }: { label: string; value: number; icon: typeof Images }) { return <div className="rounded-md border border-line bg-white p-4 shadow-soft"><div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-500">{label}</p><Icon className="h-4 w-4 text-accent" /></div><p className="mt-2 text-2xl font-bold text-ink">{value}</p></div>; }
-function actionLabel(action: string) { return ({ review_labeled: "Foto etiquetada", reviews_cleared: "Fotos borradas", calibration_created: "Calibración creada", calibration_activated: "Calibración activada", calibration_rollback: "Cambio de calibración", model_registered: "Modelo registrado" } as Record<string, string>)[action] ?? action; }
+function actionLabel(action: string) { return ({ review_labeled: "Foto etiquetada", reviews_cleared: "Fotos borradas", manual_image_reported: "Foto marcada desde DAG", calibration_created: "Calibración creada", calibration_activated: "Calibración activada", calibration_rollback: "Cambio de calibración", model_registered: "Modelo registrado" } as Record<string, string>)[action] ?? action; }

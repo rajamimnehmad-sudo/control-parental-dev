@@ -79,6 +79,14 @@ Usuario 1a293595be0aff2075db17430af335ef405f364622825b400983b5bcb2125e28
 Admin   433d2a723bf16a6dc36375b505fb70a429abc2700048b5a35125f600021852a0
 ```
 
+## Publicacion DEV 256 - Marcacion visual para Calibracion DAG - 2026-07-17
+
+- `DAG-CALIBRATION-IN-PAGE-08` agrega en el menu de DAG DEV el modo temporal `Marcar fotos inapropiadas`, apagado por defecto y precedido por una confirmacion clara. Al activarlo, cada raster visible ya clasificado por DAG recibe una X roja; tocarla difumina esa imagen inmediatamente y envia solo su miniatura acotada, hash, version y puntajes como reporte manual. Las imagenes sin X no se interpretan como permitidas.
+- El puente WebView acepta mensajes solo del marco principal con origen HTTPS y la URL debe existir en el mapa local, acotado y efimero de recursos que DAG ya descargo y clasifico. El modo no existe en Beta ni Production, no expone una interfaz Android general a la pagina y no incorpora Service Role ni secretos al APK.
+- Un reporte manual entra como `pending` y `submission_source=manual_dag`; no cambia umbrales ni cuenta como etiqueta revisada hasta que Super Admin elige un motivo y confirma Permitir/Difuminar. La Superweb muestra la insignia `Marcada desde DAG` y el registro de auditoria distingue `manual_image_reported`.
+- Backend aplicado exclusivamente en Supabase DEV: migracion `20260717204621_dag_visual_calibration_reports` y Edge Function `dag-calibration` v8. La migracion preservo las 106 filas historicas, ya archivadas por la accion de borrado anterior. Una llamada invalida fue rechazada con HTTP 400.
+- Validacion: TypeScript, ESLint y build Next correctos; matriz final Android de Usuario/Admin completo 903 tareas y la repeticion Usuario posterior al ajuste fisico completo 690. En SM-A235M ambas APK se instalaron in-place como 256. La prueba real mostro X sobre imagenes Samsung, difumino un telefono al tocarla y creo exactamente un pendiente manual auditable en DEV. Ese caso de prueba permanece para poder revisarlo desde Super Admin; no se borro ningun dato.
+
 ## Hotfix Calibracion DAG - borrado autenticado - 2026-07-17
 
 - Reporte: `Borrar todas` respondia `Edge Function returned a non-2xx status code` y no retiraba las fotos.

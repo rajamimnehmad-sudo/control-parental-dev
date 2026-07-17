@@ -1,12 +1,12 @@
 import { createClient } from "@supabase/supabase-js";
 
 type Payload = {
-  action?: "submit" | "current" | "clear";
+  action?: "submit" | "submit_manual_block" | "current" | "clear";
   device_id?: string;
   image_base64?: string;
   image_hash?: string;
   model_version?: string;
-  initial_decision?: "blocked" | "uncertain";
+  initial_decision?: "allowed" | "blocked" | "uncertain";
   scores?: Record<string, number>;
 };
 
@@ -58,7 +58,8 @@ Deno.serve(async (request) => {
     return json({ calibration: data ?? null }, 200);
   }
 
-  if (payload.action !== "submit") return json({ error: "Acción inválida." }, 400);
+  const manualSubmission = payload.action === "submit_manual_block";
+  if (payload.action !== "submit" && !manualSubmission) return json({ error: "Acción inválida." }, 400);
   const modelVersion = payload.model_version?.trim() ?? "";
   const imageHash = payload.image_hash?.trim().toLowerCase() ?? "";
   const imageBytes = decodeBase64(payload.image_base64 ?? "");
@@ -67,7 +68,8 @@ Deno.serve(async (request) => {
     modelVersion.length < 1 || modelVersion.length > 120 ||
     !/^[0-9a-f]{64}$/.test(imageHash) ||
     !imageBytes || imageBytes.length > MaximumThumbnailBytes || !isJpeg(imageBytes) ||
-    payload.initial_decision !== "uncertain" ||
+    (!manualSubmission && payload.initial_decision !== "uncertain") ||
+    (manualSubmission && !["allowed", "blocked", "uncertain"].includes(payload.initial_decision ?? "")) ||
     !scores
   ) {
     return json({ error: "Caso de calibración inválido." }, 400);
@@ -80,7 +82,7 @@ Deno.serve(async (request) => {
     .eq("status", "active")
     .maybeSingle();
   if (calibrationError) return json({ error: "No se pudo comprobar la calibración activa." }, 503);
-  if (isClearlyBlocked(scores, activeCalibration?.thresholds)) {
+  if (!manualSubmission && isClearlyBlocked(scores, activeCalibration?.thresholds)) {
     return json({ accepted: false, reason: "clear_block" }, 202);
   }
 
@@ -114,6 +116,7 @@ Deno.serve(async (request) => {
     model_version: modelVersion,
     initial_decision: payload.initial_decision,
     scores,
+    submission_source: manualSubmission ? "manual_dag" : "automatic_uncertainty",
   }, { onConflict: "device_id,image_hash,model_version", ignoreDuplicates: true });
   if (insertError) return json({ error: "No se pudo registrar el caso dudoso." }, 503);
 
@@ -125,7 +128,35 @@ Deno.serve(async (request) => {
     .eq("model_version", modelVersion)
     .single();
   if (existingReviewError) return json({ error: "No se pudo comprobar el caso dudoso." }, 503);
-  if (existingReview.archived_at) {
+  if (manualSubmission) {
+    const { error: markError } = await serviceClient
+      .from("dag_calibration_reviews")
+      .update({
+        community_id: communityId,
+        storage_path: storagePath,
+        initial_decision: payload.initial_decision,
+        scores,
+        submission_source: "manual_dag",
+        status: "pending",
+        review_decision: null,
+        review_reason: null,
+        review_note: null,
+        reviewed_by: null,
+        reviewed_at: null,
+        created_at: now,
+        expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+        archived_at: null,
+        archived_by: null,
+      })
+      .eq("id", existingReview.id);
+    if (markError) return json({ error: "No se pudo registrar la marcación manual." }, 503);
+    const { error: auditError } = await serviceClient.from("dag_calibration_audit").insert({
+      action: "manual_image_reported",
+      review_id: existingReview.id,
+      details: { device_id: deviceId, initial_decision: payload.initial_decision, model_version: modelVersion },
+    });
+    if (auditError) return json({ error: "La foto se marcó, pero no se pudo registrar la auditoría." }, 503);
+  } else if (existingReview.archived_at) {
     const { error: restoreError } = await serviceClient
       .from("dag_calibration_reviews")
       .update({
@@ -133,6 +164,7 @@ Deno.serve(async (request) => {
         storage_path: storagePath,
         initial_decision: "uncertain",
         scores,
+        submission_source: "automatic_uncertainty",
         status: "pending",
         review_decision: null,
         review_reason: null,

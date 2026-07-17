@@ -46,6 +46,7 @@ internal class DagImageResourceLoader(
     private val closed = AtomicBoolean(false)
     private val imageSlots = Semaphore(DagImageDeliveryPolicy.MaximumConcurrentImages, true)
     private val responseCache = LinkedHashMap<String, CachedImageResource>(16, 0.75f, true)
+    private val manualCalibrationCandidates = LinkedHashMap<String, DagManualCalibrationCandidate>(16, 0.75f, true)
     private var responseCacheBytes = 0
 
     fun resetPage() {
@@ -58,6 +59,7 @@ internal class DagImageResourceLoader(
             responseCache.clear()
             responseCacheBytes = 0
         }
+        synchronized(manualCalibrationCandidates) { manualCalibrationCandidates.clear() }
     }
 
     fun pageSummary(): DagImagePageSummary =
@@ -71,6 +73,11 @@ internal class DagImageResourceLoader(
         closed.set(true)
         pageGeneration.incrementAndGet()
     }
+
+    fun takeManualCalibrationCandidate(imageUrl: String): DagManualCalibrationCandidate? =
+        synchronized(manualCalibrationCandidates) {
+            manualCalibrationCandidates.remove(normalizeImageUrl(imageUrl))
+        }
 
     fun intercept(
         request: WebResourceRequest,
@@ -137,6 +144,11 @@ internal class DagImageResourceLoader(
                 return cacheAndCreateResource(request.url.toString(), bytes, "image/svg+xml", "safe-icon")
             }
             val classification = classifier.classify(bytes, mimeType)
+            if (classification.scores.isNotEmpty()) {
+                dagCalibrationThumbnail(bytes)?.let { thumbnail ->
+                    rememberManualCalibrationCandidate(request.url.toString(), thumbnail, classification)
+                }
+            }
             when (classification.decision) {
                 DagImageDecision.Allowed -> allowedCount.incrementAndGet()
                 DagImageDecision.Blocked -> blockedCount.incrementAndGet()
@@ -207,6 +219,20 @@ internal class DagImageResourceLoader(
             }
         } finally {
             source.recycle()
+        }
+    }
+
+    private fun rememberManualCalibrationCandidate(
+        imageUrl: String,
+        thumbnail: ByteArray,
+        classification: DagImageClassification,
+    ) {
+        synchronized(manualCalibrationCandidates) {
+            manualCalibrationCandidates[normalizeImageUrl(imageUrl)] =
+                DagManualCalibrationCandidate(thumbnail, classification)
+            while (manualCalibrationCandidates.size > MaximumManualCalibrationCandidates) {
+                manualCalibrationCandidates.remove(manualCalibrationCandidates.entries.first().key)
+            }
         }
     }
 
@@ -284,9 +310,17 @@ internal class DagImageResourceLoader(
         const val MaximumCachedImages = 64
         const val MaximumCachedImageBytes = 1024 * 1024
         const val MaximumResponseCacheBytes = 16 * 1024 * 1024
+        const val MaximumManualCalibrationCandidates = 160
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }
 }
+
+internal data class DagManualCalibrationCandidate(
+    val thumbnail: ByteArray,
+    val classification: DagImageClassification,
+)
+
+internal fun normalizeImageUrl(value: String): String = value.substringBefore('#')
 
 private data class CachedImageResource(
     val bytes: ByteArray,
