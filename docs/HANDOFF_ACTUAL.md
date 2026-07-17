@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-16:
 
 ```text
-App Usuario versionCode 246
-App Admin versionCode 246
+App Usuario versionCode 247
+App Admin versionCode 247
 versionName 1.0.1-dev
 ```
 
@@ -68,24 +68,25 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-246-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-246-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-247-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-247-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 5ed0bf43507b764295eb589da2ccd0b526df118b04116c5cf37c3286aa026b0e
-Admin   4d9632957b8139c32a47ba2a2f03f8822ff1aed10c1e1e33509bc07673efc8d9
+Usuario 76705ffc434ac62803ea8debc98e14d86e0488824b92efda415ab785435d432e
+Admin   19b75f9a07cb61c22bab19ca3362b1dd314f2da47ec07aa12e32eb701e976d71
 ```
 
-## Candidato DEV 247 - Paridad UX de App Usuario - 2026-07-16
+## Publicacion DEV 247 - Paridad UX de App Usuario - 2026-07-16
 
 - `USER-UX-PARITY-01` fue aprobado con cuatro destinos principales: Inicio, Mis apps, Internet y Ajustes. Internet permanece separado de Mis apps.
 - Cambiar una pestana principal limpia la pila secundaria como en App Admin. Mis apps, Internet y Ajustes dejan de mostrar Volver por ser raices; Solicitudes y Avisos conservan encabezado fijo y regreso interno.
 - La iconografia deja de reutilizar conceptos: Mis apps tiene cuadricula, Solicitudes lista de pedidos, Internet globo, Avisos campana, Inicio casa y Ajustes engranaje. `Web` se presenta como `Internet` sin modificar el comportamiento de VPN, Accessibility, DAG o politicas.
 - Usuario y Admin suben juntos a `versionCode 247` porque los iconos viven en `core-ui`, compartido por ambas APK. Antes del bump pasaron `core-ui:ktlintCheck`, tests unitarios DEV de ambas apps y builds optimizados: 764 tareas correctas.
-- Pendiente de este cierre: commit/push, una unica publicacion Supabase DEV, verificacion de manifiestos/hashes y recorrido visual fisico.
+- El commit `5f92ee1` fue publicado una sola vez exclusivamente en Supabase DEV por el workflow `29550036969`. Android CI `29550036945` completo build, tests, ktlint, lint y detekt correctamente.
+- Ambos manifiestos publicos declaran 247; las descargas recalculan exactamente los SHA-256 registrados arriba. `aapt` confirma paquetes DEV correctos, `versionCode 247` y `minSdk 29`. Queda pendiente el recorrido visual fisico.
 
 ## Candidato agrupado DEV 246 - Superweb verificable y banners unificados - 2026-07-16
 

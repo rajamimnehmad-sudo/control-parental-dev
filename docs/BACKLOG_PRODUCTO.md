@@ -209,11 +209,11 @@ Flujo de una entrada:
 
 ### USER-UX-PARITY-01 - Navegacion Usuario alineada con Admin
 
-- Estado: `Implementado candidato DEV 247; pendiente publicacion y prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-16, con Internet separado de Mis apps y mejora de iconos.
+- Estado: `Publicado DEV 247; pendiente prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-16, con Internet separado de Mis apps y mejora de iconos.
 - Causa: App Usuario ya compartia tarjetas, fondo y banners premium con Admin, pero sus destinos principales acumulaban historial entre pestanas, mostraban Volver en superficies raiz y reutilizaban la lupa o la campana para funciones distintas.
 - Resultado: el nav conserva cuatro destinos independientes —Inicio, Mis apps, Internet y Ajustes—; cambiar de pestana limpia la pila secundaria como en Admin; Mis apps, Internet y Ajustes son raices sin Volver redundante; Solicitudes y Avisos siguen como secciones internas con regreso fijo.
 - Iconografia: Mis apps usa una cuadricula propia, Solicitudes una lista de pedidos, Internet el globo y Avisos la campana. El destino Web pasa a mostrarse como `Internet` sin cambiar VPN, Accessibility, DAG, politicas ni datos.
-- Validacion candidata: `core-ui:ktlintCheck`, tests DEV Usuario/Admin y builds optimizados de ambas APK correctos. Riesgo residual: recorrido visual y navegacion fisica en Samsung.
+- Validacion: `core-ui:ktlintCheck`, tests DEV Usuario/Admin y builds optimizados de ambas APK correctos; Android CI completo correcto. La publicacion DEV fue unica y los manifiestos/hashes publicos 247 coinciden. Riesgo residual: recorrido visual y navegacion fisica en Samsung.
 - Aceptacion: cuatro destinos claros sin duplicados; Internet separado; iconos distinguibles; las raices no muestran Volver; secciones internas, notificaciones y Atrás conservan su destino; Android 10 o posterior sigue soportado.
 
 ### SUPERWEB-FUNCTIONAL-VERIFY-01 - Recorrido funcional del propietario
