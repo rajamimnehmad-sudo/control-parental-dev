@@ -1,12 +1,9 @@
 import { ShieldCheck } from "lucide-react";
-import { LoginForm } from "@/components/LoginForm";
+import { UpdatePasswordForm } from "@/components/UpdatePasswordForm";
+import { requireSuperAdmin } from "@/lib/auth";
 
-export default async function LoginPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ passwordUpdated?: string; recoveryError?: string }>;
-}) {
-  const params = await searchParams;
+export default async function UpdatePasswordPage() {
+  await requireSuperAdmin();
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-10">
@@ -16,14 +13,11 @@ export default async function LoginPage({
             <ShieldCheck className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-xl font-semibold text-ink">Super Admin</h1>
-            <p className="text-sm text-slate-500">Content Filter</p>
+            <h1 className="text-xl font-semibold text-ink">Contraseña nueva</h1>
+            <p className="text-sm text-slate-500">El cambio cerrará las sesiones anteriores.</p>
           </div>
         </div>
-        <LoginForm
-          passwordUpdated={params.passwordUpdated === "1"}
-          recoveryError={typeof params.recoveryError === "string"}
-        />
+        <UpdatePasswordForm />
       </section>
     </main>
   );

@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-17
+Fecha de corte: 2026-07-18
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -78,6 +78,14 @@ SHA-256 publicados:
 Usuario 2f2399839e456de760ba66729163ec731884a92921fc2e2a3efc5ba98680354b
 Admin   47a121561d5c18fde90608a70b693d69171e8e935490a48c318ebe14200c354f
 ```
+
+## Recuperacion segura de Super Admin - 2026-07-18
+
+- `SUPERWEB-AUTH-RECOVERY-01` corrige la ausencia total de recuperacion de contraseña: Login incorpora `Olvidé mi contraseña`, solicitud por email, callback PKCE y pantalla para establecer una contraseña nueva de al menos 12 caracteres.
+- El pedido devuelve el mismo mensaje exista o no la cuenta para evitar enumeracion. El callback acepta solo el destino fijo de actualizacion, intercambia el codigo con Supabase Auth y exige que la sesion pertenezca a un registro activo de `super_admins`; cualquier otro usuario es desconectado y rechazado.
+- Al guardar, la accion vuelve a comprobar usuario y rol, actualiza mediante Supabase Auth —sin manipular hashes ni usar Service Role en cliente—, revoca las sesiones persistentes y obliga a ingresar nuevamente. Enlaces invalidos o vencidos vuelven al Login con un mensaje seguro.
+- Causa adicional corregida exclusivamente en Supabase DEV: Auth todavia declaraba `http://localhost:3000` como Site URL y no tenia redirects publicos permitidos. Ahora la Site URL es `https://web-super-admin-nine.vercel.app` y la lista permite ese dominio y localhost para pruebas. Production no fue consultado ni modificado.
+- Diagnostico de la cuenta DEV: existe un unico Super Admin activo, con contraseña configurada, email confirmado y sin bloqueo ni borrado. Su ultimo ingreso correcto fue el 2026-07-12; el registro Auth se actualizo el 2026-07-17, pero no existen entradas de auditoria Auth que permitan atribuir ese cambio a una modificacion de contraseña. Por eso no se afirma una causa no demostrable.
 
 ## Publicacion DEV 256 - Marcacion visual para Calibracion DAG - 2026-07-17
 

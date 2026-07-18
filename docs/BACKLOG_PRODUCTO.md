@@ -144,6 +144,7 @@ Flujo de una entrada:
 | SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
+| SUPERWEB-AUTH-RECOVERY-01 | Implementado; pendiente despliegue y recorrido por email | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
 | SUPERWEB-OPS-UX-01 | Archivo seguro, agrupacion y claridad Base implementados; busqueda/filtros pendientes | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
 | APP-UPDATE-CHANGELOG-01 | Idea | P2 | Mostrar en Usuario y Admin las novedades especificas de la actualizacion ofrecida | M | Medio |
@@ -205,6 +206,15 @@ Flujo de una entrada:
 - Verificacion implementada: `scripts/verify_superweb.sh` exige health DEV, commit esperado y existencia protegida de Comunidades, Uso DAG, Alertas y Avisos. El Vercel viejo falla correctamente esta comprobacion.
 - Pendiente externo: iniciar sesion en Vercel como propietario, revisar proyecto/rama/root directory, reconectar GitHub si corresponde, desplegar y ejecutar la verificacion contra la URL oficial.
 - Aceptacion: URL oficial sin 404 en rutas nuevas; anonimo redirigido a Login; health coincide con el commit publicado y DEV; futuros pushes de `main` vuelven a generar estado/despliegue visible; ninguna variable de Production ni Service Role.
+
+### SUPERWEB-AUTH-RECOVERY-01 - Recuperacion segura del propietario
+
+- Estado: `Implementado; pendiente despliegue y recorrido por email`; aprobado explicitamente el 2026-07-18.
+- Causa: el Login solo admitia email/password y mostraba un error generico; no existian solicitud de recuperacion, callback ni pantalla de contraseña nueva. Ademas, Supabase Auth DEV conservaba localhost como Site URL y no autorizaba el dominio Vercel.
+- Resultado: `Olvidé mi contraseña` envia un enlace sin revelar si la cuenta existe; el callback usa PKCE, limita el destino, comprueba el rol Super Admin activo y la nueva contraseña exige al menos 12 caracteres. El cambio usa Supabase Auth, revoca sesiones persistentes y vuelve al Login.
+- Seguridad: sin SQL sobre `encrypted_password`, sin Service Role en navegador, sin secretos nuevos y sin acceso para usuarios Auth que no sean Super Admin. Site URL y redirects fueron corregidos solo en `syeycayasyufedwoprea`.
+- Diagnostico: el Super Admin DEV sigue activo, confirmado, no bloqueado y con contraseña configurada. Auth registra una actualizacion el 2026-07-17 y el ultimo login exitoso el 2026-07-12, pero la auditoria Auth esta vacia; no hay evidencia suficiente para afirmar por que cambio el acceso.
+- Aceptacion: solicitar desde el Login, recibir el correo, abrir un enlace valido una sola vez, guardar contraseña nueva, cerrar sesiones previas e ingresar nuevamente; enlaces vencidos y usuarios no autorizados fallan cerrados.
 
 ### UI-BANNER-UNIFY-01 - Feedback premium compartido
 

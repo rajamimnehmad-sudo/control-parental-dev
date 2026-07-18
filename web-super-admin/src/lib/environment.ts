@@ -1,5 +1,6 @@
 export const devSupabaseProjectRef = "syeycayasyufedwoprea";
 export const devSupabaseUrl = `https://${devSupabaseProjectRef}.supabase.co`;
+export const superAdminSiteUrl = "https://web-super-admin-nine.vercel.app";
 
 export function requireDevSupabaseUrl() {
   const configured = process.env.NEXT_PUBLIC_SUPABASE_URL;
