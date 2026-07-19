@@ -74,7 +74,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.domain.model.DeviceProtectionControl
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicySchedulePolicy
+import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
+import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
+import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
@@ -88,9 +94,20 @@ import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 fun RulesRoute(
     entryMode: RulesEntryMode = RulesEntryMode.Apps,
     onBack: (() -> Unit)? = null,
+    initialDeviceId: String? = null,
+    onInitialDeviceConsumed: () -> Unit = {},
     viewModel: RulesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    LaunchedEffect(initialDeviceId) {
+        initialDeviceId?.let { deviceId ->
+            viewModel.onDeviceSelected(
+                deviceId = deviceId,
+                refreshApps = entryMode != RulesEntryMode.Web,
+            )
+            onInitialDeviceConsumed()
+        }
+    }
     RulesScreen(
         entryMode = entryMode,
         state = state,
@@ -115,12 +132,18 @@ fun RulesRoute(
             )
         },
         onDeviceCleared = viewModel::clearDeviceSelection,
-        onDeviceDeleted = viewModel::deleteDevicePermanently,
+        onDeviceDeleted = viewModel::archiveUser,
         onAppAllowedChanged = viewModel::setAppAllowed,
         onAppLimitSaved = viewModel::saveAppControlLimit,
+        onAllowedScheduleSaved = viewModel::saveAllowedSchedule,
+        onAllowDomainChanged = viewModel::onAllowDomainChanged,
+        onAllowDomainMinutesChanged = viewModel::onAllowDomainMinutesChanged,
+        onCreateAllowedDomain = viewModel::createAllowedDomainRule,
+        onSaveAllowedDomainLimit = viewModel::saveAllowedDomainLimit,
         onWebNavigationBlockedChanged = viewModel::setInternetBlocked,
         onOnlyResultsChanged = viewModel::setOnlyResultsEnabled,
         onDagEnabledChanged = viewModel::setDagEnabled,
+        onDagExtraKosherEnabledChanged = viewModel::setDagExtraKosherEnabled,
         onProtectionArmedChanged = viewModel::setProtectionArmed,
         onAuthorizeSettings = viewModel::authorizeSettings,
         onAuthorizeRemoval = viewModel::authorizeRemoval,
@@ -160,9 +183,15 @@ private fun RulesScreen(
     onDeviceDeleted: (String) -> Unit,
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
+    onAllowedScheduleSaved: (RuleScope, String, List<AllowedScheduleWindowInput>) -> Unit,
+    onAllowDomainChanged: (String) -> Unit,
+    onAllowDomainMinutesChanged: (String) -> Unit,
+    onCreateAllowedDomain: () -> Unit,
+    onSaveAllowedDomainLimit: () -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
     onDagEnabledChanged: (Boolean) -> Unit,
+    onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
     onProtectionArmedChanged: (String, Boolean) -> Unit,
     onAuthorizeSettings: (String) -> Unit,
     onAuthorizeRemoval: (String) -> Unit,
@@ -188,12 +217,7 @@ private fun RulesScreen(
             onPairingUserNameChanged = onPairingUserNameChanged,
             onGeneratePairingCode = onGeneratePairingCode,
             onPairingCodeCopied = onPairingCodeCopied,
-            onDeviceSelected =
-                if (entryMode == RulesEntryMode.ManageUsers) {
-                    {}
-                } else {
-                    onDeviceSelected
-                },
+            onDeviceSelected = onDeviceSelected,
             onDeviceDeleted = onDeviceDeleted,
         )
     } else {
@@ -216,9 +240,15 @@ private fun RulesScreen(
             onDeleteAppGroup = onDeleteAppGroup,
             onAppAllowedChanged = onAppAllowedChanged,
             onAppLimitSaved = onAppLimitSaved,
+            onAllowedScheduleSaved = onAllowedScheduleSaved,
+            onAllowDomainChanged = onAllowDomainChanged,
+            onAllowDomainMinutesChanged = onAllowDomainMinutesChanged,
+            onCreateAllowedDomain = onCreateAllowedDomain,
+            onSaveAllowedDomainLimit = onSaveAllowedDomainLimit,
             onWebNavigationBlockedChanged = onWebNavigationBlockedChanged,
             onOnlyResultsChanged = onOnlyResultsChanged,
             onDagEnabledChanged = onDagEnabledChanged,
+            onDagExtraKosherEnabledChanged = onDagExtraKosherEnabledChanged,
             onProtectionArmedChanged = onProtectionArmedChanged,
             onAuthorizeSettings = onAuthorizeSettings,
             onAuthorizeRemoval = onAuthorizeRemoval,
@@ -282,6 +312,14 @@ private fun UsersListContent(
             onRefresh = onRefreshDevices,
             onBack = onBack,
         )
+        val bannerText = state.message.ifBlank { if (state.offlineMode) "Sin conexión. Mostrando datos guardados." else "" }
+        if (bannerText.isNotBlank()) {
+            FeedbackBanner(
+                text = bannerText,
+                modifier = Modifier.padding(horizontal = 16.dp),
+                isError = state.offlineMode || bannerText.startsWith("No se pudo"),
+            )
+        }
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -293,16 +331,6 @@ private fun UsersListContent(
                     bottom = 18.dp,
                 ),
         ) {
-            if (state.offlineMode) {
-                item {
-                    FeedbackBanner("Sin conexion. Mostrando datos guardados.", isError = true)
-                }
-            }
-            if (state.message.isNotBlank()) {
-                item {
-                    FeedbackBanner(state.message, isError = state.message.startsWith("No se pudo"))
-                }
-            }
             item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -659,7 +687,7 @@ private fun ProtectedUserCard(
                         onDismissRequest = { actionsExpanded = false },
                     ) {
                         DropdownMenuItem(
-                            text = { Text(if (deleting) "Borrando..." else "Borrar") },
+                            text = { Text(if (deleting) "Archivando..." else "Archivar") },
                             enabled = !deleting,
                             onClick = {
                                 actionsExpanded = false
@@ -674,10 +702,10 @@ private fun ProtectedUserCard(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Borrar usuario") },
+            title = { Text("Archivar usuario") },
             text = {
                 Text(
-                    "El usuario perderá acceso de inmediato y se ocultarán sus apps, reglas, activaciones y solicitudes. Se conservará un registro de auditoría.",
+                    "El usuario perderá acceso de inmediato y saldrá de la lista activa. Su configuración y auditoría se conservarán para poder restaurarlo después.",
                 )
             },
             confirmButton = {
@@ -688,9 +716,9 @@ private fun ProtectedUserCard(
                     },
                     enabled = !deleting,
                     modifier = Modifier,
-                    text = "Borrar definitivo",
-                    loadingText = "Borrando...",
-                    successText = "Borrado",
+                    text = "Archivar usuario",
+                    loadingText = "Archivando...",
+                    successText = "Archivado",
                     tone = ActionButtonTone.Destructive,
                 )
             },
@@ -821,9 +849,15 @@ private fun UserDetailContent(
     onDeleteAppGroup: (String) -> Unit,
     onAppAllowedChanged: (String, Boolean) -> Unit,
     onAppLimitSaved: (String, String) -> Unit,
+    onAllowedScheduleSaved: (RuleScope, String, List<AllowedScheduleWindowInput>) -> Unit,
+    onAllowDomainChanged: (String) -> Unit,
+    onAllowDomainMinutesChanged: (String) -> Unit,
+    onCreateAllowedDomain: () -> Unit,
+    onSaveAllowedDomainLimit: () -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
     onDagEnabledChanged: (Boolean) -> Unit,
+    onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
     onProtectionArmedChanged: (String, Boolean) -> Unit,
     onAuthorizeSettings: (String) -> Unit,
     onAuthorizeRemoval: (String) -> Unit,
@@ -833,6 +867,8 @@ private fun UserDetailContent(
     onDelete: (PolicyRule) -> Unit,
 ) {
     var appFilter by remember(selectedDevice.id) { mutableStateOf(AppQuickFilter.All) }
+    var scheduleAppPackage by rememberSaveable(selectedDevice.id) { mutableStateOf<String?>(null) }
+    var scheduleDomain by rememberSaveable(selectedDevice.id) { mutableStateOf<String?>(null) }
     var searchExpanded by rememberSaveable(selectedDevice.id) { mutableStateOf(state.appSearchQuery.isNotBlank()) }
     val listState = rememberLazyListState()
     val scrollHeaderProgress =
@@ -892,6 +928,23 @@ private fun UserDetailContent(
             when (selectedPanel) {
                 DevicePanel.Apps -> {
                     item {
+                        AllowedScheduleEditor(
+                            title = "Horario global de aplicaciones",
+                            rules =
+                                state.rules.filter {
+                                    it.scope == RuleScope.App &&
+                                        it.scheduleTarget() == PolicySchedulePolicy.WildcardTarget
+                                },
+                            onSave = { windows ->
+                                onAllowedScheduleSaved(
+                                    RuleScope.App,
+                                    PolicySchedulePolicy.WildcardTarget,
+                                    windows,
+                                )
+                            },
+                        )
+                    }
+                    item {
                         AppsToolbar(
                             apps = state.appControls,
                             selectedFilter = appFilter,
@@ -918,11 +971,35 @@ private fun UserDetailContent(
                         }
                     }
                     items(displayedApps, key = { it.packageName }) { app ->
-                        AppControlCard(
-                            app = app,
-                            onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },
-                            onLimitSaved = { minutes -> onAppLimitSaved(app.packageName, minutes) },
-                        )
+                        val appScheduleRules =
+                            state.rules.filter {
+                                it.scope == RuleScope.App && it.scheduleTarget() == app.packageName
+                            }
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            AppControlCard(
+                                app = app,
+                                scheduleConfigured = appScheduleRules.any { it.activeWindow != null },
+                                onAllowedChanged = { allowed -> onAppAllowedChanged(app.packageName, allowed) },
+                                onLimitSaved = { minutes -> onAppLimitSaved(app.packageName, minutes) },
+                                onScheduleClick = {
+                                    scheduleAppPackage =
+                                        app.packageName.takeUnless { it == scheduleAppPackage }
+                                },
+                            )
+                            if (scheduleAppPackage == app.packageName) {
+                                AllowedScheduleEditor(
+                                    title = "Horario de ${app.appName}",
+                                    rules = appScheduleRules,
+                                    onSave = { windows ->
+                                        onAllowedScheduleSaved(
+                                            RuleScope.App,
+                                            app.packageName,
+                                            windows,
+                                        )
+                                    },
+                                )
+                            }
+                        }
                     }
                     if (otherRules.isNotEmpty()) {
                         item {
@@ -958,6 +1035,23 @@ private fun UserDetailContent(
                 }
                 DevicePanel.Web -> {
                     item {
+                        AllowedScheduleEditor(
+                            title = "Horario global de Web",
+                            rules =
+                                state.rules.filter {
+                                    it.scope == RuleScope.Domain &&
+                                        it.scheduleTarget() == PolicySchedulePolicy.WildcardTarget
+                                },
+                            onSave = { windows ->
+                                onAllowedScheduleSaved(
+                                    RuleScope.Domain,
+                                    PolicySchedulePolicy.WildcardTarget,
+                                    windows,
+                                )
+                            },
+                        )
+                    }
+                    item {
                         WebNavigationPanel(
                             blocked = state.internetBlocked,
                             onlyResultsEnabled = state.onlyResultsEnabled,
@@ -967,11 +1061,76 @@ private fun UserDetailContent(
                             dagEnabled = state.dagEnabled,
                             dagEntitled = state.dagEntitled,
                             dagSaving = state.pendingDagEnabled != null,
+                            dagExtraKosherEnabled = state.dagExtraKosherEnabled,
+                            dagExtraKosherSaving = state.pendingDagExtraKosherEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
                             onOnlyResultsChanged = onOnlyResultsChanged,
                             onDagEnabledChanged = onDagEnabledChanged,
+                            onDagExtraKosherEnabledChanged = onDagExtraKosherEnabledChanged,
                         )
+                    }
+                    item {
+                        DomainRuleEditor(
+                            domain = state.allowDomain,
+                            minutes = state.allowDomainMinutes,
+                            saving = state.internetSaving,
+                            onDomainChanged = onAllowDomainChanged,
+                            onMinutesChanged = onAllowDomainMinutesChanged,
+                            onAllow = onCreateAllowedDomain,
+                            onAllowWithLimit = onSaveAllowedDomainLimit,
+                        )
+                    }
+                    val domainRules =
+                        state.rules.filter {
+                            it.scope == RuleScope.Domain &&
+                                it.target != PolicySchedulePolicy.WildcardTarget &&
+                                !it.target.startsWith("__")
+                        }
+                    val domainTargets = domainRules.map(PolicyRule::target).distinct().sorted()
+                    if (domainTargets.isNotEmpty()) {
+                        item {
+                            ProductSectionHeader(title = "Sitios configurados", count = domainTargets.size)
+                        }
+                    }
+                    items(domainTargets, key = { "domain-$it" }) { target ->
+                        val targetRules = domainRules.filter { it.target == target }
+                        val scheduleRules =
+                            state.rules.filter {
+                                it.scope == RuleScope.Domain && it.scheduleTarget() == target
+                            }
+                        val regularRules = targetRules.filterNot { it.isScheduleRule() }
+                        val dailyLimit =
+                            state.limits.firstOrNull {
+                                it.targetType == PolicyTargetType.Domain && it.target == target
+                            }
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            regularRules.forEach { rule ->
+                                RuleCard(
+                                    rule = rule,
+                                    dailyLimitMinutes = dailyLimit?.limitMinutes,
+                                    onToggle = { onToggle(rule) },
+                                    onDelete = { onDelete(rule) },
+                                )
+                            }
+                            OutlinedButton(
+                                modifier = Modifier.fillMaxWidth(),
+                                onClick = { scheduleDomain = target.takeUnless { it == scheduleDomain } },
+                            ) {
+                                Text(
+                                    if (scheduleRules.isEmpty()) "Agregar horario a $target" else "Editar horario de $target",
+                                )
+                            }
+                            if (scheduleDomain == target) {
+                                AllowedScheduleEditor(
+                                    title = "Horario de $target",
+                                    rules = scheduleRules,
+                                    onSave = { windows ->
+                                        onAllowedScheduleSaved(RuleScope.Domain, target, windows)
+                                    },
+                                )
+                            }
+                        }
                     }
                 }
                 DevicePanel.Protection -> {
@@ -980,7 +1139,7 @@ private fun UserDetailContent(
                             state = state,
                             device = selectedDevice,
                             clipboardManager = LocalClipboardManager.current,
-                            onArmedChanged = { armed -> onProtectionArmedChanged(selectedDevice.id, armed) },
+                            onArmProtection = { onProtectionArmedChanged(selectedDevice.id, true) },
                             onAuthorizeSettings = { onAuthorizeSettings(selectedDevice.id) },
                             onAuthorizeRemoval = { onAuthorizeRemoval(selectedDevice.id) },
                             onGenerateRecoveryCode = { onGenerateRecoveryCode(selectedDevice.id) },
@@ -1106,6 +1265,49 @@ private fun AppsToolbar(
 }
 
 @Composable
+private fun DomainRuleEditor(
+    domain: String,
+    minutes: String,
+    saving: Boolean,
+    onDomainChanged: (String) -> Unit,
+    onMinutesChanged: (String) -> Unit,
+    onAllow: () -> Unit,
+    onAllowWithLimit: () -> Unit,
+) {
+    ProductCard {
+        Text("Agregar sitio", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Podés permitir un sitio, limitar sus minutos por DNS o agregarle después un horario exacto.",
+            style = MaterialTheme.typography.bodyMedium,
+            color = HeaderMuted,
+        )
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = domain,
+            onValueChange = onDomainChanged,
+            label = { Text("Dominio") },
+            placeholder = { Text("ejemplo.com") },
+            singleLine = true,
+        )
+        OutlinedTextField(
+            modifier = Modifier.fillMaxWidth(),
+            value = minutes,
+            onValueChange = onMinutesChanged,
+            label = { Text("Minutos DNS opcionales") },
+            supportingText = { Text("Es una aproximación técnica; no equivale a tiempo real de lectura.") },
+            singleLine = true,
+        )
+        Button(
+            modifier = Modifier.fillMaxWidth(),
+            enabled = !saving && domain.isNotBlank(),
+            onClick = if (minutes.isBlank()) onAllow else onAllowWithLimit,
+        ) {
+            Text(if (minutes.isBlank()) "Permitir sitio" else "Permitir con límite aproximado")
+        }
+    }
+}
+
+@Composable
 private fun WebNavigationPanel(
     blocked: Boolean,
     onlyResultsEnabled: Boolean,
@@ -1115,10 +1317,13 @@ private fun WebNavigationPanel(
     dagEnabled: Boolean,
     dagEntitled: Boolean,
     dagSaving: Boolean,
+    dagExtraKosherEnabled: Boolean,
+    dagExtraKosherSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
     onDagEnabledChanged: (Boolean) -> Unit,
+    onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
 ) {
     ProductCard {
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
@@ -1174,6 +1379,15 @@ private fun WebNavigationPanel(
                 enabled = dagEntitled && !dagSaving,
                 saving = dagSaving,
                 onCheckedChange = onDagEnabledChanged,
+            )
+            WebSwitchRow(
+                title = "Modo Extra Kosher",
+                description =
+                    "Difumina todas las fotos de contenido; conserva logos, iconos y controles esenciales. Los videos permanecen bloqueados.",
+                checked = dagExtraKosherEnabled,
+                enabled = dagEnabled && dagEntitled && !dagExtraKosherSaving,
+                saving = dagExtraKosherSaving,
+                onCheckedChange = onDagExtraKosherEnabledChanged,
             )
             if (blocked && !protectionActive) {
                 FeedbackBanner(
@@ -1447,7 +1661,7 @@ private fun UserDetailHeader(
                 }
             }
         }
-        if (entryMode == RulesEntryMode.Apps) {
+        if (entryMode != RulesEntryMode.Web) {
             Row(
                 modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -1487,6 +1701,21 @@ private fun UserDetailHeader(
                         Text("Apps en grupo")
                     }
                 }
+                if (selectedPanel == DevicePanel.Web) {
+                    Button(
+                        onClick = { },
+                        shape = RoundedCornerShape(tabShape),
+                    ) {
+                        Text("Web")
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = { onPanelSelected(DevicePanel.Web) },
+                        shape = RoundedCornerShape(tabShape),
+                    ) {
+                        Text("Web")
+                    }
+                }
                 if (selectedPanel == DevicePanel.Protection) {
                     Button(
                         onClick = { },
@@ -1512,7 +1741,7 @@ private fun ProtectionPanel(
     state: RulesUiState,
     device: UserDeviceUiState,
     clipboardManager: androidx.compose.ui.platform.ClipboardManager,
-    onArmedChanged: (Boolean) -> Unit,
+    onArmProtection: () -> Unit,
     onAuthorizeSettings: () -> Unit,
     onAuthorizeRemoval: () -> Unit,
     onGenerateRecoveryCode: () -> Unit,
@@ -1540,10 +1769,9 @@ private fun ProtectionPanel(
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
-            Switch(
-                checked = control?.armed == true,
-                enabled = !loading,
-                onCheckedChange = onArmedChanged,
+            StatusChip(
+                if (control?.armed == true) "Obligatoria" else "Requiere activación",
+                if (control?.armed == true) ActiveGreen else MaterialTheme.colorScheme.error,
             )
         }
         if (control == null) {
@@ -1554,15 +1782,25 @@ private fun ProtectionPanel(
                 style = MaterialTheme.typography.bodySmall,
             )
         }
+        if (control?.armed != true) {
+            Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onArmProtection) {
+                Text("Activar protección obligatoria")
+            }
+        }
     }
     ProductCard {
         Text("Permisos temporales", style = MaterialTheme.typography.titleMedium)
-        Text("Cada permiso vence automáticamente a los 10 minutos.", style = MaterialTheme.typography.bodyMedium)
+        Text("Cada permiso vence automáticamente a los 30 minutos.", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            text = control.authorizationStatusLabel(),
+            style = MaterialTheme.typography.bodySmall,
+            color = HeaderMuted,
+        )
         Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeSettings) {
-            Text("Permitir ajustes protegidos")
+            Text("Permitir mantenimiento")
         }
         OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
-            Text("Autorizar desinstalación")
+            Text("Permitir desinstalación")
         }
     }
     ProductCard {
@@ -1587,6 +1825,21 @@ private fun ProtectionPanel(
                 Text("Copiar y ocultar")
             }
         }
+    }
+}
+
+private fun DeviceProtectionControl?.authorizationStatusLabel(
+    nowEpochMillis: Long = System.currentTimeMillis(),
+): String {
+    val control = this ?: return "Sin permisos temporales activos."
+    val expiresAt = control.authorizationExpiresAtEpochMillis ?: return "Sin permisos temporales activos."
+    val remainingMillis = expiresAt - nowEpochMillis
+    if (remainingMillis <= 0) return "Los permisos temporales vencieron; la protección se reactivó automáticamente."
+    val remainingMinutes = ((remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
+    return when (control.authorizationScope) {
+        ProtectionAuthorizationScope.Settings -> "Mantenimiento habilitado · quedan $remainingMinutes min."
+        ProtectionAuthorizationScope.Removal -> "Desinstalación habilitada · quedan $remainingMinutes min."
+        ProtectionAuthorizationScope.None -> "Sin permisos temporales activos."
     }
 }
 
@@ -1671,7 +1924,7 @@ private fun AppGroupsPanel(
         Text("Apps disponibles", style = MaterialTheme.typography.labelLarge)
         val selectedPackages = state.groupSelectedPackages
         val selectedApps = state.appControls.filter { it.packageName in selectedPackages }
-        val selectableApps = state.appControls.filter { it.packageName !in selectedPackages }.take(10)
+        val selectableApps = state.appControls.filter { it.packageName !in selectedPackages }
         if (state.appControls.isEmpty()) {
             Text(
                 "Actualizá apps o buscá el usuario para armar el grupo.",

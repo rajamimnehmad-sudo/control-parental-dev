@@ -15,6 +15,7 @@ import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.dagEnabled
+import com.contentfilter.core.domain.model.dagExtraKosherEnabled
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -147,6 +148,7 @@ internal fun List<PolicyRule>.webPolicyPreferences(): WebPolicyPreferences =
         externalSearchResultsAllowed = externalSearchResultsAllowed(),
         safeSearchEnabled = safeSearchEnabled(),
         dagEnabled = dagEnabled(),
+        dagExtraKosherEnabled = dagExtraKosherEnabled(),
     )
 
 internal fun List<PolicyRule>.webPolicyChanges(
@@ -214,6 +216,12 @@ internal fun List<PolicyRule>.webPolicyChanges(
         enabled = desired.dagEnabled,
         priority = WebNavigationBlockPriority + 30,
     )
+    planCanonical(
+        target = WebNavigationPolicy.DagExtraKosherTarget,
+        action = RuleAction.Allow,
+        enabled = desired.dagExtraKosherEnabled,
+        priority = WebNavigationBlockPriority + 40,
+    )
 
     working
         .filter { rule ->
@@ -233,7 +241,8 @@ private fun PolicyRule.isCanonicalWebPreference(): Boolean =
     (target == WebNavigationPolicy.RuleTarget && action == RuleAction.Block) ||
         (target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget && action == RuleAction.Allow) ||
         (target == WebNavigationPolicy.SafeSearchTarget && action == RuleAction.Allow) ||
-        (target == WebNavigationPolicy.DagEnabledTarget && action == RuleAction.Allow)
+        (target == WebNavigationPolicy.DagEnabledTarget && action == RuleAction.Allow) ||
+        (target == WebNavigationPolicy.DagExtraKosherTarget && action == RuleAction.Allow)
 
 internal fun webRuleId(
     deviceId: String,
@@ -246,6 +255,7 @@ internal data class WebPolicyPreferences(
     val externalSearchResultsAllowed: Boolean,
     val safeSearchEnabled: Boolean,
     val dagEnabled: Boolean,
+    val dagExtraKosherEnabled: Boolean,
 )
 
 internal enum class WebPolicyPreference {
@@ -253,6 +263,7 @@ internal enum class WebPolicyPreference {
     ExternalSearchResultsAllowed,
     SafeSearchEnabled,
     DagEnabled,
+    DagExtraKosherEnabled,
 }
 
 internal fun WebPolicyPreferences.withPreference(
@@ -264,6 +275,7 @@ internal fun WebPolicyPreferences.withPreference(
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(externalSearchResultsAllowed = enabled)
         WebPolicyPreference.SafeSearchEnabled -> copy(safeSearchEnabled = true)
         WebPolicyPreference.DagEnabled -> copy(dagEnabled = enabled)
+        WebPolicyPreference.DagExtraKosherEnabled -> copy(dagExtraKosherEnabled = enabled)
     }
 
 internal fun List<PolicyRule>.webPolicyPreferenceChanges(
@@ -285,6 +297,7 @@ internal fun RulesUiState.withPendingWebPreference(
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = enabled)
         WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = enabled)
         WebPolicyPreference.DagEnabled -> copy(pendingDagEnabled = enabled)
+        WebPolicyPreference.DagExtraKosherEnabled -> copy(pendingDagExtraKosherEnabled = enabled)
     }
 
 internal fun RulesUiState.clearPendingWebPreference(preference: WebPolicyPreference): RulesUiState =
@@ -293,6 +306,7 @@ internal fun RulesUiState.clearPendingWebPreference(preference: WebPolicyPrefere
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = null)
         WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = null)
         WebPolicyPreference.DagEnabled -> copy(pendingDagEnabled = null)
+        WebPolicyPreference.DagExtraKosherEnabled -> copy(pendingDagExtraKosherEnabled = null)
     }
 
 internal fun List<PolicyRule>.webNavigationOpenWithoutAuxiliaryBlocks(): Boolean =

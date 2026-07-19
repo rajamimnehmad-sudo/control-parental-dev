@@ -42,6 +42,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
@@ -90,10 +91,12 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.alerts.AdminAlertsRoute
-import com.contentfilter.admin.alerts.AdminAlertsViewModel
 import com.contentfilter.admin.announcements.AdminAnnouncementsRoute
+import com.contentfilter.admin.announcements.AdminAnnouncementsViewModel
 import com.contentfilter.admin.auth.AdminAuthRoute
 import com.contentfilter.admin.dashboard.DashboardRoute
+import com.contentfilter.admin.dashboard.DashboardViewModel
+import com.contentfilter.admin.dashboard.ProtectedUserHealthUiState
 import com.contentfilter.admin.push.AdminProtectionAlertPayload
 import com.contentfilter.admin.push.AdminPushViewModel
 import com.contentfilter.admin.push.AlertTypeKey
@@ -109,9 +112,14 @@ import com.contentfilter.admin.rules.RulesRoute
 import com.contentfilter.admin.updates.AdminUpdatesRoute
 import com.contentfilter.admin.updates.AdminUpdatesStatus
 import com.contentfilter.admin.updates.AdminUpdatesViewModel
+import com.contentfilter.core.domain.model.LicenseState
+import com.contentfilter.core.domain.model.allowsProtection
 import com.contentfilter.core.ui.ContentFilterTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
@@ -160,6 +168,7 @@ private fun AdminAppRoot(
 ) {
     var tab by rememberSaveable { mutableStateOf(AdminTab.Home) }
     var section by rememberSaveable { mutableStateOf<AdminSection?>(null) }
+    var requestedUserId by rememberSaveable { mutableStateOf<String?>(null) }
     var requestsRefreshKey by rememberSaveable { mutableStateOf(0) }
     val context = LocalContext.current
     val rootViewModel: AdminRootViewModel = hiltViewModel()
@@ -272,6 +281,21 @@ private fun AdminAppRoot(
                     ) {
                         AdminAlertsRoute()
                     }
+                AdminSection.ProtectionStatus ->
+                    SectionContainer(
+                        title = "Estado de protección",
+                        subtitle = "Usuarios que requieren atención",
+                        onBack = { section = null },
+                    ) {
+                        ProtectionStatusRoute(
+                            onOpenUser = { deviceId ->
+                                requestedUserId = deviceId
+                                section = null
+                                tab = AdminTab.Users
+                            },
+                            onOpenAlerts = { section = AdminSection.Alerts },
+                        )
+                    }
                 AdminSection.Announcements ->
                     SectionContainer(
                         title = "Avisos",
@@ -292,20 +316,28 @@ private fun AdminAppRoot(
                     when (tab) {
                         AdminTab.Home ->
                             HomeTab(
-                                onManageUsers = { section = AdminSection.ManageUsers },
+                                onManageUsers = { tab = AdminTab.Users },
                                 onRequests = {
                                     requestsRefreshKey += 1
-                                    section = AdminSection.Requests
+                                    tab = AdminTab.Requests
                                 },
-                                onAlerts = { section = AdminSection.Alerts },
+                                onProtectionStatus = { section = AdminSection.ProtectionStatus },
                                 onAnnouncements = { section = AdminSection.Announcements },
                             )
-                        AdminTab.Community ->
-                            CommunityTab(
-                                onApps = { section = AdminSection.Apps },
-                                onWeb = { section = AdminSection.Web },
+                        AdminTab.Users ->
+                            RulesRoute(
+                                entryMode = RulesEntryMode.ManageUsers,
+                                initialDeviceId = requestedUserId,
+                                onInitialDeviceConsumed = { requestedUserId = null },
                             )
-                        AdminTab.Settings ->
+                        AdminTab.Requests ->
+                            SectionContainer(
+                                title = "Solicitudes",
+                                subtitle = "Permisos y tiempo extra pendientes",
+                            ) {
+                                AdminRequestsRoute(refreshKey = requestsRefreshKey)
+                            }
+                        AdminTab.Account ->
                             SettingsTab(
                                 onPanel = { section = AdminSection.Panel },
                                 onUpdates = { section = AdminSection.Updates },
@@ -326,7 +358,7 @@ private fun AdminAppRoot(
             },
             dismissButton = {
                 OutlinedButton(onClick = {
-                    tab = AdminTab.Settings
+                    tab = AdminTab.Account
                     section = AdminSection.Updates
                 }) {
                     Text("Ver")
@@ -345,7 +377,7 @@ private fun AdminAppRoot(
             },
             dismissButton = {
                 OutlinedButton(onClick = {
-                    tab = AdminTab.Settings
+                    tab = AdminTab.Account
                     section = AdminSection.Updates
                 }) {
                     Text("Ver")
@@ -359,68 +391,280 @@ private fun AdminAppRoot(
 private fun HomeTab(
     onManageUsers: () -> Unit,
     onRequests: () -> Unit,
-    onAlerts: () -> Unit,
+    onProtectionStatus: () -> Unit,
     onAnnouncements: () -> Unit,
 ) {
-    val alertsViewModel: AdminAlertsViewModel = hiltViewModel()
-    val alertsState by alertsViewModel.uiState.collectAsStateWithLifecycle()
-    VisualPage(
-        title = "Hola",
-        subtitle = "Tu panel de administración está listo",
-        headerAction = {
-            Box {
-                IconButton(onClick = onAlerts) {
-                    Icon(Icons.Filled.Notifications, contentDescription = "Abrir alertas de seguridad")
+    val dashboardViewModel: DashboardViewModel = hiltViewModel()
+    val dashboardState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
+    val announcementsViewModel: AdminAnnouncementsViewModel = hiltViewModel()
+    val announcementsState by announcementsViewModel.state.collectAsStateWithLifecycle()
+    Column(modifier = Modifier.fillMaxSize().background(AppBackground)) {
+        AdminHomeHeader(
+            administratorName = dashboardState.guideName.ifBlank { "Administrador" },
+            communityName = dashboardState.communityName,
+            licenseState = dashboardState.licenseState,
+            licenseExpiresAtEpochMillis = dashboardState.licenseExpiresAtEpochMillis,
+            announcementCount = announcementsState.items.size,
+            onAnnouncements = onAnnouncements,
+        )
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 18.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            ProtectionSummaryCard(
+                users = dashboardState.protectedUsers,
+                licenseState = dashboardState.licenseState,
+                onClick = onProtectionStatus,
+            )
+            FeatureTile(
+                icon = Icons.Filled.Person,
+                title = "Agregar usuario",
+                subtitle = "Crear y vincular un nuevo usuario",
+                accent = Sky,
+                onClick = onManageUsers,
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                StatCard(
+                    value = dashboardState.activeUserCount.toString(),
+                    label = "usuarios activos",
+                    accent = Teal,
+                    modifier = Modifier.weight(1f),
+                )
+                StatCard(
+                    value = dashboardState.pendingRequests.toString(),
+                    label = "solicitudes pendientes",
+                    accent = Sun,
+                    modifier = Modifier.weight(1f).clickable(onClick = onRequests),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun AdminHomeHeader(
+    administratorName: String,
+    communityName: String,
+    licenseState: LicenseState,
+    licenseExpiresAtEpochMillis: Long?,
+    announcementCount: Int,
+    onAnnouncements: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.linearGradient(listOf(Color(0xFF172033), Color(0xFF263A5A))),
+                    shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
+                )
+                .statusBarsPadding()
+                .padding(start = 20.dp, top = 18.dp, end = 14.dp, bottom = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = "Hola, $administratorName (ADM)",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
+                )
+                if (communityName.isNotBlank()) {
+                    Text(
+                        text = communityName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.72f),
+                    )
                 }
-                if (alertsState.alerts.isNotEmpty()) {
+            }
+            Box {
+                IconButton(onClick = onAnnouncements) {
+                    Icon(
+                        imageVector = Icons.Filled.Notifications,
+                        contentDescription = "Abrir avisos de Superweb",
+                        tint = Color.White,
+                    )
+                }
+                if (announcementCount > 0) {
                     Box(
                         modifier =
                             Modifier
                                 .align(Alignment.TopEnd)
                                 .size(20.dp)
-                                .clip(CircleShape)
-                                .background(MaterialTheme.colorScheme.error),
+                                .background(Color(0xFFFF5C65), CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Text(
-                            alertsState.alerts.size.coerceAtMost(99).toString(),
+                            text = announcementCount.coerceAtMost(99).toString(),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color.White,
                         )
                     }
                 }
             }
-        },
+        }
+        Text(
+            modifier =
+                Modifier
+                    .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            text = licenseSummary(licenseState, licenseExpiresAtEpochMillis),
+            style = MaterialTheme.typography.labelMedium,
+            color = licenseState.homeColor,
+        )
+    }
+}
+
+@Composable
+private fun ProtectionSummaryCard(
+    users: List<ProtectedUserHealthUiState>,
+    licenseState: LicenseState,
+    onClick: () -> Unit,
+) {
+    val affectedCount = users.count(ProtectedUserHealthUiState::hasConfirmedProblem)
+    val pendingCount = users.count(ProtectedUserHealthUiState::requiresVerification)
+    val cardState = protectionCardState(licenseState, users.size, affectedCount, pendingCount)
+    val accent = cardState.color
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = accent.copy(alpha = 0.10f)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
-        AdminHeroCard()
-        FeatureTile(
-            icon = Icons.Filled.Person,
-            title = "Administrar usuarios",
-            subtitle = "Ver, agregar y borrar usuarios",
-            accent = Sky,
-            onClick = onManageUsers,
-        )
-        FeatureTile(
-            icon = Icons.Filled.Notifications,
-            title = "Solicitudes",
-            subtitle = "Aprobar accesos y tiempo extra",
-            accent = Sun,
-            onClick = onRequests,
-        )
-        FeatureTile(
-            icon = Icons.Filled.Notifications,
-            title = "Alertas de seguridad",
-            subtitle = "Ver protecciones desactivadas",
-            accent = Color(0xFFFF8A80),
-            onClick = onAlerts,
-        )
-        FeatureTile(
-            icon = Icons.Filled.Notifications,
-            title = "Avisos",
-            subtitle = "Mensajes de tu comunidad",
-            accent = Mint,
-            onClick = onAnnouncements,
-        )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(14.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ProtectionShield(count = affectedCount, color = accent)
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text("Estado de protección de usuarios", style = MaterialTheme.typography.titleMedium, color = Ink)
+                Text(
+                    text = cardState.summary,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = accent,
+                )
+            }
+            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = accent)
+        }
+    }
+}
+
+@Composable
+private fun ProtectionShield(
+    count: Int,
+    color: Color,
+) {
+    Box(
+        modifier = Modifier.size(52.dp).background(color.copy(alpha = 0.14f), RoundedCornerShape(16.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Canvas(modifier = Modifier.size(30.dp)) {
+            val shield =
+                Path().apply {
+                    moveTo(size.width / 2f, 1f)
+                    lineTo(size.width - 2f, size.height * 0.22f)
+                    lineTo(size.width * 0.85f, size.height * 0.72f)
+                    quadraticTo(size.width / 2f, size.height, size.width * 0.15f, size.height * 0.72f)
+                    lineTo(2f, size.height * 0.22f)
+                    close()
+                }
+            drawPath(path = shield, color = color)
+        }
+        if (count > 0) {
+            Text(count.coerceAtMost(99).toString(), style = MaterialTheme.typography.labelSmall, color = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun ProtectionStatusRoute(
+    onOpenUser: (String) -> Unit,
+    onOpenAlerts: () -> Unit,
+) {
+    val viewModel: DashboardViewModel = hiltViewModel()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val affectedUsers = state.usersRequiringAttention
+    val pendingUsers = state.usersPendingVerification
+    Column(
+        modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (!state.licenseState.allowsProtection()) {
+            LargeFeatureCard(
+                title = "Protección suspendida por licencia",
+                subtitle = "Revisa el estado de la licencia en Cuenta para recuperar la protección.",
+                accent = MaterialTheme.colorScheme.error,
+            )
+        } else if (affectedUsers.isEmpty() && pendingUsers.isEmpty() && state.protectedUsers.isNotEmpty()) {
+            LargeFeatureCard(
+                title = "Todos protegidos",
+                subtitle = "VPN, Accesibilidad y Administrador del dispositivo están activos.",
+                accent = Color(0xFF17895D),
+            )
+        } else if (affectedUsers.isEmpty() && pendingUsers.isEmpty()) {
+            LargeFeatureCard(
+                title = "Sin usuarios vinculados",
+                subtitle = "Agrega un usuario para comenzar a supervisar su protección.",
+                accent = Sun,
+            )
+        }
+        if (affectedUsers.isNotEmpty()) {
+            affectedUsers.forEach { user ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onOpenUser(user.id) },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(user.name, style = MaterialTheme.typography.titleMedium)
+                        if (user.vpnProblem) Text("VPN desactivada")
+                        if (user.accessibilityProblem) Text("Accesibilidad desactivada")
+                        if (user.deviceAdminProblem) Text("Administrador del dispositivo desactivado")
+                    }
+                }
+            }
+        }
+        if (pendingUsers.isNotEmpty()) {
+            Text("Pendientes de verificación", style = MaterialTheme.typography.titleMedium, color = Ink)
+            pendingUsers.forEach { user ->
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    onClick = { onOpenUser(user.id) },
+                    shape = RoundedCornerShape(18.dp),
+                    colors = CardDefaults.cardColors(containerColor = Sun.copy(alpha = 0.16f)),
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp),
+                    ) {
+                        Text(user.name, style = MaterialTheme.typography.titleMedium)
+                        Text(
+                            if (user.isRecentlySeen) {
+                                "Esperando confirmar todos los componentes"
+                            } else {
+                                "Sin conexión reciente"
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onOpenAlerts) {
+            Text("Ver alertas recientes")
+        }
     }
 }
 
@@ -1061,6 +1305,8 @@ private fun SettingsTab(
     onPanel: () -> Unit,
     onUpdates: () -> Unit,
 ) {
+    val dashboardViewModel: DashboardViewModel = hiltViewModel()
+    val state by dashboardViewModel.uiState.collectAsStateWithLifecycle()
     Column(
         modifier =
             Modifier
@@ -1076,11 +1322,25 @@ private fun SettingsTab(
                     .padding(horizontal = 18.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
-            PageHeader(title = "Ajustes", subtitle = "Herramientas de administración")
-            LargeFeatureCard(
-                title = "Control general",
-                subtitle = "Configuración, estado y versiones desde un solo lugar.",
+            PageHeader(title = "Cuenta", subtitle = "Licencia, estado y versión")
+            AccountStatusCard(
+                title = state.guideName.ifBlank { "Administrador" },
+                lines =
+                    listOfNotNull(
+                        "Rol: Administrador (ADM)",
+                        state.communityName.takeIf(String::isNotBlank)?.let { "Comunidad: $it" },
+                        "Superweb: ${if (state.offlineMode) "sin conexión" else "sincronización ${state.syncState.lowercase()}"}",
+                    ),
                 accent = Violet,
+            )
+            AccountStatusCard(
+                title = licenseSummary(state.licenseState, state.licenseExpiresAtEpochMillis),
+                lines =
+                    listOfNotNull(
+                        state.licenseExpiresAtEpochMillis?.let { "Vencimiento: ${formatArgentinaDate(it)}" },
+                        licenseEffectText(state.licenseState),
+                    ),
+                accent = state.licenseState.accountColor,
             )
             FeatureTile(
                 icon = Icons.Filled.Settings,
@@ -1106,6 +1366,34 @@ private fun SettingsTab(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+    }
+}
+
+@Composable
+private fun AccountStatusCard(
+    title: String,
+    lines: List<String>,
+    accent: Color,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(18.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.Top,
+        ) {
+            Box(modifier = Modifier.size(12.dp).background(accent, CircleShape))
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text(title, style = MaterialTheme.typography.titleMedium, color = Ink)
+                lines.forEach { line ->
+                    Text(line, style = MaterialTheme.typography.bodyMedium, color = MutedInk)
+                }
+            }
+        }
     }
 }
 
@@ -1334,7 +1622,7 @@ private fun NavGlyph(
 private fun SectionContainer(
     title: String,
     subtitle: String,
-    onBack: () -> Unit,
+    onBack: (() -> Unit)? = null,
     content: @Composable () -> Unit,
 ) {
     Column(
@@ -1365,8 +1653,9 @@ private enum class AdminTab(
     val icon: ImageVector,
 ) {
     Home("Home", Icons.Filled.Home),
-    Community("Comunidad", Icons.Filled.Person),
-    Settings("Ajustes", Icons.Filled.Settings),
+    Users("Usuarios", Icons.Filled.Person),
+    Requests("Solicitudes", Icons.AutoMirrored.Filled.List),
+    Account("Cuenta", Icons.Filled.Settings),
 }
 
 private enum class AdminSection {
@@ -1376,6 +1665,7 @@ private enum class AdminSection {
     ManageUsers,
     Requests,
     Alerts,
+    ProtectionStatus,
     Announcements,
     Updates,
 }
@@ -1388,3 +1678,90 @@ private val Sky = Color(0xFF2C9AF4)
 private val Sun = Color(0xFFFFC849)
 private val Mint = Color(0xFF55E1B8)
 private val Violet = Color(0xFF6C63FF)
+
+private fun licenseSummary(
+    state: LicenseState,
+    expiresAtEpochMillis: Long?,
+): String {
+    val daysRemaining =
+        expiresAtEpochMillis?.let { expiresAt ->
+            ChronoUnit.DAYS.between(
+                Instant.now().atZone(ArgentinaZone).toLocalDate(),
+                Instant.ofEpochMilli(expiresAt).atZone(ArgentinaZone).toLocalDate(),
+            ).coerceAtLeast(0)
+        }
+    val stateLabel =
+        when (state) {
+            LicenseState.Active -> "Licencia activa"
+            LicenseState.Scheduled -> "Licencia programada"
+            LicenseState.ExpiringSoon -> "Licencia por vencer"
+            LicenseState.Expired -> "Licencia vencida"
+            LicenseState.GracePeriod -> "Licencia en período de gracia"
+            LicenseState.Suspended -> "Licencia suspendida"
+            LicenseState.PendingActivation -> "Licencia pendiente"
+        }
+    return if (daysRemaining != null && state in setOf(LicenseState.Active, LicenseState.ExpiringSoon, LicenseState.GracePeriod)) {
+        "$stateLabel · $daysRemaining días restantes"
+    } else {
+        stateLabel
+    }
+}
+
+private fun formatArgentinaDate(epochMillis: Long): String {
+    val date = Instant.ofEpochMilli(epochMillis).atZone(ArgentinaZone).toLocalDate()
+    return "%02d/%02d/%04d".format(date.dayOfMonth, date.monthValue, date.year)
+}
+
+private fun licenseEffectText(state: LicenseState): String =
+    when (state) {
+        LicenseState.Active -> "La protección y las configuraciones están habilitadas."
+        LicenseState.ExpiringSoon -> "La protección continúa activa; conviene renovar antes del vencimiento."
+        LicenseState.GracePeriod -> "La protección continúa durante el período de gracia."
+        LicenseState.Scheduled -> "La licencia todavía no comenzó; la protección permanece suspendida."
+        LicenseState.Expired -> "La licencia venció y la protección está suspendida."
+        LicenseState.Suspended -> "La licencia fue suspendida y no permite aplicar protección."
+        LicenseState.PendingActivation -> "La licencia aún no está activa; la protección permanece suspendida."
+    }
+
+private val LicenseState.homeColor: Color
+    get() =
+        when (this) {
+            LicenseState.Active -> Color(0xFF89E4B3)
+            LicenseState.ExpiringSoon, LicenseState.GracePeriod, LicenseState.Scheduled -> Color(0xFFFFD166)
+            LicenseState.Expired, LicenseState.Suspended, LicenseState.PendingActivation -> Color(0xFFFF8A8A)
+        }
+
+private val LicenseState.accountColor: Color
+    get() =
+        when (this) {
+            LicenseState.Active -> Color(0xFF17895D)
+            LicenseState.ExpiringSoon, LicenseState.GracePeriod, LicenseState.Scheduled -> Color(0xFF9A6700)
+            LicenseState.Expired, LicenseState.Suspended, LicenseState.PendingActivation -> Color(0xFFBA1A1A)
+        }
+
+private enum class ProtectionCardState(
+    val summary: String,
+    val color: Color,
+) {
+    Healthy("Todos los usuarios están protegidos", Color(0xFF17895D)),
+    NeedsAttention("Hay usuarios que requieren atención", Color(0xFFBA1A1A)),
+    PendingVerification("Hay estados pendientes de verificar", Color(0xFF9A6700)),
+    LicenseBlocked("Protección suspendida por licencia", Color(0xFFBA1A1A)),
+    NoUsers("Todavía no hay usuarios vinculados", Color(0xFF9A6700)),
+}
+
+private fun protectionCardState(
+    licenseState: LicenseState,
+    userCount: Int,
+    affectedCount: Int,
+    pendingCount: Int,
+): ProtectionCardState =
+    when {
+        !licenseState.allowsProtection() -> ProtectionCardState.LicenseBlocked
+        affectedCount > 0 -> ProtectionCardState.NeedsAttention
+        userCount == 0 -> ProtectionCardState.NoUsers
+        pendingCount > 0 -> ProtectionCardState.PendingVerification
+        else -> ProtectionCardState.Healthy
+    }
+
+private val ArgentinaZone: ZoneId = ZoneId.of("America/Argentina/Buenos_Aires")

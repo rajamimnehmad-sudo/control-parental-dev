@@ -12,5 +12,6 @@ data class PolicyRule(
     val priority: Int,
     val enabled: Boolean,
     val activeWindow: PolicyTimeWindow? = null,
+    val activeDaysMask: Int = PolicyWeekdays.All,
     val safeSearchRequired: Boolean = false,
 )

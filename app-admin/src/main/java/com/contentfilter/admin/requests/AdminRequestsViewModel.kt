@@ -83,12 +83,20 @@ class AdminRequestsViewModel
                 localState,
             ) { requests, devices, local ->
                 val pendingRequests = requests.filter { it.status.isPending() }
-                val users = pendingRequests.toUserItems(devices)
+                val resolvedRequests = requests.filterNot { it.status.isPending() }
+                val users = requests.toUserItems(devices)
                 val resolvedSelected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
                 AdminRequestsUiState(
                     requests =
                         resolvedSelected?.let { selectedId ->
                             pendingRequests.filter { it.deviceGroupId == selectedId }
+                                .toRequestItems(local.apps)
+                        }.orEmpty(),
+                    resolvedRequests =
+                        resolvedSelected?.let { selectedId ->
+                            resolvedRequests
+                                .filter { it.deviceGroupId == selectedId }
+                                .sortedByDescending(AccessRequest::createdAtEpochMillis)
                                 .toRequestItems(local.apps)
                         }.orEmpty(),
                     users = users,
@@ -293,7 +301,8 @@ private fun List<AccessRequest>.toUserItems(devices: List<Device>): List<AdminRe
             AdminRequestUserUiState(
                 deviceId = deviceId,
                 name = devicesById[deviceId]?.displayName ?: "Usuario",
-                pendingCount = requests.size,
+                pendingCount = requests.count { it.status.isPending() },
+                resolvedCount = requests.count { !it.status.isPending() },
             )
         }
         .sortedWith(

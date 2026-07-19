@@ -73,6 +73,7 @@ enum class DagPageStatus {
 data class DagBrowserUiState(
     val dagAvailabilityKnown: Boolean = false,
     val dagEnabled: Boolean = false,
+    val dagExtraKosherEnabled: Boolean = false,
     val address: String = "",
     val view: DagView = DagView.Start,
     val pageStatus: DagPageStatus = DagPageStatus.Idle,

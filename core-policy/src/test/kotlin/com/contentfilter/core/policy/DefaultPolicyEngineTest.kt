@@ -10,8 +10,11 @@ import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicySchedulePolicy
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.PolicyTimeWindow
+import com.contentfilter.core.domain.model.PolicyWeekdays
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
@@ -95,6 +98,54 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
+    fun `scheduled app wildcard allows every app only on configured days`() {
+        val scheduleRule =
+            rule(
+                id = "schedule-global-app",
+                target = PolicySchedulePolicy.encodedTarget("*"),
+                action = RuleAction.Allow,
+            ).copy(
+                priority = PolicySchedulePolicy.RulePriority,
+                activeWindow = PolicyTimeWindow(22 * 60, 23 * 60 + 59),
+                activeDaysMask = PolicyWeekdays.bit(3),
+            )
+        val wednesdayNight =
+            appContext().copy(time = TimePolicyContext(Now, 22 * 60 + 30, isoDayOfWeek = 3))
+        val thursdayNight =
+            appContext().copy(time = TimePolicyContext(Now, 22 * 60 + 30, isoDayOfWeek = 4))
+
+        assertIs<PolicyDecision.Allow>(engine.evaluateApp(policy(rules = listOf(scheduleRule)), wednesdayNight))
+        assertIs<PolicyDecision.Block>(engine.evaluateApp(policy(rules = listOf(scheduleRule)), thursdayNight))
+    }
+
+    @Test
+    fun `global and per app schedules use the most restrictive intersection`() {
+        val global = allowedSchedule("global", RuleScope.App, "*", 8 * 60, 18 * 60)
+        val app = allowedSchedule("app", RuleScope.App, AllowedPackage, 10 * 60, 20 * 60)
+
+        listOf(9 * 60, 19 * 60).forEach { minute ->
+            val context = appContext().copy(time = TimePolicyContext(Now, minute, isoDayOfWeek = 1))
+            assertIs<PolicyDecision.Block>(engine.evaluateApp(policy(rules = listOf(global, app)), context))
+        }
+        val sharedWindow = appContext().copy(time = TimePolicyContext(Now, 12 * 60, isoDayOfWeek = 1))
+        assertIs<PolicyDecision.Allow>(engine.evaluateApp(policy(rules = listOf(global, app)), sharedWindow))
+    }
+
+    @Test
+    fun `domain schedule blocks only the configured site outside its window`() {
+        val schedule = allowedSchedule("site", RuleScope.Domain, "example.com", 8 * 60, 12 * 60)
+        val outside =
+            domainContext("www.example.com").copy(
+                time = TimePolicyContext(Now, 12 * 60, isoDayOfWeek = 1),
+            )
+
+        assertIs<PolicyDecision.Block>(engine.evaluateDomain(policy(rules = listOf(schedule)), outside))
+        assertIs<PolicyDecision.Allow>(
+            engine.evaluateDomain(policy(rules = listOf(schedule)), domainContext("other.com")),
+        )
+    }
+
+    @Test
     fun `allows app while daily limit is still available`() {
         val decision =
             engine.evaluateApp(
@@ -117,14 +168,14 @@ class DefaultPolicyEngineTest {
     }
 
     @Test
-    fun `allows app when daily limit is exactly reached`() {
+    fun `blocks app when daily limit is exactly reached`() {
         val decision =
             engine.evaluateApp(
                 snapshot = policy(limits = listOf(limit(target = AllowedPackage, minutes = 60))),
                 context = appContext(packageName = AllowedPackage, usedMinutesToday = 60),
             )
 
-        assertIs<PolicyDecision.Allow>(decision)
+        assertIs<PolicyDecision.Block>(decision)
     }
 
     @Test
@@ -812,6 +863,24 @@ class DefaultPolicyEngineTest {
             target = target,
             grantedMinutes = 15,
             validUntilEpochMillis = validUntil,
+        )
+
+    private fun allowedSchedule(
+        id: String,
+        scope: RuleScope,
+        target: String,
+        startMinute: Int,
+        endMinute: Int,
+    ): PolicyRule =
+        rule(
+            id = id,
+            scope = scope,
+            target = PolicySchedulePolicy.encodedTarget(target),
+            action = RuleAction.Allow,
+            priority = PolicySchedulePolicy.RulePriority,
+        ).copy(
+            activeWindow = PolicyTimeWindow(startMinute, endMinute),
+            activeDaysMask = PolicyWeekdays.All,
         )
 
     private fun appContext(

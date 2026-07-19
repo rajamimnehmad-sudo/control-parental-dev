@@ -29,5 +29,8 @@ data class PolicyRuleEntity(
     val action: String,
     val priority: Int,
     val enabled: Boolean,
+    val activeWindowStartMinute: Int? = null,
+    val activeWindowEndMinute: Int? = null,
+    val activeDaysMask: Int = 0b1111111,
     val updatedAtEpochMillis: Long,
 )

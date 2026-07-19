@@ -77,109 +77,104 @@ private fun AdminUpdatesScreen(
         )
     }
     Column(
-        modifier =
-            Modifier
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(20.dp),
+        modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         PremiumFeedbackBanner(
-            text = state.status.message(),
-            isError = state.status.isError(),
+            text = state.resetMessage.ifBlank { state.status.message() },
+            isError = state.resetMessage.startsWith("No se pudo") || (state.resetMessage.isBlank() && state.status.isError()),
         )
-        Text(
-            text = "Version instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        state.manifest?.let { manifest ->
+        Column(
+            modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Text(
-                text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
+                text = "Version instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.titleMedium,
+            )
+            state.manifest?.let { manifest ->
+                Text(
+                    text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
+                    style = MaterialTheme.typography.titleMedium,
+                )
+                Text(
+                    text = manifest.releaseNotes.ifBlank { "Sin notas de version." },
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+            Spacer(modifier = Modifier.height(8.dp))
+            when (state.status) {
+                AdminUpdatesStatus.Available,
+                AdminUpdatesStatus.DownloadFailed,
+                AdminUpdatesStatus.ChecksumFailed,
+                -> {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onDownload,
+                    ) {
+                        Text("Actualizar")
+                    }
+                }
+                AdminUpdatesStatus.Downloading -> {
+                    state.downloadProgressPercent?.let { progress ->
+                        Text("Descarga: $progress%", style = MaterialTheme.typography.bodyMedium)
+                    }
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        enabled = false,
+                        onClick = onDownload,
+                    ) {
+                        Text("Actualizando...")
+                    }
+                }
+                AdminUpdatesStatus.NeedsInstallPermission -> {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onInstallPermission,
+                    ) {
+                        Text("Permitir instalacion")
+                    }
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onInstall,
+                    ) {
+                        Text("Instalar")
+                    }
+                }
+                AdminUpdatesStatus.ReadyToInstall -> {
+                    Button(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onInstall,
+                    ) {
+                        Text("Instalar")
+                    }
+                }
+                else -> Unit
+            }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled =
+                    state.status != AdminUpdatesStatus.Checking &&
+                        state.status != AdminUpdatesStatus.Downloading,
+                onClick = onCheck,
+            ) {
+                Text("Buscar actualizacion")
+            }
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                text = "Administrador de este teléfono",
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                text = manifest.releaseNotes.ifBlank { "Sin notas de version." },
+                text = "Usá esta opción si quedó un admin viejo y necesitás ingresar un token nuevo.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-        }
-        Spacer(modifier = Modifier.height(8.dp))
-        when (state.status) {
-            AdminUpdatesStatus.Available,
-            AdminUpdatesStatus.DownloadFailed,
-            AdminUpdatesStatus.ChecksumFailed,
-            -> {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onDownload,
-                ) {
-                    Text("Actualizar")
-                }
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onRequestReset,
+            ) {
+                Text("Cambiar administrador")
             }
-            AdminUpdatesStatus.Downloading -> {
-                state.downloadProgressPercent?.let { progress ->
-                    Text("Descarga: $progress%", style = MaterialTheme.typography.bodyMedium)
-                }
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = false,
-                    onClick = onDownload,
-                ) {
-                    Text("Actualizando...")
-                }
-            }
-            AdminUpdatesStatus.NeedsInstallPermission -> {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onInstallPermission,
-                ) {
-                    Text("Permitir instalacion")
-                }
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onInstall,
-                ) {
-                    Text("Instalar")
-                }
-            }
-            AdminUpdatesStatus.ReadyToInstall -> {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onInstall,
-                ) {
-                    Text("Instalar")
-                }
-            }
-            else -> Unit
-        }
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            enabled =
-                state.status != AdminUpdatesStatus.Checking &&
-                    state.status != AdminUpdatesStatus.Downloading,
-            onClick = onCheck,
-        ) {
-            Text("Buscar actualizacion")
-        }
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = "Administrador de este teléfono",
-            style = MaterialTheme.typography.titleMedium,
-        )
-        Text(
-            text = "Usá esta opción si quedó un admin viejo y necesitás ingresar un token nuevo.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        OutlinedButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onRequestReset,
-        ) {
-            Text("Cambiar administrador")
-        }
-        if (state.resetMessage.isNotBlank()) {
-            PremiumFeedbackBanner(
-                text = state.resetMessage,
-                isError = state.resetMessage.startsWith("No se pudo"),
-            )
         }
     }
 }

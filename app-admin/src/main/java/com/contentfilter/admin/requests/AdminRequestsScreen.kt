@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -67,14 +68,17 @@ fun AdminRequestsRoute(
                 Text(if (state.isLoading) "Cargando..." else "Actualizar")
             }
         }
-        if (state.offlineMode) {
-            FeedbackBanner("Sin conexion. Mostrando datos guardados.", isError = true)
-        }
-        if (state.message.isNotBlank()) {
-            FeedbackBanner(state.message, isError = true)
-        }
-        if (state.lastSyncMessage.isNotBlank()) {
-            FeedbackBanner(state.lastSyncMessage, isError = state.lastSyncMessage.startsWith("No se pudo"))
+        val bannerText =
+            state.message.ifBlank {
+                state.lastSyncMessage.ifBlank {
+                    if (state.offlineMode) "Sin conexión. Mostrando datos guardados." else ""
+                }
+            }
+        if (bannerText.isNotBlank()) {
+            FeedbackBanner(
+                text = bannerText,
+                isError = state.offlineMode || bannerText.startsWith("No se pudo"),
+            )
         }
         val selectedUser = state.users.firstOrNull { it.deviceId == state.selectedDeviceId }
         if (selectedUser == null) {
@@ -82,7 +86,7 @@ fun AdminRequestsRoute(
             if (state.users.isEmpty()) {
                 Text("No hay solicitudes para revisar.")
             }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 items(state.users, key = { it.deviceId }) { user ->
                     RequestUserCard(
                         user = user,
@@ -91,6 +95,7 @@ fun AdminRequestsRoute(
                 }
             }
         } else {
+            var showingHistory by remember(selectedUser.deviceId) { mutableStateOf(false) }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -98,14 +103,38 @@ fun AdminRequestsRoute(
             ) {
                 Column {
                     Text(selectedUser.name, style = MaterialTheme.typography.titleMedium)
-                    Text("${state.requests.size} pendientes", style = MaterialTheme.typography.bodySmall)
+                    Text(
+                        "${state.requests.size} pendientes · ${state.resolvedRequests.size} en historial",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
                 }
                 OutlinedButton(onClick = viewModel::clearUserSelection) {
                     Text("Volver")
                 }
             }
-            LazyColumn(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                items(state.requests, key = { it.id }) { request ->
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (showingHistory) {
+                    OutlinedButton(modifier = Modifier.weight(1f), onClick = { showingHistory = false }) {
+                        Text("Pendientes (${state.requests.size})")
+                    }
+                    androidx.compose.material3.Button(modifier = Modifier.weight(1f), onClick = {}) {
+                        Text("Historial (${state.resolvedRequests.size})")
+                    }
+                } else {
+                    androidx.compose.material3.Button(modifier = Modifier.weight(1f), onClick = {}) {
+                        Text("Pendientes (${state.requests.size})")
+                    }
+                    OutlinedButton(modifier = Modifier.weight(1f), onClick = { showingHistory = true }) {
+                        Text("Historial (${state.resolvedRequests.size})")
+                    }
+                }
+            }
+            val displayedRequests = if (showingHistory) state.resolvedRequests else state.requests
+            if (displayedRequests.isEmpty()) {
+                Text(if (showingHistory) "Todavía no hay solicitudes resueltas." else "No hay solicitudes pendientes.")
+            }
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                items(displayedRequests, key = { it.id }) { request ->
                     RequestCard(
                         item = request,
                         pendingActionIds = state.pendingActionIds,
@@ -144,7 +173,7 @@ private fun RequestUserCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(user.name, style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "${user.pendingCount} solicitudes pendientes",
+                    "${user.pendingCount} pendientes · ${user.resolvedCount} en historial",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -187,7 +216,15 @@ private fun RequestCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                StatusChip("Pendiente", MaterialTheme.colorScheme.primary)
+                StatusChip(
+                    request.status.displayName(),
+                    when (request.status) {
+                        RequestStatus.PendingLocal, RequestStatus.PendingRemote -> MaterialTheme.colorScheme.primary
+                        RequestStatus.Approved -> Color(0xFF17895D)
+                        RequestStatus.Rejected -> MaterialTheme.colorScheme.error
+                        RequestStatus.Expired -> MaterialTheme.colorScheme.outline
+                    },
+                )
             }
             if (request.reason.isNotBlank()) {
                 Text(request.reason, style = MaterialTheme.typography.bodySmall)

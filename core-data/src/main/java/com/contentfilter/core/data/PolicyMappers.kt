@@ -2,6 +2,7 @@ package com.contentfilter.core.data
 
 import com.contentfilter.core.database.entity.PolicyRuleEntity
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicyTimeWindow
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 
@@ -13,6 +14,11 @@ internal fun PolicyRuleEntity.toDomain(): PolicyRule =
         action = enumValueOrDefault(action, RuleAction.Warn),
         priority = priority,
         enabled = enabled,
+        activeWindow =
+            activeWindowStartMinute?.let { start ->
+                activeWindowEndMinute?.let { end -> PolicyTimeWindow(start, end) }
+            },
+        activeDaysMask = activeDaysMask,
     )
 
 internal fun PolicyRule.toEntity(
@@ -27,6 +33,9 @@ internal fun PolicyRule.toEntity(
         action = action.name,
         priority = priority,
         enabled = enabled,
+        activeWindowStartMinute = activeWindow?.startMinuteOfDay,
+        activeWindowEndMinute = activeWindow?.endMinuteOfDay,
+        activeDaysMask = activeDaysMask,
         updatedAtEpochMillis = updatedAtEpochMillis,
     )
 

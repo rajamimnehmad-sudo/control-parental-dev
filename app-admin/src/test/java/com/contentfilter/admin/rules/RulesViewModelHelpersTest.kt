@@ -110,7 +110,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `complete preference matrix remains independent and has no auxiliary blocks`() {
-        val combinations = (0 until 8).map(::preferencesFromBits)
+        val combinations = (0 until 16).map(::preferencesFromBits)
 
         combinations.forEach { desired ->
             val result =
@@ -125,7 +125,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `every Web mutation changes only its selected preference`() {
-        (0 until 8).map(::preferencesFromBits).forEach { initial ->
+        (0 until 16).map(::preferencesFromBits).forEach { initial ->
             val initialRules =
                 emptyList<PolicyRule>()
                     .webPolicyChanges(initial, DeviceId)
@@ -277,6 +277,7 @@ class RulesViewModelHelpersTest {
                         externalResultsAllowed = false,
                         safeSearch = true,
                         dagEnabled = true,
+                        dagExtraKosherEnabled = true,
                     ),
                     DeviceId,
                 ).applyTo(emptyList())
@@ -289,6 +290,7 @@ class RulesViewModelHelpersTest {
         assertFalse(rules.externalSearchResultsAllowedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
         assertTrue(rules.webPolicyPreferences().dagEnabled)
+        assertTrue(rules.webPolicyPreferences().dagExtraKosherEnabled)
 
         rules =
             rules
@@ -298,6 +300,7 @@ class RulesViewModelHelpersTest {
         assertFalse(rules.externalSearchResultsAllowedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
         assertTrue(rules.webPolicyPreferences().dagEnabled)
+        assertTrue(rules.webPolicyPreferences().dagExtraKosherEnabled)
     }
 
     @Test
@@ -468,12 +471,14 @@ class RulesViewModelHelpersTest {
         externalResultsAllowed: Boolean = false,
         safeSearch: Boolean = true,
         dagEnabled: Boolean = false,
+        dagExtraKosherEnabled: Boolean = false,
     ): WebPolicyPreferences =
         WebPolicyPreferences(
             webNavigationBlocked = webBlocked,
             externalSearchResultsAllowed = externalResultsAllowed,
             safeSearchEnabled = true,
             dagEnabled = dagEnabled,
+            dagExtraKosherEnabled = dagExtraKosherEnabled,
         )
 
     private fun preferencesFromBits(bits: Int): WebPolicyPreferences =
@@ -482,6 +487,7 @@ class RulesViewModelHelpersTest {
             externalResultsAllowed = bits and 2 != 0,
             safeSearch = true,
             dagEnabled = bits and 4 != 0,
+            dagExtraKosherEnabled = bits and 8 != 0,
         )
 
     private fun appRule(

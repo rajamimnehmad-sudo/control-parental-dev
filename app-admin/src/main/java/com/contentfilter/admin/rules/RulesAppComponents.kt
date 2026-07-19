@@ -48,8 +48,10 @@ import com.contentfilter.core.ui.StatusChip
 @Composable
 internal fun AppControlCard(
     app: AppControlUiState,
+    scheduleConfigured: Boolean,
     onAllowedChanged: (Boolean) -> Unit,
     onLimitSaved: (String) -> Unit,
+    onScheduleClick: () -> Unit,
 ) {
     var showLimitDialog by remember(app.packageName) { mutableStateOf(false) }
     var minutes by remember(app.packageName, app.dailyLimitMinutes) {
@@ -137,11 +139,20 @@ internal fun AppControlCard(
                         ),
                 )
             }
-            app.groupLabel?.let { label ->
-                StatusChip(
-                    text = label,
-                    color = status.switchColor,
-                )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                app.groupLabel?.let { label ->
+                    StatusChip(
+                        text = label,
+                        color = status.switchColor,
+                    )
+                }
+                TextButton(onClick = onScheduleClick) {
+                    Text(if (scheduleConfigured) "Horario activo" else "Agregar horario")
+                }
             }
         }
     }

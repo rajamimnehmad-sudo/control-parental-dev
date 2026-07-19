@@ -52,7 +52,7 @@ import com.contentfilter.core.database.entity.UsageSessionEntity
         AppGroupAppEntity::class,
         InstalledAppEntity::class,
     ],
-    version = 13,
+    version = 14,
     exportSchema = true,
 )
 abstract class AppDatabase : RoomDatabase() {

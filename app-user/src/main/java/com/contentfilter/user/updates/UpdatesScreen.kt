@@ -144,14 +144,16 @@ private fun UpdatesScreen(
         title = "Ajustes",
         subtitle = "Protección y versión instalada ${BuildConfig.VERSION_CODE}",
         onBack = onBack,
+        banner = {
+            PremiumFeedbackBanner(
+                text = state.status.message(),
+                isError =
+                    state.status == UpdatesStatus.SearchFailed ||
+                        state.status == UpdatesStatus.DownloadFailed ||
+                        state.status == UpdatesStatus.ChecksumFailed,
+            )
+        },
     ) {
-        PremiumFeedbackBanner(
-            text = state.status.message(),
-            isError =
-                state.status == UpdatesStatus.SearchFailed ||
-                    state.status == UpdatesStatus.DownloadFailed ||
-                    state.status == UpdatesStatus.ChecksumFailed,
-        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

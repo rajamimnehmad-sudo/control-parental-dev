@@ -157,10 +157,10 @@ internal fun UserDeviceCard(
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
-            title = { Text("Borrar dispositivo") },
+            title = { Text("Archivar usuario") },
             text = {
                 Text(
-                    "Esto borra definitivamente el dispositivo, sus apps detectadas, activaciones y solicitudes asociadas.",
+                    "El usuario saldrá de la lista activa. Su configuración y auditoría se conservarán para una restauración futura.",
                 )
             },
             confirmButton = {
@@ -171,9 +171,9 @@ internal fun UserDeviceCard(
                     },
                     enabled = !deleting,
                     modifier = Modifier,
-                    text = "Borrar definitivo",
-                    loadingText = "Borrando...",
-                    successText = "Borrado",
+                    text = "Archivar usuario",
+                    loadingText = "Archivando...",
+                    successText = "Archivado",
                     tone = ActionButtonTone.Destructive,
                 )
             },

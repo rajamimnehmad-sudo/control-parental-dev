@@ -8,3 +8,8 @@ internal fun JSONObject.optNullableString(name: String): String? {
         .trim()
         .takeUnless { it.isBlank() || it.equals("null", ignoreCase = true) }
 }
+
+internal fun JSONObject.optNullableInt(name: String): Int? {
+    if (!has(name) || isNull(name)) return null
+    return optInt(name)
+}

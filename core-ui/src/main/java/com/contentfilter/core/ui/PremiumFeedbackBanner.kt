@@ -1,6 +1,7 @@
 package com.contentfilter.core.ui
 
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -9,20 +10,33 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.keyframes
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -32,99 +46,158 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
+import kotlin.math.floor
 
 @Composable
 fun PremiumFeedbackBanner(
     text: String,
     modifier: Modifier = Modifier,
     isError: Boolean = false,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
 ) {
-    if (text.isBlank()) return
-    val mood = rememberBannerFishMood(text = text, isError = isError)
-    val patrol = rememberInfiniteTransition(label = "banner-fish-patrol")
-    val patrolX by patrol.animateFloat(
+    val kind = remember(text, isError) { text.feedbackBannerKind(isError) }
+    var visible by remember(text) { mutableStateOf(text.isNotBlank()) }
+    LaunchedEffect(text, kind) {
+        if (kind == FeedbackBannerKind.Success) {
+            delay(2_500)
+            visible = false
+        }
+    }
+    AnimatedVisibility(
+        visible = visible && text.isNotBlank(),
+        enter = slideInVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeIn(tween(180)),
+        exit = slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(180)),
+    ) {
+        FeedbackBannerSurface(
+            text = text,
+            kind = kind,
+            actionLabel = actionLabel,
+            onAction = onAction,
+            onDismiss = { visible = false },
+            modifier = modifier,
+        )
+    }
+}
+
+@Composable
+private fun FeedbackBannerSurface(
+    text: String,
+    kind: FeedbackBannerKind,
+    actionLabel: String?,
+    onAction: (() -> Unit)?,
+    onDismiss: () -> Unit,
+    modifier: Modifier,
+) {
+    val stableMessage = text.trim().trimEnd('.')
+    val dotsTransition = rememberInfiniteTransition(label = "feedback-banner-dots")
+    val dotPhase by dotsTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 0f,
+        targetValue = 4f,
         animationSpec =
             infiniteRepeatable(
-                animation =
-                    keyframes {
-                        durationMillis = 9200
-                        0f at 0 using FastOutSlowInEasing
-                        -46f at 900 using FastOutSlowInEasing
-                        -210f at 2100 using FastOutSlowInEasing
-                        -230f at 2700 using LinearEasing
-                        28f at 3650 using FastOutSlowInEasing
-                        44f at 4050 using FastOutSlowInEasing
-                        -72f at 5250 using FastOutSlowInEasing
-                        -32f at 6500 using FastOutSlowInEasing
-                        0f at 9200 using FastOutSlowInEasing
-                    },
+                animation = tween(durationMillis = 900, easing = LinearEasing),
                 repeatMode = RepeatMode.Restart,
             ),
-        label = "banner-fish-patrol-x",
+        label = "feedback-banner-dot-phase",
     )
-    val patrolY by patrol.animateFloat(
-        initialValue = 0f,
-        targetValue = 0f,
-        animationSpec =
-            infiniteRepeatable(
-                animation =
-                    keyframes {
-                        durationMillis = 2400
-                        0f at 0 using FastOutSlowInEasing
-                        -4f at 450 using FastOutSlowInEasing
-                        3f at 1150 using FastOutSlowInEasing
-                        -2f at 1850 using FastOutSlowInEasing
-                        0f at 2400 using FastOutSlowInEasing
-                    },
-                repeatMode = RepeatMode.Restart,
-            ),
-        label = "banner-fish-patrol-y",
-    )
-    Box(
+    Row(
         modifier =
             modifier
                 .fillMaxWidth()
-                .defaultMinSize(minHeight = 42.dp)
-                .background(
-                    brush =
-                        Brush.linearGradient(
-                            colors = listOf(Color(0xFF18C7B7), Color(0xFF3A7DFF), Color(0xFF1E2A4A)),
-                        ),
-                    shape = RoundedCornerShape(14.dp),
-                )
-                .padding(start = 10.dp, top = 8.dp, end = 10.dp, bottom = 8.dp),
+                .height(48.dp)
+                .clip(RoundedCornerShape(10.dp))
+                .background(Color(0xFF202124))
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = text.trim()
+                }
+                .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        BannerFishMascot(
-            mood = mood,
+        Box(
             modifier =
                 Modifier
-                    .align(Alignment.CenterEnd)
-                    .size(46.dp)
-                    .graphicsLayer {
-                        alpha = 0.66f
-                        translationX = patrolX.dp.toPx()
-                        translationY = patrolY.dp.toPx()
-                    },
+                    .size(10.dp)
+                    .background(kind.color, RoundedCornerShape(5.dp)),
         )
-        Crossfade(
+        AnimatedContent(
             modifier =
                 Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp, end = 58.dp)
-                    .align(Alignment.CenterStart),
+                    .padding(start = 10.dp)
+                    .weight(1f),
             targetState = text,
-            animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing),
+            transitionSpec = {
+                (slideInVertically(tween(180, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)))
+                    .togetherWith(
+                        slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(180)),
+                    )
+            },
             label = "feedback-banner-text",
         ) { message ->
+            val displayMessage =
+                if (kind == FeedbackBannerKind.Busy) {
+                    stableMessage + ".".repeat(floor(dotPhase).toInt().coerceIn(1, 3))
+                } else {
+                    message.trim()
+                }
             Text(
-                text = message,
+                modifier =
+                    Modifier.basicMarquee(
+                        initialDelayMillis = 1_000,
+                        repeatDelayMillis = 1_000,
+                        velocity = 40.dp,
+                    ),
+                text = displayMessage,
+                maxLines = 1,
+                overflow = TextOverflow.Clip,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Color.White,
             )
         }
+        if (actionLabel != null && onAction != null) {
+            TextButton(onClick = onAction) {
+                Text(actionLabel, color = Color.White)
+            }
+        } else if (kind == FeedbackBannerKind.Error || kind == FeedbackBannerKind.Warning) {
+            TextButton(
+                modifier = Modifier.semantics { contentDescription = "Cerrar aviso" },
+                onClick = onDismiss,
+            ) {
+                Text("×", color = Color.White, style = MaterialTheme.typography.titleMedium)
+            }
+        }
+    }
+}
+
+private enum class FeedbackBannerKind(val color: Color) {
+    Busy(Color.White),
+    Success(Color(0xFF6EDC8C)),
+    Warning(Color(0xFFFFC857)),
+    Error(Color(0xFFFF7B72)),
+}
+
+private fun String.feedbackBannerKind(isError: Boolean): FeedbackBannerKind {
+    val normalized = lowercase()
+    return when {
+        isError || normalized.contains("no se pudo") || normalized.contains("sin conexion") || normalized.contains("sin conexión") ->
+            FeedbackBannerKind.Error
+        listOf("enlazando", "verificando", "guardando", "sincronizando", "cargando", "buscando", "preparando", "actualizando", "descargando", "reseteando", "generando").any(
+            normalized::contains,
+        ) ->
+            FeedbackBannerKind.Busy
+        listOf("guardado", "guardada", "listo", "actualizado", "actualizada", "verificado", "verificada", "ultima version", "última versión").any(
+            normalized::contains,
+        ) ->
+            FeedbackBannerKind.Success
+        else -> FeedbackBannerKind.Warning
     }
 }
 

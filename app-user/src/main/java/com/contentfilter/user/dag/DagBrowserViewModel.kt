@@ -11,6 +11,7 @@ import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.dagEnabled
+import com.contentfilter.core.domain.model.dagExtraKosherEnabled
 import com.contentfilter.core.domain.repository.AccessRequestRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
@@ -80,7 +81,10 @@ class DagBrowserViewModel
                         activeRules = snapshot.rules
                         activePolicyVersion = snapshot.version
                         val enabled = activation != null && health.dagEntitled && snapshot.rules.dagEnabled()
-                        mutableState.update { state -> state.withDagAvailability(enabled) }
+                        val extraKosherEnabled = enabled && snapshot.rules.dagExtraKosherEnabled()
+                        mutableState.update { state ->
+                            state.withDagAvailability(enabled).copy(dagExtraKosherEnabled = extraKosherEnabled)
+                        }
                     }
             }
             viewModelScope.launch {
@@ -968,6 +972,7 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
             copy(
                 dagAvailabilityKnown = true,
                 dagEnabled = false,
+                dagExtraKosherEnabled = false,
                 address = "",
                 view = DagView.Start,
                 pageStatus = DagPageStatus.Idle,

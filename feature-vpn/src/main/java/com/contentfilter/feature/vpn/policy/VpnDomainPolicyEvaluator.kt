@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.DevicePolicyContext
 import com.contentfilter.core.domain.model.DomainPolicyContext
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicySchedulePolicy.isAllowedWindow
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
@@ -37,6 +38,7 @@ class VpnDomainPolicyEvaluator
         ): PolicyDecision {
             val now = clock.nowEpochMillis()
             val minuteOfDay = clock.minuteOfDay(now)
+            val isoDayOfWeek = clock.isoDayOfWeek(now)
             val normalizedDomain = domain.normalizedDomain()
             val policyDecision =
                 policyEngine.evaluateDomain(
@@ -49,6 +51,7 @@ class VpnDomainPolicyEvaluator
                                 TimePolicyContext(
                                     evaluatedAtEpochMillis = now,
                                     minuteOfDay = minuteOfDay,
+                                    isoDayOfWeek = isoDayOfWeek,
                                 ),
                             device =
                                 DevicePolicyContext(
@@ -66,7 +69,11 @@ class VpnDomainPolicyEvaluator
             val technicalHostAllowed =
                 policyDecision is PolicyDecision.Allow && normalizedDomain.isTechnicalWebProtectionHost()
             val explicitDecision =
-                snapshot.rules.bestExplicitDomainRule(normalizedDomain, minuteOfDay)?.toDecision(normalizedDomain)
+                snapshot.rules
+                    .bestExplicitDomainRule(
+                        normalizedDomain,
+                        TimePolicyContext(now, minuteOfDay, isoDayOfWeek),
+                    )?.toDecision(normalizedDomain)
             if (explicitDecision != null && explicitDecision !is PolicyDecision.Allow) return explicitDecision
             if (policyDecision !is PolicyDecision.Allow) return policyDecision
             val finalDecision = explicitDecision ?: policyDecision
@@ -94,13 +101,14 @@ class VpnDomainPolicyEvaluator
 
         private fun List<PolicyRule>.bestExplicitDomainRule(
             domain: String,
-            minuteOfDay: Int,
+            time: TimePolicyContext,
         ): PolicyRule? =
             asSequence()
                 .filter { it.enabled && it.scope == RuleScope.Domain }
+                .filterNot { it.isAllowedWindow() }
                 .filterNot { it.id.startsWith("safe-default-") }
                 .filter { !it.target.startsWith("__") && it.target != "*" }
-                .filter { it.activeWindow?.contains(minuteOfDay) != false }
+                .filter { it.activeWindow?.contains(time, it.activeDaysMask) != false }
                 .filter { domain.matchesLimitTarget(it.target.normalizedDomain()) }
                 .sortedWith(
                     compareByDescending<PolicyRule> { it.level.specificity }

@@ -14,11 +14,22 @@ import com.contentfilter.core.domain.model.UpdateState
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.policy.DefaultPolicyEngine
 import com.contentfilter.feature.vpn.domainlist.DynamicDomainBlocklist
+import java.time.Instant
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertTrue
 
 class VpnDomainPolicyEvaluatorTest {
+    @Test
+    fun `system clock always evaluates Argentina local time`() {
+        val epochMillis = Instant.parse("2026-07-19T03:30:00Z").toEpochMilli()
+
+        val clock = SystemVpnClock()
+        assertEquals(30, clock.minuteOfDay(epochMillis))
+        assertEquals(7, clock.isoDayOfWeek(epochMillis))
+    }
+
     private val domainBlocklist = FakeDomainBlocklist()
     private val evaluator =
         VpnDomainPolicyEvaluator(
@@ -237,6 +248,8 @@ class VpnDomainPolicyEvaluatorTest {
         override fun nowEpochMillis(): Long = FixedTime
 
         override fun minuteOfDay(epochMillis: Long): Int = 12 * 60
+
+        override fun isoDayOfWeek(epochMillis: Long): Int = 3
     }
 
     private class FakeDomainBlocklist : DynamicDomainBlocklist {

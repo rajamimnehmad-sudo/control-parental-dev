@@ -44,7 +44,7 @@ class DashboardViewModel
                 accountFlow,
             ) { devices, requests, health, account ->
                 DashboardUiState(
-                    deviceCount = devices.count { it.appRole != "admin" },
+                    deviceCount = devices.count { it.appRole.equals("user", ignoreCase = true) },
                     pendingRequests =
                         requests.count {
                             it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote
@@ -54,6 +54,21 @@ class DashboardViewModel
                     lastSync = health.checkedAtEpochMillis.toDisplayDate(),
                     communityName = account?.communityName.orEmpty(),
                     guideName = account?.guideName.orEmpty(),
+                    licenseState = health.licenseState,
+                    licenseExpiresAtEpochMillis = health.licenseExpiresAtEpochMillis,
+                    protectedUsers =
+                        devices
+                            .filter { it.appRole.equals("user", ignoreCase = true) }
+                            .map { device ->
+                                ProtectedUserHealthUiState(
+                                    id = device.id,
+                                    name = device.displayName,
+                                    vpnState = device.vpnState,
+                                    accessibilityState = device.accessibilityState,
+                                    deviceAdminState = device.deviceAdminState,
+                                    lastSeenAtEpochMillis = device.lastSeenAtEpochMillis,
+                                )
+                            },
                     offlineMode = false,
                 )
             }.stateIn(

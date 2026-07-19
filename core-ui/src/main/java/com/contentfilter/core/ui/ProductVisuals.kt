@@ -43,9 +43,10 @@ fun ProductVisualPage(
     subtitle: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    banner: (@Composable () -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    if (onBack != null) {
+    if (onBack != null || banner != null) {
         Column(
             modifier =
                 modifier
@@ -59,12 +60,17 @@ fun ProductVisualPage(
                 onBack = onBack,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
             )
+            banner?.let { bannerContent ->
+                Box(modifier = Modifier.padding(horizontal = 18.dp)) {
+                    bannerContent()
+                }
+            }
             Column(
                 modifier =
                     Modifier
                         .weight(1f)
                         .verticalScroll(rememberScrollState())
-                        .padding(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                        .padding(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 content = content,
             )
@@ -92,9 +98,10 @@ fun ProductLazyVisualPage(
     subtitle: String,
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
+    banner: (@Composable () -> Unit)? = null,
     content: LazyListScope.() -> Unit,
 ) {
-    if (onBack != null) {
+    if (onBack != null || banner != null) {
         Column(
             modifier =
                 modifier
@@ -108,9 +115,14 @@ fun ProductLazyVisualPage(
                 onBack = onBack,
                 modifier = Modifier.padding(horizontal = 18.dp, vertical = 18.dp),
             )
+            banner?.let { bannerContent ->
+                Box(modifier = Modifier.padding(horizontal = 18.dp)) {
+                    bannerContent()
+                }
+            }
             LazyColumn(
                 modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 18.dp, end = 18.dp, bottom = 18.dp),
+                contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 18.dp),
                 verticalArrangement = Arrangement.spacedBy(18.dp),
                 content = content,
             )

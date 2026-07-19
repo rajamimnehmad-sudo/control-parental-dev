@@ -206,6 +206,15 @@ object DatabaseMigrations {
             }
         }
 
+    val Migration13To14: Migration =
+        object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE policy_rules ADD COLUMN activeWindowStartMinute INTEGER")
+                db.execSQL("ALTER TABLE policy_rules ADD COLUMN activeWindowEndMinute INTEGER")
+                db.execSQL("ALTER TABLE policy_rules ADD COLUMN activeDaysMask INTEGER NOT NULL DEFAULT 127")
+            }
+        }
+
     val All: Array<Migration> =
         arrayOf(
             Migration1To2,
@@ -220,5 +229,6 @@ object DatabaseMigrations {
             Migration10To11,
             Migration11To12,
             Migration12To13,
+            Migration13To14,
         )
 }

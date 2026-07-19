@@ -59,6 +59,9 @@ internal fun RemotePolicyRuleDto.toEntity(): PolicyRuleEntity =
         action = action,
         priority = priority,
         enabled = enabled && deletedAt == null,
+        activeWindowStartMinute = activeWindowStartMinute,
+        activeWindowEndMinute = activeWindowEndMinute,
+        activeDaysMask = activeDaysMask,
         updatedAtEpochMillis = updatedAt.toEpochMillis(),
     )
 

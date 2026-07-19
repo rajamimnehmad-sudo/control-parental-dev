@@ -42,6 +42,7 @@ class AccessibilityAppPolicyEvaluator
                     TimePolicyContext(
                         evaluatedAtEpochMillis = now,
                         minuteOfDay = clock.minuteOfDay(now),
+                        isoDayOfWeek = clock.isoDayOfWeek(now),
                     ),
                 device =
                     DevicePolicyContext(

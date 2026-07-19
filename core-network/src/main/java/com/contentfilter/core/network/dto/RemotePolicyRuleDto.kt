@@ -11,6 +11,9 @@ data class RemotePolicyRuleDto(
     val action: String,
     val priority: Int,
     val enabled: Boolean,
+    val activeWindowStartMinute: Int? = null,
+    val activeWindowEndMinute: Int? = null,
+    val activeDaysMask: Int = 0b1111111,
     val updatedAt: String,
     val deletedAt: String?,
 ) {
@@ -24,6 +27,9 @@ data class RemotePolicyRuleDto(
             .put("action", action)
             .put("priority", priority)
             .put("enabled", enabled)
+            .put("active_window_start_minute", activeWindowStartMinute ?: JSONObject.NULL)
+            .put("active_window_end_minute", activeWindowEndMinute ?: JSONObject.NULL)
+            .put("active_days_mask", activeDaysMask)
             .put("updated_at", updatedAt)
             .apply {
                 if (deletedAt != null) {
@@ -42,6 +48,9 @@ data class RemotePolicyRuleDto(
                 action = json.getString("action"),
                 priority = json.getInt("priority"),
                 enabled = json.getBoolean("enabled"),
+                activeWindowStartMinute = json.optNullableInt("active_window_start_minute"),
+                activeWindowEndMinute = json.optNullableInt("active_window_end_minute"),
+                activeDaysMask = json.optInt("active_days_mask", 0b1111111),
                 updatedAt = json.getString("updated_at"),
                 deletedAt = json.optNullableString("deleted_at"),
             )

@@ -1550,6 +1550,7 @@ private fun DagWebContent(
     val currentManualCalibrationCandidate by rememberUpdatedState(onManualCalibrationCandidate)
     val currentManualBlurReviewCandidate by rememberUpdatedState(onManualBlurReviewCandidate)
     val currentVisualCalibrationEnabled by rememberUpdatedState(visualCalibrationEnabled)
+    val currentExtraKosherEnabled by rememberUpdatedState(state.dagExtraKosherEnabled)
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val imageLoader =
@@ -1601,6 +1602,13 @@ private fun DagWebContent(
             view?.setDagVisualCalibrationMode(visualCalibrationEnabled)
         }
     }
+    LaunchedEffect(webView, state.dagExtraKosherEnabled) {
+        val view = webView ?: return@LaunchedEffect
+        view.url?.takeIf { it.startsWith("https://", ignoreCase = true) }?.let {
+            view.settings.blockNetworkImage = true
+            view.reload()
+        }
+    }
     DisposableEffect(Unit) {
         onDispose {
             webView?.stopLoading()
@@ -1649,7 +1657,7 @@ private fun DagWebContent(
                     ) {
                         if (preparedUrl == url) return
                         preparedUrl = url
-                        view.sanitizeAndExtractVisibleText {
+                        view.sanitizeAndExtractVisibleText(extraKosherEnabled = currentExtraKosherEnabled) {
                             view.setDagVisualCalibrationMode(currentVisualCalibrationEnabled)
                             view.setDagImageCalibrationDecisions(imageLoader.manualCalibrationDecisions())
                             view.awaitDagViewportImages(
@@ -1672,7 +1680,7 @@ private fun DagWebContent(
                         if (inspectedUrl == url) return
                         inspectedUrl = url
                         prepareViewport(view, url)
-                        view.sanitizeAndExtractVisibleText { text ->
+                        view.sanitizeAndExtractVisibleText(extraKosherEnabled = currentExtraKosherEnabled) { text ->
                             onPageTextReady(url, view.title.orEmpty(), text, imageLoader.pageSummary())
                         }
                     }
@@ -1984,12 +1992,14 @@ internal class DagPageUrlTracker {
 }
 
 private fun WebView.sanitizeAndExtractVisibleText(
+    extraKosherEnabled: Boolean,
     attempt: Int = 0,
     callback: (String?) -> Unit,
 ) {
     evaluateJavascript(
         """
         (function() {
+          window.__dagExtraKosherEnabled = ${if (extraKosherEnabled) "true" else "false"};
           var dagIntimatePattern = /$DagIntimateImageJavaScriptPattern/i;
           function dagNormalizedText(value) {
             return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
@@ -2013,8 +2023,19 @@ private fun WebView.sanitizeAndExtractVisibleText(
           }
           function dagIsContentImage(image) {
             if (image.closest && image.closest('header,nav,[role="navigation"]')) return false;
+            if (image.closest && image.closest('button,[role="button"],input,label')) return false;
             var marker = dagNormalizedText([image.className, image.id, image.getAttribute('alt')].join(' '));
             return !/\b(logo|icon|sprite|flag|payment)\b/.test(marker);
+          }
+          function dagApplyExtraKosherImage(image) {
+            if (!image) return false;
+            var shouldBlur = window.__dagExtraKosherEnabled === true && dagIsContentImage(image);
+            if (shouldBlur) {
+              image.setAttribute('data-dag-extra-kosher-blurred', 'true');
+            } else {
+              image.removeAttribute('data-dag-extra-kosher-blurred');
+            }
+            return shouldBlur;
           }
           function dagBlurIntimateImage(image) {
             var sensitive = dagIntimatePattern.test(dagImageContext(image));
@@ -2060,6 +2081,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
           function dagLoadImage(image) {
             if (!image || !image.isConnected) return;
             dagBlurIntimateImage(image);
+            dagApplyExtraKosherImage(image);
             var source = dagHttpsImageSource(image);
             if (!source) {
               image.style.setProperty('visibility', 'hidden', 'important');
@@ -2078,6 +2100,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
           function dagQueueImage(image) {
             if (!image) return;
             dagBlurIntimateImage(image);
+            dagApplyExtraKosherImage(image);
             var lazy = image.getAttribute('loading') === 'lazy' ||
               image.hasAttribute('data-src') || image.hasAttribute('data-lazy-src') ||
               image.hasAttribute('data-srcset') || image.hasAttribute('data-lazy-srcset') ||
@@ -2159,6 +2182,13 @@ private fun WebView.sanitizeAndExtractVisibleText(
             var background = '';
             try { background = window.getComputedStyle(node).backgroundImage || ''; } catch (_) {}
             if (!background || background === 'none') return;
+            if (window.__dagExtraKosherEnabled === true &&
+                !(node.closest && node.closest('header,nav,button,[role="button"],[role="navigation"]')) &&
+                !/\b(logo|icon|sprite|flag|payment)\b/.test(dagNormalizedText([node.className, node.id].join(' ')))) {
+              node.style.setProperty('background-image', 'none', 'important');
+              node.setAttribute('data-dag-extra-kosher-background', 'true');
+              return;
+            }
             var matches = background.matchAll(/url\(["']?([^"')]+)["']?\)/g);
             for (var match of matches) {
               try {
@@ -2309,11 +2339,18 @@ private fun WebView.sanitizeAndExtractVisibleText(
             });
           }
           dagSecureNode(document.documentElement);
+          if (document.documentElement) {
+            if (window.__dagExtraKosherEnabled) {
+              document.documentElement.setAttribute('data-dag-extra-kosher', 'true');
+            } else {
+              document.documentElement.removeAttribute('data-dag-extra-kosher');
+            }
+          }
           var style = document.getElementById('dag-safe-style');
           if (!style) {
             style = document.createElement('style');
             style.id = 'dag-safe-style';
-            style.textContent = 'video,audio,canvas,iframe:not([data-dag-safe-captcha="true"]) { display:none !important; } img[data-dag-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; transform: scale(1.14) !important; } html[data-dag-dev-calibration="true"] img[data-dag-kosher-blurred="true"] { filter:none !important; transform:none !important; }';
+            style.textContent = 'video,audio,canvas,iframe:not([data-dag-safe-captcha="true"]) { display:none !important; } img[data-dag-kosher-blurred="true"], img[data-dag-extra-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; transform: scale(1.14) !important; } html[data-dag-dev-calibration="true"] img[data-dag-kosher-blurred="true"]:not([data-dag-extra-kosher-blurred="true"]) { filter:none !important; transform:none !important; }';
             document.documentElement.appendChild(style);
           }
           if (!window.__dagSafeObserver) {
@@ -2354,7 +2391,11 @@ private fun WebView.sanitizeAndExtractVisibleText(
         val text = encoded.decodeJavascriptString()
         if (text.isNullOrBlank() && attempt < MaximumTextExtractionRetries && isAttachedToWindow) {
             postDelayed(
-                { runCatching { sanitizeAndExtractVisibleText(attempt + 1, callback) }.onFailure { callback(null) } },
+                {
+                    runCatching {
+                        sanitizeAndExtractVisibleText(extraKosherEnabled, attempt + 1, callback)
+                    }.onFailure { callback(null) }
+                },
                 TextExtractionRetryDelayMillis * (attempt + 1L),
             )
         } else {

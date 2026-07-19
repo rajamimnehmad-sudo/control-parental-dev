@@ -82,7 +82,6 @@ private fun AdminAuthScreen(
             Modifier
                 .fillMaxSize()
                 .background(MaterialTheme.colorScheme.background)
-                .verticalScroll(rememberScrollState())
                 .padding(horizontal = 16.dp, vertical = 18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -90,61 +89,71 @@ private fun AdminAuthScreen(
             title = "Activación Admin",
             subtitle = "Ingresá el token de administrador para activar este panel",
         )
-        if (state.offlineMode) {
-            FeedbackBanner("Sin conexion. Mostrando datos guardados.", isError = true)
+        val bannerText = state.message.ifBlank { if (state.offlineMode) "Sin conexión. Mostrando datos guardados." else "" }
+        if (bannerText.isNotBlank()) {
+            FeedbackBanner(
+                text = bannerText,
+                isError = state.offlineMode || bannerText.startsWith("No se pudo"),
+            )
         }
-        if (state.activated) {
-            FeedbackBanner(state.message)
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !state.loading,
-                onClick = onRequestReset,
-            ) {
-                Text("Ingresar nuevo token")
+        Column(
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            if (state.activated) {
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.loading,
+                    onClick = onRequestReset,
+                ) {
+                    Text("Ingresar nuevo token")
+                }
+                return@Column
             }
-            return@Column
+            ProductCard {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = state.activationCode,
+                    onValueChange = onCode,
+                    label = { Text("Token de administrador") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = state.email,
+                    onValueChange = onEmail,
+                    label = { Text("Email") },
+                    singleLine = true,
+                )
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = state.password,
+                    onValueChange = onPassword,
+                    label = { Text("Contraseña") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = state.confirmPassword,
+                    onValueChange = onConfirmPassword,
+                    label = { Text("Repetir contraseña") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation(),
+                )
+                ProgressActionButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !state.loading,
+                    onClick = onActivate,
+                    loading = state.loading,
+                    loadingText = "Activando...",
+                    successText = "Admin activado",
+                    text = "Activar",
+                )
+            }
         }
-        ProductCard {
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = state.activationCode,
-                onValueChange = onCode,
-                label = { Text("Token de administrador") },
-                singleLine = true,
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = state.email,
-                onValueChange = onEmail,
-                label = { Text("Email") },
-                singleLine = true,
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = state.password,
-                onValueChange = onPassword,
-                label = { Text("Contraseña") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = state.confirmPassword,
-                onValueChange = onConfirmPassword,
-                label = { Text("Repetir contraseña") },
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-            )
-            ProgressActionButton(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = !state.loading,
-                onClick = onActivate,
-                loading = state.loading,
-                loadingText = "Activando...",
-                successText = "Admin activado",
-                text = "Activar",
-            )
-        }
-        FeedbackBanner(state.message, isError = state.message.startsWith("No se pudo"))
     }
 }

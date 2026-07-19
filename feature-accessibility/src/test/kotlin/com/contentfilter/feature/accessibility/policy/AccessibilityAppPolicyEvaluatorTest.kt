@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
+import java.time.Instant
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -11,6 +12,15 @@ import kotlin.test.assertTrue
 
 class AccessibilityAppPolicyEvaluatorTest {
     private val evaluator = AccessibilityAppPolicyEvaluator(FixedClock)
+
+    @Test
+    fun `system clock always evaluates Argentina local time`() {
+        val epochMillis = Instant.parse("2026-07-19T03:30:00Z").toEpochMilli()
+
+        val clock = SystemAccessibilityClock()
+        assertEquals(30, clock.minuteOfDay(epochMillis))
+        assertEquals(7, clock.isoDayOfWeek(epochMillis))
+    }
 
     @Test
     fun `builds app policy context without android framework state`() {
@@ -64,6 +74,8 @@ class AccessibilityAppPolicyEvaluatorTest {
         override fun nowEpochMillis(): Long = FixedEpochMillis
 
         override fun minuteOfDay(epochMillis: Long): Int = 12 * 60
+
+        override fun isoDayOfWeek(epochMillis: Long): Int = 3
     }
 
     private companion object {

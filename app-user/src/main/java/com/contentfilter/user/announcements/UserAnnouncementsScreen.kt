@@ -34,18 +34,25 @@ fun UserAnnouncementsRoute(
     viewModel: UserAnnouncementsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    ProductLazyVisualPage(title = "Avisos", subtitle = "Mensajes de tu comunidad", onBack = onBack) {
+    ProductLazyVisualPage(
+        title = "Avisos",
+        subtitle = "Mensajes de tu comunidad",
+        onBack = onBack,
+        banner =
+            if (state.message.isNotBlank()) {
+                {
+                    PremiumFeedbackBanner(
+                        text = state.message,
+                        isError = state.message.startsWith("No se pudo"),
+                    )
+                }
+            } else {
+                null
+            },
+    ) {
         item {
             OutlinedButton(onClick = viewModel::refresh, modifier = Modifier.fillMaxWidth(), enabled = !state.loading) {
                 Text(if (state.loading) "Actualizando..." else "Actualizar avisos")
-            }
-        }
-        if (state.message.isNotBlank()) {
-            item {
-                PremiumFeedbackBanner(
-                    text = state.message,
-                    isError = state.message.startsWith("No se pudo"),
-                )
             }
         }
         items(state.items, key = RemoteAnnouncement::id) { item ->

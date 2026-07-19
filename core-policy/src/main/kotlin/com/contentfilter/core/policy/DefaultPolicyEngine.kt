@@ -8,6 +8,9 @@ import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.PolicyContext
 import com.contentfilter.core.domain.model.PolicyDecision
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicySchedulePolicy
+import com.contentfilter.core.domain.model.PolicySchedulePolicy.isAllowedWindow
+import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
 import com.contentfilter.core.domain.model.PolicySnapshot
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleAction
@@ -30,6 +33,9 @@ class DefaultPolicyEngine : PolicyEngine {
         context: AppPolicyContext,
     ): PolicyDecision {
         deviceDecision(context.device)?.let { return it }
+        if (!snapshot.rules.isAppAllowedBySchedule(context)) {
+            return PolicyDecision.Block("Blocked outside the allowed app schedule.")
+        }
         activeGrant(snapshot.extraTimeGrants, PolicyTargetType.App, context.packageName, context.time)?.let {
             return PolicyDecision.GrantExtraTime(it.grantedMinutes, it.validUntilEpochMillis)
         }
@@ -54,7 +60,7 @@ class DefaultPolicyEngine : PolicyEngine {
             snapshot.dailyLimits
                 .filter { it.enabled && it.targetType == PolicyTargetType.App && it.target == context.packageName }
                 .minByOrNull { it.limitMinutes }
-        if (limit != null && usedMinutesToday > limit.limitMinutes) {
+        if (limit != null && usedMinutesToday >= limit.limitMinutes) {
             return PolicyDecision.Block("Daily limit exceeded for ${context.packageName}.")
         }
         appGroups.forEach { group ->
@@ -112,6 +118,9 @@ class DefaultPolicyEngine : PolicyEngine {
         }
         if (normalizedContext.domain.matchesAny(CriticalAllowedDomains)) {
             return PolicyDecision.Allow()
+        }
+        if (!snapshot.rules.isDomainAllowedBySchedule(normalizedContext)) {
+            return PolicyDecision.Block("Blocked outside the allowed web schedule.")
         }
         activeGrant(
             snapshot.extraTimeGrants,
@@ -204,6 +213,7 @@ class DefaultPolicyEngine : PolicyEngine {
     private fun List<PolicyRule>.bestMatchingRule(context: AppPolicyContext): PolicyRule? =
         asSequence()
             .filter { it.enabled }
+            .filterNot { it.isAllowedWindow() }
             .filter { it.isActiveAt(context.time) }
             .filter { it.matchesApp(context) }
             .sortedWith(ruleComparator)
@@ -215,6 +225,7 @@ class DefaultPolicyEngine : PolicyEngine {
     ): PolicyRule? =
         asSequence()
             .filter { it.enabled }
+            .filterNot { it.isAllowedWindow() }
             .filter { it.isActiveAt(context.time) }
             .filter { it.matchesDomain(context) }
             .filterNot {
@@ -227,6 +238,7 @@ class DefaultPolicyEngine : PolicyEngine {
     private fun List<PolicyRule>.bestExplicitDomainRule(context: DomainPolicyContext): PolicyRule? =
         asSequence()
             .filter { it.enabled && it.scope == RuleScope.Domain }
+            .filterNot { it.isAllowedWindow() }
             .filterNot { it.id.startsWith("safe-default-") }
             .filter { !it.target.startsWith("__") && it.target != DomainWildcard }
             .filter { it.isActiveAt(context.time) }
@@ -236,7 +248,7 @@ class DefaultPolicyEngine : PolicyEngine {
 
     private fun PolicyRule.matchesApp(context: AppPolicyContext): Boolean =
         when (scope) {
-            RuleScope.App -> target == context.packageName
+            RuleScope.App -> target == AppWildcard || target == context.packageName
             RuleScope.Category -> target == context.category
             RuleScope.Global -> true
             RuleScope.Domain -> false
@@ -253,8 +265,28 @@ class DefaultPolicyEngine : PolicyEngine {
             RuleScope.App -> false
         }
 
+    private fun List<PolicyRule>.isAppAllowedBySchedule(context: AppPolicyContext): Boolean =
+        asSequence()
+            .filter { it.isAllowedWindow() && it.scope == RuleScope.App }
+            .filter {
+                it.scheduleTarget() == PolicySchedulePolicy.WildcardTarget ||
+                    it.scheduleTarget() == context.packageName
+            }.groupBy { requireNotNull(it.scheduleTarget()) }
+            .values
+            .all { windows -> windows.any { it.isActiveAt(context.time) } }
+
+    private fun List<PolicyRule>.isDomainAllowedBySchedule(context: DomainPolicyContext): Boolean =
+        asSequence()
+            .filter { it.isAllowedWindow() && it.scope == RuleScope.Domain }
+            .filter {
+                it.scheduleTarget() == PolicySchedulePolicy.WildcardTarget ||
+                    context.domain.matchesDomainTarget(requireNotNull(it.scheduleTarget()).normalizedDomain())
+            }.groupBy { requireNotNull(it.scheduleTarget()) }
+            .values
+            .all { windows -> windows.any { it.isActiveAt(context.time) } }
+
     private fun PolicyRule.isActiveAt(time: TimePolicyContext): Boolean =
-        activeWindow?.contains(time.minuteOfDay) ?: true
+        activeWindow?.contains(time, activeDaysMask) ?: true
 
     private fun activeGrant(
         grants: List<ExtraTimeGrant>,
@@ -278,6 +310,7 @@ class DefaultPolicyEngine : PolicyEngine {
 
     private companion object {
         const val GlobalExtraTimeTarget = "extra_time"
+        const val AppWildcard = "*"
         const val DomainWildcard = "*"
         val CriticalAllowedDomains =
             setOf(

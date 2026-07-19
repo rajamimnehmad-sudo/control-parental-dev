@@ -4,6 +4,7 @@ import com.contentfilter.core.domain.model.AccessRequest
 
 data class AdminRequestsUiState(
     val requests: List<AdminAccessRequestUiState> = emptyList(),
+    val resolvedRequests: List<AdminAccessRequestUiState> = emptyList(),
     val users: List<AdminRequestUserUiState> = emptyList(),
     val selectedDeviceId: String? = null,
     val offlineMode: Boolean = true,
@@ -25,6 +26,7 @@ data class AdminRequestUserUiState(
     val deviceId: String,
     val name: String,
     val pendingCount: Int,
+    val resolvedCount: Int,
 ) {
     val needsAttention: Boolean = pendingCount > 0
 }

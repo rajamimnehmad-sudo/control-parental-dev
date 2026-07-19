@@ -10,13 +10,18 @@ import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.domain.model.PolicySchedulePolicy
+import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
+import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.PolicyTimeWindow
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.model.WebProtectionSemantics
 import com.contentfilter.core.domain.model.dagEnabled
+import com.contentfilter.core.domain.model.dagExtraKosherEnabled
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
@@ -186,6 +191,9 @@ class RulesViewModel
                     safeSearchEnabled =
                         formState.pendingSafeSearchEnabled ?: policy.rules.safeSearchEnabledForWeb(),
                     dagEnabled = health.dagEntitled && (formState.pendingDagEnabled ?: policy.rules.dagEnabled()),
+                    dagExtraKosherEnabled =
+                        health.dagEntitled &&
+                            (formState.pendingDagExtraKosherEnabled ?: policy.rules.dagExtraKosherEnabled()),
                     dagEntitled = health.dagEntitled,
                     appControls =
                         if (selectedDeviceId == null) {
@@ -334,7 +342,7 @@ class RulesViewModel
                     accountId = device.accountId,
                     deviceId = device.id,
                     scope = ProtectionAuthorizationScope.Settings,
-                    durationMinutes = 10,
+                    durationMinutes = 30,
                 )
             }
 
@@ -344,7 +352,7 @@ class RulesViewModel
                     accountId = device.accountId,
                     deviceId = device.id,
                     scope = ProtectionAuthorizationScope.Removal,
-                    durationMinutes = 10,
+                    durationMinutes = 30,
                 )
             }
 
@@ -508,11 +516,11 @@ class RulesViewModel
             }
         }
 
-        fun deleteDevicePermanently(deviceId: String) {
+        fun archiveUser(deviceId: String) {
             form.update {
                 it.copy(
                     pendingDeviceDeleteIds = it.pendingDeviceDeleteIds + deviceId,
-                    message = "Borrando usuario...",
+                    message = "Archivando usuario...",
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
@@ -523,13 +531,13 @@ class RulesViewModel
                         val syncResult = syncEngine.syncDevicesFull()
                         Log.i(
                             LogTag,
-                            "deleteUser finished deviceId=$deviceId syncSuccess=${syncResult.success} message=${syncResult.message}",
+                            "archiveUser finished deviceId=$deviceId syncSuccess=${syncResult.success} message=${syncResult.message}",
                         )
                         form.update {
                             it.copy(
                                 selectedDeviceId = it.selectedDeviceId.takeUnless { selected -> selected == deviceId },
                                 pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
-                                message = "Usuario borrado.",
+                                message = "Usuario archivado.",
                             )
                         }
                     }
@@ -537,7 +545,7 @@ class RulesViewModel
                         form.update {
                             it.copy(
                                 pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
-                                message = "No se pudo borrar el usuario.",
+                                message = "No se pudo archivar el usuario.",
                             )
                         }
                     }
@@ -666,6 +674,24 @@ class RulesViewModel
                 requestedState = enabled,
                 previousState = uiState.value.dagEnabled,
                 successMessage = if (enabled) "DAG abierto." else "DAG cerrado.",
+            )
+        }
+
+        fun setDagExtraKosherEnabled(enabled: Boolean) {
+            if (!uiState.value.dagEntitled) {
+                form.update { it.copy(message = "DAG no está incluido en la licencia de esta comunidad.") }
+                return
+            }
+            if (enabled && !uiState.value.dagEnabled) {
+                form.update { it.copy(message = "Abrí DAG antes de activar el modo Extra Kosher.") }
+                return
+            }
+            setWebOption(
+                preference = WebPolicyPreference.DagExtraKosherEnabled,
+                action = "dag-extra-kosher",
+                requestedState = enabled,
+                previousState = uiState.value.dagExtraKosherEnabled,
+                successMessage = if (enabled) "Modo Extra Kosher activado." else "Modo Extra Kosher desactivado.",
             )
         }
 
@@ -914,6 +940,69 @@ class RulesViewModel
                                 "Regla y límite asociado eliminados."
                             } else {
                                 "Regla eliminada."
+                            },
+                    )
+                }
+            }
+        }
+
+        internal fun saveAllowedSchedule(
+            scope: RuleScope,
+            target: String,
+            windows: List<AllowedScheduleWindowInput>,
+        ) {
+            val targetDeviceId = selectedDeviceIdForRules() ?: return
+            if (
+                scope !in setOf(RuleScope.App, RuleScope.Domain) ||
+                target.isBlank() ||
+                windows.any { !it.isValid() }
+            ) {
+                form.update { it.copy(message = "Revisá los días y horarios ingresados.") }
+                return
+            }
+            val existing =
+                uiState.value.rules.filter {
+                    it.isScheduleRule() && it.scope == scope && it.scheduleTarget() == target
+                }
+            val desired =
+                windows.map { window ->
+                    PolicyRule(
+                        id = window.id?.takeIf { id -> existing.any { it.id == id } } ?: UUID.randomUUID().toString(),
+                        level = PolicyLevel.Device,
+                        scope = scope,
+                        target = PolicySchedulePolicy.encodedTarget(target),
+                        action = RuleAction.Allow,
+                        priority = PolicySchedulePolicy.RulePriority,
+                        enabled = true,
+                        activeWindow = PolicyTimeWindow(window.startMinuteOfDay, window.endMinuteOfDay),
+                        activeDaysMask = window.activeDaysMask,
+                    )
+                }
+            val desiredIds = desired.mapTo(mutableSetOf(), PolicyRule::id)
+            val removed = existing.filterNot { it.id in desiredIds }
+            viewModelScope.launch {
+                form.update { it.copy(message = "Guardando horario...") }
+                val saved =
+                    runCatching {
+                        if (desired.isNotEmpty()) {
+                            saveRule.saveAll(
+                                rules = desired,
+                                deviceId = targetDeviceId,
+                                requestId = "schedule-${UUID.randomUUID()}",
+                            )
+                        }
+                        removed.forEach { deleteRule(it) }
+                        syncScheduler.requestSync()
+                        syncNowWithResult()
+                    }
+                val syncResult = saved.getOrNull()
+                form.update {
+                    it.copy(
+                        message =
+                            when {
+                                saved.isFailure -> "No se pudo guardar el horario."
+                                syncResult?.success == true -> "Horario guardado."
+                                else -> "Horario guardado en este dispositivo. Pendiente por conexión."
                             },
                     )
                 }
@@ -1819,3 +1908,15 @@ class RulesViewModel
             const val PolicyApplicationWaitMillis = 8_000L
         }
     }
+
+internal data class AllowedScheduleWindowInput(
+    val id: String? = null,
+    val startMinuteOfDay: Int,
+    val endMinuteOfDay: Int,
+    val activeDaysMask: Int,
+) {
+    fun isValid(): Boolean =
+        startMinuteOfDay in 0..1_439 &&
+            endMinuteOfDay in 0..1_439 &&
+            activeDaysMask in 1..0b1111111
+}
