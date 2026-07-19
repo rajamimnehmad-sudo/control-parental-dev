@@ -101,6 +101,12 @@ export async function signInAction(_prevState: ActionState, formData: FormData):
   const supabase = await createClient();
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error?.status === 402 || error?.message.includes("project is restricted")) {
+    return {
+      ok: false,
+      message: "Supabase DEV está temporalmente restringido por su cuota. La contraseña no fue rechazada.",
+    };
+  }
   if (error) return { ok: false, message: "Email o password invalidos" };
 
   redirect("/communities");

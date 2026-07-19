@@ -8,10 +8,10 @@ import { emptyState } from "@/lib/action-state";
 
 export function LoginForm({
   passwordUpdated = false,
-  recoveryError = false,
+  recoveryError,
 }: {
   passwordUpdated?: boolean;
-  recoveryError?: boolean;
+  recoveryError?: string;
 }) {
   const [state, action, pending] = useActionState(signInAction, emptyState);
 
@@ -37,7 +37,9 @@ export function LoginForm({
       ) : null}
       {recoveryError ? (
         <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-danger">
-          El enlace no es válido o venció. Solicitá uno nuevo.
+          {recoveryError === "service"
+            ? "Supabase DEV está temporalmente restringido por su cuota. La contraseña no fue rechazada."
+            : "El enlace no es válido o venció. Solicitá uno nuevo."}
         </p>
       ) : null}
       {state.message ? <p className="rounded-md bg-red-50 px-3 py-2 text-sm font-medium text-danger">{state.message}</p> : null}

@@ -22,7 +22,7 @@ export default async function LoginPage({
         </div>
         <LoginForm
           passwordUpdated={params.passwordUpdated === "1"}
-          recoveryError={typeof params.recoveryError === "string"}
+          recoveryError={params.recoveryError}
         />
       </section>
     </main>

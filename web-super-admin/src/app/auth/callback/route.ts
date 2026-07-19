@@ -20,6 +20,9 @@ export async function GET(request: NextRequest) {
   const supabase = await createClient();
   const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
   if (exchangeError) {
+    if (exchangeError.status === 402 || exchangeError.message.includes("project is restricted")) {
+      return loginRedirect("service");
+    }
     return loginRedirect("expired");
   }
 

@@ -15,6 +15,10 @@ const passwordSchema = z
   .min(12, "La contraseña debe tener al menos 12 caracteres.")
   .max(128, "La contraseña es demasiado larga.");
 
+function isProjectRestricted(error: { status?: number; message?: string } | null) {
+  return error?.status === 402 || error?.message?.includes("project is restricted") === true;
+}
+
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value : "";
@@ -30,9 +34,15 @@ export async function requestPasswordRecoveryAction(
   }
 
   const supabase = await createClient();
-  await supabase.auth.resetPasswordForEmail(parsedEmail.data, {
+  const { error } = await supabase.auth.resetPasswordForEmail(parsedEmail.data, {
     redirectTo: `${superAdminSiteUrl}/auth/callback?next=/actualizar-password`,
   });
+  if (isProjectRestricted(error)) {
+    return {
+      ok: false,
+      message: "Supabase DEV está temporalmente restringido por su cuota. Intentá nuevamente cuando se restaure.",
+    };
+  }
 
   // The same response is returned whether or not the account exists.
   return { ok: true, message: genericRecoveryMessage };
@@ -55,6 +65,9 @@ export async function updatePasswordAction(
 
   const supabase = await createClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (isProjectRestricted(userError)) {
+    return { ok: false, message: "Supabase DEV está temporalmente restringido por su cuota." };
+  }
   if (userError || !userData.user) {
     return { ok: false, message: "El enlace venció. Solicitá uno nuevo." };
   }
@@ -66,6 +79,9 @@ export async function updatePasswordAction(
   }
 
   const { error: updateError } = await supabase.auth.updateUser({ password: parsedPassword.data });
+  if (isProjectRestricted(updateError)) {
+    return { ok: false, message: "Supabase DEV está temporalmente restringido por su cuota." };
+  }
   if (updateError) {
     return { ok: false, message: "No se pudo actualizar la contraseña. Solicitá un enlace nuevo." };
   }
