@@ -72,6 +72,7 @@ internal class DagImageClassifier(
     fun classify(
         bytes: ByteArray,
         mimeType: String?,
+        audienceContext: DagImageAudienceContext = DagImageAudienceContext.Unknown,
     ): DagImageClassification =
         synchronized(lock) {
             val detectedMime = supportedStaticImageMime(bytes, mimeType)
@@ -122,13 +123,22 @@ internal class DagImageClassifier(
                     }
                 }
                 val modestyDecision =
-                    modestyScores?.let { dagModestyImageDecision(it, calibration) } ?: DagImageDecision.Allowed
-                val decision = dagCombinedImageDecision(ensembleDecision, modestyDecision)
+                    modestyScores?.let { dagModestyImageDecision(it, calibration, audienceContext) }
+                        ?: DagImageDecision.Allowed
+                val decision =
+                    dagAudienceAwareImageDecision(
+                        ensembleDecision,
+                        modestyDecision,
+                        modestyScores,
+                        calibration,
+                        audienceContext,
+                    )
                 Log.d(
                     ImageMetricsTag,
                     "decision=${decision.name.lowercase()} elapsed_ms=" +
                         (SystemClock.elapsedRealtime() - classificationStartedAt) +
-                        " fallback=${legacyScore != null} modesty=${modestyDecision.name.lowercase()}",
+                        " fallback=${legacyScore != null} modesty=${modestyDecision.name.lowercase()} " +
+                        "audience=${audienceContext.name.lowercase()}",
                 )
                 val scores =
                     buildMap {

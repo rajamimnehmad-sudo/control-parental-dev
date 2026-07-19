@@ -260,6 +260,125 @@ class DagImagePolicyTest {
     }
 
     @Test
+    fun `young children allow ordinary exposed limbs but not underwear or nudity`() {
+        val calibration = DagImageCalibration()
+        val ordinaryChild =
+            DagModestyScores(
+                femaleFace = 0.90f,
+                armpitsExposed = 0.90f,
+                bellyExposed = 0.90f,
+                sleevesAboveElbow = 0.90f,
+                hemAboveKnee = 0.90f,
+            )
+
+        assertFalse(requiresKosherModestyBlur(ordinaryChild, calibration, DagImageAudienceContext.YoungChild))
+        assertTrue(
+            requiresKosherModestyBlur(
+                ordinaryChild.copy(buttocksCovered = 0.60f),
+                calibration,
+                DagImageAudienceContext.YoungChild,
+            ),
+        )
+        assertTrue(
+            requiresKosherModestyBlur(
+                ordinaryChild.copy(explicitRegion = 0.60f),
+                calibration,
+                DagImageAudienceContext.YoungChild,
+            ),
+        )
+    }
+
+    @Test
+    fun `girls use female criteria while male chest and belly stay allowed`() {
+        val calibration = DagImageCalibration()
+        assertTrue(
+            requiresKosherModestyBlur(
+                DagModestyScores(hemAboveKnee = 0.80f),
+                calibration,
+                DagImageAudienceContext.FemaleSixPlus,
+            ),
+        )
+        assertFalse(
+            requiresKosherModestyBlur(
+                DagModestyScores(maleFace = 0.90f, maleBreastExposed = 0.90f, bellyExposed = 0.90f),
+                calibration,
+                DagImageAudienceContext.Male,
+            ),
+        )
+    }
+
+    @Test
+    fun `male chest and young child context can resolve generic model false positives`() {
+        val calibration = DagImageCalibration()
+        assertEquals(
+            DagImageDecision.Allowed,
+            dagAudienceAwareImageDecision(
+                DagImageDecision.Blocked,
+                DagImageDecision.Allowed,
+                DagModestyScores(maleFace = 0.90f, maleBreastExposed = 0.80f),
+                calibration,
+                DagImageAudienceContext.Male,
+            ),
+        )
+        assertEquals(
+            DagImageDecision.Allowed,
+            dagAudienceAwareImageDecision(
+                DagImageDecision.Uncertain,
+                DagImageDecision.Allowed,
+                DagModestyScores(femaleFace = 0.90f),
+                calibration,
+                DagImageAudienceContext.YoungChild,
+            ),
+        )
+    }
+
+    @Test
+    fun `audience context recognizes babies men and girls without substring collisions`() {
+        assertEquals(
+            DagImageAudienceContext.IntimateClothing,
+            dagImageAudienceContext("https://cdn.example/look.jpg", "https://shop.example/bebes/ropa-interior"),
+        )
+        assertEquals(
+            DagImageAudienceContext.YoungChild,
+            dagImageAudienceContext("https://cdn.example/look.jpg", "https://shop.example/bebés/0-a-3"),
+        )
+        assertEquals(
+            DagImageAudienceContext.Male,
+            dagImageAudienceContext("https://cdn.example/man-shirtless.jpg", "https://shop.example/hombre"),
+        )
+        assertEquals(
+            DagImageAudienceContext.FemaleSixPlus,
+            dagImageAudienceContext("https://cdn.example/look.jpg", "https://shop.example/niñas/vestidos"),
+        )
+        assertEquals(
+            DagImageAudienceContext.Unknown,
+            dagImageAudienceContext("https://cdn.example/humanity.jpg", "https://shop.example/home"),
+        )
+    }
+
+    @Test
+    fun `underwear context stays blurred for children and men`() {
+        val calibration = DagImageCalibration()
+        val maleUnderwear = DagModestyScores(maleFace = 0.90f, maleBreastExposed = 0.90f)
+
+        assertTrue(
+            requiresKosherModestyBlur(
+                maleUnderwear,
+                calibration,
+                DagImageAudienceContext.IntimateClothing,
+            ),
+        )
+        assertEquals(
+            DagImageDecision.Uncertain,
+            dagModestyImageDecision(
+                maleUnderwear,
+                calibration,
+                DagImageAudienceContext.IntimateClothing,
+            ),
+        )
+    }
+
+    @Test
     fun `human explanation signals identify the threshold that fired`() {
         val calibration = DagImageCalibration(version = 4, sleevesAboveElbow = 0.70f)
         val signals =

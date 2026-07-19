@@ -12,6 +12,8 @@ import java.nio.FloatBuffer
 
 internal data class DagModestyScores(
     val femaleFace: Float = 0f,
+    val maleFace: Float = 0f,
+    val maleBreastExposed: Float = 0f,
     val femaleBreastCovered: Float = 0f,
     val femaleGenitaliaCovered: Float = 0f,
     val buttocksCovered: Float = 0f,
@@ -31,6 +33,8 @@ internal fun DagModestyScores.withTzniutPose(scores: DagTzniutPoseScores): DagMo
 internal fun DagModestyScores.toCalibrationScores(): Map<String, Float> =
     mapOf(
         "female_face" to femaleFace,
+        "male_face" to maleFace,
+        "male_breast_exposed" to maleBreastExposed,
         "female_breast_covered" to femaleBreastCovered,
         "female_genitalia_covered" to femaleGenitaliaCovered,
         "buttocks_covered" to buttocksCovered,
@@ -44,12 +48,17 @@ internal fun DagModestyScores.toCalibrationScores(): Map<String, Float> =
 internal fun requiresKosherModestyBlur(
     scores: DagModestyScores,
     calibration: DagImageCalibration = DagImageCalibration(),
+    audienceContext: DagImageAudienceContext = DagImageAudienceContext.Unknown,
 ): Boolean {
-    val femaleContext = scores.femaleFace >= calibration.femaleFace
-    return scores.explicitRegion >= calibration.explicitRegion ||
-        scores.femaleBreastCovered >= calibration.femaleBreastCovered ||
-        scores.femaleGenitaliaCovered >= calibration.femaleGenitaliaCovered ||
-        scores.buttocksCovered >= calibration.buttocksCovered ||
+    val femaleContext = scores.hasFemaleContext(calibration, audienceContext)
+    val femaleSpecificRegion = !scores.hasMaleOnlyContext(calibration, audienceContext)
+    val universallySensitive =
+        audienceContext == DagImageAudienceContext.IntimateClothing ||
+            scores.explicitRegion >= calibration.explicitRegion ||
+            scores.femaleGenitaliaCovered >= calibration.femaleGenitaliaCovered ||
+            scores.buttocksCovered >= calibration.buttocksCovered
+    if (universallySensitive || audienceContext == DagImageAudienceContext.YoungChild) return universallySensitive
+    return (femaleSpecificRegion && scores.femaleBreastCovered >= calibration.femaleBreastCovered) ||
         (femaleContext && scores.armpitsExposed >= calibration.armpitsExposed) ||
         (femaleContext && scores.bellyExposed >= calibration.bellyExposed) ||
         (femaleContext && scores.sleevesAboveElbow >= calibration.sleevesAboveElbow) ||
@@ -59,12 +68,13 @@ internal fun requiresKosherModestyBlur(
 internal fun dagModestyImageDecision(
     scores: DagModestyScores,
     calibration: DagImageCalibration = DagImageCalibration(),
+    audienceContext: DagImageAudienceContext = DagImageAudienceContext.Unknown,
 ): DagImageDecision {
-    if (!requiresKosherModestyBlur(scores, calibration)) return DagImageDecision.Allowed
-    val femaleContext = scores.femaleFace >= calibration.femaleFace
+    if (!requiresKosherModestyBlur(scores, calibration, audienceContext)) return DagImageDecision.Allowed
+    val femaleContext = scores.hasFemaleContext(calibration, audienceContext)
+    val femaleSpecificRegion = !scores.hasMaleOnlyContext(calibration, audienceContext)
     val clearlyBlocked =
         scores.explicitRegion >= calibration.explicitRegion.strongThreshold() ||
-            scores.femaleBreastCovered >= calibration.femaleBreastCovered.strongThreshold() ||
             scores.femaleGenitaliaCovered >= calibration.femaleGenitaliaCovered.strongThreshold() ||
             scores.buttocksCovered >= calibration.buttocksCovered.strongThreshold() ||
             (
@@ -75,8 +85,52 @@ internal fun dagModestyImageDecision(
                             scores.sleevesAboveElbow >= calibration.sleevesAboveElbow.strongThreshold() ||
                             scores.hemAboveKnee >= calibration.hemAboveKnee.strongThreshold()
                     )
-            )
+            ) ||
+            (femaleSpecificRegion && scores.femaleBreastCovered >= calibration.femaleBreastCovered.strongThreshold())
     return if (clearlyBlocked) DagImageDecision.Blocked else DagImageDecision.Uncertain
+}
+
+internal fun DagModestyScores.hasFemaleContext(
+    calibration: DagImageCalibration,
+    audienceContext: DagImageAudienceContext,
+): Boolean {
+    if (audienceContext == DagImageAudienceContext.YoungChild) return false
+    if (audienceContext == DagImageAudienceContext.FemaleSixPlus) return true
+    val femaleDetected = femaleFace >= calibration.femaleFace
+    val maleDominates =
+        (audienceContext == DagImageAudienceContext.Male || maleFace >= calibration.femaleFace) &&
+            maleFace >= femaleFace + GenderDominanceMargin
+    return femaleDetected && !maleDominates
+}
+
+private fun DagModestyScores.hasMaleOnlyContext(
+    calibration: DagImageCalibration,
+    audienceContext: DagImageAudienceContext,
+): Boolean {
+    if (audienceContext == DagImageAudienceContext.YoungChild) return true
+    if (audienceContext == DagImageAudienceContext.IntimateClothing) return false
+    if (audienceContext == DagImageAudienceContext.FemaleSixPlus) return false
+    val maleDetected = audienceContext == DagImageAudienceContext.Male || maleFace >= calibration.femaleFace
+    return maleDetected && (femaleFace < calibration.femaleFace || maleFace >= femaleFace + GenderDominanceMargin)
+}
+
+internal fun dagAudienceAwareImageDecision(
+    ensembleDecision: DagImageDecision,
+    modestyDecision: DagImageDecision,
+    scores: DagModestyScores?,
+    calibration: DagImageCalibration,
+    audienceContext: DagImageAudienceContext,
+): DagImageDecision {
+    if (modestyDecision != DagImageDecision.Allowed) {
+        return dagCombinedImageDecision(ensembleDecision, modestyDecision)
+    }
+    val measured = scores ?: return ensembleDecision
+    val maleChestOnly =
+        measured.hasMaleOnlyContext(calibration, audienceContext) &&
+            measured.maleBreastExposed >= MaleChestEvidenceThreshold &&
+            !measured.hasFemaleContext(calibration, audienceContext)
+    val youngChild = audienceContext == DagImageAudienceContext.YoungChild
+    return if (maleChestOnly || youngChild) DagImageDecision.Allowed else ensembleDecision
 }
 
 internal fun dagCombinedImageDecision(
@@ -157,11 +211,16 @@ internal class DagModestyImageClassifier(
     }
 
     private fun Array<*>.toModestyScores(): DagModestyScores {
-        fun maximum(classIndex: Int): Float = (getOrNull(BoxChannels + classIndex) as? FloatArray)?.maxOrNull() ?: 1f
+        fun maximum(
+            classIndex: Int,
+            missingValue: Float = 1f,
+        ): Float = (getOrNull(BoxChannels + classIndex) as? FloatArray)?.maxOrNull() ?: missingValue
 
         return DagModestyScores(
             femaleGenitaliaCovered = maximum(FemaleGenitaliaCovered),
             femaleFace = maximum(FemaleFace),
+            maleFace = maximum(MaleFace, 0f),
+            maleBreastExposed = maximum(MaleBreastExposed, 0f),
             armpitsExposed = maximum(ArmpitsExposed),
             bellyExposed = maximum(BellyExposed),
             femaleBreastCovered = maximum(FemaleBreastCovered),
@@ -178,13 +237,17 @@ internal class DagModestyImageClassifier(
         const val BoxChannels = 4
         const val FemaleGenitaliaCovered = 0
         const val FemaleFace = 1
+        const val MaleBreastExposed = 5
         const val ArmpitsExposed = 11
+        const val MaleFace = 12
         const val BellyExposed = 13
         const val FemaleBreastCovered = 16
         const val ButtocksCovered = 17
-        val ExplicitClasses = listOf(2, 3, 4, 6, 13, 14)
+        val ExplicitClasses = listOf(2, 3, 4, 6, 14)
         val FailedInferenceScores = DagModestyScores(explicitRegion = 1f)
     }
 }
 
 private const val StrongDecisionMargin = 0.15f
+private const val GenderDominanceMargin = 0.10f
+private const val MaleChestEvidenceThreshold = 0.30f
