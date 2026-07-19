@@ -88,6 +88,12 @@ Admin   df29546d127b1b3c13952e68db46eb12740164038d3e75069c36ae6ced3a9acd
 - Validacion local: unit tests, compilacion, ktlint y builds DEV de Usuario/Admin correctos; Android Lint de Usuario, ESLint, TypeScript y build Next correctos. GitHub `Publicar APKs DEV` run `29670710720` finalizo correctamente en una sola publicacion y Android CI `29670710746` completo build, tests, ktlint, Android Lint y Detekt. La Superweb sirve el commit `eefc2b8` y confirma ambiente DEV y proyecto `syeycayasyufedwoprea`.
 - Los manifiestos publicos declaran 257 y los APK descargados coinciden con los SHA-256 documentados arriba. `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`; ambos conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Falta la prueba fisica de activacion, originales visibles, X, R y restauracion del blur al apagar el modo.
 
+## Candidato DEV 258 - entrega directa de marcadores X/R - 2026-07-19
+
+- Reporte fisico en el Samsung personal con 257: `Calibración DEV` recargaba correctamente y revelaba los originales, pero no mostraba X ni R. Esto aislo el fallo al recorrido que pedia cada decision desde JavaScript y esperaba la respuesta nativa antes de crear el marcador; el modo de revelado y la clasificacion local si funcionaban.
+- Correccion: al terminar cada clasificacion, el cargador envia directamente URL normalizada y decision al WebView; al finalizar la pagina tambien sincroniza una instantanea acotada de decisiones ya disponibles. La consulta anterior queda como respaldo. X/R siguen requiriendo una candidata local clasificada para que el reporte sea aceptado.
+- Validacion local: tests DEV, ktlint y build optimizado de App Usuario correctos, 690 tareas. El candidato 257 se instalo in-place en SM-A235M preservando datos; ese dispositivo tenia DAG deshabilitado por politica y no permitio cerrar el recorrido visual. Se publica 258 a pedido del usuario para validacion en el Samsung personal.
+
 ## Recuperacion segura de Super Admin - 2026-07-18
 
 - `SUPERWEB-AUTH-RECOVERY-01` corrige la ausencia total de recuperacion de contraseña: Login incorpora `Olvidé mi contraseña`, solicitud por email, callback PKCE y pantalla para establecer una contraseña nueva de al menos 12 caracteres.

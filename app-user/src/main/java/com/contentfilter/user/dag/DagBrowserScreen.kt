@@ -9,6 +9,8 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.net.Uri
 import android.net.http.SslError
+import android.os.Handler
+import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.webkit.CookieManager
@@ -1515,6 +1517,9 @@ private fun DagWebContent(
     val currentCalibrationCandidate by rememberUpdatedState(onCalibrationCandidate)
     val currentManualCalibrationCandidate by rememberUpdatedState(onManualCalibrationCandidate)
     val currentManualBlurReviewCandidate by rememberUpdatedState(onManualBlurReviewCandidate)
+    val currentVisualCalibrationEnabled by rememberUpdatedState(visualCalibrationEnabled)
+    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+    var webView by remember { mutableStateOf<WebView?>(null) }
     val imageLoader =
         remember(imageClassifier) {
             DagImageResourceLoader(
@@ -1522,9 +1527,15 @@ private fun DagWebContent(
                 onCalibrationCandidate = { image, classification ->
                     currentCalibrationCandidate(image, classification)
                 },
+                onManualCandidateReady = { imageUrl, decision ->
+                    mainHandler.post {
+                        if (currentVisualCalibrationEnabled) {
+                            webView?.setDagImageCalibrationDecision(imageUrl, decision)
+                        }
+                    }
+                },
             )
         }
-    var webView by remember { mutableStateOf<WebView?>(null) }
     var canGoBack by remember { mutableStateOf(false) }
     var canGoForward by remember { mutableStateOf(false) }
     var inspectedUrl by remember { mutableStateOf<String?>(null) }
@@ -1656,6 +1667,7 @@ private fun DagWebContent(
                                 onNavigationStateChanged(canGoBack, canGoForward)
                                 inspectPage(view, url)
                                 view.setDagVisualCalibrationMode(visualCalibrationEnabled)
+                                view.setDagImageCalibrationDecisions(imageLoader.manualCalibrationDecisions())
                             },
                             onBlocked = onPageBlocked,
                             onRendererGone = { failedView ->
@@ -1750,6 +1762,22 @@ private fun WebView.setDagImageCalibrationDecision(
         "(function(){if(window.__dagSetImageCalibrationDecision){window.__dagSetImageCalibrationDecision(" +
             org.json.JSONObject.quote(imageUrl) + "," +
             org.json.JSONObject.quote(decision.name.lowercase()) + ");}})();",
+        null,
+    )
+}
+
+private fun WebView.setDagImageCalibrationDecisions(decisions: Map<String, DagImageDecision>) {
+    if (decisions.isEmpty()) return
+    val payload =
+        JSONArray().apply {
+            decisions.forEach { (imageUrl, decision) ->
+                put(JSONArray().put(imageUrl).put(decision.name.lowercase()))
+            }
+        }
+    evaluateJavascript(
+        "(function(items){if(!window.__dagSetImageCalibrationDecision){return;}" +
+            "items.forEach(function(item){window.__dagSetImageCalibrationDecision(item[0],item[1]);});})(" +
+            payload + ");",
         null,
     )
 }
@@ -2166,10 +2194,14 @@ private fun WebView.sanitizeAndExtractVisibleText(
           }
           window.__dagImageCalibrationDecisions = window.__dagImageCalibrationDecisions || Object.create(null);
           window.__dagImageCalibrationProbes = window.__dagImageCalibrationProbes || Object.create(null);
+          function dagCalibrationKey(source) {
+            try { return new URL(source || '', document.baseURI).href.split('#')[0]; } catch (_) { return source || ''; }
+          }
           window.__dagSetImageCalibrationDecision = function(source, decision) {
             if (!source || !decision) return;
-            window.__dagImageCalibrationDecisions[source] = decision;
-            delete window.__dagImageCalibrationProbes[source];
+            var key = dagCalibrationKey(source);
+            window.__dagImageCalibrationDecisions[key] = decision;
+            delete window.__dagImageCalibrationProbes[key];
             if (window.__dagVisualCalibrationEnabled) window.requestAnimationFrame(window.__dagRefreshCalibrationMarkers);
           };
           window.__dagRefreshCalibrationMarkers = function() {
@@ -2182,15 +2214,16 @@ private fun WebView.sanitizeAndExtractVisibleText(
               if (rect.width < 48 || rect.height < 48 || rect.bottom < 0 || rect.top > window.innerHeight) return;
               var source = dagHttpsImageSource(image);
               if (!source) return;
-              var decision = window.__dagImageCalibrationDecisions[source];
+              var sourceKey = dagCalibrationKey(source);
+              var decision = window.__dagImageCalibrationDecisions[sourceKey];
               if (!decision) {
-                if (!window.__dagImageCalibrationProbes[source]) {
-                  window.__dagImageCalibrationProbes[source] = true;
+                if (!window.__dagImageCalibrationProbes[sourceKey]) {
+                  window.__dagImageCalibrationProbes[sourceKey] = true;
                   try {
                     window.$DagCalibrationBridgeName.postMessage(JSON.stringify({ action: 'probe', url: source }));
                   } catch (_) {}
                   window.setTimeout(function() {
-                    delete window.__dagImageCalibrationProbes[source];
+                    delete window.__dagImageCalibrationProbes[sourceKey];
                     if (window.__dagVisualCalibrationEnabled) window.requestAnimationFrame(window.__dagRefreshCalibrationMarkers);
                   }, 500);
                 }

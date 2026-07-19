@@ -176,7 +176,7 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
-| DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 257; pendiente prueba fisica | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
+| DAG-CALIBRATION-BIDIRECTIONAL-09 | Hotfix candidato DEV 258; pendiente prueba fisica | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-ULTRA-KOSHER-01 | Idea | P1 | Elegir entre fotos filtradas con advertencia o modo Ultra kosher con todas las fotos desenfocadas | M | Alto |
 | DAG-RESULTS-DIAG-01 | Resuelto DEV 237 | P1 | Contabilizar localmente el embudo de resultados Brave y los descartes DAG sin guardar contenido | S | Bajo |
 | DAG-RESULTS-PAGE-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Ofrecer una unica pagina adicional cuando Brave informa mas resultados, con costo explicito | S | Medio |

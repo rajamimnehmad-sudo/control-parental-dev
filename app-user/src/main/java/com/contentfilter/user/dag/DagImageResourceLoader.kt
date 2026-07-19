@@ -20,6 +20,7 @@ import java.util.concurrent.atomic.AtomicInteger
 internal class DagImageResourceLoader(
     private val classifier: DagImageClassifier,
     private val onCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit = { _, _ -> },
+    private val onManualCandidateReady: (String, DagImageDecision) -> Unit = { _, _ -> },
     private val cookieManager: CookieManager = CookieManager.getInstance(),
     private val client: OkHttpClient =
         OkHttpClient.Builder()
@@ -84,6 +85,11 @@ internal class DagImageResourceLoader(
     fun manualCalibrationDecision(imageUrl: String): DagImageDecision? =
         synchronized(manualCalibrationCandidates) {
             manualCalibrationCandidates[normalizeImageUrl(imageUrl)]?.classification?.decision
+        }
+
+    fun manualCalibrationDecisions(): Map<String, DagImageDecision> =
+        synchronized(manualCalibrationCandidates) {
+            manualCalibrationCandidates.mapValues { it.value.classification.decision }
         }
 
     fun takeManualCalibrationCandidate(imageUrl: String): DagManualCalibrationCandidate? =
@@ -162,6 +168,7 @@ internal class DagImageResourceLoader(
                 calibrationThumbnail.let { thumbnail ->
                     rememberManualCalibrationCandidate(request.url.toString(), thumbnail, classification)
                 }
+                onManualCandidateReady(request.url.toString(), classification.decision)
             }
             when (classification.decision) {
                 DagImageDecision.Allowed -> allowedCount.incrementAndGet()
