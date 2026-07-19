@@ -75,14 +75,8 @@ val uploadDevUpdatesToStorage by tasks.registering(Exec::class) {
 gradle.projectsEvaluated {
     val userDevDebug = project(":app-user").tasks.named("assembleDevDebug")
     val adminDevDebug = project(":app-admin").tasks.named("assembleDevDebug")
-    val userPackageDevDebug = project(":app-user").tasks.named("packageDevDebug")
-    val adminPackageDevDebug = project(":app-admin").tasks.named("packageDevDebug")
 
     prepareDevUpdatesForStorage.configure {
-        mustRunAfter(userPackageDevDebug, adminPackageDevDebug)
-    }
-
-    adminDevDebug.configure {
-        dependsOn(userDevDebug, uploadDevUpdatesToStorage)
+        dependsOn(userDevDebug, adminDevDebug)
     }
 }
