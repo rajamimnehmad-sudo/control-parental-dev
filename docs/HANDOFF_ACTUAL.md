@@ -95,6 +95,13 @@ Admin   c347e20af45868f03f4629bfe8bcd55ba4754cde5395dd38c5033ae1a4802a70
 - Validacion local: tests DEV, ktlint y build optimizado de App Usuario correctos, 690 tareas; la validacion final de Admin y ambos APK completo 756 tareas. El candidato 257 se instalo in-place en SM-A235M preservando datos; ese dispositivo tenia DAG deshabilitado por politica y no permitio cerrar el recorrido visual.
 - GitHub `Publicar APKs DEV` run `29671696981` finalizo correctamente y publico una sola vez, exclusivamente en Supabase DEV. Android CI run `29671696980` completo build, tests, ktlint, Android Lint y Detekt. Los manifiestos publicos declaran 258 y las descargas coinciden con los SHA-256 documentados arriba. `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`; ambos APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Pendiente: prueba fisica de X/R en el Samsung personal.
 
+## Candidato DEV 259 - marcadores sincronizados desde page commit - 2026-07-19
+
+- Reproduccion fisica en SM-A235M con DEV 258: la clasificacion local completaba mas de veinte decisiones y el modo revelaba originales, pero X/R no aparecian. La prueba requirio volver a enlazar el equipo de prueba con un token temporal y habilitar DAG mediante la politica normal de App Admin; no se borro ningun dato.
+- Causa confirmada: el callback creado inicialmente por el WebView conservaba el valor `false` de Calibracion DEV. Al activar el modo se recargaba la pagina, pero los marcadores dependian de `onPageFinished` y de ese valor capturado. Sitios pesados como Samsung pueden no finalizar mientras mantienen recursos activos, por lo que las decisiones llegaban pero el motor visual permanecia apagado.
+- Correccion: al preparar el viewport desde `onPageCommitVisible`, DAG aplica el estado actual de Calibracion DEV y sincroniza las decisiones ya disponibles; `onPageFinished` conserva el mismo respaldo usando tambien el estado actual. Las decisiones posteriores siguen llegando directamente desde el clasificador.
+- Validacion fisica local: X visibles sobre las tarjetas Galaxy y el banner en samsung.com; despues de desplazar la pagina los marcadores se reposicionan y aparecen sobre contenido nuevo. No se pulso ninguna X y no se creo un pendiente de calibracion artificial. Pendiente: matriz final, publicacion DEV 259 y prueba en el Samsung personal.
+
 ## Recuperacion segura de Super Admin - 2026-07-18
 
 - `SUPERWEB-AUTH-RECOVERY-01` corrige la ausencia total de recuperacion de contraseña: Login incorpora `Olvidé mi contraseña`, solicitud por email, callback PKCE y pantalla para establecer una contraseña nueva de al menos 12 caracteres.

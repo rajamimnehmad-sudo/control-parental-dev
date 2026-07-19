@@ -1618,6 +1618,8 @@ private fun DagWebContent(
                         if (preparedUrl == url) return
                         preparedUrl = url
                         view.sanitizeAndExtractVisibleText {
+                            view.setDagVisualCalibrationMode(currentVisualCalibrationEnabled)
+                            view.setDagImageCalibrationDecisions(imageLoader.manualCalibrationDecisions())
                             view.awaitDagViewportImages(
                                 onProgress = { resolved, total -> onViewportImageProgress(url, resolved, total) },
                             ) {
@@ -1666,7 +1668,7 @@ private fun DagWebContent(
                                 canGoForward = view.canGoForward()
                                 onNavigationStateChanged(canGoBack, canGoForward)
                                 inspectPage(view, url)
-                                view.setDagVisualCalibrationMode(visualCalibrationEnabled)
+                                view.setDagVisualCalibrationMode(currentVisualCalibrationEnabled)
                                 view.setDagImageCalibrationDecisions(imageLoader.manualCalibrationDecisions())
                             },
                             onBlocked = onPageBlocked,
