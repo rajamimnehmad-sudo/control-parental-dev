@@ -65,15 +65,20 @@ fun RequestsScreen(
         title = "Solicitudes",
         subtitle = "${state.pendingCount} pendientes",
         onBack = onBack,
+        banner =
+            if (state.message.isNotBlank()) {
+                {
+                    PremiumFeedbackBanner(text = state.message, isError = state.message.startsWith("No se pudo"))
+                }
+            } else {
+                null
+            },
     ) {
         ProductLargeFeatureCard(
             title = "Permisos pedidos",
             subtitle = "Acá ves si el administrador aprobó, rechazó o dejó pendiente cada solicitud.",
             accent = ProductSun,
         )
-        if (state.message.isNotBlank()) {
-            PremiumFeedbackBanner(text = state.message, isError = state.message.startsWith("No se pudo"))
-        }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = onRefresh,

@@ -38,19 +38,23 @@ fun ActivationScreen(
     notice: String = "",
     modifier: Modifier = Modifier,
 ) {
+    val bannerText = notice.ifBlank { state.message }
     ProductVisualPage(
         modifier = modifier,
         title = "Enlazar dispositivo",
         subtitle = "Ingresá el token que te dio tu administrador",
+        banner = {
+            FeedbackBanner(
+                text = bannerText,
+                isError = notice.isNotBlank() || bannerText.startsWith("No se pudo"),
+            )
+        },
     ) {
         ProductLargeFeatureCard(
             title = "Dispositivo protegido",
             subtitle = "Este teléfono se conecta a tu comunidad con un token temporal.",
             accent = ProductTeal,
         )
-        if (notice.isNotBlank()) {
-            FeedbackBanner(text = notice, isError = true)
-        }
         ProductCard {
             OutlinedTextField(
                 value = state.activationCode,
@@ -68,6 +72,5 @@ fun ActivationScreen(
                 text = "Enlazar",
             )
         }
-        FeedbackBanner(text = state.message, isError = state.message.startsWith("No se pudo"))
     }
 }
