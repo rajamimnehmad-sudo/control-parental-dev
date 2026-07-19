@@ -11,6 +11,7 @@ data class MyAppsUiState(
 data class MyAppGroupUiState(
     val id: String,
     val name: String,
+    val enabled: Boolean,
     val limitMinutes: Int,
     val usedMinutes: Int,
     val appCount: Int,

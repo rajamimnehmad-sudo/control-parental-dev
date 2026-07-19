@@ -51,6 +51,14 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### USER-HOME-UX-03 - Home dinamico de App Usuario
+
+- Estado: `Implementado candidato local posterior a DEV 261; pendiente prueba fisica y publicacion conjunta`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX, estado de proteccion, uso y actualizaciones. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Alcance: integrar la zona de camara con el header oscuro; mover Avisos a una campanita; retirar las tarjetas tecnicas; mostrar la actualizacion solo cuando corresponda; expandir/cerrar en Home el diagnostico de proteccion con pasos de reparacion; y mostrar apps y grupos cerca del limite mediante una cola superpuesta de iconos y barras de progreso.
+- Comportamiento: solo se muestran limites diarios con al menos 70 % consumido; grupos deshabilitados y apps con tiempo extra activo quedan fuera. Proteccion y Tiempos son mutuamente excluyentes al expandirse, y las secciones dinamicas desaparecen sin dejar bloques vacios.
+- Arquitectura: reutiliza ViewModels, estados, iconos, flujo de actualizacion y acciones de reparacion existentes; no agrega biblioteca ni dependencia. La busqueda queda localizada en `Mis apps` para no recortar el inventario compartido que consume Home.
+- Aceptacion alcanzada: ktlint, tests unitarios, Android Lint vital y APK DEV local correctos. Falta revision visual en telefono conectado y la publicacion conjunta que el usuario autorice; no cambia `versionCode` ni publica por si solo.
+
 ### AI-SEARCH-01A - Intencion semantica local compacta
 
 - Estado: `En progreso`; aprobado por la continuacion explicita de IA local el 2026-07-15. DEV 212 publicado y verificado; falta prueba fisica en el celular personal.
@@ -152,6 +160,7 @@ Flujo de una entrada:
 | POLICY-SCHEDULES-01 | Publicado DEV 261 y backend DEV aplicado; pendiente prueba física | P1 | Límites de uso real y horarios múltiples por día en zona Argentina para Apps y Web | XL | Alto |
 | ADMIN-REQUESTS-ACCOUNT-01 | Publicado DEV 261; pendiente prueba física | P1 | Solicitudes raíz y Cuenta con identidad, Superweb, licencia, versión y novedades | M | Medio |
 | USER-UX-ALIGN-02 | Publicado DEV 261; validación local completa y cierre físico parcial | P2 | Reacomodar App Usuario con componentes visuales compartidos sin exponer controles Admin | L | Medio |
+| USER-HOME-UX-03 | Implementado candidato local posterior a DEV 261; pendiente prueba física y publicación conjunta | P2 | Home dinámico con protección reparable, campanita Superweb, actualización contextual y cola de apps/grupos cerca del límite | M | Medio |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-AUTH-RECOVERY-01 | Publicado; recovery bloqueado externamente por cuota Supabase DEV | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |

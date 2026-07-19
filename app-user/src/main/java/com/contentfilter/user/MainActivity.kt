@@ -9,11 +9,21 @@ import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,18 +31,30 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,8 +66,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -65,7 +91,6 @@ import com.contentfilter.core.ui.ProductLazyVisualPage
 import com.contentfilter.core.ui.ProductMint
 import com.contentfilter.core.ui.ProductNavGlyph
 import com.contentfilter.core.ui.ProductSky
-import com.contentfilter.core.ui.ProductStatCard
 import com.contentfilter.core.ui.ProductSun
 import com.contentfilter.feature.accessibility.service.AccessibilityController
 import com.contentfilter.feature.accessibility.service.DeviceAdminController
@@ -75,7 +100,10 @@ import com.contentfilter.feature.requests.RequestsViewModel
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.announcements.UserAnnouncementsRoute
+import com.contentfilter.user.announcements.UserAnnouncementsViewModel
+import com.contentfilter.user.apps.AppIcon
 import com.contentfilter.user.apps.MyAppsRoute
+import com.contentfilter.user.apps.MyAppsViewModel
 import com.contentfilter.user.dag.DagActivity
 import com.contentfilter.user.dag.DagBrowserRoute
 import com.contentfilter.user.dag.DagShortcutController
@@ -87,6 +115,7 @@ import com.contentfilter.user.push.OpenAnnouncementsAction
 import com.contentfilter.user.push.UserPushViewModel
 import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
+import com.contentfilter.user.updates.UpdatesUiState
 import com.contentfilter.user.updates.UpdatesViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
@@ -109,6 +138,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(UserHomeHeaderTop.toArgb()))
         recordDagLaunch(intent)
         recordAnnouncementLaunch(intent)
         setContent {
@@ -300,6 +330,25 @@ private fun UserAppRoot(
                     UserHomeRoute(
                         onRequests = { navigateTo(UserDestination.Requests) },
                         onAnnouncements = { navigateTo(UserDestination.Announcements) },
+                        onMyApps = { selectTopLevel(UserDestination.MyApps) },
+                        updateState = updateState,
+                        onUpdateNow = updatesViewModel::downloadUpdate,
+                        onActivateVpn = {
+                            val permissionIntent = VpnController.prepareIntent(context)
+                            if (permissionIntent == null) {
+                                VpnController.start(context)
+                            } else {
+                                vpnPermissionLauncher.launch(permissionIntent)
+                            }
+                        },
+                        onActivateAccessibility = {
+                            accessibilityReminderDeferred = true
+                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        },
+                        onActivateDeviceAdmin = {
+                            deviceAdminLauncher.launch(DeviceAdminController.activationIntent(context))
+                        },
+                        onOpenSettings = { selectTopLevel(UserDestination.Updates) },
                     )
                 UserDestination.MyApps -> MyAppsRoute()
                 UserDestination.Requests -> RequestsRoute(onBack = ::goBack)
@@ -530,21 +579,45 @@ private fun UserAppRoot(
 private fun UserHomeRoute(
     onRequests: () -> Unit,
     onAnnouncements: () -> Unit,
+    onMyApps: () -> Unit,
+    updateState: UpdatesUiState,
+    onUpdateNow: () -> Unit,
+    onActivateVpn: () -> Unit,
+    onActivateAccessibility: () -> Unit,
+    onActivateDeviceAdmin: () -> Unit,
+    onOpenSettings: () -> Unit,
     requestsViewModel: RequestsViewModel = hiltViewModel(),
     homeViewModel: UserHomeViewModel = hiltViewModel(),
     statusViewModel: SystemStatusViewModel = hiltViewModel(),
+    appsViewModel: MyAppsViewModel = hiltViewModel(),
+    announcementsViewModel: UserAnnouncementsViewModel = hiltViewModel(),
 ) {
     val requestsState by requestsViewModel.uiState.collectAsStateWithLifecycle()
     val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
+    val appsState by appsViewModel.uiState.collectAsStateWithLifecycle()
+    val announcementsState by announcementsViewModel.state.collectAsStateWithLifecycle()
+    val limitItems = remember(appsState) { nearLimitItems(appsState) }
     UserHomeTab(
         greeting = homeState.greeting,
         protectionLevel = statusState.protectionLevel,
-        protectionSummary = statusState.summary,
+        vpnState = statusState.vpnState,
+        accessibilityState = statusState.accessibilityState,
+        deviceAdminState = statusState.deviceAdminState,
+        syncState = statusState.syncState,
+        activationState = statusState.activationState,
+        announcementCount = announcementsState.items.size,
+        updateState = updateState,
+        limitItems = limitItems,
         pendingRequests = requestsState.pendingCount,
-        latestRequestLabel = requestsState.requests.firstOrNull()?.requestType?.name.orEmpty(),
         onRequests = onRequests,
         onAnnouncements = onAnnouncements,
+        onMyApps = onMyApps,
+        onUpdateNow = onUpdateNow,
+        onActivateVpn = onActivateVpn,
+        onActivateAccessibility = onActivateAccessibility,
+        onActivateDeviceAdmin = onActivateDeviceAdmin,
+        onOpenSettings = onOpenSettings,
     )
 }
 
@@ -552,39 +625,69 @@ private fun UserHomeRoute(
 private fun UserHomeTab(
     greeting: String,
     protectionLevel: ProtectionLevel,
-    protectionSummary: String,
+    vpnState: String,
+    accessibilityState: String,
+    deviceAdminState: String,
+    syncState: String,
+    activationState: String,
+    announcementCount: Int,
+    updateState: UpdatesUiState,
+    limitItems: List<UserHomeLimitItem>,
     pendingRequests: Int,
-    latestRequestLabel: String,
     onRequests: () -> Unit,
     onAnnouncements: () -> Unit,
+    onMyApps: () -> Unit,
+    onUpdateNow: () -> Unit,
+    onActivateVpn: () -> Unit,
+    onActivateAccessibility: () -> Unit,
+    onActivateDeviceAdmin: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
+    var expandedSection by rememberSaveable { mutableStateOf<UserHomeSection?>(null) }
     Column(modifier = Modifier.fillMaxSize().background(ProductAppBackground)) {
         UserHomeHeader(
             greeting = greeting,
             protectionLevel = protectionLevel,
-            protectionSummary = protectionSummary,
+            vpnState = vpnState,
+            accessibilityState = accessibilityState,
+            deviceAdminState = deviceAdminState,
+            syncState = syncState,
+            activationState = activationState,
+            announcementCount = announcementCount,
+            expanded = expandedSection == UserHomeSection.Protection,
+            onToggleProtection = {
+                expandedSection =
+                    if (expandedSection == UserHomeSection.Protection) null else UserHomeSection.Protection
+            },
+            onAnnouncements = onAnnouncements,
+            onActivateVpn = onActivateVpn,
+            onActivateAccessibility = onActivateAccessibility,
+            onActivateDeviceAdmin = onActivateDeviceAdmin,
+            onOpenSettings = onOpenSettings,
         )
         LazyColumn(
             modifier = Modifier.weight(1f),
             contentPadding = PaddingValues(horizontal = 18.dp, vertical = 18.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    ProductStatCard(
-                        modifier = Modifier.weight(1f),
-                        value = "6",
-                        label = "secciones",
-                        accent = ProductSky,
+            if (updateState.shouldShowOnHome) {
+                item {
+                    UserHomeUpdateCard(
+                        state = updateState,
+                        onUpdateNow = onUpdateNow,
                     )
-                    ProductStatCard(
-                        modifier = Modifier.weight(1f),
-                        value = "DEV",
-                        label = "versión ${BuildConfig.VERSION_CODE}",
-                        accent = ProductMint,
+                }
+            }
+            if (limitItems.isNotEmpty()) {
+                item {
+                    UserHomeLimitsCard(
+                        items = limitItems,
+                        expanded = expandedSection == UserHomeSection.Limits,
+                        onToggle = {
+                            expandedSection =
+                                if (expandedSection == UserHomeSection.Limits) null else UserHomeSection.Limits
+                        },
+                        onMyApps = onMyApps,
                     )
                 }
             }
@@ -596,19 +699,10 @@ private fun UserHomeTab(
                         if (pendingRequests == 0) {
                             "No hay pedidos pendientes"
                         } else {
-                            "$pendingRequests pendientes${latestRequestLabel.ifBlank { "" }.let { if (it.isBlank()) "" else " · tocá para ver" }}"
+                            "$pendingRequests pendientes · tocá para ver"
                         },
                     accent = ProductSun,
                     onClick = onRequests,
-                )
-            }
-            item {
-                ProductFeatureTile(
-                    icon = ProductIcon.Bell,
-                    title = "Avisos",
-                    subtitle = "Mensajes de tu comunidad",
-                    accent = ProductMint,
-                    onClick = onAnnouncements,
                 )
             }
         }
@@ -619,7 +713,19 @@ private fun UserHomeTab(
 private fun UserHomeHeader(
     greeting: String,
     protectionLevel: ProtectionLevel,
-    protectionSummary: String,
+    vpnState: String,
+    accessibilityState: String,
+    deviceAdminState: String,
+    syncState: String,
+    activationState: String,
+    announcementCount: Int,
+    expanded: Boolean,
+    onToggleProtection: () -> Unit,
+    onAnnouncements: () -> Unit,
+    onActivateVpn: () -> Unit,
+    onActivateAccessibility: () -> Unit,
+    onActivateDeviceAdmin: () -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val statusLabel =
         when (protectionLevel) {
@@ -637,31 +743,415 @@ private fun UserHomeHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
+                .animateContentSize()
                 .background(
-                    brush = Brush.linearGradient(listOf(Color(0xFF172033), Color(0xFF263A5A))),
+                    brush = Brush.linearGradient(listOf(UserHomeHeaderTop, UserHomeHeaderBottom)),
                     shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
                 )
                 .statusBarsPadding()
-                .padding(horizontal = 20.dp, vertical = 18.dp),
+                .padding(start = 20.dp, top = 18.dp, end = 14.dp, bottom = 18.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(greeting, style = MaterialTheme.typography.headlineSmall, color = Color.White)
-        Text(
-            text = protectionSummary,
-            style = MaterialTheme.typography.bodyMedium,
-            color = Color.White.copy(alpha = 0.72f),
-        )
-        Text(
+        Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
+            Text(
+                modifier = Modifier.weight(1f).padding(top = 6.dp),
+                text = greeting,
+                style = MaterialTheme.typography.headlineSmall,
+                color = Color.White,
+            )
+            UserHomeAnnouncementButton(
+                count = announcementCount,
+                onClick = onAnnouncements,
+            )
+        }
+        Row(
             modifier =
                 Modifier
-                    .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
-            text = statusLabel,
-            style = MaterialTheme.typography.labelMedium,
-            color = statusColor,
+                    .fillMaxWidth()
+                    .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                    .clickable(onClick = onToggleProtection)
+                    .padding(horizontal = 12.dp, vertical = 9.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = statusLabel,
+                style = MaterialTheme.typography.labelLarge,
+                color = statusColor,
+            )
+            Text(
+                text = if (expanded) "⌃" else "⌄",
+                style = MaterialTheme.typography.titleLarge,
+                color = Color.White.copy(alpha = 0.82f),
+            )
+        }
+        AnimatedVisibility(
+            visible = expanded,
+            enter = expandVertically() + fadeIn(),
+            exit = shrinkVertically() + fadeOut(),
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                UserProtectionDetailRow(
+                    label = "VPN",
+                    state = vpnState,
+                    active = vpnState == ActiveStateLabel,
+                    help = "Aceptá la conexión VPN para proteger Internet.",
+                    actionLabel = "Activar VPN",
+                    onAction = onActivateVpn,
+                )
+                UserProtectionDetailRow(
+                    label = "Accesibilidad",
+                    state = accessibilityState,
+                    active = accessibilityState == ActiveStateLabel,
+                    help = "Abrí Accesibilidad, elegí Content Filter y activalo.",
+                    actionLabel = "Abrir Accesibilidad",
+                    onAction = onActivateAccessibility,
+                )
+                UserProtectionDetailRow(
+                    label = "Desinstalación",
+                    state = deviceAdminState,
+                    active = deviceAdminState == ActiveStateLabel,
+                    help = "Confirmá la protección contra desinstalación de Android.",
+                    actionLabel = "Activar protección",
+                    onAction = onActivateDeviceAdmin,
+                )
+                UserProtectionDetailRow(
+                    label = "Sincronización",
+                    state = syncState,
+                    active = syncState == ActiveStateLabel,
+                    help = "Revisá la conexión y actualizá el estado desde Ajustes.",
+                    actionLabel = "Abrir Ajustes",
+                    onAction = onOpenSettings,
+                )
+                UserProtectionDetailRow(
+                    label = "Licencia",
+                    state = activationState,
+                    active = activationState.isHealthyLicenseState(),
+                    help = "El administrador debe revisar el enlace o la licencia.",
+                    actionLabel = "Ver estado",
+                    onAction = onOpenSettings,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserHomeAnnouncementButton(
+    count: Int,
+    onClick: () -> Unit,
+) {
+    Box {
+        IconButton(onClick = onClick) {
+            Icon(
+                imageVector = Icons.Filled.Notifications,
+                contentDescription = "Abrir avisos",
+                tint = Color.White,
+            )
+        }
+        if (count > 0) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(20.dp)
+                        .background(Color(0xFFFF5C65), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = count.coerceAtMost(99).toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserProtectionDetailRow(
+    label: String,
+    state: String,
+    active: Boolean,
+    help: String,
+    actionLabel: String,
+    onAction: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(Color.White.copy(alpha = 0.08f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 9.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.White)
+            Text(
+                text = state,
+                style = MaterialTheme.typography.labelMedium,
+                color = if (active) ActiveProtectionColor else ReviewProtectionColor,
+            )
+        }
+        if (!active) {
+            Text(
+                modifier = Modifier.padding(top = 4.dp),
+                text = help,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color.White.copy(alpha = 0.72f),
+            )
+            TextButton(
+                modifier = Modifier.align(Alignment.End),
+                onClick = onAction,
+            ) {
+                Text(actionLabel, color = ReviewProtectionColor)
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserHomeUpdateCard(
+    state: UpdatesUiState,
+    onUpdateNow: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(18.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFEAF3FF)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("Nueva actualización disponible", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = state.homeUpdateMessage,
+                style = MaterialTheme.typography.bodyMedium,
+                color = Color(0xFF4A6075),
+            )
+            if (state.status == UpdatesStatus.Downloading) {
+                LinearProgressIndicator(
+                    progress = { (state.downloadProgressPercent ?: 0) / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            } else {
+                Button(onClick = onUpdateNow) {
+                    Text(if (state.status == UpdatesStatus.Available) "Actualizar ahora" else "Reintentar")
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserHomeLimitsCard(
+    items: List<UserHomeLimitItem>,
+    expanded: Boolean,
+    onToggle: () -> Unit,
+    onMyApps: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth().animateContentSize().clickable(onClick = onToggle),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color.White),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Cerca del límite", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        text = "${items.size} ${if (items.size == 1) "límite requiere" else "límites requieren"} atención",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Color(0xFF667085),
+                    )
+                }
+                Text(
+                    text = if (expanded) "⌃" else "⌄",
+                    style = MaterialTheme.typography.titleLarge,
+                    color = Color(0xFF44546A),
+                )
+            }
+            UserHomeLimitQueue(items)
+            AnimatedVisibility(
+                visible = expanded,
+                enter = expandVertically() + fadeIn(),
+                exit = shrinkVertically() + fadeOut(),
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    items.take(MaxExpandedHomeLimits).forEach { item ->
+                        UserHomeLimitRow(item)
+                    }
+                    TextButton(
+                        modifier = Modifier.align(Alignment.End),
+                        onClick = onMyApps,
+                    ) {
+                        Text("Ver todas en Mis apps")
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UserHomeLimitQueue(items: List<UserHomeLimitItem>) {
+    val icons =
+        remember(items) {
+            items
+                .flatMap { item -> item.icons.ifEmpty { listOf(UserHomeAppIcon(item.title, null)) } }
+                .distinctBy { "${it.name}:${it.iconBase64}" }
+        }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Box(modifier = Modifier.weight(1f).height(44.dp)) {
+            icons.take(MaxQueueIcons).forEachIndexed { index, icon ->
+                Box(
+                    modifier =
+                        Modifier
+                            .offset(x = (index * QueueIconOffset).dp)
+                            .zIndex(index.toFloat())
+                            .size(40.dp)
+                            .background(Color.White, CircleShape)
+                            .border(2.dp, Color.White, CircleShape)
+                            .padding(2.dp),
+                ) {
+                    AppIcon(icon.name, icon.iconBase64, size = 32)
+                }
+            }
+        }
+        if (icons.size > MaxQueueIcons) {
+            Text(
+                text = "+${icons.size - MaxQueueIcons}",
+                style = MaterialTheme.typography.labelMedium,
+                color = Color(0xFF44546A),
+            )
+        }
+    }
+}
+
+@Composable
+private fun UserHomeLimitRow(item: UserHomeLimitItem) {
+    val progressColor =
+        when {
+            item.progress >= 0.90f -> Color(0xFFC62828)
+            item.progress >= 0.80f -> Color(0xFFDA7B00)
+            else -> Color(0xFF2C7BE5)
+        }
+    Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            UserHomeItemIconStack(item)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = item.title,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold),
+                )
+                Text(
+                    text = if (item.kind == UserHomeLimitKind.Group) "Grupo de apps" else "Aplicación",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Color(0xFF667085),
+                )
+            }
+            Text(
+                text =
+                    if (item.remainingMinutes == 0) {
+                        "Límite alcanzado"
+                    } else {
+                        "Quedan ${item.remainingMinutes} min"
+                    },
+                style = MaterialTheme.typography.labelMedium,
+                color = progressColor,
+            )
+        }
+        LinearProgressIndicator(
+            progress = { item.progress },
+            modifier = Modifier.fillMaxWidth(),
+            color = progressColor,
+            trackColor = progressColor.copy(alpha = 0.14f),
+        )
+        Text(
+            text = "${item.usedMinutes} de ${item.limitMinutes} min usados hoy",
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF667085),
         )
     }
 }
+
+@Composable
+private fun UserHomeItemIconStack(item: UserHomeLimitItem) {
+    val icons = item.icons.ifEmpty { listOf(UserHomeAppIcon(item.title, null)) }
+    Box(modifier = Modifier.size(width = 94.dp, height = 38.dp)) {
+        icons.take(MaxItemIcons).forEachIndexed { index, icon ->
+            Box(
+                modifier =
+                    Modifier
+                        .offset(x = (index * ItemIconOffset).dp)
+                        .zIndex(index.toFloat())
+                        .size(36.dp)
+                        .background(Color.White, CircleShape)
+                        .border(2.dp, Color.White, CircleShape)
+                        .padding(2.dp),
+            ) {
+                AppIcon(icon.name, icon.iconBase64, size = 28)
+            }
+        }
+    }
+}
+
+private val UpdatesUiState.shouldShowOnHome: Boolean
+    get() =
+        status == UpdatesStatus.Available ||
+            status == UpdatesStatus.Downloading ||
+            status == UpdatesStatus.DownloadFailed ||
+            status == UpdatesStatus.ChecksumFailed
+
+private val UpdatesUiState.homeUpdateMessage: String
+    get() =
+        when (status) {
+            UpdatesStatus.Available ->
+                manifest?.let { "Versión ${it.versionName} (${it.versionCode}) lista para instalar." }
+                    ?: "Hay una versión nueva lista para instalar."
+            UpdatesStatus.Downloading -> "Descargando y verificando… ${downloadProgressPercent ?: 0}%"
+            UpdatesStatus.ChecksumFailed -> "La descarga no pasó la verificación de seguridad."
+            UpdatesStatus.DownloadFailed -> "No se pudo descargar la actualización."
+            else -> ""
+        }
+
+private fun String.isHealthyLicenseState(): Boolean =
+    this == "Activada" || this == "Por vencer" || this == "Periodo de gracia"
+
+private enum class UserHomeSection {
+    Protection,
+    Limits,
+}
+
+private val UserHomeHeaderTop = Color(0xFF172033)
+private val UserHomeHeaderBottom = Color(0xFF263A5A)
+private val ActiveProtectionColor = Color(0xFF72E6AA)
+private val ReviewProtectionColor = Color(0xFFFFD166)
+private const val ActiveStateLabel = "Activa"
+private const val MaxQueueIcons = 7
+private const val QueueIconOffset = 27
+private const val MaxItemIcons = 4
+private const val ItemIconOffset = 18
+private const val MaxExpandedHomeLimits = 8
 
 @Composable
 private fun UserWebTab(

@@ -140,6 +140,7 @@ class MyAppsViewModel
                                 MyAppGroupUiState(
                                     id = group.id,
                                     name = group.name,
+                                    enabled = group.enabled,
                                     limitMinutes = group.limitMinutes,
                                     usedMinutes = usedMinutes,
                                     appCount = groupPackages.size,
@@ -150,7 +151,6 @@ class MyAppsViewModel
                             .sortedBy { it.name.lowercase() },
                     apps =
                         apps
-                            .filterBySearch(options.searchQuery)
                             .map { app ->
                                 val hasActiveExtraTime =
                                     policyState.grants.any {
@@ -342,17 +342,6 @@ class MyAppsViewModel
                         else -> "Solicitud guardada. Se enviará cuando haya conexión."
                     }
                 }
-            }
-        }
-
-        private fun List<InstalledAppPublisher.DetectedApp>.filterBySearch(
-            query: String,
-        ): List<InstalledAppPublisher.DetectedApp> {
-            val normalized = query.trim().lowercase()
-            if (normalized.isBlank()) return this
-            return filter {
-                it.name.lowercase().contains(normalized) ||
-                    it.packageName.lowercase().contains(normalized)
             }
         }
 

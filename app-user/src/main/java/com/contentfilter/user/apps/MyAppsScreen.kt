@@ -97,8 +97,19 @@ private fun MyAppsScreen(
     var quickFilter by remember { mutableStateOf(MyAppsQuickFilter.All) }
     var searchExpanded by remember { mutableStateOf(state.searchQuery.isNotBlank()) }
     val groupedPackages = remember(state.appGroups) { state.appGroups.flatMap { it.packageNames }.toSet() }
+    val searchedApps =
+        remember(state.apps, state.searchQuery) {
+            val query = state.searchQuery.trim().lowercase()
+            if (query.isBlank()) {
+                state.apps
+            } else {
+                state.apps.filter {
+                    it.name.lowercase().contains(query) || it.packageName.lowercase().contains(query)
+                }
+            }
+        }
     val ungroupedApps =
-        remember(state.apps, groupedPackages) { state.apps.filter { it.packageName !in groupedPackages } }
+        remember(searchedApps, groupedPackages) { searchedApps.filter { it.packageName !in groupedPackages } }
     val visibleApps =
         remember(ungroupedApps, quickFilter) {
             ungroupedApps.filter { app ->
@@ -158,7 +169,7 @@ private fun MyAppsScreen(
                 items(state.appGroups, key = { it.id }) { group ->
                     MyAppGroupCard(
                         group = group,
-                        apps = state.apps.filter { it.packageName in group.packageNames },
+                        apps = searchedApps.filter { it.packageName in group.packageNames },
                     )
                 }
                 item {
@@ -484,7 +495,7 @@ private fun StatusLabel(
 }
 
 @Composable
-private fun AppIcon(
+internal fun AppIcon(
     name: String,
     iconBase64: String?,
     size: Int = 40,
