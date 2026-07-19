@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-18
+Ultima sincronizacion: 2026-07-19
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -155,6 +155,8 @@ Flujo de una entrada:
 | USER-RELINK-01 | Idea | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
+| PROTECTION-ONBOARDING-HEALTH-01 | Idea | P1 | Asistente unificado de instalacion, salud de proteccion y reparacion guiada | L | Alto |
+| DEVICE-CONNECTIVITY-ALERTS-01 | Idea | P1 | Alertas de bateria baja y dispositivo sin comunicacion reciente | M | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Validado visualmente en SM-A235M DEV 248; pendiente evento real | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
@@ -850,6 +852,43 @@ Flujo de una entrada:
 - Criterios de aceptacion cubiertos: el encabezado muestra el nombre correcto del usuario activo; los cambios se reflejan cuando Room recibe la sincronizacion; existe fallback simple; el encabezado admite salto de linea para nombres largos; no se muestra el nombre de otro usuario o dispositivo.
 - Decision aplicada: no se copia el nombre a notificaciones ni pantalla bloqueada y no se agrega otra persistencia. Se conserva completo, con espacios externos normalizados, para no alterar nombres ni caracteres especiales.
 - Validacion: tests del cruce seguro, fallback y nombre normalizado; compilacion y `ktlintCheck` de App Usuario correctos. Falta prueba visual en Samsung SM-S908E y no hubo publicacion intermedia.
+
+### PROTECTION-ONBOARDING-HEALTH-01 - Instalacion, salud y reparacion de proteccion
+
+- Estado: `Idea`; no aprobado para diagnostico tecnico ni codigo. Tipo: onboarding, seguridad, observabilidad y UX multiplataforma. Prioridad: P1.
+- Problema: la activacion y la recuperacion de App Usuario estan repartidas entre permisos y pantallas distintas. Aunque ya existen comprobaciones y acciones individuales, el administrador no dispone de un recorrido unico que confirme con claridad si VPN, Accessibility, Device Admin, notificaciones, bateria y barrera quedaron realmente operativos, ni de un semaforo remoto que explique una degradacion y conduzca a repararla.
+- Solucion propuesta: unificar las ideas seleccionadas por el usuario como (1) asistente de instalacion y proteccion, (2) estado de salud por dispositivo y (15) diagnostico y reparacion guiada. El alta terminaria con una verificacion real de cada capa; App Admin y Superweb mostrarian un estado agregado `Protegido`, `Incompleto` o `En riesgo`; cada fallo abriria una reparacion especifica y volveria a comprobar el resultado sin declarar exito por el solo hecho de abrir Ajustes.
+- Evidencia: seleccion explicita del usuario el 2026-07-19 luego de comparar Content Filter con FamilyTime. El handoff confirma que ya existen watchdog, heartbeat, acciones individuales para recuperar VPN/Accessibility/Device Admin/bateria, barrera predeterminada y alertas de componentes caidos; falta convertir esas capacidades en un flujo de producto coherente y verificable.
+- Esfuerzo: L estimado. Riesgo: alto; una salud agregada incorrecta puede declarar protegido un dispositivo degradado, bloquear el onboarding, generar reparaciones circulares o exponer recorridos de Ajustes sin mantenimiento autorizado.
+- Dependencias: `BARRIER-DEFAULT-ON-01`, `BARRIER-A11Y-RACE-01`, `USER-RESILIENCE-01`, watchdog y heartbeat existentes, autorizacion temporal de Ajustes, estado de licencia y vinculo, sincronizacion App Usuario -> App Admin/Superweb, comportamiento offline y diferencias OEM.
+- Duplicados y relacion: agrupa deliberadamente las ideas 1, 2 y 15 de la seleccion; no duplica las reparaciones tecnicas ni el watchdog ya implementados. Los reutiliza como fuente de verdad y extiende su presentacion, navegacion y verificacion. No sustituye los tickets de bypass ni promete garantias de Device Owner/MDM.
+- Criterios de aceptacion propuestos:
+  - un alta nueva enumera todas las capas requeridas, explica para que sirve cada una y verifica su estado real antes de declarar la configuracion completa;
+  - Usuario, Admin y Superweb derivan el mismo estado agregado a partir de componentes y datos con antiguedad visible, sin contradicciones silenciosas;
+  - cada componente degradado ofrece una reparacion especifica, autorizada y reversible, seguida de una nueva comprobacion;
+  - reinicios, actualizaciones, perdida temporal de red y permisos incompletos no producen falsos estados sanos;
+  - la barrera no abre ni deja accesibles Ajustes protegidos fuera del recorrido administrativo permitido;
+  - la interfaz distingue claramente proteccion incompleta, componente efectivamente caido y dispositivo simplemente sin comunicacion;
+  - no se recopilan consultas, URLs, mensajes ni contenido para calcular la salud.
+- Decisiones pendientes para la entrevista del ticket: componentes obligatorios por modelo de telefono; autoridad y visibilidad Admin/Super Admin; textos y colores; antiguedad maxima del heartbeat; comportamiento durante onboarding offline; orden de reparacion; ventanas de mantenimiento; recordatorios, escalamiento y criterio exacto para los tres estados agregados.
+
+### DEVICE-CONNECTIVITY-ALERTS-01 - Bateria baja y dispositivo sin comunicacion
+
+- Estado: `Idea`; no aprobado para diagnostico tecnico ni codigo. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
+- Problema: un telefono con bateria critica, apagado, sin red o con el proceso detenido puede dejar de proteger o reportar sin que el administrador comprenda si existe manipulacion, un problema tecnico o una desconexion normal.
+- Solucion propuesta: avisar a los destinatarios autorizados cuando la bateria cruce un umbral configurable o cuando el dispositivo supere un periodo sin heartbeat. La alerta debe mostrar ultimo contacto, bateria conocida y estado de proteccion conocido, y diferenciar `bateria baja`, `sin comunicacion` y `proteccion desactivada` sin afirmar una causa no demostrada.
+- Evidencia: idea 10 seleccionada explicitamente por el usuario el 2026-07-19 luego de revisar las mejores funciones no invasivas de FamilyTime. Content Filter ya transmite heartbeat y alertas de componentes; se propone aprovechar esa evidencia sin agregar vigilancia de contenido.
+- Esfuerzo: M estimado. Riesgo: medio; umbrales agresivos, Doze, falta de red, telefono apagado o retrasos de sincronizacion pueden producir ruido y falsas alarmas.
+- Dependencias: heartbeat y watchdog; nivel de bateria disponible con permisos Android normales; FCM y bandejas existentes; `ALERT-ROUTING-01`; deduplicacion, lectura/archivo y estado de dispositivo; zona horaria, Doze y funcionamiento offline.
+- Duplicados y relacion: complementa `SUPERADMIN-ALERTS-01`, `ADMIN-ALERTS-UX-01` y `ALERT-ROUTING-01`; no redefine sus destinatarios ni mezcla una desconexion con un intento bloqueado. Se relaciona con `PROTECTION-ONBOARDING-HEALTH-01`, que consumiria el mismo ultimo estado para el semaforo de salud.
+- Criterios de aceptacion propuestos:
+  - una bateria por debajo del umbral genera como maximo una alerta por episodio y una recuperacion posterior puede cerrar o actualizar el estado;
+  - la falta de heartbeat solo se alerta despues del periodo acordado y muestra la hora exacta del ultimo contacto;
+  - volver a comunicarse resuelve el estado sin duplicar notificaciones;
+  - la interfaz nunca presenta `proteccion desactivada` cuando la unica evidencia es falta de comunicacion;
+  - destinatarios, severidad y canales respetan las reglas de ruteo vigentes;
+  - no se transmiten ubicacion, mensajes, historial ni contenido de navegacion.
+- Decisiones pendientes para la entrevista del ticket: umbral de bateria; demora y recordatorios de desconexion; destinatarios Admin/Super Admin; horario silencioso; severidad; cierre automatico; visibilidad del porcentaje; tratamiento de telefono apagado, modo avion, vacaciones y dispositivos archivados.
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 
