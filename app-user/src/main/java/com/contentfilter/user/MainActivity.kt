@@ -13,14 +13,18 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -33,13 +37,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -48,13 +52,13 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.lifecycleScope
+import com.contentfilter.core.domain.model.ProtectionLevel
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.ui.ContentFilterTheme
-import com.contentfilter.core.ui.PremiumFishMascot
+import com.contentfilter.core.ui.ProductAppBackground
 import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductFeatureTile
-import com.contentfilter.core.ui.ProductHeroPanel
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductLazyVisualPage
@@ -159,6 +163,7 @@ private fun UserAppRoot(
     var destination by rememberSaveable { mutableStateOf(UserDestination.Home) }
     var backStack by rememberSaveable { mutableStateOf<List<UserDestination>>(emptyList()) }
     var showAccessibilityDialog by rememberSaveable { mutableStateOf(false) }
+    var accessibilityReminderDeferred by remember { mutableStateOf(false) }
     var showVpnDialog by rememberSaveable { mutableStateOf(false) }
     var showDeviceAdminDialog by rememberSaveable { mutableStateOf(false) }
     var showBatteryOptimizationDialog by rememberSaveable { mutableStateOf(false) }
@@ -218,7 +223,9 @@ private fun UserAppRoot(
         }
     }
     LaunchedEffect(destination) {
-        showAccessibilityDialog = !AccessibilityController.isEnabled(context)
+        showAccessibilityDialog =
+            !accessibilityReminderDeferred &&
+            !AccessibilityController.isEnabled(context)
     }
     LaunchedEffect(rootState.needsActivation) {
         if (!rootState.needsActivation) {
@@ -434,7 +441,10 @@ private fun UserAppRoot(
         )
     } else if (showAccessibilityDialog) {
         AlertDialog(
-            onDismissRequest = { showAccessibilityDialog = false },
+            onDismissRequest = {
+                accessibilityReminderDeferred = true
+                showAccessibilityDialog = false
+            },
             title = { Text("Accesibilidad apagada") },
             text = {
                 Text(
@@ -444,6 +454,7 @@ private fun UserAppRoot(
             confirmButton = {
                 Button(
                     onClick = {
+                        accessibilityReminderDeferred = true
                         showAccessibilityDialog = false
                         context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
                     },
@@ -452,7 +463,12 @@ private fun UserAppRoot(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { showAccessibilityDialog = false }) {
+                OutlinedButton(
+                    onClick = {
+                        accessibilityReminderDeferred = true
+                        showAccessibilityDialog = false
+                    },
+                ) {
                     Text("Luego")
                 }
             },
@@ -516,11 +532,15 @@ private fun UserHomeRoute(
     onAnnouncements: () -> Unit,
     requestsViewModel: RequestsViewModel = hiltViewModel(),
     homeViewModel: UserHomeViewModel = hiltViewModel(),
+    statusViewModel: SystemStatusViewModel = hiltViewModel(),
 ) {
     val requestsState by requestsViewModel.uiState.collectAsStateWithLifecycle()
     val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
+    val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
     UserHomeTab(
         greeting = homeState.greeting,
+        protectionLevel = statusState.protectionLevel,
+        protectionSummary = statusState.summary,
         pendingRequests = requestsState.pendingCount,
         latestRequestLabel = requestsState.requests.firstOrNull()?.requestType?.name.orEmpty(),
         onRequests = onRequests,
@@ -531,66 +551,115 @@ private fun UserHomeRoute(
 @Composable
 private fun UserHomeTab(
     greeting: String,
+    protectionLevel: ProtectionLevel,
+    protectionSummary: String,
     pendingRequests: Int,
     latestRequestLabel: String,
     onRequests: () -> Unit,
     onAnnouncements: () -> Unit,
 ) {
-    ProductLazyVisualPage(
-        title = greeting,
-        subtitle = "Tu dispositivo protegido está listo",
-    ) {
-        item {
-            ProductHeroPanel(
-                title = "Content Filter",
-                subtitle = "Revisá tus apps, permisos y solicitudes desde una experiencia más clara.",
-                mascot = {
-                    UserHomeFish(modifier = Modifier.size(170.dp))
-                },
-            )
-        }
-        item {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                ProductStatCard(
-                    modifier = Modifier.weight(1f),
-                    value = "6",
-                    label = "secciones",
-                    accent = ProductSky,
+    Column(modifier = Modifier.fillMaxSize().background(ProductAppBackground)) {
+        UserHomeHeader(
+            greeting = greeting,
+            protectionLevel = protectionLevel,
+            protectionSummary = protectionSummary,
+        )
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            contentPadding = PaddingValues(horizontal = 18.dp, vertical = 18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    ProductStatCard(
+                        modifier = Modifier.weight(1f),
+                        value = "6",
+                        label = "secciones",
+                        accent = ProductSky,
+                    )
+                    ProductStatCard(
+                        modifier = Modifier.weight(1f),
+                        value = "DEV",
+                        label = "versión ${BuildConfig.VERSION_CODE}",
+                        accent = ProductMint,
+                    )
+                }
+            }
+            item {
+                ProductFeatureTile(
+                    icon = ProductIcon.Requests,
+                    title = "Solicitudes pendientes",
+                    subtitle =
+                        if (pendingRequests == 0) {
+                            "No hay pedidos pendientes"
+                        } else {
+                            "$pendingRequests pendientes${latestRequestLabel.ifBlank { "" }.let { if (it.isBlank()) "" else " · tocá para ver" }}"
+                        },
+                    accent = ProductSun,
+                    onClick = onRequests,
                 )
-                ProductStatCard(
-                    modifier = Modifier.weight(1f),
-                    value = "DEV",
-                    label = "versión ${BuildConfig.VERSION_CODE}",
+            }
+            item {
+                ProductFeatureTile(
+                    icon = ProductIcon.Bell,
+                    title = "Avisos",
+                    subtitle = "Mensajes de tu comunidad",
                     accent = ProductMint,
+                    onClick = onAnnouncements,
                 )
             }
         }
-        item {
-            ProductFeatureTile(
-                icon = ProductIcon.Requests,
-                title = "Solicitudes pendientes",
-                subtitle =
-                    if (pendingRequests == 0) {
-                        "No hay pedidos pendientes"
-                    } else {
-                        "$pendingRequests pendientes${latestRequestLabel.ifBlank { "" }.let { if (it.isBlank()) "" else " · tocá para ver" }}"
-                    },
-                accent = ProductSun,
-                onClick = onRequests,
-            )
+    }
+}
+
+@Composable
+private fun UserHomeHeader(
+    greeting: String,
+    protectionLevel: ProtectionLevel,
+    protectionSummary: String,
+) {
+    val statusLabel =
+        when (protectionLevel) {
+            ProtectionLevel.Protected -> "Protección activa"
+            ProtectionLevel.Warning -> "Protección por revisar"
+            ProtectionLevel.Unprotected -> "Protección incompleta"
         }
-        item {
-            ProductFeatureTile(
-                icon = ProductIcon.Bell,
-                title = "Avisos",
-                subtitle = "Mensajes de tu comunidad",
-                accent = ProductMint,
-                onClick = onAnnouncements,
-            )
+    val statusColor =
+        when (protectionLevel) {
+            ProtectionLevel.Protected -> Color(0xFF72E6AA)
+            ProtectionLevel.Warning -> Color(0xFFFFD166)
+            ProtectionLevel.Unprotected -> Color(0xFFFF8A80)
         }
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(
+                    brush = Brush.linearGradient(listOf(Color(0xFF172033), Color(0xFF263A5A))),
+                    shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
+                )
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 18.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(greeting, style = MaterialTheme.typography.headlineSmall, color = Color.White)
+        Text(
+            text = protectionSummary,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Color.White.copy(alpha = 0.72f),
+        )
+        Text(
+            modifier =
+                Modifier
+                    .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            text = statusLabel,
+            style = MaterialTheme.typography.labelMedium,
+            color = statusColor,
+        )
     }
 }
 
@@ -744,36 +813,6 @@ private fun UserWebStatusCard(
             Text(title, style = MaterialTheme.typography.bodyMedium)
             Text(value, style = MaterialTheme.typography.titleMedium)
         }
-    }
-}
-
-@Composable
-private fun UserHomeFish(modifier: Modifier = Modifier) {
-    Box(modifier = modifier) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(
-                color = Color.Black.copy(alpha = 0.18f),
-                radius = size.width * 0.22f,
-                center = Offset(size.width * 0.55f, size.height * 0.80f),
-            )
-            listOf(0.12f, 0.36f, 0.62f, 0.84f).forEachIndexed { index, position ->
-                val x = size.width * (0.10f + index * 0.16f)
-                val y = size.height * (0.86f - position * 0.70f)
-                val r = size.minDimension * (0.025f + index * 0.006f)
-                drawCircle(
-                    color = Color.White.copy(alpha = 0.18f),
-                    radius = r,
-                    center = Offset(x, y),
-                    style = Stroke(width = 2.2f),
-                )
-            }
-        }
-        PremiumFishMascot(
-            modifier =
-                Modifier
-                    .align(Alignment.Center)
-                    .size(138.dp),
-        )
     }
 }
 

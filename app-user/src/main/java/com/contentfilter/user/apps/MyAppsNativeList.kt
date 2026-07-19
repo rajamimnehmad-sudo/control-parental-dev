@@ -11,6 +11,7 @@ import android.util.LruCache
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AbsListView
 import android.widget.BaseAdapter
 import android.widget.Button
 import android.widget.FrameLayout
@@ -34,6 +35,8 @@ internal fun MyAppsNativeList(
         factory = { context ->
             ListView(context).apply {
                 clipToPadding = false
+                setBackgroundColor(Color.TRANSPARENT)
+                setPadding(0, 0, 0, context.dp(8))
                 divider = null
                 dividerHeight = context.dp(8)
                 isVerticalScrollBarEnabled = true
@@ -79,6 +82,15 @@ private class MyAppsListAdapter(
         val holder =
             (convertView?.tag as? AppRowHolder)
                 ?: AppRowHolder.create(context).also { it.root.tag = it }
+        val rowWidth =
+            parent.measuredWidth.takeIf { it > 0 }
+                ?: (context.resources.displayMetrics.widthPixels - context.dp(32))
+        holder.root.layoutParams =
+            AbsListView.LayoutParams(
+                rowWidth,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            )
+        holder.root.minimumWidth = rowWidth
         holder.bind(getItem(position), onRequestAccess)
         return holder.root
     }
@@ -140,6 +152,11 @@ private class AppRowHolder private constructor(
         fun create(context: Context): AppRowHolder {
             val root =
                 LinearLayout(context).apply {
+                    layoutParams =
+                        AbsListView.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        )
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
                     setPadding(context.dp(12), context.dp(10), context.dp(12), context.dp(10))

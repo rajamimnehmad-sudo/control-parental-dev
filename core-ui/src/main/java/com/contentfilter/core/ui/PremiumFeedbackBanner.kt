@@ -19,6 +19,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,7 +37,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -66,24 +66,32 @@ fun PremiumFeedbackBanner(
     val kind = remember(text, isError) { text.feedbackBannerKind(isError) }
     var visible by remember(text) { mutableStateOf(text.isNotBlank()) }
     LaunchedEffect(text, kind) {
-        if (kind == FeedbackBannerKind.Success) {
-            delay(2_500)
+        val visibleMillis = kind.visibleMillis
+        if (visibleMillis != null) {
+            delay(visibleMillis)
             visible = false
         }
     }
-    AnimatedVisibility(
-        visible = visible && text.isNotBlank(),
-        enter = slideInVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeIn(tween(180)),
-        exit = slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(180)),
-    ) {
-        FeedbackBannerSurface(
-            text = text,
-            kind = kind,
-            actionLabel = actionLabel,
-            onAction = onAction,
-            onDismiss = { visible = false },
-            modifier = modifier,
-        )
+    Column(modifier = modifier.fillMaxWidth()) {
+        AnimatedVisibility(
+            visible = visible && text.isNotBlank(),
+            enter = slideInVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeIn(tween(180)),
+            exit = slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(180)),
+        ) {
+            FeedbackBannerSurface(
+                text = text,
+                kind = kind,
+                actionLabel = actionLabel,
+                onAction = onAction,
+            )
+        }
+        AnimatedVisibility(
+            visible = !visible && text.isNotBlank() && kind == FeedbackBannerKind.Error,
+            enter = fadeIn(tween(140)),
+            exit = fadeOut(tween(100)),
+        ) {
+            InlineErrorMessage(text = text)
+        }
     }
 }
 
@@ -93,8 +101,6 @@ private fun FeedbackBannerSurface(
     kind: FeedbackBannerKind,
     actionLabel: String?,
     onAction: (() -> Unit)?,
-    onDismiss: () -> Unit,
-    modifier: Modifier,
 ) {
     val stableMessage = text.trim().trimEnd('.')
     val dotsTransition = rememberInfiniteTransition(label = "feedback-banner-dots")
@@ -110,23 +116,21 @@ private fun FeedbackBannerSurface(
     )
     Row(
         modifier =
-            modifier
+            Modifier
                 .fillMaxWidth()
-                .height(48.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFF202124))
+                .height(32.dp)
                 .semantics {
                     liveRegion = LiveRegionMode.Polite
                     contentDescription = text.trim()
                 }
-                .padding(horizontal = 12.dp),
+                .padding(horizontal = 2.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier =
                 Modifier
                     .size(10.dp)
-                    .background(kind.color, RoundedCornerShape(5.dp)),
+                    .background(kind.accent, RoundedCornerShape(5.dp)),
         )
         AnimatedContent(
             modifier =
@@ -159,29 +163,54 @@ private fun FeedbackBannerSurface(
                 maxLines = 1,
                 overflow = TextOverflow.Clip,
                 style = MaterialTheme.typography.bodyMedium,
-                color = Color.White,
+                color = kind.content,
             )
         }
         if (actionLabel != null && onAction != null) {
             TextButton(onClick = onAction) {
-                Text(actionLabel, color = Color.White)
-            }
-        } else if (kind == FeedbackBannerKind.Error || kind == FeedbackBannerKind.Warning) {
-            TextButton(
-                modifier = Modifier.semantics { contentDescription = "Cerrar aviso" },
-                onClick = onDismiss,
-            ) {
-                Text("×", color = Color.White, style = MaterialTheme.typography.titleMedium)
+                Text(actionLabel, color = kind.content)
             }
         }
     }
 }
 
-private enum class FeedbackBannerKind(val color: Color) {
-    Busy(Color.White),
-    Success(Color(0xFF6EDC8C)),
-    Warning(Color(0xFFFFC857)),
-    Error(Color(0xFFFF7B72)),
+@Composable
+private fun InlineErrorMessage(text: String) {
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .semantics {
+                    liveRegion = LiveRegionMode.Polite
+                    contentDescription = text.trim()
+                }
+                .padding(horizontal = 2.dp, vertical = 4.dp),
+        horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(8.dp)
+                    .background(Color(0xFFC62828), RoundedCornerShape(4.dp)),
+        )
+        Text(
+            text = text.trim(),
+            style = MaterialTheme.typography.bodySmall,
+            color = Color(0xFF6B1B1B),
+        )
+    }
+}
+
+private enum class FeedbackBannerKind(
+    val accent: Color,
+    val content: Color,
+    val visibleMillis: Long?,
+) {
+    Busy(Color(0xFF2C7BE5), Color(0xFF31506F), null),
+    Success(Color(0xFF1B8F4D), Color(0xFF24623F), 2_000),
+    Warning(Color(0xFFB77900), Color(0xFF6A520F), 2_500),
+    Error(Color(0xFFC62828), Color(0xFF8B2424), 3_000),
 }
 
 private fun String.feedbackBannerKind(isError: Boolean): FeedbackBannerKind {
@@ -193,7 +222,7 @@ private fun String.feedbackBannerKind(isError: Boolean): FeedbackBannerKind {
             normalized::contains,
         ) ->
             FeedbackBannerKind.Busy
-        listOf("guardado", "guardada", "listo", "actualizado", "actualizada", "verificado", "verificada", "ultima version", "última versión").any(
+        listOf("guardado", "guardada", "listo", "actualizado", "actualizada", "verificado", "verificada", "sincronizado", "sincronizada", "ultima version", "última versión").any(
             normalized::contains,
         ) ->
             FeedbackBannerKind.Success

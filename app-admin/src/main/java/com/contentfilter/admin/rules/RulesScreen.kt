@@ -1108,6 +1108,12 @@ private fun UserDetailContent(
             when (selectedPanel) {
                 DevicePanel.Apps -> {
                     item {
+                        AppSectionSelector(
+                            selectedPanel = selectedPanel,
+                            onPanelSelected = onPanelSelected,
+                        )
+                    }
+                    item {
                         AllowedScheduleEditor(
                             title = "Horario global de aplicaciones",
                             rules =
@@ -1191,6 +1197,12 @@ private fun UserDetailContent(
                     }
                 }
                 DevicePanel.AppGroups -> {
+                    item {
+                        AppSectionSelector(
+                            selectedPanel = selectedPanel,
+                            onPanelSelected = onPanelSelected,
+                        )
+                    }
                     item {
                         OutlinedTextField(
                             modifier = Modifier.fillMaxWidth(),
@@ -1842,15 +1854,20 @@ private fun UserDetailHeader(
             }
         }
         if (entryMode != RulesEntryMode.Web) {
+            ProtectionSummaryCard(
+                device = device,
+                selected = selectedPanel == DevicePanel.Protection,
+                onClick = { onPanelSelected(DevicePanel.Protection) },
+            )
             Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (selectedPanel == DevicePanel.Apps) {
+                if (selectedPanel == DevicePanel.Apps || selectedPanel == DevicePanel.AppGroups) {
                     Button(
                         modifier = Modifier.weight(1f),
-                        onClick = { },
+                        onClick = { onPanelSelected(DevicePanel.Apps) },
                         shape = RoundedCornerShape(tabShape),
                     ) {
                         Text("Aplicaciones")
@@ -1864,25 +1881,9 @@ private fun UserDetailHeader(
                         Text("Aplicaciones")
                     }
                 }
-                if (selectedPanel == DevicePanel.AppGroups) {
-                    Button(
-                        modifier = Modifier.weight(1f),
-                        onClick = { },
-                        shape = RoundedCornerShape(tabShape),
-                    ) {
-                        Text("Apps en grupo")
-                    }
-                } else {
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { onPanelSelected(DevicePanel.AppGroups) },
-                        shape = RoundedCornerShape(tabShape),
-                    ) {
-                        Text("Apps en grupo")
-                    }
-                }
                 if (selectedPanel == DevicePanel.Web) {
                     Button(
+                        modifier = Modifier.weight(1f),
                         onClick = { },
                         shape = RoundedCornerShape(tabShape),
                     ) {
@@ -1890,27 +1891,96 @@ private fun UserDetailHeader(
                     }
                 } else {
                     OutlinedButton(
+                        modifier = Modifier.weight(1f),
                         onClick = { onPanelSelected(DevicePanel.Web) },
                         shape = RoundedCornerShape(tabShape),
                     ) {
                         Text("Web")
                     }
                 }
-                if (selectedPanel == DevicePanel.Protection) {
-                    Button(
-                        onClick = { },
-                        shape = RoundedCornerShape(tabShape),
-                    ) {
-                        Text("Protección")
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = { onPanelSelected(DevicePanel.Protection) },
-                        shape = RoundedCornerShape(tabShape),
-                    ) {
-                        Text("Protección")
-                    }
-                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ProtectionSummaryCard(
+    device: UserDeviceUiState,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        colors =
+            CardDefaults.cardColors(
+                containerColor =
+                    if (selected) {
+                        MaterialTheme.colorScheme.primaryContainer
+                    } else {
+                        Color.White
+                    },
+            ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text("Protección", style = MaterialTheme.typography.titleMedium, color = HeaderInk)
+                StatusChip(
+                    if (device.protectionComplete) "Completa" else "Revisar",
+                    if (device.protectionComplete) ActiveGreen else MaterialTheme.colorScheme.error,
+                )
+            }
+            Text(
+                text =
+                    "VPN: ${device.vpnState} · Accesibilidad: ${device.accessibilityState} · " +
+                        "Admin.: ${device.deviceAdminState}",
+                style = MaterialTheme.typography.bodySmall,
+                color = HeaderMuted,
+            )
+        }
+    }
+}
+
+@Composable
+private fun AppSectionSelector(
+    selectedPanel: DevicePanel,
+    onPanelSelected: (DevicePanel) -> Unit,
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        if (selectedPanel == DevicePanel.Apps) {
+            Button(modifier = Modifier.weight(1f), onClick = {}) {
+                Text("Todas las apps")
+            }
+        } else {
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                onClick = { onPanelSelected(DevicePanel.Apps) },
+            ) {
+                Text("Todas las apps")
+            }
+        }
+        if (selectedPanel == DevicePanel.AppGroups) {
+            Button(modifier = Modifier.weight(1f), onClick = {}) {
+                Text("Grupos")
+            }
+        } else {
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                onClick = { onPanelSelected(DevicePanel.AppGroups) },
+            ) {
+                Text("Grupos")
             }
         }
     }

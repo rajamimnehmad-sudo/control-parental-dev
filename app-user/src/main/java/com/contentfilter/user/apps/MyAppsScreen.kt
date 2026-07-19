@@ -8,7 +8,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,7 +22,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -243,20 +241,22 @@ private fun AppsToolbar(
             }
         }
         if (!searchExpanded) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                MyAppsQuickFilter.entries.forEach { filter ->
-                    AppFilterBanner(
-                        filter = filter,
-                        selected = selected == filter,
-                        count = filter.count(apps, groups),
-                        onClick = { onSelected(filter) },
-                    )
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                MyAppsQuickFilter.entries.chunked(2).forEach { filters ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        filters.forEach { filter ->
+                            AppFilterBanner(
+                                filter = filter,
+                                selected = selected == filter,
+                                count = filter.count(apps, groups),
+                                onClick = { onSelected(filter) },
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -294,20 +294,22 @@ private fun AppFilterBanner(
     selected: Boolean,
     count: Int,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val shape = RoundedCornerShape(20.dp)
     val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier =
-            Modifier
-                .size(width = 142.dp, height = 72.dp)
+            modifier
+                .fillMaxWidth()
+                .height(54.dp)
                 .clip(shape)
                 .background(if (selected) Color(0xFFE9EEF0) else Color.White, shape)
                 .border(1.dp, if (selected) Color(0xFFB7C0C7) else Color(0xFFE1E7EA), shape)
                 .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
@@ -323,7 +325,7 @@ private fun AppFilterBanner(
                     filter.label,
                     style =
                         MaterialTheme.typography.labelLarge.copy(
-                            fontSize = if (filter == MyAppsQuickFilter.InGroup) 12.sp else 14.sp,
+                            fontSize = if (filter == MyAppsQuickFilter.InGroup) 11.sp else 13.sp,
                         ),
                     color = UserInk,
                     maxLines = 1,

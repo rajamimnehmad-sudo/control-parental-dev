@@ -1329,7 +1329,7 @@ private fun SettingsTab(
                     listOfNotNull(
                         "Rol: Administrador (ADM)",
                         state.communityName.takeIf(String::isNotBlank)?.let { "Comunidad: $it" },
-                        "Superweb: ${if (state.offlineMode) "sin conexión" else "sincronización ${state.syncState.lowercase()}"}",
+                        "Superweb: ${syncStatusLabel(state.offlineMode, state.syncState)}",
                     ),
                 accent = Violet,
             )
@@ -1701,9 +1701,28 @@ private fun licenseSummary(
             LicenseState.PendingActivation -> "Licencia pendiente"
         }
     return if (daysRemaining != null && state in setOf(LicenseState.Active, LicenseState.ExpiringSoon, LicenseState.GracePeriod)) {
-        "$stateLabel · $daysRemaining días restantes"
+        val remainingLabel =
+            if (daysRemaining == 1L) {
+                "1 día restante"
+            } else {
+                "$daysRemaining días restantes"
+            }
+        "$stateLabel · $remainingLabel"
     } else {
         stateLabel
+    }
+}
+
+private fun syncStatusLabel(
+    offlineMode: Boolean,
+    syncState: String,
+): String {
+    if (offlineMode) return "sin conexión"
+    return when (syncState.lowercase()) {
+        "enabled", "active" -> "sincronización activa"
+        "warning" -> "sincronización con advertencias"
+        "disabled" -> "sincronización desactivada"
+        else -> "sincronización pendiente"
     }
 }
 
