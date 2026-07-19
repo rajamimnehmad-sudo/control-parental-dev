@@ -21,6 +21,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -32,6 +33,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -64,10 +66,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -83,14 +88,10 @@ import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.ui.ContentFilterTheme
 import com.contentfilter.core.ui.ProductAppBackground
-import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductFeatureTile
 import com.contentfilter.core.ui.ProductIcon
-import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductLazyVisualPage
-import com.contentfilter.core.ui.ProductMint
 import com.contentfilter.core.ui.ProductNavGlyph
-import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.ProductSun
 import com.contentfilter.feature.accessibility.service.AccessibilityController
 import com.contentfilter.feature.accessibility.service.DeviceAdminController
@@ -360,7 +361,6 @@ private fun UserAppRoot(
                         onBack = null,
                         onOpenDag = { DagActivity.open(context) },
                         vpnActive = statusState.isVpnActive,
-                        accessibilityActive = statusState.accessibilityState == "Activa",
                         onActivateWebProtection = {
                             val permissionIntent = VpnController.prepareIntent(context)
                             if (permissionIntent == null) {
@@ -1170,152 +1170,192 @@ private fun UserWebTab(
     onBack: (() -> Unit)?,
     onOpenDag: () -> Unit,
     vpnActive: Boolean,
-    accessibilityActive: Boolean,
     onActivateWebProtection: () -> Unit,
     viewModel: UserWebViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val blocked = state.webNavigationBlocked
-    val protectionActive = vpnActive && accessibilityActive
     ProductLazyVisualPage(
         title = "Internet",
-        subtitle = if (blocked) "Navegación bloqueada" else "Navegación protegida",
+        subtitle = "Tu navegación protegida",
         onBack = onBack,
     ) {
         item {
-            ProductLargeFeatureCard(
-                title =
-                    if (blocked) {
-                        "Internet bloqueado"
-                    } else {
-                        if (state.activeLayers.isEmpty()) {
-                            "Internet totalmente abierto"
-                        } else {
-                            "Internet abierto con protecciones"
+            UserInternetStatusCard(
+                state = state,
+                vpnActive = vpnActive,
+                onOpenDag = onOpenDag,
+                onActivateWebProtection = onActivateWebProtection,
+            )
+        }
+    }
+}
+
+@Composable
+private fun UserInternetStatusCard(
+    state: com.contentfilter.user.internet.UserWebUiState,
+    vpnActive: Boolean,
+    onOpenDag: () -> Unit,
+    onActivateWebProtection: () -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
+    val scheduleBlocked = state.schedule?.isAllowed == false
+    val blocked = state.webNavigationBlocked || scheduleBlocked
+    val status =
+        when {
+            blocked -> InternetVisualStatus.Blocked
+            !vpnActive -> InternetVisualStatus.Review
+            else -> InternetVisualStatus.Protected
+        }
+    val summary =
+        when {
+            state.webNavigationBlocked -> "El administrador pausó la navegación"
+            scheduleBlocked -> state.schedule?.summary ?: "Fuera del horario permitido"
+            !vpnActive -> "Activá la VPN para recuperar la protección Web"
+            state.schedule != null -> state.schedule.summary
+            else -> "SafeSearch activo${if (state.onlyResultsEnabled) " · Solo resultados" else ""}"
+        }
+    val shape = RoundedCornerShape(26.dp)
+    Card(
+        modifier = Modifier.fillMaxWidth().animateContentSize().clickable { expanded = !expanded },
+        shape = shape,
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF10243A)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
+    ) {
+        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 238.dp).clip(shape)) {
+            Image(
+                painter = painterResource(R.drawable.user_internet_status_background),
+                contentDescription = null,
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop,
+            )
+            Box(
+                modifier =
+                    Modifier
+                        .matchParentSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                listOf(
+                                    status.overlay.copy(alpha = 0.94f),
+                                    status.overlay.copy(alpha = 0.72f),
+                                    Color.Black.copy(alpha = 0.42f),
+                                ),
+                            ),
+                        ),
+            )
+            Column(
+                modifier = Modifier.fillMaxWidth().padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Text(
+                    text = status.label,
+                    style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.SemiBold),
+                    color = Color.White,
+                )
+                Text(
+                    text = summary,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = Color.White.copy(alpha = 0.86f),
+                )
+                Text(
+                    text = state.compactProtectionSummary,
+                    style = MaterialTheme.typography.labelLarge,
+                    color = status.accent,
+                )
+                Text(
+                    text = if (expanded) "Ocultar detalle  ⌃" else "Ver detalle  ⌄",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = Color.White.copy(alpha = 0.78f),
+                )
+                AnimatedVisibility(
+                    visible = expanded,
+                    enter = expandVertically() + fadeIn(),
+                    exit = shrinkVertically() + fadeOut(),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
+                        InternetProtectionLine(
+                            "VPN",
+                            if (vpnActive) "Activa" else "Inactiva",
+                            vpnActive,
+                        )
+                        InternetProtectionLine(
+                            "SafeSearch",
+                            if (state.safeSearchEnabled) "Activo" else "Inactivo",
+                            state.safeSearchEnabled,
+                        )
+                        InternetProtectionLine(
+                            "Solo resultados",
+                            if (state.onlyResultsEnabled) "Activo" else "Navegación autorizada",
+                            true,
+                        )
+                        InternetProtectionLine(
+                            "Buscador DAG",
+                            when {
+                                state.dagEnabled -> "Activo"
+                                !state.dagEntitled -> "No incluido en la licencia"
+                                else -> "Cerrado por el administrador"
+                            },
+                            state.dagEnabled,
+                        )
+                        state.schedule?.let { schedule ->
+                            InternetProtectionLine("Horario", schedule.summary, schedule.isAllowed)
                         }
-                    },
-                subtitle =
-                    if (blocked) {
-                        "Las capas elegidas quedan guardadas hasta que el administrador abra Internet."
-                    } else {
-                        state.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" }
-                    },
-                accent = ProductSky,
-            )
-        }
-        item { UserWebStatusCard(title = "SafeSearch", value = if (blocked) "Automatico" else "Activo") }
-        if (state.onlyResultsEnabled) {
-            item { UserWebStatusCard(title = "Solo resultados", value = if (blocked) "Guardado" else "Activo") }
-        }
-        item {
-            ProductLargeFeatureCard(
-                title = "DAG",
-                subtitle =
-                    if (state.dagEnabled) {
-                        "Buscador protegido habilitado por el administrador."
-                    } else if (!state.dagEntitled) {
-                        "DAG no está incluido en la licencia de esta comunidad."
-                    } else {
-                        "El administrador mantiene DAG cerrado."
-                    },
-                accent = ProductMint,
-            )
-        }
-        if (state.dagEnabled) {
-            item {
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onOpenDag) {
-                    Text("Abrir DAG")
-                }
-            }
-            item {
-                ProductCard {
-                    Text("DAG también aparece como una app independiente en el inicio del teléfono.")
-                }
-            }
-        }
-        if (state.showDomainListDiagnostics) {
-            item {
-                ProductCard {
-                    Text("Base de proteccion Web", style = MaterialTheme.typography.titleMedium)
-                    Text("Estado: ${state.domainList.status}", style = MaterialTheme.typography.bodyMedium)
-                    Text(
-                        "Version instalada: ${state.domainList.version.takeIf { it > 0L } ?: "Sin base"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        "Fecha de instalacion: ${state.domainList.installedAtEpochMillis.devDateLabel()}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        "Ultima comprobacion: ${state.domainList.lastCheckResult}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        "Canario incluido: ${if (state.domainList.canaryIncluded) "Si" else "No"}",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    state.domainList.lastError?.let { error ->
-                        Text("Ultimo error: $error", style = MaterialTheme.typography.bodyMedium)
-                    }
-                    Button(
-                        enabled = !state.domainList.isChecking,
-                        onClick = viewModel::checkDomainListNow,
-                    ) {
-                        Text(if (state.domainList.isChecking) "Comprobando..." else "Comprobar actualizacion ahora")
+                        Text(
+                            text = "Configurado por tu administrador",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = Color.White.copy(alpha = 0.66f),
+                        )
                     }
                 }
-            }
-        }
-        if (!accessibilityActive) {
-            item {
-                ProductCard {
-                    Text("Accessibility apagado.", style = MaterialTheme.typography.bodyMedium)
-                }
-            }
-        }
-        if (!vpnActive) {
-            item {
-                ProductCard {
-                    Text("VPN apagada.", style = MaterialTheme.typography.bodyMedium)
+                if (!vpnActive) {
                     Button(onClick = onActivateWebProtection) {
-                        Text("Activar protección web")
+                        Text("Reparar protección")
                     }
-                }
-            }
-        }
-        if (!protectionActive) {
-            item {
-                ProductCard {
-                    Text("Protección web no activa.", style = MaterialTheme.typography.bodyMedium)
+                } else if (state.dagEnabled) {
+                    Button(onClick = onOpenDag) {
+                        Text("Abrir DAG")
+                    }
                 }
             }
         }
     }
 }
 
-private fun Long.devDateLabel(): String =
-    if (this <= 0L) {
-        "Sin datos"
-    } else {
-        java.text.DateFormat.getDateTimeInstance(java.text.DateFormat.SHORT, java.text.DateFormat.SHORT)
-            .format(java.util.Date(this))
-    }
-
 @Composable
-private fun UserWebStatusCard(
-    title: String,
+private fun InternetProtectionLine(
+    label: String,
     value: String,
+    active: Boolean,
 ) {
-    ProductCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(title, style = MaterialTheme.typography.bodyMedium)
-            Text(value, style = MaterialTheme.typography.titleMedium)
-        }
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.82f))
+        Text(
+            text = value,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (active) Color(0xFF8EF0C0) else Color(0xFFFFD27A),
+        )
     }
+}
+
+private val com.contentfilter.user.internet.UserWebUiState.compactProtectionSummary: String
+    get() =
+        buildList {
+            if (safeSearchEnabled) add("SafeSearch")
+            if (onlyResultsEnabled) add("Solo resultados")
+            if (dagEnabled) add("DAG activo")
+        }.joinToString(" · ").ifBlank { "Protección Web configurada" }
+
+private enum class InternetVisualStatus(
+    val label: String,
+    val overlay: Color,
+    val accent: Color,
+) {
+    Protected("Internet protegido", Color(0xFF09283A), Color(0xFF8EF0C0)),
+    Review("Internet por revisar", Color(0xFF443316), Color(0xFFFFD27A)),
+    Blocked("Internet bloqueado", Color(0xFF321B25), Color(0xFFFFB0B7)),
 }
 
 private enum class UserDestination(

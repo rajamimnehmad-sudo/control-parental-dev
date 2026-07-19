@@ -59,6 +59,14 @@ Flujo de una entrada:
 - Arquitectura: reutiliza ViewModels, estados, iconos, flujo de actualizacion y acciones de reparacion existentes; no agrega biblioteca ni dependencia. La busqueda queda localizada en `Mis apps` para no recortar el inventario compartido que consume Home.
 - Aceptacion alcanzada: ktlint, tests unitarios, Android Lint vital y APK DEV local correctos. Falta revision visual en telefono conectado y la publicacion conjunta que el usuario autorice; no cambia `versionCode` ni publica por si solo.
 
+### USER-INTERNET-UX-04 - Estado Web unificado
+
+- Estado: `Implementado candidato local posterior a DEV 261; pendiente prueba fisica y publicacion conjunta`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX, proteccion Web y horarios. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Alcance: una unica tarjeta panoramica, visualmente distinta del Home, reemplaza las tarjetas separadas de Internet, SafeSearch, DAG y advertencias duplicadas. Usa una imagen original local sin marcas ni contenido real, cambia tono segun el estado y expande/cierra el detalle al tocar.
+- Estado y acciones: refleja bloqueo administrativo, horario global, VPN, SafeSearch obligatorio, Solo resultados, entitlement/estado DAG y una sola accion contextual. DAG abre desde la tarjeta cuando esta habilitado; VPN degradada conduce a reparacion.
+- Limpieza tecnica: se retira de la interfaz la comprobacion manual de la base Web y sus datos diagnosticos; la actualizacion automatica existente permanece activa. El horario se evalua cada minuto en zona Argentina, incluyendo proxima apertura y franjas nocturnas. No se presenta un tiempo Web global inexistente o inexacto.
+- Aceptacion alcanzada: imagen optimizada a 68 KiB, ktlint, tests unitarios con horarios diurnos/nocturnos y proxima apertura, Android Lint vital y APK DEV local correctos. Falta revision visual fisica y publicacion conjunta autorizada; no cambia `versionCode`.
+
 ### AI-SEARCH-01A - Intencion semantica local compacta
 
 - Estado: `En progreso`; aprobado por la continuacion explicita de IA local el 2026-07-15. DEV 212 publicado y verificado; falta prueba fisica en el celular personal.
@@ -161,6 +169,7 @@ Flujo de una entrada:
 | ADMIN-REQUESTS-ACCOUNT-01 | Publicado DEV 261; pendiente prueba física | P1 | Solicitudes raíz y Cuenta con identidad, Superweb, licencia, versión y novedades | M | Medio |
 | USER-UX-ALIGN-02 | Publicado DEV 261; validación local completa y cierre físico parcial | P2 | Reacomodar App Usuario con componentes visuales compartidos sin exponer controles Admin | L | Medio |
 | USER-HOME-UX-03 | Implementado candidato local posterior a DEV 261; pendiente prueba física y publicación conjunta | P2 | Home dinámico con protección reparable, campanita Superweb, actualización contextual y cola de apps/grupos cerca del límite | M | Medio |
+| USER-INTERNET-UX-04 | Implementado candidato local posterior a DEV 261; pendiente prueba física y publicación conjunta | P2 | Internet unificado en una tarjeta visual con estado real, DAG, reparación y horario dinámico | M | Medio |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-AUTH-RECOVERY-01 | Publicado; recovery bloqueado externamente por cuota Supabase DEV | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
