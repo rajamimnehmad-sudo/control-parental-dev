@@ -142,6 +142,7 @@ Flujo de una entrada:
 | USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
+| SUPERWEB-VERSION-01 | Idea | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-AUTH-RECOVERY-01 | Publicado; recovery bloqueado externamente por cuota Supabase DEV | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
@@ -207,6 +208,24 @@ Flujo de una entrada:
 - Verificacion implementada: `scripts/verify_superweb.sh` exige health DEV, commit esperado y existencia protegida de Comunidades, Uso DAG, Alertas y Avisos. El Vercel viejo falla correctamente esta comprobacion.
 - Pendiente externo: iniciar sesion en Vercel como propietario, revisar proyecto/rama/root directory, reconectar GitHub si corresponde, desplegar y ejecutar la verificacion contra la URL oficial.
 - Aceptacion: URL oficial sin 404 en rutas nuevas; anonimo redirigido a Login; health coincide con el commit publicado y DEV; futuros pushes de `main` vuelven a generar estado/despliegue visible; ninguna variable de Production ni Service Role.
+
+### SUPERWEB-VERSION-01 - Version publicada visible
+
+- Estado: `Idea`; no aprobado para codigo. Tipo: UX operativa, soporte y trazabilidad de despliegue. Prioridad: P2.
+- Problema: Superweb expone internamente el commit y entorno mediante `/api/health`, pero la interfaz no permite que el propietario identifique facilmente qué version o build esta usando.
+- Solucion propuesta: mostrar una referencia breve y visible de la version publicada, por ejemplo `Superweb DEV · build 6b12a60`, obtenida del mismo dato verificable del despliegue. Puede acompañarse con fecha de publicacion o estado actualizado, sin mostrar project ref, variables, claves ni informacion de sesion.
+- Evidencia: pedido explicito del usuario del 2026-07-18.
+- Esfuerzo: S estimado. Riesgo: bajo; una version calculada desde una fuente distinta de `/api/health` podria quedar desactualizada o confundir código fuente con despliegue real.
+- Dependencias: `SUPERWEB-DEPLOY-SYNC-01`; `/api/health`; commit inyectado por Vercel; layout autenticado y Login; diseño mobile-first.
+- Duplicados y relacion: complementa la comprobacion automatizada de despliegue, pero no la duplica: este ticket hace visible el dato para el usuario.
+- Criterios de aceptacion propuestos:
+  - la interfaz muestra la build realmente servida por Vercel y coincide con `/api/health`;
+  - el dato es legible en celular y escritorio sin ocupar espacio principal;
+  - una build desconocida muestra un fallback neutro y no rompe Login ni navegación;
+  - actualizar `main` y desplegar cambia automaticamente la version visible;
+  - no se exponen claves, variables, project ref completo, credenciales, sesión ni información sensible;
+  - soporte puede copiar o comunicar la referencia para diagnosticar una Superweb desactualizada.
+- Decisiones pendientes para la entrevista del ticket: ubicación —Login, menú, pie o sección Acerca de—; mostrar commit corto, numero propio o ambos; fecha/hora; acción para copiar; visibilidad antes o despues de iniciar sesión.
 
 ### SUPERWEB-AUTH-RECOVERY-01 - Recuperacion segura del propietario
 
