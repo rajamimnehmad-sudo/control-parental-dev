@@ -66,6 +66,8 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 import java.util.UUID
 import javax.inject.Inject
 
@@ -326,6 +328,115 @@ class RulesViewModel
                 form.update {
                     it.copy(message = devicesResult.message.takeIf { message -> message.isNotBlank() }.orEmpty())
                 }
+            }
+        }
+
+        fun refreshArchivedUsers() {
+            if (form.value.archivedUsersLoading) return
+            form.update { it.copy(archivedUsersLoading = true, message = "Cargando usuarios anteriores...") }
+            viewModelScope.launch(Dispatchers.IO) {
+                when (val result = activationClient.listArchivedProtectedUsers()) {
+                    is RemoteResult.Success -> {
+                        val archivedUsers =
+                            result.value.map { archived ->
+                                ArchivedUserUiState(
+                                    archiveId = archived.archiveId,
+                                    deviceId = archived.deviceId,
+                                    name = archived.displayName,
+                                    archivedAtLabel = archived.archivedAt.archivedAtLabel(),
+                                    canRestore = archived.canRestore,
+                                )
+                            }
+                        form.update {
+                            it.copy(
+                                archivedUsers = archivedUsers,
+                                archivedUsersLoading = false,
+                                message =
+                                    if (archivedUsers.isEmpty()) {
+                                        "No hay usuarios anteriores."
+                                    } else {
+                                        "Usuarios anteriores actualizados."
+                                    },
+                            )
+                        }
+                    }
+                    is RemoteResult.Failure -> {
+                        form.update {
+                            it.copy(
+                                archivedUsersLoading = false,
+                                message = "No se pudieron cargar los usuarios anteriores.",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        fun createArchivedUserRestoreCode(archiveId: String) {
+            val archivedUser = form.value.archivedUsers.firstOrNull { it.archiveId == archiveId }
+            if (archivedUser == null || !archivedUser.canRestore) {
+                form.update { it.copy(message = "Este archivo necesita revisión antes de restaurarse.") }
+                return
+            }
+            form.update {
+                it.copy(
+                    restoreLoadingArchiveIds = it.restoreLoadingArchiveIds + archiveId,
+                    restorePairingCode = "",
+                    restorePairingExpiresAt = "",
+                    restorePairingUserName = "",
+                    message = "Generando token de restauración...",
+                )
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                when (
+                    val result =
+                        activationClient.createArchivedUserRestoreCode(
+                            archiveId = archiveId,
+                            ttlMinutes = UserPairingTokenTtlMinutes,
+                        )
+                ) {
+                    is RemoteResult.Success -> {
+                        form.update {
+                            it.copy(
+                                restoreLoadingArchiveIds = it.restoreLoadingArchiveIds - archiveId,
+                                restorePairingCode = result.value.code.withPairingName(archivedUser.name),
+                                restorePairingExpiresAt = result.value.expiresAt,
+                                restorePairingUserName = archivedUser.name,
+                                message = "Token de restauración listo.",
+                            )
+                        }
+                    }
+                    is RemoteResult.Failure -> {
+                        form.update {
+                            it.copy(
+                                restoreLoadingArchiveIds = it.restoreLoadingArchiveIds - archiveId,
+                                message = "No se pudo generar el token de restauración.",
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        fun markArchivedUserRestoreCodeCopied() {
+            form.update {
+                it.copy(
+                    restorePairingCode = "",
+                    restorePairingExpiresAt = "",
+                    restorePairingUserName = "",
+                    message = "Token copiado.",
+                )
+            }
+        }
+
+        fun dismissArchivedUserRestoreCode() {
+            form.update {
+                it.copy(
+                    restorePairingCode = "",
+                    restorePairingExpiresAt = "",
+                    restorePairingUserName = "",
+                    message = "Token ocultado.",
+                )
             }
         }
 
@@ -1892,6 +2003,10 @@ class RulesViewModel
 
         private fun String.safeDeviceId(): String = take(8)
 
+        private fun String.archivedAtLabel(): String =
+            runCatching { ArchiveDateFormatter.format(Instant.parse(this)) }
+                .getOrDefault("Fecha no disponible")
+
         private fun String.withPairingName(userName: String): String {
             val safeName =
                 userName
@@ -1906,6 +2021,9 @@ class RulesViewModel
             const val NoonMinuteOfDay = 720
             const val UserPairingTokenTtlMinutes = 180
             const val PolicyApplicationWaitMillis = 8_000L
+            val ArchiveDateFormatter: DateTimeFormatter =
+                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
+                    .withZone(ZoneId.of("America/Argentina/Buenos_Aires"))
         }
     }
 

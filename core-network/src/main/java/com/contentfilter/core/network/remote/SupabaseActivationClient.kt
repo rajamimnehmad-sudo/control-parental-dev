@@ -209,6 +209,86 @@ class SupabaseActivationClient
                 }
             }
 
+        suspend fun listArchivedProtectedUsers(): RemoteResult<List<ArchivedProtectedUserDto>> =
+            withContext(Dispatchers.IO) {
+                val config = configProvider.current()
+                val baseUrl = config.normalizedUrlOrNull()
+                val token = authTokenProvider.currentToken()
+                if (baseUrl == null || token == null) {
+                    return@withContext RemoteResult.Failure(
+                        "Supabase archive list requires an authenticated admin session.",
+                        retryable = true,
+                    )
+                }
+                val request =
+                    Request.Builder()
+                        .url("$baseUrl/rest/v1/rpc/admin_list_archived_protected_users")
+                        .header("apikey", config.anonKey)
+                        .header("Authorization", "Bearer $token")
+                        .header("Content-Type", "application/json")
+                        .post(JSONObject().toString().toRequestBody(JsonMediaType))
+                        .build()
+                try {
+                    httpClient.newCall(request).execute().use { response ->
+                        val responseBody = response.body?.string().orEmpty()
+                        if (response.isSuccessful) {
+                            val items = JSONArray(responseBody)
+                            RemoteResult.Success(
+                                buildList {
+                                    repeat(items.length()) { index ->
+                                        val item = items.getJSONObject(index)
+                                        add(
+                                            ArchivedProtectedUserDto(
+                                                archiveId = item.getString("archive_id"),
+                                                deviceId = item.getString("device_id"),
+                                                displayName = item.getString("display_name"),
+                                                archivedAt = item.getString("archived_at"),
+                                                canRestore = item.optBoolean("can_restore", false),
+                                            ),
+                                        )
+                                    }
+                                },
+                            )
+                        } else {
+                            httpFailure("Supabase admin_list_archived_protected_users RPC", response.code, responseBody)
+                        }
+                    }
+                } catch (exception: Exception) {
+                    exceptionFailure("Supabase admin_list_archived_protected_users RPC", exception)
+                }
+            }
+
+        suspend fun createArchivedUserRestoreCode(
+            archiveId: String,
+            ttlMinutes: Int = 180,
+        ): RemoteResult<PairingCodeDto> =
+            withContext(Dispatchers.IO) {
+                val config = configProvider.current()
+                val baseUrl = config.normalizedUrlOrNull()
+                val token = authTokenProvider.currentToken()
+                if (baseUrl == null || token == null) {
+                    return@withContext RemoteResult.Failure(
+                        "Supabase restore requires an authenticated admin session.",
+                        retryable = true,
+                    )
+                }
+                val body =
+                    JSONObject()
+                        .put("target_archive_id", archiveId)
+                        .put("ttl_minutes", ttlMinutes)
+                        .toString()
+                        .toRequestBody(JsonMediaType)
+                val request =
+                    Request.Builder()
+                        .url("$baseUrl/rest/v1/rpc/admin_create_archived_user_restore_code")
+                        .header("apikey", config.anonKey)
+                        .header("Authorization", "Bearer $token")
+                        .header("Content-Type", "application/json")
+                        .post(body)
+                        .build()
+                executePairingCodeRequest(request, "Supabase admin_create_archived_user_restore_code RPC")
+            }
+
         private fun executeActivationRequest(
             request: Request,
             source: String,
@@ -257,6 +337,14 @@ class SupabaseActivationClient
         data class PairingCodeDto(
             val code: String,
             val expiresAt: String,
+        )
+
+        data class ArchivedProtectedUserDto(
+            val archiveId: String,
+            val deviceId: String,
+            val displayName: String,
+            val archivedAt: String,
+            val canRestore: Boolean,
         )
 
         private companion object {

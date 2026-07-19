@@ -84,6 +84,7 @@ import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductLazyVisualPage
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.ProgressActionButton
@@ -122,6 +123,10 @@ fun RulesRoute(
         onDeleteAppGroup = viewModel::deleteAppGroup,
         onRefreshApps = viewModel::refreshApps,
         onRefreshDevices = viewModel::refreshDevices,
+        onRefreshArchivedUsers = viewModel::refreshArchivedUsers,
+        onRestoreArchivedUser = viewModel::createArchivedUserRestoreCode,
+        onRestoreTokenCopied = viewModel::markArchivedUserRestoreCodeCopied,
+        onRestoreTokenDismissed = viewModel::dismissArchivedUserRestoreCode,
         onPairingUserNameChanged = viewModel::onPairingUserNameChanged,
         onGeneratePairingCode = viewModel::generatePairingCode,
         onPairingCodeCopied = viewModel::clearPairingCode,
@@ -175,6 +180,10 @@ private fun RulesScreen(
     onDeleteAppGroup: (String) -> Unit,
     onRefreshApps: () -> Unit,
     onRefreshDevices: () -> Unit,
+    onRefreshArchivedUsers: () -> Unit,
+    onRestoreArchivedUser: (String) -> Unit,
+    onRestoreTokenCopied: () -> Unit,
+    onRestoreTokenDismissed: () -> Unit,
     onPairingUserNameChanged: (String) -> Unit,
     onGeneratePairingCode: () -> Unit,
     onPairingCodeCopied: () -> Unit,
@@ -205,9 +214,20 @@ private fun RulesScreen(
     val selectedDevice = state.userDevices.firstOrNull { it.id == state.selectedDeviceId }
     val initialPanel = if (entryMode == RulesEntryMode.Web) DevicePanel.Web else DevicePanel.Apps
     var selectedPanel by rememberSaveable(selectedDevice?.id, entryMode) { mutableStateOf(initialPanel) }
+    var showingArchivedUsers by rememberSaveable { mutableStateOf(false) }
     val effectivePanel = if (entryMode == RulesEntryMode.Web) DevicePanel.Web else selectedPanel
 
-    if (selectedDevice == null) {
+    if (selectedDevice == null && showingArchivedUsers) {
+        ArchivedUsersContent(
+            state = state,
+            clipboardManager = clipboardManager,
+            onBack = { showingArchivedUsers = false },
+            onRefresh = onRefreshArchivedUsers,
+            onRestore = onRestoreArchivedUser,
+            onTokenCopied = onRestoreTokenCopied,
+            onTokenDismissed = onRestoreTokenDismissed,
+        )
+    } else if (selectedDevice == null) {
         UsersListContent(
             entryMode = entryMode,
             state = state,
@@ -219,6 +239,10 @@ private fun RulesScreen(
             onPairingCodeCopied = onPairingCodeCopied,
             onDeviceSelected = onDeviceSelected,
             onDeviceDeleted = onDeviceDeleted,
+            onShowArchivedUsers = {
+                showingArchivedUsers = true
+                onRefreshArchivedUsers()
+            },
         )
     } else {
         UserDetailContent(
@@ -272,6 +296,7 @@ private fun UsersListContent(
     onPairingCodeCopied: () -> Unit,
     onDeviceSelected: (String) -> Unit,
     onDeviceDeleted: (String) -> Unit,
+    onShowArchivedUsers: () -> Unit,
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
     var userSearchQuery by rememberSaveable { mutableStateOf("") }
@@ -370,6 +395,16 @@ private fun UsersListContent(
                     onDelete = { onDeviceDeleted(device.id) },
                 )
             }
+            if (entryMode == RulesEntryMode.ManageUsers) {
+                item(key = "archived-users") {
+                    OutlinedButton(
+                        modifier = Modifier.fillMaxWidth(),
+                        onClick = onShowArchivedUsers,
+                    ) {
+                        Text("Ver usuarios anteriores")
+                    }
+                }
+            }
         }
     }
 
@@ -384,6 +419,151 @@ private fun UsersListContent(
                 onPairingCodeCopied()
             },
         )
+    }
+}
+
+@Composable
+private fun ArchivedUsersContent(
+    state: RulesUiState,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+    onRestore: (String) -> Unit,
+    onTokenCopied: () -> Unit,
+    onTokenDismissed: () -> Unit,
+) {
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    val filteredUsers =
+        remember(state.archivedUsers, searchQuery) {
+            val normalized = searchQuery.trim().lowercase()
+            if (normalized.isBlank()) {
+                state.archivedUsers
+            } else {
+                state.archivedUsers.filter { user -> user.name.lowercase().contains(normalized) }
+            }
+        }
+    val bannerText = state.message.ifBlank { if (state.offlineMode) "Sin conexión. Mostrando datos guardados." else "" }
+
+    ProductLazyVisualPage(
+        title = "Usuarios anteriores",
+        subtitle = "${state.archivedUsers.size} archivados · búsqueda por nombre",
+        onBack = onBack,
+        banner =
+            if (bannerText.isNotBlank()) {
+                {
+                    FeedbackBanner(
+                        text = bannerText,
+                        isError = state.offlineMode || bannerText.startsWith("No se pudo"),
+                    )
+                }
+            } else {
+                null
+            },
+    ) {
+        item(key = "archived-search") {
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                label = { Text("Buscar por nombre") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                singleLine = true,
+            )
+        }
+        item(key = "archived-refresh") {
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = onRefresh,
+                enabled = !state.archivedUsersLoading,
+            ) {
+                Text(if (state.archivedUsersLoading) "Actualizando..." else "Actualizar")
+            }
+        }
+        if (!state.archivedUsersLoading && filteredUsers.isEmpty()) {
+            item(key = "archived-empty") {
+                EmptySectionText(
+                    if (state.archivedUsers.isEmpty()) {
+                        "Todavía no hay usuarios archivados desde App Admin."
+                    } else {
+                        "No hay usuarios anteriores que coincidan con ese nombre."
+                    },
+                )
+            }
+        }
+        items(filteredUsers, key = { it.archiveId }) { user ->
+            ArchivedUserCard(
+                user = user,
+                restoring = user.archiveId in state.restoreLoadingArchiveIds,
+                onRestore = { onRestore(user.archiveId) },
+            )
+        }
+    }
+
+    if (state.restorePairingCode.isNotBlank()) {
+        AlertDialog(
+            onDismissRequest = onTokenDismissed,
+            title = { Text("Restaurar ${state.restorePairingUserName}") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        "Ingresá este token en App Usuario. La configuración se restaurará recién cuando el token se use.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    TokenReadyCard(
+                        code = state.restorePairingCode,
+                        expiresAt = state.restorePairingExpiresAt,
+                        onCopy = {
+                            clipboardManager.setText(AnnotatedString(state.restorePairingCode))
+                            onTokenCopied()
+                        },
+                    )
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                OutlinedButton(onClick = onTokenDismissed) {
+                    Text("Cerrar")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun ArchivedUserCard(
+    user: ArchivedUserUiState,
+    restoring: Boolean,
+    onRestore: () -> Unit,
+) {
+    ProductCard {
+        Text(user.name, style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Archivado: ${user.archivedAtLabel}",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        if (user.canRestore) {
+            Text(
+                "Configuración segura disponible.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            ProgressActionButton(
+                modifier = Modifier.fillMaxWidth(),
+                text = "Restaurar con token nuevo",
+                loadingText = "Generando token...",
+                successText = "Token listo",
+                onClick = onRestore,
+                loading = restoring,
+                enabled = !restoring,
+            )
+        } else {
+            StatusChip("Revisión necesaria", PendingYellow)
+            Text(
+                "Este archivo es anterior al respaldo seguro. No se restaurará automáticamente sin una decisión explícita.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
 

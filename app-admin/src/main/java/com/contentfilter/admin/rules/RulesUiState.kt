@@ -46,6 +46,12 @@ data class RulesUiState(
     val pairingCode: String = "",
     val pairingExpiresAt: String = "",
     val pairingLoading: Boolean = false,
+    val archivedUsers: List<ArchivedUserUiState> = emptyList(),
+    val archivedUsersLoading: Boolean = false,
+    val restoreLoadingArchiveIds: Set<String> = emptySet(),
+    val restorePairingCode: String = "",
+    val restorePairingExpiresAt: String = "",
+    val restorePairingUserName: String = "",
     val protectionControls: Map<String, DeviceProtectionControl> = emptyMap(),
     val protectionLoadingDeviceIds: Set<String> = emptySet(),
     val recoveryCode: String = "",
@@ -125,6 +131,14 @@ data class UserDeviceUiState(
     val accessibilityState: String = "Desconocida",
     val deviceAdminState: String = "Desconocida",
     val userLabel: String = "Usuario",
+)
+
+data class ArchivedUserUiState(
+    val archiveId: String,
+    val deviceId: String,
+    val name: String,
+    val archivedAtLabel: String,
+    val canRestore: Boolean,
 )
 
 enum class UserDeviceStatus {
