@@ -371,6 +371,7 @@ Admin   47a121561d5c18fde90608a70b693d69171e8e935490a48c318ebe14200c354f
 ## Implementacion 2026-07-16 - candidato DEV 241 SUPERADMIN-TOKEN-01
 
 - El token de activacion Admin se entrega una sola vez y queda solo en memoria de la pestaña actual. Superweb ya no lo persiste en `localStorage` ni en cookies; al ocultarlo, recargar o cerrar la pestaña no puede recuperarlo. Supabase conserva exclusivamente el hash bcrypt preexistente.
+- Hotfix Superweb 2026-07-18: el formulario conserva su referencia antes de esperar la respuesta HTTP. Esto evita que React invalide `event.currentTarget` y corte el flujo antes de mostrar el token recien generado. El token sigue siendo efimero, no se registra ni se persiste, y no se creo ningun token real durante la validacion.
 - La ruta de generacion acepta solo la solicitud JSON autenticada de la interfaz; se elimino el fallback de formulario que guardaba el secreto en una cookie para poder mostrarlo despues.
 - Super Admin puede revocar un token Admin pendiente sin borrar el administrador. La RPC valida comunidad y admin, solo invalida codigos Admin sin usar y no afecta dispositivos ya activados.
 - La tabla privada `activation_code_audit` registra generacion, uso y revocacion con ID de codigo, rol, vencimiento, actor cuando existe y fecha; nunca guarda el codigo ni su hash. RLS permite lectura solo a Super Admin.

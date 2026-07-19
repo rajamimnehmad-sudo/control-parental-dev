@@ -17,11 +17,12 @@ export function AdminTokenForm({ communityId }: { communityId: string }) {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setLoading(true);
     setError("");
     setToken(null);
 
-    const form = new FormData(event.currentTarget);
+    const form = new FormData(formElement);
     const payload = await fetch(`/api/communities/${communityId}/admins`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -50,8 +51,8 @@ export function AdminTokenForm({ communityId }: { communityId: string }) {
     }
 
     const nextToken = payload as TokenResult;
-    event.currentTarget.reset();
     setToken(nextToken);
+    formElement.reset();
     window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: "smooth" }));
   }
 
