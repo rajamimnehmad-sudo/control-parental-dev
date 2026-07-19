@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 261 y App Admin DEV 261, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 262 y App Admin DEV 262, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -53,19 +53,19 @@ Flujo de una entrada:
 
 ### USER-HOME-UX-03 - Home dinamico de App Usuario
 
-- Estado: `Implementado candidato local posterior a DEV 261; pendiente prueba fisica y publicacion conjunta`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX, estado de proteccion, uso y actualizaciones. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 262; pendiente prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX, estado de proteccion, uso y actualizaciones. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: integrar la zona de camara con el header oscuro y mostrar el nombre de la comunidad; mover Avisos a una campanita; retirar las tarjetas tecnicas; mostrar la actualizacion solo cuando corresponda; expandir/cerrar en Home el diagnostico de proteccion con pasos de reparacion; mostrar apps y grupos cerca del limite mediante una cola superpuesta de iconos y barras de progreso; y simplificar `Mis apps` a un solo titulo con filtros en una fila horizontal desplazable.
 - Comportamiento: solo se muestran limites diarios con al menos 70 % consumido; grupos deshabilitados y apps con tiempo extra activo quedan fuera. Proteccion y Tiempos son mutuamente excluyentes al expandirse, y las secciones dinamicas desaparecen sin dejar bloques vacios.
 - Arquitectura: reutiliza ViewModels, estados, iconos, flujo de actualizacion y acciones de reparacion existentes; no agrega biblioteca ni dependencia. La busqueda queda localizada en `Mis apps` para no recortar el inventario compartido que consume Home.
-- Aceptacion alcanzada: ktlint, tests unitarios, Android Lint vital y APK DEV local correctos. Falta revision visual en telefono conectado y la publicacion conjunta que el usuario autorice; no cambia `versionCode` ni publica por si solo.
+- Aceptacion alcanzada: matriz local y Android CI correctas; APK Usuario DEV 262 publicado y verificado por hash, paquete, version y certificado. Falta revision visual en telefono conectado.
 
 ### USER-INTERNET-UX-04 - Estado Web unificado
 
-- Estado: `Implementado candidato local posterior a DEV 261; pendiente prueba fisica y publicacion conjunta`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX, proteccion Web y horarios. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 262; pendiente prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX, proteccion Web y horarios. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: una unica tarjeta panoramica, visualmente distinta del Home, reemplaza las tarjetas separadas de Internet, SafeSearch, DAG y advertencias duplicadas. Usa una imagen original local sin marcas ni contenido real, cambia tono segun el estado y expande/cierra el detalle al tocar.
 - Estado y acciones: refleja bloqueo administrativo, horario global, VPN, SafeSearch obligatorio, Solo resultados, entitlement/estado DAG y una sola accion contextual. DAG abre desde la tarjeta cuando esta habilitado; VPN degradada conduce a reparacion.
 - Limpieza tecnica: se retira de la interfaz la comprobacion manual de la base Web y sus datos diagnosticos; la actualizacion automatica existente permanece activa. El horario se evalua cada minuto en zona Argentina, incluyendo proxima apertura y franjas nocturnas. No se presenta un tiempo Web global inexistente o inexacto.
-- Aceptacion alcanzada: imagen optimizada a 68 KiB, ktlint, tests unitarios con horarios diurnos/nocturnos y proxima apertura, Android Lint vital y APK DEV local correctos. Falta revision visual fisica y publicacion conjunta autorizada; no cambia `versionCode`.
+- Aceptacion alcanzada: imagen optimizada a 68 KiB, matriz local y Android CI correctas, con tests de horarios diurnos/nocturnos y proxima apertura; APK Usuario DEV 262 publicado y verificado. Falta revision visual fisica.
 
 ### AI-SEARCH-01A - Intencion semantica local compacta
 
@@ -168,8 +168,8 @@ Flujo de una entrada:
 | POLICY-SCHEDULES-01 | Publicado DEV 261 y backend DEV aplicado; pendiente prueba física | P1 | Límites de uso real y horarios múltiples por día en zona Argentina para Apps y Web | XL | Alto |
 | ADMIN-REQUESTS-ACCOUNT-01 | Publicado DEV 261; pendiente prueba física | P1 | Solicitudes raíz y Cuenta con identidad, Superweb, licencia, versión y novedades | M | Medio |
 | USER-UX-ALIGN-02 | Publicado DEV 261; validación local completa y cierre físico parcial | P2 | Reacomodar App Usuario con componentes visuales compartidos sin exponer controles Admin | L | Medio |
-| USER-HOME-UX-03 | Implementado candidato local posterior a DEV 261; pendiente prueba física y publicación conjunta | P2 | Home dinámico con protección reparable, campanita Superweb, actualización contextual y cola de apps/grupos cerca del límite | M | Medio |
-| USER-INTERNET-UX-04 | Implementado candidato local posterior a DEV 261; pendiente prueba física y publicación conjunta | P2 | Internet unificado en una tarjeta visual con estado real, DAG, reparación y horario dinámico | M | Medio |
+| USER-HOME-UX-03 | Publicado DEV 262; pendiente prueba física | P2 | Home dinámico con protección reparable, campanita Superweb, actualización contextual y cola de apps/grupos cerca del límite | M | Medio |
+| USER-INTERNET-UX-04 | Publicado DEV 262; pendiente prueba física | P2 | Internet unificado en una tarjeta visual con estado real, DAG, reparación y horario dinámico | M | Medio |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-AUTH-RECOVERY-01 | Publicado; recovery bloqueado externamente por cuota Supabase DEV | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |

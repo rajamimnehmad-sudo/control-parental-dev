@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-19:
 
 ```text
-App Usuario versionCode 261
-App Admin versionCode 261
+App Usuario versionCode 262
+App Admin versionCode 262
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-261-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-261-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-262-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-262-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 1a62301719851abd82a556ec10f6e254db223455a0963115d65b296dc0b0c523
-Admin   4c310e5860ac65e8a01bfad98ed4b28d1f5eff33265bdd1b170e5650ee2bb242
+Usuario a58aab3d2d264f077d54f786b986de9a5c8587696afd71de4e44caef00923a19
+Admin   f741b42ff7058c245902f4aa8379b1b7b6a6b8f38490f1eb3df616d09f8b2937
 ```
 
 ## Publicacion DEV 261 - Epic UX Admin, feedback y horarios - 2026-07-19
@@ -97,7 +97,7 @@ Admin   4c310e5860ac65e8a01bfad98ed4b28d1f5eff33265bdd1b170e5650ee2bb242
 - Publicación conjunta autorizada: ambos `versionCode` subieron a 261 en el commit `0a022cb`. El workflow `Publicar APKs DEV` `29698758791` publicó una sola vez y exclusivamente en Supabase DEV; Android CI `29698758829` completó build, tests, ktlint, Android Lint y Detekt. Los APK públicos descargados miden 51.569.870 bytes Usuario y 28.278.292 bytes Admin; sus SHA-256 coinciden con los manifiestos, `aapt` confirma paquetes DEV y versión 261, y ambos conservan el certificado esperado `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. No se tocó Production ni se borraron datos.
 - Pendiente de este epic: prueba física. El flujo exacto para archivos futuros ya está implementado. Por decisión del usuario, los dos archivos legados sin snapshot no requieren recuperación: permanecen aislados como `Revisión necesaria`, sin restauración automática ni modificación de sus datos.
 
-## Candidato local posterior a DEV 261 - Home dinamico de App Usuario - 2026-07-19
+## Publicacion DEV 262 - Home e Internet dinamicos de App Usuario - 2026-07-19
 
 - `USER-HOME-UX-03` elimina de Home las tarjetas tecnicas `6 secciones`, ambiente/version y el acceso corporal duplicado a Avisos. Los avisos provenientes de Superweb quedan en una campanita dentro del encabezado, con contador de mensajes disponibles.
 - La barra de estado de Android usa el mismo tono oscuro del inicio del encabezado para integrar la zona de camara. El resumen principal dice `Proteccion activa`, `Proteccion por revisar` o `Proteccion incompleta`; al tocarlo se expande en el mismo Home y detalla VPN, Accesibilidad, proteccion contra desinstalacion, sincronizacion y licencia. Cada estado faltante explica el arreglo y ofrece su accion existente. Al tocar nuevamente se cierra.
@@ -107,7 +107,9 @@ Admin   4c310e5860ac65e8a01bfad98ed4b28d1f5eff33265bdd1b170e5650ee2bb242
 - Ajuste visual posterior: el encabezado de Home muestra debajo del saludo el nombre real de la comunidad ya sincronizada. `Mis apps` elimina el segundo titulo `Aplicaciones`; actualizar y buscar permanecen como acciones compactas, y `Todas / Con tiempo / Apps en grupo / Bloqueadas` forman una unica fila horizontal desplazable en lugar de la grilla 2 x 2.
 - `USER-INTERNET-UX-04` reemplaza la lista tecnica de Internet por una unica tarjeta panoramica distinta del Home, con una imagen original local de 68 KiB, desenfocada, sin marcas, texto ni capturas reales. La tarjeta muestra `Internet protegido`, `por revisar` o `bloqueado`, resume VPN, SafeSearch, Solo resultados y DAG, se expande al tocar y conserva una sola accion contextual: reparar VPN o abrir DAG.
 - La comprobacion manual y el diagnostico DEV de la base Web dejan de exponerse en la interfaz; la actualizacion automatica segura de la base sigue ejecutandose desde `UserApplication`. Los horarios Web globales se recalculan por minuto en `America/Argentina/Buenos_Aires` y muestran hasta cuando esta disponible o cuando vuelve a abrir. No se inventa tiempo Web restante porque el conteo DNS existente es aproximado y por dominio.
-- Validacion local: `:app-user:ktlintCheck`, `:app-user:testDevDebugUnitTest`, Android Lint vital y `:app-user:assembleDevDebug` correctos; las pruebas nuevas cubren umbral, prioridad, grupos deshabilitados y tiempo extra activo. El telefono no estaba visible por ADB al terminar, por lo que falta la prueba visual fisica. No se uso Supabase, no se cambio `versionCode`, no se publico APK y Production no fue tocado.
+- Validacion y publicacion conjunta autorizada: ambos `versionCode` subieron a 262 en `334ae1d`. La matriz local con concurrencia controlada completo `assembleDevDebug` de Usuario/Admin, tests DEV, ktlint, Android Lint y Detekt: 1011 tareas correctas; las pruebas nuevas cubren umbral, prioridad, grupos deshabilitados, tiempo extra activo y horarios Web diurnos/nocturnos con proxima apertura. El primer intento amplio saturo un analizador de `core-ui`; la tarea aislada y la matriz controlada pasaron, confirmando que no era un defecto de codigo.
+- GitHub `Publicar APKs DEV` `29705231350` publico exclusivamente en Supabase DEV `syeycayasyufedwoprea`, y Android CI `29705231343` completo build, tests, ktlint, Android Lint y Detekt. Los APK publicos descargados miden 51.705.690 bytes Usuario y 28.278.292 bytes Admin; sus SHA-256 coinciden con los manifiestos. `aapt` confirma `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, version 262, y `apksigner` verifica en ambos el certificado esperado `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- El telefono no estuvo visible por ADB durante el cierre, por lo que falta instalar DEV 262 y recorrer visualmente Home, Mis apps e Internet. No se toco Production, no se borraron datos y no se agregaron secretos.
 
 ## Publicacion DEV 257 - Calibracion DAG bidireccional - 2026-07-18
 
