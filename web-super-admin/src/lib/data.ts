@@ -116,8 +116,8 @@ export async function getDagUsageBundle(): Promise<{ summaries: DagUsageSummary[
 export async function getDagCalibrationBundle() {
   const supabase = await createClient();
   const [pendingResult, reviewedResult, versionsResult, auditResult, modelsResult] = await Promise.all([
-    supabase.rpc("super_admin_list_dag_calibration_reviews", { requested_status: "pending", max_rows: 200 }),
-    supabase.rpc("super_admin_list_dag_calibration_reviews", { requested_status: "reviewed", max_rows: 500 }),
+    supabase.rpc("super_admin_list_dag_calibration_reviews_v2", { requested_status: "pending", max_rows: 200 }),
+    supabase.rpc("super_admin_list_dag_calibration_reviews_v2", { requested_status: "reviewed", max_rows: 500 }),
     supabase.rpc("super_admin_list_dag_calibrations"),
     supabase.rpc("super_admin_list_dag_calibration_audit", { max_rows: 200 }),
     supabase.rpc("super_admin_list_dag_calibration_models"),

@@ -91,6 +91,7 @@ data class DagBrowserUiState(
     val loading: Boolean = false,
     val message: String = "",
     val reviewCandidate: DagReviewCandidate? = null,
+    val calibrationVersion: Long = 0,
 )
 
 data class DagTabSnapshot(

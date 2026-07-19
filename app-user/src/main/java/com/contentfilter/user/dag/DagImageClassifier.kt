@@ -25,6 +25,8 @@ internal data class DagImageClassification(
     val unsafeScore: Float? = null,
     val mimeType: String? = null,
     val scores: Map<String, Float> = emptyMap(),
+    val signals: Set<String> = emptySet(),
+    val calibrationVersion: Long = 0,
 )
 
 internal fun dagImageDecision(
@@ -62,7 +64,10 @@ internal class DagImageClassifier(
     private var interpreter: Interpreter? = null
     private val professionalClassifier = DagProfessionalImageClassifier(applicationContext)
     private val modestyClassifier = DagModestyImageClassifier(applicationContext)
+    private val tzniutPoseClassifier = DagTzniutPoseClassifier()
     private val calibrationStore = DagImageCalibrationStore(applicationContext)
+
+    fun exactDecision(imageHash: String): DagImageDecision? = calibrationStore.exactDecision(imageHash)
 
     fun classify(
         bytes: ByteArray,
@@ -96,7 +101,7 @@ internal class DagImageClassifier(
                         legacyScore = output[0][UnsafeOutputIndex]
                         dagEnsembleImageDecision(professional.decision, dagImageDecision(legacyScore, calibration))
                     }
-                val modestyScores =
+                var modestyScores =
                     if (ensembleDecision != DagImageDecision.Blocked) {
                         modestyClassifier.classify(
                             bitmap,
@@ -104,6 +109,18 @@ internal class DagImageClassifier(
                     } else {
                         null
                     }
+                if (
+                    modestyScores != null &&
+                    modestyScores.femaleFace >= calibration.femaleFace * PoseFemaleContextRatio
+                ) {
+                    decodeForPose(bytes)?.let { poseBitmap ->
+                        try {
+                            modestyScores = modestyScores.withTzniutPose(tzniutPoseClassifier.classify(poseBitmap))
+                        } finally {
+                            poseBitmap.recycle()
+                        }
+                    }
+                }
                 val modestyDecision =
                     modestyScores?.let { dagModestyImageDecision(it, calibration) } ?: DagImageDecision.Allowed
                 val decision = dagCombinedImageDecision(ensembleDecision, modestyDecision)
@@ -113,16 +130,19 @@ internal class DagImageClassifier(
                         (SystemClock.elapsedRealtime() - classificationStartedAt) +
                         " fallback=${legacyScore != null} modesty=${modestyDecision.name.lowercase()}",
                 )
+                val scores =
+                    buildMap {
+                        professional.unsafeScore?.let { put("professional", it) }
+                        legacyScore?.let { put("legacy", it) }
+                        modestyScores?.toCalibrationScores()?.let(::putAll)
+                    }
                 DagImageClassification(
                     decision = decision,
                     unsafeScore = maxOf(professional.unsafeScore ?: 0f, legacyScore ?: 0f),
                     mimeType = detectedMime,
-                    scores =
-                        buildMap {
-                            professional.unsafeScore?.let { put("professional", it) }
-                            legacyScore?.let { put("legacy", it) }
-                            modestyScores?.toCalibrationScores()?.let(::putAll)
-                        },
+                    scores = scores,
+                    signals = dagImageDecisionSignals(decision, scores, calibration),
+                    calibrationVersion = calibration.version,
                 )
             } catch (_: RuntimeException) {
                 DagImageClassification(DagImageDecision.Uncertain)
@@ -137,6 +157,7 @@ internal class DagImageClassifier(
             interpreter = null
             professionalClassifier.close()
             modestyClassifier.close()
+            tzniutPoseClassifier.close()
         }
     }
 
@@ -178,6 +199,32 @@ internal class DagImageClassifier(
         return Bitmap.createScaledBitmap(decoded, ResizeSize, ResizeSize, true).also {
             if (it !== decoded) decoded.recycle()
         }
+    }
+
+    private fun decodeForPose(bytes: ByteArray): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+        var sampleSize = 1
+        while (max(bounds.outWidth, bounds.outHeight) / sampleSize > MaximumPoseSourceDimension) sampleSize *= 2
+        val decoded =
+            BitmapFactory.decodeByteArray(
+                bytes,
+                0,
+                bytes.size,
+                BitmapFactory.Options().apply {
+                    inSampleSize = sampleSize
+                    inPreferredConfig = Bitmap.Config.ARGB_8888
+                },
+            ) ?: return null
+        val scale = minOf(1f, MaximumPoseDimension.toFloat() / max(decoded.width, decoded.height))
+        if (scale >= 1f) return decoded
+        return Bitmap.createScaledBitmap(
+            decoded,
+            (decoded.width * scale).toInt().coerceAtLeast(1),
+            (decoded.height * scale).toInt().coerceAtLeast(1),
+            true,
+        ).also { decoded.recycle() }
     }
 
     private fun bitmapToInput(bitmap: Bitmap): ByteBuffer {
@@ -276,6 +323,9 @@ internal class DagImageClassifier(
         private const val MinimumDimension = 24
         private const val MaximumSourceDimension = 16_384
         private const val MaximumDecodeDimension = 1_024
+        private const val MaximumPoseSourceDimension = 960
+        private const val MaximumPoseDimension = 480
+        private const val PoseFemaleContextRatio = 0.65f
         private const val VggMeanBlue = 103.939f
         private const val VggMeanGreen = 116.779f
         private const val VggMeanRed = 123.68f
@@ -292,3 +342,29 @@ internal class DagImageClassifier(
             )
     }
 }
+
+internal fun dagImageDecisionSignals(
+    decision: DagImageDecision,
+    scores: Map<String, Float>,
+    calibration: DagImageCalibration,
+): Set<String> =
+    buildSet {
+        fun signal(
+            scoreKey: String,
+            threshold: Float,
+            signalName: String = scoreKey,
+        ) {
+            if ((scores[scoreKey] ?: 0f) >= threshold) add(signalName)
+        }
+        signal("professional", calibration.professionalSafe, "professional_content")
+        signal("legacy", calibration.professionalSafe, "legacy_content")
+        signal("female_breast_covered", calibration.femaleBreastCovered)
+        signal("female_genitalia_covered", calibration.femaleGenitaliaCovered)
+        signal("buttocks_covered", calibration.buttocksCovered)
+        signal("armpits_exposed", calibration.armpitsExposed)
+        signal("belly_exposed", calibration.bellyExposed)
+        signal("explicit_region", calibration.explicitRegion)
+        signal("sleeves_above_elbow", calibration.sleevesAboveElbow)
+        signal("hem_above_knee", calibration.hemAboveKnee)
+        if (isEmpty() && decision == DagImageDecision.Uncertain) add("uncertain_content")
+    }

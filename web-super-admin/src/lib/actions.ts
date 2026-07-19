@@ -67,9 +67,10 @@ const dagReviewSchema = z.object({
   reviewId: z.string().uuid(),
   decision: z.enum(["allow", "block"]),
   reason: z.enum([
-    "acceptable_clothing", "pronounced_neckline", "exposed_shoulders", "tight_or_transparent",
-    "swimwear", "lingerie", "nudity", "product_without_person", "mannequin",
-    "false_positive", "ambiguous", "other",
+    "acceptable_clothing", "product_without_person", "mannequin", "object_misclassified",
+    "false_positive", "allow_other", "pronounced_neckline", "exposed_shoulders",
+    "sleeves_above_elbow", "hem_above_knee", "tight_or_transparent", "swimwear",
+    "lingerie", "nudity", "block_other",
   ]),
   note: z.string().trim().max(500).optional(),
 });
@@ -354,6 +355,7 @@ export async function prepareDagCalibrationAction(_prevState: ActionState): Prom
   });
   if (error) return errorState(error);
   const allReviews = (data ?? []) as Array<{
+    review_id: string;
     review_decision: "allow" | "block";
     review_reason: string;
     scores: Record<string, number>;
@@ -366,35 +368,86 @@ export async function prepareDagCalibrationAction(_prevState: ActionState): Prom
   if (reviews.length < 12 || allowCount < 3 || blockCount < 3) {
     return { ok: false, message: `Faltan ejemplos: hay ${reviews.length}/12, con ${allowCount} permitidos y ${blockCount} bloqueados (mínimo 3 de cada uno).` };
   }
-  const professional = bestThreshold(reviews, "professional", 0.65);
+  const { training, validation } = calibrationSplit(reviews);
+  const professional = bestThreshold(training, "professional", 0.65);
+  const professionalBlock = clampThreshold(professional.threshold, 0.35, 0.90);
   const thresholds = {
-    professional_safe: Math.max(0.05, round4(professional.threshold - 0.15)),
-    professional_block: professional.threshold,
-    female_face: bestThreshold(reviews, "female_face", 0.30).threshold,
-    female_breast_covered: bestThreshold(reviews, "female_breast_covered", 0.18, ["acceptable_clothing", "pronounced_neckline", "tight_or_transparent", "swimwear", "lingerie", "nudity"]).threshold,
-    female_genitalia_covered: bestThreshold(reviews, "female_genitalia_covered", 0.18, ["acceptable_clothing", "tight_or_transparent", "swimwear", "lingerie", "nudity"]).threshold,
-    buttocks_covered: bestThreshold(reviews, "buttocks_covered", 0.18, ["acceptable_clothing", "tight_or_transparent", "swimwear", "lingerie", "nudity"]).threshold,
-    armpits_exposed: bestThreshold(reviews, "armpits_exposed", 0.20, ["acceptable_clothing", "exposed_shoulders", "swimwear", "lingerie"]).threshold,
-    belly_exposed: bestThreshold(reviews, "belly_exposed", 0.20, ["acceptable_clothing", "tight_or_transparent", "swimwear", "lingerie", "nudity"]).threshold,
-    explicit_region: bestThreshold(reviews, "explicit_region", 0.20, ["swimwear", "lingerie", "nudity"]).threshold,
+    professional_safe: round4(professionalBlock - 0.15),
+    professional_block: professionalBlock,
+    female_face: boundedBestThreshold(training, "female_face", 0.30, 0.12, 0.65),
+    female_breast_covered: boundedBestThreshold(training, "female_breast_covered", 0.18, 0.08, 0.65, ["pronounced_neckline", "tight_or_transparent", "swimwear", "lingerie", "nudity", "block_other"]),
+    female_genitalia_covered: boundedBestThreshold(training, "female_genitalia_covered", 0.18, 0.08, 0.65, ["tight_or_transparent", "swimwear", "lingerie", "nudity", "block_other"]),
+    buttocks_covered: boundedBestThreshold(training, "buttocks_covered", 0.18, 0.08, 0.65, ["tight_or_transparent", "swimwear", "lingerie", "nudity", "block_other"]),
+    armpits_exposed: boundedBestThreshold(training, "armpits_exposed", 0.20, 0.08, 0.65, ["exposed_shoulders", "sleeves_above_elbow", "swimwear", "lingerie", "block_other"]),
+    belly_exposed: boundedBestThreshold(training, "belly_exposed", 0.20, 0.08, 0.65, ["tight_or_transparent", "swimwear", "lingerie", "nudity", "block_other"]),
+    explicit_region: boundedBestThreshold(training, "explicit_region", 0.20, 0.08, 0.65, ["swimwear", "lingerie", "nudity", "block_other"]),
+    sleeves_above_elbow: boundedBestThreshold(training, "sleeves_above_elbow", 0.72, 0.45, 0.95, ["sleeves_above_elbow", "block_other"]),
+    hem_above_knee: boundedBestThreshold(training, "hem_above_knee", 0.72, 0.45, 0.95, ["hem_above_knee", "block_other"]),
   };
+  const trainingMetrics = evaluateCalibration(training, thresholds);
+  const validationMetrics = evaluateCalibration(validation, thresholds);
   const metrics = {
     reviewed: reviews.length,
     allowed: allowCount,
     blocked: blockCount,
-    false_positive: professional.falsePositive,
-    false_negative: professional.falseNegative,
-    weighted_error: professional.weightedError,
+    false_positive: trainingMetrics.falsePositive,
+    false_negative: trainingMetrics.falseNegative,
+    weighted_error: trainingMetrics.weightedError,
+    training_examples: training.length,
+    validation_examples: validation.length,
+    validation_false_positive: validationMetrics.falsePositive,
+    validation_false_negative: validationMetrics.falseNegative,
+    validation_weighted_error: validationMetrics.weightedError,
   };
   const { error: createError } = await supabase.rpc("super_admin_create_dag_calibration", {
     new_thresholds: thresholds,
     new_metrics: metrics,
     calibration_model_version: modelVersion,
-    calibration_explanation: "Umbrales candidatos calculados con falsos negativos ponderados 3× y falsos positivos 1×. Requiere activación manual y admite reversión.",
+    calibration_explanation: "Umbrales candidatos calculados con ejemplos de ajuste y comprobados contra un grupo separado. Los falsos negativos pesan 3×. Incluye decisiones exactas, requiere activación manual y admite reversión.",
   });
   if (createError) return errorState(createError);
   revalidatePath("/dag-calibration");
   return { ok: true, message: "Calibración candidata creada. Revisá las métricas antes de activarla." };
+}
+
+type CalibrationReview = {
+  review_id: string;
+  review_decision: "allow" | "block";
+  review_reason: string;
+  scores: Record<string, number>;
+};
+
+function calibrationSplit<T extends CalibrationReview>(reviews: T[]): { training: T[]; validation: T[] } {
+  const validationIds = new Set<string>();
+  for (const decision of ["allow", "block"] as const) {
+    reviews.filter((review) => review.review_decision === decision).slice(0, Math.max(1, Math.floor(reviews.filter((review) => review.review_decision === decision).length * 0.2))).forEach((review) => validationIds.add(review.review_id));
+  }
+  return {
+    training: reviews.filter((review) => !validationIds.has(review.review_id)),
+    validation: reviews.filter((review) => validationIds.has(review.review_id)),
+  };
+}
+
+function evaluateCalibration(
+  reviews: CalibrationReview[],
+  thresholds: Record<string, number>,
+): { falsePositive: number; falseNegative: number; weightedError: number } {
+  const predictedBlock = (review: CalibrationReview) => imageScoresRequireBlur(review.scores, thresholds);
+  const falsePositive = reviews.filter((review) => review.review_decision === "allow" && predictedBlock(review)).length;
+  const falseNegative = reviews.filter((review) => review.review_decision === "block" && !predictedBlock(review)).length;
+  return { falsePositive, falseNegative, weightedError: falsePositive + falseNegative * 3 };
+}
+
+function imageScoresRequireBlur(scores: Record<string, number>, thresholds: Record<string, number>): boolean {
+  if ((scores.professional ?? 0) >= thresholds.professional_block) return true;
+  if ((scores.legacy ?? 0) >= thresholds.professional_block) return true;
+  if ((scores.female_breast_covered ?? 0) >= thresholds.female_breast_covered) return true;
+  if ((scores.female_genitalia_covered ?? 0) >= thresholds.female_genitalia_covered) return true;
+  if ((scores.buttocks_covered ?? 0) >= thresholds.buttocks_covered) return true;
+  if ((scores.explicit_region ?? 0) >= thresholds.explicit_region) return true;
+  const femaleContext = (scores.female_face ?? 0) >= thresholds.female_face;
+  return femaleContext && ["armpits_exposed", "belly_exposed", "sleeves_above_elbow", "hem_above_knee"]
+    .some((key) => (scores[key] ?? 0) >= thresholds[key]);
 }
 
 export async function activateDagCalibrationAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
@@ -411,10 +464,13 @@ function bestThreshold(
   reviews: Array<{ review_decision: "allow" | "block"; review_reason: string; scores: Record<string, number> }>,
   key: string,
   fallback: number,
-  relevantReasons?: string[],
+  relevantBlockReasons?: string[],
 ) {
-  const relevantReviews = relevantReasons
-    ? reviews.filter((review) => relevantReasons.includes(review.review_reason))
+  // Every permitted example is useful for avoiding false positives (including phones
+  // and other objects). A blocked example only trains the detector that matches the
+  // human reason, so a neckline label cannot accidentally lower the sleeve threshold.
+  const relevantReviews = relevantBlockReasons
+    ? reviews.filter((review) => review.review_decision === "allow" || relevantBlockReasons.includes(review.review_reason))
     : reviews;
   const samples = relevantReviews.flatMap((review) => {
     const score = review.scores?.[key];
@@ -427,6 +483,21 @@ function bestThreshold(
     const falseNegative = samples.filter((sample) => sample.decision === "block" && sample.score < threshold).length;
     return { threshold, falsePositive, falseNegative, weightedError: falsePositive + falseNegative * 3 };
   }).sort((left, right) => left.weightedError - right.weightedError || left.falseNegative - right.falseNegative || left.threshold - right.threshold)[0];
+}
+
+function boundedBestThreshold(
+  reviews: Array<{ review_decision: "allow" | "block"; review_reason: string; scores: Record<string, number> }>,
+  key: string,
+  fallback: number,
+  minimum: number,
+  maximum: number,
+  relevantBlockReasons?: string[],
+): number {
+  return clampThreshold(bestThreshold(reviews, key, fallback, relevantBlockReasons).threshold, minimum, maximum);
+}
+
+function clampThreshold(value: number, minimum: number, maximum: number): number {
+  return round4(Math.max(minimum, Math.min(maximum, value)));
 }
 
 function round4(value: number) {

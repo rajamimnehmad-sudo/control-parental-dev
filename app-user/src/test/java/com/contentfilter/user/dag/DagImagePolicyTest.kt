@@ -74,6 +74,24 @@ class DagImagePolicyTest {
     }
 
     @Test
+    fun `unsafe calibration extremes are bounded before classification`() {
+        val calibration =
+            DagImageCalibration(
+                version = 3,
+                professionalSafe = 0.05f,
+                professionalBlock = 0.05f,
+                femaleBreastCovered = 0.0022f,
+                sleevesAboveElbow = 0.01f,
+            ).withSafeBounds()
+
+        assertEquals(3, calibration.version)
+        assertEquals(0.05f, calibration.professionalSafe)
+        assertEquals(0.35f, calibration.professionalBlock)
+        assertEquals(0.08f, calibration.femaleBreastCovered)
+        assertEquals(0.45f, calibration.sleevesAboveElbow)
+    }
+
+    @Test
     fun `professional probability conversion is stable`() {
         assertTrue(binarySoftmaxFirst(4f, -4f) > 0.99f)
         assertTrue(binarySoftmaxFirst(-4f, 4f) < 0.01f)
@@ -215,6 +233,51 @@ class DagImagePolicyTest {
             DagImageDecision.Allowed,
             dagModestyImageDecision(DagModestyScores(femaleFace = 0.90f)),
         )
+    }
+
+    @Test
+    fun `elbow and knee exposure require female context and use calibrated thresholds`() {
+        val calibration = DagImageCalibration(sleevesAboveElbow = 0.70f, hemAboveKnee = 0.75f)
+
+        assertFalse(
+            requiresKosherModestyBlur(
+                DagModestyScores(sleevesAboveElbow = 0.90f, hemAboveKnee = 0.90f),
+                calibration,
+            ),
+        )
+        assertTrue(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleFace = 0.80f, sleevesAboveElbow = 0.71f),
+                calibration,
+            ),
+        )
+        assertTrue(
+            requiresKosherModestyBlur(
+                DagModestyScores(femaleFace = 0.80f, hemAboveKnee = 0.76f),
+                calibration,
+            ),
+        )
+    }
+
+    @Test
+    fun `human explanation signals identify the threshold that fired`() {
+        val calibration = DagImageCalibration(version = 4, sleevesAboveElbow = 0.70f)
+        val signals =
+            dagImageDecisionSignals(
+                DagImageDecision.Uncertain,
+                mapOf("female_face" to 0.9f, "sleeves_above_elbow" to 0.72f),
+                calibration,
+            )
+
+        assertEquals(setOf("sleeves_above_elbow"), signals)
+    }
+
+    @Test
+    fun `calibration thumbnail hash is deterministic`() {
+        val thumbnail = "same reviewed image".encodeToByteArray()
+
+        assertEquals(thumbnail.dagCalibrationHash(), thumbnail.dagCalibrationHash())
+        assertEquals(64, thumbnail.dagCalibrationHash().length)
     }
 
     @Test

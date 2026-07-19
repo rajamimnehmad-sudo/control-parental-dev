@@ -18,7 +18,15 @@ internal data class DagModestyScores(
     val armpitsExposed: Float = 0f,
     val bellyExposed: Float = 0f,
     val explicitRegion: Float = 0f,
+    val sleevesAboveElbow: Float = 0f,
+    val hemAboveKnee: Float = 0f,
 )
+
+internal fun DagModestyScores.withTzniutPose(scores: DagTzniutPoseScores): DagModestyScores =
+    copy(
+        sleevesAboveElbow = scores.sleevesAboveElbow,
+        hemAboveKnee = scores.hemAboveKnee,
+    )
 
 internal fun DagModestyScores.toCalibrationScores(): Map<String, Float> =
     mapOf(
@@ -29,6 +37,8 @@ internal fun DagModestyScores.toCalibrationScores(): Map<String, Float> =
         "armpits_exposed" to armpitsExposed,
         "belly_exposed" to bellyExposed,
         "explicit_region" to explicitRegion,
+        "sleeves_above_elbow" to sleevesAboveElbow,
+        "hem_above_knee" to hemAboveKnee,
     )
 
 internal fun requiresKosherModestyBlur(
@@ -41,7 +51,9 @@ internal fun requiresKosherModestyBlur(
         scores.femaleGenitaliaCovered >= calibration.femaleGenitaliaCovered ||
         scores.buttocksCovered >= calibration.buttocksCovered ||
         (femaleContext && scores.armpitsExposed >= calibration.armpitsExposed) ||
-        (femaleContext && scores.bellyExposed >= calibration.bellyExposed)
+        (femaleContext && scores.bellyExposed >= calibration.bellyExposed) ||
+        (femaleContext && scores.sleevesAboveElbow >= calibration.sleevesAboveElbow) ||
+        (femaleContext && scores.hemAboveKnee >= calibration.hemAboveKnee)
 }
 
 internal fun dagModestyImageDecision(
@@ -59,7 +71,9 @@ internal fun dagModestyImageDecision(
                 femaleContext &&
                     (
                         scores.armpitsExposed >= calibration.armpitsExposed.strongThreshold() ||
-                            scores.bellyExposed >= calibration.bellyExposed.strongThreshold()
+                            scores.bellyExposed >= calibration.bellyExposed.strongThreshold() ||
+                            scores.sleevesAboveElbow >= calibration.sleevesAboveElbow.strongThreshold() ||
+                            scores.hemAboveKnee >= calibration.hemAboveKnee.strongThreshold()
                     )
             )
     return if (clearlyBlocked) DagImageDecision.Blocked else DagImageDecision.Uncertain

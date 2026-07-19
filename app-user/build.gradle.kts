@@ -40,7 +40,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 259
+            versionCode = 260
             versionNameSuffix = "-dev"
             buildConfigField(
                 "String",
@@ -134,6 +134,7 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.onnxruntime.android)
     implementation(libs.onnxruntime.extensions.android)
+    implementation(libs.mlkit.pose)
     implementation(libs.tflite)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)

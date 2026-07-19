@@ -161,9 +161,14 @@ internal class DagImageResourceLoader(
                 allowedCount.incrementAndGet()
                 return cacheAndCreateResource(request.url.toString(), bytes, "image/svg+xml", "safe-icon")
             }
-            val classification = classifier.classify(bytes, mimeType)
+            val measuredClassification = classifier.classify(bytes, mimeType)
             val calibrationThumbnail =
-                if (classification.scores.isNotEmpty()) dagCalibrationThumbnail(bytes) else null
+                if (measuredClassification.scores.isNotEmpty()) dagCalibrationThumbnail(bytes) else null
+            val classification =
+                calibrationThumbnail
+                    ?.let { classifier.exactDecision(it.dagCalibrationHash()) }
+                    ?.let { measuredClassification.copy(decision = it) }
+                    ?: measuredClassification
             if (calibrationThumbnail != null) {
                 calibrationThumbnail.let { thumbnail ->
                     rememberManualCalibrationCandidate(request.url.toString(), thumbnail, classification)

@@ -110,6 +110,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -207,6 +209,10 @@ private fun DagBrowserContent(
     var tabs by remember { mutableStateOf(listOf(DagTab(snapshot = viewModel.captureTab()))) }
     var activeTabId by remember { mutableStateOf(tabs.first().id) }
     var tabsRestored by remember { mutableStateOf(false) }
+
+    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
+        viewModel.refreshCalibration()
+    }
 
     LaunchedEffect(Unit) {
         val saved = viewModel.loadTabSession()
@@ -394,6 +400,19 @@ private fun DagBrowserContent(
                             )
                             if (BuildConfig.DAG_VISUAL_CALIBRATION_AVAILABLE) {
                                 HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (state.calibrationVersion > 0) {
+                                                "Calibración aplicada: #${state.calibrationVersion}"
+                                            } else {
+                                                "Calibración aplicada: base"
+                                            },
+                                        )
+                                    },
+                                    enabled = false,
+                                    onClick = {},
+                                )
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -592,6 +611,19 @@ private fun DagBrowserContent(
                             )
                             if (BuildConfig.DAG_VISUAL_CALIBRATION_AVAILABLE) {
                                 HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            if (state.calibrationVersion > 0) {
+                                                "Calibración aplicada: #${state.calibrationVersion}"
+                                            } else {
+                                                "Calibración aplicada: base"
+                                            },
+                                        )
+                                    },
+                                    enabled = false,
+                                    onClick = {},
+                                )
                                 DropdownMenuItem(
                                     text = {
                                         Text(

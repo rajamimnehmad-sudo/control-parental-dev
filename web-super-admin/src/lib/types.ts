@@ -133,6 +133,8 @@ export type DagCalibrationReview = {
   initial_decision: "allowed" | "blocked" | "uncertain";
   submission_source: "automatic_uncertainty" | "manual_dag" | "manual_dag_false_positive";
   scores: Record<string, number>;
+  signals: string[];
+  classification_calibration_version: number;
   status: "pending" | "reviewed";
   review_decision: "allow" | "block" | null;
   review_reason: string | null;

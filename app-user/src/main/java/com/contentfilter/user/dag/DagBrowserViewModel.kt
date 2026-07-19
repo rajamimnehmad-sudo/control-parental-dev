@@ -67,9 +67,7 @@ class DagBrowserViewModel
                 syncScheduler.requestSync()
                 withContext(Dispatchers.IO) { runCatching { syncEngine.syncOnce() } }
                 withContext(Dispatchers.IO) {
-                    activationRepository.currentActivation()?.let { activation ->
-                        runCatching { calibrationRepository.refresh(activation.deviceId) }
-                    }
+                    refreshCalibrationFromDev()
                 }
             }
             viewModelScope.launch {
@@ -98,6 +96,18 @@ class DagBrowserViewModel
                             .sortedByDescending(AccessRequest::createdAtEpochMillis)
                     mutableState.update { it.copy(reviewRequests = reviews) }
                 }
+            }
+        }
+
+        fun refreshCalibration() {
+            viewModelScope.launch(Dispatchers.IO) { refreshCalibrationFromDev() }
+        }
+
+        private suspend fun refreshCalibrationFromDev() {
+            val activation = activationRepository.currentActivation() ?: return
+            val result = runCatching { calibrationRepository.refresh(activation.deviceId) }.getOrNull()
+            if (result is RemoteResult.Success) {
+                mutableState.update { it.copy(calibrationVersion = calibrationRepository.currentVersion()) }
             }
         }
 

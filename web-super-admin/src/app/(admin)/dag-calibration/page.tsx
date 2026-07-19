@@ -4,6 +4,7 @@ import { DagCalibrationReviewForm } from "@/components/DagCalibrationReviewForm"
 import { EmptyState } from "@/components/EmptyState";
 import { getDagCalibrationBundle } from "@/lib/data";
 import { formatDate } from "@/lib/utils";
+import { dagCalibrationExplanation } from "@/lib/dag-calibration-explanation";
 
 export const dynamic = "force-dynamic";
 
@@ -33,7 +34,7 @@ export default async function DagCalibrationPage() {
 
       <section className="rounded-md border border-cyan-100 bg-cyan-50 p-4 text-sm text-cyan-950">
         <p className="font-bold">Qué hace “Calibrar DAG”</p>
-        <p className="mt-1">Necesita al menos 12 respuestas, con 3 permitidas y 3 bloqueadas. Calcula umbrales candidatos penalizando tres veces más un falso negativo, guarda métricas y no cambia los teléfonos hasta que actives la versión.</p>
+        <p className="mt-1">Necesita al menos 12 respuestas, con 3 permitidas y 3 bloqueadas. Separa ejemplos de ajuste y validación, penaliza tres veces más un falso negativo, conserva las decisiones exactas y no cambia los teléfonos hasta que actives la versión.</p>
       </section>
 
       <section className="grid gap-3">
@@ -59,6 +60,11 @@ export default async function DagCalibrationPage() {
                     <p className="text-xs text-slate-500">{review.device_name} · {formatDate(review.created_at)}</p>
                     {review.submission_source === "manual_dag" ? <p className="mt-1 text-xs text-slate-600">La X indicó “inapropiada”. Elegí el motivo antes de incorporarla a una calibración.</p> : null}
                     {review.submission_source === "manual_dag_false_positive" ? <p className="mt-1 text-xs text-slate-600">La R indicó que DAG habría difuminado esta foto y podría ser un falso positivo. Decidí si debe permitirse o bloquearse y registrá el motivo.</p> : null}
+                  </div>
+                  <div className="rounded-md border border-cyan-100 bg-cyan-50 p-3 text-sm text-cyan-950">
+                    <p className="font-semibold">Por qué llegó a revisión</p>
+                    <p className="mt-1">{dagCalibrationExplanation(review)}</p>
+                    <p className="mt-1 text-xs text-cyan-800">Clasificada con Calibración #{review.classification_calibration_version || "base"}.</p>
                   </div>
                   <details className="text-xs text-slate-600"><summary className="cursor-pointer font-semibold">Ver puntajes del modelo</summary><pre className="mt-2 overflow-x-auto rounded bg-slate-50 p-2">{JSON.stringify(review.scores, null, 2)}</pre></details>
                   <DagCalibrationReviewForm reviewId={review.review_id} />

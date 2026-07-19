@@ -8,6 +8,8 @@ type Payload = {
   model_version?: string;
   initial_decision?: "allowed" | "blocked" | "uncertain";
   scores?: Record<string, number>;
+  signals?: string[];
+  calibration_version?: number;
 };
 
 const MaximumThumbnailBytes = 128 * 1024;
@@ -21,6 +23,13 @@ const AllowedScoreKeys = new Set([
   "professional", "legacy", "female_face", "female_breast_covered",
   "female_genitalia_covered", "buttocks_covered", "armpits_exposed",
   "belly_exposed", "explicit_region",
+  "sleeves_above_elbow", "hem_above_knee",
+]);
+const AllowedSignals = new Set([
+  "professional_content", "legacy_content", "female_breast_covered",
+  "female_genitalia_covered", "buttocks_covered", "armpits_exposed",
+  "belly_exposed", "explicit_region", "sleeves_above_elbow", "hem_above_knee",
+  "uncertain_content",
 ]);
 
 Deno.serve(async (request) => {
@@ -49,13 +58,48 @@ Deno.serve(async (request) => {
   }
 
   if (payload.action === "current") {
+    const modelVersion = payload.model_version?.trim() ?? "";
+    if (modelVersion.length < 1 || modelVersion.length > 120) {
+      return json({ error: "Modelo inválido." }, 400);
+    }
     const { data, error } = await serviceClient
       .from("dag_calibration_versions")
-      .select("version_number,thresholds,model_version,activated_at")
+      .select("id,version_number,thresholds,model_version,activated_at")
       .eq("status", "active")
+      .eq("model_version", modelVersion)
       .maybeSingle();
     if (error) return json({ error: "No se pudo consultar la calibración." }, 503);
-    return json({ calibration: data ?? null }, 200);
+    if (!data) return json({ calibration: null, exact_decisions: { allow: [], block: [] } }, 200);
+    const { data: links, error: linksError } = await serviceClient
+      .from("dag_calibration_version_reviews")
+      .select("review_id")
+      .eq("calibration_id", data.id)
+      .limit(1000);
+    if (linksError) return json({ error: "No se pudieron consultar las decisiones exactas." }, 503);
+    const reviewIds = (links ?? []).map((item) => item.review_id).filter((value): value is string => typeof value === "string");
+    let exactReviews: Array<{ image_hash: string; review_decision: string }> = [];
+    if (reviewIds.length > 0) {
+      const { data: reviews, error: reviewsError } = await serviceClient
+        .from("dag_calibration_reviews")
+        .select("image_hash,review_decision")
+        .in("id", reviewIds)
+        .eq("model_version", modelVersion)
+        .not("review_decision", "is", null);
+      if (reviewsError) return json({ error: "No se pudieron consultar las decisiones exactas." }, 503);
+      exactReviews = reviews ?? [];
+    }
+    return json({
+      calibration: {
+        version_number: data.version_number,
+        thresholds: data.thresholds,
+        model_version: data.model_version,
+        activated_at: data.activated_at,
+      },
+      exact_decisions: {
+        allow: exactReviews.filter((review) => review.review_decision === "allow").map((review) => review.image_hash),
+        block: exactReviews.filter((review) => review.review_decision === "block").map((review) => review.image_hash),
+      },
+    }, 200);
   }
 
   const manualBlockSubmission = payload.action === "submit_manual_block";
@@ -67,13 +111,17 @@ Deno.serve(async (request) => {
   const imageHash = payload.image_hash?.trim().toLowerCase() ?? "";
   const imageBytes = decodeBase64(payload.image_base64 ?? "");
   const scores = cleanScores(payload.scores);
+  const signals = cleanSignals(payload.signals);
+  const calibrationVersion = Number.isSafeInteger(payload.calibration_version) && (payload.calibration_version ?? 0) >= 0
+    ? payload.calibration_version ?? 0
+    : -1;
   if (
     modelVersion.length < 1 || modelVersion.length > 120 ||
     !/^[0-9a-f]{64}$/.test(imageHash) ||
     !imageBytes || imageBytes.length > MaximumThumbnailBytes || !isJpeg(imageBytes) ||
     (!manualSubmission && payload.initial_decision !== "uncertain") ||
     (manualSubmission && !["allowed", "blocked", "uncertain"].includes(payload.initial_decision ?? "")) ||
-    !scores
+    !scores || !signals || calibrationVersion < 0
   ) {
     return json({ error: "Caso de calibración inválido." }, 400);
   }
@@ -83,6 +131,7 @@ Deno.serve(async (request) => {
     .from("dag_calibration_versions")
     .select("thresholds")
     .eq("status", "active")
+    .eq("model_version", modelVersion)
     .maybeSingle();
   if (calibrationError) return json({ error: "No se pudo comprobar la calibración activa." }, 503);
   if (!manualSubmission && isClearlyBlocked(scores, activeCalibration?.thresholds)) {
@@ -119,6 +168,8 @@ Deno.serve(async (request) => {
     model_version: modelVersion,
     initial_decision: payload.initial_decision,
     scores,
+    signals,
+    classification_calibration_version: calibrationVersion,
     submission_source: manualSubmission ? manualSubmissionSource : "automatic_uncertainty",
   }, { onConflict: "device_id,image_hash,model_version", ignoreDuplicates: true });
   if (insertError) return json({ error: "No se pudo registrar el caso dudoso." }, 503);
@@ -139,6 +190,8 @@ Deno.serve(async (request) => {
         storage_path: storagePath,
         initial_decision: payload.initial_decision,
         scores,
+        signals,
+        classification_calibration_version: calibrationVersion,
         submission_source: manualSubmissionSource,
         status: "pending",
         review_decision: null,
@@ -160,6 +213,8 @@ Deno.serve(async (request) => {
         device_id: deviceId,
         initial_decision: payload.initial_decision,
         model_version: modelVersion,
+        calibration_version: calibrationVersion,
+        signals,
         requested_outcome: manualBlockSubmission ? "block" : "review_false_positive",
       },
     });
@@ -172,6 +227,8 @@ Deno.serve(async (request) => {
         storage_path: storagePath,
         initial_decision: "uncertain",
         scores,
+        signals,
+        classification_calibration_version: calibrationVersion,
         submission_source: "automatic_uncertainty",
         status: "pending",
         review_decision: null,
@@ -279,7 +336,9 @@ function isClearlyBlocked(
   const femaleContext = (scores.female_face ?? 0) >= thresholds.female_face;
   return femaleContext && (
     (scores.armpits_exposed ?? 0) >= strong(thresholds.armpits_exposed) ||
-    (scores.belly_exposed ?? 0) >= strong(thresholds.belly_exposed)
+    (scores.belly_exposed ?? 0) >= strong(thresholds.belly_exposed) ||
+    (scores.sleeves_above_elbow ?? 0) >= strong(thresholds.sleeves_above_elbow) ||
+    (scores.hem_above_knee ?? 0) >= strong(thresholds.hem_above_knee)
   );
 }
 
@@ -293,15 +352,37 @@ function scoreThresholds(value: unknown): Record<string, number> {
     armpits_exposed: 0.20,
     belly_exposed: 0.20,
     explicit_region: 0.20,
+    sleeves_above_elbow: 0.72,
+    hem_above_knee: 0.72,
+  };
+  const bounds: Record<string, [number, number]> = {
+    professional_block: [0.35, 0.90],
+    female_face: [0.12, 0.65],
+    female_breast_covered: [0.08, 0.65],
+    female_genitalia_covered: [0.08, 0.65],
+    buttocks_covered: [0.08, 0.65],
+    armpits_exposed: [0.08, 0.65],
+    belly_exposed: [0.08, 0.65],
+    explicit_region: [0.08, 0.65],
+    sleeves_above_elbow: [0.45, 0.95],
+    hem_above_knee: [0.45, 0.95],
   };
   if (!value || typeof value !== "object" || Array.isArray(value)) return defaults;
   for (const key of Object.keys(defaults)) {
     const candidate = (value as Record<string, unknown>)[key];
     if (typeof candidate === "number" && Number.isFinite(candidate) && candidate >= 0 && candidate <= 1) {
-      defaults[key] = candidate;
+      const [minimum, maximum] = bounds[key];
+      defaults[key] = Math.min(maximum, Math.max(minimum, candidate));
     }
   }
   return defaults;
+}
+
+function cleanSignals(value: unknown): string[] | null {
+  if (value === undefined) return [];
+  if (!Array.isArray(value) || value.length > 16) return null;
+  const signals = [...new Set(value.filter((item): item is string => typeof item === "string"))];
+  return signals.length === value.length && signals.every((item) => AllowedSignals.has(item)) ? signals : null;
 }
 
 function strong(threshold: number): number {
