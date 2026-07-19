@@ -131,7 +131,7 @@ export type DagCalibrationReview = {
   image_url: string | null;
   model_version: string;
   initial_decision: "allowed" | "blocked" | "uncertain";
-  submission_source: "automatic_uncertainty" | "manual_dag";
+  submission_source: "automatic_uncertainty" | "manual_dag" | "manual_dag_false_positive";
   scores: Record<string, number>;
   status: "pending" | "reviewed";
   review_decision: "allow" | "block" | null;

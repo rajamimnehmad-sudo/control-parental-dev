@@ -163,6 +163,38 @@ class DagBrowserViewModel
             }
         }
 
+        internal fun submitDagManualBlurReviewCandidate(
+            thumbnail: ByteArray,
+            classification: DagImageClassification,
+        ) {
+            if (
+                !mutableState.value.dagEnabled ||
+                classification.scores.isEmpty()
+            ) {
+                return
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                val activation = activationRepository.currentActivation() ?: return@launch
+                runCatching {
+                    calibrationRepository.submitManualBlurReview(activation.deviceId, thumbnail, classification)
+                }.onSuccess { result ->
+                    mutableState.update {
+                        it.copy(
+                            message =
+                                if (result is RemoteResult.Success) {
+                                    "Foto enviada para revisar un posible falso positivo."
+                                } else {
+                                    "No se pudo enviar la foto para revisión."
+                                },
+                        )
+                    }
+                }.onFailure {
+                    Log.d("DagCalibration", "manual_blur_review_upload_failed")
+                    mutableState.update { it.copy(message = "No se pudo enviar la foto para revisión.") }
+                }
+            }
+        }
+
         fun submitAddress() {
             val input = mutableState.value.address.trim()
             if (!mutableState.value.dagEnabled || input.isBlank() || mutableState.value.loading) return

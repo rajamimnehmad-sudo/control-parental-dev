@@ -396,9 +396,9 @@ private fun DagBrowserContent(
                                     text = {
                                         Text(
                                             if (visualCalibrationEnabled) {
-                                                "✓ Marcar fotos inapropiadas"
+                                                "✓ Calibración DEV"
                                             } else {
-                                                "Marcar fotos inapropiadas"
+                                                "Calibración DEV"
                                             },
                                         )
                                     },
@@ -594,9 +594,9 @@ private fun DagBrowserContent(
                                     text = {
                                         Text(
                                             if (visualCalibrationEnabled) {
-                                                "✓ Marcar fotos inapropiadas"
+                                                "✓ Calibración DEV"
                                             } else {
-                                                "Marcar fotos inapropiadas"
+                                                "Calibración DEV"
                                             },
                                         )
                                     },
@@ -694,6 +694,7 @@ private fun DagBrowserContent(
                         onCalibrationCandidate = viewModel::submitDagCalibrationCandidate,
                         visualCalibrationEnabled = visualCalibrationEnabled,
                         onManualCalibrationCandidate = viewModel::submitDagManualCalibrationCandidate,
+                        onManualBlurReviewCandidate = viewModel::submitDagManualBlurReviewCandidate,
                         onBlockedAction = viewModel::onBrowserBlockedAction,
                         onPageBlocked = viewModel::onPageBlocked,
                         onRendererGone = viewModel::onBrowserRendererGone,
@@ -752,10 +753,10 @@ private fun DagBrowserContent(
     if (visualCalibrationDialog) {
         AlertDialog(
             onDismissRequest = { visualCalibrationDialog = false },
-            title = { Text("¿Activar marcación de prueba?") },
+            title = { Text("¿Activar Calibración DEV?") },
             text = {
                 Text(
-                    "DAG mostrará una X sobre las fotos. Al tocarla, la foto se difumina y se envía a Calibración DAG como reporte manual. Las fotos no marcadas no se consideran permitidas.",
+                    "Sólo para pruebas: DAG recargará la página y mostrará todas las fotos originales sin difuminar. Usá X si una foto permitida debería bloquearse y R si una foto que DAG habría difuminado debería revisarse como posible falso positivo. Al desactivar el modo, se restaura la protección normal.",
                 )
             },
             confirmButton = {
@@ -1502,6 +1503,7 @@ private fun DagWebContent(
     onCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit,
     visualCalibrationEnabled: Boolean,
     onManualCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit,
+    onManualBlurReviewCandidate: (ByteArray, DagImageClassification) -> Unit,
     onBlockedAction: (String) -> Unit,
     onPageBlocked: (String) -> Unit,
     onRendererGone: () -> Unit,
@@ -1512,6 +1514,7 @@ private fun DagWebContent(
     val imageClassifier = remember(context) { DagImageClassifier(context) }
     val currentCalibrationCandidate by rememberUpdatedState(onCalibrationCandidate)
     val currentManualCalibrationCandidate by rememberUpdatedState(onManualCalibrationCandidate)
+    val currentManualBlurReviewCandidate by rememberUpdatedState(onManualBlurReviewCandidate)
     val imageLoader =
         remember(imageClassifier) {
             DagImageResourceLoader(
@@ -1544,9 +1547,15 @@ private fun DagWebContent(
             }
         }
     }
-    LaunchedEffect(webView, visualCalibrationEnabled, state.pageStatus) {
-        if (state.pageStatus == DagPageStatus.Visible) {
-            webView?.setDagVisualCalibrationMode(visualCalibrationEnabled)
+    LaunchedEffect(webView, visualCalibrationEnabled) {
+        val view = webView
+        if (imageLoader.setDevCalibrationRevealEnabled(visualCalibrationEnabled)) {
+            view?.url?.takeIf { it.startsWith("https://", ignoreCase = true) }?.let {
+                view.settings.blockNetworkImage = true
+                view.reload()
+            }
+        } else if (state.pageStatus == DagPageStatus.Visible) {
+            view?.setDagVisualCalibrationMode(visualCalibrationEnabled)
         }
     }
     DisposableEffect(Unit) {
@@ -1567,11 +1576,22 @@ private fun DagWebContent(
                 WebView(context).apply {
                     webView = this
                     onWebViewChanged(this)
-                    configureDagSettings { imageUrl ->
-                        imageLoader.takeManualCalibrationCandidate(imageUrl)?.let { candidate ->
-                            currentManualCalibrationCandidate(candidate.thumbnail, candidate.classification)
-                        }
-                    }
+                    configureDagSettings(
+                        calibrationDecision = imageLoader::manualCalibrationDecision,
+                        onManualImageReported = { action, imageUrl ->
+                            imageLoader.takeManualCalibrationCandidate(imageUrl)?.let { candidate ->
+                                when (action) {
+                                    DagCalibrationActionBlock ->
+                                        currentManualCalibrationCandidate(candidate.thumbnail, candidate.classification)
+                                    DagCalibrationActionReviewBlur ->
+                                        currentManualBlurReviewCandidate(
+                                            candidate.thumbnail,
+                                            candidate.classification,
+                                        )
+                                }
+                            }
+                        },
+                    )
                     setBackgroundColor(android.graphics.Color.WHITE)
                     val dagWebView = this
                     CookieManager.getInstance().apply {
@@ -1672,7 +1692,10 @@ private fun DagWebContent(
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun WebView.configureDagSettings(onManualImageReported: (String) -> Unit) {
+private fun WebView.configureDagSettings(
+    calibrationDecision: (String) -> DagImageDecision?,
+    onManualImageReported: (String, String) -> Unit,
+) {
     val supportsDocumentStartScript = WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
     settings.javaScriptEnabled = true
     if (supportsDocumentStartScript) {
@@ -1682,17 +1705,27 @@ private fun WebView.configureDagSettings(onManualImageReported: (String) -> Unit
             setOf("*"),
         )
     }
-    if (WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) {
+    if (
+        BuildConfig.DAG_VISUAL_CALIBRATION_AVAILABLE &&
+        WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)
+    ) {
         WebViewCompat.addWebMessageListener(
             this,
             DagCalibrationBridgeName,
             setOf("*"),
-        ) { _, message, sourceOrigin, isMainFrame, _ ->
+        ) { view, message, sourceOrigin, isMainFrame, _ ->
             if (!isMainFrame || sourceOrigin.scheme != "https") return@addWebMessageListener
             val data = message.data ?: return@addWebMessageListener
             val payload = runCatching { org.json.JSONObject(data) }.getOrNull() ?: return@addWebMessageListener
-            if (payload.optString("action") != "block") return@addWebMessageListener
-            payload.optString("url").takeIf { it.startsWith("https://") }?.let(onManualImageReported)
+            val action = payload.optString("action")
+            val imageUrl = payload.optString("url").takeIf { it.startsWith("https://") } ?: return@addWebMessageListener
+            if (action == DagCalibrationActionProbe) {
+                calibrationDecision(imageUrl)?.let { view.setDagImageCalibrationDecision(imageUrl, it) }
+                return@addWebMessageListener
+            }
+            if (action == DagCalibrationActionBlock || action == DagCalibrationActionReviewBlur) {
+                onManualImageReported(action, imageUrl)
+            }
         }
     }
     settings.domStorageEnabled = true
@@ -1707,6 +1740,18 @@ private fun WebView.configureDagSettings(onManualImageReported: (String) -> Unit
     settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
     settings.cacheMode = WebSettings.LOAD_DEFAULT
     settings.safeBrowsingEnabled = true
+}
+
+private fun WebView.setDagImageCalibrationDecision(
+    imageUrl: String,
+    decision: DagImageDecision,
+) {
+    evaluateJavascript(
+        "(function(){if(window.__dagSetImageCalibrationDecision){window.__dagSetImageCalibrationDecision(" +
+            org.json.JSONObject.quote(imageUrl) + "," +
+            org.json.JSONObject.quote(decision.name.lowercase()) + ");}})();",
+        null,
+    )
 }
 
 private fun WebView.setDagVisualCalibrationMode(enabled: Boolean) {
@@ -2119,6 +2164,14 @@ private fun WebView.sanitizeAndExtractVisibleText(
               marker.remove();
             });
           }
+          window.__dagImageCalibrationDecisions = window.__dagImageCalibrationDecisions || Object.create(null);
+          window.__dagImageCalibrationProbes = window.__dagImageCalibrationProbes || Object.create(null);
+          window.__dagSetImageCalibrationDecision = function(source, decision) {
+            if (!source || !decision) return;
+            window.__dagImageCalibrationDecisions[source] = decision;
+            delete window.__dagImageCalibrationProbes[source];
+            if (window.__dagVisualCalibrationEnabled) window.requestAnimationFrame(window.__dagRefreshCalibrationMarkers);
+          };
           window.__dagRefreshCalibrationMarkers = function() {
             dagRemoveCalibrationMarkers();
             if (!window.__dagVisualCalibrationEnabled || !document.body || !window.$DagCalibrationBridgeName) return;
@@ -2129,23 +2182,40 @@ private fun WebView.sanitizeAndExtractVisibleText(
               if (rect.width < 48 || rect.height < 48 || rect.bottom < 0 || rect.top > window.innerHeight) return;
               var source = dagHttpsImageSource(image);
               if (!source) return;
+              var decision = window.__dagImageCalibrationDecisions[source];
+              if (!decision) {
+                if (!window.__dagImageCalibrationProbes[source]) {
+                  window.__dagImageCalibrationProbes[source] = true;
+                  try {
+                    window.$DagCalibrationBridgeName.postMessage(JSON.stringify({ action: 'probe', url: source }));
+                  } catch (_) {}
+                  window.setTimeout(function() {
+                    delete window.__dagImageCalibrationProbes[source];
+                    if (window.__dagVisualCalibrationEnabled) window.requestAnimationFrame(window.__dagRefreshCalibrationMarkers);
+                  }, 500);
+                }
+                return;
+              }
+              var reviewBlur = decision !== 'allowed' || image.getAttribute('data-dag-kosher-blurred') === 'true';
               var marker = document.createElement('button');
               marker.type = 'button';
               marker.setAttribute('data-dag-calibration-marker', 'true');
-              marker.setAttribute('aria-label', 'Marcar foto como inapropiada');
-              marker.textContent = '×';
-              marker.style.cssText = 'position:fixed;z-index:2147483647;width:34px;height:34px;border:2px solid white;border-radius:17px;background:#d71920;color:white;font:700 25px/27px sans-serif;padding:0;box-shadow:0 2px 7px rgba(0,0,0,.55);';
+              marker.setAttribute('aria-label', reviewBlur ? 'Revisar posible falso positivo' : 'Marcar foto como inapropiada');
+              marker.textContent = reviewBlur ? 'R' : '×';
+              marker.style.cssText = 'position:fixed;z-index:2147483647;width:34px;height:34px;border:2px solid white;border-radius:17px;background:' + (reviewBlur ? '#087f8c' : '#d71920') + ';color:white;font:700 ' + (reviewBlur ? '17px/29px' : '25px/27px') + ' sans-serif;padding:0;box-shadow:0 2px 7px rgba(0,0,0,.55);';
               marker.style.left = Math.max(4, rect.right - 38) + 'px';
               marker.style.top = Math.max(4, rect.top + 4) + 'px';
               marker.addEventListener('click', function(event) {
                 event.preventDefault();
                 event.stopPropagation();
                 image.setAttribute('data-dag-manually-blocked', 'true');
-                image.style.setProperty('filter', 'blur(48px) saturate(0.05) brightness(0.82)', 'important');
-                image.style.setProperty('transform', 'scale(1.14)', 'important');
+                if (!reviewBlur) {
+                  image.style.setProperty('filter', 'blur(48px) saturate(0.05) brightness(0.82)', 'important');
+                  image.style.setProperty('transform', 'scale(1.14)', 'important');
+                }
                 marker.remove();
                 try {
-                  window.$DagCalibrationBridgeName.postMessage(JSON.stringify({ action: 'block', url: source }));
+                  window.$DagCalibrationBridgeName.postMessage(JSON.stringify({ action: reviewBlur ? 'review_blur' : 'block', url: source }));
                 } catch (_) {}
               }, true);
               document.body.appendChild(marker);
@@ -2153,6 +2223,13 @@ private fun WebView.sanitizeAndExtractVisibleText(
           };
           window.__dagSetVisualCalibrationMode = function(enabled) {
             window.__dagVisualCalibrationEnabled = enabled === true;
+            if (document.documentElement) {
+              if (window.__dagVisualCalibrationEnabled) {
+                document.documentElement.setAttribute('data-dag-dev-calibration', 'true');
+              } else {
+                document.documentElement.removeAttribute('data-dag-dev-calibration');
+              }
+            }
             window.__dagRefreshCalibrationMarkers();
           };
           if (!window.__dagCalibrationMarkerEvents) {
@@ -2169,7 +2246,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
           if (!style) {
             style = document.createElement('style');
             style.id = 'dag-safe-style';
-            style.textContent = 'video,audio,canvas,iframe:not([data-dag-safe-captcha="true"]) { display:none !important; } img[data-dag-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; transform: scale(1.14) !important; }';
+            style.textContent = 'video,audio,canvas,iframe:not([data-dag-safe-captcha="true"]) { display:none !important; } img[data-dag-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; transform: scale(1.14) !important; } html[data-dag-dev-calibration="true"] img[data-dag-kosher-blurred="true"] { filter:none !important; transform:none !important; }';
             document.documentElement.appendChild(style);
           }
           if (!window.__dagSafeObserver) {
@@ -2297,3 +2374,6 @@ private const val MaximumTextExtractionRetries = 2
 private const val TextExtractionRetryDelayMillis = 700L
 private const val PageCommitInspectionDelayMillis = 1_000L
 private const val DagCalibrationBridgeName = "dagCalibrationBridge"
+private const val DagCalibrationActionProbe = "probe"
+private const val DagCalibrationActionBlock = "block"
+private const val DagCalibrationActionReviewBlur = "review_blur"

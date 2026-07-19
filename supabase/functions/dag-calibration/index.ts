@@ -1,7 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 
 type Payload = {
-  action?: "submit" | "submit_manual_block" | "current" | "clear";
+  action?: "submit" | "submit_manual_block" | "submit_manual_blur_review" | "current" | "clear";
   device_id?: string;
   image_base64?: string;
   image_hash?: string;
@@ -58,7 +58,10 @@ Deno.serve(async (request) => {
     return json({ calibration: data ?? null }, 200);
   }
 
-  const manualSubmission = payload.action === "submit_manual_block";
+  const manualBlockSubmission = payload.action === "submit_manual_block";
+  const manualBlurReviewSubmission = payload.action === "submit_manual_blur_review";
+  const manualSubmission = manualBlockSubmission || manualBlurReviewSubmission;
+  const manualSubmissionSource = manualBlurReviewSubmission ? "manual_dag_false_positive" : "manual_dag";
   if (payload.action !== "submit" && !manualSubmission) return json({ error: "Acción inválida." }, 400);
   const modelVersion = payload.model_version?.trim() ?? "";
   const imageHash = payload.image_hash?.trim().toLowerCase() ?? "";
@@ -116,7 +119,7 @@ Deno.serve(async (request) => {
     model_version: modelVersion,
     initial_decision: payload.initial_decision,
     scores,
-    submission_source: manualSubmission ? "manual_dag" : "automatic_uncertainty",
+    submission_source: manualSubmission ? manualSubmissionSource : "automatic_uncertainty",
   }, { onConflict: "device_id,image_hash,model_version", ignoreDuplicates: true });
   if (insertError) return json({ error: "No se pudo registrar el caso dudoso." }, 503);
 
@@ -136,7 +139,7 @@ Deno.serve(async (request) => {
         storage_path: storagePath,
         initial_decision: payload.initial_decision,
         scores,
-        submission_source: "manual_dag",
+        submission_source: manualSubmissionSource,
         status: "pending",
         review_decision: null,
         review_reason: null,
@@ -153,7 +156,12 @@ Deno.serve(async (request) => {
     const { error: auditError } = await serviceClient.from("dag_calibration_audit").insert({
       action: "manual_image_reported",
       review_id: existingReview.id,
-      details: { device_id: deviceId, initial_decision: payload.initial_decision, model_version: modelVersion },
+      details: {
+        device_id: deviceId,
+        initial_decision: payload.initial_decision,
+        model_version: modelVersion,
+        requested_outcome: manualBlockSubmission ? "block" : "review_false_positive",
+      },
     });
     if (auditError) return json({ error: "La foto se marcó, pero no se pudo registrar la auditoría." }, 503);
   } else if (existingReview.archived_at) {

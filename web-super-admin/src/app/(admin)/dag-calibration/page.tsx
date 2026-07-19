@@ -54,9 +54,11 @@ export default async function DagCalibrationPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-bold text-ink">{review.community_name}</p>
                       {review.submission_source === "manual_dag" ? <span className="rounded-full bg-red-50 px-2 py-1 text-[11px] font-bold text-red-700">Marcada desde DAG</span> : null}
+                      {review.submission_source === "manual_dag_false_positive" ? <span className="rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-bold text-cyan-700">Revisar difuminado</span> : null}
                     </div>
                     <p className="text-xs text-slate-500">{review.device_name} · {formatDate(review.created_at)}</p>
                     {review.submission_source === "manual_dag" ? <p className="mt-1 text-xs text-slate-600">La X indicó “inapropiada”. Elegí el motivo antes de incorporarla a una calibración.</p> : null}
+                    {review.submission_source === "manual_dag_false_positive" ? <p className="mt-1 text-xs text-slate-600">La R indicó que DAG habría difuminado esta foto y podría ser un falso positivo. Decidí si debe permitirse o bloquearse y registrá el motivo.</p> : null}
                   </div>
                   <details className="text-xs text-slate-600"><summary className="cursor-pointer font-semibold">Ver puntajes del modelo</summary><pre className="mt-2 overflow-x-auto rounded bg-slate-50 p-2">{JSON.stringify(review.scores, null, 2)}</pre></details>
                   <DagCalibrationReviewForm reviewId={review.review_id} />

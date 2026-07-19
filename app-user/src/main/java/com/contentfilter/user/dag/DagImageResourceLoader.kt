@@ -44,6 +44,7 @@ internal class DagImageResourceLoader(
     private val uncertainCount = AtomicInteger(0)
     private val pageGeneration = AtomicInteger(0)
     private val closed = AtomicBoolean(false)
+    private val devCalibrationRevealEnabled = AtomicBoolean(false)
     private val imageSlots = Semaphore(DagImageDeliveryPolicy.MaximumConcurrentImages, true)
     private val responseCache = LinkedHashMap<String, CachedImageResource>(16, 0.75f, true)
     private val manualCalibrationCandidates = LinkedHashMap<String, DagManualCalibrationCandidate>(16, 0.75f, true)
@@ -73,6 +74,17 @@ internal class DagImageResourceLoader(
         closed.set(true)
         pageGeneration.incrementAndGet()
     }
+
+    fun setDevCalibrationRevealEnabled(enabled: Boolean): Boolean {
+        if (devCalibrationRevealEnabled.getAndSet(enabled) == enabled) return false
+        resetPage()
+        return true
+    }
+
+    fun manualCalibrationDecision(imageUrl: String): DagImageDecision? =
+        synchronized(manualCalibrationCandidates) {
+            manualCalibrationCandidates[normalizeImageUrl(imageUrl)]?.classification?.decision
+        }
 
     fun takeManualCalibrationCandidate(imageUrl: String): DagManualCalibrationCandidate? =
         synchronized(manualCalibrationCandidates) {
@@ -144,8 +156,10 @@ internal class DagImageResourceLoader(
                 return cacheAndCreateResource(request.url.toString(), bytes, "image/svg+xml", "safe-icon")
             }
             val classification = classifier.classify(bytes, mimeType)
-            if (classification.scores.isNotEmpty()) {
-                dagCalibrationThumbnail(bytes)?.let { thumbnail ->
+            val calibrationThumbnail =
+                if (classification.scores.isNotEmpty()) dagCalibrationThumbnail(bytes) else null
+            if (calibrationThumbnail != null) {
+                calibrationThumbnail.let { thumbnail ->
                     rememberManualCalibrationCandidate(request.url.toString(), thumbnail, classification)
                 }
             }
@@ -156,7 +170,15 @@ internal class DagImageResourceLoader(
             }
             if (classification.decision != DagImageDecision.Allowed) {
                 if (classification.decision == DagImageDecision.Uncertain) {
-                    dagCalibrationThumbnail(bytes)?.let { onCalibrationCandidate(it, classification) }
+                    calibrationThumbnail?.let { onCalibrationCandidate(it, classification) }
+                }
+                if (devCalibrationRevealEnabled.get()) {
+                    return cacheAndCreateResource(
+                        request.url.toString(),
+                        bytes,
+                        classification.mimeType ?: return unavailableImageResource(),
+                        classification.decision.name.lowercase(),
+                    )
                 }
                 return blurredImageResource(request.url.toString(), bytes) ?: unavailableImageResource()
             }

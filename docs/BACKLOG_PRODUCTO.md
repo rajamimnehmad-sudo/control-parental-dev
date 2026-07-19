@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-16
+Ultima sincronizacion: 2026-07-18
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 246 y App Admin DEV 246, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 256 y App Admin DEV 256, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -176,6 +176,7 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
+| DAG-CALIBRATION-BIDIRECTIONAL-09 | Candidato local; aprobado, no publicado | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-ULTRA-KOSHER-01 | Idea | P1 | Elegir entre fotos filtradas con advertencia o modo Ultra kosher con todas las fotos desenfocadas | M | Alto |
 | DAG-RESULTS-DIAG-01 | Resuelto DEV 237 | P1 | Contabilizar localmente el embudo de resultados Brave y los descartes DAG sin guardar contenido | S | Bajo |
 | DAG-RESULTS-PAGE-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Ofrecer una unica pagina adicional cuando Brave informa mas resultados, con costo explicito | S | Medio |
@@ -1058,6 +1059,7 @@ Flujo de una entrada:
 - `DAG-CALIBRATION-QUALITY-06`: solo los cruces leves de umbral entran a revision. Evidencia fuerte de desnudez o modestia se bloquea localmente incluso si el modelo profesional queda incierto; el backend DEV repite la comprobacion antes de almacenar para proteger la cola frente a clientes anteriores o inconsistentes.
 - `DAG-CALIBRATION-CLEAR-07`: Super Admin incorpora `Borrar todas` con confirmacion. Elimina fisicamente miniaturas privadas mediante Storage API, archiva las filas visibles pendientes y revisadas, excluye esos ejemplos de futuras calibraciones y registra actor, cantidad de casos y objetos en auditoria. No borra calibraciones ya versionadas ni ejecuta el borrado automaticamente.
 - `DAG-CALIBRATION-IN-PAGE-08`: el menu DEV incorpora un modo de prueba apagado por defecto. Agrega una X a las fotos visibles ya clasificadas; tocarla aplica blur inmediato y crea un caso manual pendiente con origen separado. No toma la ausencia de X como permiso y no incorpora el caso a una calibracion hasta que Super Admin confirme el motivo. El puente exige marco principal HTTPS y coincidencia con el mapa local efimero del cargador. Beta y Production no muestran la funcion.
+- `DAG-CALIBRATION-BIDIRECTIONAL-09`: candidato local aprobado y todavia no publicado. Renombra la herramienta como `Calibración DEV`, recarga temporalmente la pagina con todos los raster originales ya evaluados y asigna `X` a los originalmente permitidos o `R` a los que DAG habria difuminado. X propone un falso negativo; R propone un falso positivo. Ambos llegan pendientes y separados a Super Admin, donde la etiqueta y el motivo humanos siguen siendo obligatorios antes de calibrar. El puente nativo se registra solo en DEV; desactivar el modo recarga la pagina y restaura el blur normal. La migracion y Edge asociadas permanecen locales hasta la publicacion agrupada.
 - Hotfix 2026-07-17: las primeras llamadas de la Superweb llegaron con JWT valido pero Edge perdio el contexto de `auth.uid()` en la comprobacion duplicada de rol y devolvio 403 antes de Storage. Edge v7 valida el JWT directamente con Auth y autoriza contra `super_admins`; la interfaz muestra el error concreto del backend. Los intentos fallidos no borraron ni archivaron ninguna de las 106 revisiones.
 - Privacidad actualizada: las versiones historicas de `DAG-IMAGES-01` no sincronizaban ningun dato visual. Este bloque posterior, aprobado por el usuario, agrega exclusivamente miniaturas inciertas bajo el contrato anterior; la clasificacion completa y las imagenes normales permanecen locales.
 - Backend DEV: migraciones `20260717175505_dag_calibration`, `20260717181351_dag_calibration_model_scope`, `20260717181541_dag_calibration_service_auth`, `20260717191627_dag_calibration_clear_queue`, `20260717193420_dag_calibration_archive_indexes` y `20260717204621_dag_visual_calibration_reports`, cuatro tablas con RLS, RPC Super Admin, bucket privado `dag-calibration` y Edge Function `dag-calibration` con autenticacion propia del dispositivo. La RPC de autorizacion queda reservada al backend; cada calibracion usa etiquetas del mismo modelo. No se borra informacion automaticamente; `expires_at` solo retira casos vencidos de la cola operativa y el borrado total exige una accion confirmada del Super Admin.

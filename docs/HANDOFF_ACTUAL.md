@@ -79,6 +79,14 @@ Usuario 2f2399839e456de760ba66729163ec731884a92921fc2e2a3efc5ba98680354b
 Admin   47a121561d5c18fde90608a70b693d69171e8e935490a48c318ebe14200c354f
 ```
 
+## Candidato local no publicado - Calibracion DAG bidireccional DEV - 2026-07-18
+
+- `DAG-CALIBRATION-BIDIRECTIONAL-09` reemplaza el modo temporal de X por `Calibración DEV`, disponible solamente en el flavor DEV de App Usuario y apagado por defecto. Al activarlo, DAG recarga la pagina y entrega los originales ya clasificados sin blur exclusivamente durante esa sesion de prueba; al desactivarlo vuelve a recargar con la proteccion normal.
+- Cada imagen raster visible consulta al puente nativo su decision local. Una imagen originalmente permitida muestra `X` para reportar que deberia bloquearse; una imagen que DAG habria difuminado muestra `R` para revisar un posible falso positivo. El reporte exige origen HTTPS, marco principal, URL presente en el mapa efimero y una clasificacion local compatible con la accion.
+- El puente de calibracion ya no se registra en Beta ni Production. Ninguna pagina puede habilitar el modo, revelar originales o crear reportes fuera del build DEV. No se agregan secretos ni Service Role a Android.
+- Backend y Superweb distinguen `manual_dag` de `manual_dag_false_positive`; el registro incluye `requested_outcome`, y la cola explica si la foto llego por X o R antes de que Super Admin elija la etiqueta y el motivo definitivos. La migracion `20260719022436_dag_bidirectional_dev_calibration` esta creada localmente, pero no se aplico todavia.
+- Validacion local: unit tests, compilacion Kotlin, ktlint, Android Lint y build DEV de App Usuario correctos; ESLint, TypeScript y build Next correctos. `deno check` no pudo ejecutarse porque Deno no esta instalado en el host. Faltan despliegue DEV, publicacion agrupada de APK y prueba fisica. No se modificaron versionCode, manifiestos publicos ni Supabase DEV.
+
 ## Recuperacion segura de Super Admin - 2026-07-18
 
 - `SUPERWEB-AUTH-RECOVERY-01` corrige la ausencia total de recuperacion de contraseña: Login incorpora `Olvidé mi contraseña`, solicitud por email, callback PKCE y pantalla para establecer una contraseña nueva de al menos 12 caracteres.
