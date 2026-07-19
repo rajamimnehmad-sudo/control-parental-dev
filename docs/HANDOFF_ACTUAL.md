@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-19:
 
 ```text
-App Usuario versionCode 259
-App Admin versionCode 259
+App Usuario versionCode 260
+App Admin versionCode 260
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-259-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-259-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-260-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-260-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 849c4386327e29d14572241d440e201180faac2d927c0f330768af51d776305b
-Admin   f8469e5735294639fa5dc9391d3ec868cbd6f3b29903673b032c7bf97fce39e7
+Usuario 3166fd8b00865d6ff7e96c087ba2eb7529af4aa9fa506ccf7ebb704a26c35e13
+Admin   d037b0934ee662f5842ccad571b12db49aa083f0988e24e516471c9f8e23a83a
 ```
 
 ## Publicacion DEV 257 - Calibracion DAG bidireccional - 2026-07-18
@@ -103,14 +103,14 @@ Admin   f8469e5735294639fa5dc9391d3ec868cbd6f3b29903673b032c7bf97fce39e7
 - Validacion fisica: el APK local 259 y luego exactamente el APK publico 259 se instalaron in-place en SM-A235M preservando datos. X quedo visible sobre las tarjetas Galaxy y el banner en samsung.com; despues de desplazar la pagina los marcadores se reposicionaron y aparecieron sobre contenido nuevo. No se pulso ninguna X y no se creo un pendiente de calibracion artificial.
 - Validacion automatica: la matriz local de tests Usuario/Admin, ktlint y ambos APK completo 773 tareas. GitHub `Publicar APKs DEV` run `29672903978` publico una sola vez, exclusivamente en Supabase DEV; Android CI run `29672903983` completo build, tests, ktlint, Android Lint y Detekt. Los manifiestos publicos declaran 259 y las descargas coinciden con los SHA-256 documentados arriba. `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`; ambos APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Pendiente: confirmacion en el Samsung personal.
 
-## Candidato DEV 260 - Calibracion DAG de circuito cerrado - 2026-07-19
+## Publicacion DEV 260 - Calibracion DAG de circuito cerrado - 2026-07-19
 
 - `DAG-CALIBRATION-CLOSED-LOOP-10` corrige que una foto etiquetada pudiera volver a recibir la decision anterior. Las versiones de calibracion ahora conservan el conjunto exacto de revisiones que las origino; Android descarga los hashes permitidos/bloqueados y aplica la decision humana a la misma miniatura deterministica, ademas de los umbrales generales. La migracion recupero para la calibracion activa DEV 3 sus 22 casos vigentes: 5 permitidos y 17 bloqueados. No se borro ningun dato.
 - El calculo incorpora todos los permitidos al control de falsos positivos —incluidos celulares u objetos— y utiliza cada bloqueado solo para las señales compatibles con su motivo. Reserva un grupo balanceado de validacion y registra sus falsos positivos, falsos negativos y error ponderado. La activacion y el rollback siguen siendo manuales y auditados; esto calibra umbrales, no reentrena pesos ni cambia el modelo embebido.
 - Super Admin obliga a decidir primero `Permitir` o `Difuminar`; luego ofrece solamente motivos positivos o negativos, respectivamente, y la base rechaza combinaciones incompatibles. Sin decision el caso queda pendiente. Cada tarjeta agrega una explicacion breve basada en las señales reales y mantiene los puntajes tecnicos dentro del detalle colapsado.
-- App Usuario agrega medicion tzniut local y calibrable de mangas por encima del codo y prendas por encima de la rodilla. MoveNet Lightning INT8, embebido y con artefacto fijado por SHA-256, se ejecuta solo con contexto femenino suficiente y combina sus 17 landmarks con piel local; los cruces fuertes se difuminan y los cercanos se envian a revision. Se reemplazo ML Kit Pose porque su unica distribucion Android es embebida y elevaba el APK a unos 89 MB, por encima del limite de Supabase Storage. MoveNet conserva la ejecucion local sin depender de Google Play y deja el APK en 51.520.718 bytes. No se activo Accessibility durante la prueba.
+- App Usuario agrega medicion tzniut local y calibrable de mangas por encima del codo y prendas por encima de la rodilla. MoveNet Lightning INT8, embebido y con artefacto fijado por SHA-256, se ejecuta solo con contexto femenino suficiente y combina sus 17 landmarks con piel local; los cruces fuertes se difuminan y los cercanos se envian a revision. Se reemplazo ML Kit Pose porque su unica distribucion Android es embebida y elevaba el APK a unos 89 MB, por encima del limite de Supabase Storage. MoveNet conserva la ejecucion local sin depender de Google Play y deja el APK en 51.520.718 bytes. En SM-A235M, Zara abrio y siguio navegable; la primera inferencia observada midio 90 ms y las siguientes 41-44 ms. No se activo Accessibility durante la prueba.
 - La prueba fisica descubrio que la version activa 3 contenia umbrales extremos entre `0.0002` y `0.0058`, con `professional_safe` igual a `professional_block=0.05`; Android la descartaba y esos valores explicaban parte de la excesiva sensibilidad. DEV 260 limita cada familia de señal a un rango seguro en Android, Edge y RPC, conserva el numero/version y evita que futuras muestras pequeñas creen otro candidato degenerado. Tras el ajuste, el menu mostro `Calibración aplicada: #3` y samsung.com mostro sin blur las tarjetas Galaxy S y Z; la pagina proceso mas de veinte imagenes y siguio cargando contenido posterior.
-- Backend aplicado solamente a `syeycayasyufedwoprea`: migracion `20260719113929_dag_calibration_closed_loop`, RLS activa sin lectura para anon/authenticated, asesores de seguridad y rendimiento sin errores, y Edge Function `dag-calibration` v11 activa. Una invocacion no autenticada/invalida fallo cerrada con HTTP 400. El primer workflow de publicacion 260 termino antes de subir archivos: Supabase rechazo el APK Usuario de unos 89 MB con HTTP 413, por lo que los manifiestos publicos siguieron intactos en 259. Pendiente antes de publicar: validar MoveNet fisicamente, commit/push, workflows, Superweb oficial, manifiestos, hashes y reinstalacion del APK publico exacto.
+- Backend aplicado solamente a `syeycayasyufedwoprea`: migracion `20260719113929_dag_calibration_closed_loop`, RLS activa sin lectura para anon/authenticated, asesores de seguridad y rendimiento sin errores, y Edge Function `dag-calibration` v11 activa. Una invocacion no autenticada/invalida fallo cerrada con HTTP 400. El primer workflow de publicacion 260 termino antes de subir archivos: Supabase rechazo el APK Usuario de unos 89 MB con HTTP 413, por lo que los manifiestos publicos siguieron intactos en 259. El hotfix MoveNet se publico una sola vez mediante workflow `29687527289`; Android CI `29687527287` completo build, tests, ktlint, Android Lint y Detekt. Los manifiestos y descargas publicos coinciden con los SHA-256 documentados, `aapt` confirma paquetes DEV, version 260, minSdk 29 y targetSdk 36, y ambos APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. El APK Usuario publico exacto se reinstalo in-place en SM-A235M y mostro `Calibración aplicada: #3`.
 
 ## Recuperacion segura de Super Admin - 2026-07-18
 
