@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 260 y App Admin DEV 260, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 261 y App Admin DEV 261, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -144,14 +144,14 @@ Flujo de una entrada:
 | SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
 | SUPERWEB-VERSION-01 | Idea | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
-| UI-BANNER-DYNAMIC-02 | Implementado y validado local/físicamente; pendiente publicación conjunta autorizada | P1 | Línea de estado sin fondo ni X; desaparece sin hueco y el error persiste junto a la acción | M | Medio |
-| ADMIN-UX-NAV-HOME-01 | Implementado y validado local; pendiente prueba física y publicación conjunta autorizada | P1 | Navegación Home/Usuarios/Solicitudes/Cuenta y Home orientado a salud, licencia y avisos Superweb | M | Medio |
-| ADMIN-USERS-UX-02 | Implementado y validado local; pendiente cierre visual físico y publicación conjunta autorizada | P1 | Detalle con Protección siempre visible, Apps/Web y grupos dentro de Aplicaciones | L | Alto |
+| UI-BANNER-DYNAMIC-02 | Publicado DEV 261; validado local y físicamente | P1 | Línea de estado sin fondo ni X; desaparece sin hueco y el error persiste junto a la acción | M | Medio |
+| ADMIN-UX-NAV-HOME-01 | Publicado DEV 261; pendiente recorrido físico completo | P1 | Navegación Home/Usuarios/Solicitudes/Cuenta y Home orientado a salud, licencia y avisos Superweb | M | Medio |
+| ADMIN-USERS-UX-02 | Publicado DEV 261; cierre visual físico parcial | P1 | Detalle con Protección siempre visible, Apps/Web y grupos dentro de Aplicaciones | L | Alto |
 | USER-ARCHIVE-RESTORE-02 | Implementado y validado para archivos nuevos; 2 legados quedan bloqueados a revisión por falta de snapshot | P1 | Usuarios anteriores, archivo reversible, restauración y reenlace seguro con token nuevo | L | Alto |
-| PROTECTION-MAINTENANCE-UX-01 | Implementado y validado local; pendiente prueba física | P0 | Separar mantenimiento y desinstalación por 30 minutos con reactivación automática | M | Alto |
-| POLICY-SCHEDULES-01 | Implementado local y backend DEV aplicado; pendiente prueba física | P1 | Límites de uso real y horarios múltiples por día en zona Argentina para Apps y Web | XL | Alto |
-| ADMIN-REQUESTS-ACCOUNT-01 | Implementado y validado local; pendiente prueba física | P1 | Solicitudes raíz y Cuenta con identidad, Superweb, licencia, versión y novedades | M | Medio |
-| USER-UX-ALIGN-02 | Home y Mis apps reacomodados; validación local completa y cierre físico parcial | P2 | Reacomodar App Usuario con componentes visuales compartidos sin exponer controles Admin | L | Medio |
+| PROTECTION-MAINTENANCE-UX-01 | Publicado DEV 261; pendiente prueba física | P0 | Separar mantenimiento y desinstalación por 30 minutos con reactivación automática | M | Alto |
+| POLICY-SCHEDULES-01 | Publicado DEV 261 y backend DEV aplicado; pendiente prueba física | P1 | Límites de uso real y horarios múltiples por día en zona Argentina para Apps y Web | XL | Alto |
+| ADMIN-REQUESTS-ACCOUNT-01 | Publicado DEV 261; pendiente prueba física | P1 | Solicitudes raíz y Cuenta con identidad, Superweb, licencia, versión y novedades | M | Medio |
+| USER-UX-ALIGN-02 | Publicado DEV 261; validación local completa y cierre físico parcial | P2 | Reacomodar App Usuario con componentes visuales compartidos sin exponer controles Admin | L | Medio |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-AUTH-RECOVERY-01 | Publicado; recovery bloqueado externamente por cuota Supabase DEV | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
@@ -188,8 +188,8 @@ Flujo de una entrada:
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
 | DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 259; validado en SM-A235M | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-CALIBRATION-CLOSED-LOOP-10 | Publicado DEV 260; validado en SM-A235M | P0 | Hacer persistentes las decisiones calibradas, separar motivos positivos/negativos y agregar criterio local de mangas/corte sobre rodillas | L | Alto |
-| DAG-AUDIENCE-POLICY-11 | Implementado local; pendiente proxima publicacion autorizada | P0 | Permitir imagenes normales de bebes y hombres, aplicar criterio femenino a niñas y mantener ropa interior/desnudez como bloqueo universal | M | Alto |
-| DAG-ULTRA-KOSHER-01 | Implementado y validado local; pendiente prueba física y publicación conjunta | P1 | Modo Extra Kosher: fotos difuminadas salvo logos/controles esenciales y videos totalmente bloqueados | L | Alto |
+| DAG-AUDIENCE-POLICY-11 | Publicado DEV 261; validación física previa correcta, pendiente repetir APK público | P0 | Permitir imagenes normales de bebes y hombres, aplicar criterio femenino a niñas y mantener ropa interior/desnudez como bloqueo universal | M | Alto |
+| DAG-ULTRA-KOSHER-01 | Publicado DEV 261; pendiente prueba física completa | P1 | Modo Extra Kosher: fotos difuminadas salvo logos/controles esenciales y videos totalmente bloqueados | L | Alto |
 | DAG-RESULTS-DIAG-01 | Resuelto DEV 237 | P1 | Contabilizar localmente el embudo de resultados Brave y los descartes DAG sin guardar contenido | S | Bajo |
 | DAG-RESULTS-PAGE-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Ofrecer una unica pagina adicional cuando Brave informa mas resultados, con costo explicito | S | Medio |
 | DAG-HISTORY-UX-01 | Resuelto DEV 234 | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
@@ -214,7 +214,7 @@ Flujo de una entrada:
 
 ### ADMIN-UX-EPIC-2026-07-19 - Reorganización integral de App Admin
 
-- Estado: `En progreso avanzado`; banner, navegación/Home, Usuarios, permisos temporales, horarios, DAG Extra Kosher, Solicitudes, Cuenta y archivo/restauración segura para nuevos archivos están implementados y validados localmente. Los dos archivos legados sin snapshot quedan aislados como `Revisión necesaria` y no se recuperarán, por decisión del usuario. No se autorizó publicar APK ni cambiar `versionCode`.
+- Estado: `Publicado en DEV 261`; feedback, navegación/Home, Usuarios, permisos temporales, horarios, DAG Extra Kosher, Solicitudes, Cuenta, archivo/restauración segura y alineación de App Usuario están incluidos. Los dos archivos legados sin snapshot quedan aislados como `Revisión necesaria` y no se recuperarán, por decisión del usuario. Continúan pendientes los recorridos físicos específicos señalados en la tabla.
 - Orden aprobado: banner dinámico; navegación y Home; Usuarios y detalle; archivo/restauración/reenlace; mantenimiento y desinstalación; límites y horarios; DAG Extra Kosher; Solicitudes y Cuenta; validación integral; adaptación posterior de App Usuario.
 - Feedback compartido: deja de ser un banner. Cada pantalla muestra como máximo una línea de 32 dp bajo su header, con punto pequeño y texto, sin fondo, tarjeta ni X. El último estado reemplaza al anterior y no acompaña el cambio de sección; usa transición vertical rápida, puntos animados y marquee para textos largos. Progreso permanece mientras trabaja; éxito dura 2 segundos, aviso 2,5 y error 3. Después, el error queda en rojo junto a la acción hasta corregir o reintentar con éxito. Sin estado no se reserva altura.
 - Home Admin: header superior con sólo esquinas inferiores redondeadas, saludo `Hola, {nombre} (ADM)`, comunidad, campana exclusiva de avisos Superweb y resumen de licencia; cuerpo con estado real de protección, acceso a usuarios afectados, agregar usuario, usuarios activos y solicitudes pendientes.
