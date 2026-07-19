@@ -152,6 +152,7 @@ Flujo de una entrada:
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 248; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado DEV 241 y hotfix de visualizacion 2026-07-18; pendiente prueba funcional autenticada | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | SUPERADMIN-ADMIN-RELINK-01 | Idea | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
+| USER-RELINK-01 | Idea | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
@@ -255,6 +256,28 @@ Flujo de una entrada:
   - errores de red o activacion no consumen falsamente el token ni dejan dos estados contradictorios;
   - no se borra comunidad, usuarios protegidos, reglas, solicitudes, licencias ni historial operativo.
 - Decisiones pendientes para la entrevista del ticket: definicion exacta de `desvinculado`; si un Admin puede tener uno o varios dispositivos; revocacion inmediata del token/dispositivo anterior; duracion del token; confirmacion reforzada; aviso al administrador; comportamiento offline y tratamiento de una sesion antigua que reaparece.
+
+### USER-RELINK-01 - Reenlace de un Usuario existente
+
+- Estado: `Idea`; no aprobado para codigo ni cambios de datos. Tipo: recuperacion de acceso, activacion Usuario y seguridad. Prioridad: P1.
+- Problema: App Usuario puede perder su vinculacion local por un fallo, limpieza de datos, cambio de telefono u otra incidencia, aunque el Usuario protegido y su configuracion remota sigan existiendo. Crear otro Usuario duplicaria identidad, reglas, grupos, solicitudes y auditoria.
+- Solucion propuesta: ofrecer `Volver a enlazar` o `Reemplazar enlace` tanto en la tarjeta del Usuario dentro de App Admin como en su tarjeta Superweb. La accion genera un token nuevo, de un solo uso y vencimiento corto, asociado exactamente al Usuario, comunidad y alcance autorizados; App Usuario lo utiliza para recuperar el vínculo sin crear otra identidad.
+- Evidencia: propuesta explicita del usuario del 2026-07-18.
+- Esfuerzo: L estimado. Riesgo: alto; una recuperacion incorrecta podria entregar el control de un Usuario a otro dispositivo, mantener activo el vínculo anterior o mezclar configuraciones entre personas.
+- Dependencias: activacion de App Usuario; generación actual de tokens desde App Admin; Superweb y permisos Super Admin; dispositivo/token anterior; licencia; grupos, reglas, limites, solicitudes y política; auditoria; sincronizacion inicial segura.
+- Duplicados y relacion: complementa `SUPERADMIN-ADMIN-RELINK-01`, pero recupera App Usuario y admite dos autoridades. No duplica la creación normal de un Usuario nuevo ni `DATA-DELETE-01`; reenlazar no archiva ni borra la identidad existente.
+- Criterios de aceptacion propuestos:
+  - App Admin y Superweb ofrecen la accion únicamente sobre el Usuario y comunidad autorizados;
+  - ambas superficies generan tokens equivalentes en seguridad, alcance, vencimiento y auditoria;
+  - el token se muestra una sola vez, vence, solo puede usarse una vez y no queda almacenado en claro;
+  - reenlazar conserva identidad, nombre, comunidad, grupos, reglas, limites, solicitudes y configuración remota sin crear un Usuario duplicado;
+  - la sesión o token anterior se revoca o conserva únicamente según una política explícita y atómica;
+  - un token viejo, revocado, vencido o emitido para otro Usuario falla cerrado;
+  - fallos de red o sincronización no consumen falsamente el token ni dejan dos dispositivos con estados contradictorios;
+  - la primera sincronización aplica la protección antes de considerar completado el reenlace;
+  - la interfaz aclara que datos exclusivamente locales perdidos —por ejemplo historial local cifrado de DAG— no pueden restaurarse desde el servidor;
+  - generar, revocar, vencer y consumir el token queda auditado sin borrar datos del Usuario.
+- Decisiones pendientes para la entrevista del ticket: causas admitidas de pérdida de vínculo; mismo teléfono o dispositivo nuevo; uno o varios dispositivos por Usuario; revocación inmediata del anterior; confirmación reforzada; duración; aviso al administrador; estado de barrera durante el reenlace; tratamiento de datos locales y recuperación offline.
 
 ### UI-BANNER-UNIFY-01 - Feedback premium compartido
 
