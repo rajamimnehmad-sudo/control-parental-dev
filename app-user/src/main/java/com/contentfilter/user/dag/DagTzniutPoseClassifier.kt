@@ -1,18 +1,20 @@
 package com.contentfilter.user.dag
 
+import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.RectF
 import android.os.SystemClock
 import android.util.Log
-import com.google.android.gms.tasks.Tasks
-import com.google.mlkit.vision.common.InputImage
-import com.google.mlkit.vision.pose.Pose
-import com.google.mlkit.vision.pose.PoseDetection
-import com.google.mlkit.vision.pose.PoseDetector
-import com.google.mlkit.vision.pose.PoseLandmark
-import com.google.mlkit.vision.pose.defaults.PoseDetectorOptions
+import org.tensorflow.lite.DataType
+import org.tensorflow.lite.Interpreter
 import java.io.Closeable
-import java.util.concurrent.TimeUnit
+import java.io.FileInputStream
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.channels.FileChannel
 import kotlin.math.hypot
 import kotlin.math.sqrt
 
@@ -21,32 +23,34 @@ internal data class DagTzniutPoseScores(
     val hemAboveKnee: Float = 0f,
 )
 
-internal class DagTzniutPoseClassifier : Closeable {
-    private val detectorDelegate =
-        lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
-            val options =
-                PoseDetectorOptions.Builder()
-                    .setDetectorMode(PoseDetectorOptions.SINGLE_IMAGE_MODE)
-                    .setPreferredHardwareConfigs(PoseDetectorOptions.CPU)
-                    .build()
-            PoseDetection.getClient(options)
-        }
-    private val detector: PoseDetector by detectorDelegate
+internal class DagTzniutPoseClassifier(
+    context: Context,
+) : Closeable {
+    private val applicationContext = context.applicationContext
+    private var interpreter: Interpreter? = null
 
     fun classify(bitmap: Bitmap): DagTzniutPoseScores {
         val startedAt = SystemClock.elapsedRealtime()
         val scores =
             runCatching {
-                val pose =
-                    Tasks.await(
-                        detector.process(InputImage.fromBitmap(bitmap, 0)),
-                        TimeoutSeconds,
-                        TimeUnit.SECONDS,
+                val inputBitmap = bitmap.resizeWithPadding(InputSize)
+                try {
+                    val pose = detectPose(inputBitmap)
+                    DagTzniutPoseScores(
+                        sleevesAboveElbow =
+                            maxOf(
+                                pose.armExposure(inputBitmap, true),
+                                pose.armExposure(inputBitmap, false),
+                            ),
+                        hemAboveKnee =
+                            maxOf(
+                                pose.legExposure(inputBitmap, true),
+                                pose.legExposure(inputBitmap, false),
+                            ),
                     )
-                DagTzniutPoseScores(
-                    sleevesAboveElbow = maxOf(pose.armExposure(bitmap, true), pose.armExposure(bitmap, false)),
-                    hemAboveKnee = maxOf(pose.legExposure(bitmap, true), pose.legExposure(bitmap, false)),
-                )
+                } finally {
+                    inputBitmap.recycle()
+                }
             }.getOrDefault(DagTzniutPoseScores())
         Log.d(
             MetricsTag,
@@ -57,46 +61,80 @@ internal class DagTzniutPoseClassifier : Closeable {
     }
 
     override fun close() {
-        if (detectorDelegate.isInitialized()) detector.close()
+        interpreter?.close()
+        interpreter = null
+    }
+
+    private fun detectPose(bitmap: Bitmap): Pose {
+        val input = ByteBuffer.allocateDirect(InputSize * InputSize * 3).order(ByteOrder.nativeOrder())
+        val pixels = IntArray(InputSize * InputSize)
+        bitmap.getPixels(pixels, 0, InputSize, 0, 0, InputSize, InputSize)
+        pixels.forEach { pixel ->
+            input.put(Color.red(pixel).toByte())
+            input.put(Color.green(pixel).toByte())
+            input.put(Color.blue(pixel).toByte())
+        }
+        input.rewind()
+        val output = Array(1) { Array(1) { Array(KeypointCount) { FloatArray(KeypointValues) } } }
+        model().run(input, output)
+        return Pose(output[0][0].map { values -> Keypoint(values[1], values[0], values[2]) })
+    }
+
+    private fun model(): Interpreter =
+        interpreter ?: loadModel().also { loaded ->
+            check(loaded.getInputTensor(0).shape().contentEquals(intArrayOf(1, InputSize, InputSize, 3)))
+            check(loaded.getInputTensor(0).dataType() == DataType.UINT8)
+            check(loaded.getOutputTensor(0).shape().contentEquals(intArrayOf(1, 1, KeypointCount, KeypointValues)))
+            check(loaded.getOutputTensor(0).dataType() == DataType.FLOAT32)
+            interpreter = loaded
+        }
+
+    private fun loadModel(): Interpreter {
+        val descriptor = applicationContext.assets.openFd(ModelAsset)
+        descriptor.use {
+            FileInputStream(it.fileDescriptor).channel.use { channel ->
+                val mapped = channel.map(FileChannel.MapMode.READ_ONLY, it.startOffset, it.declaredLength)
+                return Interpreter(mapped, Interpreter.Options().setNumThreads(ModelThreads))
+            }
+        }
     }
 
     private fun Pose.armExposure(
         bitmap: Bitmap,
         left: Boolean,
     ): Float {
-        val shoulder = confident(if (left) PoseLandmark.LEFT_SHOULDER else PoseLandmark.RIGHT_SHOULDER) ?: return 0f
-        val elbow = confident(if (left) PoseLandmark.LEFT_ELBOW else PoseLandmark.RIGHT_ELBOW) ?: return 0f
-        val wrist = confident(if (left) PoseLandmark.LEFT_WRIST else PoseLandmark.RIGHT_WRIST) ?: return 0f
+        val shoulder = confident(if (left) LeftShoulder else RightShoulder) ?: return 0f
+        val elbow = confident(if (left) LeftElbow else RightElbow) ?: return 0f
+        val wrist = confident(if (left) LeftWrist else RightWrist) ?: return 0f
         val radius = maxOf(MinimumSampleRadius, shoulder.distanceTo(elbow) * SampleRadiusRatio)
-        val upperArm = bitmap.skinRatio(shoulder.point(), elbow.point(), 0.35f, 0.88f, radius)
-        val forearm = bitmap.skinRatio(elbow.point(), wrist.point(), 0.12f, 0.55f, radius)
-        return exposureScore(upperArm, forearm, shoulder.likelihood(), elbow.likelihood(), wrist.likelihood())
+        val upperArm = bitmap.skinRatio(shoulder.point(bitmap), elbow.point(bitmap), 0.35f, 0.88f, radius)
+        val forearm = bitmap.skinRatio(elbow.point(bitmap), wrist.point(bitmap), 0.12f, 0.55f, radius)
+        return exposureScore(upperArm, forearm, shoulder.score, elbow.score, wrist.score)
     }
 
     private fun Pose.legExposure(
         bitmap: Bitmap,
         left: Boolean,
     ): Float {
-        val hip = confident(if (left) PoseLandmark.LEFT_HIP else PoseLandmark.RIGHT_HIP) ?: return 0f
-        val knee = confident(if (left) PoseLandmark.LEFT_KNEE else PoseLandmark.RIGHT_KNEE) ?: return 0f
-        val ankle = confident(if (left) PoseLandmark.LEFT_ANKLE else PoseLandmark.RIGHT_ANKLE) ?: return 0f
+        val hip = confident(if (left) LeftHip else RightHip) ?: return 0f
+        val knee = confident(if (left) LeftKnee else RightKnee) ?: return 0f
+        val ankle = confident(if (left) LeftAnkle else RightAnkle) ?: return 0f
         val radius = maxOf(MinimumSampleRadius, hip.distanceTo(knee) * SampleRadiusRatio)
-        val thigh = bitmap.skinRatio(hip.point(), knee.point(), 0.55f, 0.92f, radius)
-        val lowerLeg = bitmap.skinRatio(knee.point(), ankle.point(), 0.10f, 0.45f, radius)
-        return exposureScore(thigh, lowerLeg, hip.likelihood(), knee.likelihood(), ankle.likelihood())
+        val thigh = bitmap.skinRatio(hip.point(bitmap), knee.point(bitmap), 0.55f, 0.92f, radius)
+        val lowerLeg = bitmap.skinRatio(knee.point(bitmap), ankle.point(bitmap), 0.10f, 0.45f, radius)
+        return exposureScore(thigh, lowerLeg, hip.score, knee.score, ankle.score)
     }
 
-    private fun Pose.confident(type: Int): PoseLandmark? =
-        getPoseLandmark(type)?.takeIf { it.inFrameLikelihood >= MinimumLandmarkLikelihood }
+    private fun Pose.confident(index: Int): Keypoint? =
+        keypoints[index].takeIf { it.score >= MinimumKeypointConfidence }
 
     private fun exposureScore(
         proximalSkin: Float,
         distalSkin: Float,
-        vararg likelihoods: Float,
+        vararg confidence: Float,
     ): Float {
         if (proximalSkin < MinimumSkinRatio || distalSkin < MinimumSkinRatio) return 0f
-        val skinConfidence = sqrt(proximalSkin * distalSkin)
-        return (skinConfidence * (likelihoods.minOrNull() ?: 0f)).coerceIn(0f, 1f)
+        return (sqrt(proximalSkin * distalSkin) * (confidence.minOrNull() ?: 0f)).coerceIn(0f, 1f)
     }
 
     private fun Bitmap.skinRatio(
@@ -126,6 +164,25 @@ internal class DagTzniutPoseClassifier : Closeable {
         return if (sampled == 0) 0f else skin.toFloat() / sampled
     }
 
+    private fun Bitmap.resizeWithPadding(size: Int): Bitmap {
+        val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val scale = minOf(size.toFloat() / width, size.toFloat() / height)
+        val targetWidth = width * scale
+        val targetHeight = height * scale
+        val left = (size - targetWidth) / 2f
+        val top = (size - targetHeight) / 2f
+        Canvas(output).apply {
+            drawColor(Color.BLACK)
+            drawBitmap(
+                this@resizeWithPadding,
+                null,
+                RectF(left, top, left + targetWidth, top + targetHeight),
+                Paint(Paint.FILTER_BITMAP_FLAG),
+            )
+        }
+        return output
+    }
+
     private fun Int.isProbableSkin(): Boolean {
         val red = Color.red(this)
         val green = Color.green(this)
@@ -139,18 +196,39 @@ internal class DagTzniutPoseClassifier : Closeable {
         return rgbRule && y > 45 && cb in 72.0..138.0 && cr in 125.0..180.0
     }
 
-    private fun PoseLandmark.point() = Point(position.x, position.y)
+    private fun Keypoint.point(bitmap: Bitmap) = Point(x * bitmap.width, y * bitmap.height)
 
-    private fun PoseLandmark.likelihood(): Float = inFrameLikelihood.coerceIn(0f, 1f)
+    private fun Keypoint.distanceTo(other: Keypoint): Float = hypot(x - other.x, y - other.y) * InputSize
 
-    private fun PoseLandmark.distanceTo(other: PoseLandmark): Float =
-        hypot(position.x - other.position.x, position.y - other.position.y)
+    private data class Pose(val keypoints: List<Keypoint>)
+
+    private data class Keypoint(
+        val x: Float,
+        val y: Float,
+        val score: Float,
+    )
 
     private data class Point(val x: Float, val y: Float)
 
     private companion object {
-        const val TimeoutSeconds = 2L
-        const val MinimumLandmarkLikelihood = 0.72f
+        const val ModelAsset = "dag/movenet_singlepose_lightning_int8.tflite"
+        const val ModelThreads = 2
+        const val InputSize = 192
+        const val KeypointCount = 17
+        const val KeypointValues = 3
+        const val LeftShoulder = 5
+        const val RightShoulder = 6
+        const val LeftElbow = 7
+        const val RightElbow = 8
+        const val LeftWrist = 9
+        const val RightWrist = 10
+        const val LeftHip = 11
+        const val RightHip = 12
+        const val LeftKnee = 13
+        const val RightKnee = 14
+        const val LeftAnkle = 15
+        const val RightAnkle = 16
+        const val MinimumKeypointConfidence = 0.48f
         const val MinimumSkinRatio = 0.58f
         const val SegmentSamples = 7
         const val MinimumSampleRadius = 2f

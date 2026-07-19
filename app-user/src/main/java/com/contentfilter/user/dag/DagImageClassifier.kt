@@ -64,7 +64,7 @@ internal class DagImageClassifier(
     private var interpreter: Interpreter? = null
     private val professionalClassifier = DagProfessionalImageClassifier(applicationContext)
     private val modestyClassifier = DagModestyImageClassifier(applicationContext)
-    private val tzniutPoseClassifier = DagTzniutPoseClassifier()
+    private val tzniutPoseClassifier = DagTzniutPoseClassifier(applicationContext)
     private val calibrationStore = DagImageCalibrationStore(applicationContext)
 
     fun exactDecision(imageHash: String): DagImageDecision? = calibrationStore.exactDecision(imageHash)

@@ -300,6 +300,15 @@ class DagImagePolicyTest {
 
         assertEquals("2e5d2b1471903c5bad06596dbb57bc991a489e27d5b475a62269321db42f123b", digest)
     }
+
+    @Test
+    fun `pose model artifact is pinned`() {
+        val relative = "src/main/assets/dag/movenet_singlepose_lightning_int8.tflite"
+        val model = listOf(File(relative), File("app-user/$relative")).first(File::isFile)
+        val digest = MessageDigest.getInstance("SHA-256").digest(model.readBytes()).toHex()
+
+        assertEquals("cd7cc22fa946e5d146a7b98d496853e1923e22828d3972d579973f27f91bb105", digest)
+    }
 }
 
 private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
