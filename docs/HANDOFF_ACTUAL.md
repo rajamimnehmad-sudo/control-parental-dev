@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-18
+Fecha de corte: 2026-07-19
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -50,11 +50,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-17:
+Version publicada real al 2026-07-19:
 
 ```text
-App Usuario versionCode 257
-App Admin versionCode 257
+App Usuario versionCode 258
+App Admin versionCode 258
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-257-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-257-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-258-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-258-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 592d5139a6fd4fe1d3152a65a6eae38d76a3c3172e5d46b90334ee36ee69ad29
-Admin   df29546d127b1b3c13952e68db46eb12740164038d3e75069c36ae6ced3a9acd
+Usuario b6b3d6781b9b6a1002a1216184d3b77dcc9aface59a45a61caba4a424e3ee4ca
+Admin   c347e20af45868f03f4629bfe8bcd55ba4754cde5395dd38c5033ae1a4802a70
 ```
 
 ## Publicacion DEV 257 - Calibracion DAG bidireccional - 2026-07-18
@@ -88,11 +88,12 @@ Admin   df29546d127b1b3c13952e68db46eb12740164038d3e75069c36ae6ced3a9acd
 - Validacion local: unit tests, compilacion, ktlint y builds DEV de Usuario/Admin correctos; Android Lint de Usuario, ESLint, TypeScript y build Next correctos. GitHub `Publicar APKs DEV` run `29670710720` finalizo correctamente en una sola publicacion y Android CI `29670710746` completo build, tests, ktlint, Android Lint y Detekt. La Superweb sirve el commit `eefc2b8` y confirma ambiente DEV y proyecto `syeycayasyufedwoprea`.
 - Los manifiestos publicos declaran 257 y los APK descargados coinciden con los SHA-256 documentados arriba. `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`; ambos conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Falta la prueba fisica de activacion, originales visibles, X, R y restauracion del blur al apagar el modo.
 
-## Candidato DEV 258 - entrega directa de marcadores X/R - 2026-07-19
+## Publicacion DEV 258 - entrega directa de marcadores X/R - 2026-07-19
 
 - Reporte fisico en el Samsung personal con 257: `Calibración DEV` recargaba correctamente y revelaba los originales, pero no mostraba X ni R. Esto aislo el fallo al recorrido que pedia cada decision desde JavaScript y esperaba la respuesta nativa antes de crear el marcador; el modo de revelado y la clasificacion local si funcionaban.
 - Correccion: al terminar cada clasificacion, el cargador envia directamente URL normalizada y decision al WebView; al finalizar la pagina tambien sincroniza una instantanea acotada de decisiones ya disponibles. La consulta anterior queda como respaldo. X/R siguen requiriendo una candidata local clasificada para que el reporte sea aceptado.
-- Validacion local: tests DEV, ktlint y build optimizado de App Usuario correctos, 690 tareas. El candidato 257 se instalo in-place en SM-A235M preservando datos; ese dispositivo tenia DAG deshabilitado por politica y no permitio cerrar el recorrido visual. Se publica 258 a pedido del usuario para validacion en el Samsung personal.
+- Validacion local: tests DEV, ktlint y build optimizado de App Usuario correctos, 690 tareas; la validacion final de Admin y ambos APK completo 756 tareas. El candidato 257 se instalo in-place en SM-A235M preservando datos; ese dispositivo tenia DAG deshabilitado por politica y no permitio cerrar el recorrido visual.
+- GitHub `Publicar APKs DEV` run `29671696981` finalizo correctamente y publico una sola vez, exclusivamente en Supabase DEV. Android CI run `29671696980` completo build, tests, ktlint, Android Lint y Detekt. Los manifiestos publicos declaran 258 y las descargas coinciden con los SHA-256 documentados arriba. `aapt` confirma paquetes DEV, `versionName 1.0.1-dev`, `minSdk 29` y `targetSdk 36`; ambos APK conservan el certificado SHA-256 `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Pendiente: prueba fisica de X/R en el Samsung personal.
 
 ## Recuperacion segura de Super Admin - 2026-07-18
 
