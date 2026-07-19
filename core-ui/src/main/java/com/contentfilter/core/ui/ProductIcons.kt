@@ -7,7 +7,6 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -410,7 +409,7 @@ private fun ProductIcon.materialVector(): ImageVector? =
         ProductIcon.UserPlus -> Icons.Filled.Add
         ProductIcon.Search -> Icons.Filled.Search
         ProductIcon.Refresh -> Icons.Filled.Refresh
-        ProductIcon.Bell -> Icons.Filled.Notifications
+        ProductIcon.Bell -> null
         ProductIcon.Panel -> Icons.Filled.List
         ProductIcon.Update -> Icons.Filled.Refresh
         ProductIcon.Web -> null

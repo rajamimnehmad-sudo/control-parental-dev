@@ -44,7 +44,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -84,6 +83,8 @@ import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -115,6 +116,8 @@ import com.contentfilter.admin.updates.AdminUpdatesViewModel
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.allowsProtection
 import com.contentfilter.core.ui.ContentFilterTheme
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -398,13 +401,14 @@ private fun HomeTab(
     val dashboardState by dashboardViewModel.uiState.collectAsStateWithLifecycle()
     val announcementsViewModel: AdminAnnouncementsViewModel = hiltViewModel()
     val announcementsState by announcementsViewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { announcementsViewModel.refresh() }
     Column(modifier = Modifier.fillMaxSize().background(AppBackground)) {
         AdminHomeHeader(
             administratorName = dashboardState.guideName.ifBlank { "Administrador" },
             communityName = dashboardState.communityName,
             licenseState = dashboardState.licenseState,
             licenseExpiresAtEpochMillis = dashboardState.licenseExpiresAtEpochMillis,
-            announcementCount = announcementsState.items.size,
+            announcementCount = announcementsState.unreadCount,
             onAnnouncements = onAnnouncements,
         )
         Column(
@@ -485,11 +489,14 @@ private fun AdminHomeHeader(
                 }
             }
             Box {
-                IconButton(onClick = onAnnouncements) {
-                    Icon(
-                        imageVector = Icons.Filled.Notifications,
-                        contentDescription = "Abrir avisos de Superweb",
-                        tint = Color.White,
+                IconButton(
+                    onClick = onAnnouncements,
+                    modifier = Modifier.semantics { contentDescription = "Abrir avisos de Superweb" },
+                ) {
+                    ProductGlyph(
+                        icon = ProductIcon.Bell,
+                        color = Color.White,
+                        modifier = Modifier.size(25.dp),
                     )
                 }
                 if (announcementCount > 0) {

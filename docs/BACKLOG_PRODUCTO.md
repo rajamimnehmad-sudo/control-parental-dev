@@ -51,6 +51,14 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### ANNOUNCEMENTS-INBOX-UX-02 - Lectura y ocultado por dispositivo
+
+- Estado: `Candidato posterior a DEV 262; backend DEV pendiente de aplicar y sin publicacion Android`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX y comunicacion operativa. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Alcance: en Usuario y Admin se quita el refresco manual, la bandeja carga al abrir, los avisos no leidos se distinguen en negrita, abrirlos apaga el contador rojo y cada fila se puede ocultar deslizando a la izquierda con opcion de deshacer. La campanita pasa al icono de contorno compartido.
+- Regla de producto: ocultar afecta solo a ese dispositivo; no archiva, borra ni modifica el aviso de Superweb para otros equipos. El contador representa avisos no leidos, no el total historico disponible.
+- Arquitectura: recibos por `(device_id, announcement_id)` detras de RLS y RPC autenticadas con token de dispositivo; Android no tiene escritura directa ni secretos. El RPC de listado anterior permanece intacto para APK publicados.
+- Aceptacion local: ktlint, compilacion, tests DEV, Android Lint vital y ensamblado local de ambas apps correctos. Pendiente autorizar el llavero local para aplicar y verificar la migracion exclusivamente en Supabase DEV, probar el ciclo real en dispositivo y publicarlo mas adelante junto con el resto de cambios aprobados.
+
 ### USER-HOME-UX-03 - Home dinamico de App Usuario
 
 - Estado: `Publicado DEV 262; pendiente prueba fisica`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX, estado de proteccion, uso y actualizaciones. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
@@ -160,7 +168,8 @@ Flujo de una entrada:
 | SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
 | SUPERWEB-VERSION-01 | Idea | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
-| UI-BANNER-DYNAMIC-02 | Publicado DEV 261; validado local y físicamente | P1 | Línea de estado sin fondo ni X; desaparece sin hueco y el error persiste junto a la acción | M | Medio |
+| UI-BANNER-DYNAMIC-02 | Publicado DEV 261; pulido sutil candidato posterior a DEV 262 | P1 | Línea de estado sin fondo ni X; desaparece sin hueco y el error persiste junto a la acción | M | Medio |
+| ANNOUNCEMENTS-INBOX-UX-02 | Candidato posterior a DEV 262; backend DEV pendiente y sin publicación Android | P2 | Avisos leídos/no leídos, contador real y ocultado por dispositivo con deshacer | M | Medio |
 | ADMIN-UX-NAV-HOME-01 | Publicado DEV 261; pendiente recorrido físico completo | P1 | Navegación Home/Usuarios/Solicitudes/Cuenta y Home orientado a salud, licencia y avisos Superweb | M | Medio |
 | ADMIN-USERS-UX-02 | Publicado DEV 261; cierre visual físico parcial | P1 | Detalle con Protección siempre visible, Apps/Web y grupos dentro de Aplicaciones | L | Alto |
 | USER-ARCHIVE-RESTORE-02 | Implementado y validado para archivos nuevos; 2 legados quedan bloqueados a revisión por falta de snapshot | P1 | Usuarios anteriores, archivo reversible, restauración y reenlace seguro con token nuevo | L | Alto |
@@ -956,9 +965,9 @@ Flujo de una entrada:
 
 - Estado: `Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb`. Aprobado al ordenar ejecutar todos los tickets el 2026-07-16.
 - Tipo: comunicacion operativa y UX. Prioridad: P2.
-- Alcance cerrado: Super Admin crea un aviso para una comunidad y elige Administradores, Usuarios o ambos. Es un canal unidireccional; no hay chat, respuestas ni recibos de lectura.
+- Alcance cerrado: Super Admin crea un aviso para una comunidad y elige Administradores, Usuarios o ambos. Es un canal unidireccional y no hay chat ni respuestas. `ANNOUNCEMENTS-INBOX-UX-02` agrega estado de lectura y ocultado exclusivamente por dispositivo, sin exponerlo como analitica global de Superweb.
 - Superweb incorpora formulario, vencimiento opcional e historial. El aviso queda guardado aunque FCM no este disponible y la UI distingue ese caso.
-- App Usuario y App Admin incorporan bandeja con refresco manual. Un push normal abre esa bandeja; no usa el canal urgente reservado para incidentes de proteccion.
+- App Usuario y App Admin incorporan bandeja; el candidato `ANNOUNCEMENTS-INBOX-UX-02` reemplaza el refresco manual por carga al abrir. Un push normal abre esa bandeja; no usa el canal urgente reservado para incidentes de proteccion.
 - Seguridad: las apps leen solo avisos de su comunidad y rol mediante token de dispositivo. El registro FCM generico acepta solo el token del propio dispositivo. La Service Role y credenciales FCM permanecen en `send-announcement`, nunca en Android.
 - Backend DEV: migraciones `20260716162000_super_admin_announcements.sql` y `20260716162500_device_push_registration_all_roles.sql`; Edge Function `send-announcement` desplegada solo en `syeycayasyufedwoprea`.
 - Compatibilidad: Android 10 o posterior, igual que las apps existentes. Android 13 o posterior pide permiso de notificaciones; si se rechaza, la bandeja sigue funcionando al abrir la app.

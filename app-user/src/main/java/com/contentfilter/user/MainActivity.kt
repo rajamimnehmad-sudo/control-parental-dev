@@ -41,13 +41,10 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -73,6 +70,8 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -89,6 +88,7 @@ import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.ui.ContentFilterTheme
 import com.contentfilter.core.ui.ProductAppBackground
 import com.contentfilter.core.ui.ProductFeatureTile
+import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductLazyVisualPage
 import com.contentfilter.core.ui.ProductNavGlyph
@@ -597,6 +597,7 @@ private fun UserHomeRoute(
     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
     val appsState by appsViewModel.uiState.collectAsStateWithLifecycle()
     val announcementsState by announcementsViewModel.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { announcementsViewModel.refresh() }
     val limitItems = remember(appsState) { nearLimitItems(appsState) }
     UserHomeTab(
         greeting = homeState.greeting,
@@ -607,7 +608,7 @@ private fun UserHomeRoute(
         syncState = statusState.syncState,
         activationState = statusState.activationState,
         communityName = statusState.communityName,
-        announcementCount = announcementsState.items.size,
+        announcementCount = announcementsState.unreadCount,
         updateState = updateState,
         limitItems = limitItems,
         pendingRequests = requestsState.pendingCount,
@@ -854,11 +855,14 @@ private fun UserHomeAnnouncementButton(
     onClick: () -> Unit,
 ) {
     Box {
-        IconButton(onClick = onClick) {
-            Icon(
-                imageVector = Icons.Filled.Notifications,
-                contentDescription = "Abrir avisos",
-                tint = Color.White,
+        IconButton(
+            onClick = onClick,
+            modifier = Modifier.semantics { contentDescription = "Abrir avisos" },
+        ) {
+            ProductGlyph(
+                icon = ProductIcon.Bell,
+                color = Color.White,
+                modifier = Modifier.size(25.dp),
             )
         }
         if (count > 0) {

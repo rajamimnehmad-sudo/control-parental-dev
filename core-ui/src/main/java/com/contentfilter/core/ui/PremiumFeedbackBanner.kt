@@ -75,8 +75,8 @@ fun PremiumFeedbackBanner(
     Column(modifier = modifier.fillMaxWidth()) {
         AnimatedVisibility(
             visible = visible && text.isNotBlank(),
-            enter = slideInVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeIn(tween(180)),
-            exit = slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(180)),
+            enter = slideInVertically(tween(220, easing = FastOutSlowInEasing)) { -it / 4 } + fadeIn(tween(220)),
+            exit = slideOutVertically(tween(160, easing = FastOutSlowInEasing)) { -it / 4 } + fadeOut(tween(160)),
         ) {
             FeedbackBannerSurface(
                 text = text,
@@ -139,9 +139,9 @@ private fun FeedbackBannerSurface(
                     .weight(1f),
             targetState = text,
             transitionSpec = {
-                (slideInVertically(tween(180, easing = FastOutSlowInEasing)) { it } + fadeIn(tween(180)))
+                (slideInVertically(tween(220, easing = FastOutSlowInEasing)) { it / 3 } + fadeIn(tween(220)))
                     .togetherWith(
-                        slideOutVertically(tween(180, easing = FastOutSlowInEasing)) { -it } + fadeOut(tween(180)),
+                        slideOutVertically(tween(160, easing = FastOutSlowInEasing)) { -it / 3 } + fadeOut(tween(160)),
                     )
             },
             label = "feedback-banner-text",
