@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 257 y App Admin DEV 257, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 260 y App Admin DEV 260, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -144,6 +144,14 @@ Flujo de una entrada:
 | SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
 | SUPERWEB-VERSION-01 | Idea | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
+| UI-BANNER-DYNAMIC-02 | Implementado y validado local/físicamente; pendiente publicación conjunta autorizada | P1 | Línea de estado sin fondo ni X; desaparece sin hueco y el error persiste junto a la acción | M | Medio |
+| ADMIN-UX-NAV-HOME-01 | Implementado y validado local; pendiente prueba física y publicación conjunta autorizada | P1 | Navegación Home/Usuarios/Solicitudes/Cuenta y Home orientado a salud, licencia y avisos Superweb | M | Medio |
+| ADMIN-USERS-UX-02 | Implementado y validado local; pendiente cierre visual físico y publicación conjunta autorizada | P1 | Detalle con Protección siempre visible, Apps/Web y grupos dentro de Aplicaciones | L | Alto |
+| USER-ARCHIVE-RESTORE-02 | Implementado y validado para archivos nuevos; 2 legados quedan bloqueados a revisión por falta de snapshot | P1 | Usuarios anteriores, archivo reversible, restauración y reenlace seguro con token nuevo | L | Alto |
+| PROTECTION-MAINTENANCE-UX-01 | Implementado y validado local; pendiente prueba física | P0 | Separar mantenimiento y desinstalación por 30 minutos con reactivación automática | M | Alto |
+| POLICY-SCHEDULES-01 | Implementado local y backend DEV aplicado; pendiente prueba física | P1 | Límites de uso real y horarios múltiples por día en zona Argentina para Apps y Web | XL | Alto |
+| ADMIN-REQUESTS-ACCOUNT-01 | Implementado y validado local; pendiente prueba física | P1 | Solicitudes raíz y Cuenta con identidad, Superweb, licencia, versión y novedades | M | Medio |
+| USER-UX-ALIGN-02 | Home y Mis apps reacomodados; validación local completa y cierre físico parcial | P2 | Reacomodar App Usuario con componentes visuales compartidos sin exponer controles Admin | L | Medio |
 | SUPERWEB-FUNCTIONAL-VERIFY-01 | Validacion automatizada DEV correcta; pendiente sesion autenticada publicada | P1 | Comprobar licencias, tokens, DAG, actualizaciones, alertas y avisos desde la Superweb oficial | M | Alto |
 | SUPERWEB-AUTH-RECOVERY-01 | Publicado; recovery bloqueado externamente por cuota Supabase DEV | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
@@ -202,6 +210,21 @@ Flujo de una entrada:
 | DAG-CALIBRATION-MODELS-05 | Resuelto DEV 253 | P1 | Registrar modelos y separar calibracion de entrenamiento real | M | Alto |
 | DAG-CALIBRATION-IN-PAGE-08 | Resuelto y validado fisicamente DEV 256 | P1 | Marcar una foto inapropiada desde DAG con X, blur inmediato y revision posterior auditable | M | Medio |
 | USER-GREETING-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
+
+### ADMIN-UX-EPIC-2026-07-19 - Reorganización integral de App Admin
+
+- Estado: `En progreso avanzado`; banner, navegación/Home, Usuarios, permisos temporales, horarios, DAG Extra Kosher, Solicitudes, Cuenta y archivo/restauración segura para nuevos archivos están implementados y validados localmente. Los dos archivos legados sin snapshot quedan aislados como `Revisión necesaria` y no se recuperarán, por decisión del usuario. No se autorizó publicar APK ni cambiar `versionCode`.
+- Orden aprobado: banner dinámico; navegación y Home; Usuarios y detalle; archivo/restauración/reenlace; mantenimiento y desinstalación; límites y horarios; DAG Extra Kosher; Solicitudes y Cuenta; validación integral; adaptación posterior de App Usuario.
+- Feedback compartido: deja de ser un banner. Cada pantalla muestra como máximo una línea de 32 dp bajo su header, con punto pequeño y texto, sin fondo, tarjeta ni X. El último estado reemplaza al anterior y no acompaña el cambio de sección; usa transición vertical rápida, puntos animados y marquee para textos largos. Progreso permanece mientras trabaja; éxito dura 2 segundos, aviso 2,5 y error 3. Después, el error queda en rojo junto a la acción hasta corregir o reintentar con éxito. Sin estado no se reserva altura.
+- Home Admin: header superior con sólo esquinas inferiores redondeadas, saludo `Hola, {nombre} (ADM)`, comunidad, campana exclusiva de avisos Superweb y resumen de licencia; cuerpo con estado real de protección, acceso a usuarios afectados, agregar usuario, usuarios activos y solicitudes pendientes.
+- Usuarios: lista, búsqueda, actualización y alta; detalle con header fijo, resumen de Protección visible apenas se abre y acceso a su detalle, Aplicaciones/Web como únicas secciones principales y grupos dentro de Aplicaciones. Conserva estado de VPN/Accesibilidad/Administrador del dispositivo, protección obligatoria sin control para desarmarla, archivo reversible y reenlace con token nuevo.
+- Archivo seguro: App Admin nunca hace borrado físico. `Usuarios anteriores` permite buscar por nombre y generar un token de restauración ligado al mismo usuario. Los archivos nuevos guardan un snapshot de banderas y conservan en sus filas soft-deleted identidad, categorías, reglas, límites, horarios, grupos e inventario; la restauración atómica recupera el mismo `device_id` recién al consumir el token. La eliminación definitiva queda exclusivamente en Superweb y sigue requiriendo confirmación específica. Los dos archivos anteriores a este mecanismo aparecen como `Revisión necesaria` y no se restauran automáticamente.
+- Permisos temporales: mantenimiento y desinstalación son autorizaciones separadas de 30 minutos, vencen y reactivan automáticamente; Admin muestra qué permiso sigue activo y hasta cuándo.
+- Límites y horarios: tiempo por uso real de aplicación o Web y ventanas horarias múltiples por día, zona `America/Argentina/Buenos_Aires`; límite de tiempo y reloj se aplican juntos y gana la restricción más fuerte; configuración global con excepciones por app o sitio.
+- DAG Extra Kosher: todas las fotos se difuminan, excepto logos, iconos y controles esenciales; videos y miniaturas de video quedan bloqueados/difuminados y nunca se reproducen.
+- Solicitudes: destino raíz con pendientes accionables y resueltos como historial; tipos Web, descargas y aplicaciones; App Usuario podrá cancelar únicamente sus propias solicitudes pendientes en el ticket posterior.
+- Cuenta: identidad Admin, comunidad, estado con Superweb, licencia completa y su efecto, versión, actualización y novedades específicas de App Admin.
+- Criterio transversal: un estado verde sólo aparece con protección confirmada; estados desconocidos o sin conexión reciente son amarillos/pendientes y una licencia que no permite proteger se muestra separadamente, sin atribuir falsamente una falla a VPN o Accesibilidad.
 
 ### SUPERWEB-DEPLOY-SYNC-01 - Publicacion oficial verificable
 
