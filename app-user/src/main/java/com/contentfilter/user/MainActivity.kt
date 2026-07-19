@@ -606,6 +606,7 @@ private fun UserHomeRoute(
         deviceAdminState = statusState.deviceAdminState,
         syncState = statusState.syncState,
         activationState = statusState.activationState,
+        communityName = statusState.communityName,
         announcementCount = announcementsState.items.size,
         updateState = updateState,
         limitItems = limitItems,
@@ -630,6 +631,7 @@ private fun UserHomeTab(
     deviceAdminState: String,
     syncState: String,
     activationState: String,
+    communityName: String,
     announcementCount: Int,
     updateState: UpdatesUiState,
     limitItems: List<UserHomeLimitItem>,
@@ -653,6 +655,7 @@ private fun UserHomeTab(
             deviceAdminState = deviceAdminState,
             syncState = syncState,
             activationState = activationState,
+            communityName = communityName,
             announcementCount = announcementCount,
             expanded = expandedSection == UserHomeSection.Protection,
             onToggleProtection = {
@@ -718,6 +721,7 @@ private fun UserHomeHeader(
     deviceAdminState: String,
     syncState: String,
     activationState: String,
+    communityName: String,
     announcementCount: Int,
     expanded: Boolean,
     onToggleProtection: () -> Unit,
@@ -753,12 +757,20 @@ private fun UserHomeHeader(
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Row(modifier = Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Text(
-                modifier = Modifier.weight(1f).padding(top = 6.dp),
-                text = greeting,
-                style = MaterialTheme.typography.headlineSmall,
-                color = Color.White,
-            )
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    text = greeting,
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Color.White,
+                )
+                if (communityName.isNotBlank()) {
+                    Text(
+                        text = communityName,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = Color.White.copy(alpha = 0.72f),
+                    )
+                }
+            }
             UserHomeAnnouncementButton(
                 count = announcementCount,
                 onClick = onAnnouncements,

@@ -20,7 +20,9 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,7 +53,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
@@ -226,10 +227,7 @@ private fun AppsToolbar(
                     singleLine = true,
                 )
             } else {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text("Aplicaciones", style = MaterialTheme.typography.titleLarge, color = UserInk)
-                    Text("${apps.size} total", style = MaterialTheme.typography.bodySmall, color = UserMuted)
-                }
+                Box(modifier = Modifier.weight(1f))
             }
             ToolbarCircleButton(onClick = onRefreshApps, enabled = !refreshing) {
                 Icon(
@@ -252,22 +250,18 @@ private fun AppsToolbar(
             }
         }
         if (!searchExpanded) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                MyAppsQuickFilter.entries.chunked(2).forEach { filters ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        filters.forEach { filter ->
-                            AppFilterBanner(
-                                filter = filter,
-                                selected = selected == filter,
-                                count = filter.count(apps, groups),
-                                onClick = { onSelected(filter) },
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
-                    }
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                items(MyAppsQuickFilter.entries) { filter ->
+                    AppFilterBanner(
+                        filter = filter,
+                        selected = selected == filter,
+                        count = filter.count(apps, groups),
+                        onClick = { onSelected(filter) },
+                        modifier = Modifier.width(148.dp),
+                    )
                 }
             }
         }
@@ -312,7 +306,6 @@ private fun AppFilterBanner(
     Box(
         modifier =
             modifier
-                .fillMaxWidth()
                 .height(54.dp)
                 .clip(shape)
                 .background(if (selected) Color(0xFFE9EEF0) else Color.White, shape)
@@ -334,10 +327,7 @@ private fun AppFilterBanner(
             Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
                 Text(
                     filter.label,
-                    style =
-                        MaterialTheme.typography.labelLarge.copy(
-                            fontSize = if (filter == MyAppsQuickFilter.InGroup) 11.sp else 13.sp,
-                        ),
+                    style = MaterialTheme.typography.labelLarge,
                     color = UserInk,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
