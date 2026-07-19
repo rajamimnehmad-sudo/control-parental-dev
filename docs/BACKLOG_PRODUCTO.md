@@ -150,6 +150,7 @@ Flujo de una entrada:
 | APP-UPDATE-CHANGELOG-01 | Idea | P2 | Mostrar en Usuario y Admin las novedades especificas de la actualizacion ofrecida | M | Medio |
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 248; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado DEV 241 y hotfix de visualizacion 2026-07-18; pendiente prueba funcional autenticada | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
+| SUPERADMIN-ADMIN-RELINK-01 | Idea | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
@@ -215,6 +216,26 @@ Flujo de una entrada:
 - Seguridad: sin SQL sobre `encrypted_password`, sin Service Role en navegador, sin secretos nuevos y sin acceso para usuarios Auth que no sean Super Admin. Site URL y redirects fueron corregidos solo en `syeycayasyufedwoprea`.
 - Diagnostico: el Super Admin DEV sigue activo, confirmado, no bloqueado y con contraseña configurada. Auth registra una actualizacion el 2026-07-17 y el ultimo login exitoso el 2026-07-12, pero la auditoria Auth esta vacia. La causa demostrada del acceso actual es HTTP 402 de Auth por `exceed_egress_quota` y `exceed_cached_egress_quota`; Login y recovery fallan antes de validar la contraseña. La interfaz publicada ya lo informa sin atribuirlo a credenciales.
 - Aceptacion: solicitar desde el Login, recibir el correo, abrir un enlace valido una sola vez, guardar contraseña nueva, cerrar sesiones previas e ingresar nuevamente; enlaces vencidos y usuarios no autorizados fallan cerrados.
+
+### SUPERADMIN-ADMIN-RELINK-01 - Reenlace de un administrador existente
+
+- Estado: `Idea`; no aprobado para codigo ni cambios de datos. Tipo: recuperacion de acceso, activacion y seguridad Super Admin. Prioridad: P1.
+- Problema: si App Admin pierde o elimina su activacion local, el administrador puede quedar sin acceso aunque su identidad, comunidad y permisos sigan vigentes. Crear otro administrador produciria duplicados y fragmentaria la auditoria.
+- Solucion propuesta: desde la tarjeta del administrador existente en Superweb, ofrecer `Volver a enlazar` y generar un token nuevo, de un solo uso y vencimiento corto, asociado exactamente a ese administrador y comunidad. App Admin usa ese token para recuperar el vinculo sin crear otra identidad administrativa.
+- Evidencia: propuesta explicita del usuario del 2026-07-18.
+- Esfuerzo: M estimado. Riesgo: alto; un token emitido para la identidad equivocada, reutilizable o que no revoque correctamente el acceso anterior podria habilitar dos dispositivos no autorizados o tomar control de una comunidad.
+- Dependencias: `SUPERADMIN-TOKEN-01`; tarjeta de Admin en Superweb; activacion App Admin; hash y vencimiento de codigos; sesiones/tokens de dispositivo anteriores; licencia y pertenencia a comunidad; auditoria y revocacion.
+- Duplicados y relacion: seguimiento de `SUPERADMIN-TOKEN-01`, que cubre creacion y revocacion de tokens pendientes. No lo reabre porque este caso recupera un administrador ya existente y conserva su identidad.
+- Criterios de aceptacion propuestos:
+  - la accion aparece en la tarjeta del administrador correcto y muestra claramente comunidad y estado actual;
+  - el token solo puede activar App Admin para ese administrador, se visualiza una vez, vence y no puede reutilizarse;
+  - reenlazar conserva identidad, comunidad, permisos y auditoria, sin crear otra fila de administrador;
+  - la politica definida para el acceso anterior se aplica atomicamente: se revoca o se conserva de forma explicita, nunca por accidente;
+  - generar, revocar, vencer, usar y volver a generar quedan auditados sin almacenar el token en claro;
+  - un Super Admin no autorizado, un administrador común o un usuario anonimo no puede emitir ni consultar el token;
+  - errores de red o activacion no consumen falsamente el token ni dejan dos estados contradictorios;
+  - no se borra comunidad, usuarios protegidos, reglas, solicitudes, licencias ni historial operativo.
+- Decisiones pendientes para la entrevista del ticket: definicion exacta de `desvinculado`; si un Admin puede tener uno o varios dispositivos; revocacion inmediata del token/dispositivo anterior; duracion del token; confirmacion reforzada; aviso al administrador; comportamiento offline y tratamiento de una sesion antigua que reaparece.
 
 ### UI-BANNER-UNIFY-01 - Feedback premium compartido
 
