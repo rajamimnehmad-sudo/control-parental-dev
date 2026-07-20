@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-20:
 
 ```text
-App Usuario versionCode 264
-App Admin versionCode 264
+App Usuario versionCode 265
+App Admin versionCode 265
 versionName 1.0.1-dev
 ```
 
@@ -68,24 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-264-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-264-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-265-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-265-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 8513a03ce9eba9bb40344a13451ad4651f9da9017b822418783c6de0d35feea8
-Admin   c11f526866e6ac4d9de38fad452d1b174cd4e7d0f0d5b1c766ede3c6c17677ea
+Usuario 07b8749b37ea07aa03fd4eae192adac384ca973c68d823afcb4a578b95a6f5f3
+Admin   2838a6bf20f66ee46d921c7f72d6b54c9a9693780161563430e1ea9273392112
 ```
 
-## Candidato UX posterior a DEV 264 - no publicado - 2026-07-20
+## Publicacion DEV 265 - pulido de Usuarios, iconos y novedades instaladas - 2026-07-20
 
 - Ambas apps agregan `Ver novedades` en texto azul junto a la version instalada. La comprobacion conserva el manifiesto tambien cuando la version ya esta al dia, por lo que las notas de la ultima version pueden abrirse y cerrarse sin fingir una actualizacion disponible.
 - La campana compartida se redibuja como un contorno mas limpio. En Home Admin, `Estado de proteccion de usuarios` usa un escudo con check o alerta y conserva el contador de problemas.
 - `Agregar usuario` desde Home Admin abre directamente la ventana de alta dentro de Usuarios. La lista elimina las metricas redundantes y las etiquetas extensas: cada fila es mas compacta y muestra solo una luz verde cuando la proteccion esta completa o amarilla cuando requiere atencion.
 - El detalle de Usuario Admin sigue el flujo aprobado: resumen expandible de Proteccion arriba; selector Aplicaciones/Web; en Aplicaciones, primero configuracion global, luego Grupos y finalmente todas las apps; detalles tecnicos de proteccion separados; y `Mas opciones` al final para desinstalacion temporal, reenlace, codigo de emergencia y archivo reversible. Tocar nuevamente Proteccion cierra su detalle.
-- El candidato conserva `versionCode` 264. No se genero ni publico una nueva version, no se instalo en un telefono, no se uso Supabase, no se toco Production y no se modificaron datos ni secretos.
+- Cambios funcionales en `cc70182`; version y notas separadas por app en `98520d0`. La validacion local previa completo tests de `core-update`, Usuario y Admin, mas `assembleDevDebug` de ambas apps: 768 tareas correctas. El workflow `Publicar APKs DEV` `29714909406` publico una sola vez exclusivamente en Supabase DEV y `Android CI` `29714909416` aprobo build, tests, ktlint, Android Lint y Detekt.
+- Los APK publicos se descargaron nuevamente: Usuario mide 51.874.434 bytes y Admin 28.423.580 bytes; sus SHA-256 coinciden con los manifiestos. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, version 265; `apksigner` confirma en ambos el certificado `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- No se instalo DEV 265 en un telefono. No se tocaron Production, datos, tablas ni secretos; la unica mutacion externa fue la publicacion autorizada en Storage DEV.
 
 ## Publicacion DEV 264 - reenlace seguro, novedades, comunicacion e iconos oficiales - 2026-07-20
 
