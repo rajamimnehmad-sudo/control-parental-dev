@@ -53,11 +53,11 @@ Flujo de una entrada:
 
 ### ANNOUNCEMENTS-INBOX-UX-02 - Lectura y ocultado por dispositivo
 
-- Estado: `Candidato posterior a DEV 262; backend DEV pendiente de aplicar y sin publicacion Android`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX y comunicacion operativa. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Candidato posterior a DEV 262; backend DEV aplicado y sin publicacion Android`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX y comunicacion operativa. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: en Usuario y Admin se quita el refresco manual, la bandeja carga al abrir, los avisos no leidos se distinguen en negrita, abrirlos apaga el contador rojo y cada fila se puede ocultar deslizando a la izquierda con opcion de deshacer. La campanita pasa al icono de contorno compartido.
 - Regla de producto: ocultar afecta solo a ese dispositivo; no archiva, borra ni modifica el aviso de Superweb para otros equipos. El contador representa avisos no leidos, no el total historico disponible.
 - Arquitectura: recibos por `(device_id, announcement_id)` detras de RLS y RPC autenticadas con token de dispositivo; Android no tiene escritura directa ni secretos. El RPC de listado anterior permanece intacto para APK publicados.
-- Aceptacion local: ktlint, compilacion, tests DEV, Android Lint vital y ensamblado local de ambas apps correctos. Pendiente autorizar el llavero local para aplicar y verificar la migracion exclusivamente en Supabase DEV, probar el ciclo real en dispositivo y publicarlo mas adelante junto con el resto de cambios aprobados.
+- Aceptacion: ktlint, compilacion, tests DEV, Android Lint, Detekt y ensamblado local de ambas apps correctos; Android CI correcto y publicacion omitida. La migracion esta aplicada y verificada exclusivamente en Supabase DEV con 0 recibos iniciales y sin tocar datos existentes. Pendiente probar el ciclo real en dispositivo y publicarlo mas adelante junto con el resto de cambios aprobados.
 
 ### USER-HOME-UX-03 - Home dinamico de App Usuario
 
@@ -169,7 +169,7 @@ Flujo de una entrada:
 | SUPERWEB-VERSION-01 | Idea | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | UI-BANNER-DYNAMIC-02 | Publicado DEV 261; pulido sutil candidato posterior a DEV 262 | P1 | Línea de estado sin fondo ni X; desaparece sin hueco y el error persiste junto a la acción | M | Medio |
-| ANNOUNCEMENTS-INBOX-UX-02 | Candidato posterior a DEV 262; backend DEV pendiente y sin publicación Android | P2 | Avisos leídos/no leídos, contador real y ocultado por dispositivo con deshacer | M | Medio |
+| ANNOUNCEMENTS-INBOX-UX-02 | Candidato posterior a DEV 262; backend DEV aplicado y sin publicación Android | P2 | Avisos leídos/no leídos, contador real y ocultado por dispositivo con deshacer | M | Medio |
 | ADMIN-UX-NAV-HOME-01 | Publicado DEV 261; pendiente recorrido físico completo | P1 | Navegación Home/Usuarios/Solicitudes/Cuenta y Home orientado a salud, licencia y avisos Superweb | M | Medio |
 | ADMIN-USERS-UX-02 | Publicado DEV 261; cierre visual físico parcial | P1 | Detalle con Protección siempre visible, Apps/Web y grupos dentro de Aplicaciones | L | Alto |
 | USER-ARCHIVE-RESTORE-02 | Implementado y validado para archivos nuevos; 2 legados quedan bloqueados a revisión por falta de snapshot | P1 | Usuarios anteriores, archivo reversible, restauración y reenlace seguro con token nuevo | L | Alto |
