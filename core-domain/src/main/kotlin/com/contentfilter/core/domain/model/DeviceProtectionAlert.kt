@@ -4,6 +4,8 @@ object DeviceProtectionAlert {
     const val WebDisabled = "Protección web desactivada en este dispositivo."
     const val AppsDisabled = "Protección de apps desactivada en este dispositivo."
     const val AdminDisabled = "Protección contra desinstalación desactivada en este dispositivo."
+    const val PossibleUninstall = "ALERTA MÁXIMA · App Usuario posiblemente desinstalada."
+    const val PossibleUninstallWindowMillis = 30L * 60L * 1000L
 
     fun fromStates(
         vpnState: ComponentState,
@@ -16,4 +18,13 @@ object DeviceProtectionAlert {
             deviceAdminState == ComponentState.Disabled -> AdminDisabled
             else -> null
         }
+
+    fun isPossibleUninstall(
+        deviceAdminState: ComponentState,
+        lastSeenAtEpochMillis: Long?,
+        nowEpochMillis: Long = System.currentTimeMillis(),
+    ): Boolean =
+        deviceAdminState == ComponentState.Disabled &&
+            lastSeenAtEpochMillis != null &&
+            nowEpochMillis - lastSeenAtEpochMillis > PossibleUninstallWindowMillis
 }

@@ -17,6 +17,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -38,6 +39,7 @@ import com.contentfilter.admin.dashboard.DashboardViewModel
 internal fun SettingsTab(
     onPanel: () -> Unit,
     onUpdates: () -> Unit,
+    onHelp: () -> Unit,
 ) {
     val dashboardViewModel: DashboardViewModel = hiltViewModel()
     val state by dashboardViewModel.uiState.collectAsStateWithLifecycle()
@@ -89,6 +91,13 @@ internal fun SettingsTab(
                 subtitle = "Buscar versión y cambiar administrador local",
                 accent = Sun,
                 onClick = onUpdates,
+            )
+            FeatureTile(
+                icon = Icons.Filled.Search,
+                title = "Ayuda",
+                subtitle = "Asistente interactivo según el estado actual",
+                accent = Violet,
+                onClick = onHelp,
             )
         }
         Row(

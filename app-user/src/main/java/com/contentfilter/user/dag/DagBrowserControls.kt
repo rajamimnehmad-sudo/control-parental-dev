@@ -167,16 +167,16 @@ internal fun DagTabSwitcher(
             color = MaterialTheme.colorScheme.surface,
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
                     Column {
                         Text("Pestañas recientes", style = MaterialTheme.typography.titleLarge)
                         Text("${tabs.size} de $MaximumTabs", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Row {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
                         TextButton(onClick = onCloseAll, enabled = tabs.size > 1) { Text("Cerrar todas") }
                         TextButton(
                             onClick = onNew,

@@ -1,6 +1,7 @@
 package com.contentfilter.core.security
 
 import com.contentfilter.core.domain.model.DeviceProtectionControl
+import com.contentfilter.core.domain.model.RecoveryCodeVerifier
 import kotlin.test.Test
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
@@ -24,6 +25,14 @@ class RecoveryMaterialChangeTest {
     @Test
     fun firstControlStartsWithCleanAttemptState() {
         assertTrue(recoveryMaterialChanged(null, control(revision = 1)))
+    }
+
+    @Test
+    fun rotatingOfflineKitResetsAttemptState() {
+        val previous = control(revision = 3)
+        val kit = listOf(RecoveryCodeVerifier(slot = 0, salt = "kit-salt", verifier = "kit-verifier"))
+
+        assertTrue(recoveryMaterialChanged(previous, previous.copy(recoveryKitRevision = 1, recoveryKit = kit)))
     }
 
     private fun control(

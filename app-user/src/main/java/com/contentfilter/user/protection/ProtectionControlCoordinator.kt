@@ -33,14 +33,16 @@ class ProtectionControlCoordinator
                     return Result.failure(it)
                 } ?: return Result.success(Unit)
             stateStore.saveControl(control)
-            val consumedRevision = stateStore.pendingRecoveryConsumedRevision()
+            val consumption = stateStore.pendingRecoveryConsumption()
             return remoteRepository
                 .acknowledge(
                     deviceId = activation.deviceId,
                     commandRevision = control.commandRevision,
-                    recoveryConsumedRevision = consumedRevision,
+                    recoveryConsumedRevision = consumption?.legacyRevision,
+                    recoveryKitRevision = consumption?.kitRevision,
+                    recoveryConsumedSlots = consumption?.consumedSlots.orEmpty(),
                 ).onSuccess {
-                    consumedRevision?.let(stateStore::markRecoveryConsumptionAcknowledged)
+                    consumption?.let(stateStore::markRecoveryConsumptionAcknowledged)
                 }
         }
     }

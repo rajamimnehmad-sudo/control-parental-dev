@@ -208,50 +208,26 @@ private fun AppsToolbar(
             keyboardController?.show()
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (searchExpanded) {
-                OutlinedTextField(
-                    modifier =
-                        Modifier
-                            .weight(1f)
-                            .focusRequester(focusRequester),
-                    value = searchQuery,
-                    onValueChange = onSearchChanged,
-                    label = { Text("Buscar app") },
-                    leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                    singleLine = true,
-                )
-            } else {
-                Box(modifier = Modifier.weight(1f))
-            }
-            ToolbarCircleButton(onClick = onRefreshApps, enabled = !refreshing) {
-                Icon(
-                    Icons.Filled.Refresh,
-                    contentDescription = "Actualizar",
-                    tint = if (refreshing) UserMuted.copy(alpha = 0.45f) else UserMuted,
-                    modifier =
-                        Modifier
-                            .size(22.dp)
-                            .graphicsLayer { if (refreshing) rotationZ = 20f },
-                )
-            }
-            ToolbarCircleButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
-                Icon(
-                    Icons.Filled.Search,
-                    contentDescription = "Buscar app",
-                    tint = UserInk,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        }
-        if (!searchExpanded) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (searchExpanded) {
+            OutlinedTextField(
+                modifier =
+                    Modifier
+                        .weight(1f)
+                        .focusRequester(focusRequester),
+                value = searchQuery,
+                onValueChange = onSearchChanged,
+                label = { Text("Buscar app") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                singleLine = true,
+            )
+        } else {
             LazyRow(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.weight(1f),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 items(MyAppsQuickFilter.entries) { filter ->
@@ -264,6 +240,25 @@ private fun AppsToolbar(
                     )
                 }
             }
+        }
+        ToolbarCircleButton(onClick = onRefreshApps, enabled = !refreshing) {
+            Icon(
+                Icons.Filled.Refresh,
+                contentDescription = "Actualizar",
+                tint = if (refreshing) UserMuted.copy(alpha = 0.45f) else UserMuted,
+                modifier =
+                    Modifier
+                        .size(22.dp)
+                        .graphicsLayer { if (refreshing) rotationZ = 20f },
+            )
+        }
+        ToolbarCircleButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
+            Icon(
+                Icons.Filled.Search,
+                contentDescription = "Buscar app",
+                tint = UserInk,
+                modifier = Modifier.size(22.dp),
+            )
         }
     }
 }

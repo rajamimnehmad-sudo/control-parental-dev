@@ -1,6 +1,7 @@
 package com.contentfilter.admin.dashboard
 
 import com.contentfilter.core.domain.model.ComponentState
+import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.LicenseState
 
 data class DashboardUiState(
@@ -21,6 +22,9 @@ data class DashboardUiState(
 
     val usersPendingVerification: List<ProtectedUserHealthUiState>
         get() = protectedUsers.filter(ProtectedUserHealthUiState::requiresVerification)
+
+    val usersWithPossibleUninstall: List<ProtectedUserHealthUiState>
+        get() = protectedUsers.filter(ProtectedUserHealthUiState::possibleUninstall)
 
     val activeUserCount: Int
         get() = protectedUsers.count(ProtectedUserHealthUiState::isRecentlySeen)
@@ -45,6 +49,13 @@ data class ProtectedUserHealthUiState(
 
     val hasConfirmedProblem: Boolean
         get() = vpnProblem || accessibilityProblem || deviceAdminProblem
+
+    val possibleUninstall: Boolean
+        get() =
+            DeviceProtectionAlert.isPossibleUninstall(
+                deviceAdminState = deviceAdminState,
+                lastSeenAtEpochMillis = lastSeenAtEpochMillis,
+            )
 
     val isRecentlySeen: Boolean
         get() =

@@ -76,8 +76,6 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
-import com.contentfilter.core.ui.ProductGlyph
-import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductLazyVisualPage
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.ProgressActionButton
@@ -770,7 +768,12 @@ private fun ProtectedUserCard(
     var confirmDelete by remember { mutableStateOf(false) }
     var actionsExpanded by remember { mutableStateOf(false) }
     val healthy = device.status == UserDeviceStatus.Active && device.protectionComplete
-    val statusColor = if (healthy) ActiveGreen else PendingYellow
+    val statusColor =
+        when {
+            device.possibleUninstall -> CriticalRed
+            healthy -> ActiveGreen
+            else -> PendingYellow
+        }
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -795,8 +798,8 @@ private fun ProtectedUserCard(
                 Text(
                     text = device.listSummary(healthy),
                     style = MaterialTheme.typography.bodySmall,
-                    color = HeaderMuted,
-                    maxLines = 1,
+                    color = if (device.possibleUninstall) CriticalRed else HeaderMuted,
+                    maxLines = 2,
                 )
             }
             Box(modifier = Modifier.size(10.dp).background(statusColor, CircleShape))
@@ -957,7 +960,11 @@ private val UserDeviceStatus.label: String
         }
 
 private fun UserDeviceUiState.detailHealthColor(): Color =
-    if (status == UserDeviceStatus.Active && protectionComplete) ActiveGreen else PendingYellow
+    when {
+        possibleUninstall -> CriticalRed
+        status == UserDeviceStatus.Active && protectionComplete -> ActiveGreen
+        else -> PendingYellow
+    }
 
 private fun UserDeviceUiState.detailAttentionSummary(): String =
     protectionAlert
@@ -972,6 +979,7 @@ private val AdminSurface = Color(0xFFF2F8F7)
 internal val HeaderInk = Color(0xFF162235)
 internal val HeaderMuted = Color(0xFF68758A)
 internal val ActiveGreen = Color(0xFF00A650)
+internal val CriticalRed = Color(0xFFB00020)
 private val PendingYellow = Color(0xFFFFC849)
 
 private fun lerpDp(
@@ -1324,21 +1332,21 @@ private fun UserDetailContent(
                             onArmProtection = { onProtectionArmedChanged(selectedDevice.id, true) },
                         )
                     }
-                }
-            }
-            if (entryMode == RulesEntryMode.ManageUsers) {
-                item(key = "advanced-options-${selectedDevice.id}") {
-                    AdvancedUserOptions(
-                        state = state,
-                        device = selectedDevice,
-                        clipboardManager = LocalClipboardManager.current,
-                        onAuthorizeRemoval = { onAuthorizeRemoval(selectedDevice.id) },
-                        onGenerateRecoveryCode = { onGenerateRecoveryCode(selectedDevice.id) },
-                        onRecoveryCodeCopied = onRecoveryCodeCopied,
-                        onGenerateRelinkCode = { onGenerateRelinkCode(selectedDevice.id) },
-                        onRelinkCodeCopied = onRelinkCodeCopied,
-                        onArchiveUser = onArchiveUser,
-                    )
+                    if (entryMode == RulesEntryMode.ManageUsers) {
+                        item(key = "advanced-options-${selectedDevice.id}") {
+                            AdvancedUserOptions(
+                                state = state,
+                                device = selectedDevice,
+                                clipboardManager = LocalClipboardManager.current,
+                                onAuthorizeRemoval = { onAuthorizeRemoval(selectedDevice.id) },
+                                onGenerateRecoveryCode = { onGenerateRecoveryCode(selectedDevice.id) },
+                                onRecoveryCodeCopied = onRecoveryCodeCopied,
+                                onGenerateRelinkCode = { onGenerateRelinkCode(selectedDevice.id) },
+                                onRelinkCodeCopied = onRelinkCodeCopied,
+                                onArchiveUser = onArchiveUser,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -1550,7 +1558,6 @@ private fun UserDetailHeader(
     val headerGap = lerpDp(14.dp, 10.dp, collapseProgress)
     val iconSize = lerpDp(44.dp, 40.dp, collapseProgress)
     val titleGap = lerpDp(4.dp, 2.dp, collapseProgress)
-    val tabShape = lerpDp(22.dp, 18.dp, collapseProgress)
     Column(
         verticalArrangement = Arrangement.spacedBy(headerGap),
     ) {
@@ -1606,96 +1613,54 @@ private fun UserDetailHeader(
             }
         }
         if (entryMode != RulesEntryMode.Web) {
-            ProtectionSummaryCard(
+            GlassDetailSectionSelector(
                 device = device,
-                selected = selectedPanel == DevicePanel.Protection,
-                onClick = {
-                    onPanelSelected(
-                        if (selectedPanel == DevicePanel.Protection) DevicePanel.Apps else DevicePanel.Protection,
-                    )
-                },
+                selectedPanel = selectedPanel,
+                collapseProgress = collapseProgress,
+                onPanelSelected = onPanelSelected,
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DetailSegmentButton(
-                    modifier = Modifier.weight(1f),
-                    text = "Aplicaciones",
-                    selected = selectedPanel == DevicePanel.Apps || selectedPanel == DevicePanel.AppGroups,
-                    shape = RoundedCornerShape(tabShape),
-                    onClick = { onPanelSelected(DevicePanel.Apps) },
-                )
-                DetailSegmentButton(
-                    modifier = Modifier.weight(1f),
-                    text = "Web",
-                    selected = selectedPanel == DevicePanel.Web,
-                    shape = RoundedCornerShape(tabShape),
-                    onClick = { onPanelSelected(DevicePanel.Web) },
-                )
-            }
         }
     }
 }
 
 @Composable
-private fun ProtectionSummaryCard(
+private fun GlassDetailSectionSelector(
     device: UserDeviceUiState,
-    selected: Boolean,
-    onClick: () -> Unit,
+    selectedPanel: DevicePanel,
+    collapseProgress: Float,
+    onPanelSelected: (DevicePanel) -> Unit,
 ) {
-    val healthy = device.status == UserDeviceStatus.Active && device.protectionComplete
-    val statusColor = if (healthy) ActiveGreen else PendingYellow
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors =
-            CardDefaults.cardColors(
-                containerColor =
-                    if (selected) {
-                        MaterialTheme.colorScheme.primaryContainer
-                    } else {
-                        Color.White
-                    },
-            ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    val outerRadius = lerpDp(24.dp, 20.dp, collapseProgress)
+    val shape = RoundedCornerShape(outerRadius)
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clip(shape)
+                .background(Color.White.copy(alpha = 0.7f), shape)
+                .border(1.dp, Color.White.copy(alpha = 0.94f), shape)
+                .horizontalScroll(rememberScrollState())
+                .padding(5.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier = Modifier.size(42.dp).background(statusColor.copy(alpha = 0.14f), RoundedCornerShape(13.dp)),
-                contentAlignment = Alignment.Center,
-            ) {
-                ProductGlyph(
-                    icon = if (healthy) ProductIcon.ShieldCheck else ProductIcon.ShieldAlert,
-                    color = statusColor,
-                    modifier = Modifier.size(27.dp),
-                )
-            }
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                Text(
-                    if (healthy) "Protección completa" else "Protección por revisar",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = HeaderInk,
-                )
-                Text(
-                    text = if (healthy) "VPN, Accesibilidad y antidesinstalación activas" else device.detailAttentionSummary(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = HeaderMuted,
-                    maxLines = 2,
-                )
-            }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = if (selected) "Cerrar protección" else "Ver protección",
-                tint = statusColor,
-            )
-        }
+        DetailSegmentButton(
+            text = "Apps",
+            selected = selectedPanel == DevicePanel.Apps || selectedPanel == DevicePanel.AppGroups,
+            onClick = { onPanelSelected(DevicePanel.Apps) },
+        )
+        DetailSegmentButton(
+            text = "Web",
+            selected = selectedPanel == DevicePanel.Web,
+            onClick = { onPanelSelected(DevicePanel.Web) },
+        )
+        DetailSegmentButton(
+            text = "Seguridad",
+            selected = selectedPanel == DevicePanel.Protection,
+            attention = !device.protectionComplete || device.status != UserDeviceStatus.Active,
+            critical = device.possibleUninstall,
+            onClick = { onPanelSelected(DevicePanel.Protection) },
+        )
     }
 }
 
@@ -1703,28 +1668,45 @@ private fun ProtectionSummaryCard(
 private fun DetailSegmentButton(
     text: String,
     selected: Boolean,
-    shape: RoundedCornerShape,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier,
+    attention: Boolean = false,
+    critical: Boolean = false,
 ) {
-    Card(
-        modifier = modifier,
-        onClick = onClick,
-        shape = shape,
-        colors =
-            CardDefaults.cardColors(
-                containerColor = if (selected) HeaderInk else Color.White,
-            ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    val shape = RoundedCornerShape(18.dp)
+    val selectedColor = if (critical) CriticalRed else HeaderInk
+    Row(
+        modifier =
+            Modifier
+                .width(116.dp)
+                .clip(shape)
+                .background(
+                    color = if (selected) selectedColor else Color.White.copy(alpha = 0.42f),
+                    shape = shape,
+                ).clickable(onClick = onClick)
+                .padding(horizontal = 12.dp, vertical = 11.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier = Modifier.fillMaxWidth().padding(vertical = 11.dp),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                color = if (selected) Color.White else HeaderInk,
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) Color.White else HeaderInk,
+        )
+        if (attention) {
+            Box(
+                modifier =
+                    Modifier
+                        .padding(start = 7.dp)
+                        .size(7.dp)
+                        .background(
+                            color =
+                                when {
+                                    selected -> Color.White
+                                    critical -> CriticalRed
+                                    else -> PendingYellow
+                                },
+                            shape = CircleShape,
+                        ),
             )
         }
     }

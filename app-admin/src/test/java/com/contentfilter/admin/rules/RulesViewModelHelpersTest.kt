@@ -3,6 +3,7 @@ package com.contentfilter.admin.rules
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
+import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
@@ -512,6 +513,31 @@ class RulesViewModelHelpersTest {
 
         assertEquals(UserDeviceStatus.Active, listOf(recent).toUserDevices(emptyList()).single().status)
         assertEquals(UserDeviceStatus.Inactive, listOf(offline).toUserDevices(emptyList()).single().status)
+    }
+
+    @Test
+    fun `stale device with uninstall protection disabled gets maximum alert`() {
+        val device =
+            healthyDevice(
+                System.currentTimeMillis() - OfflineDeviceWindowMillis - 60_000L,
+            ).copy(deviceAdminState = ComponentState.Disabled)
+
+        val user = listOf(device).toUserDevices(emptyList()).single()
+
+        assertTrue(user.possibleUninstall)
+        assertEquals(DeviceProtectionAlert.PossibleUninstall, user.protectionAlert)
+    }
+
+    @Test
+    fun `web preference matching reconciles an already applied DAG change`() {
+        assertTrue(
+            preferences(webBlocked = false, dagEnabled = true)
+                .matchesPreference(WebPolicyPreference.DagEnabled, true),
+        )
+        assertFalse(
+            preferences(webBlocked = false, dagEnabled = false)
+                .matchesPreference(WebPolicyPreference.DagEnabled, true),
+        )
     }
 
     private fun healthyDevice(lastSeenAtEpochMillis: Long) =

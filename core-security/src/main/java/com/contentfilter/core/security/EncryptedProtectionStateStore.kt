@@ -5,7 +5,9 @@ import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
 import com.contentfilter.core.domain.model.DeviceProtectionControl
+import com.contentfilter.core.domain.model.PendingRecoveryConsumption
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
+import com.contentfilter.core.domain.model.RecoveryCodeVerifier
 import com.contentfilter.core.domain.model.RecoveryUnlockResult
 import com.contentfilter.core.domain.repository.ProtectionStateStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -44,13 +46,25 @@ class EncryptedProtectionStateStore
         @Synchronized
         override fun saveControl(control: DeviceProtectionControl) {
             val consumed = maxOf(state.pendingRecoveryConsumedRevision ?: 0, control.recoveryConsumedRevision)
+            val sameKit = state.control?.recoveryKitRevision == control.recoveryKitRevision
+            val pendingKitSlots = if (sameKit) state.pendingRecoveryKitConsumedSlots else emptySet()
+            val consumedKitSlots = control.recoveryConsumedSlots + pendingKitSlots
             val recoveryChanged = recoveryMaterialChanged(state.control, control)
             persist(
                 state.copy(
-                    control = control.copy(recoveryConsumedRevision = consumed),
+                    control =
+                        control.copy(
+                            recoveryConsumedRevision = consumed,
+                            recoveryConsumedSlots = consumedKitSlots,
+                        ),
                     failedAttempts = if (recoveryChanged) 0 else state.failedAttempts,
                     lockedUntilEpochMillis = if (recoveryChanged) null else state.lockedUntilEpochMillis,
                     pendingRecoveryConsumedRevision = consumed.takeIf { it > control.recoveryConsumedRevision },
+                    pendingRecoveryKitRevision =
+                        control.recoveryKitRevision.takeIf {
+                            pendingKitSlots.any { slot -> slot !in control.recoveryConsumedSlots }
+                        },
+                    pendingRecoveryKitConsumedSlots = pendingKitSlots - control.recoveryConsumedSlots,
                 ),
             )
         }
@@ -93,12 +107,44 @@ class EncryptedProtectionStateStore
             }
             val control = current.control
             if (control == null || !control.hasAvailableRecovery) return RecoveryUnlockResult.Unavailable
-            val matches =
-                recoveryCodeHasher.matches(
-                    rawCode = code,
-                    salt = requireNotNull(control.recoverySalt),
-                    expectedVerifier = requireNotNull(control.recoveryVerifier),
+            val matchedKitSlot =
+                control.recoveryKit
+                    .asSequence()
+                    .filter { it.slot !in control.recoveryConsumedSlots }
+                    .firstOrNull { material ->
+                        recoveryCodeHasher.matches(
+                            rawCode = code,
+                            salt = material.salt,
+                            expectedVerifier = material.verifier,
+                        )
+                    }
+            if (matchedKitSlot != null) {
+                val validUntil = nowEpochMillis + RecoveryAuthorizationMillis
+                val consumedSlots = control.recoveryConsumedSlots + matchedKitSlot.slot
+                persist(
+                    current.copy(
+                        failedAttempts = 0,
+                        lockedUntilEpochMillis = null,
+                        localRemovalUntilEpochMillis = validUntil,
+                        pendingRecoveryKitRevision = control.recoveryKitRevision,
+                        pendingRecoveryKitConsumedSlots =
+                            current.pendingRecoveryKitConsumedSlots + matchedKitSlot.slot,
+                        control = control.copy(recoveryConsumedSlots = consumedSlots),
+                    ),
                 )
+                return RecoveryUnlockResult.Unlocked(validUntil)
+            }
+            val legacySalt = control.recoverySalt
+            val legacyVerifier = control.recoveryVerifier
+            val matches =
+                control.recoveryRevision > control.recoveryConsumedRevision &&
+                    !legacySalt.isNullOrBlank() &&
+                    !legacyVerifier.isNullOrBlank() &&
+                    recoveryCodeHasher.matches(
+                        rawCode = code,
+                        salt = legacySalt,
+                        expectedVerifier = legacyVerifier,
+                    )
             if (matches) {
                 val validUntil = nowEpochMillis + RecoveryAuthorizationMillis
                 persist(
@@ -122,13 +168,30 @@ class EncryptedProtectionStateStore
             return RecoveryUnlockResult.Invalid(MaxAttempts - attempts)
         }
 
-        override fun pendingRecoveryConsumedRevision(): Long? = state.pendingRecoveryConsumedRevision
+        override fun pendingRecoveryConsumption(): PendingRecoveryConsumption? {
+            val current = state
+            if (current.pendingRecoveryConsumedRevision == null && current.pendingRecoveryKitConsumedSlots.isEmpty()) return null
+            return PendingRecoveryConsumption(
+                legacyRevision = current.pendingRecoveryConsumedRevision,
+                kitRevision = current.pendingRecoveryKitRevision,
+                consumedSlots = current.pendingRecoveryKitConsumedSlots,
+            )
+        }
 
         @Synchronized
-        override fun markRecoveryConsumptionAcknowledged(revision: Long) {
-            if (state.pendingRecoveryConsumedRevision == revision) {
-                persist(state.copy(pendingRecoveryConsumedRevision = null))
-            }
+        override fun markRecoveryConsumptionAcknowledged(consumption: PendingRecoveryConsumption) {
+            val remainingKitSlots = state.pendingRecoveryKitConsumedSlots - consumption.consumedSlots
+            persist(
+                state.copy(
+                    pendingRecoveryConsumedRevision =
+                        state.pendingRecoveryConsumedRevision.takeUnless { it == consumption.legacyRevision },
+                    pendingRecoveryKitRevision =
+                        state.pendingRecoveryKitRevision.takeUnless {
+                            it == consumption.kitRevision && remainingKitSlots.isEmpty()
+                        },
+                    pendingRecoveryKitConsumedSlots = remainingKitSlots,
+                ),
+            )
         }
 
         @Synchronized
@@ -201,6 +264,8 @@ class EncryptedProtectionStateStore
                 .put("locked_until", lockedUntilEpochMillis ?: JSONObject.NULL)
                 .put("local_removal_until", localRemovalUntilEpochMillis ?: JSONObject.NULL)
                 .put("pending_consumed_revision", pendingRecoveryConsumedRevision ?: JSONObject.NULL)
+                .put("pending_kit_revision", pendingRecoveryKitRevision ?: JSONObject.NULL)
+                .put("pending_kit_slots", pendingRecoveryKitConsumedSlots.toJsonArray())
                 .put("trusted_install_until", trustedInstallUntilEpochMillis ?: JSONObject.NULL)
                 .toString()
 
@@ -212,6 +277,8 @@ class EncryptedProtectionStateStore
                 lockedUntilEpochMillis = json.optNullableLong("locked_until"),
                 localRemovalUntilEpochMillis = json.optNullableLong("local_removal_until"),
                 pendingRecoveryConsumedRevision = json.optNullableLong("pending_consumed_revision"),
+                pendingRecoveryKitRevision = json.optNullableLong("pending_kit_revision"),
+                pendingRecoveryKitConsumedSlots = json.optIntSet("pending_kit_slots"),
                 trustedInstallUntilEpochMillis = json.optNullableLong("trusted_install_until"),
             )
         }
@@ -229,6 +296,9 @@ class EncryptedProtectionStateStore
                 .put("recovery_verifier", recoveryVerifier ?: JSONObject.NULL)
                 .put("recovery_revision", recoveryRevision)
                 .put("recovery_consumed_revision", recoveryConsumedRevision)
+                .put("recovery_kit_revision", recoveryKitRevision)
+                .put("recovery_kit", recoveryKit.toJsonArray())
+                .put("recovery_consumed_slots", recoveryConsumedSlots.toJsonArray())
 
         private fun JSONObject.toControl(): DeviceProtectionControl =
             DeviceProtectionControl(
@@ -243,7 +313,46 @@ class EncryptedProtectionStateStore
                 recoveryVerifier = optString("recovery_verifier").takeIf { it.isNotBlank() && it != "null" },
                 recoveryRevision = optLong("recovery_revision", 0),
                 recoveryConsumedRevision = optLong("recovery_consumed_revision", 0),
+                recoveryKitRevision = optLong("recovery_kit_revision", 0),
+                recoveryKit = optRecoveryKit("recovery_kit"),
+                recoveryConsumedSlots = optIntSet("recovery_consumed_slots"),
             )
+
+        private fun List<RecoveryCodeVerifier>.toJsonArray(): org.json.JSONArray =
+            org.json.JSONArray().also { array ->
+                forEach { material ->
+                    array.put(
+                        JSONObject()
+                            .put("slot", material.slot)
+                            .put("salt", material.salt)
+                            .put("verifier", material.verifier),
+                    )
+                }
+            }
+
+        private fun Set<Int>.toJsonArray(): org.json.JSONArray =
+            org.json.JSONArray().also { array -> sorted().forEach(array::put) }
+
+        private fun JSONObject.optRecoveryKit(key: String): List<RecoveryCodeVerifier> {
+            val array = optJSONArray(key) ?: return emptyList()
+            return buildList {
+                repeat(array.length()) { index ->
+                    val item = array.optJSONObject(index) ?: return@repeat
+                    add(
+                        RecoveryCodeVerifier(
+                            slot = item.optInt("slot", -1),
+                            salt = item.optString("salt"),
+                            verifier = item.optString("verifier"),
+                        ),
+                    )
+                }
+            }.filter { it.slot >= 0 && it.salt.isNotBlank() && it.verifier.isNotBlank() }
+        }
+
+        private fun JSONObject.optIntSet(key: String): Set<Int> {
+            val array = optJSONArray(key) ?: return emptySet()
+            return buildSet { repeat(array.length()) { add(array.optInt(it, -1)) } }.filter { it >= 0 }.toSet()
+        }
 
         private fun JSONObject.optNullableLong(key: String): Long? =
             if (isNull(key) || !has(key)) null else getLong(key)
@@ -254,6 +363,8 @@ class EncryptedProtectionStateStore
             val lockedUntilEpochMillis: Long? = null,
             val localRemovalUntilEpochMillis: Long? = null,
             val pendingRecoveryConsumedRevision: Long? = null,
+            val pendingRecoveryKitRevision: Long? = null,
+            val pendingRecoveryKitConsumedSlots: Set<Int> = emptySet(),
             val trustedInstallUntilEpochMillis: Long? = null,
         )
 
@@ -278,4 +389,6 @@ internal fun recoveryMaterialChanged(
     previous == null ||
         previous.recoveryRevision != current.recoveryRevision ||
         previous.recoverySalt != current.recoverySalt ||
-        previous.recoveryVerifier != current.recoveryVerifier
+        previous.recoveryVerifier != current.recoveryVerifier ||
+        previous.recoveryKitRevision != current.recoveryKitRevision ||
+        previous.recoveryKit != current.recoveryKit

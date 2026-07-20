@@ -37,6 +37,33 @@ internal fun ProtectionPanel(
 ) {
     val control = state.protectionControls[device.id]
     val loading = device.id in state.protectionLoadingDeviceIds
+    if (device.possibleUninstall) {
+        ProductCard {
+            StatusChip("ALERTA MÁXIMA", CriticalRed)
+            Text("App Usuario posiblemente desinstalada", style = MaterialTheme.typography.titleLarge)
+            Text(
+                "El teléfono dejó de reportar después de quedar sin protección contra desinstalación.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text("Qué hacer ahora", style = MaterialTheme.typography.titleMedium)
+            Text("1. Revisá el teléfono y buscá App Usuario.", style = MaterialTheme.typography.bodyMedium)
+            Text("2. Si no está, reinstalá el APK oficial.", style = MaterialTheme.typography.bodyMedium)
+            Text(
+                "3. En Más opciones, generá un token en Volver a enlazar.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "4. En el teléfono, activá VPN, Accesibilidad y protección contra desinstalación.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "Si sólo estaba apagado o sin Internet, la alerta se restablece sola cuando vuelve a reportar. " +
+                    "Si fue desinstalada, no se reinstala sola: requiere reinstalación y reenlace.",
+                style = MaterialTheme.typography.bodySmall,
+                color = HeaderMuted,
+            )
+        }
+    }
     ProductCard {
         Text("Estado de conexión", style = MaterialTheme.typography.titleMedium)
         Text("Última conexión: ${device.lastSeenLabel}", style = MaterialTheme.typography.bodyMedium)
@@ -249,16 +276,39 @@ private fun RecoveryOptionCard(
     ProductCard {
         Text("Recuperación sin conexión", style = MaterialTheme.typography.titleMedium)
         Text(
-            "Genera un código de un solo uso. En DEV sólo se guarda su verificador.",
+            "Prepará cinco códigos de un solo uso mientras ambos teléfonos estén conectados. " +
+                "Después podés revelar el próximo código aunque no haya Internet.",
             style = MaterialTheme.typography.bodyMedium,
+        )
+        val remaining = state.recoveryKitRemainingByDevice[deviceId] ?: 0
+        val remoteKitPrepared = state.protectionControls[deviceId]?.recoveryKit?.isNotEmpty() == true
+        Text(
+            when {
+                remaining > 0 -> "Kit listo · $remaining códigos guardados en este Admin"
+                remoteKitPrepared -> "Kit activo, pero sin códigos disponibles en este Admin"
+                else -> "Kit no preparado"
+            },
+            style = MaterialTheme.typography.bodySmall,
+            color = if (remaining > 0) ActiveGreen else HeaderMuted,
         )
         val recoveryCode = state.recoveryCodeFor(deviceId)
         if (recoveryCode.isBlank()) {
             OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onGenerateRecoveryCode) {
-                Text("Generar código de recuperación")
+                Text(
+                    when {
+                        remaining > 0 -> "Revelar próximo código"
+                        remoteKitPrepared -> "Renovar kit offline"
+                        else -> "Preparar kit offline"
+                    },
+                )
             }
         } else {
             Text(recoveryCode, style = MaterialTheme.typography.headlineSmall)
+            Text(
+                "Compartilo sólo con el usuario correcto. Vence al usarse y habilita la desinstalación durante 10 minutos.",
+                style = MaterialTheme.typography.bodySmall,
+                color = HeaderMuted,
+            )
             Button(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = {

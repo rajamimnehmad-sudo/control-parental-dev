@@ -45,6 +45,21 @@ class DashboardUiStateTest {
         assertEquals(0, state.activeUserCount)
     }
 
+    @Test
+    fun `stale telemetry after uninstall protection disabled is a possible uninstall`() {
+        val user =
+            protectedUser(
+                deviceAdminState = ComponentState.Disabled,
+                lastSeenAtEpochMillis =
+                    System.currentTimeMillis() -
+                        com.contentfilter.core.domain.model.DeviceProtectionAlert.PossibleUninstallWindowMillis -
+                        1L,
+            )
+
+        assertTrue(user.possibleUninstall)
+        assertEquals(listOf(user), DashboardUiState(protectedUsers = listOf(user)).usersWithPossibleUninstall)
+    }
+
     private fun protectedUser(
         vpnState: ComponentState = ComponentState.Enabled,
         accessibilityState: ComponentState = ComponentState.Enabled,

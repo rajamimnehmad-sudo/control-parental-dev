@@ -24,6 +24,8 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.PremiumFeedbackBanner
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductFeatureTile
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductMint
 import com.contentfilter.core.ui.ProductSky
@@ -35,6 +37,7 @@ import com.contentfilter.user.BuildConfig
 @Composable
 fun UpdatesRoute(
     onBack: (() -> Unit)? = null,
+    onHelp: () -> Unit = {},
     activationState: String = "",
     recoveryCode: String = "",
     protectionMessage: String = "",
@@ -57,6 +60,7 @@ fun UpdatesRoute(
         onPrepareAdminInstall = viewModel::prepareAdminInstall,
         onInstallAdmin = viewModel::installDownloadedAdmin,
         onBack = onBack,
+        onHelp = onHelp,
         activationState = activationState,
         recoveryCode = recoveryCode,
         protectionMessage = protectionMessage,
@@ -75,6 +79,7 @@ private fun UpdatesScreen(
     onPrepareAdminInstall: () -> Unit,
     onInstallAdmin: () -> Unit,
     onBack: (() -> Unit)?,
+    onHelp: () -> Unit,
     activationState: String,
     recoveryCode: String,
     protectionMessage: String,
@@ -137,6 +142,13 @@ private fun UpdatesScreen(
                 Text(protectionMessage, style = MaterialTheme.typography.bodyMedium)
             }
         }
+        ProductFeatureTile(
+            icon = ProductIcon.Search,
+            title = "Ayuda",
+            subtitle = "Conversá con el asistente según el estado actual",
+            accent = ProductViolet,
+            onClick = onHelp,
+        )
         ProductLargeFeatureCard(
             title = "Actualizaciones",
             subtitle = "Buscá nuevas versiones DEV y completá la instalación desde Android.",

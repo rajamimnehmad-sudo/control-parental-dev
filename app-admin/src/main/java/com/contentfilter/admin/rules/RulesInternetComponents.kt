@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -169,76 +170,76 @@ internal fun WebNavigationPanel(
     onDagEnabledChanged: (Boolean) -> Unit,
     onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
 ) {
-    ProductCard {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            InternetModeSelector(
-                blocked = blocked,
-                saving = navigationSaving,
-                onBlockedChanged = onBlockedChanged,
-            )
+    Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Acceso a Internet", style = MaterialTheme.typography.titleLarge)
+        InternetModeSelector(
+            blocked = blocked,
+            saving = navigationSaving,
+            onBlockedChanged = onBlockedChanged,
+        )
+        Text(
+            text = presentation.headline,
+            style = MaterialTheme.typography.titleSmall,
+            color = MaterialTheme.colorScheme.onSurface,
+        )
+        if (blocked) {
             Text(
-                text = presentation.headline,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
+                "Los navegadores no pueden abrir sitios. Las protecciones quedan guardadas para cuando abras Internet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = HeaderMuted,
             )
-            if (blocked) {
+        } else {
+            Text(
+                presentation.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = HeaderMuted,
+            )
+        }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Text("Protecciones web", style = MaterialTheme.typography.titleMedium)
+        AnimatedVisibility(visible = presentation.showLayers) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 Text(
-                    "Los navegadores no pueden abrir sitios. Tus protecciones quedan guardadas para cuando abras Internet.",
+                    "SafeSearch se aplica automáticamente.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = HeaderMuted,
                 )
-            } else {
-                Text(
-                    presentation.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HeaderMuted,
+                WebSwitchRow(
+                    title = "Solo resultados",
+                    description = "Permite buscar y ver resultados, pero bloquea los sitios externos.",
+                    checked = onlyResultsEnabled,
+                    enabled = !onlyResultsSaving,
+                    saving = onlyResultsSaving,
+                    onCheckedChange = onOnlyResultsChanged,
                 )
             }
-            AnimatedVisibility(visible = presentation.showLayers) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        "SafeSearch se aplica automaticamente.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = HeaderMuted,
-                    )
-                    WebSwitchRow(
-                        title = "Solo resultados",
-                        description = "Permite buscar y ver resultados, pero bloquea todos los sitios externos.",
-                        checked = onlyResultsEnabled,
-                        enabled = !onlyResultsSaving,
-                        saving = onlyResultsSaving,
-                        onCheckedChange = onOnlyResultsChanged,
-                    )
-                }
-            }
-            WebSwitchRow(
-                title = "Buscador DAG",
-                description =
-                    if (dagEntitled) {
-                        "Habilita el acceso al buscador protegido desde la App Usuario."
-                    } else {
-                        "DAG no está incluido en la licencia de esta comunidad."
-                    },
-                checked = dagEnabled,
-                enabled = dagEntitled && !dagSaving,
-                saving = dagSaving,
-                onCheckedChange = onDagEnabledChanged,
+        }
+        WebSwitchRow(
+            title = "Buscador DAG",
+            description =
+                if (dagEntitled) {
+                    "Habilita el buscador protegido en App Usuario."
+                } else {
+                    "DAG no está incluido en la licencia de esta comunidad."
+                },
+            checked = dagEnabled,
+            enabled = dagEntitled && !dagSaving,
+            saving = dagSaving,
+            onCheckedChange = onDagEnabledChanged,
+        )
+        WebSwitchRow(
+            title = "Modo Extra Kosher",
+            description = "Difumina fotos de contenido y mantiene los videos bloqueados.",
+            checked = dagExtraKosherEnabled,
+            enabled = dagEnabled && dagEntitled && !dagExtraKosherSaving,
+            saving = dagExtraKosherSaving,
+            onCheckedChange = onDagExtraKosherEnabledChanged,
+        )
+        if (blocked && !protectionActive) {
+            FeedbackBanner(
+                "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
+                isError = true,
             )
-            WebSwitchRow(
-                title = "Modo Extra Kosher",
-                description =
-                    "Difumina todas las fotos de contenido; conserva logos, iconos y controles esenciales. Los videos permanecen bloqueados.",
-                checked = dagExtraKosherEnabled,
-                enabled = dagEnabled && dagEntitled && !dagExtraKosherSaving,
-                saving = dagExtraKosherSaving,
-                onCheckedChange = onDagExtraKosherEnabledChanged,
-            )
-            if (blocked && !protectionActive) {
-                FeedbackBanner(
-                    "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
-                    isError = true,
-                )
-            }
         }
     }
 }

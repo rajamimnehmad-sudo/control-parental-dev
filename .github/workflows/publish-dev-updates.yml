@@ -1,12 +1,13 @@
 name: Publicar APKs DEV
 
 on:
-  push:
-    branches:
-      - main
-    paths-ignore:
-      - "docs/**"
   workflow_dispatch:
+    inputs:
+      confirm_publish:
+        description: "Confirmo que quiero publicar ambas APK en Supabase DEV"
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: publish-dev-updates-${{ github.ref }}
@@ -14,9 +15,9 @@ concurrency:
 
 jobs:
   publish-dev:
-    if: ${{ !contains(github.event.head_commit.message, '[skip dev publish]') }}
+    if: ${{ inputs.confirm_publish }}
     name: Build, test y publicar DEV
-    runs-on: [self-hosted, macOS, dev]
+    runs-on: ubuntu-latest
     timeout-minutes: 60
 
     steps:
@@ -31,6 +32,14 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.109.0
 
       - name: Crear .env DEV desde secrets
         shell: bash

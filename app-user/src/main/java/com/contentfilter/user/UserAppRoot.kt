@@ -33,6 +33,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.contentfilter.core.domain.help.HelpAction
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductNavGlyph
 import com.contentfilter.feature.accessibility.service.AccessibilityController
@@ -251,6 +252,7 @@ internal fun UserAppRoot(
                     val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
                     UpdatesRoute(
                         onBack = null,
+                        onHelp = { navigateTo(UserDestination.Help) },
                         activationState = statusState.activationState,
                         recoveryCode = protectionState.recoveryCode,
                         protectionMessage = protectionState.message,
@@ -258,6 +260,22 @@ internal fun UserAppRoot(
                         onSubmitRecoveryCode = protectionViewModel::submitRecoveryCode,
                     )
                 }
+                UserDestination.Help ->
+                    UserHelpRoute(
+                        onBack = ::goBack,
+                        onAction = { action ->
+                            selectTopLevel(
+                                when (action) {
+                                    HelpAction.Apps -> UserDestination.MyApps
+                                    HelpAction.Web -> UserDestination.Web
+                                    HelpAction.Security -> UserDestination.Home
+                                    HelpAction.Recovery,
+                                    HelpAction.Settings,
+                                    -> UserDestination.Updates
+                                },
+                            )
+                        },
+                    )
             }
         }
     }
@@ -416,4 +434,5 @@ private enum class UserDestination(
     Requests("Solicitudes", ProductIcon.Requests, showInNav = false),
     Announcements("Avisos", ProductIcon.Bell, showInNav = false),
     Updates("Ajustes", ProductIcon.Settings),
+    Help("Ayuda", ProductIcon.Search, showInNav = false),
 }

@@ -48,6 +48,7 @@ import com.contentfilter.admin.rules.RulesRoute
 import com.contentfilter.admin.updates.AdminUpdatesRoute
 import com.contentfilter.admin.updates.AdminUpdatesStatus
 import com.contentfilter.admin.updates.AdminUpdatesViewModel
+import com.contentfilter.core.domain.help.HelpAction
 import kotlinx.coroutines.launch
 
 @Composable
@@ -171,7 +172,7 @@ internal fun AdminAppRoot(
                 AdminSection.Alerts ->
                     SectionContainer(
                         title = "Alertas de seguridad",
-                        subtitle = "Desactivaciones confirmadas y mantenimiento",
+                        subtitle = "Desactivaciones, posibles desinstalaciones y mantenimiento",
                         onBack = { section = null },
                     ) {
                         AdminAlertsRoute()
@@ -207,6 +208,22 @@ internal fun AdminAppRoot(
                     ) {
                         AdminUpdatesRoute()
                     }
+                AdminSection.Help ->
+                    AdminHelpRoute(
+                        onBack = { section = null },
+                        onAction = { action ->
+                            section = null
+                            tab =
+                                when (action) {
+                                    HelpAction.Apps,
+                                    HelpAction.Web,
+                                    HelpAction.Security,
+                                    HelpAction.Recovery,
+                                    -> AdminTab.Users
+                                    HelpAction.Settings -> AdminTab.Account
+                                }
+                        },
+                    )
                 null ->
                     when (tab) {
                         AdminTab.Home ->
@@ -241,6 +258,7 @@ internal fun AdminAppRoot(
                             SettingsTab(
                                 onPanel = { section = AdminSection.Panel },
                                 onUpdates = { section = AdminSection.Updates },
+                                onHelp = { section = AdminSection.Help },
                             )
                     }
             }
@@ -307,4 +325,5 @@ private enum class AdminSection {
     ProtectionStatus,
     Announcements,
     Updates,
+    Help,
 }

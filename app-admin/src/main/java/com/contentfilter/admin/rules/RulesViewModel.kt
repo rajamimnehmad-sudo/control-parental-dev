@@ -16,6 +16,7 @@ import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicyTimeWindow
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
+import com.contentfilter.core.domain.model.RecoveryCodeVerifier
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.TechnicalDiagnostic
@@ -41,6 +42,7 @@ import com.contentfilter.core.network.dto.RemoteInstalledAppDto
 import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseActivationClient
+import com.contentfilter.core.security.AdminRecoveryKitStore
 import com.contentfilter.core.security.RecoveryCodeHasher
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.PolicyApplicationState
@@ -100,6 +102,7 @@ class RulesViewModel
         private val telemetryRepository: TelemetryRepository,
         private val protectionControlRepository: ProtectionControlRepository,
         private val recoveryCodeHasher: RecoveryCodeHasher,
+        private val adminRecoveryKitStore: AdminRecoveryKitStore,
         systemStatusRepository: SystemStatusRepository,
     ) : ViewModel() {
         private val form =
@@ -470,6 +473,22 @@ class RulesViewModel
 
         fun generateRecoveryCode(deviceId: String) {
             if (deviceId in form.value.protectionLoadingDeviceIds) return
+            val expectedKitRevision =
+                form.value.protectionControls[deviceId]
+                    ?.recoveryKitRevision
+                    ?.takeIf { it > 0 }
+            if (adminRecoveryKitStore.remaining(deviceId, expectedKitRevision) > 0) {
+                val revealed = adminRecoveryKitStore.revealNext(deviceId, expectedKitRevision) ?: return
+                form.update {
+                    it.copy(
+                        recoveryCode = revealed.code,
+                        recoveryCodeDeviceId = deviceId,
+                        recoveryKitRemainingByDevice = it.recoveryKitRemainingByDevice + (deviceId to revealed.remaining),
+                        message = "Código revelado. Se usa una sola vez.",
+                    )
+                }
+                return
+            }
             val device = uiState.value.userDevices.firstOrNull { it.id == deviceId }
             if (device == null) {
                 form.update { it.copy(message = "Dispositivo no disponible.") }
@@ -478,29 +497,38 @@ class RulesViewModel
             form.update {
                 it.copy(
                     protectionLoadingDeviceIds = it.protectionLoadingDeviceIds + deviceId,
-                    message = "Generando código de recuperación...",
+                    message = "Preparando kit de recuperación offline...",
                     recoveryCode = "",
                     recoveryCodeDeviceId = deviceId,
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
-                val material = recoveryCodeHasher.generate()
+                val materials = List(RecoveryKitSize) { recoveryCodeHasher.generate() }
                 protectionControlRepository
-                    .rotateRecovery(
+                    .rotateRecoveryKit(
                         accountId = device.accountId,
                         deviceId = device.id,
-                        salt = material.salt,
-                        verifier = material.verifier,
+                        verifiers =
+                            materials.mapIndexed { slot, material ->
+                                RecoveryCodeVerifier(slot, material.salt, material.verifier)
+                            },
                     ).onSuccess { control ->
+                        adminRecoveryKitStore.save(
+                            deviceId = deviceId,
+                            revision = control.recoveryKitRevision,
+                            codes = materials.map { it.code },
+                        )
                         form.update {
                             it.copy(
                                 protectionControls = it.protectionControls + (deviceId to control),
                                 protectionLoadingDeviceIds = it.protectionLoadingDeviceIds - deviceId,
-                                recoveryCode = material.code,
+                                recoveryCode = "",
                                 recoveryCodeDeviceId = deviceId,
+                                recoveryKitRemainingByDevice =
+                                    it.recoveryKitRemainingByDevice + (deviceId to RecoveryKitSize),
                                 message =
                                     if (it.selectedDeviceId == deviceId) {
-                                        "Código listo. Guardalo antes de cerrar."
+                                        "Kit preparado. Ya podés revelar códigos incluso sin Internet."
                                     } else {
                                         it.message
                                     },
@@ -513,7 +541,11 @@ class RulesViewModel
                                 recoveryCode = "",
                                 recoveryCodeDeviceId = null,
                                 message =
-                                    if (it.selectedDeviceId == deviceId) "No se pudo generar el código." else it.message,
+                                    if (it.selectedDeviceId == deviceId) {
+                                        "No se pudo preparar el kit. Conectá ambos teléfonos y reintentá."
+                                    } else {
+                                        it.message
+                                    },
                             )
                         }
                     }
@@ -578,7 +610,19 @@ class RulesViewModel
                     protectionControlRepository.get(deviceId).getOrNull()?.let { deviceId to it }
                 }.toMap()
             if (refreshed.isNotEmpty()) {
-                form.update { it.copy(protectionControls = it.protectionControls + refreshed) }
+                form.update {
+                    it.copy(
+                        protectionControls = it.protectionControls + refreshed,
+                        recoveryKitRemainingByDevice =
+                            it.recoveryKitRemainingByDevice +
+                                refreshed.mapValues { (deviceId, control) ->
+                                    adminRecoveryKitStore.remaining(
+                                        deviceId,
+                                        control.recoveryKitRevision.takeIf { revision -> revision > 0 },
+                                    )
+                                },
+                    )
+                }
             }
         }
 
@@ -935,19 +979,29 @@ class RulesViewModel
                                             snapshot.rules.activeWebAuxiliaryBlockCount() == 0
                                     }
                                 }
-                            if (confirmed == null) error("Room no confirmó $action.")
+                            val applied =
+                                confirmed
+                                    ?: policyRepository.getActivePolicy(targetDeviceId).takeIf { snapshot ->
+                                        snapshot.deviceId == targetDeviceId &&
+                                            snapshot.rules.webPolicyPreferences().matchesPreference(
+                                                preference,
+                                                requestedState,
+                                            ) &&
+                                            snapshot.rules.activeWebAuxiliaryBlockCount() == 0
+                                    }
+                            if (applied == null) error("Room no confirmó $action.")
                             if (BuildConfig.FLAVOR == "dev") {
                                 Log.i(
                                     LogTag,
                                     "web option room confirmed requestId=$traceRequestId " +
                                         "deviceId=${targetDeviceId.safeDeviceId()} policyId=${receipt.policyId.take(8)} " +
                                         "revision=${receipt.revision} changed=${preference.name} " +
-                                        "webBlocked=${confirmed.rules.internetBlocked()} " +
+                                        "webBlocked=${applied.rules.internetBlocked()} " +
                                         "externalSearchResultsAllowed=" +
-                                        "${confirmed.rules.externalSearchResultsAllowedForWeb()} " +
-                                        "safeSearchEnabled=${confirmed.rules.safeSearchEnabledForWeb()} " +
-                                        "activeDomainBlocks=${confirmed.rules.activeDomainBlockCount()} " +
-                                        "activeAuxiliaryBlocks=${confirmed.rules.activeWebAuxiliaryBlockCount()} " +
+                                        "${applied.rules.externalSearchResultsAllowedForWeb()} " +
+                                        "safeSearchEnabled=${applied.rules.safeSearchEnabledForWeb()} " +
+                                        "activeDomainBlocks=${applied.rules.activeDomainBlockCount()} " +
+                                        "activeAuxiliaryBlocks=${applied.rules.activeWebAuxiliaryBlockCount()} " +
                                         "changes=${changes.size}",
                                 )
                             }
@@ -955,25 +1009,41 @@ class RulesViewModel
                         }
                     }
                 if (saved.isFailure) {
+                    val alreadyApplied =
+                        runCatching {
+                            policyRepository
+                                .getActivePolicy(targetDeviceId)
+                                .rules
+                                .webPolicyPreferences()
+                                .matchesPreference(preference, requestedState)
+                        }.getOrDefault(false)
                     recordAdminDiagnostic(
                         action = action,
                         deviceId = targetDeviceId,
                         requestId = requestId,
                         previousState = previousState.toString(),
                         requestedState = requestedState.toString(),
-                        result = "save-failed",
+                        result = if (alreadyApplied) "save-reconciled" else "save-failed",
                         reason = saved.exceptionOrNull()?.javaClass?.simpleName ?: "unknown",
                     )
                     if (isCurrentWebPreferenceSave(targetDeviceId, preference, requestId)) {
                         form.update { state ->
                             val cleared = state.clearPendingWebPreference(targetDeviceId, preference)
                             if (isLatestWebPreferenceMessage(targetDeviceId, requestId)) {
-                                cleared.copy(message = "No se pudo guardar el cambio web.")
+                                cleared.copy(
+                                    message =
+                                        if (alreadyApplied) {
+                                            "Cambio aplicado localmente. Sincronización pendiente."
+                                        } else {
+                                            "No se pudo guardar. Verificá la conexión y volvé a intentar."
+                                        },
+                                )
                             } else {
                                 cleared
                             }
                         }
                     }
+                    if (alreadyApplied) syncScheduler.requestSync()
                     return@launch
                 }
                 recordAdminDiagnostic(
@@ -2161,6 +2231,7 @@ class RulesViewModel
 
         private companion object {
             const val NoonMinuteOfDay = 720
+            const val RecoveryKitSize = 5
             const val UserPairingTokenTtlMinutes = 180
             const val RelinkTokenTtlMinutes = 30
             const val PolicyApplicationWaitMillis = 8_000L

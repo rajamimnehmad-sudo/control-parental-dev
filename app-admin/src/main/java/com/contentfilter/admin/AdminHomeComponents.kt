@@ -194,7 +194,8 @@ private fun ProtectionSummaryCard(
 ) {
     val affectedCount = users.count(ProtectedUserHealthUiState::hasConfirmedProblem)
     val pendingCount = users.count(ProtectedUserHealthUiState::requiresVerification)
-    val cardState = protectionCardState(licenseState, users.size, affectedCount, pendingCount)
+    val criticalCount = users.count(ProtectedUserHealthUiState::possibleUninstall)
+    val cardState = protectionCardState(licenseState, users.size, affectedCount, pendingCount, criticalCount)
     val accent = cardState.color
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -209,7 +210,7 @@ private fun ProtectionSummaryCard(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             ProtectionShield(
-                count = affectedCount,
+                count = if (criticalCount > 0) criticalCount else affectedCount,
                 requiresAttention = affectedCount > 0 || pendingCount > 0 || !licenseState.allowsProtection(),
                 color = accent,
             )
@@ -294,17 +295,36 @@ internal fun ProtectionStatusRoute(
         }
         if (affectedUsers.isNotEmpty()) {
             affectedUsers.forEach { user ->
+                val critical = user.possibleUninstall
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     onClick = { onOpenUser(user.id) },
                     shape = RoundedCornerShape(18.dp),
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.errorContainer),
+                    colors =
+                        CardDefaults.cardColors(
+                            containerColor =
+                                if (critical) Color(0xFFFFDAD6) else MaterialTheme.colorScheme.errorContainer,
+                        ),
                 ) {
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
-                        Text(user.name, style = MaterialTheme.typography.titleMedium)
+                        if (critical) {
+                            Text(
+                                "ALERTA MÁXIMA",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = Color(0xFFB00020),
+                            )
+                            Text("App Usuario posiblemente desinstalada", style = MaterialTheme.typography.titleMedium)
+                            Text(user.name, style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "No se reinstala sola. Abrí el usuario para ver los pasos de recuperación.",
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                        } else {
+                            Text(user.name, style = MaterialTheme.typography.titleMedium)
+                        }
                         if (user.vpnProblem) Text("VPN desactivada")
                         if (user.accessibilityProblem) Text("Accesibilidad desactivada")
                         if (user.deviceAdminProblem) Text("Administrador del dispositivo desactivado")

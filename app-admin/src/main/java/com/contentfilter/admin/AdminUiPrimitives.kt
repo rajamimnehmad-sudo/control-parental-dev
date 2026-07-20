@@ -385,6 +385,7 @@ internal enum class ProtectionCardState(
     val color: Color,
 ) {
     Healthy("Todos los usuarios están protegidos", Color(0xFF17895D)),
+    Critical("ALERTA MÁXIMA · posible desinstalación", Color(0xFFB00020)),
     NeedsAttention("Hay usuarios que requieren atención", Color(0xFFBA1A1A)),
     PendingVerification("Hay estados pendientes de verificar", Color(0xFF9A6700)),
     LicenseBlocked("Protección suspendida por licencia", Color(0xFFBA1A1A)),
@@ -396,9 +397,11 @@ internal fun protectionCardState(
     userCount: Int,
     affectedCount: Int,
     pendingCount: Int,
+    criticalCount: Int = 0,
 ): ProtectionCardState =
     when {
         !licenseState.allowsProtection() -> ProtectionCardState.LicenseBlocked
+        criticalCount > 0 -> ProtectionCardState.Critical
         affectedCount > 0 -> ProtectionCardState.NeedsAttention
         userCount == 0 -> ProtectionCardState.NoUsers
         pendingCount > 0 -> ProtectionCardState.PendingVerification

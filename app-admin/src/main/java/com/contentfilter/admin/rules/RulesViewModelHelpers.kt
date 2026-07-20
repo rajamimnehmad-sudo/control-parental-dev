@@ -278,6 +278,18 @@ internal fun WebPolicyPreferences.withPreference(
         WebPolicyPreference.DagExtraKosherEnabled -> copy(dagExtraKosherEnabled = enabled)
     }
 
+internal fun WebPolicyPreferences.matchesPreference(
+    preference: WebPolicyPreference,
+    enabled: Boolean,
+): Boolean =
+    when (preference) {
+        WebPolicyPreference.NavigationBlocked -> webNavigationBlocked == enabled
+        WebPolicyPreference.ExternalSearchResultsAllowed -> externalSearchResultsAllowed == enabled
+        WebPolicyPreference.SafeSearchEnabled -> safeSearchEnabled == enabled
+        WebPolicyPreference.DagEnabled -> dagEnabled == enabled
+        WebPolicyPreference.DagExtraKosherEnabled -> dagExtraKosherEnabled == enabled
+    }
+
 internal fun List<PolicyRule>.webPolicyPreferenceChanges(
     preference: WebPolicyPreference,
     enabled: Boolean,
@@ -401,6 +413,13 @@ internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDevi
                 device?.vpnState == ComponentState.Enabled &&
                     device.accessibilityState == ComponentState.Enabled &&
                     device.deviceAdminState == ComponentState.Enabled
+            val possibleUninstall =
+                device?.let {
+                    DeviceProtectionAlert.isPossibleUninstall(
+                        deviceAdminState = it.deviceAdminState,
+                        lastSeenAtEpochMillis = lastSeen,
+                    )
+                } == true
             val status =
                 when {
                     lastSeen == null -> UserDeviceStatus.Unknown
@@ -416,13 +435,18 @@ internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDevi
                 lastSeenLabel = lastSeen.toLastSeenLabel(),
                 appCount = appsByDevice[deviceId]?.distinctBy { it.packageName }?.size ?: 0,
                 protectionAlert =
-                    device?.let {
-                        DeviceProtectionAlert.fromStates(
-                            it.vpnState,
-                            it.accessibilityState,
-                            it.deviceAdminState,
-                        )
+                    if (possibleUninstall) {
+                        DeviceProtectionAlert.PossibleUninstall
+                    } else {
+                        device?.let {
+                            DeviceProtectionAlert.fromStates(
+                                it.vpnState,
+                                it.accessibilityState,
+                                it.deviceAdminState,
+                            )
+                        }
                     },
+                possibleUninstall = possibleUninstall,
                 protectionComplete = protectionComplete,
                 vpnState = device?.vpnState.displayName(),
                 accessibilityState = device?.accessibilityState.displayName(),

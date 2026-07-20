@@ -62,6 +62,7 @@ data class RulesUiState(
     val protectionLoadingDeviceIds: Set<String> = emptySet(),
     val recoveryCode: String = "",
     val recoveryCodeDeviceId: String? = null,
+    val recoveryKitRemainingByDevice: Map<String, Int> = emptyMap(),
     val offlineMode: Boolean = true,
     val message: String = "",
 ) {
@@ -154,6 +155,7 @@ data class UserDeviceUiState(
     val lastSeenLabel: String,
     val appCount: Int,
     val protectionAlert: String? = null,
+    val possibleUninstall: Boolean = false,
     val protectionComplete: Boolean = false,
     val vpnState: String = "Desconocida",
     val accessibilityState: String = "Desconocida",

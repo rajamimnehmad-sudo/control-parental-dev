@@ -38,7 +38,7 @@ private fun AdminAlertsScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Text(
-            "Solo aparecen desactivaciones confirmadas y pedidos de mantenimiento. Los intentos bloqueados quedan en Super Admin.",
+            "Acá aparecen desactivaciones confirmadas, posibles desinstalaciones y pedidos de mantenimiento. Los intentos bloqueados quedan en Super Admin.",
             style = MaterialTheme.typography.bodyMedium,
         )
         OutlinedButton(
@@ -58,7 +58,14 @@ private fun AdminAlertsScreen(
             items(state.alerts, key = AdminAlertUiState::id) { alert ->
                 ProductCard {
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                        StatusChip("Requiere atención", MaterialTheme.colorScheme.error)
+                        StatusChip(
+                            if (alert.alertType == "possible_uninstall") {
+                                "ALERTA MÁXIMA"
+                            } else {
+                                "Requiere atención"
+                            },
+                            MaterialTheme.colorScheme.error,
+                        )
                         Text(alert.title, style = MaterialTheme.typography.titleMedium)
                         Text(alert.body, style = MaterialTheme.typography.bodyMedium)
                         Text(

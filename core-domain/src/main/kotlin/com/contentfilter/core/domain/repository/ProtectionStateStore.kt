@@ -1,6 +1,7 @@
 package com.contentfilter.core.domain.repository
 
 import com.contentfilter.core.domain.model.DeviceProtectionControl
+import com.contentfilter.core.domain.model.PendingRecoveryConsumption
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RecoveryUnlockResult
 import kotlinx.coroutines.flow.Flow
@@ -30,9 +31,9 @@ interface ProtectionStateStore {
         nowEpochMillis: Long = System.currentTimeMillis(),
     ): RecoveryUnlockResult
 
-    fun pendingRecoveryConsumedRevision(): Long?
+    fun pendingRecoveryConsumption(): PendingRecoveryConsumption?
 
-    fun markRecoveryConsumptionAcknowledged(revision: Long)
+    fun markRecoveryConsumptionAcknowledged(consumption: PendingRecoveryConsumption)
 
     fun cancelLocalRemovalAuthorization()
 }
