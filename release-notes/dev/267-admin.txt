@@ -1,0 +1,3 @@
+Aplicaciones, Web y Seguridad ahora entran siempre completas en pantalla, sin desplazamiento lateral oculto.
+Al bajar por el contenido, el selector se transforma suavemente en una etiqueta compacta junto al nombre del usuario.
+Tocar la etiqueta vuelve al inicio y recupera las tres secciones con una transición clara.

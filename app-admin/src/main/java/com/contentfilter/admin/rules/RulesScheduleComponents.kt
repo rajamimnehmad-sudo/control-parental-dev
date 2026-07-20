@@ -4,14 +4,23 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -22,17 +31,102 @@ import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
 import com.contentfilter.core.domain.model.PolicyWeekdays
 import com.contentfilter.core.ui.ProductCard
 
 @Composable
+internal fun GlobalScheduleButton(
+    title: String,
+    rules: List<PolicyRule>,
+    saving: Boolean = false,
+    onSave: (List<AllowedScheduleWindowInput>) -> Unit,
+) {
+    val scheduleFingerprint =
+        remember(rules) {
+            rules
+                .filter { it.isScheduleRule() }
+                .joinToString("|") { "${it.id}:${it.activeWindow}:${it.activeDaysMask}:${it.enabled}" }
+        }
+    var visible by rememberSaveable(scheduleFingerprint) { mutableStateOf(false) }
+    OutlinedButton(
+        modifier = Modifier.fillMaxWidth(),
+        enabled = !saving,
+        onClick = { visible = true },
+    ) {
+        Text("Configurar horarios")
+    }
+    if (visible) {
+        Dialog(
+            onDismissRequest = { if (!saving) visible = false },
+            properties =
+                DialogProperties(
+                    usePlatformDefaultWidth = false,
+                    decorFitsSystemWindows = false,
+                ),
+        ) {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                color = Color(0xFFF2F8F7),
+            ) {
+                Column(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .statusBarsPadding()
+                            .navigationBarsPadding()
+                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    ) {
+                        IconButton(
+                            enabled = !saving,
+                            onClick = { visible = false },
+                        ) {
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                                contentDescription = "Volver",
+                            )
+                        }
+                        Text(
+                            text = title,
+                            style = MaterialTheme.typography.headlineSmall,
+                        )
+                    }
+                    LazyColumn(
+                        modifier = Modifier.weight(1f),
+                        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 18.dp),
+                    ) {
+                        item {
+                            AllowedScheduleEditor(
+                                title = "Franjas permitidas",
+                                rules = rules,
+                                saving = saving,
+                                forceExpanded = true,
+                                onSave = onSave,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 internal fun AllowedScheduleEditor(
     title: String,
     rules: List<PolicyRule>,
     saving: Boolean = false,
+    forceExpanded: Boolean = false,
     onSave: (List<AllowedScheduleWindowInput>) -> Unit,
 ) {
     val scheduleRules =
@@ -41,7 +135,9 @@ internal fun AllowedScheduleEditor(
         scheduleRules.joinToString("|") { rule ->
             "${rule.id}:${rule.activeWindow}:${rule.activeDaysMask}:${rule.enabled}"
         }
-    var expanded by rememberSaveable(rulesFingerprint) { mutableStateOf(scheduleRules.isNotEmpty()) }
+    var expanded by rememberSaveable(rulesFingerprint) {
+        mutableStateOf(forceExpanded || scheduleRules.isNotEmpty())
+    }
     var drafts by rememberSaveable(rulesFingerprint, stateSaver = ScheduleDraftsSaver) {
         mutableStateOf(
             scheduleRules.map { rule ->

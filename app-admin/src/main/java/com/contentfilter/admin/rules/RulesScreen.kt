@@ -4,9 +4,11 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -53,6 +56,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -80,6 +84,7 @@ import com.contentfilter.core.ui.ProductLazyVisualPage
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
+import kotlinx.coroutines.launch
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
 @Composable
@@ -1038,17 +1043,13 @@ private fun UserDetailContent(
         } else {
             (listState.firstVisibleItemScrollOffset / 72f).coerceIn(0f, 1f)
         }
-    val headerTargetProgress =
-        if (searchExpanded || selectedPanel != DevicePanel.Apps) {
-            1f
-        } else {
-            scrollHeaderProgress
-        }
+    val headerTargetProgress = if (searchExpanded) 1f else scrollHeaderProgress
     val headerProgress by animateFloatAsState(
         targetValue = headerTargetProgress,
         animationSpec = spring(dampingRatio = 0.92f, stiffness = 920f),
         label = "user-detail-header-progress",
     )
+    val coroutineScope = rememberCoroutineScope()
     val displayedApps =
         remember(state.appControls, appFilter, state.appSearchQuery) {
             if (state.appSearchQuery.isNotBlank()) {
@@ -1072,10 +1073,30 @@ private fun UserDetailContent(
             selectedPanel = selectedPanel,
             collapseProgress = headerProgress,
             onPanelSelected = onPanelSelected,
+            onCompactPanelClick = {
+                coroutineScope.launch {
+                    listState.animateScrollToItem(0)
+                }
+            },
             onBack = onBack,
         )
         if (state.message.isNotBlank()) {
             CompactActionBanner(state.message, isError = state.message.startsWith("No se pudo"))
+        }
+        if (selectedPanel == DevicePanel.Apps) {
+            AppsToolbar(
+                apps = state.appControls,
+                selectedFilter = appFilter,
+                searchQuery = state.appSearchQuery,
+                searchExpanded = searchExpanded,
+                onFilterSelected = { appFilter = it },
+                onSearchExpandedChanged = { expanded ->
+                    searchExpanded = expanded
+                    if (!expanded) onAppSearchChanged("")
+                },
+                onSearchChanged = onAppSearchChanged,
+                onRefreshApps = onRefreshApps,
+            )
         }
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -1089,7 +1110,7 @@ private fun UserDetailContent(
             when (selectedPanel) {
                 DevicePanel.Apps -> {
                     item {
-                        AllowedScheduleEditor(
+                        GlobalScheduleButton(
                             title = "Horario global de aplicaciones",
                             rules =
                                 state.rules.filter {
@@ -1115,21 +1136,6 @@ private fun UserDetailContent(
                         AppSectionSelector(
                             selectedPanel = selectedPanel,
                             onPanelSelected = onPanelSelected,
-                        )
-                    }
-                    item {
-                        AppsToolbar(
-                            apps = state.appControls,
-                            selectedFilter = appFilter,
-                            searchQuery = state.appSearchQuery,
-                            searchExpanded = searchExpanded,
-                            onFilterSelected = { appFilter = it },
-                            onSearchExpandedChanged = { expanded ->
-                                searchExpanded = expanded
-                                if (!expanded) onAppSearchChanged("")
-                            },
-                            onSearchChanged = onAppSearchChanged,
-                            onRefreshApps = onRefreshApps,
                         )
                     }
                     if (displayedApps.isEmpty()) {
@@ -1217,7 +1223,7 @@ private fun UserDetailContent(
                 }
                 DevicePanel.Web -> {
                     item {
-                        AllowedScheduleEditor(
+                        GlobalScheduleButton(
                             title = "Horario global de Web",
                             rules =
                                 state.rules.filter {
@@ -1553,11 +1559,13 @@ private fun UserDetailHeader(
     selectedPanel: DevicePanel,
     collapseProgress: Float,
     onPanelSelected: (DevicePanel) -> Unit,
+    onCompactPanelClick: () -> Unit,
     onBack: () -> Unit,
 ) {
     val headerGap = lerpDp(14.dp, 10.dp, collapseProgress)
     val iconSize = lerpDp(44.dp, 40.dp, collapseProgress)
     val titleGap = lerpDp(4.dp, 2.dp, collapseProgress)
+    val compactMode = collapseProgress >= 0.52f
     Column(
         verticalArrangement = Arrangement.spacedBy(headerGap),
     ) {
@@ -1592,6 +1600,21 @@ private fun UserDetailHeader(
                         color = HeaderInk,
                         maxLines = 1,
                     )
+                    AnimatedVisibility(
+                        visible = compactMode && entryMode != RulesEntryMode.Web,
+                        enter =
+                            expandHorizontally(animationSpec = tween(durationMillis = 180)) +
+                                fadeIn(animationSpec = tween(durationMillis = 150)),
+                        exit =
+                            shrinkHorizontally(animationSpec = tween(durationMillis = 140)) +
+                                fadeOut(animationSpec = tween(durationMillis = 110)),
+                    ) {
+                        CompactPanelChip(
+                            panel = selectedPanel,
+                            critical = device.possibleUninstall && selectedPanel == DevicePanel.Protection,
+                            onClick = onCompactPanelClick,
+                        )
+                    }
                     Box(
                         modifier =
                             Modifier
@@ -1600,7 +1623,7 @@ private fun UserDetailHeader(
                     )
                 }
                 AnimatedVisibility(
-                    visible = collapseProgress < 0.72f,
+                    visible = !compactMode,
                     enter = expandVertically(animationSpec = tween(durationMillis = 90)) + fadeIn(animationSpec = tween(durationMillis = 90)),
                     exit = shrinkVertically(animationSpec = tween(durationMillis = 70)) + fadeOut(animationSpec = tween(durationMillis = 70)),
                 ) {
@@ -1613,13 +1636,62 @@ private fun UserDetailHeader(
             }
         }
         if (entryMode != RulesEntryMode.Web) {
-            GlassDetailSectionSelector(
-                device = device,
-                selectedPanel = selectedPanel,
-                collapseProgress = collapseProgress,
-                onPanelSelected = onPanelSelected,
-            )
+            AnimatedVisibility(
+                visible = !compactMode,
+                enter =
+                    expandVertically(animationSpec = tween(durationMillis = 180)) +
+                        fadeIn(animationSpec = tween(durationMillis = 150)),
+                exit =
+                    shrinkVertically(animationSpec = tween(durationMillis = 150)) +
+                        fadeOut(animationSpec = tween(durationMillis = 110)),
+            ) {
+                GlassDetailSectionSelector(
+                    device = device,
+                    selectedPanel = selectedPanel,
+                    collapseProgress = collapseProgress,
+                    onPanelSelected = onPanelSelected,
+                )
+            }
         }
+    }
+}
+
+@Composable
+private fun CompactPanelChip(
+    panel: DevicePanel,
+    critical: Boolean,
+    onClick: () -> Unit,
+) {
+    val label =
+        when (panel) {
+            DevicePanel.Apps, DevicePanel.AppGroups -> "Apps"
+            DevicePanel.Web -> "Web"
+            DevicePanel.Protection -> "Seguridad"
+        }
+    val color = if (critical) CriticalRed else HeaderInk
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        modifier =
+            Modifier
+                .clip(shape)
+                .background(color, shape)
+                .clickable(onClick = onClick)
+                .padding(start = 11.dp, top = 7.dp, end = 7.dp, bottom = 7.dp),
+        horizontalArrangement = Arrangement.spacedBy(2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium,
+            color = Color.White,
+            maxLines = 1,
+        )
+        Icon(
+            imageVector = Icons.Filled.KeyboardArrowDown,
+            contentDescription = "Mostrar secciones",
+            tint = Color.White,
+            modifier = Modifier.size(17.dp),
+        )
     }
 }
 
@@ -1639,22 +1711,24 @@ private fun GlassDetailSectionSelector(
                 .clip(shape)
                 .background(Color.White.copy(alpha = 0.7f), shape)
                 .border(1.dp, Color.White.copy(alpha = 0.94f), shape)
-                .horizontalScroll(rememberScrollState())
                 .padding(5.dp),
         horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         DetailSegmentButton(
+            modifier = Modifier.weight(1f),
             text = "Apps",
             selected = selectedPanel == DevicePanel.Apps || selectedPanel == DevicePanel.AppGroups,
             onClick = { onPanelSelected(DevicePanel.Apps) },
         )
         DetailSegmentButton(
+            modifier = Modifier.weight(1f),
             text = "Web",
             selected = selectedPanel == DevicePanel.Web,
             onClick = { onPanelSelected(DevicePanel.Web) },
         )
         DetailSegmentButton(
+            modifier = Modifier.weight(1f),
             text = "Seguridad",
             selected = selectedPanel == DevicePanel.Protection,
             attention = !device.protectionComplete || device.status != UserDeviceStatus.Active,
@@ -1666,6 +1740,7 @@ private fun GlassDetailSectionSelector(
 
 @Composable
 private fun DetailSegmentButton(
+    modifier: Modifier = Modifier,
     text: String,
     selected: Boolean,
     onClick: () -> Unit,
@@ -1676,8 +1751,7 @@ private fun DetailSegmentButton(
     val selectedColor = if (critical) CriticalRed else HeaderInk
     Row(
         modifier =
-            Modifier
-                .width(116.dp)
+            modifier
                 .clip(shape)
                 .background(
                     color = if (selected) selectedColor else Color.White.copy(alpha = 0.42f),
@@ -1723,14 +1797,14 @@ private fun AppSectionSelector(
     ) {
         if (selectedPanel == DevicePanel.AppGroups) {
             Button(modifier = Modifier.weight(1f), onClick = {}) {
-                Text("Grupos")
+                Text("Crear grupo de apps")
             }
         } else {
             OutlinedButton(
                 modifier = Modifier.weight(1f),
                 onClick = { onPanelSelected(DevicePanel.AppGroups) },
             ) {
-                Text("Grupos")
+                Text("Crear grupo de apps")
             }
         }
         if (selectedPanel == DevicePanel.Apps) {

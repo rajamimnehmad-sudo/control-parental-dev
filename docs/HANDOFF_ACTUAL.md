@@ -79,6 +79,15 @@ Usuario b169c3312418550fa486c05e46c87122bc40fe4d0e013c835f3910c6446a4d28
 Admin   2117c8c1978c01c2925a75589ad21f904493c5132aa6187f026576336d09c0bc
 ```
 
+## Candidato DEV 267 - Detalle de Usuario compacto en App Admin - 2026-07-20
+
+- App Admin reemplaza los anchos fijos del selector por tres segmentos de igual ancho; `Apps`, `Web` y `Seguridad` entran completos incluso en el SM-A235M.
+- Al desplazar el detalle, el selector completo se desvanece y la seccion activa aparece como una etiqueta compacta junto al nombre. Tocar esa etiqueta anima el regreso al inicio para volver a elegir seccion.
+- En Aplicaciones, `Configurar horarios` queda como boton simple sin descripcion y abre un editor de pantalla completa. `Grupos` se renombra `Crear grupo de apps`; titulo, actualizar, buscar y filtros rapidos permanecen fijos mientras se desplaza el inventario.
+- Validacion local final: `:app-admin:testDevDebugUnitTest`, `:app-admin:ktlintCheck`, `:app-admin:assembleDevDebug` y `:app-user:assembleDevDebug` correctos, 756 tareas. Ambos APK locales declaran version 267.
+- Validacion fisica parcial: App Admin DEV 267 se instalo in-place en Samsung SM-A235M, conservando `firstInstallTime` (`2026-07-14 15:20:42`) y `ceDataInode` (`348488`). La pantalla de bloqueo/SystemUI permanecio por encima de la actividad y devolvio capturas negras, por lo que el recorrido visual no pudo completarse; no se observo un crash de Content Filter. Por indicacion del usuario, esta limitacion no bloquea la publicacion.
+- No hay cambios de backend, datos ni Supabase. Production no fue tocado.
+
 ## Publicacion DEV 266 - UX, ayuda privada y recuperacion offline - 2026-07-20
 
 - App Admin separa `Aplicaciones / Web / Seguridad` mediante un selector horizontal translucido y desplazable. Web elimina la foto y la tarjeta contenedora; Seguridad concentra proteccion, reenlace, desinstalacion y recuperacion, sin mezclar esas acciones con reglas de apps o sitios.
