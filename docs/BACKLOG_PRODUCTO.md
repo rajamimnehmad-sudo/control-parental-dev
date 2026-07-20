@@ -192,15 +192,15 @@ Flujo de una entrada:
 | SUPERWEB-AUTH-RECOVERY-01 | Publicado; recovery bloqueado externamente por cuota Supabase DEV | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
 | SUPERWEB-OPS-UX-01 | Archivo seguro, agrupacion y claridad Base implementados; busqueda/filtros pendientes | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
-| APP-UPDATE-CHANGELOG-01 | Idea | P2 | Mostrar en Usuario y Admin las novedades especificas de la actualizacion ofrecida | M | Medio |
+| APP-UPDATE-CHANGELOG-01 | Implementado candidato DEV 264 | P2 | Mostrar en Usuario y Admin las novedades especificas de la actualizacion ofrecida | M | Medio |
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 248; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado DEV 241 y hotfix de visualizacion 2026-07-18; pendiente prueba funcional autenticada | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
-| SUPERADMIN-ADMIN-RELINK-01 | Idea | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
-| USER-RELINK-01 | Idea | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
+| SUPERADMIN-ADMIN-RELINK-01 | Implementado candidato DEV 264 | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
+| USER-RELINK-01 | Implementado candidato DEV 264 | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
-| PROTECTION-ONBOARDING-HEALTH-01 | Idea | P1 | Asistente unificado de instalacion, salud de proteccion y reparacion guiada | L | Alto |
-| DEVICE-CONNECTIVITY-ALERTS-01 | Idea | P1 | Alertas de bateria baja y dispositivo sin comunicacion reciente | M | Medio |
+| PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
+| DEVICE-CONNECTIVITY-ALERTS-01 | Implementado candidato DEV 264, sin bateria por decision de producto | P1 | Alerta tras 24 horas sin comunicacion para Admin y Superweb | M | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Validado visualmente en SM-A235M DEV 248; pendiente evento real | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
@@ -303,7 +303,7 @@ Flujo de una entrada:
 
 ### SUPERADMIN-ADMIN-RELINK-01 - Reenlace de un administrador existente
 
-- Estado: `Idea`; no aprobado para codigo ni cambios de datos. Tipo: recuperacion de acceso, activacion y seguridad Super Admin. Prioridad: P1.
+- Estado: `Implementado candidato DEV 264`; aprobado explicitamente el 2026-07-20. Tipo: recuperacion de acceso, activacion y seguridad Super Admin. Prioridad: P1.
 - Problema: si App Admin pierde o elimina su activacion local, el administrador puede quedar sin acceso aunque su identidad, comunidad y permisos sigan vigentes. Crear otro administrador produciria duplicados y fragmentaria la auditoria.
 - Solucion propuesta: desde la tarjeta del administrador existente en Superweb, ofrecer `Volver a enlazar` y generar un token nuevo, de un solo uso y vencimiento corto, asociado exactamente a ese administrador y comunidad. App Admin usa ese token para recuperar el vinculo sin crear otra identidad administrativa.
 - Evidencia: propuesta explicita del usuario del 2026-07-18.
@@ -319,11 +319,11 @@ Flujo de una entrada:
   - un Super Admin no autorizado, un administrador común o un usuario anonimo no puede emitir ni consultar el token;
   - errores de red o activacion no consumen falsamente el token ni dejan dos estados contradictorios;
   - no se borra comunidad, usuarios protegidos, reglas, solicitudes, licencias ni historial operativo.
-- Decisiones pendientes para la entrevista del ticket: definicion exacta de `desvinculado`; si un Admin puede tener uno o varios dispositivos; revocacion inmediata del token/dispositivo anterior; duracion del token; confirmacion reforzada; aviso al administrador; comportamiento offline y tratamiento de una sesion antigua que reaparece.
+- Decision aplicada: token de un solo uso por 30 minutos. El Admin conserva una sola identidad/dispositivo logico; el acceso anterior se revoca atomicamente sólo despues de la primera sincronizacion completa correcta del nuevo enlace.
 
 ### USER-RELINK-01 - Reenlace de un Usuario existente
 
-- Estado: `Idea`; no aprobado para codigo ni cambios de datos. Tipo: recuperacion de acceso, activacion Usuario y seguridad. Prioridad: P1.
+- Estado: `Implementado candidato DEV 264`; aprobado explicitamente el 2026-07-20. Tipo: recuperacion de acceso, activacion Usuario y seguridad. Prioridad: P1.
 - Problema: App Usuario puede perder su vinculacion local por un fallo, limpieza de datos, cambio de telefono u otra incidencia, aunque el Usuario protegido y su configuracion remota sigan existiendo. Crear otro Usuario duplicaria identidad, reglas, grupos, solicitudes y auditoria.
 - Solucion propuesta: ofrecer `Volver a enlazar` o `Reemplazar enlace` tanto en la tarjeta del Usuario dentro de App Admin como en su tarjeta Superweb. La accion genera un token nuevo, de un solo uso y vencimiento corto, asociado exactamente al Usuario, comunidad y alcance autorizados; App Usuario lo utiliza para recuperar el vínculo sin crear otra identidad.
 - Evidencia: propuesta explicita del usuario del 2026-07-18.
@@ -341,7 +341,7 @@ Flujo de una entrada:
   - la primera sincronización aplica la protección antes de considerar completado el reenlace;
   - la interfaz aclara que datos exclusivamente locales perdidos —por ejemplo historial local cifrado de DAG— no pueden restaurarse desde el servidor;
   - generar, revocar, vencer y consumir el token queda auditado sin borrar datos del Usuario.
-- Decisiones pendientes para la entrevista del ticket: causas admitidas de pérdida de vínculo; mismo teléfono o dispositivo nuevo; uno o varios dispositivos por Usuario; revocación inmediata del anterior; confirmación reforzada; duración; aviso al administrador; estado de barrera durante el reenlace; tratamiento de datos locales y recuperación offline.
+- Decision aplicada: mismo Usuario y `device_id`, sea el mismo telefono reparado o uno nuevo; token de un solo uso por 30 minutos. El enlace anterior sigue operativo hasta que el nuevo completa la primera sincronizacion segura y entonces se revoca atomicamente. Los datos exclusivamente locales perdidos no se prometen como recuperables.
 
 ### UI-BANNER-UNIFY-01 - Feedback premium compartido
 
@@ -387,7 +387,7 @@ Flujo de una entrada:
 
 ### APP-UPDATE-CHANGELOG-01 - Novedades de actualizacion por aplicacion
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX de actualizaciones, comunicacion de producto y publicacion DEV. Prioridad: P2.
+- Estado: `Implementado candidato DEV 264`; aprobado explicitamente el 2026-07-20. Tipo: UX de actualizaciones, comunicacion de producto y publicacion DEV. Prioridad: P2.
 - Problema: App Usuario y App Admin pueden informar que existe una version nueva, pero no explican de forma clara que cambia para la aplicacion correspondiente antes de instalarla.
 - Solucion propuesta: mostrar en la pantalla de Actualizaciones un bloque `Novedades` asociado a la version ofrecida. App Usuario recibe exclusivamente cambios relevantes para Usuario y DAG; App Admin recibe exclusivamente cambios de administracion. Si se saltaron varias versiones, presentar un resumen acumulado y legible sin mezclar detalles tecnicos internos.
 - Evidencia: pedido explicito del usuario del 2026-07-17.
@@ -403,7 +403,7 @@ Flujo de una entrada:
   - las notas pueden leerse antes de descargar y siguen disponibles durante el flujo de instalacion;
   - no incluyen secretos, nombres internos sensibles, datos de usuarios ni promesas que excedan lo realmente publicado;
   - clientes antiguos ignoran el campo nuevo sin romper la comprobacion de actualizaciones.
-- Decisiones pendientes para la entrevista del ticket: notas dentro del manifiesto o archivo versionado separado; extension maxima; categorias visibles; acumulacion entre versiones; conservar historial despues de instalar; autor y proceso de revision de cada texto.
+- Decision aplicada: notas fuente separadas por `versionCode` y app, incorporadas al manifiesto firmado operativamente por URL y SHA-256. La pantalla las muestra antes de descargar; el publicador aborta si falta el archivo correspondiente.
 
 ### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
 
@@ -917,9 +917,9 @@ Flujo de una entrada:
 ### PROTECTION-ONBOARDING-HEALTH-01 - Instalacion, salud y reparacion de proteccion
 
 - Estado: `Idea`; no aprobado para diagnostico tecnico ni codigo. Tipo: onboarding, seguridad, observabilidad y UX multiplataforma. Prioridad: P1.
-- Problema: la activacion y la recuperacion de App Usuario estan repartidas entre permisos y pantallas distintas. Aunque ya existen comprobaciones y acciones individuales, el administrador no dispone de un recorrido unico que confirme con claridad si VPN, Accessibility, Device Admin, notificaciones, bateria y barrera quedaron realmente operativos, ni de un semaforo remoto que explique una degradacion y conduzca a repararla.
+- Problema: la activacion y la recuperacion de App Usuario estan repartidas entre permisos y pantallas distintas. Aunque ya existen comprobaciones y acciones individuales, el administrador necesita una lectura coherente de VPN, Accessibility, Device Admin, sincronizacion, licencia y barrera, con una reparacion clara para cada degradacion.
 - Solucion propuesta: unificar las ideas seleccionadas por el usuario como (1) asistente de instalacion y proteccion, (2) estado de salud por dispositivo y (15) diagnostico y reparacion guiada. El alta terminaria con una verificacion real de cada capa; App Admin y Superweb mostrarian un estado agregado `Protegido`, `Incompleto` o `En riesgo`; cada fallo abriria una reparacion especifica y volveria a comprobar el resultado sin declarar exito por el solo hecho de abrir Ajustes.
-- Evidencia: seleccion explicita del usuario el 2026-07-19 luego de comparar Content Filter con FamilyTime. El handoff confirma que ya existen watchdog, heartbeat, acciones individuales para recuperar VPN/Accessibility/Device Admin/bateria, barrera predeterminada y alertas de componentes caidos; falta convertir esas capacidades en un flujo de producto coherente y verificable.
+- Evidencia: seleccion explicita del usuario el 2026-07-19 luego de comparar Content Filter con FamilyTime. El handoff confirma que ya existen watchdog, heartbeat, acciones individuales para recuperar VPN/Accessibility/Device Admin, barrera predeterminada y alertas de componentes caidos.
 - Esfuerzo: L estimado. Riesgo: alto; una salud agregada incorrecta puede declarar protegido un dispositivo degradado, bloquear el onboarding, generar reparaciones circulares o exponer recorridos de Ajustes sin mantenimiento autorizado.
 - Dependencias: `BARRIER-DEFAULT-ON-01`, `BARRIER-A11Y-RACE-01`, `USER-RESILIENCE-01`, watchdog y heartbeat existentes, autorizacion temporal de Ajustes, estado de licencia y vinculo, sincronizacion App Usuario -> App Admin/Superweb, comportamiento offline y diferencias OEM.
 - Duplicados y relacion: agrupa deliberadamente las ideas 1, 2 y 15 de la seleccion; no duplica las reparaciones tecnicas ni el watchdog ya implementados. Los reutiliza como fuente de verdad y extiende su presentacion, navegacion y verificacion. No sustituye los tickets de bypass ni promete garantias de Device Owner/MDM.
@@ -933,23 +933,22 @@ Flujo de una entrada:
   - no se recopilan consultas, URLs, mensajes ni contenido para calcular la salud.
 - Decisiones pendientes para la entrevista del ticket: componentes obligatorios por modelo de telefono; autoridad y visibilidad Admin/Super Admin; textos y colores; antiguedad maxima del heartbeat; comportamiento durante onboarding offline; orden de reparacion; ventanas de mantenimiento; recordatorios, escalamiento y criterio exacto para los tres estados agregados.
 
-### DEVICE-CONNECTIVITY-ALERTS-01 - Bateria baja y dispositivo sin comunicacion
+### DEVICE-CONNECTIVITY-ALERTS-01 - Dispositivo sin comunicacion
 
-- Estado: `Idea`; no aprobado para diagnostico tecnico ni codigo. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
-- Problema: un telefono con bateria critica, apagado, sin red o con el proceso detenido puede dejar de proteger o reportar sin que el administrador comprenda si existe manipulacion, un problema tecnico o una desconexion normal.
-- Solucion propuesta: avisar a los destinatarios autorizados cuando la bateria cruce un umbral configurable o cuando el dispositivo supere un periodo sin heartbeat. La alerta debe mostrar ultimo contacto, bateria conocida y estado de proteccion conocido, y diferenciar `bateria baja`, `sin comunicacion` y `proteccion desactivada` sin afirmar una causa no demostrada.
+- Estado: `Implementado candidato DEV 264`; aprobado explicitamente el 2026-07-20. Bateria queda fuera por decision expresa del usuario. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
+- Problema: un telefono apagado, sin red o con el proceso detenido puede dejar de reportar sin que el administrador sepa que perdio comunicacion.
+- Solucion implementada: despues de 24 horas sin heartbeat, crear como maximo una alerta por episodio para las bandejas existentes de App Admin y Superweb. Muestra el ultimo contacto y nunca afirma que la proteccion fue desactivada.
 - Evidencia: idea 10 seleccionada explicitamente por el usuario el 2026-07-19 luego de revisar las mejores funciones no invasivas de FamilyTime. Content Filter ya transmite heartbeat y alertas de componentes; se propone aprovechar esa evidencia sin agregar vigilancia de contenido.
 - Esfuerzo: M estimado. Riesgo: medio; umbrales agresivos, Doze, falta de red, telefono apagado o retrasos de sincronizacion pueden producir ruido y falsas alarmas.
-- Dependencias: heartbeat y watchdog; nivel de bateria disponible con permisos Android normales; FCM y bandejas existentes; `ALERT-ROUTING-01`; deduplicacion, lectura/archivo y estado de dispositivo; zona horaria, Doze y funcionamiento offline.
+- Dependencias: heartbeat y watchdog; bandejas existentes; `ALERT-ROUTING-01`; deduplicacion y estado de dispositivo; zona horaria, Doze y funcionamiento offline.
 - Duplicados y relacion: complementa `SUPERADMIN-ALERTS-01`, `ADMIN-ALERTS-UX-01` y `ALERT-ROUTING-01`; no redefine sus destinatarios ni mezcla una desconexion con un intento bloqueado. Se relaciona con `PROTECTION-ONBOARDING-HEALTH-01`, que consumiria el mismo ultimo estado para el semaforo de salud.
 - Criterios de aceptacion propuestos:
-  - una bateria por debajo del umbral genera como maximo una alerta por episodio y una recuperacion posterior puede cerrar o actualizar el estado;
   - la falta de heartbeat solo se alerta despues del periodo acordado y muestra la hora exacta del ultimo contacto;
   - volver a comunicarse resuelve el estado sin duplicar notificaciones;
   - la interfaz nunca presenta `proteccion desactivada` cuando la unica evidencia es falta de comunicacion;
   - destinatarios, severidad y canales respetan las reglas de ruteo vigentes;
   - no se transmiten ubicacion, mensajes, historial ni contenido de navegacion.
-- Decisiones pendientes para la entrevista del ticket: umbral de bateria; demora y recordatorios de desconexion; destinatarios Admin/Super Admin; horario silencioso; severidad; cierre automatico; visibilidad del porcentaje; tratamiento de telefono apagado, modo avion, vacaciones y dispositivos archivados.
+- Decisiones aplicadas: 24 horas, destinatarios App Admin y Superweb, sin bateria y sin notificacion push nueva en este corte. Al volver a comunicarse, un episodio futuro puede generar una nueva alerta sin duplicar el anterior.
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 

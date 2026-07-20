@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.network.config.DeviceTokenProvider
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
 import com.contentfilter.core.network.dto.RemoteAccountDto
 import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
@@ -96,6 +97,50 @@ class DefaultSyncEngineFastPathTest {
             fullSync.cancelAndJoin()
         }
 
+    @Test
+    fun `successful full sync completes pending relink`() =
+        runBlocking {
+            val devices = FakeDeviceRepository()
+            val tokens = FakeDeviceTokenProvider(pending = true)
+            val engine =
+                engine(
+                    outbox = FakeOutboxProcessor(),
+                    accounts = FakeAccountRepository(),
+                    policies = FakePolicyRepository(),
+                    limits = FakeLimitRepository(),
+                    requests = FakeRequestRepository(),
+                    applier = FakeRemoteApplier(),
+                    devices = devices,
+                    tokens = tokens,
+                )
+
+            assertTrue(engine.syncCoreDataFull().success)
+            assertEquals(1, devices.completeRelinkCalls)
+            assertEquals(false, tokens.pending)
+        }
+
+    @Test
+    fun `failed relink completion stays pending for retry`() =
+        runBlocking {
+            val devices = FakeDeviceRepository(completeRelinkSucceeds = false)
+            val tokens = FakeDeviceTokenProvider(pending = true)
+            val engine =
+                engine(
+                    outbox = FakeOutboxProcessor(),
+                    accounts = FakeAccountRepository(),
+                    policies = FakePolicyRepository(),
+                    limits = FakeLimitRepository(),
+                    requests = FakeRequestRepository(),
+                    applier = FakeRemoteApplier(),
+                    devices = devices,
+                    tokens = tokens,
+                )
+
+            assertTrue(engine.syncCoreDataFull().success)
+            assertEquals(1, devices.completeRelinkCalls)
+            assertTrue(tokens.pending)
+        }
+
     private fun engine(
         outbox: OutboxProcessor,
         accounts: RemoteAccountRepository,
@@ -103,11 +148,13 @@ class DefaultSyncEngineFastPathTest {
         limits: RemoteLimitRepository,
         requests: RemoteRequestRepository,
         applier: RemoteApplier,
+        devices: FakeDeviceRepository = FakeDeviceRepository(),
+        tokens: FakeDeviceTokenProvider = FakeDeviceTokenProvider(),
     ): DefaultSyncEngine =
         DefaultSyncEngine(
             outboxProcessor = outbox,
             accountRepository = accounts,
-            deviceRepository = FakeDeviceRepository(),
+            deviceRepository = devices,
             policyRepository = policies,
             limitRepository = limits,
             licenseRepository = FakeLicenseRepository(),
@@ -116,6 +163,7 @@ class DefaultSyncEngineFastPathTest {
             applier = applier,
             systemStatusRepository = FakeSystemStatusRepository(),
             deviceActivationRepository = FakeActivationRepository(),
+            deviceTokenProvider = tokens,
         )
 
     private fun receipt(): PolicyMutationReceipt =
@@ -237,7 +285,11 @@ class DefaultSyncEngineFastPathTest {
         override suspend fun upsertExtraTimeGrant(grant: RemoteExtraTimeGrantDto) = RemoteResult.Success(Unit)
     }
 
-    private class FakeDeviceRepository : RemoteDeviceRepository {
+    private class FakeDeviceRepository(
+        private val completeRelinkSucceeds: Boolean = true,
+    ) : RemoteDeviceRepository {
+        var completeRelinkCalls = 0
+
         override suspend fun pullDevices(updatedAfterIso: String?) = RemoteResult.Success(emptyList<RemoteDeviceDto>())
 
         override suspend fun pullDevice(deviceId: String) = RemoteResult.Success(emptyList<RemoteDeviceDto>())
@@ -257,6 +309,35 @@ class DefaultSyncEngineFastPathTest {
             policyId: String,
             revision: Long,
         ) = RemoteResult.Success(Unit)
+
+        override suspend fun completeOwnRelink(): RemoteResult<Unit> {
+            completeRelinkCalls++
+            return if (completeRelinkSucceeds) {
+                RemoteResult.Success(Unit)
+            } else {
+                RemoteResult.Failure(reason = "retry", retryable = true)
+            }
+        }
+    }
+
+    private class FakeDeviceTokenProvider(
+        var pending: Boolean = false,
+    ) : DeviceTokenProvider {
+        override fun currentDeviceToken(): String? = null
+
+        override fun saveDeviceToken(token: String) = Unit
+
+        override fun isDeviceRelinkPending(): Boolean = pending
+
+        override fun markDeviceRelinkPending() {
+            pending = true
+        }
+
+        override fun clearDeviceRelinkPending() {
+            pending = false
+        }
+
+        override fun clearDeviceToken() = Unit
     }
 
     private class FakeRemoteApplier : RemoteApplier {

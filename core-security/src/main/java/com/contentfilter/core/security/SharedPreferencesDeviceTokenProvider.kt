@@ -21,14 +21,26 @@ class SharedPreferencesDeviceTokenProvider
                 .apply()
         }
 
+        override fun isDeviceRelinkPending(): Boolean = preferences.getBoolean(DeviceRelinkPendingKey, false)
+
+        override fun markDeviceRelinkPending() {
+            preferences.edit().putBoolean(DeviceRelinkPendingKey, true).apply()
+        }
+
+        override fun clearDeviceRelinkPending() {
+            preferences.edit().remove(DeviceRelinkPendingKey).apply()
+        }
+
         override fun clearDeviceToken() {
             preferences.edit()
                 .remove(DeviceTokenKey)
+                .remove(DeviceRelinkPendingKey)
                 .apply()
         }
 
         private companion object {
             const val PreferencesName = "device-token"
             const val DeviceTokenKey = "device-token"
+            const val DeviceRelinkPendingKey = "device-relink-pending"
         }
     }

@@ -1,5 +1,6 @@
 package com.contentfilter.admin.rules
 
+import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
 import com.contentfilter.core.domain.model.ExtraTimeGrant
@@ -440,6 +441,36 @@ class RulesViewModelHelpersTest {
         assertTrue(control.allowed)
         assertTrue(control.isUpdating)
     }
+
+    @Test
+    fun `recent device with a missing protection layer is unprotected`() {
+        val device =
+            healthyDevice(
+                lastSeenAtEpochMillis = System.currentTimeMillis() - 60_000L,
+            ).copy(vpnState = ComponentState.Disabled)
+
+        assertEquals(UserDeviceStatus.Unprotected, listOf(device).toUserDevices(emptyList()).single().status)
+    }
+
+    @Test
+    fun `healthy device becomes offline only after 24 hours`() {
+        val recent = healthyDevice(System.currentTimeMillis() - OfflineDeviceWindowMillis + 60_000L)
+        val offline = healthyDevice(System.currentTimeMillis() - OfflineDeviceWindowMillis - 60_000L)
+
+        assertEquals(UserDeviceStatus.Active, listOf(recent).toUserDevices(emptyList()).single().status)
+        assertEquals(UserDeviceStatus.Inactive, listOf(offline).toUserDevices(emptyList()).single().status)
+    }
+
+    private fun healthyDevice(lastSeenAtEpochMillis: Long) =
+        Device(
+            id = DeviceId,
+            accountId = AccountId,
+            displayName = "Usuario",
+            lastSeenAtEpochMillis = lastSeenAtEpochMillis,
+            vpnState = ComponentState.Enabled,
+            accessibilityState = ComponentState.Enabled,
+            deviceAdminState = ComponentState.Enabled,
+        )
 
     private fun domainRule(
         target: String,

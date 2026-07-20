@@ -153,6 +153,8 @@ fun RulesRoute(
         onAuthorizeRemoval = viewModel::authorizeRemoval,
         onGenerateRecoveryCode = viewModel::generateRecoveryCode,
         onRecoveryCodeCopied = viewModel::clearRecoveryCode,
+        onGenerateRelinkCode = viewModel::generateRelinkCode,
+        onRelinkCodeCopied = viewModel::clearRelinkCode,
         onToggle = viewModel::toggle,
         onDelete = viewModel::delete,
     )
@@ -204,6 +206,8 @@ private fun RulesScreen(
     onAuthorizeRemoval: (String) -> Unit,
     onGenerateRecoveryCode: (String) -> Unit,
     onRecoveryCodeCopied: () -> Unit,
+    onGenerateRelinkCode: (String) -> Unit,
+    onRelinkCodeCopied: () -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -275,6 +279,8 @@ private fun RulesScreen(
             onAuthorizeRemoval = onAuthorizeRemoval,
             onGenerateRecoveryCode = onGenerateRecoveryCode,
             onRecoveryCodeCopied = onRecoveryCodeCopied,
+            onGenerateRelinkCode = onGenerateRelinkCode,
+            onRelinkCodeCopied = onRelinkCodeCopied,
             onToggle = onToggle,
             onDelete = onDelete,
         )
@@ -981,7 +987,7 @@ private val UserDeviceStatus.label: String
         when (this) {
             UserDeviceStatus.Active -> "Activo"
             UserDeviceStatus.Unprotected -> "Protección caída"
-            UserDeviceStatus.Inactive -> "Pendiente"
+            UserDeviceStatus.Inactive -> "Sin comunicación"
             UserDeviceStatus.Unknown -> "Pendiente"
         }
 
@@ -1039,6 +1045,8 @@ private fun UserDetailContent(
     onAuthorizeRemoval: (String) -> Unit,
     onGenerateRecoveryCode: (String) -> Unit,
     onRecoveryCodeCopied: () -> Unit,
+    onGenerateRelinkCode: (String) -> Unit,
+    onRelinkCodeCopied: () -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -1331,6 +1339,8 @@ private fun UserDetailContent(
                             onAuthorizeRemoval = { onAuthorizeRemoval(selectedDevice.id) },
                             onGenerateRecoveryCode = { onGenerateRecoveryCode(selectedDevice.id) },
                             onRecoveryCodeCopied = onRecoveryCodeCopied,
+                            onGenerateRelinkCode = { onGenerateRelinkCode(selectedDevice.id) },
+                            onRelinkCodeCopied = onRelinkCodeCopied,
                         )
                     }
                 }
@@ -1990,6 +2000,8 @@ private fun ProtectionPanel(
     onAuthorizeRemoval: () -> Unit,
     onGenerateRecoveryCode: () -> Unit,
     onRecoveryCodeCopied: () -> Unit,
+    onGenerateRelinkCode: () -> Unit,
+    onRelinkCodeCopied: () -> Unit,
 ) {
     val control = state.protectionControls[device.id]
     val loading = device.id in state.protectionLoadingDeviceIds
@@ -2045,6 +2057,40 @@ private fun ProtectionPanel(
         )
         Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
             Text("Permitir desinstalación")
+        }
+    }
+    ProductCard {
+        Text("Volver a enlazar", style = MaterialTheme.typography.titleMedium)
+        Text(
+            "Genera un token de un solo uso por 30 minutos. El vínculo anterior sigue activo hasta que el nuevo teléfono sincronice correctamente.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        if (state.relinkCode.isBlank() || state.relinkDeviceId != device.id) {
+            OutlinedButton(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = device.id !in state.relinkLoadingDeviceIds,
+                onClick = onGenerateRelinkCode,
+            ) {
+                Text(
+                    if (device.id in state.relinkLoadingDeviceIds) {
+                        "Generando token..."
+                    } else {
+                        "Generar token de reenlace"
+                    },
+                )
+            }
+        } else {
+            Text(state.relinkCode, style = MaterialTheme.typography.headlineSmall)
+            Text("Vence: ${state.relinkExpiresAt}", style = MaterialTheme.typography.bodySmall)
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                onClick = {
+                    clipboardManager.setText(AnnotatedString(state.relinkCode))
+                    onRelinkCodeCopied()
+                },
+            ) {
+                Text("Copiar y ocultar")
+            }
         }
     }
     ProductCard {

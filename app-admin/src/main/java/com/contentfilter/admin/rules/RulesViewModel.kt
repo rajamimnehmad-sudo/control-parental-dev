@@ -585,6 +585,46 @@ class RulesViewModel
             }
         }
 
+        fun generateRelinkCode(deviceId: String) {
+            if (deviceId in form.value.relinkLoadingDeviceIds) return
+            viewModelScope.launch {
+                form.update {
+                    it.copy(
+                        relinkCode = "",
+                        relinkExpiresAt = "",
+                        relinkDeviceId = deviceId,
+                        relinkLoadingDeviceIds = it.relinkLoadingDeviceIds + deviceId,
+                        message = "Generando token de reenlace...",
+                    )
+                }
+                when (val result = activationClient.createDeviceRelinkCode(deviceId, RelinkTokenTtlMinutes)) {
+                    is RemoteResult.Success ->
+                        form.update {
+                            it.copy(
+                                relinkCode = result.value.code,
+                                relinkExpiresAt = result.value.expiresAt,
+                                relinkDeviceId = deviceId,
+                                relinkLoadingDeviceIds = it.relinkLoadingDeviceIds - deviceId,
+                                message = "Token listo. Vence en 30 minutos y se usa una sola vez.",
+                            )
+                        }
+                    is RemoteResult.Failure ->
+                        form.update {
+                            it.copy(
+                                relinkLoadingDeviceIds = it.relinkLoadingDeviceIds - deviceId,
+                                message = "No se pudo generar el token de reenlace.",
+                            )
+                        }
+                }
+            }
+        }
+
+        fun clearRelinkCode() {
+            form.update {
+                it.copy(relinkCode = "", relinkExpiresAt = "", relinkDeviceId = null, message = "Token copiado.")
+            }
+        }
+
         fun onDeviceSelected(
             deviceId: String,
             refreshApps: Boolean = true,
@@ -2010,6 +2050,7 @@ class RulesViewModel
         private companion object {
             const val NoonMinuteOfDay = 720
             const val UserPairingTokenTtlMinutes = 180
+            const val RelinkTokenTtlMinutes = 30
             const val PolicyApplicationWaitMillis = 8_000L
             val ArchiveDateFormatter: DateTimeFormatter =
                 DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")

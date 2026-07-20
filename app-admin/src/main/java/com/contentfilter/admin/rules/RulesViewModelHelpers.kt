@@ -343,16 +343,17 @@ internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDevi
                     ?.map { it.updatedAtEpochMillis }
                     ?.maxOrNull()
             val lastSeen = device?.lastSeenAtEpochMillis ?: newestAppSeen
-            val status =
-                when {
-                    lastSeen == null -> UserDeviceStatus.Unknown
-                    System.currentTimeMillis() - lastSeen <= ActiveDeviceWindowMillis -> UserDeviceStatus.Active
-                    else -> UserDeviceStatus.Inactive
-                }
             val protectionComplete =
                 device?.vpnState == ComponentState.Enabled &&
                     device.accessibilityState == ComponentState.Enabled &&
                     device.deviceAdminState == ComponentState.Enabled
+            val status =
+                when {
+                    lastSeen == null -> UserDeviceStatus.Unknown
+                    System.currentTimeMillis() - lastSeen > OfflineDeviceWindowMillis -> UserDeviceStatus.Inactive
+                    !protectionComplete -> UserDeviceStatus.Unprotected
+                    else -> UserDeviceStatus.Active
+                }
             UserDeviceUiState(
                 id = deviceId,
                 accountId = device?.accountId.orEmpty(),
@@ -477,7 +478,7 @@ private fun Long?.toLastSeenLabel(): String =
 
 internal val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$")
 internal val DomainRegex = Regex("^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$")
-internal const val ActiveDeviceWindowMillis = 15 * 60 * 1000L
+internal const val OfflineDeviceWindowMillis = 24 * 60 * 60 * 1000L
 internal const val SwitchHoldMillis = 2_500L
 internal const val RoomConfirmTimeoutMillis = 5_000L
 internal const val MinuteMillis = 60_000L

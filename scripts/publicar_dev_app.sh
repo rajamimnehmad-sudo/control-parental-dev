@@ -140,6 +140,15 @@ mkdir -p "$OUT_DIR"
 
 VERSION_CODE="$(json_value "$LOCAL_META" versionCode)"
 VERSION_NAME="$(json_value "$LOCAL_META" versionName)"
+NOTES_FILE="$ROOT_DIR/release-notes/dev/$VERSION_CODE-$TARGET.txt"
+if [[ "$TARGET" == "usuario" ]]; then
+    NOTES_FILE="$ROOT_DIR/release-notes/dev/$VERSION_CODE-user.txt"
+fi
+if [[ ! -f "$NOTES_FILE" ]]; then
+    printf 'Faltan las novedades de App %s para versionCode %s: %s\n' "$LABEL" "$VERSION_CODE" "$NOTES_FILE" >&2
+    exit 1
+fi
+RELEASE_NOTES="$(< "$NOTES_FILE")"
 APK_NAME="$FILE_PREFIX-dev-$VERSION_CODE-debug.apk"
 OUT_APK="$OUT_DIR/$APK_NAME"
 cp "$LOCAL_APK" "$OUT_APK"
@@ -158,7 +167,7 @@ write_manifest \
     "$VERSION_NAME" \
     "$BUCKET_URL/$APK_NAME" \
     "$APK_SHA" \
-    "Build DEV $LABEL preparado para pruebas internas."
+    "$RELEASE_NOTES"
 
 if [[ ! -f "$ROOT_DIR/supabase/.temp/project-ref" ]]; then
     printf 'Linkeando proyecto Supabase DEV: %s\n' "$PROJECT_REF"

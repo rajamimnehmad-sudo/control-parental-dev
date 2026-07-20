@@ -7,6 +7,7 @@ data class RemoteDeviceActivationDto(
     val deviceId: String,
     val activationId: String,
     val deviceToken: String?,
+    val relinkPending: Boolean,
 ) {
     companion object {
         fun fromJson(json: JSONObject): RemoteDeviceActivationDto =
@@ -15,6 +16,7 @@ data class RemoteDeviceActivationDto(
                 deviceId = json.getString("device_id"),
                 activationId = json.getString("activation_id"),
                 deviceToken = json.optNullableString("device_token"),
+                relinkPending = json.optBoolean("relink_pending", false),
             )
     }
 }

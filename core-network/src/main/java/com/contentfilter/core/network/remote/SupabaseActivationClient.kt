@@ -54,6 +54,38 @@ class SupabaseActivationClient
                 executePairingCodeRequest(builtRequest, "Supabase create_device_pairing_code RPC")
             }
 
+        suspend fun createDeviceRelinkCode(
+            deviceId: String,
+            ttlMinutes: Int = 30,
+        ): RemoteResult<PairingCodeDto> =
+            withContext(Dispatchers.IO) {
+                val config = configProvider.current()
+                val baseUrl = config.normalizedUrlOrNull()
+                val token = authTokenProvider.currentToken()
+                val deviceToken = deviceTokenProvider.currentDeviceToken()
+                if (baseUrl == null || (token == null && deviceToken == null)) {
+                    return@withContext RemoteResult.Failure(
+                        "Supabase relink requires an activated admin device.",
+                        retryable = true,
+                    )
+                }
+                val body =
+                    JSONObject()
+                        .put("target_device_id", deviceId)
+                        .put("ttl_minutes", ttlMinutes)
+                        .toString()
+                        .toRequestBody(JsonMediaType)
+                val request =
+                    Request.Builder()
+                        .url("$baseUrl/rest/v1/rpc/admin_create_device_relink_code")
+                        .header("apikey", config.anonKey)
+                        .header("Authorization", "Bearer ${token ?: config.anonKey}")
+                        .header("Content-Type", "application/json")
+                        .post(body)
+                if (deviceToken != null) request.header("x-device-token", deviceToken)
+                executePairingCodeRequest(request.build(), "Supabase admin_create_device_relink_code RPC")
+            }
+
         suspend fun activateDevice(
             activationCode: String,
             displayName: String,

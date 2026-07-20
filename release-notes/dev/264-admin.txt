@@ -1,0 +1,4 @@
+Inicio, Usuarios, Solicitudes y Cuenta reorganizados para administrar más rápido.
+Estado de protección por usuario, incluido aviso tras 24 horas sin comunicación.
+Avisos más simples: lectura automática, indicador correcto y eliminación con gesto.
+Reenlace seguro de usuarios con token de un solo uso válido durante 30 minutos.

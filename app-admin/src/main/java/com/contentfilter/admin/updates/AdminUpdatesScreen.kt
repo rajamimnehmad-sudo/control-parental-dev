@@ -97,8 +97,9 @@ private fun AdminUpdatesScreen(
                     text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
                     style = MaterialTheme.typography.titleMedium,
                 )
+                Text(text = "Novedades", style = MaterialTheme.typography.titleSmall)
                 Text(
-                    text = manifest.releaseNotes.ifBlank { "Sin notas de version." },
+                    text = manifest.releaseNotes.ifBlank { "Sin novedades informadas." },
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }

@@ -23,4 +23,6 @@ interface RemoteDeviceRepository {
         policyId: String,
         revision: Long,
     ): RemoteResult<Unit>
+
+    suspend fun completeOwnRelink(): RemoteResult<Unit>
 }

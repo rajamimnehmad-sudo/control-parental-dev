@@ -7,6 +7,7 @@ import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.PolicyMutationReceipt
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.network.config.DeviceTokenProvider
 import com.contentfilter.core.network.dto.RemoteAppGroupAppDto
 import com.contentfilter.core.network.dto.RemoteAppGroupDto
 import com.contentfilter.core.network.dto.RemoteDailyLimitDto
@@ -42,6 +43,7 @@ class DefaultSyncEngine
         private val applier: RemoteApplier,
         private val systemStatusRepository: SystemStatusRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
+        private val deviceTokenProvider: DeviceTokenProvider,
     ) : SyncEngine {
         private val policySyncMutex = Mutex()
         private val targetedPolicyPullMutex = Mutex()
@@ -62,6 +64,7 @@ class DefaultSyncEngine
                 systemStatusRepository.updateSyncState(
                     if (result.success) ComponentState.Enabled else ComponentState.Warning,
                 )
+                if (result.success) completePendingRelink()
             }
         }
 
@@ -118,6 +121,7 @@ class DefaultSyncEngine
             systemStatusRepository.updateSyncState(
                 if (result.success) ComponentState.Enabled else ComponentState.Warning,
             )
+            if (result.success) completePendingRelink()
             return result
         }
 
@@ -402,6 +406,17 @@ class DefaultSyncEngine
             when (val result = deviceRepository.markDeviceSeen(activation.deviceId, health)) {
                 is RemoteResult.Success -> Unit
                 is RemoteResult.Failure -> Log.w(LogTag, "Device heartbeat failed: ${result.reason}")
+            }
+        }
+
+        private suspend fun completePendingRelink() {
+            if (!deviceTokenProvider.isDeviceRelinkPending()) return
+            when (val result = deviceRepository.completeOwnRelink()) {
+                is RemoteResult.Success -> {
+                    deviceTokenProvider.clearDeviceRelinkPending()
+                    Log.i(LogTag, "Device relink completed after successful core sync.")
+                }
+                is RemoteResult.Failure -> Log.w(LogTag, "Device relink completion deferred: ${result.reason}")
             }
         }
 

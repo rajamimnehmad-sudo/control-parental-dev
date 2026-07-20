@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft, CalendarClock, CheckCircle2, Download, KeyRound, Mail, MonitorSmartphone, Settings2, ShieldCheck, Smartphone, UserRound, UsersRound } from "lucide-react";
+import { ArrowLeft, CalendarClock, CheckCircle2, Download, KeyRound, Mail, MonitorSmartphone, Settings2, ShieldCheck, Smartphone, UserRound, UsersRound, WifiOff } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { AdminTokenForm } from "@/components/AdminTokenForm";
 import { DeleteCommunityButton } from "@/components/DeleteCommunityButton";
@@ -7,6 +7,7 @@ import { DeleteAdminButton } from "@/components/DeleteAdminButton";
 import { DeleteProtectedUserButton } from "@/components/DeleteProtectedUserButton";
 import { DagEntitlementForm } from "@/components/DagEntitlementForm";
 import { DeviceDagForm } from "@/components/DeviceDagForm";
+import { DeviceRelinkButton } from "@/components/DeviceRelinkButton";
 import { EmptyState } from "@/components/EmptyState";
 import { LicenseBadge, ProtectedUserBadge } from "@/components/Badge";
 import { LicenseForm } from "@/components/LicenseForm";
@@ -207,12 +208,15 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
         {!active && admin.pending_token_expires_at ? (
           <RevokeAdminTokenButton communityId={communityId} adminId={admin.admin_id} />
         ) : null}
+        {admin.activated_device_id ? <DeviceRelinkButton communityId={communityId} deviceId={admin.activated_device_id} /> : null}
       </div>
     </article>
   );
 }
 
 function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }: { user: ProtectedUser; communityId: string; dagEntitled: boolean; device?: CommunityDevice; versions: DevAppVersions }) {
+  const lastSeen = user.last_seen_at ? new Date(user.last_seen_at).getTime() : null;
+  const offline = lastSeen !== null && Date.now() - lastSeen >= 24 * 60 * 60 * 1000;
   return (
     <article className="rounded-md border border-line bg-white p-4 shadow-soft">
       <div className="flex items-start justify-between gap-3">
@@ -232,8 +236,10 @@ function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }:
         <InfoLine icon={Smartphone} label={user.device_id ? `Dispositivo activo · v${user.app_version_code ?? "-"}` : "Token sin activar"} />
         <InfoLine icon={KeyRound} label={`Token vence: ${formatDate(user.token_expires_at)}`} />
         <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(user.last_seen_at)}`} />
+        {offline ? <InfoLine icon={WifiOff} label="Sin comunicación desde hace más de 24 horas" /> : null}
       </div>
       <DeviceDagForm communityId={communityId} deviceId={user.device_id} enabled={user.dag_enabled} entitled={dagEntitled} />
+      {user.device_id ? <div className="mt-3"><DeviceRelinkButton communityId={communityId} deviceId={user.device_id} /></div> : null}
       {device ? <div className="mt-3"><DeviceUpdateCard device={device} versions={versions} /></div> : null}
     </article>
   );

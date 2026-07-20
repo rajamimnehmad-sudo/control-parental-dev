@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-19
+Fecha de corte: 2026-07-20
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -78,6 +78,16 @@ SHA-256 publicados:
 Usuario b1563fbd104962b2810c2edc4e7c1ce2c13c03f6884e457cf3132cb3476a0298
 Admin   45979b8a1c7fe55877bfeb0ad37c90c5f155fdea70f939111909729a1d40054b
 ```
+
+## Candidato DEV 264 - reenlace seguro, novedades y alerta de comunicacion - 2026-07-20
+
+- App Admin agrega `Volver a enlazar` dentro de Proteccion del Usuario. Superweb incorpora la misma accion en cada Usuario activo y en cada Admin activado. El token queda ligado al mismo `device_id`, rol, cuenta y administrador; es de un solo uso, dura como maximo 30 minutos y sólo se muestra en la respuesta que lo genera.
+- Consumir el token no duplica Usuario/Admin ni rota inmediatamente la credencial anterior. La app nueva recibe una credencial transitoria que sólo puede leer/sincronizar la misma cuenta y dispositivo. Despues de una sincronizacion completa correcta llama `complete_own_device_relink`: entonces se rota atomicamente el token del mismo dispositivo y se revocan sus activaciones anteriores. Si la sincronizacion o el cierre fallan, el enlace anterior sigue vigente y el nuevo reintenta sin quedar declarado como completo.
+- Se conservan identidad, comunidad, reglas, limites, horarios, grupos, solicitudes y configuracion remota. Los datos exclusivamente locales que ya se hayan perdido no se recrean. App Admin comun sólo puede emitir reenlace para Usuarios activos de su propia cuenta; Super Admin puede emitirlo para Usuario/Admin. Las tablas internas no tienen lectura directa desde Android y las RPC fallan sin token/rol valido.
+- App Admin distingue ahora `Proteccion caida` de `Sin comunicacion`: VPN, Accesibilidad o antidesinstalacion incompletos se muestran como problema tecnico; el heartbeat sólo pasa a `Sin comunicacion` al superar 24 horas. Superweb muestra el mismo atraso en la tarjeta. Un cron DEV horario crea como maximo un evento `device_offline` por episodio, visible en las bandejas Admin/Superweb existentes. No se recopila ni alerta bateria.
+- Actualizaciones muestra el titulo `Novedades` en ambas apps. La publicacion exige un archivo versionado independiente por APK (`release-notes/dev/{versionCode}-user.txt` y `-admin.txt`) y lo incorpora al manifiesto que ya vincula version, URL y SHA-256; faltan notas, el publicador falla antes de subir.
+- Backend aplicado exclusivamente en Supabase DEV `syeycayasyufedwoprea`: migracion `20260720014907_secure_device_relink_and_offline_alerts.sql`, RLS y grants verificados, `pg_cron` habilitado con un unico job `17 * * * *`, 0 sesiones/tokens de reenlace creados durante las pruebas y 0 alertas offline persistidas. La simulacion del generador se ejecuto dentro de `BEGIN/ROLLBACK`; no borro ni modifico datos existentes. Production no fue tocado.
+- Validacion hasta este corte: compilacion Kotlin DEV Usuario/Admin, unit tests de ambas apps, `core-network` y `core-sync`, ktlint, DTO retrocompatible, cierre de reenlace correcto/reintentable, ESLint, TypeScript y build Next correctos. Pendiente ejecutar la matriz final con version 264, publicar ambas APK juntas y verificar sus artefactos; la prueba fisica se hara despues con el telefono del usuario.
 
 ## Publicacion DEV 261 - Epic UX Admin, feedback y horarios - 2026-07-19
 

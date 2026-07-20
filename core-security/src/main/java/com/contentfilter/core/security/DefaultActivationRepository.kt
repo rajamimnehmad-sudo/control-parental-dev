@@ -93,6 +93,7 @@ class DefaultActivationRepository
                                 is RemoteResult.Success ->
                                     result.value.also { dto ->
                                         dto.deviceToken?.let(deviceTokenProvider::saveDeviceToken)
+                                        if (dto.relinkPending) deviceTokenProvider.markDeviceRelinkPending()
                                     }
                             }
                         val session =
@@ -122,6 +123,7 @@ class DefaultActivationRepository
                             is RemoteResult.Success ->
                                 result.value.also { dto ->
                                     dto.deviceToken?.let(deviceTokenProvider::saveDeviceToken)
+                                    if (dto.relinkPending) deviceTokenProvider.markDeviceRelinkPending()
                                 }
                         }
                     } else {

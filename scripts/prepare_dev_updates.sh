@@ -32,6 +32,14 @@ ADMIN_APK="$ROOT_DIR/app-admin/build/outputs/apk/dev/debug/app-admin-dev-debug.a
 USER_META="$ROOT_DIR/app-user/build/outputs/apk/dev/debug/output-metadata.json"
 ADMIN_META="$ROOT_DIR/app-admin/build/outputs/apk/dev/debug/output-metadata.json"
 
+release_notes() {
+    local app="$1"
+    local version_code="$2"
+    local file="$ROOT_DIR/release-notes/dev/$version_code-$app.txt"
+    require_file "$file"
+    printf '%s' "$(< "$file")"
+}
+
 require_file() {
     local file="$1"
     if [[ ! -f "$file" ]]; then
@@ -94,6 +102,8 @@ USER_VERSION_CODE="$(metadata_value "$USER_META" versionCode)"
 USER_VERSION_NAME="$(metadata_value "$USER_META" versionName)"
 ADMIN_VERSION_CODE="$(metadata_value "$ADMIN_META" versionCode)"
 ADMIN_VERSION_NAME="$(metadata_value "$ADMIN_META" versionName)"
+USER_NOTES="$(release_notes user "$USER_VERSION_CODE")"
+ADMIN_NOTES="$(release_notes admin "$ADMIN_VERSION_CODE")"
 USER_APK_NAME="app-user-dev-$USER_VERSION_CODE-debug.apk"
 ADMIN_APK_NAME="app-admin-dev-$ADMIN_VERSION_CODE-debug.apk"
 
@@ -111,7 +121,7 @@ write_manifest \
     "$USER_VERSION_NAME" \
     "$USER_APK_NAME" \
     "$USER_SHA" \
-    "Build DEV Usuario preparado para pruebas internas."
+    "$USER_NOTES"
 
 write_manifest \
     "$OUT_DIR/app-admin-dev-manifest.json" \
@@ -119,7 +129,7 @@ write_manifest \
     "$ADMIN_VERSION_NAME" \
     "$ADMIN_APK_NAME" \
     "$ADMIN_SHA" \
-    "Build DEV Admin preparado para pruebas internas."
+    "$ADMIN_NOTES"
 
 cat <<EOF
 Archivos listos en:

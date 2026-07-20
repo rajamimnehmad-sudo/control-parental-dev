@@ -65,6 +65,9 @@ class SupabaseRemoteDeviceRepository
             )
         }
 
+        override suspend fun completeOwnRelink(): RemoteResult<Unit> =
+            client.invokeRpc("complete_own_device_relink", JSONObject())
+
         private fun SystemHealthSnapshot.toDeviceSeenJson(): JSONObject {
             val now = Instant.now().toString()
             return JSONObject()

@@ -8,6 +8,7 @@ import com.contentfilter.core.domain.model.ActivationResult
 import com.contentfilter.core.domain.repository.ActivationRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.SyncScheduler
+import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +27,7 @@ class ActivationViewModel
         private val activationRepository: ActivationRepository,
         private val deviceActivationRepository: DeviceActivationRepository,
         private val syncScheduler: SyncScheduler,
+        private val syncEngine: SyncEngine,
         private val targetedPolicySyncCoordinator: TargetedPolicySyncCoordinator,
         private val realtimeSyncCoordinator: RealtimeSyncCoordinator,
         private val installedAppVersionProvider: InstalledAppVersionProvider,
@@ -111,7 +113,8 @@ class ActivationViewModel
                     realtimeSyncCoordinator.start()
                     syncScheduler.requestSync()
                     viewModelScope.launch(Dispatchers.IO) {
-                        val syncResult =
+                        val coreSync = runCatching { syncEngine.syncCoreDataFull() }
+                        val policySync =
                             runCatching {
                                 targetedPolicySyncCoordinator.refresh(
                                     deviceId = result.activation.deviceId,
@@ -120,7 +123,10 @@ class ActivationViewModel
                             }
                         Log.i(
                             LogTag,
-                            "Initial sync after activation. newDeviceId=${result.activation.deviceId} success=${syncResult.isSuccess} error=${syncResult.exceptionOrNull()?.javaClass?.simpleName}",
+                            "Initial sync after activation. newDeviceId=${result.activation.deviceId} " +
+                                "coreSuccess=${coreSync.getOrNull()?.success == true} " +
+                                "policySuccess=${policySync.isSuccess} " +
+                                "error=${coreSync.exceptionOrNull()?.javaClass?.simpleName ?: policySync.exceptionOrNull()?.javaClass?.simpleName}",
                         )
                     }
                 } else if (result is ActivationResult.Failed) {
