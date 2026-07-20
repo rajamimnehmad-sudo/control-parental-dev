@@ -18,6 +18,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.listSaver
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -30,11 +32,17 @@ import com.contentfilter.core.ui.ProductCard
 internal fun AllowedScheduleEditor(
     title: String,
     rules: List<PolicyRule>,
+    saving: Boolean = false,
     onSave: (List<AllowedScheduleWindowInput>) -> Unit,
 ) {
-    val scheduleRules = remember(rules) { rules.filter { it.isScheduleRule() }.sortedBy(PolicyRule::id) }
-    var expanded by remember(scheduleRules.isNotEmpty()) { mutableStateOf(scheduleRules.isNotEmpty()) }
-    var drafts by remember(scheduleRules) {
+    val scheduleRules =
+        remember(rules) { rules.filter { it.isScheduleRule() }.sortedBy(PolicyRule::id) }
+    val rulesFingerprint =
+        scheduleRules.joinToString("|") { rule ->
+            "${rule.id}:${rule.activeWindow}:${rule.activeDaysMask}:${rule.enabled}"
+        }
+    var expanded by rememberSaveable(rulesFingerprint) { mutableStateOf(scheduleRules.isNotEmpty()) }
+    var drafts by rememberSaveable(rulesFingerprint, stateSaver = ScheduleDraftsSaver) {
         mutableStateOf(
             scheduleRules.map { rule ->
                 ScheduleWindowDraft(
@@ -77,16 +85,23 @@ internal fun AllowedScheduleEditor(
         }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
+            enabled = !saving,
             onClick = { drafts = drafts + ScheduleWindowDraft() },
         ) {
             Text("Agregar franja")
         }
         Button(
             modifier = Modifier.fillMaxWidth(),
-            enabled = drafts.all(ScheduleWindowDraft::isValid),
+            enabled = !saving && drafts.all(ScheduleWindowDraft::isValid),
             onClick = { onSave(drafts.map(ScheduleWindowDraft::toInput)) },
         ) {
-            Text(if (drafts.isEmpty()) "Quitar horario" else "Guardar horario")
+            Text(
+                when {
+                    saving -> "Guardando horario..."
+                    drafts.isEmpty() -> "Quitar horario"
+                    else -> "Guardar horario"
+                },
+            )
         }
     }
 }
@@ -166,7 +181,7 @@ private fun Int?.toScheduleTime(): String {
     return "%02d:%02d".format(value / MinutesPerHour, value % MinutesPerHour)
 }
 
-private data class ScheduleWindowDraft(
+internal data class ScheduleWindowDraft(
     val id: String? = null,
     val start: String = "08:00",
     val end: String = "00:00",
@@ -185,6 +200,34 @@ private data class ScheduleWindowDraft(
             activeDaysMask = activeDaysMask,
         )
 }
+
+private val ScheduleDraftsSaver =
+    listSaver<List<ScheduleWindowDraft>, String>(
+        save = { encodeScheduleDrafts(it) },
+        restore = { decodeScheduleDrafts(it) },
+    )
+
+internal fun encodeScheduleDrafts(drafts: List<ScheduleWindowDraft>): List<String> =
+    drafts.map { draft ->
+        listOf(
+            draft.id.orEmpty(),
+            draft.start,
+            draft.end,
+            draft.activeDaysMask.toString(),
+        ).joinToString("\t")
+    }
+
+internal fun decodeScheduleDrafts(saved: List<String>): List<ScheduleWindowDraft> =
+    saved.mapNotNull { encoded ->
+        val parts = encoded.split('\t')
+        if (parts.size != 4) return@mapNotNull null
+        ScheduleWindowDraft(
+            id = parts[0].ifBlank { null },
+            start = parts[1],
+            end = parts[2],
+            activeDaysMask = parts[3].toIntOrNull() ?: return@mapNotNull null,
+        )
+    }
 
 private data class WeekdayUi(
     val isoDayOfWeek: Int,

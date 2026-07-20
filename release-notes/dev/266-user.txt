@@ -1,0 +1,5 @@
+Ayuda incorpora un chat interactivo privado que responde dudas de Content Filter y propone preguntas según el estado real del teléfono.
+Mis apps reúne búsqueda, actualización y estado en una misma línea, sin perder filtros ni claridad.
+La protección ya no se marca como caída cuando una comprobación opcional no puede confirmar su estado.
+La recuperación para desinstalar puede usar códigos preparados previamente aunque el teléfono no tenga Internet.
+Los controles de pestañas de DAG se muestran completos y más fáciles de tocar.

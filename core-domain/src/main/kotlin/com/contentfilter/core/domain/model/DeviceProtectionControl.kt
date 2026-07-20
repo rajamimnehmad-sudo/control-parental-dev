@@ -24,6 +24,9 @@ data class DeviceProtectionControl(
     val recoveryVerifier: String? = null,
     val recoveryRevision: Long = 0,
     val recoveryConsumedRevision: Long = 0,
+    val recoveryKitRevision: Long = 0,
+    val recoveryKit: List<RecoveryCodeVerifier> = emptyList(),
+    val recoveryConsumedSlots: Set<Int> = emptySet(),
 ) {
     fun hasAuthorization(
         scope: ProtectionAuthorizationScope,
@@ -34,7 +37,22 @@ data class DeviceProtectionControl(
 
     val hasAvailableRecovery: Boolean
         get() =
-            !recoverySalt.isNullOrBlank() &&
-                !recoveryVerifier.isNullOrBlank() &&
-                recoveryRevision > recoveryConsumedRevision
+            recoveryKit.any { it.slot !in recoveryConsumedSlots } ||
+                (
+                    !recoverySalt.isNullOrBlank() &&
+                        !recoveryVerifier.isNullOrBlank() &&
+                        recoveryRevision > recoveryConsumedRevision
+                )
 }
+
+data class RecoveryCodeVerifier(
+    val slot: Int,
+    val salt: String,
+    val verifier: String,
+)
+
+data class PendingRecoveryConsumption(
+    val legacyRevision: Long? = null,
+    val kitRevision: Long? = null,
+    val consumedSlots: Set<Int> = emptySet(),
+)

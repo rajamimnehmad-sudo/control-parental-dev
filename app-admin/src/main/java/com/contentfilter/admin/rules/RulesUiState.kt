@@ -25,11 +25,11 @@ data class RulesUiState(
     val dagExtraKosherEnabled: Boolean = false,
     val dagEntitled: Boolean = false,
     val internetSaving: Boolean = false,
-    val pendingInternetBlocked: Boolean? = null,
-    val pendingExternalSearchResultsAllowed: Boolean? = null,
-    val pendingSafeSearchEnabled: Boolean? = null,
-    val pendingDagEnabled: Boolean? = null,
-    val pendingDagExtraKosherEnabled: Boolean? = null,
+    val pendingInternetBlockedByDevice: Map<String, Boolean> = emptyMap(),
+    val pendingExternalSearchResultsAllowedByDevice: Map<String, Boolean> = emptyMap(),
+    val pendingSafeSearchEnabledByDevice: Map<String, Boolean> = emptyMap(),
+    val pendingDagEnabledByDevice: Map<String, Boolean> = emptyMap(),
+    val pendingDagExtraKosherEnabledByDevice: Map<String, Boolean> = emptyMap(),
     val limitPackageName: String = "",
     val limitMinutes: String = "",
     val appSearchQuery: String = "",
@@ -37,10 +37,12 @@ data class RulesUiState(
     val groupMinutes: String = "",
     val groupSelectedPackages: Set<String> = emptySet(),
     val editingGroupId: String? = null,
-    val groupSaving: Boolean = false,
+    val groupSavingDeviceIds: Set<String> = emptySet(),
     val pendingAppGroupDeleteIds: Set<String> = emptySet(),
     val selectedAction: RuleAction = RuleAction.Block,
-    val pendingAppAllowed: Map<String, Boolean> = emptyMap(),
+    val pendingAppAllowedByDevice: Map<String, Map<String, Boolean>> = emptyMap(),
+    val scheduleSavingKeys: Set<String> = emptySet(),
+    val appRefreshDeviceIds: Set<String> = emptySet(),
     val pendingDeviceDeleteIds: Set<String> = emptySet(),
     val pairingUserName: String = "",
     val pairingCode: String = "",
@@ -59,9 +61,32 @@ data class RulesUiState(
     val protectionControls: Map<String, DeviceProtectionControl> = emptyMap(),
     val protectionLoadingDeviceIds: Set<String> = emptySet(),
     val recoveryCode: String = "",
+    val recoveryCodeDeviceId: String? = null,
+    val recoveryKitRemainingByDevice: Map<String, Int> = emptyMap(),
     val offlineMode: Boolean = true,
     val message: String = "",
 ) {
+    val pendingInternetBlocked: Boolean?
+        get() = selectedDeviceId?.let(pendingInternetBlockedByDevice::get)
+
+    val pendingExternalSearchResultsAllowed: Boolean?
+        get() = selectedDeviceId?.let(pendingExternalSearchResultsAllowedByDevice::get)
+
+    val pendingSafeSearchEnabled: Boolean?
+        get() = selectedDeviceId?.let(pendingSafeSearchEnabledByDevice::get)
+
+    val pendingDagEnabled: Boolean?
+        get() = selectedDeviceId?.let(pendingDagEnabledByDevice::get)
+
+    val pendingDagExtraKosherEnabled: Boolean?
+        get() = selectedDeviceId?.let(pendingDagExtraKosherEnabledByDevice::get)
+
+    val pendingAppAllowed: Map<String, Boolean>
+        get() = selectedDeviceId?.let(pendingAppAllowedByDevice::get).orEmpty()
+
+    val groupSaving: Boolean
+        get() = selectedDeviceId in groupSavingDeviceIds
+
     val internetMode: InternetMode
         get() = InternetMode.fromBlocked(internetBlocked)
 
@@ -130,6 +155,7 @@ data class UserDeviceUiState(
     val lastSeenLabel: String,
     val appCount: Int,
     val protectionAlert: String? = null,
+    val possibleUninstall: Boolean = false,
     val protectionComplete: Boolean = false,
     val vpnState: String = "Desconocida",
     val accessibilityState: String = "Desconocida",

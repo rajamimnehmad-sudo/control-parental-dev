@@ -2,6 +2,7 @@ package com.contentfilter.core.domain.repository
 
 import com.contentfilter.core.domain.model.DeviceProtectionControl
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
+import com.contentfilter.core.domain.model.RecoveryCodeVerifier
 
 interface ProtectionControlRepository {
     suspend fun get(deviceId: String): Result<DeviceProtectionControl?>
@@ -28,10 +29,18 @@ interface ProtectionControlRepository {
         verifier: String,
     ): Result<DeviceProtectionControl>
 
+    suspend fun rotateRecoveryKit(
+        accountId: String,
+        deviceId: String,
+        verifiers: List<RecoveryCodeVerifier>,
+    ): Result<DeviceProtectionControl>
+
     suspend fun acknowledge(
         deviceId: String,
         commandRevision: Long,
         recoveryConsumedRevision: Long? = null,
+        recoveryKitRevision: Long? = null,
+        recoveryConsumedSlots: Set<Int> = emptySet(),
     ): Result<Unit>
 
     suspend fun cancelOwnRemovalAuthorization(): Result<Unit>

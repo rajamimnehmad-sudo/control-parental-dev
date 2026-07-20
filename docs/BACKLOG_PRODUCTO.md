@@ -51,6 +51,29 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### PROTECTION-POSSIBLE-UNINSTALL-01 - Alerta maxima persistente
+
+- Estado: `Implementado candidato DEV 266; pendiente prueba fisica y publicacion`. Aprobado explicitamente el 2026-07-20. Tipo: seguridad, alertas y recuperacion. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
+- Alcance: si el administrador del dispositivo queda desactivado y App Usuario deja de comunicarse durante mas de 30 minutos, Admin muestra una `ALERTA MAXIMA` persistente, deduplicada por episodio, sin afirmar como hecho una desinstalacion que Android no puede confirmar remotamente.
+- Recuperacion: explica verificar si la app sigue instalada, reinstalar/reenlazar si falta y reactivar administrador, Accesibilidad y VPN. La alerta se genera en Supabase DEV aunque el telefono ya no pueda reportar.
+
+### PROTECTION-OFFLINE-RECOVERY-02 - Kit sin conexion de un solo uso
+
+- Estado: `Implementado candidato DEV 266; pendiente prueba fisica y publicacion`. Aprobado explicitamente el 2026-07-20. Tipo: seguridad y continuidad offline. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
+- Alcance: Admin prepara cinco codigos por dispositivo mientras tiene conexion y revela el siguiente aun offline. Usuario valida un codigo no consumido sin Internet, habilita diez minutos para desinstalar y sincroniza el consumo al reconectar.
+- Seguridad: Supabase conserva solo verificadores con salt y slots consumidos; Admin cifra los codigos legibles con Android Keystore. Cada codigo se usa una vez, rotar invalida el kit anterior y cinco intentos fallidos bloquean durante 15 minutos.
+
+### HELP-CONTEXTUAL-CHAT-01 - Asistente privado de Content Filter
+
+- Estado: `Implementado candidato DEV 266; pendiente prueba fisica y publicacion`. Aprobado explicitamente el 2026-07-20. Tipo: ayuda, UX y privacidad. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Alcance: chat interactivo disponible en Usuario y Admin, con preguntas sugeridas segun el estado real propio o agregado de todos los dispositivos y acciones directas hacia la seccion correcta.
+- Decision: motor local determinista, universal y gratuito; funciona offline, no envia preguntas ni promete conocimiento general. Rechaza temas ajenos a Content Filter y conserva solo contexto corto de la conversacion visible.
+
+### ADMIN-USER-SECTIONS-UX-04 - Apps, Web y Seguridad separadas
+
+- Estado: `Implementado candidato DEV 266; pendiente prueba fisica y publicacion`. Aprobado explicitamente el 2026-07-20. Tipo: UX Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Alcance: selector horizontal moderno y translucido; Aplicaciones y Web contienen solo sus reglas; Seguridad concentra proteccion, reenlace, desinstalacion, archivo y recuperacion. Web queda sin foto ni tarjeta exterior.
+
 ### ANDROID-BRAND-ICONS-01 - Iconos oficiales diferenciados
 
 - Estado: `Publicado DEV 264; pendiente comprobacion visual en launcher`. Aprobado explicitamente por el usuario el 2026-07-20. Tipo: marca y UX Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
@@ -172,6 +195,10 @@ Flujo de una entrada:
 
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
+| PROTECTION-POSSIBLE-UNINSTALL-01 | Candidato DEV 266; actualizacion in-place validada, recorrido visual limitado por ANR de SystemUI; pendiente publicacion | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
+| PROTECTION-OFFLINE-RECOVERY-02 | Candidato DEV 266; actualizacion in-place validada, recorrido visual limitado por ANR de SystemUI; pendiente publicacion | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
+| HELP-CONTEXTUAL-CHAT-01 | Candidato DEV 266; actualizacion in-place validada, recorrido visual limitado por ANR de SystemUI; pendiente publicacion | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
+| ADMIN-USER-SECTIONS-UX-04 | Candidato DEV 266; actualizacion in-place validada, recorrido visual limitado por ANR de SystemUI; pendiente publicacion | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |

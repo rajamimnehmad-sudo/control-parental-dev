@@ -1,6 +1,6 @@
-# Publicar APKs DEV sin ir a la Mac
+# Trabajar y publicar DEV desde la nube
 
-Objetivo: usar la Mac encendida como runner de GitHub Actions. Desde el Samsung se toca un boton en GitHub y la Mac compila, testea, sube APKs a Supabase Storage y actualiza manifiestos.
+Objetivo: trabajar con Codex cloud sobre GitHub y publicar desde un runner alojado por GitHub. La Mac puede quedar apagada; solo hace falta para pruebas Android fisicas por cable.
 
 ## Una sola vez
 
@@ -16,22 +16,18 @@ Objetivo: usar la Mac encendida como runner de GitHub Actions. Desde el Samsung 
 
 No crear ni guardar `SERVICE_ROLE_KEY`.
 
-3. En GitHub, abrir:
+3. Conectar el repositorio a Codex en `https://chatgpt.com/codex` y crear un entorno cloud para la rama de trabajo.
 
-`Settings -> Actions -> Runners -> New self-hosted runner`
+4. No hace falta configurar un runner propio. `Publicar APKs DEV` usa `ubuntu-latest`, instala JDK, Android SDK, Gradle y Supabase CLI en cada ejecucion.
 
-Elegir:
+## Trabajo cotidiano desde el Samsung
 
-- macOS
-- la arquitectura de tu Mac
+1. Abrir Codex web desde Chrome e iniciar una tarea sobre este repositorio.
+2. Trabajar en una rama y abrir un PR; Android CI valida la rama sin publicar APKs.
+3. Revisar el diff y los checks desde GitHub o Codex.
+4. Fusionar el PR a `main` solo cuando el cambio este aprobado.
 
-4. GitHub va a mostrar comandos para descargar y configurar el runner. Ejecutarlos en la Mac una sola vez.
-
-5. Cuando pregunte labels, dejar los defaults. El workflow usa:
-
-`self-hosted, macOS`
-
-6. Dejar el runner corriendo en la Mac.
+Un push o merge ya no publica automaticamente. La publicacion DEV es una accion manual separada.
 
 ## Cada actualizacion
 
@@ -42,19 +38,25 @@ Desde el Samsung:
 3. Abrir `Actions`.
 4. Elegir `Publicar APKs DEV`.
 5. Tocar `Run workflow`.
-6. Esperar que termine verde.
-7. Abrir App Usuario o App Admin.
-8. Tocar `Actualizaciones`.
+6. Marcar `Confirmo que quiero publicar ambas APK en Supabase DEV`.
+7. Tocar nuevamente `Run workflow` y esperar que termine verde.
+8. Abrir App Usuario o App Admin.
+9. Tocar `Actualizaciones`.
 
 ## Que hace automaticamente
 
 - Compila App Usuario DEV.
 - Compila App Admin DEV.
 - Ejecuta tests.
+- Comprueba que ambos `versionCode` sean mayores que los publicados.
 - Genera manifiestos.
-- Sube APKs a Supabase Storage.
+- Sube ambas APK exclusivamente a Supabase Storage DEV mediante staging atomico.
 - Actualiza manifiestos.
+
+No usa Production ni guarda una Service Role Key. El token de acceso a Supabase vive solo como GitHub Actions Secret.
 
 ## Si falla
 
 Abrir el run fallido en GitHub Actions y mirar el paso rojo. El error queda ahi con el detalle exacto.
+
+Si falla antes de promocionar los manifiestos, no volver a ejecutar a ciegas: comprobar primero las versiones publicas y el prefijo de staging indicado por el log.

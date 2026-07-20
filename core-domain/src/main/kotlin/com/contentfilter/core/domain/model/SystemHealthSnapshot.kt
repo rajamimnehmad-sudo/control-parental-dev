@@ -37,5 +37,5 @@ data class SystemHealthSnapshot(
             integrityState == ComponentState.Warning ||
             databaseState == ComponentState.Warning ||
             licenseState != LicenseState.Active ||
-            updateState != UpdateState.Current
+            updateState == UpdateState.RequiredUpdateAvailable
 }

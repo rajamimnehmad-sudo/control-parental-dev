@@ -1,0 +1,5 @@
+Ayuda incorpora un chat interactivo privado, limitado a Content Filter, con sugerencias según el estado actual de todos los dispositivos.
+El detalle de cada usuario separa Aplicaciones, Web y Seguridad con un selector moderno y un flujo más simple.
+Web deja la tarjeta con foto y muestra la configuración directamente, con menos ruido visual.
+Seguridad permite preparar cinco códigos de recuperación de un solo uso para casos sin Internet.
+Una posible desinstalación genera una ALERTA MÁXIMA persistente con pasos concretos para verificar y restablecer la protección.

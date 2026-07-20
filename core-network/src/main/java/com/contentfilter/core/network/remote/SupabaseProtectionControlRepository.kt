@@ -2,7 +2,9 @@ package com.contentfilter.core.network.remote
 
 import com.contentfilter.core.domain.model.DeviceProtectionControl
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
+import com.contentfilter.core.domain.model.RecoveryCodeVerifier
 import com.contentfilter.core.domain.repository.ProtectionControlRepository
+import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
 import javax.inject.Inject
@@ -75,16 +77,33 @@ class SupabaseProtectionControlRepository
                     .put("command_revision", current.commandRevision + 1)
             }
 
+        override suspend fun rotateRecoveryKit(
+            accountId: String,
+            deviceId: String,
+            verifiers: List<RecoveryCodeVerifier>,
+        ): Result<DeviceProtectionControl> =
+            mutate(accountId, deviceId) { current, json ->
+                json
+                    .put("recovery_kit_revision", current.recoveryKitRevision + 1)
+                    .put("recovery_kit", verifiers.toJsonArray())
+                    .put("recovery_consumed_slots", JSONArray())
+                    .put("command_revision", current.commandRevision + 1)
+            }
+
         override suspend fun acknowledge(
             deviceId: String,
             commandRevision: Long,
             recoveryConsumedRevision: Long?,
+            recoveryKitRevision: Long?,
+            recoveryConsumedSlots: Set<Int>,
         ): Result<Unit> {
             val json =
                 JSONObject()
                     .put("p_device_id", deviceId)
                     .put("p_command_revision", commandRevision)
                     .put("p_recovery_consumed_revision", recoveryConsumedRevision ?: JSONObject.NULL)
+                    .put("p_recovery_kit_revision", recoveryKitRevision ?: JSONObject.NULL)
+                    .put("p_recovery_consumed_slots", recoveryConsumedSlots.toJsonArray())
             return client.invokeRpc("ack_device_protection_control", json).toResult()
         }
 
@@ -131,7 +150,45 @@ class SupabaseProtectionControlRepository
                 recoveryVerifier = optString("recovery_verifier").takeIf { it.isNotBlank() && it != "null" },
                 recoveryRevision = optLong("recovery_revision", 0),
                 recoveryConsumedRevision = optLong("recovery_consumed_revision", 0),
+                recoveryKitRevision = optLong("recovery_kit_revision", 0),
+                recoveryKit = optRecoveryKit("recovery_kit"),
+                recoveryConsumedSlots = optIntSet("recovery_consumed_slots"),
             )
+
+        private fun List<RecoveryCodeVerifier>.toJsonArray(): JSONArray =
+            JSONArray().also { array ->
+                forEach { material ->
+                    array.put(
+                        JSONObject()
+                            .put("slot", material.slot)
+                            .put("salt", material.salt)
+                            .put("verifier", material.verifier),
+                    )
+                }
+            }
+
+        private fun Set<Int>.toJsonArray(): JSONArray = JSONArray().also { array -> sorted().forEach(array::put) }
+
+        private fun JSONObject.optRecoveryKit(key: String): List<RecoveryCodeVerifier> {
+            val array = optJSONArray(key) ?: return emptyList()
+            return buildList {
+                repeat(array.length()) { index ->
+                    val item = array.optJSONObject(index) ?: return@repeat
+                    add(
+                        RecoveryCodeVerifier(
+                            slot = item.optInt("slot", -1),
+                            salt = item.optString("salt"),
+                            verifier = item.optString("verifier"),
+                        ),
+                    )
+                }
+            }.filter { it.slot in 0..4 && it.salt.isNotBlank() && it.verifier.isNotBlank() }
+        }
+
+        private fun JSONObject.optIntSet(key: String): Set<Int> {
+            val array = optJSONArray(key) ?: return emptySet()
+            return buildSet { repeat(array.length()) { add(array.optInt(it, -1)) } }.filter { it in 0..4 }.toSet()
+        }
 
         private fun RemoteResult<Unit>.toResult(): Result<Unit> =
             when (this) {
