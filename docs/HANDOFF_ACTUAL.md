@@ -50,11 +50,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-19:
+Version publicada real al 2026-07-20:
 
 ```text
-App Usuario versionCode 262
-App Admin versionCode 262
+App Usuario versionCode 263
+App Admin versionCode 263
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-262-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-262-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-263-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-263-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario a58aab3d2d264f077d54f786b986de9a5c8587696afd71de4e44caef00923a19
-Admin   f741b42ff7058c245902f4aa8379b1b7b6a6b8f38490f1eb3df616d09f8b2937
+Usuario b1563fbd104962b2810c2edc4e7c1ce2c13c03f6884e457cf3132cb3476a0298
+Admin   45979b8a1c7fe55877bfeb0ad37c90c5f155fdea70f939111909729a1d40054b
 ```
 
 ## Publicacion DEV 261 - Epic UX Admin, feedback y horarios - 2026-07-19
@@ -111,7 +111,7 @@ Admin   f741b42ff7058c245902f4aa8379b1b7b6a6b8f38490f1eb3df616d09f8b2937
 - GitHub `Publicar APKs DEV` `29705231350` publico exclusivamente en Supabase DEV `syeycayasyufedwoprea`, y Android CI `29705231343` completo build, tests, ktlint, Android Lint y Detekt. Los APK publicos descargados miden 51.705.690 bytes Usuario y 28.278.292 bytes Admin; sus SHA-256 coinciden con los manifiestos. `aapt` confirma `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, version 262, y `apksigner` verifica en ambos el certificado esperado `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 - El telefono no estuvo visible por ADB durante el cierre, por lo que falta instalar DEV 262 y recorrer visualmente Home, Mis apps e Internet. No se toco Production, no se borraron datos y no se agregaron secretos.
 
-## Candidato posterior a DEV 262 - Bandeja de avisos y transiciones sutiles - 2026-07-19
+## Cambios incluidos en DEV 263 - Bandeja de avisos y transiciones sutiles - 2026-07-19
 
 - `ANNOUNCEMENTS-INBOX-UX-02` adapta Avisos en App Usuario y App Admin: se retira `Actualizar avisos`, la carga se ejecuta al abrir, los avisos no leidos usan mayor peso tipografico y abrir la bandeja marca los visibles como leidos. El contador rojo de la campanita representa exclusivamente no leidos y desaparece cuando quedan marcados.
 - Cada aviso puede ocultarse para ese dispositivo deslizando de derecha a izquierda. La operacion es optimista, ofrece `Deshacer` y nunca archiva ni elimina el aviso global de Superweb. La campanita usa el glifo de contorno compartido en ambas apps.
@@ -119,9 +119,9 @@ Admin   f741b42ff7058c245902f4aa8379b1b7b6a6b8f38490f1eb3df616d09f8b2937
 - `UI-BANNER-DYNAMIC-02` recibe un pulido adicional: la linea de estado entra y sale con un recorrido vertical corto combinado con fade; el cambio de texto mantiene el desplazamiento vertical rapido pero reduce su amplitud. Conserva puntos animados, marquee para textos largos, exito temporal y error contextual persistente.
 - Validacion local: ktlint de `core-network`, `core-ui`, Usuario y Admin; compilacion Kotlin DEV de ambas apps (320 tareas); tests de `core-network`, Usuario y Admin, Android Lint vital y `assembleDevDebug` de ambas apps (792 tareas); y control global de Detekt mas Android Lint DEV de ambas apps (738 tareas). Todo termino correctamente; Detekt conserva su deuda informativa historica y el test nuevo cubre lectura y compatibilidad del payload anterior.
 - Backend DEV: la migracion `20260719224124_device_announcement_inbox_state.sql` se aplico exclusivamente en Supabase DEV `syeycayasyufedwoprea`. El `db push --dry-run` se detuvo sin cambios al detectar una desalineacion historica preexistente entre nombres locales y remotos; no se repararon esas versiones. Se ejecuto solamente el archivo nuevo mediante `db query --linked` y luego se registro exclusivamente `20260719224124` como aplicada. La verificacion confirma tabla con RLS, 3 indices, 4 RPC `SECURITY DEFINER`, 0 grants directos de tabla para `anon/authenticated`, rechazo sin token de dispositivo y 0 recibos iniciales. No se borro ni modifico ningun dato existente.
-- Publicacion Android: ninguna. `versionCode` permanece en 262, no se instalo en el telefono y no se subio ningun APK. El workflow de publicacion `29707118139` quedo omitido por `[skip dev publish]`; Android CI `29707118100` completo build, tests, ktlint, Android Lint y Detekt. No se toco Production.
+- La primera entrega se conservo como candidato sin publicacion: `versionCode` permanecio en 262, el workflow `29707118139` fue omitido por `[skip dev publish]` y Android CI `29707118100` fue correcto. Estos cambios se publicaron finalmente dentro de DEV 263, junto con la simplificacion de Proteccion documentada debajo.
 
-## Candidato DEV 263 - Proteccion centralizada y acceso de emergencia - 2026-07-20
+## Publicacion DEV 263 - Proteccion centralizada y acceso de emergencia - 2026-07-20
 
 - App Usuario concentra el diagnostico y la reparacion de VPN, Accesibilidad, proteccion contra desinstalacion, sincronizacion y licencia en la tarjeta expandible de Inicio. Ajustes deja de duplicar esos controles y conserva siempre visible el ingreso de `Codigo de emergencia`, explicado exclusivamente como autorizacion offline para desinstalar.
 - Cuando existe una autorizacion de desinstalacion, Inicio muestra dentro de Proteccion las acciones contextuales `Desinstalar ahora` y `Cancelar autorizacion`. La cancelacion revoca tanto el permiso local como el remoto; si falla, el estado seguro se vuelve a sincronizar y el error queda junto a la accion.
@@ -129,7 +129,8 @@ Admin   f741b42ff7058c245902f4aa8379b1b7b6a6b8f38490f1eb3df616d09f8b2937
 - La linea de estado compartida conserva las transiciones cortas y sutiles, pero calcula el tiempo visible segun la longitud del mensaje: los textos breves mantienen su duracion y los largos pueden permanecer hasta 8 segundos. El progreso continua visible mientras trabaja y los errores accionables conservan su copia contextual.
 - Backend DEV: `20260720004440_cancel_own_removal_authorization.sql` fue aplicada exclusivamente en `syeycayasyufedwoprea` mediante el mismo procedimiento aislado usado para la migracion anterior y se registro solo esa version, sin reparar la desalineacion historica. La RPC `cancel_own_removal_authorization` exige token del propio dispositivo, solo puede retirar su alcance `removal`, incrementa la revision y falla cerrada sin token. El asesor informa el grant anonimo esperado para RPC de dispositivo `SECURITY DEFINER`; el control interno por token fue verificado. No se borraron datos, no se agregaron secretos y Production no fue tocado.
 - Validacion previa a publicacion: ktlint y compilacion de los modulos afectados correctos; matriz local completa de tests, ktlint, Android Lint, Detekt y `assembleDevDebug` de ambas apps correcta, 1.068 tareas. Las advertencias de Detekt son la deuda informativa historica. El test nuevo verifica duracion creciente y tope para textos largos.
-- Publicacion conjunta autorizada por el usuario: ambos flavors DEV quedan preparados con `versionCode 263`. La evidencia definitiva de CI, manifiestos, hashes y publicacion se agregara tras completar el unico workflow conjunto.
+- Publicacion conjunta autorizada por el usuario: ambos flavors DEV subieron a `versionCode 263` en el commit `0d96b21`. GitHub registro el workflow `Publicar APKs DEV` `29710212274`, pero una interrupcion parcial oficial de Actions lo mantuvo en cola; se cancelo correctamente antes de que ejecutara ningun paso. Para no duplicar la entrega se ejecuto una sola vez el mismo publicador oficial del repositorio de forma local contra DEV: recompilo ambas APK, completo `./gradlew test` con 1.184 tareas y promovio en conjunto ambos APK y manifiestos desde staging. Android CI `29710212314` termino correctamente con build DEV, tests, ktlint, Android Lint y Detekt.
+- Verificacion publica: las descargas pesan 51.722.074 bytes Usuario y 28.294.676 bytes Admin; sus SHA-256 coinciden con los manifiestos. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, version 263 y `1.0.1-dev`; `apksigner` confirma en ambas el certificado `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. No se instalo en el telefono, no se toco Production y no se borro ningun dato.
 
 ## Publicacion DEV 257 - Calibracion DAG bidireccional - 2026-07-18
 
