@@ -289,25 +289,79 @@ internal fun List<PolicyRule>.webPolicyPreferenceChanges(
     )
 
 internal fun RulesUiState.withPendingWebPreference(
+    deviceId: String,
     preference: WebPolicyPreference,
     enabled: Boolean,
 ): RulesUiState =
     when (preference) {
-        WebPolicyPreference.NavigationBlocked -> copy(pendingInternetBlocked = enabled)
-        WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = enabled)
-        WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = enabled)
-        WebPolicyPreference.DagEnabled -> copy(pendingDagEnabled = enabled)
-        WebPolicyPreference.DagExtraKosherEnabled -> copy(pendingDagExtraKosherEnabled = enabled)
+        WebPolicyPreference.NavigationBlocked ->
+            copy(pendingInternetBlockedByDevice = pendingInternetBlockedByDevice + (deviceId to enabled))
+        WebPolicyPreference.ExternalSearchResultsAllowed ->
+            copy(
+                pendingExternalSearchResultsAllowedByDevice =
+                    pendingExternalSearchResultsAllowedByDevice + (deviceId to enabled),
+            )
+        WebPolicyPreference.SafeSearchEnabled ->
+            copy(pendingSafeSearchEnabledByDevice = pendingSafeSearchEnabledByDevice + (deviceId to enabled))
+        WebPolicyPreference.DagEnabled ->
+            copy(pendingDagEnabledByDevice = pendingDagEnabledByDevice + (deviceId to enabled))
+        WebPolicyPreference.DagExtraKosherEnabled ->
+            copy(pendingDagExtraKosherEnabledByDevice = pendingDagExtraKosherEnabledByDevice + (deviceId to enabled))
     }
 
-internal fun RulesUiState.clearPendingWebPreference(preference: WebPolicyPreference): RulesUiState =
+internal fun RulesUiState.clearPendingWebPreference(
+    deviceId: String,
+    preference: WebPolicyPreference,
+): RulesUiState =
     when (preference) {
-        WebPolicyPreference.NavigationBlocked -> copy(pendingInternetBlocked = null)
-        WebPolicyPreference.ExternalSearchResultsAllowed -> copy(pendingExternalSearchResultsAllowed = null)
-        WebPolicyPreference.SafeSearchEnabled -> copy(pendingSafeSearchEnabled = null)
-        WebPolicyPreference.DagEnabled -> copy(pendingDagEnabled = null)
-        WebPolicyPreference.DagExtraKosherEnabled -> copy(pendingDagExtraKosherEnabled = null)
+        WebPolicyPreference.NavigationBlocked ->
+            copy(pendingInternetBlockedByDevice = pendingInternetBlockedByDevice - deviceId)
+        WebPolicyPreference.ExternalSearchResultsAllowed ->
+            copy(
+                pendingExternalSearchResultsAllowedByDevice = pendingExternalSearchResultsAllowedByDevice - deviceId,
+            )
+        WebPolicyPreference.SafeSearchEnabled ->
+            copy(pendingSafeSearchEnabledByDevice = pendingSafeSearchEnabledByDevice - deviceId)
+        WebPolicyPreference.DagEnabled ->
+            copy(pendingDagEnabledByDevice = pendingDagEnabledByDevice - deviceId)
+        WebPolicyPreference.DagExtraKosherEnabled ->
+            copy(pendingDagExtraKosherEnabledByDevice = pendingDagExtraKosherEnabledByDevice - deviceId)
     }
+
+internal fun RulesUiState.withPendingAppAllowed(
+    deviceId: String,
+    packageName: String,
+    allowed: Boolean,
+): RulesUiState =
+    copy(
+        pendingAppAllowedByDevice =
+            pendingAppAllowedByDevice +
+                (deviceId to (pendingAppAllowedByDevice[deviceId].orEmpty() + (packageName to allowed))),
+    )
+
+internal fun RulesUiState.clearPendingAppAllowed(
+    deviceId: String,
+    packageName: String,
+): RulesUiState {
+    val remainingForDevice = pendingAppAllowedByDevice[deviceId].orEmpty() - packageName
+    return copy(
+        pendingAppAllowedByDevice =
+            if (remainingForDevice.isEmpty()) {
+                pendingAppAllowedByDevice - deviceId
+            } else {
+                pendingAppAllowedByDevice + (deviceId to remainingForDevice)
+            },
+    )
+}
+
+internal fun scheduleSavingKey(
+    deviceId: String,
+    scope: RuleScope,
+    target: String,
+): String = "$deviceId:${scope.name}:$target"
+
+internal fun RulesUiState.recoveryCodeFor(deviceId: String): String =
+    recoveryCode.takeIf { recoveryCodeDeviceId == deviceId }.orEmpty()
 
 internal fun List<PolicyRule>.webNavigationOpenWithoutAuxiliaryBlocks(): Boolean =
     !webNavigationBlocked() && activeWebAuxiliaryBlockCount() == 0

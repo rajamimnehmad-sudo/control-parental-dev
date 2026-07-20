@@ -11,7 +11,6 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +19,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -35,7 +33,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -45,13 +42,11 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -66,22 +61,18 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.contentfilter.core.domain.model.DeviceProtectionControl
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
 import com.contentfilter.core.domain.model.PolicyTargetType
-import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
@@ -89,7 +80,6 @@ import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductLazyVisualPage
 import com.contentfilter.core.ui.ProductSectionHeader
-import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
@@ -979,9 +969,9 @@ private fun UserDeviceUiState.detailAttentionSummary(): String =
         }
 
 private val AdminSurface = Color(0xFFF2F8F7)
-private val HeaderInk = Color(0xFF162235)
-private val HeaderMuted = Color(0xFF68758A)
-private val ActiveGreen = Color(0xFF00A650)
+internal val HeaderInk = Color(0xFF162235)
+internal val HeaderMuted = Color(0xFF68758A)
+internal val ActiveGreen = Color(0xFF00A650)
 private val PendingYellow = Color(0xFFFFC849)
 
 private fun lerpDp(
@@ -1029,7 +1019,7 @@ private fun UserDetailContent(
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
-    var appFilter by remember(selectedDevice.id) { mutableStateOf(AppQuickFilter.All) }
+    var appFilter by rememberSaveable(selectedDevice.id) { mutableStateOf(AppQuickFilter.All) }
     var scheduleAppPackage by rememberSaveable(selectedDevice.id) { mutableStateOf<String?>(null) }
     var scheduleDomain by rememberSaveable(selectedDevice.id) { mutableStateOf<String?>(null) }
     var searchExpanded by rememberSaveable(selectedDevice.id) { mutableStateOf(state.appSearchQuery.isNotBlank()) }
@@ -1098,6 +1088,12 @@ private fun UserDetailContent(
                                     it.scope == RuleScope.App &&
                                         it.scheduleTarget() == PolicySchedulePolicy.WildcardTarget
                                 },
+                            saving =
+                                scheduleSavingKey(
+                                    selectedDevice.id,
+                                    RuleScope.App,
+                                    PolicySchedulePolicy.WildcardTarget,
+                                ) in state.scheduleSavingKeys,
                             onSave = { windows ->
                                 onAllowedScheduleSaved(
                                     RuleScope.App,
@@ -1159,6 +1155,9 @@ private fun UserDetailContent(
                                 AllowedScheduleEditor(
                                     title = "Horario de ${app.appName}",
                                     rules = appScheduleRules,
+                                    saving =
+                                        scheduleSavingKey(selectedDevice.id, RuleScope.App, app.packageName) in
+                                            state.scheduleSavingKeys,
                                     onSave = { windows ->
                                         onAllowedScheduleSaved(
                                             RuleScope.App,
@@ -1217,6 +1216,12 @@ private fun UserDetailContent(
                                     it.scope == RuleScope.Domain &&
                                         it.scheduleTarget() == PolicySchedulePolicy.WildcardTarget
                                 },
+                            saving =
+                                scheduleSavingKey(
+                                    selectedDevice.id,
+                                    RuleScope.Domain,
+                                    PolicySchedulePolicy.WildcardTarget,
+                                ) in state.scheduleSavingKeys,
                             onSave = { windows ->
                                 onAllowedScheduleSaved(
                                     RuleScope.Domain,
@@ -1300,6 +1305,9 @@ private fun UserDetailContent(
                                 AllowedScheduleEditor(
                                     title = "Horario de $target",
                                     rules = scheduleRules,
+                                    saving =
+                                        scheduleSavingKey(selectedDevice.id, RuleScope.Domain, target) in
+                                            state.scheduleSavingKeys,
                                     onSave = { windows ->
                                         onAllowedScheduleSaved(RuleScope.Domain, target, windows)
                                     },
@@ -1446,260 +1454,6 @@ private fun AppsToolbar(
                 )
             }
         }
-    }
-}
-
-@Composable
-private fun DomainRuleEditor(
-    domain: String,
-    minutes: String,
-    saving: Boolean,
-    onDomainChanged: (String) -> Unit,
-    onMinutesChanged: (String) -> Unit,
-    onAllow: () -> Unit,
-    onAllowWithLimit: () -> Unit,
-) {
-    ProductCard {
-        Text("Agregar sitio", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Podés permitir un sitio, limitar sus minutos por DNS o agregarle después un horario exacto.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = HeaderMuted,
-        )
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = domain,
-            onValueChange = onDomainChanged,
-            label = { Text("Dominio") },
-            placeholder = { Text("ejemplo.com") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = minutes,
-            onValueChange = onMinutesChanged,
-            label = { Text("Minutos DNS opcionales") },
-            supportingText = { Text("Es una aproximación técnica; no equivale a tiempo real de lectura.") },
-            singleLine = true,
-        )
-        Button(
-            modifier = Modifier.fillMaxWidth(),
-            enabled = !saving && domain.isNotBlank(),
-            onClick = if (minutes.isBlank()) onAllow else onAllowWithLimit,
-        ) {
-            Text(if (minutes.isBlank()) "Permitir sitio" else "Permitir con límite aproximado")
-        }
-    }
-}
-
-@Composable
-private fun WebNavigationPanel(
-    blocked: Boolean,
-    onlyResultsEnabled: Boolean,
-    presentation: WebPanelPresentation,
-    navigationSaving: Boolean,
-    onlyResultsSaving: Boolean,
-    dagEnabled: Boolean,
-    dagEntitled: Boolean,
-    dagSaving: Boolean,
-    dagExtraKosherEnabled: Boolean,
-    dagExtraKosherSaving: Boolean,
-    protectionActive: Boolean,
-    onBlockedChanged: (Boolean) -> Unit,
-    onOnlyResultsChanged: (Boolean) -> Unit,
-    onDagEnabledChanged: (Boolean) -> Unit,
-    onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
-) {
-    ProductCard {
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            InternetModeSelector(
-                blocked = blocked,
-                saving = navigationSaving,
-                onBlockedChanged = onBlockedChanged,
-            )
-            Text(
-                text = presentation.headline,
-                style = MaterialTheme.typography.titleSmall,
-                color = MaterialTheme.colorScheme.onSurface,
-            )
-            if (blocked) {
-                Text(
-                    "Los navegadores no pueden abrir sitios. Tus protecciones quedan guardadas para cuando abras Internet.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HeaderMuted,
-                )
-            } else {
-                Text(
-                    presentation.activeLayers.joinToString(" · ").ifBlank { "Sin capas adicionales" },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = HeaderMuted,
-                )
-            }
-            AnimatedVisibility(visible = presentation.showLayers) {
-                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                    Text(
-                        "SafeSearch se aplica automaticamente.",
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = HeaderMuted,
-                    )
-                    WebSwitchRow(
-                        title = "Solo resultados",
-                        description = "Permite buscar y ver resultados, pero bloquea todos los sitios externos.",
-                        checked = onlyResultsEnabled,
-                        enabled = !onlyResultsSaving,
-                        saving = onlyResultsSaving,
-                        onCheckedChange = onOnlyResultsChanged,
-                    )
-                }
-            }
-            WebSwitchRow(
-                title = "Buscador DAG",
-                description =
-                    if (dagEntitled) {
-                        "Habilita el acceso al buscador protegido desde la App Usuario."
-                    } else {
-                        "DAG no está incluido en la licencia de esta comunidad."
-                    },
-                checked = dagEnabled,
-                enabled = dagEntitled && !dagSaving,
-                saving = dagSaving,
-                onCheckedChange = onDagEnabledChanged,
-            )
-            WebSwitchRow(
-                title = "Modo Extra Kosher",
-                description =
-                    "Difumina todas las fotos de contenido; conserva logos, iconos y controles esenciales. Los videos permanecen bloqueados.",
-                checked = dagExtraKosherEnabled,
-                enabled = dagEnabled && dagEntitled && !dagExtraKosherSaving,
-                saving = dagExtraKosherSaving,
-                onCheckedChange = onDagExtraKosherEnabledChanged,
-            )
-            if (blocked && !protectionActive) {
-                FeedbackBanner(
-                    "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",
-                    isError = true,
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun InternetModeSelector(
-    blocked: Boolean,
-    saving: Boolean,
-    onBlockedChanged: (Boolean) -> Unit,
-) {
-    var dragDistance by remember { mutableStateOf(0f) }
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .height(58.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color(0xFFF1F4F5))
-                    .border(1.dp, Color(0xFFD2DADD), RoundedCornerShape(8.dp))
-                    .pointerInput(blocked, saving) {
-                        if (!saving) {
-                            val swipeThreshold = 48.dp.toPx()
-                            detectHorizontalDragGestures(
-                                onDragStart = { dragDistance = 0f },
-                                onDragCancel = { dragDistance = 0f },
-                                onDragEnd = {
-                                    when {
-                                        dragDistance > swipeThreshold && !blocked -> onBlockedChanged(true)
-                                        dragDistance < -swipeThreshold && blocked -> onBlockedChanged(false)
-                                    }
-                                    dragDistance = 0f
-                                },
-                            ) { change, amount ->
-                                change.consume()
-                                dragDistance += amount
-                            }
-                        }
-                    },
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            InternetModeOption(
-                title = "INTERNET ABIERTO",
-                selected = !blocked,
-                enabled = !saving,
-                icon = { Icon(Icons.Default.Search, contentDescription = null) },
-                onClick = { if (blocked) onBlockedChanged(false) },
-            )
-            InternetModeOption(
-                title = "INTERNET BLOQUEADO",
-                selected = blocked,
-                enabled = !saving,
-                icon = { Icon(Icons.Default.Lock, contentDescription = null) },
-                onClick = { if (!blocked) onBlockedChanged(true) },
-            )
-        }
-        if (saving) {
-            Text("Aplicando…", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
-        }
-    }
-}
-
-@Composable
-private fun androidx.compose.foundation.layout.RowScope.InternetModeOption(
-    title: String,
-    selected: Boolean,
-    enabled: Boolean,
-    icon: @Composable () -> Unit,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .weight(1f)
-                .height(58.dp)
-                .background(if (selected) ProductSky else Color.Transparent)
-                .clickable(enabled = enabled, onClick = onClick)
-                .padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) { icon() }
-        Text(
-            text = title,
-            modifier = Modifier.padding(start = 6.dp),
-            style = MaterialTheme.typography.labelMedium,
-            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
-        )
-    }
-}
-
-@Composable
-private fun WebSwitchRow(
-    title: String,
-    description: String,
-    checked: Boolean,
-    enabled: Boolean,
-    saving: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(title, style = MaterialTheme.typography.titleMedium)
-            Text(description, style = MaterialTheme.typography.bodyMedium, color = HeaderMuted)
-            if (saving) {
-                Text("Guardando...", style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
-            }
-        }
-        Switch(
-            checked = checked,
-            enabled = enabled,
-            onCheckedChange = onCheckedChange,
-        )
     }
 }
 
@@ -2009,513 +1763,5 @@ private fun AppSectionSelector(
                 Text("Todas las apps")
             }
         }
-    }
-}
-
-@Composable
-private fun ProtectionPanel(
-    state: RulesUiState,
-    device: UserDeviceUiState,
-    onArmProtection: () -> Unit,
-) {
-    val control = state.protectionControls[device.id]
-    val loading = device.id in state.protectionLoadingDeviceIds
-    ProductCard {
-        Text("Estado de conexión", style = MaterialTheme.typography.titleMedium)
-        Text("Última conexión: ${device.lastSeenLabel}", style = MaterialTheme.typography.bodyMedium)
-        Text("VPN: ${device.vpnState}", style = MaterialTheme.typography.bodyMedium)
-        Text("Accesibilidad: ${device.accessibilityState}", style = MaterialTheme.typography.bodyMedium)
-        Text(
-            "Protección contra desinstalación: ${device.deviceAdminState}",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-    }
-    ProductCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Barrera reforzada", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    if (control?.armed == true) "Armada" else "Pendiente",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-            StatusChip(
-                if (control?.armed == true) "Obligatoria" else "Requiere activación",
-                if (control?.armed == true) ActiveGreen else MaterialTheme.colorScheme.error,
-            )
-        }
-        if (control == null) {
-            Text("El control se creará al activar la barrera.", style = MaterialTheme.typography.bodySmall)
-        } else {
-            Text(
-                "Aplicación: revisión ${control.appliedRevision} de ${control.commandRevision}",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
-        if (control?.armed != true) {
-            Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onArmProtection) {
-                Text("Activar protección obligatoria")
-            }
-        }
-    }
-}
-
-@Composable
-private fun AdvancedUserOptions(
-    state: RulesUiState,
-    device: UserDeviceUiState,
-    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
-    onAuthorizeRemoval: () -> Unit,
-    onGenerateRecoveryCode: () -> Unit,
-    onRecoveryCodeCopied: () -> Unit,
-    onGenerateRelinkCode: () -> Unit,
-    onRelinkCodeCopied: () -> Unit,
-    onArchiveUser: () -> Unit,
-) {
-    var expanded by rememberSaveable(device.id) { mutableStateOf(false) }
-    var confirmArchive by rememberSaveable(device.id) { mutableStateOf(false) }
-    val control = state.protectionControls[device.id]
-    val loading = device.id in state.protectionLoadingDeviceIds
-    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        ProductCard(onClick = { expanded = !expanded }) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    Text("Más opciones", style = MaterialTheme.typography.titleMedium, color = HeaderInk)
-                    Text(
-                        "Reenlace, desinstalación temporal, código de emergencia y archivo",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = HeaderMuted,
-                    )
-                }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = if (expanded) "Cerrar más opciones" else "Abrir más opciones",
-                    tint = HeaderMuted,
-                )
-            }
-        }
-        AnimatedVisibility(visible = expanded) {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                ProductCard {
-                    Text("Desinstalación temporal", style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "La autorización vence automáticamente a los 30 minutos.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
-                    Text(
-                        text = control.authorizationStatusLabel(),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = HeaderMuted,
-                    )
-                    Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
-                        Text("Permitir desinstalación")
-                    }
-                }
-                RelinkOptionCard(
-                    state = state,
-                    device = device,
-                    clipboardManager = clipboardManager,
-                    onGenerateRelinkCode = onGenerateRelinkCode,
-                    onRelinkCodeCopied = onRelinkCodeCopied,
-                )
-                RecoveryOptionCard(
-                    state = state,
-                    loading = loading,
-                    clipboardManager = clipboardManager,
-                    onGenerateRecoveryCode = onGenerateRecoveryCode,
-                    onRecoveryCodeCopied = onRecoveryCodeCopied,
-                )
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = device.id !in state.pendingDeviceDeleteIds,
-                    onClick = { confirmArchive = true },
-                ) {
-                    Text("Archivar usuario", color = MaterialTheme.colorScheme.error)
-                }
-            }
-        }
-    }
-    if (confirmArchive) {
-        AlertDialog(
-            onDismissRequest = { confirmArchive = false },
-            title = { Text("Archivar usuario") },
-            text = {
-                Text(
-                    "El usuario perderá acceso y saldrá de la lista activa. Su configuración se conservará para restaurarlo después.",
-                )
-            },
-            confirmButton = {
-                ProgressActionButton(
-                    onClick = {
-                        confirmArchive = false
-                        onArchiveUser()
-                    },
-                    enabled = device.id !in state.pendingDeviceDeleteIds,
-                    modifier = Modifier,
-                    text = "Archivar usuario",
-                    loadingText = "Archivando...",
-                    successText = "Archivado",
-                    tone = ActionButtonTone.Destructive,
-                )
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { confirmArchive = false }) {
-                    Text("Cancelar")
-                }
-            },
-        )
-    }
-}
-
-@Composable
-private fun RelinkOptionCard(
-    state: RulesUiState,
-    device: UserDeviceUiState,
-    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
-    onGenerateRelinkCode: () -> Unit,
-    onRelinkCodeCopied: () -> Unit,
-) {
-    ProductCard {
-        Text("Volver a enlazar", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Genera un token de un solo uso por 30 minutos. El vínculo anterior sigue activo hasta que el nuevo teléfono sincronice correctamente.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        if (state.relinkCode.isBlank() || state.relinkDeviceId != device.id) {
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = device.id !in state.relinkLoadingDeviceIds,
-                onClick = onGenerateRelinkCode,
-            ) {
-                Text(
-                    if (device.id in state.relinkLoadingDeviceIds) {
-                        "Generando token..."
-                    } else {
-                        "Generar token de reenlace"
-                    },
-                )
-            }
-        } else {
-            Text(state.relinkCode, style = MaterialTheme.typography.headlineSmall)
-            Text("Vence: ${state.relinkExpiresAt}", style = MaterialTheme.typography.bodySmall)
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(state.relinkCode))
-                    onRelinkCodeCopied()
-                },
-            ) {
-                Text("Copiar y ocultar")
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecoveryOptionCard(
-    state: RulesUiState,
-    loading: Boolean,
-    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
-    onGenerateRecoveryCode: () -> Unit,
-    onRecoveryCodeCopied: () -> Unit,
-) {
-    ProductCard {
-        Text("Recuperación sin conexión", style = MaterialTheme.typography.titleMedium)
-        Text(
-            "Genera un código de un solo uso. En DEV sólo se guarda su verificador.",
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        if (state.recoveryCode.isBlank()) {
-            OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onGenerateRecoveryCode) {
-                Text("Generar código de recuperación")
-            }
-        } else {
-            Text(state.recoveryCode, style = MaterialTheme.typography.headlineSmall)
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    clipboardManager.setText(AnnotatedString(state.recoveryCode))
-                    onRecoveryCodeCopied()
-                },
-            ) {
-                Text("Copiar y ocultar")
-            }
-        }
-    }
-}
-
-private fun DeviceProtectionControl?.authorizationStatusLabel(
-    nowEpochMillis: Long = System.currentTimeMillis(),
-): String {
-    val control = this ?: return "Sin permisos temporales activos."
-    val expiresAt = control.authorizationExpiresAtEpochMillis ?: return "Sin permisos temporales activos."
-    val remainingMillis = expiresAt - nowEpochMillis
-    if (remainingMillis <= 0) return "Los permisos temporales vencieron; la protección se reactivó automáticamente."
-    val remainingMinutes = ((remainingMillis + 59_999L) / 60_000L).coerceAtLeast(1L)
-    return when (control.authorizationScope) {
-        ProtectionAuthorizationScope.Settings -> "Mantenimiento habilitado · quedan $remainingMinutes min."
-        ProtectionAuthorizationScope.Removal -> "Desinstalación habilitada · quedan $remainingMinutes min."
-        ProtectionAuthorizationScope.None -> "Sin permisos temporales activos."
-    }
-}
-
-@Composable
-private fun AppGroupsPanel(
-    state: RulesUiState,
-    onGroupNameChanged: (String) -> Unit,
-    onGroupMinutesChanged: (String) -> Unit,
-    onGroupAppToggled: (String, Boolean) -> Unit,
-    onSaveAppGroup: () -> Unit,
-    onEditAppGroup: (String) -> Unit,
-    onCancelAppGroupEdit: () -> Unit,
-    onDeleteAppGroup: (String) -> Unit,
-) {
-    val editingGroupId = state.editingGroupId
-    val usedPackages =
-        state.appGroups
-            .filter { it.id != editingGroupId }
-            .flatMap { group -> group.appPackages.map { packageName -> packageName to group.name } }
-            .toMap()
-    ProductCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Apps en grupo", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Tiempo compartido por grupo · reinicia 12 PM",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            StatusChip("${state.appGroups.size}", MaterialTheme.colorScheme.primary)
-        }
-        if (state.appGroups.isNotEmpty()) {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                state.appGroups.forEach { group ->
-                    AppGroupSummaryCard(
-                        group = group,
-                        deleting = group.id in state.pendingAppGroupDeleteIds,
-                        onEdit = { onEditAppGroup(group.id) },
-                        onDelete = { onDeleteAppGroup(group.id) },
-                    )
-                }
-            }
-        }
-        HorizontalDivider()
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = if (editingGroupId == null) "Nuevo grupo" else "Editando grupo",
-                style = MaterialTheme.typography.labelLarge,
-            )
-            if (editingGroupId != null) {
-                OutlinedButton(onClick = onCancelAppGroupEdit) {
-                    Text("Cancelar")
-                }
-            }
-        }
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = state.groupName,
-            onValueChange = onGroupNameChanged,
-            label = { Text("Nombre del grupo") },
-            placeholder = { Text("Entretenimiento") },
-            singleLine = true,
-        )
-        OutlinedTextField(
-            modifier = Modifier.fillMaxWidth(),
-            value = state.groupMinutes,
-            onValueChange = onGroupMinutesChanged,
-            label = { Text("Tiempo total diario") },
-            placeholder = { Text("240 minutos") },
-            singleLine = true,
-            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = KeyboardType.Number),
-        )
-        Text("Apps disponibles", style = MaterialTheme.typography.labelLarge)
-        val selectedPackages = state.groupSelectedPackages
-        val selectedApps = state.appControls.filter { it.packageName in selectedPackages }
-        val selectableApps = state.appControls.filter { it.packageName !in selectedPackages }
-        if (state.appControls.isEmpty()) {
-            Text(
-                "Actualizá apps o buscá el usuario para armar el grupo.",
-                style = MaterialTheme.typography.bodySmall,
-            )
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                selectableApps.forEach { app ->
-                    val usedByGroup = usedPackages[app.packageName]
-                    GroupAppPickerRow(
-                        app = app,
-                        actionText = if (usedByGroup == null) "+" else "En grupo",
-                        helperText = usedByGroup?.let { "Ya está en $it" },
-                        enabled = usedByGroup == null,
-                        onClick = { onGroupAppToggled(app.packageName, true) },
-                    )
-                }
-            }
-        }
-        Text("Cajón de apps (${selectedApps.size})", style = MaterialTheme.typography.labelLarge)
-        if (selectedApps.isEmpty()) {
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.35f))
-                        .padding(12.dp),
-            ) {
-                Text(
-                    "Agregá apps con +. Todas compartirán el tiempo total diario.",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-        } else {
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                selectedApps.forEach { app ->
-                    GroupAppPickerRow(
-                        app = app,
-                        actionText = "x",
-                        helperText = null,
-                        onClick = { onGroupAppToggled(app.packageName, false) },
-                    )
-                }
-            }
-        }
-        ProgressActionButton(
-            modifier = Modifier.fillMaxWidth(),
-            onClick = onSaveAppGroup,
-            loading = state.groupSaving,
-            loadingText = if (editingGroupId == null) "Guardando..." else "Actualizando...",
-            successText = if (editingGroupId == null) "Grupo guardado" else "Grupo actualizado",
-            text = if (editingGroupId == null) "Guardar grupo" else "Actualizar grupo",
-        )
-    }
-}
-
-@Composable
-private fun GroupAppPickerRow(
-    app: AppControlUiState,
-    actionText: String,
-    helperText: String?,
-    enabled: Boolean = true,
-    onClick: () -> Unit,
-) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        AppIcon(app.appName, app.iconBase64)
-        Column(modifier = Modifier.weight(1f)) {
-            Text(app.appName, style = MaterialTheme.typography.bodyMedium)
-            Text(helperText ?: app.packageName, style = MaterialTheme.typography.bodySmall)
-        }
-        OutlinedButton(
-            enabled = enabled,
-            onClick = onClick,
-        ) {
-            Text(actionText)
-        }
-    }
-}
-
-@Composable
-private fun AppGroupSummaryCard(
-    group: AppGroupUiState,
-    deleting: Boolean,
-    onEdit: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    var confirmDelete by remember { mutableStateOf(false) }
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
-                .padding(10.dp),
-        verticalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(group.name, style = MaterialTheme.typography.titleSmall)
-                Text(
-                    "${group.appPackages.size} apps · ${group.limitMinutes} min · ${group.resetLabel}",
-                    style = MaterialTheme.typography.bodySmall,
-                )
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedButton(
-                    onClick = onEdit,
-                    enabled = !deleting,
-                ) {
-                    Text("Editar")
-                }
-                ProgressActionButton(
-                    modifier = Modifier,
-                    text = "Borrar",
-                    loadingText = "Borrando...",
-                    successText = "Borrado",
-                    loading = deleting,
-                    enabled = !deleting,
-                    onClick = { confirmDelete = true },
-                    tone = ActionButtonTone.Destructive,
-                )
-            }
-        }
-        group.appPackages.take(4).forEach { packageName ->
-            Text(packageName, style = MaterialTheme.typography.bodySmall)
-        }
-        if (group.appPackages.size > 4) {
-            Text("+${group.appPackages.size - 4} más", style = MaterialTheme.typography.bodySmall)
-        }
-    }
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Borrar grupo") },
-            text = { Text("Las apps de este grupo volverán a sus reglas individuales.") },
-            confirmButton = {
-                ProgressActionButton(
-                    onClick = {
-                        confirmDelete = false
-                        onDelete()
-                    },
-                    modifier = Modifier,
-                    text = "Borrar",
-                    loadingText = "Borrando...",
-                    successText = "Borrado",
-                    tone = ActionButtonTone.Destructive,
-                )
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { confirmDelete = false }) {
-                    Text("Cancelar")
-                }
-            },
-        )
     }
 }

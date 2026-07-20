@@ -184,16 +184,17 @@ class RulesViewModelHelpersTest {
     @Test
     fun `failed layer rollback clears only that pending state`() {
         val bothPending =
-            RulesUiState(
-                pendingExternalSearchResultsAllowed = false,
-                pendingSafeSearchEnabled = true,
-            )
+            RulesUiState(selectedDeviceId = DeviceId)
+                .withPendingWebPreference(DeviceId, WebPolicyPreference.ExternalSearchResultsAllowed, false)
+                .withPendingWebPreference(DeviceId, WebPolicyPreference.SafeSearchEnabled, true)
 
-        val safeSearchFailed = bothPending.clearPendingWebPreference(WebPolicyPreference.SafeSearchEnabled)
+        val safeSearchFailed =
+            bothPending.clearPendingWebPreference(DeviceId, WebPolicyPreference.SafeSearchEnabled)
         assertEquals(false, safeSearchFailed.pendingExternalSearchResultsAllowed)
         assertEquals(null, safeSearchFailed.pendingSafeSearchEnabled)
 
-        val onlyResultsFailed = bothPending.clearPendingWebPreference(WebPolicyPreference.ExternalSearchResultsAllowed)
+        val onlyResultsFailed =
+            bothPending.clearPendingWebPreference(DeviceId, WebPolicyPreference.ExternalSearchResultsAllowed)
         assertEquals(null, onlyResultsFailed.pendingExternalSearchResultsAllowed)
         assertEquals(true, onlyResultsFailed.pendingSafeSearchEnabled)
     }
@@ -218,7 +219,9 @@ class RulesViewModelHelpersTest {
     @Test
     fun `each Web pending state is isolated from the other switches`() {
         WebPolicyPreference.entries.forEach { preference ->
-            val pending = RulesUiState().withPendingWebPreference(preference, true)
+            val pending =
+                RulesUiState(selectedDeviceId = DeviceId)
+                    .withPendingWebPreference(DeviceId, preference, true)
 
             assertEquals(preference == WebPolicyPreference.NavigationBlocked, pending.pendingInternetBlocked == true)
             assertEquals(
@@ -227,8 +230,58 @@ class RulesViewModelHelpersTest {
             )
             assertEquals(preference == WebPolicyPreference.SafeSearchEnabled, pending.pendingSafeSearchEnabled == true)
             assertEquals(preference == WebPolicyPreference.DagEnabled, pending.pendingDagEnabled == true)
-            assertEquals(RulesUiState(), pending.clearPendingWebPreference(preference))
+            assertEquals(
+                RulesUiState(selectedDeviceId = DeviceId),
+                pending.clearPendingWebPreference(DeviceId, preference),
+            )
         }
+    }
+
+    @Test
+    fun `pending Web state never leaks to another selected device`() {
+        val pendingForFirst =
+            RulesUiState(selectedDeviceId = DeviceId)
+                .withPendingWebPreference(DeviceId, WebPolicyPreference.NavigationBlocked, true)
+
+        assertEquals(true, pendingForFirst.pendingInternetBlocked)
+        assertEquals(null, pendingForFirst.copy(selectedDeviceId = OtherDeviceId).pendingInternetBlocked)
+    }
+
+    @Test
+    fun `pending app state is isolated by device and package`() {
+        val pendingForFirst =
+            RulesUiState(selectedDeviceId = DeviceId)
+                .withPendingAppAllowed(DeviceId, "com.example.app", true)
+
+        assertEquals(true, pendingForFirst.pendingAppAllowed["com.example.app"])
+        assertTrue(pendingForFirst.copy(selectedDeviceId = OtherDeviceId).pendingAppAllowed.isEmpty())
+        assertTrue(
+            pendingForFirst
+                .clearPendingAppAllowed(DeviceId, "com.example.app")
+                .pendingAppAllowedByDevice
+                .isEmpty(),
+        )
+    }
+
+    @Test
+    fun `schedule saving key includes device scope and target`() {
+        val first = scheduleSavingKey(DeviceId, RuleScope.App, "com.example.app")
+
+        assertFalse(first == scheduleSavingKey(OtherDeviceId, RuleScope.App, "com.example.app"))
+        assertFalse(first == scheduleSavingKey(DeviceId, RuleScope.Domain, "com.example.app"))
+        assertFalse(first == scheduleSavingKey(DeviceId, RuleScope.App, "com.example.other"))
+    }
+
+    @Test
+    fun `recovery code is visible only for its owner device`() {
+        val state =
+            RulesUiState(
+                recoveryCode = "secret-code",
+                recoveryCodeDeviceId = DeviceId,
+            )
+
+        assertEquals("secret-code", state.recoveryCodeFor(DeviceId))
+        assertEquals("", state.recoveryCodeFor(OtherDeviceId))
     }
 
     @Test
@@ -560,6 +613,7 @@ class RulesViewModelHelpersTest {
     private companion object {
         const val AccountId = "account"
         const val DeviceId = "device"
+        const val OtherDeviceId = "other-device"
         const val NowEpochMillis = 1_000_000L
     }
 }
