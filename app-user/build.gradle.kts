@@ -15,6 +15,8 @@ fun envValue(name: String): String {
     return envFile.readLines().firstOrNull { it.startsWith("$name=") }?.substringAfter("=")?.trim().orEmpty()
 }
 
+val devSigningStorePath = providers.environmentVariable("ANDROID_DEV_KEYSTORE_PATH").orNull
+
 android {
     namespace = "com.contentfilter.user"
     compileSdk = 36
@@ -36,6 +38,18 @@ android {
     }
 
     flavorDimensions += "distribution"
+
+    signingConfigs {
+        if (!devSigningStorePath.isNullOrBlank()) {
+            create("devUpdate") {
+                storeFile = file(devSigningStorePath)
+                storePassword = envValue("ANDROID_DEV_KEYSTORE_PASSWORD")
+                keyAlias = envValue("ANDROID_DEV_KEY_ALIAS")
+                keyPassword = envValue("ANDROID_DEV_KEY_PASSWORD")
+            }
+        }
+    }
+
     productFlavors {
         create("dev") {
             dimension = "distribution"
@@ -74,6 +88,9 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
             )
+            if (!devSigningStorePath.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("devUpdate")
+            }
         }
     }
 

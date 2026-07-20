@@ -78,6 +78,11 @@ assert_version_code_increased() {
         return
     fi
 
+    if (( local_version == remote_version )) && [[ "${ALLOW_SAME_VERSION_REPAIR:-false}" == "true" ]]; then
+        printf '%s: reparacion confirmada de la misma version DEV (%s).\n' "$app_name" "$local_version"
+        return
+    fi
+
     if (( local_version <= remote_version )); then
         printf '%s: versionCode DEV no subio. Local=%s, publicado=%s. Abortando publicacion.\n' \
             "$app_name" "$local_version" "$remote_version" >&2
@@ -87,8 +92,40 @@ assert_version_code_increased() {
     printf '%s: versionCode DEV OK (%s > %s).\n' "$app_name" "$local_version" "$remote_version"
 }
 
+assert_stable_dev_signature() {
+    local expected_digest="d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832"
+    local build_tools_dir="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}/build-tools"
+    local apksigner
+    local apk
+    local actual_digest
+
+    apksigner="$(find "$build_tools_dir" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+    if [[ -z "$apksigner" ]]; then
+        printf 'No se encontro apksigner para validar la firma DEV.\n' >&2
+        exit 1
+    fi
+
+    for apk in \
+        app-user/build/outputs/apk/dev/debug/app-user-dev-debug.apk \
+        app-admin/build/outputs/apk/dev/debug/app-admin-dev-debug.apk; do
+        actual_digest="$(
+            "$apksigner" verify --print-certs "$apk" |
+                awk -F': ' '/Signer #1 certificate SHA-256 digest/ { print tolower($2); exit }'
+        )"
+        if [[ "$actual_digest" != "$expected_digest" ]]; then
+            printf 'Firma DEV incorrecta en %s. Esperada=%s, actual=%s.\n' \
+                "$apk" "$expected_digest" "${actual_digest:-ausente}" >&2
+            exit 1
+        fi
+    done
+
+    printf 'Firma DEV estable verificada en ambos APK (%s).\n' "$expected_digest"
+}
+
 printf 'Compilando App Usuario y App Admin DEV...\n'
 ./gradlew :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage
+
+assert_stable_dev_signature
 
 printf '\nEjecutando tests...\n'
 ./gradlew test -x uploadDevUpdatesToStorage
