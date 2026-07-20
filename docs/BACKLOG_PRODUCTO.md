@@ -195,10 +195,10 @@ Flujo de una entrada:
 
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
-| PROTECTION-POSSIBLE-UNINSTALL-01 | Candidato DEV 266; actualizacion in-place validada, recorrido visual limitado por ANR de SystemUI; pendiente publicacion | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
-| PROTECTION-OFFLINE-RECOVERY-02 | Candidato DEV 266; actualizacion in-place validada, recorrido visual limitado por ANR de SystemUI; pendiente publicacion | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
-| HELP-CONTEXTUAL-CHAT-01 | Candidato DEV 266; actualizacion in-place validada, recorrido visual limitado por ANR de SystemUI; pendiente publicacion | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
-| ADMIN-USER-SECTIONS-UX-04 | Candidato DEV 266; actualizacion in-place validada, recorrido visual limitado por ANR de SystemUI; pendiente publicacion | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
+| PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
+| PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
+| HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
+| ADMIN-USER-SECTIONS-UX-04 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |

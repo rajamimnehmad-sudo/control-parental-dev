@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-20:
 
 ```text
-App Usuario versionCode 265
-App Admin versionCode 265
+App Usuario versionCode 266
+App Admin versionCode 266
 versionName 1.0.1-dev
 ```
 
@@ -68,18 +68,18 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-265-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-265-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-266-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-266-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 07b8749b37ea07aa03fd4eae192adac384ca973c68d823afcb4a578b95a6f5f3
-Admin   2838a6bf20f66ee46d921c7f72d6b54c9a9693780161563430e1ea9273392112
+Usuario b169c3312418550fa486c05e46c87122bc40fe4d0e013c835f3910c6446a4d28
+Admin   2117c8c1978c01c2925a75589ad21f904493c5132aa6187f026576336d09c0bc
 ```
 
-## Candidato DEV 266 - UX, ayuda privada y recuperacion offline - 2026-07-20
+## Publicacion DEV 266 - UX, ayuda privada y recuperacion offline - 2026-07-20
 
 - App Admin separa `Aplicaciones / Web / Seguridad` mediante un selector horizontal translucido y desplazable. Web elimina la foto y la tarjeta contenedora; Seguridad concentra proteccion, reenlace, desinstalacion y recuperacion, sin mezclar esas acciones con reglas de apps o sitios.
 - App Usuario alinea busqueda, estado y actualizacion en una sola fila dentro de Mis apps. DAG evita partir los controles del selector y Web deja de mostrar un exito falso cuando la reconciliacion remota contradice el guardado.
@@ -90,6 +90,8 @@ Admin   2838a6bf20f66ee46d921c7f72d6b54c9a9693780161563430e1ea9273392112
 - Validacion automatizada final: `./gradlew test ktlintCheck` correcto, 1.308 tareas; build DEV de ambas apps, Android Lint y Detekt correctos, 871 tareas; matriz dirigida de seguridad/Admin correcta, 559 tareas. Las pruebas nuevas cubren asistente acotado/contextual, estado desconocido, inferencia de posible desinstalacion, uso unico/rotacion de codigos y recuperacion concurrente. Los APK locales son version 266, paquetes DEV, certificado `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`; SHA-256 Usuario `8a8d4d38cac389cc67b291db53bf042f36e64ed4a8a5eb09596e8986a3dadcf3` y Admin `814fff50e599463a5dfa93c397a7ec7371da98b7f46f8f70b0fed4e19ba6a694`.
 - Validacion fisica parcial en Samsung SM-A235M: ambas apps se actualizaron in-place de DEV 260 a DEV 266 sin borrar datos. Se conservaron `firstInstallTime`, `ceDataInode`, Device Admin y el servicio de Accesibilidad de App Usuario. El recorrido visual detallado no pudo completarse porque Android reporto `Application Not Responding: com.android.systemui`; no se observo un ANR atribuido a Content Filter. Con esta limitacion documentada, el usuario autorizo continuar a publicacion.
 - Operacion cloud preparada: `Publicar APKs DEV` deja de ejecutarse automaticamente al hacer push y pasa a `workflow_dispatch` con confirmacion booleana. Usa `ubuntu-latest`, Gradle cacheado y `supabase/setup-cli@v3` con CLI 2.109.0; los PR ejecutan un preflight sin secrets que valida CLI y sintaxis de scripts sin publicar. La Mac queda reservada para ADB. La guia movil esta en `docs/PUBLICAR_DEV_REMOTO.md`.
+- Publicacion cloud final: PR funcional #1 fusionado en `86e23c9`. El primer run `29769625133` publico artefactos 266 firmados por la clave debug efimera del runner; la verificacion externa detecto que no eran compatibles con actualizaciones in-place y no se dio el corte por valido. Los PR #2, #3 y #4 incorporaron la clave DEV historica como secretos de GitHub, configuracion de firma externa, validacion obligatoria del certificado PEM embebido antes de cualquier carga y una confirmacion separada para reparar la misma version. Dos intentos de reparacion (`29770893053` y `29771262815`) abortaron antes de tests y Storage por el verificador conservador. El run final `29771574008` completo build, firma, tests y publicacion en 7m27s exclusivamente en DEV.
+- Verificacion de lo publicado: manifiestos y APK se descargaron nuevamente. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, versionCode 266 y versionName `1.0.1-dev`; los SHA-256 coinciden con los manifiestos y `apksigner` confirma en ambos el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`. Production no fue tocado.
 
 ## Publicacion DEV 265 - pulido de Usuarios, iconos y novedades instaladas - 2026-07-20
 
