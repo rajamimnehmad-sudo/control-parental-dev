@@ -61,6 +61,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -172,6 +173,7 @@ private fun AdminAppRoot(
     var tab by rememberSaveable { mutableStateOf(AdminTab.Home) }
     var section by rememberSaveable { mutableStateOf<AdminSection?>(null) }
     var requestedUserId by rememberSaveable { mutableStateOf<String?>(null) }
+    var createUserRequestKey by rememberSaveable { mutableStateOf(0) }
     var requestsRefreshKey by rememberSaveable { mutableStateOf(0) }
     val context = LocalContext.current
     val rootViewModel: AdminRootViewModel = hiltViewModel()
@@ -319,7 +321,10 @@ private fun AdminAppRoot(
                     when (tab) {
                         AdminTab.Home ->
                             HomeTab(
-                                onManageUsers = { tab = AdminTab.Users },
+                                onCreateUser = {
+                                    createUserRequestKey += 1
+                                    tab = AdminTab.Users
+                                },
                                 onRequests = {
                                     requestsRefreshKey += 1
                                     tab = AdminTab.Requests
@@ -332,6 +337,8 @@ private fun AdminAppRoot(
                                 entryMode = RulesEntryMode.ManageUsers,
                                 initialDeviceId = requestedUserId,
                                 onInitialDeviceConsumed = { requestedUserId = null },
+                                createUserRequestKey = createUserRequestKey,
+                                onCreateUserRequestConsumed = { createUserRequestKey = 0 },
                             )
                         AdminTab.Requests ->
                             SectionContainer(
@@ -392,7 +399,7 @@ private fun AdminAppRoot(
 
 @Composable
 private fun HomeTab(
-    onManageUsers: () -> Unit,
+    onCreateUser: () -> Unit,
     onRequests: () -> Unit,
     onProtectionStatus: () -> Unit,
     onAnnouncements: () -> Unit,
@@ -429,7 +436,7 @@ private fun HomeTab(
                 title = "Agregar usuario",
                 subtitle = "Crear y vincular un nuevo usuario",
                 accent = Sky,
-                onClick = onManageUsers,
+                onClick = onCreateUser,
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -551,7 +558,11 @@ private fun ProtectionSummaryCard(
             horizontalArrangement = Arrangement.spacedBy(14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ProtectionShield(count = affectedCount, color = accent)
+            ProtectionShield(
+                count = affectedCount,
+                requiresAttention = affectedCount > 0 || pendingCount > 0 || !licenseState.allowsProtection(),
+                color = accent,
+            )
             Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 Text("Estado de protección de usuarios", style = MaterialTheme.typography.titleMedium, color = Ink)
                 Text(
@@ -568,26 +579,33 @@ private fun ProtectionSummaryCard(
 @Composable
 private fun ProtectionShield(
     count: Int,
+    requiresAttention: Boolean,
     color: Color,
 ) {
     Box(
         modifier = Modifier.size(52.dp).background(color.copy(alpha = 0.14f), RoundedCornerShape(16.dp)),
         contentAlignment = Alignment.Center,
     ) {
-        Canvas(modifier = Modifier.size(30.dp)) {
-            val shield =
-                Path().apply {
-                    moveTo(size.width / 2f, 1f)
-                    lineTo(size.width - 2f, size.height * 0.22f)
-                    lineTo(size.width * 0.85f, size.height * 0.72f)
-                    quadraticTo(size.width / 2f, size.height, size.width * 0.15f, size.height * 0.72f)
-                    lineTo(2f, size.height * 0.22f)
-                    close()
-                }
-            drawPath(path = shield, color = color)
-        }
+        ProductGlyph(
+            icon = if (requiresAttention) ProductIcon.ShieldAlert else ProductIcon.ShieldCheck,
+            color = color,
+            modifier = Modifier.size(32.dp),
+        )
         if (count > 0) {
-            Text(count.coerceAtMost(99).toString(), style = MaterialTheme.typography.labelSmall, color = Color.White)
+            Box(
+                modifier =
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .size(19.dp)
+                        .background(color, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    count.coerceAtMost(99).toString(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Color.White,
+                )
+            }
         }
     }
 }
@@ -1364,15 +1382,23 @@ private fun SettingsTab(
                 onClick = onUpdates,
             )
         }
-        Text(
+        Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 20.dp, vertical = 12.dp),
-            text = "Versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+                    .padding(horizontal = 20.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "Versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            TextButton(onClick = onUpdates) {
+                Text("Ver novedades")
+            }
+        }
     }
 }
 

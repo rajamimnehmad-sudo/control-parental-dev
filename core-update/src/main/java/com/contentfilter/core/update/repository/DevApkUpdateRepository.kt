@@ -49,7 +49,7 @@ class DevApkUpdateRepository
                 if (manifest.versionCode > currentVersionCode) {
                     UpdateCheckResult.Available(manifest)
                 } else {
-                    UpdateCheckResult.UpToDate
+                    UpdateCheckResult.UpToDate(manifest)
                 }
             }
 

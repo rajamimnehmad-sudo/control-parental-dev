@@ -3,7 +3,7 @@ package com.contentfilter.core.update.model
 sealed interface UpdateCheckResult {
     data object NotConfigured : UpdateCheckResult
 
-    data object UpToDate : UpdateCheckResult
+    data class UpToDate(val manifest: UpdateManifest) : UpdateCheckResult
 
     data object NetworkError : UpdateCheckResult
 

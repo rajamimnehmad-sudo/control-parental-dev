@@ -2,6 +2,7 @@ package com.contentfilter.admin.updates
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,9 +15,13 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -55,6 +60,7 @@ private fun AdminUpdatesScreen(
     onDismissReset: () -> Unit,
     onConfirmReset: () -> Unit,
 ) {
+    var showReleaseNotes by rememberSaveable { mutableStateOf(false) }
     if (state.showResetConfirmation) {
         AlertDialog(
             onDismissRequest = onDismissReset,
@@ -88,20 +94,36 @@ private fun AdminUpdatesScreen(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            Text(
-                text = "Version instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            state.manifest?.let { manifest ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Text(
-                    text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
+                    modifier = Modifier.weight(1f),
+                    text = "Versión instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text(text = "Novedades", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = manifest.releaseNotes.ifBlank { "Sin novedades informadas." },
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                TextButton(
+                    enabled = state.manifest != null,
+                    onClick = { showReleaseNotes = !showReleaseNotes },
+                ) {
+                    Text(if (showReleaseNotes) "Ocultar" else "Ver novedades")
+                }
+            }
+            state.manifest?.let { manifest ->
+                if (manifest.versionCode > BuildConfig.VERSION_CODE) {
+                    Text(
+                        text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                if (showReleaseNotes) {
+                    Text(text = "Últimos cambios", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = manifest.releaseNotes.ifBlank { "Sin novedades informadas." },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
             Spacer(modifier = Modifier.height(8.dp))
             when (state.status) {

@@ -257,7 +257,7 @@ Flujo de una entrada:
 
 ### ADMIN-UX-EPIC-2026-07-19 - Reorganización integral de App Admin
 
-- Estado: `Publicado en DEV 261`; feedback, navegación/Home, Usuarios, permisos temporales, horarios, DAG Extra Kosher, Solicitudes, Cuenta, archivo/restauración segura y alineación de App Usuario están incluidos. Los dos archivos legados sin snapshot quedan aislados como `Revisión necesaria` y no se recuperarán, por decisión del usuario. Continúan pendientes los recorridos físicos específicos señalados en la tabla.
+- Estado: `Publicado en DEV 261; pulido de flujo candidato posterior a DEV 264, no publicado`; feedback, navegación/Home, Usuarios, permisos temporales, horarios, DAG Extra Kosher, Solicitudes, Cuenta, archivo/restauración segura y alineación de App Usuario están incluidos. Los dos archivos legados sin snapshot quedan aislados como `Revisión necesaria` y no se recuperarán, por decisión del usuario. Continúan pendientes los recorridos físicos específicos señalados en la tabla.
 - Orden aprobado: banner dinámico; navegación y Home; Usuarios y detalle; archivo/restauración/reenlace; mantenimiento y desinstalación; límites y horarios; DAG Extra Kosher; Solicitudes y Cuenta; validación integral; adaptación posterior de App Usuario.
 - Feedback compartido: deja de ser un banner. Cada pantalla muestra como máximo una línea de 32 dp bajo su header, con punto pequeño y texto, sin fondo, tarjeta ni X. El último estado reemplaza al anterior y no acompaña el cambio de sección; usa transición vertical rápida, puntos animados y marquee para textos largos. Progreso permanece mientras trabaja; éxito dura 2 segundos, aviso 2,5 y error 3. Después, el error queda en rojo junto a la acción hasta corregir o reintentar con éxito. Sin estado no se reserva altura.
 - Home Admin: header superior con sólo esquinas inferiores redondeadas, saludo `Hola, {nombre} (ADM)`, comunidad, campana exclusiva de avisos Superweb y resumen de licencia; cuerpo con estado real de protección, acceso a usuarios afectados, agregar usuario, usuarios activos y solicitudes pendientes.
@@ -269,6 +269,7 @@ Flujo de una entrada:
 - Solicitudes: destino raíz con pendientes accionables y resueltos como historial; tipos Web, descargas y aplicaciones; App Usuario podrá cancelar únicamente sus propias solicitudes pendientes en el ticket posterior.
 - Cuenta: identidad Admin, comunidad, estado con Superweb, licencia completa y su efecto, versión, actualización y novedades específicas de App Admin.
 - Criterio transversal: un estado verde sólo aparece con protección confirmada; estados desconocidos o sin conexión reciente son amarillos/pendientes y una licencia que no permite proteger se muestra separadamente, sin atribuir falsamente una falla a VPN o Accesibilidad.
+- Pulido aprobado posterior a DEV 264: Home abre el alta directamente; la lista de Usuarios queda compacta, sin etiquetas de estado, con luz verde/amarilla; el detalle usa Proteccion expandible, Aplicaciones/Web, configuracion global antes de Grupos y apps, y `Mas opciones` al final. Los iconos de campana y salud de usuarios se simplifican sin cambiar contratos ni datos.
 
 ### SUPERWEB-DEPLOY-SYNC-01 - Publicacion oficial verificable
 
@@ -394,7 +395,7 @@ Flujo de una entrada:
 
 ### APP-UPDATE-CHANGELOG-01 - Novedades de actualizacion por aplicacion
 
-- Estado: `Publicado DEV 264; pendiente prueba fisica`; aprobado explicitamente el 2026-07-20. Tipo: UX de actualizaciones, comunicacion de producto y publicacion DEV. Prioridad: P2.
+- Estado: `Publicado DEV 264; acceso a novedades de la version instalada implementado como candidato no publicado`; aprobado explicitamente el 2026-07-20. Tipo: UX de actualizaciones, comunicacion de producto y publicacion DEV. Prioridad: P2.
 - Problema: App Usuario y App Admin pueden informar que existe una version nueva, pero no explican de forma clara que cambia para la aplicacion correspondiente antes de instalarla.
 - Solucion propuesta: mostrar en la pantalla de Actualizaciones un bloque `Novedades` asociado a la version ofrecida. App Usuario recibe exclusivamente cambios relevantes para Usuario y DAG; App Admin recibe exclusivamente cambios de administracion. Si se saltaron varias versiones, presentar un resumen acumulado y legible sin mezclar detalles tecnicos internos.
 - Evidencia: pedido explicito del usuario del 2026-07-17.
@@ -411,6 +412,7 @@ Flujo de una entrada:
   - no incluyen secretos, nombres internos sensibles, datos de usuarios ni promesas que excedan lo realmente publicado;
   - clientes antiguos ignoran el campo nuevo sin romper la comprobacion de actualizaciones.
 - Decision aplicada: notas fuente separadas por `versionCode` y app, incorporadas al manifiesto firmado operativamente por URL y SHA-256. La pantalla las muestra antes de descargar; el publicador aborta si falta el archivo correspondiente.
+- Pulido posterior: ambas pantallas muestran `Ver novedades` junto a la version actual y conservan las notas del manifiesto aun cuando no hay una version nueva. El control expande y contrae el contenido y no altera la decision de actualizacion.
 
 ### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
 

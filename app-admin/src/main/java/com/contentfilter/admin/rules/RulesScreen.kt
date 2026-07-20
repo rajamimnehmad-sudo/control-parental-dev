@@ -33,6 +33,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MoreVert
@@ -84,6 +85,8 @@ import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductLazyVisualPage
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.ProductSky
@@ -97,6 +100,8 @@ fun RulesRoute(
     onBack: (() -> Unit)? = null,
     initialDeviceId: String? = null,
     onInitialDeviceConsumed: () -> Unit = {},
+    createUserRequestKey: Int = 0,
+    onCreateUserRequestConsumed: () -> Unit = {},
     viewModel: RulesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -111,6 +116,8 @@ fun RulesRoute(
     }
     RulesScreen(
         entryMode = entryMode,
+        createUserRequestKey = createUserRequestKey,
+        onCreateUserRequestConsumed = onCreateUserRequestConsumed,
         state = state,
         onBack = onBack,
         onAppSearchChanged = viewModel::onAppSearchChanged,
@@ -169,6 +176,8 @@ enum class RulesEntryMode {
 @Composable
 private fun RulesScreen(
     entryMode: RulesEntryMode,
+    createUserRequestKey: Int,
+    onCreateUserRequestConsumed: () -> Unit,
     state: RulesUiState,
     onBack: (() -> Unit)?,
     onAppSearchChanged: (String) -> Unit,
@@ -232,6 +241,8 @@ private fun RulesScreen(
     } else if (selectedDevice == null) {
         UsersListContent(
             entryMode = entryMode,
+            createUserRequestKey = createUserRequestKey,
+            onCreateUserRequestConsumed = onCreateUserRequestConsumed,
             state = state,
             clipboardManager = clipboardManager,
             onBack = onBack,
@@ -281,6 +292,7 @@ private fun RulesScreen(
             onRecoveryCodeCopied = onRecoveryCodeCopied,
             onGenerateRelinkCode = onGenerateRelinkCode,
             onRelinkCodeCopied = onRelinkCodeCopied,
+            onArchiveUser = { onDeviceDeleted(selectedDevice.id) },
             onToggle = onToggle,
             onDelete = onDelete,
         )
@@ -290,6 +302,8 @@ private fun RulesScreen(
 @Composable
 private fun UsersListContent(
     entryMode: RulesEntryMode,
+    createUserRequestKey: Int,
+    onCreateUserRequestConsumed: () -> Unit,
     state: RulesUiState,
     clipboardManager: androidx.compose.ui.platform.ClipboardManager,
     onBack: (() -> Unit)?,
@@ -302,6 +316,12 @@ private fun UsersListContent(
     onShowArchivedUsers: () -> Unit,
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(createUserRequestKey) {
+        if (createUserRequestKey > 0 && entryMode == RulesEntryMode.ManageUsers) {
+            showCreateDialog = true
+            onCreateUserRequestConsumed()
+        }
+    }
     var userSearchQuery by rememberSaveable { mutableStateOf("") }
     var searchExpanded by rememberSaveable { mutableStateOf(false) }
     val filteredDevices =
@@ -317,9 +337,6 @@ private fun UsersListContent(
                 }
             }
         }
-    val activeCount = state.userDevices.count { it.status == UserDeviceStatus.Active }
-    val pendingCount = state.userDevices.count { it.status != UserDeviceStatus.Active }
-
     Column(
         modifier =
             Modifier
@@ -350,7 +367,7 @@ private fun UsersListContent(
         }
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(6.dp),
             contentPadding =
                 androidx.compose.foundation.layout.PaddingValues(
                     start = 16.dp,
@@ -359,25 +376,6 @@ private fun UsersListContent(
                     bottom = 18.dp,
                 ),
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    UserMetricCard(
-                        modifier = Modifier.weight(1f),
-                        value = activeCount.toString(),
-                        label = "activos",
-                        color = ActiveGreen,
-                    )
-                    UserMetricCard(
-                        modifier = Modifier.weight(1f),
-                        value = pendingCount.toString(),
-                        label = "pendientes",
-                        color = PendingYellow,
-                    )
-                }
-            }
             if (filteredDevices.isEmpty()) {
                 item {
                     EmptySectionText(
@@ -772,38 +770,6 @@ private fun TokenReadyCard(
 }
 
 @Composable
-private fun UserMetricCard(
-    value: String,
-    label: String,
-    color: Color,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier,
-        shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Row(
-            modifier = Modifier.padding(14.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(30.dp)
-                        .background(color.copy(alpha = 0.18f), CircleShape),
-            )
-            Column {
-                Text(value, style = MaterialTheme.typography.titleLarge, color = HeaderInk)
-                Text(label, style = MaterialTheme.typography.bodySmall, color = HeaderMuted)
-            }
-        }
-    }
-}
-
-@Composable
 private fun ProtectedUserCard(
     device: UserDeviceUiState,
     deleting: Boolean,
@@ -813,46 +779,42 @@ private fun ProtectedUserCard(
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
     var actionsExpanded by remember { mutableStateOf(false) }
-    val statusColor = device.status.userStatusColor()
+    val healthy = device.status == UserDeviceStatus.Active && device.protectionComplete
+    val statusColor = if (healthy) ActiveGreen else PendingYellow
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
     ) {
         Row(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
+                    .padding(horizontal = 12.dp, vertical = 11.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             UserAvatar(name = device.name, color = statusColor)
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                verticalArrangement = Arrangement.spacedBy(3.dp),
             ) {
                 Text(device.name, style = MaterialTheme.typography.titleMedium, color = HeaderInk)
-                StatusChip(device.status.label, statusColor)
-                StatusChip(
-                    if (device.protectionComplete) "Protección completa" else "Protección incompleta",
-                    if (device.protectionComplete) ActiveGreen else MaterialTheme.colorScheme.error,
-                )
                 Text(
-                    text = "${device.appCount} apps · ${device.lastSeenLabel}",
+                    text = device.listSummary(healthy),
                     style = MaterialTheme.typography.bodySmall,
                     color = HeaderMuted,
+                    maxLines = 1,
                 )
-                device.protectionAlert?.let { alert ->
-                    Text(
-                        text = alert,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
-                }
             }
+            Box(modifier = Modifier.size(10.dp).background(statusColor, CircleShape))
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = null,
+                tint = HeaderMuted,
+            )
             if (showActions) {
                 Box {
                     IconButton(
@@ -970,8 +932,8 @@ private fun UserAvatar(
     Box(
         modifier =
             Modifier
-                .size(50.dp)
-                .background(color.copy(alpha = 0.18f), RoundedCornerShape(18.dp)),
+                .size(42.dp)
+                .background(color.copy(alpha = 0.14f), RoundedCornerShape(14.dp)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
@@ -982,6 +944,19 @@ private fun UserAvatar(
     }
 }
 
+private fun UserDeviceUiState.listSummary(healthy: Boolean): String =
+    if (healthy) {
+        "$lastSeenLabel · $appCount apps"
+    } else {
+        protectionAlert
+            ?: when (status) {
+                UserDeviceStatus.Unprotected -> "La protección requiere atención"
+                UserDeviceStatus.Inactive -> "Sin comunicación reciente"
+                UserDeviceStatus.Unknown -> "Configuración pendiente"
+                UserDeviceStatus.Active -> "Falta completar la protección"
+            }
+    }
+
 private val UserDeviceStatus.label: String
     get() =
         when (this) {
@@ -991,14 +966,17 @@ private val UserDeviceStatus.label: String
             UserDeviceStatus.Unknown -> "Pendiente"
         }
 
-@Composable
-private fun UserDeviceStatus.userStatusColor(): Color =
-    when (this) {
-        UserDeviceStatus.Active -> ActiveGreen
-        UserDeviceStatus.Unprotected -> MaterialTheme.colorScheme.error
-        UserDeviceStatus.Inactive -> PendingYellow
-        UserDeviceStatus.Unknown -> HeaderMuted
-    }
+private fun UserDeviceUiState.detailHealthColor(): Color =
+    if (status == UserDeviceStatus.Active && protectionComplete) ActiveGreen else PendingYellow
+
+private fun UserDeviceUiState.detailAttentionSummary(): String =
+    protectionAlert
+        ?: when (status) {
+            UserDeviceStatus.Unprotected -> "Hay componentes de protección que requieren atención"
+            UserDeviceStatus.Inactive -> "No hay comunicación reciente con el dispositivo"
+            UserDeviceStatus.Unknown -> "Todavía falta verificar la configuración"
+            UserDeviceStatus.Active -> "Falta completar la configuración de protección"
+        }
 
 private val AdminSurface = Color(0xFFF2F8F7)
 private val HeaderInk = Color(0xFF162235)
@@ -1047,6 +1025,7 @@ private fun UserDetailContent(
     onRecoveryCodeCopied: () -> Unit,
     onGenerateRelinkCode: (String) -> Unit,
     onRelinkCodeCopied: () -> Unit,
+    onArchiveUser: () -> Unit,
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
@@ -1112,12 +1091,6 @@ private fun UserDetailContent(
             when (selectedPanel) {
                 DevicePanel.Apps -> {
                     item {
-                        AppSectionSelector(
-                            selectedPanel = selectedPanel,
-                            onPanelSelected = onPanelSelected,
-                        )
-                    }
-                    item {
                         AllowedScheduleEditor(
                             title = "Horario global de aplicaciones",
                             rules =
@@ -1132,6 +1105,12 @@ private fun UserDetailContent(
                                     windows,
                                 )
                             },
+                        )
+                    }
+                    item {
+                        AppSectionSelector(
+                            selectedPanel = selectedPanel,
+                            onPanelSelected = onPanelSelected,
                         )
                     }
                     item {
@@ -1334,15 +1313,24 @@ private fun UserDetailContent(
                         ProtectionPanel(
                             state = state,
                             device = selectedDevice,
-                            clipboardManager = LocalClipboardManager.current,
                             onArmProtection = { onProtectionArmedChanged(selectedDevice.id, true) },
-                            onAuthorizeRemoval = { onAuthorizeRemoval(selectedDevice.id) },
-                            onGenerateRecoveryCode = { onGenerateRecoveryCode(selectedDevice.id) },
-                            onRecoveryCodeCopied = onRecoveryCodeCopied,
-                            onGenerateRelinkCode = { onGenerateRelinkCode(selectedDevice.id) },
-                            onRelinkCodeCopied = onRelinkCodeCopied,
                         )
                     }
+                }
+            }
+            if (entryMode == RulesEntryMode.ManageUsers) {
+                item(key = "advanced-options-${selectedDevice.id}") {
+                    AdvancedUserOptions(
+                        state = state,
+                        device = selectedDevice,
+                        clipboardManager = LocalClipboardManager.current,
+                        onAuthorizeRemoval = { onAuthorizeRemoval(selectedDevice.id) },
+                        onGenerateRecoveryCode = { onGenerateRecoveryCode(selectedDevice.id) },
+                        onRecoveryCodeCopied = onRecoveryCodeCopied,
+                        onGenerateRelinkCode = { onGenerateRelinkCode(selectedDevice.id) },
+                        onRelinkCodeCopied = onRelinkCodeCopied,
+                        onArchiveUser = onArchiveUser,
+                    )
                 }
             }
         }
@@ -1843,7 +1831,12 @@ private fun UserDetailHeader(
                         color = HeaderInk,
                         maxLines = 1,
                     )
-                    StatusChip(device.status.label, device.status.userStatusColor())
+                    Box(
+                        modifier =
+                            Modifier
+                                .size(10.dp)
+                                .background(device.detailHealthColor(), CircleShape),
+                    )
                 }
                 AnimatedVisibility(
                     visible = collapseProgress < 0.72f,
@@ -1862,47 +1855,31 @@ private fun UserDetailHeader(
             ProtectionSummaryCard(
                 device = device,
                 selected = selectedPanel == DevicePanel.Protection,
-                onClick = { onPanelSelected(DevicePanel.Protection) },
+                onClick = {
+                    onPanelSelected(
+                        if (selectedPanel == DevicePanel.Protection) DevicePanel.Apps else DevicePanel.Protection,
+                    )
+                },
             )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                if (selectedPanel == DevicePanel.Apps || selectedPanel == DevicePanel.AppGroups) {
-                    Button(
-                        modifier = Modifier.weight(1f),
-                        onClick = { onPanelSelected(DevicePanel.Apps) },
-                        shape = RoundedCornerShape(tabShape),
-                    ) {
-                        Text("Aplicaciones")
-                    }
-                } else {
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { onPanelSelected(DevicePanel.Apps) },
-                        shape = RoundedCornerShape(tabShape),
-                    ) {
-                        Text("Aplicaciones")
-                    }
-                }
-                if (selectedPanel == DevicePanel.Web) {
-                    Button(
-                        modifier = Modifier.weight(1f),
-                        onClick = { },
-                        shape = RoundedCornerShape(tabShape),
-                    ) {
-                        Text("Web")
-                    }
-                } else {
-                    OutlinedButton(
-                        modifier = Modifier.weight(1f),
-                        onClick = { onPanelSelected(DevicePanel.Web) },
-                        shape = RoundedCornerShape(tabShape),
-                    ) {
-                        Text("Web")
-                    }
-                }
+                DetailSegmentButton(
+                    modifier = Modifier.weight(1f),
+                    text = "Aplicaciones",
+                    selected = selectedPanel == DevicePanel.Apps || selectedPanel == DevicePanel.AppGroups,
+                    shape = RoundedCornerShape(tabShape),
+                    onClick = { onPanelSelected(DevicePanel.Apps) },
+                )
+                DetailSegmentButton(
+                    modifier = Modifier.weight(1f),
+                    text = "Web",
+                    selected = selectedPanel == DevicePanel.Web,
+                    shape = RoundedCornerShape(tabShape),
+                    onClick = { onPanelSelected(DevicePanel.Web) },
+                )
             }
         }
     }
@@ -1914,6 +1891,8 @@ private fun ProtectionSummaryCard(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val healthy = device.status == UserDeviceStatus.Active && device.protectionComplete
+    val statusColor = if (healthy) ActiveGreen else PendingYellow
     Card(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -1929,27 +1908,69 @@ private fun ProtectionSummaryCard(
             ),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
     ) {
-        Column(
+        Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
+            Box(
+                modifier = Modifier.size(42.dp).background(statusColor.copy(alpha = 0.14f), RoundedCornerShape(13.dp)),
+                contentAlignment = Alignment.Center,
             ) {
-                Text("Protección", style = MaterialTheme.typography.titleMedium, color = HeaderInk)
-                StatusChip(
-                    if (device.protectionComplete) "Completa" else "Revisar",
-                    if (device.protectionComplete) ActiveGreen else MaterialTheme.colorScheme.error,
+                ProductGlyph(
+                    icon = if (healthy) ProductIcon.ShieldCheck else ProductIcon.ShieldAlert,
+                    color = statusColor,
+                    modifier = Modifier.size(27.dp),
                 )
             }
+            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                Text(
+                    if (healthy) "Protección completa" else "Protección por revisar",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = HeaderInk,
+                )
+                Text(
+                    text = if (healthy) "VPN, Accesibilidad y antidesinstalación activas" else device.detailAttentionSummary(),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = HeaderMuted,
+                    maxLines = 2,
+                )
+            }
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = if (selected) "Cerrar protección" else "Ver protección",
+                tint = statusColor,
+            )
+        }
+    }
+}
+
+@Composable
+private fun DetailSegmentButton(
+    text: String,
+    selected: Boolean,
+    shape: RoundedCornerShape,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Card(
+        modifier = modifier,
+        onClick = onClick,
+        shape = shape,
+        colors =
+            CardDefaults.cardColors(
+                containerColor = if (selected) HeaderInk else Color.White,
+            ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Box(
+            modifier = Modifier.fillMaxWidth().padding(vertical = 11.dp),
+            contentAlignment = Alignment.Center,
+        ) {
             Text(
-                text =
-                    "VPN: ${device.vpnState} · Accesibilidad: ${device.accessibilityState} · " +
-                        "Protección contra desinstalación: ${device.deviceAdminState}",
-                style = MaterialTheme.typography.bodySmall,
-                color = HeaderMuted,
+                text = text,
+                style = MaterialTheme.typography.labelLarge,
+                color = if (selected) Color.White else HeaderInk,
             )
         }
     }
@@ -1964,18 +1985,6 @@ private fun AppSectionSelector(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        if (selectedPanel == DevicePanel.Apps) {
-            Button(modifier = Modifier.weight(1f), onClick = {}) {
-                Text("Todas las apps")
-            }
-        } else {
-            OutlinedButton(
-                modifier = Modifier.weight(1f),
-                onClick = { onPanelSelected(DevicePanel.Apps) },
-            ) {
-                Text("Todas las apps")
-            }
-        }
         if (selectedPanel == DevicePanel.AppGroups) {
             Button(modifier = Modifier.weight(1f), onClick = {}) {
                 Text("Grupos")
@@ -1988,6 +1997,18 @@ private fun AppSectionSelector(
                 Text("Grupos")
             }
         }
+        if (selectedPanel == DevicePanel.Apps) {
+            Button(modifier = Modifier.weight(1f), onClick = {}) {
+                Text("Todas las apps")
+            }
+        } else {
+            OutlinedButton(
+                modifier = Modifier.weight(1f),
+                onClick = { onPanelSelected(DevicePanel.Apps) },
+            ) {
+                Text("Todas las apps")
+            }
+        }
     }
 }
 
@@ -1995,13 +2016,7 @@ private fun AppSectionSelector(
 private fun ProtectionPanel(
     state: RulesUiState,
     device: UserDeviceUiState,
-    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
     onArmProtection: () -> Unit,
-    onAuthorizeRemoval: () -> Unit,
-    onGenerateRecoveryCode: () -> Unit,
-    onRecoveryCodeCopied: () -> Unit,
-    onGenerateRelinkCode: () -> Unit,
-    onRelinkCodeCopied: () -> Unit,
 ) {
     val control = state.protectionControls[device.id]
     val loading = device.id in state.protectionLoadingDeviceIds
@@ -2047,18 +2062,127 @@ private fun ProtectionPanel(
             }
         }
     }
-    ProductCard {
-        Text("Desinstalación temporal", style = MaterialTheme.typography.titleMedium)
-        Text("La autorización vence automáticamente a los 30 minutos.", style = MaterialTheme.typography.bodyMedium)
-        Text(
-            text = control.authorizationStatusLabel(),
-            style = MaterialTheme.typography.bodySmall,
-            color = HeaderMuted,
-        )
-        Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
-            Text("Permitir desinstalación")
+}
+
+@Composable
+private fun AdvancedUserOptions(
+    state: RulesUiState,
+    device: UserDeviceUiState,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    onAuthorizeRemoval: () -> Unit,
+    onGenerateRecoveryCode: () -> Unit,
+    onRecoveryCodeCopied: () -> Unit,
+    onGenerateRelinkCode: () -> Unit,
+    onRelinkCodeCopied: () -> Unit,
+    onArchiveUser: () -> Unit,
+) {
+    var expanded by rememberSaveable(device.id) { mutableStateOf(false) }
+    var confirmArchive by rememberSaveable(device.id) { mutableStateOf(false) }
+    val control = state.protectionControls[device.id]
+    val loading = device.id in state.protectionLoadingDeviceIds
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        ProductCard(onClick = { expanded = !expanded }) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text("Más opciones", style = MaterialTheme.typography.titleMedium, color = HeaderInk)
+                    Text(
+                        "Reenlace, desinstalación temporal, código de emergencia y archivo",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = HeaderMuted,
+                    )
+                }
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = if (expanded) "Cerrar más opciones" else "Abrir más opciones",
+                    tint = HeaderMuted,
+                )
+            }
+        }
+        AnimatedVisibility(visible = expanded) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                ProductCard {
+                    Text("Desinstalación temporal", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "La autorización vence automáticamente a los 30 minutos.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        text = control.authorizationStatusLabel(),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = HeaderMuted,
+                    )
+                    Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
+                        Text("Permitir desinstalación")
+                    }
+                }
+                RelinkOptionCard(
+                    state = state,
+                    device = device,
+                    clipboardManager = clipboardManager,
+                    onGenerateRelinkCode = onGenerateRelinkCode,
+                    onRelinkCodeCopied = onRelinkCodeCopied,
+                )
+                RecoveryOptionCard(
+                    state = state,
+                    loading = loading,
+                    clipboardManager = clipboardManager,
+                    onGenerateRecoveryCode = onGenerateRecoveryCode,
+                    onRecoveryCodeCopied = onRecoveryCodeCopied,
+                )
+                OutlinedButton(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = device.id !in state.pendingDeviceDeleteIds,
+                    onClick = { confirmArchive = true },
+                ) {
+                    Text("Archivar usuario", color = MaterialTheme.colorScheme.error)
+                }
+            }
         }
     }
+    if (confirmArchive) {
+        AlertDialog(
+            onDismissRequest = { confirmArchive = false },
+            title = { Text("Archivar usuario") },
+            text = {
+                Text(
+                    "El usuario perderá acceso y saldrá de la lista activa. Su configuración se conservará para restaurarlo después.",
+                )
+            },
+            confirmButton = {
+                ProgressActionButton(
+                    onClick = {
+                        confirmArchive = false
+                        onArchiveUser()
+                    },
+                    enabled = device.id !in state.pendingDeviceDeleteIds,
+                    modifier = Modifier,
+                    text = "Archivar usuario",
+                    loadingText = "Archivando...",
+                    successText = "Archivado",
+                    tone = ActionButtonTone.Destructive,
+                )
+            },
+            dismissButton = {
+                OutlinedButton(onClick = { confirmArchive = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun RelinkOptionCard(
+    state: RulesUiState,
+    device: UserDeviceUiState,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    onGenerateRelinkCode: () -> Unit,
+    onRelinkCodeCopied: () -> Unit,
+) {
     ProductCard {
         Text("Volver a enlazar", style = MaterialTheme.typography.titleMedium)
         Text(
@@ -2093,6 +2217,16 @@ private fun ProtectionPanel(
             }
         }
     }
+}
+
+@Composable
+private fun RecoveryOptionCard(
+    state: RulesUiState,
+    loading: Boolean,
+    clipboardManager: androidx.compose.ui.platform.ClipboardManager,
+    onGenerateRecoveryCode: () -> Unit,
+    onRecoveryCodeCopied: () -> Unit,
+) {
     ProductCard {
         Text("Recuperación sin conexión", style = MaterialTheme.typography.titleMedium)
         Text(

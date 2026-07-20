@@ -11,9 +11,13 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -77,6 +81,7 @@ private fun UpdatesScreen(
     onRecoveryCodeChanged: (String) -> Unit,
     onSubmitRecoveryCode: () -> Unit,
 ) {
+    var showReleaseNotes by rememberSaveable { mutableStateOf(false) }
     ProductVisualPage(
         title = "Ajustes",
         subtitle = "Versión, actualización y acceso de emergencia",
@@ -138,20 +143,36 @@ private fun UpdatesScreen(
             accent = ProductSky,
         )
         ProductCard {
-            Text(
-                text = "Versión instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                style = MaterialTheme.typography.titleMedium,
-            )
-            state.manifest?.let { manifest ->
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 Text(
-                    text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
+                    modifier = Modifier.weight(1f),
+                    text = "Versión instalada: ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                     style = MaterialTheme.typography.titleMedium,
                 )
-                Text(text = "Novedades", style = MaterialTheme.typography.titleSmall)
-                Text(
-                    text = manifest.releaseNotes.ifBlank { "Sin novedades informadas." },
-                    style = MaterialTheme.typography.bodyMedium,
-                )
+                TextButton(
+                    enabled = state.manifest != null,
+                    onClick = { showReleaseNotes = !showReleaseNotes },
+                ) {
+                    Text(if (showReleaseNotes) "Ocultar" else "Ver novedades")
+                }
+            }
+            state.manifest?.let { manifest ->
+                if (manifest.versionCode > BuildConfig.VERSION_CODE) {
+                    Text(
+                        text = "${state.status.versionLabel()}: ${manifest.versionName} (${manifest.versionCode})",
+                        style = MaterialTheme.typography.titleMedium,
+                    )
+                }
+                if (showReleaseNotes) {
+                    Text(text = "Últimos cambios", style = MaterialTheme.typography.titleSmall)
+                    Text(
+                        text = manifest.releaseNotes.ifBlank { "Sin novedades informadas." },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                }
             }
             if (state.status == UpdatesStatus.Downloading) {
                 LinearProgressIndicator(

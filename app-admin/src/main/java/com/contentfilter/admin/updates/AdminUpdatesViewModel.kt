@@ -48,8 +48,14 @@ class AdminUpdatesViewModel
                         }
                         UpdateCheckResult.NetworkError,
                         UpdateCheckResult.NotConfigured,
-                        UpdateCheckResult.UpToDate,
                         -> Unit
+                        is UpdateCheckResult.UpToDate -> {
+                            _uiState.value =
+                                AdminUpdatesUiState(
+                                    status = AdminUpdatesStatus.UpToDate,
+                                    manifest = result.manifest,
+                                )
+                        }
                     }
                 }.onFailure { exception ->
                     Log.e(LogTag, "Admin auto update failed: ${exception.message}", exception)
@@ -75,8 +81,12 @@ class AdminUpdatesViewModel
                         UpdateCheckResult.NotConfigured -> {
                             _uiState.value = AdminUpdatesUiState(status = AdminUpdatesStatus.NotConfigured)
                         }
-                        UpdateCheckResult.UpToDate -> {
-                            _uiState.value = AdminUpdatesUiState(status = AdminUpdatesStatus.UpToDate)
+                        is UpdateCheckResult.UpToDate -> {
+                            _uiState.value =
+                                AdminUpdatesUiState(
+                                    status = AdminUpdatesStatus.UpToDate,
+                                    manifest = result.manifest,
+                                )
                         }
                     }
                 }.onFailure { exception ->

@@ -52,8 +52,14 @@ class UpdatesViewModel
                         }
                         UpdateCheckResult.NetworkError,
                         UpdateCheckResult.NotConfigured,
-                        UpdateCheckResult.UpToDate,
                         -> Unit
+                        is UpdateCheckResult.UpToDate -> {
+                            _uiState.value =
+                                UpdatesUiState(
+                                    status = UpdatesStatus.UpToDate,
+                                    manifest = result.manifest,
+                                )
+                        }
                     }
                 }.onFailure { exception ->
                     Log.e(LogTag, "Auto update failed: ${exception.message}", exception)
@@ -79,8 +85,12 @@ class UpdatesViewModel
                         UpdateCheckResult.NotConfigured -> {
                             _uiState.value = UpdatesUiState(status = UpdatesStatus.NotConfigured)
                         }
-                        UpdateCheckResult.UpToDate -> {
-                            _uiState.value = UpdatesUiState(status = UpdatesStatus.UpToDate)
+                        is UpdateCheckResult.UpToDate -> {
+                            _uiState.value =
+                                UpdatesUiState(
+                                    status = UpdatesStatus.UpToDate,
+                                    manifest = result.manifest,
+                                )
                         }
                     }
                 }.onFailure { exception ->
@@ -152,7 +162,7 @@ class UpdatesViewModel
                             )
                     ) {
                         is UpdateCheckResult.Available -> downloadAdmin(result.manifest)
-                        UpdateCheckResult.UpToDate -> {
+                        is UpdateCheckResult.UpToDate -> {
                             _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.AlreadyInstalled) }
                         }
                         UpdateCheckResult.NetworkError,

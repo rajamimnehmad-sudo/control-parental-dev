@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -32,6 +33,8 @@ enum class ProductIcon {
     Search,
     Refresh,
     Bell,
+    ShieldCheck,
+    ShieldAlert,
     Panel,
     Update,
     Web,
@@ -308,23 +311,99 @@ fun ProductGlyph(
                 )
             }
             ProductIcon.Bell -> {
+                val bell =
+                    Path().apply {
+                        moveTo(size.width * 0.24f, size.height * 0.69f)
+                        cubicTo(
+                            size.width * 0.34f,
+                            size.height * 0.58f,
+                            size.width * 0.29f,
+                            size.height * 0.42f,
+                            size.width * 0.36f,
+                            size.height * 0.30f,
+                        )
+                        cubicTo(
+                            size.width * 0.42f,
+                            size.height * 0.20f,
+                            size.width * 0.58f,
+                            size.height * 0.20f,
+                            size.width * 0.64f,
+                            size.height * 0.30f,
+                        )
+                        cubicTo(
+                            size.width * 0.71f,
+                            size.height * 0.42f,
+                            size.width * 0.66f,
+                            size.height * 0.58f,
+                            size.width * 0.76f,
+                            size.height * 0.69f,
+                        )
+                        close()
+                    }
+                drawPath(path = bell, color = color, style = Stroke(width = stroke, cap = StrokeCap.Round))
                 drawArc(
-                    color,
-                    195f,
-                    150f,
-                    false,
-                    Offset(size.width * 0.24f, size.height * 0.18f),
-                    Size(size.width * 0.52f, size.height * 0.58f),
+                    color = color,
+                    startAngle = 0f,
+                    sweepAngle = 180f,
+                    useCenter = false,
+                    topLeft = Offset(size.width * 0.43f, size.height * 0.68f),
+                    size = Size(size.width * 0.14f, size.height * 0.13f),
                     style = Stroke(width = stroke, cap = StrokeCap.Round),
                 )
-                drawLine(
-                    color,
-                    Offset(size.width * 0.28f, size.height * 0.68f),
-                    Offset(size.width * 0.72f, size.height * 0.68f),
-                    stroke,
-                    cap = StrokeCap.Round,
-                )
-                drawCircle(color, 1.8.dp.toPx(), Offset(size.width * 0.50f, size.height * 0.80f))
+            }
+            ProductIcon.ShieldCheck,
+            ProductIcon.ShieldAlert,
+            -> {
+                val shield =
+                    Path().apply {
+                        moveTo(size.width * 0.50f, size.height * 0.12f)
+                        lineTo(size.width * 0.78f, size.height * 0.24f)
+                        lineTo(size.width * 0.75f, size.height * 0.56f)
+                        cubicTo(
+                            size.width * 0.72f,
+                            size.height * 0.73f,
+                            size.width * 0.61f,
+                            size.height * 0.84f,
+                            size.width * 0.50f,
+                            size.height * 0.90f,
+                        )
+                        cubicTo(
+                            size.width * 0.39f,
+                            size.height * 0.84f,
+                            size.width * 0.28f,
+                            size.height * 0.73f,
+                            size.width * 0.25f,
+                            size.height * 0.56f,
+                        )
+                        lineTo(size.width * 0.22f, size.height * 0.24f)
+                        close()
+                    }
+                drawPath(path = shield, color = color, style = Stroke(width = stroke, cap = StrokeCap.Round))
+                if (icon == ProductIcon.ShieldCheck) {
+                    drawLine(
+                        color,
+                        Offset(size.width * 0.36f, size.height * 0.50f),
+                        Offset(size.width * 0.46f, size.height * 0.61f),
+                        stroke,
+                        cap = StrokeCap.Round,
+                    )
+                    drawLine(
+                        color,
+                        Offset(size.width * 0.46f, size.height * 0.61f),
+                        Offset(size.width * 0.65f, size.height * 0.39f),
+                        stroke,
+                        cap = StrokeCap.Round,
+                    )
+                } else {
+                    drawLine(
+                        color,
+                        Offset(size.width * 0.50f, size.height * 0.34f),
+                        Offset(size.width * 0.50f, size.height * 0.57f),
+                        stroke,
+                        cap = StrokeCap.Round,
+                    )
+                    drawCircle(color, 1.5.dp.toPx(), Offset(size.width * 0.50f, size.height * 0.69f))
+                }
             }
             ProductIcon.Panel -> {
                 drawRoundRect(
@@ -410,6 +489,8 @@ private fun ProductIcon.materialVector(): ImageVector? =
         ProductIcon.Search -> Icons.Filled.Search
         ProductIcon.Refresh -> Icons.Filled.Refresh
         ProductIcon.Bell -> null
+        ProductIcon.ShieldCheck -> null
+        ProductIcon.ShieldAlert -> null
         ProductIcon.Panel -> Icons.Filled.List
         ProductIcon.Update -> Icons.Filled.Refresh
         ProductIcon.Web -> null

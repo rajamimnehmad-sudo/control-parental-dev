@@ -79,6 +79,14 @@ Usuario 8513a03ce9eba9bb40344a13451ad4651f9da9017b822418783c6de0d35feea8
 Admin   c11f526866e6ac4d9de38fad452d1b174cd4e7d0f0d5b1c766ede3c6c17677ea
 ```
 
+## Candidato UX posterior a DEV 264 - no publicado - 2026-07-20
+
+- Ambas apps agregan `Ver novedades` en texto azul junto a la version instalada. La comprobacion conserva el manifiesto tambien cuando la version ya esta al dia, por lo que las notas de la ultima version pueden abrirse y cerrarse sin fingir una actualizacion disponible.
+- La campana compartida se redibuja como un contorno mas limpio. En Home Admin, `Estado de proteccion de usuarios` usa un escudo con check o alerta y conserva el contador de problemas.
+- `Agregar usuario` desde Home Admin abre directamente la ventana de alta dentro de Usuarios. La lista elimina las metricas redundantes y las etiquetas extensas: cada fila es mas compacta y muestra solo una luz verde cuando la proteccion esta completa o amarilla cuando requiere atencion.
+- El detalle de Usuario Admin sigue el flujo aprobado: resumen expandible de Proteccion arriba; selector Aplicaciones/Web; en Aplicaciones, primero configuracion global, luego Grupos y finalmente todas las apps; detalles tecnicos de proteccion separados; y `Mas opciones` al final para desinstalacion temporal, reenlace, codigo de emergencia y archivo reversible. Tocar nuevamente Proteccion cierra su detalle.
+- El candidato conserva `versionCode` 264. No se genero ni publico una nueva version, no se instalo en un telefono, no se uso Supabase, no se toco Production y no se modificaron datos ni secretos.
+
 ## Publicacion DEV 264 - reenlace seguro, novedades, comunicacion e iconos oficiales - 2026-07-20
 
 - App Admin agrega `Volver a enlazar` dentro de Proteccion del Usuario. Superweb incorpora la misma accion en cada Usuario activo y en cada Admin activado. El token queda ligado al mismo `device_id`, rol, cuenta y administrador; es de un solo uso, dura como maximo 30 minutos y sólo se muestra en la respuesta que lo genera.
