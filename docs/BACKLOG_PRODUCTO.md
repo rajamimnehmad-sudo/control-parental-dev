@@ -44,12 +44,19 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 265 y App Admin DEV 265, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 266 y App Admin DEV 266, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### ADMIN-USER-SECTIONS-UX-05 - Detalle compacto y controles persistentes
+
+- Estado: `Implementado candidato DEV 267; pendiente publicacion y recorrido visual completo`. Aprobado explicitamente el 2026-07-20. Tipo: UX Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Alcance: `Apps / Web / Seguridad` usa tres segmentos de igual ancho que siempre entran en pantalla. Al desplazar, el selector se transforma con una transicion sutil en una etiqueta compacta junto al nombre; tocarla vuelve al inicio y recupera el selector completo.
+- Aplicaciones: `Configurar horarios` queda como accion simple y abre una pantalla completa dedicada; `Grupos` pasa a `Crear grupo de apps`. El titulo, actualizar, buscar y los filtros rapidos permanecen fijos mientras se desplaza solamente el inventario.
+- Aceptacion tecnica alcanzada: tests unitarios Admin, ktlint y ensamblado DEV de Usuario/Admin correctos, 756 tareas. App Admin DEV 267 se instalo in-place en SM-A235M conservando `firstInstallTime` y `ceDataInode`; el recorrido visual quedo bloqueado por la pantalla de bloqueo/SystemUI del telefono, sin evidencia de fallo de Content Filter. No se toco Supabase ni Production.
 
 ### PROTECTION-POSSIBLE-UNINSTALL-01 - Alerta maxima persistente
 
@@ -199,6 +206,7 @@ Flujo de una entrada:
 | PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
 | HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
+| ADMIN-USER-SECTIONS-UX-05 | Implementado candidato DEV 267; pendiente publicacion y recorrido visual completo | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |

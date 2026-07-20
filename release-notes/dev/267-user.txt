@@ -1,0 +1,2 @@
+Actualización coordinada con App Admin para mantener ambas aplicaciones en la misma versión DEV.
+Conserva las mejoras de seguridad, recuperación sin Internet y ayuda privada de DEV 266.
