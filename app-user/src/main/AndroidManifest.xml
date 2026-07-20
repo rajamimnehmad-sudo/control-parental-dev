@@ -36,8 +36,9 @@
         android:name=".UserApplication"
         android:allowBackup="false"
         android:dataExtractionRules="@xml/data_extraction_rules"
-        android:icon="@drawable/ic_user_launcher"
+        android:icon="@drawable/user_fish_icon"
         android:label="Content Filter"
+        android:roundIcon="@drawable/user_fish_icon"
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
@@ -52,8 +53,9 @@
             android:name=".UserLauncherAlias"
             android:enabled="true"
             android:exported="true"
-            android:icon="@drawable/ic_user_launcher"
+            android:icon="@drawable/user_fish_icon"
             android:label="Content Filter"
+            android:roundIcon="@drawable/user_fish_icon"
             android:targetActivity=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

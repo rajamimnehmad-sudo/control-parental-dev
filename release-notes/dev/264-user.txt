@@ -2,3 +2,4 @@ Inicio, Mis apps e Internet con una experiencia más clara y moderna.
 Avisos más simples: lectura automática, indicador correcto y eliminación con gesto.
 Protección guiada desde Inicio y código de emergencia siempre accesible en Ajustes.
 Reenlace seguro del mismo usuario sin perder sus reglas ni configuraciones.
+Nuevo icono oficial con fondo blanco.

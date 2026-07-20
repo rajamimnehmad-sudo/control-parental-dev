@@ -12,6 +12,7 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:icon="@drawable/admin_fish_icon"
         android:label="Content Filter Admin"
+        android:roundIcon="@drawable/admin_fish_icon"
         android:theme="@style/AppTheme">
         <activity
             android:name=".MainActivity"
