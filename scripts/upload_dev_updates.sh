@@ -32,6 +32,27 @@ print(name)
 PY
 }
 
+archive_public_object_if_present() {
+    local object_name="$1"
+    local status
+    status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --range 0-0 \
+        "https://$PROJECT_REF.supabase.co/storage/v1/object/public/dev-updates/$object_name")"
+
+    case "$status" in
+        200|206)
+            supabase storage mv --experimental --linked \
+                "ss:///dev-updates/$object_name" \
+                "ss:///dev-updates/$object_name.$ARCHIVE_SUFFIX"
+            ;;
+        400|404)
+            ;;
+        *)
+            printf 'No se pudo comprobar %s antes de publicar (HTTP %s).\n' "$object_name" "$status" >&2
+            return 1
+            ;;
+    esac
+}
+
 if ! command -v supabase >/dev/null 2>&1; then
     printf 'Falta Supabase CLI. Instalar en macOS: brew install supabase/tap/supabase\n' >&2
     exit 1
@@ -59,10 +80,10 @@ supabase storage cp --experimental --linked --content-type application/vnd.andro
 supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive "build/dev-updates/$ADMIN_APK_NAME" "ss:///dev-updates/$STAGING_PREFIX/$ADMIN_APK_NAME"
 
 printf 'Archivando artefactos dev anteriores si existen...\n'
-supabase storage mv --experimental --linked ss:///dev-updates/app-user-dev-manifest.json "ss:///dev-updates/app-user-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
-supabase storage mv --experimental --linked ss:///dev-updates/app-admin-dev-manifest.json "ss:///dev-updates/app-admin-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
-supabase storage mv --experimental --linked "ss:///dev-updates/$USER_APK_NAME" "ss:///dev-updates/$USER_APK_NAME.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
-supabase storage mv --experimental --linked "ss:///dev-updates/$ADMIN_APK_NAME" "ss:///dev-updates/$ADMIN_APK_NAME.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
+archive_public_object_if_present app-user-dev-manifest.json
+archive_public_object_if_present app-admin-dev-manifest.json
+archive_public_object_if_present "$USER_APK_NAME"
+archive_public_object_if_present "$ADMIN_APK_NAME"
 
 printf 'Publicando artefactos staged...\n'
 supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/$USER_APK_NAME" "ss:///dev-updates/$USER_APK_NAME"

@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-20:
 
 ```text
-App Usuario versionCode 263
-App Admin versionCode 263
+App Usuario versionCode 264
+App Admin versionCode 264
 versionName 1.0.1-dev
 ```
 
@@ -68,18 +68,18 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-263-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-263-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-264-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-264-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario b1563fbd104962b2810c2edc4e7c1ce2c13c03f6884e457cf3132cb3476a0298
-Admin   45979b8a1c7fe55877bfeb0ad37c90c5f155fdea70f939111909729a1d40054b
+Usuario 8513a03ce9eba9bb40344a13451ad4651f9da9017b822418783c6de0d35feea8
+Admin   c11f526866e6ac4d9de38fad452d1b174cd4e7d0f0d5b1c766ede3c6c17677ea
 ```
 
-## Candidato DEV 264 - reenlace seguro, novedades y alerta de comunicacion - 2026-07-20
+## Publicacion DEV 264 - reenlace seguro, novedades, comunicacion e iconos oficiales - 2026-07-20
 
 - App Admin agrega `Volver a enlazar` dentro de Proteccion del Usuario. Superweb incorpora la misma accion en cada Usuario activo y en cada Admin activado. El token queda ligado al mismo `device_id`, rol, cuenta y administrador; es de un solo uso, dura como maximo 30 minutos y sólo se muestra en la respuesta que lo genera.
 - Consumir el token no duplica Usuario/Admin ni rota inmediatamente la credencial anterior. La app nueva recibe una credencial transitoria que sólo puede leer/sincronizar la misma cuenta y dispositivo. Despues de una sincronizacion completa correcta llama `complete_own_device_relink`: entonces se rota atomicamente el token del mismo dispositivo y se revocan sus activaciones anteriores. Si la sincronizacion o el cierre fallan, el enlace anterior sigue vigente y el nuevo reintenta sin quedar declarado como completo.
@@ -87,7 +87,10 @@ Admin   45979b8a1c7fe55877bfeb0ad37c90c5f155fdea70f939111909729a1d40054b
 - App Admin distingue ahora `Proteccion caida` de `Sin comunicacion`: VPN, Accesibilidad o antidesinstalacion incompletos se muestran como problema tecnico; el heartbeat sólo pasa a `Sin comunicacion` al superar 24 horas. Superweb muestra el mismo atraso en la tarjeta. Un cron DEV horario crea como maximo un evento `device_offline` por episodio, visible en las bandejas Admin/Superweb existentes. No se recopila ni alerta bateria.
 - Actualizaciones muestra el titulo `Novedades` en ambas apps. La publicacion exige un archivo versionado independiente por APK (`release-notes/dev/{versionCode}-user.txt` y `-admin.txt`) y lo incorpora al manifiesto que ya vincula version, URL y SHA-256; faltan notas, el publicador falla antes de subir.
 - Backend aplicado exclusivamente en Supabase DEV `syeycayasyufedwoprea`: migracion `20260720014907_secure_device_relink_and_offline_alerts.sql`, RLS y grants verificados, `pg_cron` habilitado con un unico job `17 * * * *`, 0 sesiones/tokens de reenlace creados durante las pruebas y 0 alertas offline persistidas. La simulacion del generador se ejecuto dentro de `BEGIN/ROLLBACK`; no borro ni modifico datos existentes. Production no fue tocado.
-- Validacion hasta este corte: compilacion Kotlin DEV Usuario/Admin, unit tests de ambas apps, `core-network` y `core-sync`, ktlint, DTO retrocompatible, cierre de reenlace correcto/reintentable, ESLint, TypeScript y build Next correctos. Pendiente ejecutar la matriz final con version 264, publicar ambas APK juntas y verificar sus artefactos; la prueba fisica se hara despues con el telefono del usuario.
+- App Usuario adopta como icono oficial el pez verde sobre fondo blanco; App Admin usa el mismo signo en blanco sobre fondo verde. Los recursos fuente recibidos se convirtieron de forma determinista a PNG 1024 x 1024, sin redibujo generativo, y se aplican tambien como `roundIcon`. Los glifos monocromos de notificacion permanecen separados para cumplir el formato de Android.
+- Validacion final: matriz local completa de tests, ktlint, Android Lint, Detekt y `assembleDevDebug` de ambas apps correcta, 1.845 tareas; recompilacion final desde el commit de iconos correcta, 739 tareas. ESLint, TypeScript y build Next tambien terminaron correctamente. Los APK publicos se descargaron de nuevo: `aapt` confirma paquetes DEV y version 264, `apksigner` confirma en ambos el certificado `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`, los recursos oficiales estan compilados y los SHA-256 coinciden con los manifiestos.
+- Commits funcionales de este corte: `ac93b1b` (reenlace seguro, novedades y alertas) y `d4249a0` (iconos oficiales). La publicacion se realizo una sola vez exclusivamente en Supabase DEV. El ultimo movimiento del manifiesto Admin encontro un conflicto porque el script ocultaba un fallo previo de archivado; se verifico que Usuario ya apuntaba a 264 y Admin aun a 263, se archivo manualmente el manifiesto Admin anterior como `app-admin-dev-manifest.json.manual-bak-20260719-233126` y se promovio el manifiesto staged 264. El publicador ahora comprueba existencia y deja de ocultar fallos de archivado, para detenerse antes de una promocion parcial futura.
+- Permanecen objetos historicos de staging, incluido el intento interrumpido `.staging-bak-20260719-231849/`; no son publicos ni los consumen las apps. No se borraron porque requieren confirmacion especifica del usuario. No se toco Production ni se agregaron secretos. Pendiente instalar DEV 264 en el telefono y recorrer Usuario/Admin; Superweb conserva los cambios en fuente y no se desplego en esta publicacion Android.
 
 ## Publicacion DEV 261 - Epic UX Admin, feedback y horarios - 2026-07-19
 

@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-19
+Ultima sincronizacion: 2026-07-20
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -44,12 +44,18 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 263 y App Admin DEV 263, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 264 y App Admin DEV 264, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### ANDROID-BRAND-ICONS-01 - Iconos oficiales diferenciados
+
+- Estado: `Publicado DEV 264; pendiente comprobacion visual en launcher`. Aprobado explicitamente por el usuario el 2026-07-20. Tipo: marca y UX Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Alcance: App Usuario usa el signo verde oficial sobre fondo blanco y App Admin el signo blanco sobre fondo verde. Ambas variantes conservan el mismo recurso para el recorte redondo del launcher; los iconos monocromos de notificacion siguen separados.
+- Aceptacion alcanzada: fuentes convertidas sin redibujo generativo, recursos compilados dentro de ambos APK, matriz integral correcta y APK DEV 264 publicos verificados por version, paquete, hash y firma. Falta confirmar visualmente ambos recortes en el telefono.
 
 ### PROTECTION-HOME-SIMPLIFY-03 - Reparacion central y emergencia visible
 
@@ -192,15 +198,16 @@ Flujo de una entrada:
 | SUPERWEB-AUTH-RECOVERY-01 | Publicado; recovery bloqueado externamente por cuota Supabase DEV | P0 | Recuperar de forma segura la contraseña del propietario desde el Login | S | Medio |
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
 | SUPERWEB-OPS-UX-01 | Archivo seguro, agrupacion y claridad Base implementados; busqueda/filtros pendientes | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
-| APP-UPDATE-CHANGELOG-01 | Implementado candidato DEV 264 | P2 | Mostrar en Usuario y Admin las novedades especificas de la actualizacion ofrecida | M | Medio |
+| APP-UPDATE-CHANGELOG-01 | Publicado DEV 264; pendiente prueba fisica | P2 | Mostrar en Usuario y Admin las novedades especificas de la actualizacion ofrecida | M | Medio |
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 248; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado DEV 241 y hotfix de visualizacion 2026-07-18; pendiente prueba funcional autenticada | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
-| SUPERADMIN-ADMIN-RELINK-01 | Implementado candidato DEV 264 | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
-| USER-RELINK-01 | Implementado candidato DEV 264 | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
+| SUPERADMIN-ADMIN-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
+| USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
+| ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
-| DEVICE-CONNECTIVITY-ALERTS-01 | Implementado candidato DEV 264, sin bateria por decision de producto | P1 | Alerta tras 24 horas sin comunicacion para Admin y Superweb | M | Medio |
+| DEVICE-CONNECTIVITY-ALERTS-01 | Backend y Android publicados DEV 264; Superweb en fuente; sin bateria | P1 | Alerta tras 24 horas sin comunicacion para Admin y Superweb | M | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Validado visualmente en SM-A235M DEV 248; pendiente evento real | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
@@ -303,7 +310,7 @@ Flujo de una entrada:
 
 ### SUPERADMIN-ADMIN-RELINK-01 - Reenlace de un administrador existente
 
-- Estado: `Implementado candidato DEV 264`; aprobado explicitamente el 2026-07-20. Tipo: recuperacion de acceso, activacion y seguridad Super Admin. Prioridad: P1.
+- Estado: `Backend y Android publicados DEV 264; Superweb implementado en fuente; pendiente prueba integral`; aprobado explicitamente el 2026-07-20. Tipo: recuperacion de acceso, activacion y seguridad Super Admin. Prioridad: P1.
 - Problema: si App Admin pierde o elimina su activacion local, el administrador puede quedar sin acceso aunque su identidad, comunidad y permisos sigan vigentes. Crear otro administrador produciria duplicados y fragmentaria la auditoria.
 - Solucion propuesta: desde la tarjeta del administrador existente en Superweb, ofrecer `Volver a enlazar` y generar un token nuevo, de un solo uso y vencimiento corto, asociado exactamente a ese administrador y comunidad. App Admin usa ese token para recuperar el vinculo sin crear otra identidad administrativa.
 - Evidencia: propuesta explicita del usuario del 2026-07-18.
@@ -323,7 +330,7 @@ Flujo de una entrada:
 
 ### USER-RELINK-01 - Reenlace de un Usuario existente
 
-- Estado: `Implementado candidato DEV 264`; aprobado explicitamente el 2026-07-20. Tipo: recuperacion de acceso, activacion Usuario y seguridad. Prioridad: P1.
+- Estado: `Backend y Android publicados DEV 264; Superweb implementado en fuente; pendiente prueba integral`; aprobado explicitamente el 2026-07-20. Tipo: recuperacion de acceso, activacion Usuario y seguridad. Prioridad: P1.
 - Problema: App Usuario puede perder su vinculacion local por un fallo, limpieza de datos, cambio de telefono u otra incidencia, aunque el Usuario protegido y su configuracion remota sigan existiendo. Crear otro Usuario duplicaria identidad, reglas, grupos, solicitudes y auditoria.
 - Solucion propuesta: ofrecer `Volver a enlazar` o `Reemplazar enlace` tanto en la tarjeta del Usuario dentro de App Admin como en su tarjeta Superweb. La accion genera un token nuevo, de un solo uso y vencimiento corto, asociado exactamente al Usuario, comunidad y alcance autorizados; App Usuario lo utiliza para recuperar el vínculo sin crear otra identidad.
 - Evidencia: propuesta explicita del usuario del 2026-07-18.
@@ -387,7 +394,7 @@ Flujo de una entrada:
 
 ### APP-UPDATE-CHANGELOG-01 - Novedades de actualizacion por aplicacion
 
-- Estado: `Implementado candidato DEV 264`; aprobado explicitamente el 2026-07-20. Tipo: UX de actualizaciones, comunicacion de producto y publicacion DEV. Prioridad: P2.
+- Estado: `Publicado DEV 264; pendiente prueba fisica`; aprobado explicitamente el 2026-07-20. Tipo: UX de actualizaciones, comunicacion de producto y publicacion DEV. Prioridad: P2.
 - Problema: App Usuario y App Admin pueden informar que existe una version nueva, pero no explican de forma clara que cambia para la aplicacion correspondiente antes de instalarla.
 - Solucion propuesta: mostrar en la pantalla de Actualizaciones un bloque `Novedades` asociado a la version ofrecida. App Usuario recibe exclusivamente cambios relevantes para Usuario y DAG; App Admin recibe exclusivamente cambios de administracion. Si se saltaron varias versiones, presentar un resumen acumulado y legible sin mezclar detalles tecnicos internos.
 - Evidencia: pedido explicito del usuario del 2026-07-17.
@@ -935,7 +942,7 @@ Flujo de una entrada:
 
 ### DEVICE-CONNECTIVITY-ALERTS-01 - Dispositivo sin comunicacion
 
-- Estado: `Implementado candidato DEV 264`; aprobado explicitamente el 2026-07-20. Bateria queda fuera por decision expresa del usuario. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
+- Estado: `Backend y Android publicados DEV 264; Superweb implementado en fuente; pendiente prueba integral`; aprobado explicitamente el 2026-07-20. Bateria queda fuera por decision expresa del usuario. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
 - Problema: un telefono apagado, sin red o con el proceso detenido puede dejar de reportar sin que el administrador sepa que perdio comunicacion.
 - Solucion implementada: despues de 24 horas sin heartbeat, crear como maximo una alerta por episodio para las bandejas existentes de App Admin y Superweb. Muestra el ultimo contacto y nunca afirma que la proteccion fue desactivada.
 - Evidencia: idea 10 seleccionada explicitamente por el usuario el 2026-07-19 luego de revisar las mejores funciones no invasivas de FamilyTime. Content Filter ya transmite heartbeat y alertas de componentes; se propone aprovechar esa evidencia sin agregar vigilancia de contenido.
