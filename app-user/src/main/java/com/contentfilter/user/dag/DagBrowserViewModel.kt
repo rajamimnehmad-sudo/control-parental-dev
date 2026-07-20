@@ -61,6 +61,8 @@ class DagBrowserViewModel
         private var activePolicyVersion: Long = 0L
         private var approvalPollingJob: Job? = null
         private var suggestionJob: Job? = null
+        private var searchJob: Job? = null
+        private val searchRequestTracker = DagSearchRequestTracker()
         private val reviewSubmissionsInFlight = mutableSetOf<String>()
 
         init {
@@ -82,6 +84,7 @@ class DagBrowserViewModel
                         activePolicyVersion = snapshot.version
                         val enabled = activation != null && health.dagEntitled && snapshot.rules.dagEnabled()
                         val extraKosherEnabled = enabled && snapshot.rules.dagExtraKosherEnabled()
+                        if (!enabled) cancelActiveSearch()
                         mutableState.update { state ->
                             state.withDagAvailability(enabled).copy(dagExtraKosherEnabled = extraKosherEnabled)
                         }
@@ -221,10 +224,12 @@ class DagBrowserViewModel
         }
 
         fun search(query: String) {
-            if (!mutableState.value.dagEnabled || query.isBlank()) return
-            val classification = classifier.classifyQuery(query)
+            val normalizedQuery = query.trim().take(MaxAddressCharacters)
+            if (!mutableState.value.dagEnabled || normalizedQuery.isBlank()) return
+            val classification = classifier.classifyQuery(normalizedQuery)
             when (classification.decision) {
                 DagClassification.Blocked -> {
+                    cancelActiveSearch()
                     mutableState.update {
                         it.copy(
                             view = DagView.Start,
@@ -237,6 +242,7 @@ class DagBrowserViewModel
                     }
                 }
                 DagClassification.Uncertain -> {
+                    cancelActiveSearch()
                     mutableState.update {
                         it.copy(
                             view = DagView.Start,
@@ -248,7 +254,7 @@ class DagBrowserViewModel
                         )
                     }
                 }
-                DagClassification.Allowed -> performSearch(query)
+                DagClassification.Allowed -> performSearch(normalizedQuery)
             }
         }
 
@@ -257,134 +263,143 @@ class DagBrowserViewModel
             page: Int = 0,
             append: Boolean = false,
         ) {
-            viewModelScope.launch {
-                mutableState.update {
-                    it.copy(
-                        loading = true,
-                        analysisProgress = 0.05f,
-                        message = "",
-                        reviewCandidate = null,
-                        pageStatus = DagPageStatus.Idle,
-                        suggestions = emptyList(),
-                    )
-                }
-                val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
-                if (activation == null) {
+            val requestId = searchRequestTracker.begin(DagSearchRequest(query, page, append)) ?: return
+            searchJob?.cancel()
+            val job =
+                viewModelScope.launch {
                     mutableState.update {
                         it.copy(
-                            loading = false,
-                            analysisProgress = 0f,
-                            message = "DAG no está vinculado a este dispositivo.",
+                            loading = true,
+                            analysisProgress = 0.05f,
+                            message = "",
+                            reviewCandidate = null,
+                            pageStatus = DagPageStatus.Idle,
+                            suggestions = emptyList(),
                         )
                     }
-                    return@launch
-                }
-                when (
-                    val response =
-                        searchRepository.search(
-                            deviceId = activation.deviceId,
-                            query = query,
-                            language = query.dagLanguage(),
-                            page = page,
-                        )
-                ) {
-                    is RemoteResult.Failure -> {
+                    val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
+                    if (activation == null) {
+                        if (!searchRequestTracker.isCurrent(requestId)) return@launch
                         mutableState.update {
                             it.copy(
                                 loading = false,
                                 analysisProgress = 0f,
-                                message = response.reason,
+                                message = "DAG no está vinculado a este dispositivo.",
                             )
                         }
+                        return@launch
                     }
-                    is RemoteResult.Success -> {
-                        val classifiedWithReasons =
-                            withContext(Dispatchers.Default) {
-                                response.value.results.mapNotNull { remote ->
-                                    val domain = DagContentClassifier.domainFrom(remote.url)
-                                    if (domain.isBlank()) return@mapNotNull null
-                                    val local =
-                                        classifier.classifyResultWithReason(
-                                            remote.title,
-                                            remote.description,
-                                            remote.url,
-                                        )
-                                    val decision = applyExplicitRule(domain = domain, result = local.classification)
-                                    val reason =
-                                        if (
-                                            decision.decision == DagClassification.Blocked &&
-                                            decision.category == "admin_block"
-                                        ) {
-                                            DagSearchDecisionReason.AdminRuleBlock
-                                        } else {
-                                            local.reason
-                                        }
-                                    reason to
-                                        DagSearchResult(
-                                            title = remote.title,
-                                            url = remote.url,
-                                            domain = domain,
-                                            description = remote.description,
-                                            classification = decision,
-                                        )
-                                }
-                            }
-                        val diagnostics =
-                            dagSearchDiagnostics(
-                                braveReceived = response.value.braveReceived,
-                                serverRejected = response.value.serverRejected,
-                                decisions = classifiedWithReasons.map { it.first },
+                    when (
+                        val response =
+                            searchRepository.search(
+                                deviceId = activation.deviceId,
+                                query = query,
+                                language = query.dagLanguage(),
+                                page = page,
                             )
-                        Log.i(
-                            DiagnosticsLogTag,
-                            "results brave=${diagnostics.braveReceived} serverRejected=${diagnostics.serverRejected} " +
-                                "domainListBlocked=${diagnostics.domainListBlocked} " +
-                                "adminRuleBlocked=${diagnostics.adminRuleBlocked} " +
-                                "platformBlocked=${diagnostics.platformBlocked} " +
-                                "localClassifierBlocked=${diagnostics.localClassifierBlocked} " +
-                                "uncertainShown=${diagnostics.uncertainShown} " +
-                                "allowedShown=${diagnostics.allowedShown} shown=${diagnostics.shown}",
-                        )
-                        val classified =
-                            classifiedWithReasons.mapNotNull { (reason, result) ->
-                                result.takeUnless {
-                                    reason == DagSearchDecisionReason.DomainListBlock ||
-                                        reason == DagSearchDecisionReason.AdminRuleBlock ||
-                                        reason == DagSearchDecisionReason.PlatformBlock ||
-                                        reason == DagSearchDecisionReason.LocalClassifierBlock
-                                }
+                    ) {
+                        is RemoteResult.Failure -> {
+                            if (!searchRequestTracker.isCurrent(requestId)) return@launch
+                            mutableState.update {
+                                it.copy(
+                                    loading = false,
+                                    analysisProgress = 0f,
+                                    message = response.reason,
+                                )
                             }
-                        if (!append) {
-                            withContext(Dispatchers.IO) { historyStore.addSearch(query) }
                         }
-                        mutableState.update { state ->
-                            val combined =
-                                if (append) {
-                                    (state.results + classified).distinctBy(DagSearchResult::url)
-                                } else {
-                                    classified
+                        is RemoteResult.Success -> {
+                            val classifiedWithReasons =
+                                withContext(Dispatchers.Default) {
+                                    response.value.results.mapNotNull { remote ->
+                                        val domain = DagContentClassifier.domainFrom(remote.url)
+                                        if (domain.isBlank()) return@mapNotNull null
+                                        val local =
+                                            classifier.classifyResultWithReason(
+                                                remote.title,
+                                                remote.description,
+                                                remote.url,
+                                            )
+                                        val decision = applyExplicitRule(domain = domain, result = local.classification)
+                                        val reason =
+                                            if (
+                                                decision.decision == DagClassification.Blocked &&
+                                                decision.category == "admin_block"
+                                            ) {
+                                                DagSearchDecisionReason.AdminRuleBlock
+                                            } else {
+                                                local.reason
+                                            }
+                                        reason to
+                                            DagSearchResult(
+                                                title = remote.title,
+                                                url = remote.url,
+                                                domain = domain,
+                                                description = remote.description,
+                                                classification = decision,
+                                            )
+                                    }
                                 }
-                            state.copy(
-                                address = query,
-                                loading = false,
-                                analysisProgress = 1f,
-                                view = DagView.Results,
-                                results = combined,
-                                searchQuery = query,
-                                searchPage = page,
-                                canLoadMoreResults = dagCanLoadMoreResults(page, response.value.hasMoreResults),
-                                suggestions = emptyList(),
-                                message =
-                                    if (combined.isEmpty()) {
-                                        "DAG no encontró resultados que pueda mostrar."
-                                    } else {
-                                        ""
-                                    },
+                            if (!searchRequestTracker.isCurrent(requestId)) return@launch
+                            val diagnostics =
+                                dagSearchDiagnostics(
+                                    braveReceived = response.value.braveReceived,
+                                    serverRejected = response.value.serverRejected,
+                                    decisions = classifiedWithReasons.map { it.first },
+                                )
+                            Log.i(
+                                DiagnosticsLogTag,
+                                "results brave=${diagnostics.braveReceived} serverRejected=${diagnostics.serverRejected} " +
+                                    "domainListBlocked=${diagnostics.domainListBlocked} " +
+                                    "adminRuleBlocked=${diagnostics.adminRuleBlocked} " +
+                                    "platformBlocked=${diagnostics.platformBlocked} " +
+                                    "localClassifierBlocked=${diagnostics.localClassifierBlocked} " +
+                                    "uncertainShown=${diagnostics.uncertainShown} " +
+                                    "allowedShown=${diagnostics.allowedShown} shown=${diagnostics.shown}",
                             )
+                            val classified =
+                                classifiedWithReasons.mapNotNull { (reason, result) ->
+                                    result.takeUnless {
+                                        reason == DagSearchDecisionReason.DomainListBlock ||
+                                            reason == DagSearchDecisionReason.AdminRuleBlock ||
+                                            reason == DagSearchDecisionReason.PlatformBlock ||
+                                            reason == DagSearchDecisionReason.LocalClassifierBlock
+                                    }
+                                }
+                            if (!append) {
+                                withContext(Dispatchers.IO) { historyStore.addSearch(query) }
+                            }
+                            if (!searchRequestTracker.isCurrent(requestId)) return@launch
+                            mutableState.update { state ->
+                                val combined =
+                                    if (append) {
+                                        (state.results + classified).distinctBy(DagSearchResult::url)
+                                    } else {
+                                        classified
+                                    }
+                                state.copy(
+                                    address = query,
+                                    loading = false,
+                                    analysisProgress = 1f,
+                                    view = DagView.Results,
+                                    results = combined,
+                                    searchQuery = query,
+                                    searchPage = page,
+                                    canLoadMoreResults = dagCanLoadMoreResults(page, response.value.hasMoreResults),
+                                    suggestions = emptyList(),
+                                    message =
+                                        if (combined.isEmpty()) {
+                                            "DAG no encontró resultados que pueda mostrar."
+                                        } else {
+                                            ""
+                                        },
+                                )
+                            }
                         }
                     }
                 }
-            }
+            searchJob = job
+            job.invokeOnCompletion { searchRequestTracker.complete(requestId) }
         }
 
         fun loadMoreResults() {
@@ -429,12 +444,14 @@ class DagBrowserViewModel
                 mutableState.update { it.copy(message = "DAG solo admite direcciones web HTTPS.") }
                 return
             }
+            cancelActiveSearch()
             val domain = DagContentClassifier.domainFrom(url)
             val classification = applyExplicitRule(domain, classifier.classifyDirectUrl(url))
             when (classification.decision) {
                 DagClassification.Blocked ->
                     mutableState.update {
                         it.copy(
+                            loading = false,
                             pageStatus = DagPageStatus.Blocked,
                             message = "DAG bloqueó este sitio.",
                             reviewCandidate = null,
@@ -444,6 +461,7 @@ class DagBrowserViewModel
                 DagClassification.Uncertain ->
                     mutableState.update {
                         it.copy(
+                            loading = false,
                             pageStatus = DagPageStatus.Uncertain,
                             message = "Este sitio necesita revisión del administrador.",
                             reviewCandidate =
@@ -460,6 +478,7 @@ class DagBrowserViewModel
                     mutableState.update {
                         it.copy(
                             address = url,
+                            loading = false,
                             view = DagView.Browser,
                             pageStatus = DagPageStatus.Loading,
                             pageAnalysisReady = false,
@@ -731,13 +750,19 @@ class DagBrowserViewModel
 
         fun showHistory() {
             if (mutableState.value.dagEnabled) {
-                mutableState.update { it.copy(view = DagView.History, message = "", suggestions = emptyList()) }
+                cancelActiveSearch()
+                mutableState.update {
+                    it.copy(view = DagView.History, loading = false, message = "", suggestions = emptyList())
+                }
             }
         }
 
         fun showReviewRequests() {
             if (mutableState.value.dagEnabled) {
-                mutableState.update { it.copy(view = DagView.Reviews, message = "", suggestions = emptyList()) }
+                cancelActiveSearch()
+                mutableState.update {
+                    it.copy(view = DagView.Reviews, loading = false, message = "", suggestions = emptyList())
+                }
             }
         }
 
@@ -764,6 +789,7 @@ class DagBrowserViewModel
         }
 
         fun showStart() {
+            cancelActiveSearch()
             mutableState.update(DagBrowserUiState::toDagStart)
         }
 
@@ -790,6 +816,7 @@ class DagBrowserViewModel
             }
 
         fun restoreTab(tab: DagTabSnapshot) {
+            cancelActiveSearch()
             mutableState.update {
                 it.copy(
                     address = tab.address,
@@ -812,6 +839,7 @@ class DagBrowserViewModel
         }
 
         fun openNewTab() {
+            cancelActiveSearch()
             mutableState.update {
                 it.copy(
                     address = "",
@@ -866,6 +894,7 @@ class DagBrowserViewModel
         }
 
         fun onBrowserRendererGone() {
+            cancelActiveSearch()
             mutableState.update {
                 it.copy(
                     address = "",
@@ -878,6 +907,12 @@ class DagBrowserViewModel
                     reviewCandidate = null,
                 )
             }
+        }
+
+        private fun cancelActiveSearch() {
+            searchRequestTracker.cancel()
+            searchJob?.cancel()
+            searchJob = null
         }
 
         private fun applyExplicitRule(
