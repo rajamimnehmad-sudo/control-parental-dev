@@ -20,6 +20,8 @@ fun envValue(name: String): String {
         .orEmpty()
 }
 
+val devSigningStorePath = providers.environmentVariable("ANDROID_DEV_KEYSTORE_PATH").orNull
+
 android {
     namespace = "com.contentfilter.admin"
     compileSdk = 36
@@ -36,6 +38,18 @@ android {
     }
 
     flavorDimensions += "distribution"
+
+    signingConfigs {
+        if (!devSigningStorePath.isNullOrBlank()) {
+            create("devUpdate") {
+                storeFile = file(devSigningStorePath)
+                storePassword = envValue("ANDROID_DEV_KEYSTORE_PASSWORD")
+                keyAlias = envValue("ANDROID_DEV_KEY_ALIAS")
+                keyPassword = envValue("ANDROID_DEV_KEY_PASSWORD")
+            }
+        }
+    }
+
     productFlavors {
         create("dev") {
             dimension = "distribution"
@@ -58,6 +72,9 @@ android {
             // DEV APKs are installed as updates on physical devices, but do
             // not need to expose a debuggable runtime outside local builds.
             isDebuggable = false
+            if (!devSigningStorePath.isNullOrBlank()) {
+                signingConfig = signingConfigs.getByName("devUpdate")
+            }
         }
     }
 

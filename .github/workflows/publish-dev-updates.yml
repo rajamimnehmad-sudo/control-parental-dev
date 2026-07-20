@@ -12,6 +12,11 @@ on:
         required: true
         default: false
         type: boolean
+      confirm_same_version_repair:
+        description: "Reparar excepcionalmente los artefactos de la misma version ya publicada"
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: publish-dev-updates-${{ github.ref }}
@@ -117,6 +122,19 @@ jobs:
           fi
           supabase login --token "$SUPABASE_ACCESS_TOKEN" --name github-actions-dev
 
+      - name: Preparar firma DEV estable
+        shell: bash
+        env:
+          ANDROID_DEV_KEYSTORE_BASE64: ${{ secrets.ANDROID_DEV_KEYSTORE_BASE64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${ANDROID_DEV_KEYSTORE_BASE64:-}" ]]; then
+            echo "Falta secret ANDROID_DEV_KEYSTORE_BASE64" >&2
+            exit 1
+          fi
+          printf '%s' "$ANDROID_DEV_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/dev-update.jks"
+          chmod 600 "$RUNNER_TEMP/dev-update.jks"
+
       - name: Permisos de scripts
         shell: bash
         run: chmod +x ./gradlew scripts/*.sh
@@ -125,4 +143,9 @@ jobs:
         shell: bash
         env:
           SUPABASE_PROJECT_REF: syeycayasyufedwoprea
+          ANDROID_DEV_KEYSTORE_PATH: ${{ runner.temp }}/dev-update.jks
+          ANDROID_DEV_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_PASSWORD }}
+          ANDROID_DEV_KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}
+          ANDROID_DEV_KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
+          ALLOW_SAME_VERSION_REPAIR: ${{ inputs.confirm_same_version_repair }}
         run: scripts/publicar_dev.sh
