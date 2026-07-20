@@ -2,11 +2,10 @@ package com.contentfilter.user.protection
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.contentfilter.core.domain.model.ProtectionAlertType
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.domain.model.RecoveryUnlockResult
+import com.contentfilter.core.domain.repository.ProtectionControlRepository
 import com.contentfilter.core.domain.repository.ProtectionStateStore
-import com.contentfilter.core.domain.repository.PushNotificationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -24,8 +23,8 @@ class ProtectionViewModel
     @Inject
     constructor(
         private val coordinator: ProtectionControlCoordinator,
+        private val remoteRepository: ProtectionControlRepository,
         private val stateStore: ProtectionStateStore,
-        private val pushNotificationRepository: PushNotificationRepository,
     ) : ViewModel() {
         private val mutableState = MutableStateFlow(ProtectionUiState())
         val uiState: StateFlow<ProtectionUiState> = mutableState.asStateFlow()
@@ -66,16 +65,26 @@ class ProtectionViewModel
             }
         }
 
-        fun requestMaintenance() {
-            viewModelScope.launch(Dispatchers.IO) {
-                pushNotificationRepository.reportProtectionAlert(ProtectionAlertType.MaintenanceRequested)
-                mutableState.update { it.copy(message = "Pedido enviado al administrador.") }
-            }
-        }
-
         fun cancelRemovalAuthorization() {
             stateStore.cancelLocalRemovalAuthorization()
-            updateFromStore(message = "Autorización cancelada. La barrera volvió a quedar activa.")
+            mutableState.update {
+                it.copy(
+                    removalAuthorized = false,
+                    message = "Cancelando autorización...",
+                )
+            }
+            viewModelScope.launch(Dispatchers.IO) {
+                val result = remoteRepository.cancelOwnRemovalAuthorization()
+                coordinator.refresh()
+                updateFromStore(
+                    message =
+                        if (result.isSuccess) {
+                            "Autorización cancelada. La barrera volvió a quedar activa."
+                        } else {
+                            "No se pudo cancelar la autorización remota."
+                        },
+                )
+            }
         }
 
         private suspend fun refreshInternal(showProgress: Boolean) {
@@ -90,17 +99,10 @@ class ProtectionViewModel
             message: String? = null,
             clearCode: Boolean = false,
         ) {
-            val control = stateStore.currentControl()
             mutableState.update { previous ->
                 previous.copy(
-                    armed = control?.armed == true,
-                    remoteSettingsAuthorized =
-                        stateStore.isAuthorized(ProtectionAuthorizationScope.Settings),
                     removalAuthorized =
                         stateStore.isAuthorized(ProtectionAuthorizationScope.Removal),
-                    recoveryAvailable = control?.hasAvailableRecovery == true,
-                    appliedRevision = control?.appliedRevision ?: 0,
-                    commandRevision = control?.commandRevision ?: 0,
                     refreshing = false,
                     recoveryCode = if (clearCode) "" else previous.recoveryCode,
                     message = message ?: previous.message,
@@ -112,12 +114,7 @@ class ProtectionViewModel
     }
 
 data class ProtectionUiState(
-    val armed: Boolean = false,
-    val remoteSettingsAuthorized: Boolean = false,
     val removalAuthorized: Boolean = false,
-    val recoveryAvailable: Boolean = false,
-    val appliedRevision: Long = 0,
-    val commandRevision: Long = 0,
     val recoveryCode: String = "",
     val refreshing: Boolean = false,
     val message: String = "",

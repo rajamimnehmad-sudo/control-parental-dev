@@ -88,6 +88,9 @@ class SupabaseProtectionControlRepository
             return client.invokeRpc("ack_device_protection_control", json).toResult()
         }
 
+        override suspend fun cancelOwnRemovalAuthorization(): Result<Unit> =
+            client.invokeRpc("cancel_own_removal_authorization", JSONObject()).toResult()
+
         private suspend fun mutate(
             accountId: String,
             deviceId: String,

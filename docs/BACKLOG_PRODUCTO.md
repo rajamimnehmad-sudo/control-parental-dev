@@ -51,6 +51,14 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### PROTECTION-HOME-SIMPLIFY-03 - Reparacion central y emergencia visible
+
+- Estado: `Candidato DEV 263; publicacion conjunta autorizada`. Aprobado explicitamente por el usuario el 2026-07-20. Tipo: UX y proteccion. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
+- Alcance Usuario: Inicio es la unica superficie de diagnostico y reparacion de proteccion; Ajustes mantiene siempre visible el codigo de emergencia y deja de duplicar botones tecnicos. La desinstalacion autorizada y su cancelacion aparecen contextualmente dentro de la tarjeta expandida de Proteccion.
+- Alcance Admin: el estado se llama `Proteccion contra desinstalacion`; se retira el permiso general de mantenimiento y queda solo la autorizacion de desinstalacion por 30 minutos, mas el codigo de emergencia offline.
+- Seguridad: cancelar revoca el permiso local y el remoto mediante una RPC limitada al dispositivo autenticado por su token y al alcance `removal`. Sin token falla cerrada; no puede conceder permisos, cambiar otro dispositivo ni borrar datos.
+- Aceptacion previa: matriz local completa de 1.068 tareas correcta, migracion aplicada y verificada solo en Supabase DEV, sin secretos ni Production. Pendiente completar la publicacion unica DEV 263 y la prueba fisica.
+
 ### ANNOUNCEMENTS-INBOX-UX-02 - Lectura y ocultado por dispositivo
 
 - Estado: `Candidato posterior a DEV 262; backend DEV aplicado y sin publicacion Android`. Aprobado explicitamente por el usuario el 2026-07-19. Tipo: UX y comunicacion operativa. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
@@ -168,12 +176,13 @@ Flujo de una entrada:
 | SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
 | SUPERWEB-VERSION-01 | Idea | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
-| UI-BANNER-DYNAMIC-02 | Publicado DEV 261; pulido sutil candidato posterior a DEV 262 | P1 | Línea de estado sin fondo ni X; desaparece sin hueco y el error persiste junto a la acción | M | Medio |
-| ANNOUNCEMENTS-INBOX-UX-02 | Candidato posterior a DEV 262; backend DEV aplicado y sin publicación Android | P2 | Avisos leídos/no leídos, contador real y ocultado por dispositivo con deshacer | M | Medio |
+| UI-BANNER-DYNAMIC-02 | Candidato DEV 263; publicación autorizada | P1 | Línea de estado sutil con duración adaptada a textos largos y error contextual | M | Medio |
+| ANNOUNCEMENTS-INBOX-UX-02 | Candidato DEV 263; backend DEV aplicado y publicación autorizada | P2 | Avisos leídos/no leídos, contador real y ocultado por dispositivo con deshacer | M | Medio |
 | ADMIN-UX-NAV-HOME-01 | Publicado DEV 261; pendiente recorrido físico completo | P1 | Navegación Home/Usuarios/Solicitudes/Cuenta y Home orientado a salud, licencia y avisos Superweb | M | Medio |
 | ADMIN-USERS-UX-02 | Publicado DEV 261; cierre visual físico parcial | P1 | Detalle con Protección siempre visible, Apps/Web y grupos dentro de Aplicaciones | L | Alto |
 | USER-ARCHIVE-RESTORE-02 | Implementado y validado para archivos nuevos; 2 legados quedan bloqueados a revisión por falta de snapshot | P1 | Usuarios anteriores, archivo reversible, restauración y reenlace seguro con token nuevo | L | Alto |
-| PROTECTION-MAINTENANCE-UX-01 | Publicado DEV 261; pendiente prueba física | P0 | Separar mantenimiento y desinstalación por 30 minutos con reactivación automática | M | Alto |
+| PROTECTION-MAINTENANCE-UX-01 | Reordenado en candidato DEV 263; publicación autorizada | P0 | Desinstalación temporal por 30 minutos, sin permiso general de mantenimiento | M | Alto |
+| PROTECTION-HOME-SIMPLIFY-03 | Candidato DEV 263; publicación autorizada | P0 | Reparación central en Inicio, desinstalación contextual y código de emergencia siempre visible | M | Alto |
 | POLICY-SCHEDULES-01 | Publicado DEV 261 y backend DEV aplicado; pendiente prueba física | P1 | Límites de uso real y horarios múltiples por día en zona Argentina para Apps y Web | XL | Alto |
 | ADMIN-REQUESTS-ACCOUNT-01 | Publicado DEV 261; pendiente prueba física | P1 | Solicitudes raíz y Cuenta con identidad, Superweb, licencia, versión y novedades | M | Medio |
 | USER-UX-ALIGN-02 | Publicado DEV 261; validación local completa y cierre físico parcial | P2 | Reacomodar App Usuario con componentes visuales compartidos sin exponer controles Admin | L | Medio |

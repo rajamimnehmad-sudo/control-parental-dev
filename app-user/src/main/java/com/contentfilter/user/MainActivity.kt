@@ -379,54 +379,11 @@ private fun UserAppRoot(
                     val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
                     UpdatesRoute(
                         onBack = null,
-                        protectionSummary = statusState.summary,
-                        communityName = statusState.communityName,
-                        guideName = statusState.guideName,
-                        vpnState = statusState.vpnState,
-                        accessibilityState = statusState.accessibilityState,
-                        deviceAdminState = statusState.deviceAdminState,
-                        syncState = statusState.syncState,
                         activationState = statusState.activationState,
-                        batteryOptimizationExempt = batteryOptimizationExempt,
-                        protectionArmed = protectionState.armed,
-                        settingsAuthorized = protectionState.remoteSettingsAuthorized,
-                        removalAuthorized = protectionState.removalAuthorized,
-                        recoveryAvailable = protectionState.recoveryAvailable,
                         recoveryCode = protectionState.recoveryCode,
                         protectionMessage = protectionState.message,
-                        protectionRefreshing = protectionState.refreshing,
-                        onActivateDeviceAdmin = {
-                            deviceAdminLauncher.launch(DeviceAdminController.activationIntent(context))
-                        },
-                        onActivateAccessibility = {
-                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                        },
-                        onActivateVpn = {
-                            val permissionIntent = VpnController.prepareIntent(context)
-                            if (permissionIntent == null) {
-                                VpnController.start(context)
-                            } else {
-                                vpnPermissionLauncher.launch(permissionIntent)
-                            }
-                        },
-                        onRequestBatteryOptimizationExemption = {
-                            batteryOptimizationLauncher.launch(BatteryOptimizationController.requestIntent(context))
-                        },
-                        onProtectionRefresh = protectionViewModel::refresh,
-                        onRequestMaintenance = protectionViewModel::requestMaintenance,
                         onRecoveryCodeChanged = protectionViewModel::onRecoveryCodeChanged,
                         onSubmitRecoveryCode = protectionViewModel::submitRecoveryCode,
-                        onCancelRemovalAuthorization = protectionViewModel::cancelRemovalAuthorization,
-                        onAuthorizedRemoval = {
-                            if (protectionState.removalAuthorized) {
-                                context
-                                    .getSystemService(DevicePolicyManager::class.java)
-                                    .removeActiveAdmin(DeviceAdminController.component(context))
-                                context.startActivity(
-                                    Intent(Intent.ACTION_DELETE, Uri.parse("package:${context.packageName}")),
-                                )
-                            }
-                        },
                     )
                 }
             }
@@ -591,12 +548,15 @@ private fun UserHomeRoute(
     statusViewModel: SystemStatusViewModel = hiltViewModel(),
     appsViewModel: MyAppsViewModel = hiltViewModel(),
     announcementsViewModel: UserAnnouncementsViewModel = hiltViewModel(),
+    protectionViewModel: ProtectionViewModel = hiltViewModel(),
 ) {
+    val context = LocalContext.current
     val requestsState by requestsViewModel.uiState.collectAsStateWithLifecycle()
     val homeState by homeViewModel.uiState.collectAsStateWithLifecycle()
     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
     val appsState by appsViewModel.uiState.collectAsStateWithLifecycle()
     val announcementsState by announcementsViewModel.state.collectAsStateWithLifecycle()
+    val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { announcementsViewModel.refresh() }
     val limitItems = remember(appsState) { nearLimitItems(appsState) }
     UserHomeTab(
@@ -620,6 +580,19 @@ private fun UserHomeRoute(
         onActivateAccessibility = onActivateAccessibility,
         onActivateDeviceAdmin = onActivateDeviceAdmin,
         onOpenSettings = onOpenSettings,
+        removalAuthorized = protectionState.removalAuthorized,
+        removalAuthorizationMessage = protectionState.message,
+        onCancelRemovalAuthorization = protectionViewModel::cancelRemovalAuthorization,
+        onAuthorizedRemoval = {
+            if (protectionState.removalAuthorized) {
+                context
+                    .getSystemService(DevicePolicyManager::class.java)
+                    .removeActiveAdmin(DeviceAdminController.component(context))
+                context.startActivity(
+                    Intent(Intent.ACTION_DELETE, Uri.parse("package:${context.packageName}")),
+                )
+            }
+        },
     )
 }
 
@@ -645,6 +618,10 @@ private fun UserHomeTab(
     onActivateAccessibility: () -> Unit,
     onActivateDeviceAdmin: () -> Unit,
     onOpenSettings: () -> Unit,
+    removalAuthorized: Boolean,
+    removalAuthorizationMessage: String,
+    onCancelRemovalAuthorization: () -> Unit,
+    onAuthorizedRemoval: () -> Unit,
 ) {
     var expandedSection by rememberSaveable { mutableStateOf<UserHomeSection?>(null) }
     Column(modifier = Modifier.fillMaxSize().background(ProductAppBackground)) {
@@ -668,6 +645,10 @@ private fun UserHomeTab(
             onActivateAccessibility = onActivateAccessibility,
             onActivateDeviceAdmin = onActivateDeviceAdmin,
             onOpenSettings = onOpenSettings,
+            removalAuthorized = removalAuthorized,
+            removalAuthorizationMessage = removalAuthorizationMessage,
+            onCancelRemovalAuthorization = onCancelRemovalAuthorization,
+            onAuthorizedRemoval = onAuthorizedRemoval,
         )
         LazyColumn(
             modifier = Modifier.weight(1f),
@@ -731,6 +712,10 @@ private fun UserHomeHeader(
     onActivateAccessibility: () -> Unit,
     onActivateDeviceAdmin: () -> Unit,
     onOpenSettings: () -> Unit,
+    removalAuthorized: Boolean,
+    removalAuthorizationMessage: String,
+    onCancelRemovalAuthorization: () -> Unit,
+    onAuthorizedRemoval: () -> Unit,
 ) {
     val statusLabel =
         when (protectionLevel) {
@@ -824,9 +809,15 @@ private fun UserHomeHeader(
                     label = "Desinstalación",
                     state = deviceAdminState,
                     active = deviceAdminState == ActiveStateLabel,
-                    help = "Confirmá la protección contra desinstalación de Android.",
+                    help =
+                        if (removalAuthorized) {
+                            "La desinstalación está autorizada temporalmente."
+                        } else {
+                            "Confirmá la protección contra desinstalación de Android."
+                        },
                     actionLabel = "Activar protección",
                     onAction = onActivateDeviceAdmin,
+                    actionVisible = !removalAuthorized,
                 )
                 UserProtectionDetailRow(
                     label = "Sincronización",
@@ -844,7 +835,49 @@ private fun UserHomeHeader(
                     actionLabel = "Ver estado",
                     onAction = onOpenSettings,
                 )
+                if (removalAuthorized) {
+                    UserRemovalAuthorizationPanel(
+                        message = removalAuthorizationMessage,
+                        onCancel = onCancelRemovalAuthorization,
+                        onUninstall = onAuthorizedRemoval,
+                    )
+                }
             }
+        }
+    }
+}
+
+@Composable
+private fun UserRemovalAuthorizationPanel(
+    message: String,
+    onCancel: () -> Unit,
+    onUninstall: () -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .background(Color.White.copy(alpha = 0.12f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        Text(
+            text = "Desinstalación autorizada temporalmente",
+            style = MaterialTheme.typography.labelLarge,
+            color = ReviewProtectionColor,
+        )
+        if (message.startsWith("No se pudo")) {
+            Text(
+                text = message,
+                style = MaterialTheme.typography.bodySmall,
+                color = Color(0xFFFFB4AB),
+            )
+        }
+        Button(modifier = Modifier.fillMaxWidth(), onClick = onUninstall) {
+            Text("Desinstalar ahora")
+        }
+        TextButton(modifier = Modifier.align(Alignment.End), onClick = onCancel) {
+            Text("Cancelar autorización", color = Color.White.copy(alpha = 0.82f))
         }
     }
 }
@@ -892,6 +925,7 @@ private fun UserProtectionDetailRow(
     help: String,
     actionLabel: String,
     onAction: () -> Unit,
+    actionVisible: Boolean = true,
 ) {
     Column(
         modifier =
@@ -919,11 +953,13 @@ private fun UserProtectionDetailRow(
                 style = MaterialTheme.typography.bodySmall,
                 color = Color.White.copy(alpha = 0.72f),
             )
-            TextButton(
-                modifier = Modifier.align(Alignment.End),
-                onClick = onAction,
-            ) {
-                Text(actionLabel, color = ReviewProtectionColor)
+            if (actionVisible) {
+                TextButton(
+                    modifier = Modifier.align(Alignment.End),
+                    onClick = onAction,
+                ) {
+                    Text(actionLabel, color = ReviewProtectionColor)
+                }
             }
         }
     }

@@ -447,16 +447,6 @@ class RulesViewModel
             protectionControlRepository.setArmed(device.accountId, device.id, armed)
         }
 
-        fun authorizeSettings(deviceId: String) =
-            mutateProtection(deviceId, "Autorizando mantenimiento...") { device ->
-                protectionControlRepository.authorize(
-                    accountId = device.accountId,
-                    deviceId = device.id,
-                    scope = ProtectionAuthorizationScope.Settings,
-                    durationMinutes = 30,
-                )
-            }
-
         fun authorizeRemoval(deviceId: String) =
             mutateProtection(deviceId, "Autorizando retiro...") { device ->
                 protectionControlRepository.authorize(

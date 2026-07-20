@@ -31,32 +31,11 @@ import com.contentfilter.user.BuildConfig
 @Composable
 fun UpdatesRoute(
     onBack: (() -> Unit)? = null,
-    protectionSummary: String = "",
-    communityName: String = "",
-    guideName: String = "",
-    vpnState: String = "",
-    accessibilityState: String = "",
-    deviceAdminState: String = "",
-    syncState: String = "",
     activationState: String = "",
-    batteryOptimizationExempt: Boolean = false,
-    protectionArmed: Boolean = false,
-    settingsAuthorized: Boolean = false,
-    removalAuthorized: Boolean = false,
-    recoveryAvailable: Boolean = false,
     recoveryCode: String = "",
     protectionMessage: String = "",
-    protectionRefreshing: Boolean = false,
-    onActivateDeviceAdmin: () -> Unit = {},
-    onActivateAccessibility: () -> Unit = {},
-    onActivateVpn: () -> Unit = {},
-    onRequestBatteryOptimizationExemption: () -> Unit = {},
-    onProtectionRefresh: () -> Unit = {},
-    onRequestMaintenance: () -> Unit = {},
     onRecoveryCodeChanged: (String) -> Unit = {},
     onSubmitRecoveryCode: () -> Unit = {},
-    onCancelRemovalAuthorization: () -> Unit = {},
-    onAuthorizedRemoval: () -> Unit = {},
     viewModel: UpdatesViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -74,32 +53,11 @@ fun UpdatesRoute(
         onPrepareAdminInstall = viewModel::prepareAdminInstall,
         onInstallAdmin = viewModel::installDownloadedAdmin,
         onBack = onBack,
-        protectionSummary = protectionSummary,
-        communityName = communityName,
-        guideName = guideName,
-        vpnState = vpnState,
-        accessibilityState = accessibilityState,
-        deviceAdminState = deviceAdminState,
-        syncState = syncState,
         activationState = activationState,
-        batteryOptimizationExempt = batteryOptimizationExempt,
-        protectionArmed = protectionArmed,
-        settingsAuthorized = settingsAuthorized,
-        removalAuthorized = removalAuthorized,
-        recoveryAvailable = recoveryAvailable,
         recoveryCode = recoveryCode,
         protectionMessage = protectionMessage,
-        protectionRefreshing = protectionRefreshing,
-        onActivateDeviceAdmin = onActivateDeviceAdmin,
-        onActivateAccessibility = onActivateAccessibility,
-        onActivateVpn = onActivateVpn,
-        onRequestBatteryOptimizationExemption = onRequestBatteryOptimizationExemption,
-        onProtectionRefresh = onProtectionRefresh,
-        onRequestMaintenance = onRequestMaintenance,
         onRecoveryCodeChanged = onRecoveryCodeChanged,
         onSubmitRecoveryCode = onSubmitRecoveryCode,
-        onCancelRemovalAuthorization = onCancelRemovalAuthorization,
-        onAuthorizedRemoval = onAuthorizedRemoval,
     )
 }
 
@@ -113,36 +71,15 @@ private fun UpdatesScreen(
     onPrepareAdminInstall: () -> Unit,
     onInstallAdmin: () -> Unit,
     onBack: (() -> Unit)?,
-    protectionSummary: String,
-    communityName: String,
-    guideName: String,
-    vpnState: String,
-    accessibilityState: String,
-    deviceAdminState: String,
-    syncState: String,
     activationState: String,
-    batteryOptimizationExempt: Boolean,
-    protectionArmed: Boolean,
-    settingsAuthorized: Boolean,
-    removalAuthorized: Boolean,
-    recoveryAvailable: Boolean,
     recoveryCode: String,
     protectionMessage: String,
-    protectionRefreshing: Boolean,
-    onActivateDeviceAdmin: () -> Unit,
-    onActivateAccessibility: () -> Unit,
-    onActivateVpn: () -> Unit,
-    onRequestBatteryOptimizationExemption: () -> Unit,
-    onProtectionRefresh: () -> Unit,
-    onRequestMaintenance: () -> Unit,
     onRecoveryCodeChanged: (String) -> Unit,
     onSubmitRecoveryCode: () -> Unit,
-    onCancelRemovalAuthorization: () -> Unit,
-    onAuthorizedRemoval: () -> Unit,
 ) {
     ProductVisualPage(
         title = "Ajustes",
-        subtitle = "Protección y versión instalada ${BuildConfig.VERSION_CODE}",
+        subtitle = "Versión, actualización y acceso de emergencia",
         onBack = onBack,
         banner = {
             PremiumFeedbackBanner(
@@ -171,137 +108,25 @@ private fun UpdatesScreen(
                 accent = ProductMint,
             )
         }
-        ProductLargeFeatureCard(
-            title = "Protección",
-            subtitle =
-                if (protectionArmed) {
-                    "Protección reforzada activa. ${protectionSummary.ifBlank { "Componentes verificados." }}"
-                } else {
-                    "Protección reforzada pendiente. ${protectionSummary.ifBlank { "Completá las barreras del dispositivo." }}"
-                },
-            accent = ProductSky,
-        )
         ProductCard {
-            Text("Estado del dispositivo", style = MaterialTheme.typography.titleMedium)
-            if (communityName.isNotBlank()) {
-                Text("Comunidad: $communityName", style = MaterialTheme.typography.bodyMedium)
-            }
-            if (guideName.isNotBlank()) {
-                Text("Guía: $guideName", style = MaterialTheme.typography.bodyMedium)
-            }
+            Text("Código de emergencia", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Accesibilidad: ${accessibilityState.ifBlank { "Desconocida" }}",
+                "Ingresalo solamente si el administrador te dio un código para autorizar una desinstalación sin conexión.",
                 style = MaterialTheme.typography.bodyMedium,
             )
-            Text(
-                "Protección contra desinstalación: ${deviceAdminState.ifBlank { "Desconocida" }}",
-                style = MaterialTheme.typography.bodyMedium,
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = recoveryCode,
+                onValueChange = onRecoveryCodeChanged,
+                label = { Text("Código de emergencia") },
+                singleLine = true,
             )
-            Text("VPN: ${vpnState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
-            Text("Sincronización: ${syncState.ifBlank { "Desconocida" }}", style = MaterialTheme.typography.bodyMedium)
-            Text(
-                "Activación: ${activationState.ifBlank { "Desconocida" }}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                "Control reforzado: ${if (protectionArmed) "Activo" else "Pendiente"}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            Text(
-                "Batería: ${if (batteryOptimizationExempt) "Sin restricciones" else "Optimizada"}",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            if (settingsAuthorized) {
-                Text(
-                    "Mantenimiento temporal autorizado",
-                    style = MaterialTheme.typography.bodyMedium,
-                )
-            }
-        }
-        ProductCard {
-            Text("Mantenimiento y recuperación", style = MaterialTheme.typography.titleMedium)
-            if (accessibilityState != "Activa") {
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onActivateAccessibility) {
-                    Text("Activar accesibilidad")
-                }
-            }
-            if (vpnState != "Activa") {
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onActivateVpn) {
-                    Text("Activar protección web")
-                }
-            }
-            if (deviceAdminState != "Activa") {
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onActivateDeviceAdmin) {
-                    Text("Activar protección contra desinstalación")
-                }
-            }
-            if (!batteryOptimizationExempt) {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onRequestBatteryOptimizationExemption,
-                ) {
-                    Text("Permitir funcionamiento continuo")
-                }
-            }
-            if (activationState in setOf("Expirada", "Suspendida", "Programada", "Pendiente")) {
-                Text(
-                    when (activationState) {
-                        "Expirada" -> "La licencia venció. La configuración se conserva y volverá al renovar."
-                        "Suspendida" -> "La comunidad suspendió temporalmente la licencia."
-                        "Programada" -> "La licencia todavía no comenzó."
-                        else -> "Este dispositivo todavía no completó la activación."
-                    },
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
-            val primaryAction =
-                protectionPrimaryAction(
-                    protectionArmed = protectionArmed,
-                    vpnState = vpnState,
-                    accessibilityState = accessibilityState,
-                    deviceAdminState = deviceAdminState,
-                    batteryOptimizationExempt = batteryOptimizationExempt,
-                )
-            if (primaryAction == ProtectionPrimaryAction.Repair) {
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = !protectionRefreshing,
-                    onClick = onProtectionRefresh,
-                ) {
-                    Text(if (protectionRefreshing) "Revisando protección..." else "Reparar protección")
-                }
-            } else {
-                OutlinedButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = onRequestMaintenance,
-                ) {
-                    Text("Solicitar acceso temporal")
-                }
-            }
-            if (recoveryAvailable) {
-                OutlinedTextField(
-                    modifier = Modifier.fillMaxWidth(),
-                    value = recoveryCode,
-                    onValueChange = onRecoveryCodeChanged,
-                    label = { Text("Código de recuperación") },
-                    singleLine = true,
-                )
-                Button(
-                    modifier = Modifier.fillMaxWidth(),
-                    enabled = recoveryCode.isNotBlank(),
-                    onClick = onSubmitRecoveryCode,
-                ) {
-                    Text("Validar código")
-                }
-            }
-            if (removalAuthorized) {
-                Button(modifier = Modifier.fillMaxWidth(), onClick = onAuthorizedRemoval) {
-                    Text("Desinstalar con autorización")
-                }
-                OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onCancelRemovalAuthorization) {
-                    Text("Cancelar autorización")
-                }
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = recoveryCode.isNotBlank(),
+                onClick = onSubmitRecoveryCode,
+            ) {
+                Text("Validar código")
             }
             if (protectionMessage.isNotBlank()) {
                 Text(protectionMessage, style = MaterialTheme.typography.bodyMedium)
@@ -434,30 +259,6 @@ private fun UpdatesScreen(
         }
     }
 }
-
-internal enum class ProtectionPrimaryAction {
-    Repair,
-    RequestTemporaryAccess,
-}
-
-internal fun protectionPrimaryAction(
-    protectionArmed: Boolean,
-    vpnState: String,
-    accessibilityState: String,
-    deviceAdminState: String,
-    batteryOptimizationExempt: Boolean,
-): ProtectionPrimaryAction =
-    if (
-        protectionArmed &&
-        vpnState == "Activa" &&
-        accessibilityState == "Activa" &&
-        deviceAdminState == "Activa" &&
-        batteryOptimizationExempt
-    ) {
-        ProtectionPrimaryAction.RequestTemporaryAccess
-    } else {
-        ProtectionPrimaryAction.Repair
-    }
 
 private fun UpdatesStatus.message(): String =
     when (this) {

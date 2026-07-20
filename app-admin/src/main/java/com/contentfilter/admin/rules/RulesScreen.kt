@@ -150,7 +150,6 @@ fun RulesRoute(
         onDagEnabledChanged = viewModel::setDagEnabled,
         onDagExtraKosherEnabledChanged = viewModel::setDagExtraKosherEnabled,
         onProtectionArmedChanged = viewModel::setProtectionArmed,
-        onAuthorizeSettings = viewModel::authorizeSettings,
         onAuthorizeRemoval = viewModel::authorizeRemoval,
         onGenerateRecoveryCode = viewModel::generateRecoveryCode,
         onRecoveryCodeCopied = viewModel::clearRecoveryCode,
@@ -202,7 +201,6 @@ private fun RulesScreen(
     onDagEnabledChanged: (Boolean) -> Unit,
     onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
     onProtectionArmedChanged: (String, Boolean) -> Unit,
-    onAuthorizeSettings: (String) -> Unit,
     onAuthorizeRemoval: (String) -> Unit,
     onGenerateRecoveryCode: (String) -> Unit,
     onRecoveryCodeCopied: () -> Unit,
@@ -274,7 +272,6 @@ private fun RulesScreen(
             onDagEnabledChanged = onDagEnabledChanged,
             onDagExtraKosherEnabledChanged = onDagExtraKosherEnabledChanged,
             onProtectionArmedChanged = onProtectionArmedChanged,
-            onAuthorizeSettings = onAuthorizeSettings,
             onAuthorizeRemoval = onAuthorizeRemoval,
             onGenerateRecoveryCode = onGenerateRecoveryCode,
             onRecoveryCodeCopied = onRecoveryCodeCopied,
@@ -1039,7 +1036,6 @@ private fun UserDetailContent(
     onDagEnabledChanged: (Boolean) -> Unit,
     onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
     onProtectionArmedChanged: (String, Boolean) -> Unit,
-    onAuthorizeSettings: (String) -> Unit,
     onAuthorizeRemoval: (String) -> Unit,
     onGenerateRecoveryCode: (String) -> Unit,
     onRecoveryCodeCopied: () -> Unit,
@@ -1332,7 +1328,6 @@ private fun UserDetailContent(
                             device = selectedDevice,
                             clipboardManager = LocalClipboardManager.current,
                             onArmProtection = { onProtectionArmedChanged(selectedDevice.id, true) },
-                            onAuthorizeSettings = { onAuthorizeSettings(selectedDevice.id) },
                             onAuthorizeRemoval = { onAuthorizeRemoval(selectedDevice.id) },
                             onGenerateRecoveryCode = { onGenerateRecoveryCode(selectedDevice.id) },
                             onRecoveryCodeCopied = onRecoveryCodeCopied,
@@ -1942,7 +1937,7 @@ private fun ProtectionSummaryCard(
             Text(
                 text =
                     "VPN: ${device.vpnState} · Accesibilidad: ${device.accessibilityState} · " +
-                        "Admin.: ${device.deviceAdminState}",
+                        "Protección contra desinstalación: ${device.deviceAdminState}",
                 style = MaterialTheme.typography.bodySmall,
                 color = HeaderMuted,
             )
@@ -1992,7 +1987,6 @@ private fun ProtectionPanel(
     device: UserDeviceUiState,
     clipboardManager: androidx.compose.ui.platform.ClipboardManager,
     onArmProtection: () -> Unit,
-    onAuthorizeSettings: () -> Unit,
     onAuthorizeRemoval: () -> Unit,
     onGenerateRecoveryCode: () -> Unit,
     onRecoveryCodeCopied: () -> Unit,
@@ -2004,7 +1998,10 @@ private fun ProtectionPanel(
         Text("Última conexión: ${device.lastSeenLabel}", style = MaterialTheme.typography.bodyMedium)
         Text("VPN: ${device.vpnState}", style = MaterialTheme.typography.bodyMedium)
         Text("Accesibilidad: ${device.accessibilityState}", style = MaterialTheme.typography.bodyMedium)
-        Text("Administrador del dispositivo: ${device.deviceAdminState}", style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Protección contra desinstalación: ${device.deviceAdminState}",
+            style = MaterialTheme.typography.bodyMedium,
+        )
     }
     ProductCard {
         Row(
@@ -2039,17 +2036,14 @@ private fun ProtectionPanel(
         }
     }
     ProductCard {
-        Text("Permisos temporales", style = MaterialTheme.typography.titleMedium)
-        Text("Cada permiso vence automáticamente a los 30 minutos.", style = MaterialTheme.typography.bodyMedium)
+        Text("Desinstalación temporal", style = MaterialTheme.typography.titleMedium)
+        Text("La autorización vence automáticamente a los 30 minutos.", style = MaterialTheme.typography.bodyMedium)
         Text(
             text = control.authorizationStatusLabel(),
             style = MaterialTheme.typography.bodySmall,
             color = HeaderMuted,
         )
-        Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeSettings) {
-            Text("Permitir mantenimiento")
-        }
-        OutlinedButton(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
+        Button(modifier = Modifier.fillMaxWidth(), enabled = !loading, onClick = onAuthorizeRemoval) {
             Text("Permitir desinstalación")
         }
     }

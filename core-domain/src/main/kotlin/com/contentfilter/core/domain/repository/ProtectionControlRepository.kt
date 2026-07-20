@@ -33,4 +33,6 @@ interface ProtectionControlRepository {
         commandRevision: Long,
         recoveryConsumedRevision: Long? = null,
     ): Result<Unit>
+
+    suspend fun cancelOwnRemovalAuthorization(): Result<Unit>
 }

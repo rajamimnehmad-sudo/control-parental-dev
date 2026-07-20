@@ -65,8 +65,8 @@ fun PremiumFeedbackBanner(
 ) {
     val kind = remember(text, isError) { text.feedbackBannerKind(isError) }
     var visible by remember(text) { mutableStateOf(text.isNotBlank()) }
-    LaunchedEffect(text, kind) {
-        val visibleMillis = kind.visibleMillis
+    LaunchedEffect(text, kind, isError) {
+        val visibleMillis = feedbackVisibleMillis(text, isError)
         if (visibleMillis != null) {
             delay(visibleMillis)
             visible = false
@@ -213,6 +213,15 @@ private enum class FeedbackBannerKind(
     Error(Color(0xFFC62828), Color(0xFF8B2424), 3_000),
 }
 
+internal fun feedbackVisibleMillis(
+    text: String,
+    isError: Boolean,
+): Long? {
+    val baseMillis = text.feedbackBannerKind(isError).visibleMillis ?: return null
+    val extraCharacters = (text.trim().length - DynamicDurationThreshold).coerceAtLeast(0)
+    return (baseMillis + extraCharacters * MillisPerExtraCharacter).coerceAtMost(MaxDynamicDurationMillis)
+}
+
 private fun String.feedbackBannerKind(isError: Boolean): FeedbackBannerKind {
     val normalized = lowercase()
     return when {
@@ -229,6 +238,10 @@ private fun String.feedbackBannerKind(isError: Boolean): FeedbackBannerKind {
         else -> FeedbackBannerKind.Warning
     }
 }
+
+private const val DynamicDurationThreshold = 48
+private const val MillisPerExtraCharacter = 75L
+private const val MaxDynamicDurationMillis = 8_000L
 
 @Composable
 fun PremiumFishMascot(modifier: Modifier = Modifier) {
