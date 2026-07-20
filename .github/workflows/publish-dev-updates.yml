@@ -1,6 +1,10 @@
 name: Publicar APKs DEV
 
 on:
+  pull_request:
+    paths:
+      - ".github/workflows/publish-dev-updates.yml"
+      - "scripts/**"
   workflow_dispatch:
     inputs:
       confirm_publish:
@@ -14,8 +18,30 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  cloud-preflight:
+    if: ${{ github.event_name == 'pull_request' }}
+    name: Validar publicador cloud sin publicar
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v3
+        with:
+          version: 2.109.0
+
+      - name: Validar CLI y scripts
+        shell: bash
+        run: |
+          set -euo pipefail
+          supabase --version
+          bash -n scripts/publicar_dev.sh
+          bash -n scripts/prepare_dev_updates.sh
+          bash -n scripts/upload_dev_updates.sh
+
   publish-dev:
-    if: ${{ inputs.confirm_publish }}
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.confirm_publish }}
     name: Build, test y publicar DEV
     runs-on: ubuntu-latest
     timeout-minutes: 60
