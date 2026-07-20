@@ -98,6 +98,7 @@ assert_stable_dev_signature() {
     local apksigner
     local apk
     local actual_digest
+    local certificate_pem
 
     apksigner="$(find "$build_tools_dir" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
     if [[ -z "$apksigner" ]]; then
@@ -108,9 +109,15 @@ assert_stable_dev_signature() {
     for apk in \
         app-user/build/outputs/apk/dev/debug/app-user-dev-debug.apk \
         app-admin/build/outputs/apk/dev/debug/app-admin-dev-debug.apk; do
+        certificate_pem="$(
+            "$apksigner" verify --print-certs-pem "$apk" 2>&1 |
+                sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p'
+        )"
         actual_digest="$(
-            "$apksigner" verify --print-certs "$apk" 2>&1 |
-                awk -F': ' '/Signer #1 certificate SHA-256 digest/ { print tolower($2); exit }'
+            printf '%s\n' "$certificate_pem" |
+                openssl x509 -noout -fingerprint -sha256 2>/dev/null |
+                awk -F= '{ print tolower($2) }' |
+                tr -d ':'
         )"
         if [[ "$actual_digest" != "$expected_digest" ]]; then
             printf 'Firma DEV incorrecta en %s. Esperada=%s, actual=%s.\n' \
