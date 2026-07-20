@@ -109,7 +109,7 @@ assert_stable_dev_signature() {
         app-user/build/outputs/apk/dev/debug/app-user-dev-debug.apk \
         app-admin/build/outputs/apk/dev/debug/app-admin-dev-debug.apk; do
         actual_digest="$(
-            "$apksigner" verify --print-certs "$apk" |
+            "$apksigner" verify --print-certs "$apk" 2>&1 |
                 awk -F': ' '/Signer #1 certificate SHA-256 digest/ { print tolower($2); exit }'
         )"
         if [[ "$actual_digest" != "$expected_digest" ]]; then
