@@ -1,0 +1,4 @@
+Lista de usuarios más compacta, con una luz clara cuando la protección está completa o necesita atención.
+El detalle del usuario ordena Protección, Aplicaciones, Web, grupos y opciones adicionales en un flujo más simple.
+Agregar usuario desde Inicio abre directamente la ventana de creación.
+Nuevos iconos para avisos y estado de protección, y acceso a las novedades de la versión instalada.

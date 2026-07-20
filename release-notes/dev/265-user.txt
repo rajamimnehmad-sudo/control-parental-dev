@@ -1,0 +1,2 @@
+La versión instalada ahora permite abrir y cerrar sus últimas novedades desde Ajustes.
+Campana de avisos renovada con un diseño más limpio y moderno.
