@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-20
+Ultima sincronizacion: 2026-07-21
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -53,33 +53,53 @@ Flujo de una entrada:
 
 ### ADMIN-USER-SECTIONS-UX-05 - Detalle compacto y controles persistentes
 
-- Estado: `Publicado DEV 267; pendiente recorrido visual completo`. Aprobado explicitamente el 2026-07-20. Tipo: UX Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Resuelto y validado fisicamente en DEV 267`. Aprobado explicitamente el 2026-07-20. Tipo: UX Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Alcance: `Apps / Web / Seguridad` usa tres segmentos de igual ancho que siempre entran en pantalla. Al desplazar, el selector se transforma con una transicion sutil en una etiqueta compacta junto al nombre; tocarla vuelve al inicio y recupera el selector completo.
 - Aplicaciones: `Configurar horarios` queda como accion simple y abre una pantalla completa dedicada; `Grupos` pasa a `Crear grupo de apps`. El titulo, actualizar, buscar y los filtros rapidos permanecen fijos mientras se desplaza solamente el inventario.
-- Aceptacion tecnica alcanzada: tests unitarios Admin, ktlint y ensamblado DEV de Usuario/Admin correctos, 756 tareas; Android CI completo correcto. App Admin DEV 267 se instalo in-place en SM-A235M conservando `firstInstallTime` y `ceDataInode`; el recorrido visual quedo bloqueado por la pantalla de bloqueo/SystemUI del telefono, sin evidencia de fallo de Content Filter. Ambos APK publicos fueron verificados por manifiesto, hash, paquete, version y certificado. No se toco Production.
+- Aceptacion alcanzada: tests unitarios Admin, ktlint y ensamblado DEV de Usuario/Admin correctos, 756 tareas; Android CI completo correcto. En SM-A235M los tres segmentos entran completos, la etiqueta compacta aparece al desplazar y vuelve al inicio, los controles de Apps permanecen fijos y horarios/grupos abren pantallas dedicadas. No hubo crash ni ANR de Content Filter. Ambos APK publicos fueron verificados por manifiesto, hash, paquete, version y certificado. No se toco Production.
+
+### ADMIN-RULES-REFACTOR-01 - Responsabilidades internas de Reglas
+
+- Estado: `Resuelto y fusionado en PR #8`. Aprobado explicitamente el 2026-07-21. Tipo: deuda tecnica Admin. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- Resultado: se conserva un unico `RulesViewModel` publico como fachada de `RulesUiState`; aplicaciones/grupos, Web, proteccion, archivo/reenlace y coordinacion de operaciones quedan en colaboradores pequenos e inyectables. `RulesScreen` conserva ruta y navegacion, con lista, archivo, detalle y toolbar extraidos por responsabilidad real.
+- Correcciones confirmadas: mensajes Web aislados por dispositivo, tracker de refresco liberado aun ante excepciones y archivo remoto exitoso distinguido de reparacion local pendiente. Las pruebas cubren cambio A -> B durante una operacion, segundo refresco tras excepcion y fallo local posterior al archivo remoto.
+- Aceptacion: matriz solicitada de tests Admin, build, ktlint, lint y detekt correcta; Android CI del PR correcto; fusion `906f162`. Sin cambio de UI, backend, contratos remotos, `versionCode` ni APK.
 
 ### PROTECTION-POSSIBLE-UNINSTALL-01 - Alerta maxima persistente
 
-- Estado: `Implementado candidato DEV 266; pendiente prueba fisica y publicacion`. Aprobado explicitamente el 2026-07-20. Tipo: seguridad, alertas y recuperacion. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
+- Estado: `Publicado DEV 266; pendiente provocar y verificar un episodio real controlado`. Aprobado explicitamente el 2026-07-20. Tipo: seguridad, alertas y recuperacion. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
 - Alcance: si el administrador del dispositivo queda desactivado y App Usuario deja de comunicarse durante mas de 30 minutos, Admin muestra una `ALERTA MAXIMA` persistente, deduplicada por episodio, sin afirmar como hecho una desinstalacion que Android no puede confirmar remotamente.
 - Recuperacion: explica verificar si la app sigue instalada, reinstalar/reenlazar si falta y reactivar administrador, Accesibilidad y VPN. La alerta se genera en Supabase DEV aunque el telefono ya no pueda reportar.
 
 ### PROTECTION-OFFLINE-RECOVERY-02 - Kit sin conexion de un solo uso
 
-- Estado: `Implementado candidato DEV 266; pendiente prueba fisica y publicacion`. Aprobado explicitamente el 2026-07-20. Tipo: seguridad y continuidad offline. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
+- Estado: `Publicado DEV 266; UI fisica validada, pendiente ciclo offline real de un solo uso`. Aprobado explicitamente el 2026-07-20. Tipo: seguridad y continuidad offline. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
 - Alcance: Admin prepara cinco codigos por dispositivo mientras tiene conexion y revela el siguiente aun offline. Usuario valida un codigo no consumido sin Internet, habilita diez minutos para desinstalar y sincroniza el consumo al reconectar.
 - Seguridad: Supabase conserva solo verificadores con salt y slots consumidos; Admin cifra los codigos legibles con Android Keystore. Cada codigo se usa una vez, rotar invalida el kit anterior y cinco intentos fallidos bloquean durante 15 minutos.
 
 ### HELP-CONTEXTUAL-CHAT-01 - Asistente privado de Content Filter
 
-- Estado: `Implementado candidato DEV 266; pendiente prueba fisica y publicacion`. Aprobado explicitamente el 2026-07-20. Tipo: ayuda, UX y privacidad. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 266; chat Usuario validado fisicamente, pendiente recorrido Admin y offline`. Aprobado explicitamente el 2026-07-20. Tipo: ayuda, UX y privacidad. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Alcance: chat interactivo disponible en Usuario y Admin, con preguntas sugeridas segun el estado real propio o agregado de todos los dispositivos y acciones directas hacia la seccion correcta.
 - Decision: motor local determinista, universal y gratuito; funciona offline, no envia preguntas ni promete conocimiento general. Rechaza temas ajenos a Content Filter y conserva solo contexto corto de la conversacion visible.
 
 ### ADMIN-USER-SECTIONS-UX-04 - Apps, Web y Seguridad separadas
 
-- Estado: `Implementado candidato DEV 266; pendiente prueba fisica y publicacion`. Aprobado explicitamente el 2026-07-20. Tipo: UX Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Resuelto y validado fisicamente en DEV 267`. Aprobado explicitamente el 2026-07-20. Tipo: UX Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Alcance: selector horizontal moderno y translucido; Aplicaciones y Web contienen solo sus reglas; Seguridad concentra proteccion, reenlace, desinstalacion, archivo y recuperacion. Web queda sin foto ni tarjeta exterior.
+- Evidencia fisica: selector completo y adaptable en SM-A235M; Web sin foto ni tarjeta exterior promocional; Seguridad separada con estado, barrera y opciones avanzadas. Se recorrieron reenlace, desinstalacion temporal, recuperacion offline y archivo sin generar secretos ni ejecutar acciones destructivas.
+
+### USER-APPS-REFRESH-FEEDBACK-01 - Refresco sin vaciar el inventario
+
+- Estado: `Idea confirmada en prueba fisica`; no aprobada para codigo. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Evidencia: en DEV 267, al tocar actualizar en Mis apps el inventario paso de 161 a 163 aplicaciones, pero durante la carga la lista quedo transitoriamente vacia sin una indicacion de progreso clara.
+- Aceptacion propuesta: conservar el inventario anterior mientras se refresca o mostrar un estado de carga inequívoco; bloquear doble tap; reemplazar la lista solo al completar; conservar datos y mensaje anterior si el refresco falla.
+
+### ADMIN-WEB-ADD-SITE-UX-01 - Formulario Web plano y compacto
+
+- Estado: `Aprobado; pendiente ticket de implementacion`. Tipo: UX Admin. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Evidencia: el pedido del usuario fue dejar Web sin foto ni tarjeta. DEV 267 elimino correctamente la foto y la tarjeta exterior promocional, pero el formulario `Agregar sitio` sigue dentro de una tarjeta grande y visualmente pesada.
+- Aceptacion propuesta: presentar dominio, minutos DNS opcionales y accion como formulario plano, compacto y claramente separado por espaciado; conservar textos, validaciones y comportamiento Web sin tocar contratos remotos.
 
 ### ANDROID-BRAND-ICONS-01 - Iconos oficiales diferenciados
 
@@ -202,11 +222,13 @@ Flujo de una entrada:
 
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
-| PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
-| PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
-| HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
-| ADMIN-USER-SECTIONS-UX-04 | Publicado DEV 266; actualizacion in-place validada, recorrido visual detallado pendiente por ANR de SystemUI | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
-| ADMIN-USER-SECTIONS-UX-05 | Publicado DEV 267; pendiente recorrido visual completo | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
+| PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; pendiente episodio real controlado | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
+| PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; UI fisica validada, pendiente ciclo offline real | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
+| HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; Usuario validado fisicamente, pendiente Admin y offline | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
+| ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
+| ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
+| USER-APPS-REFRESH-FEEDBACK-01 | Idea confirmada en prueba fisica | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
+| ADMIN-WEB-ADD-SITE-UX-01 | Aprobado; pendiente implementacion | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
