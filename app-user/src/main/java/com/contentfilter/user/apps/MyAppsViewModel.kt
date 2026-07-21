@@ -65,6 +65,7 @@ class MyAppsViewModel
         private val detectedApps = MutableStateFlow<List<InstalledAppPublisher.DetectedApp>>(emptyList())
         private val message = MutableStateFlow("")
         private val isRefreshing = MutableStateFlow(false)
+        private val lastRefreshedAtEpochMillis = MutableStateFlow<Long?>(null)
         private val searchQuery = MutableStateFlow("")
         private val pendingRequestPackages = MutableStateFlow<Set<String>>(emptySet())
         private val day = currentDay()
@@ -76,8 +77,13 @@ class MyAppsViewModel
                 }
             }
         private val appUiOptions =
-            combine(searchQuery, pendingRequestPackages, isRefreshing) { query, pendingPackages, refreshing ->
-                AppUiOptions(query, pendingPackages, refreshing)
+            combine(
+                searchQuery,
+                pendingRequestPackages,
+                isRefreshing,
+                lastRefreshedAtEpochMillis,
+            ) { query, pendingPackages, refreshing, lastRefreshedAt ->
+                AppUiOptions(query, pendingPackages, refreshing, lastRefreshedAt)
             }
         private val policyAndLimits =
             combine(
@@ -210,6 +216,7 @@ class MyAppsViewModel
                     searchQuery = options.searchQuery,
                     message = currentMessage,
                     isRefreshing = options.refreshing,
+                    lastRefreshedAtEpochMillis = options.lastRefreshedAtEpochMillis,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -251,10 +258,12 @@ class MyAppsViewModel
                                 }
                         }
                     }
+                    val fullyUpdated = coreSyncResult?.success != false && requestResultsSyncResult?.success != false
                     message.value =
-                        if (coreSyncResult?.success == false || requestResultsSyncResult?.success == false) {
+                        if (!fullyUpdated) {
                             "No se pudieron actualizar reglas. Mostrando datos guardados."
                         } else {
+                            lastRefreshedAtEpochMillis.value = System.currentTimeMillis()
                             "Apps actualizadas."
                         }
                 } catch (exception: Exception) {
@@ -411,6 +420,7 @@ class MyAppsViewModel
             val searchQuery: String,
             val pendingRequestPackages: Set<String>,
             val refreshing: Boolean,
+            val lastRefreshedAtEpochMillis: Long?,
         )
 
         private data class PolicyAndLimits(
