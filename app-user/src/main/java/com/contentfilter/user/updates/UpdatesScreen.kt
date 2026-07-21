@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -22,15 +23,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.contentfilter.core.ui.PremiumFeedbackBanner
 import com.contentfilter.core.ui.ProductCard
-import com.contentfilter.core.ui.ProductFeatureTile
+import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
-import com.contentfilter.core.ui.ProductLargeFeatureCard
-import com.contentfilter.core.ui.ProductMint
-import com.contentfilter.core.ui.ProductSky
-import com.contentfilter.core.ui.ProductStatCard
-import com.contentfilter.core.ui.ProductViolet
+import com.contentfilter.core.ui.ProductListRow
+import com.contentfilter.core.ui.ProductListSurface
 import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.user.BuildConfig
 
@@ -91,31 +88,35 @@ private fun UpdatesScreen(
         title = "Ajustes",
         subtitle = "Versión, actualización y acceso de emergencia",
         onBack = onBack,
-        banner = {
-            PremiumFeedbackBanner(
-                text = state.status.message(),
-                isError =
-                    state.status == UpdatesStatus.SearchFailed ||
-                        state.status == UpdatesStatus.DownloadFailed ||
-                        state.status == UpdatesStatus.ChecksumFailed,
-            )
-        },
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            ProductStatCard(
-                modifier = Modifier.weight(1f),
-                value = BuildConfig.VERSION_CODE.toString(),
-                label = "versión",
-                accent = ProductViolet,
+        ProductListSurface {
+            ProductListRow(
+                leading = { ProductGlyph(ProductIcon.Update, MaterialTheme.colorScheme.primary, Modifier.size(24.dp)) },
+                headline = { Text("Estado de actualización", style = MaterialTheme.typography.titleMedium) },
+                supporting = { Text(state.status.message(), style = MaterialTheme.typography.bodyMedium) },
             )
-            ProductStatCard(
-                modifier = Modifier.weight(1f),
-                value = activationState.ifBlank { "..." },
-                label = "activación",
-                accent = ProductMint,
+            ProductListRow(
+                leading = {
+                    ProductGlyph(
+                        ProductIcon.Settings,
+                        MaterialTheme.colorScheme.primary,
+                        Modifier.size(24.dp),
+                    )
+                },
+                headline = { Text("Versión instalada", style = MaterialTheme.typography.titleMedium) },
+                supporting = { Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
+            )
+            ProductListRow(
+                leading = {
+                    ProductGlyph(
+                        ProductIcon.ShieldCheck,
+                        MaterialTheme.colorScheme.primary,
+                        Modifier.size(24.dp),
+                    )
+                },
+                headline = { Text("Activación", style = MaterialTheme.typography.titleMedium) },
+                supporting = { Text(activationState.ifBlank { "Revisando…" }) },
+                showDivider = false,
             )
         }
         ProductCard {
@@ -142,18 +143,23 @@ private fun UpdatesScreen(
                 Text(protectionMessage, style = MaterialTheme.typography.bodyMedium)
             }
         }
-        ProductFeatureTile(
-            icon = ProductIcon.Search,
-            title = "Ayuda",
-            subtitle = "Conversá con el asistente según el estado actual",
-            accent = ProductViolet,
-            onClick = onHelp,
-        )
-        ProductLargeFeatureCard(
-            title = "Actualizaciones",
-            subtitle = "Buscá nuevas versiones DEV y completá la instalación desde Android.",
-            accent = ProductSky,
-        )
+        ProductListSurface {
+            ProductListRow(
+                leading = { ProductGlyph(ProductIcon.Search, MaterialTheme.colorScheme.primary, Modifier.size(24.dp)) },
+                headline = { Text("Ayuda", style = MaterialTheme.typography.titleMedium) },
+                supporting = { Text("Conversá con el asistente según el estado actual") },
+                trailing = {
+                    ProductGlyph(
+                        ProductIcon.ChevronRight,
+                        MaterialTheme.colorScheme.onSurfaceVariant,
+                        Modifier.size(22.dp),
+                    )
+                },
+                onClick = onHelp,
+                showDivider = false,
+            )
+        }
+        Text("Actualizaciones", style = MaterialTheme.typography.titleSmall)
         ProductCard {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -251,11 +257,7 @@ private fun UpdatesScreen(
         ) {
             Text("Buscar actualizacion")
         }
-        ProductLargeFeatureCard(
-            title = "App Administrador",
-            subtitle = "Instalá la app oficial desde un APK verificado, sin habilitar descargas arbitrarias.",
-            accent = ProductMint,
-        )
+        Text("App Administrador", style = MaterialTheme.typography.titleSmall)
         ProductCard {
             Text(
                 text = state.adminInstallStatus.message(),
