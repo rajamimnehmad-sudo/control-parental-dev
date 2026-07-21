@@ -120,6 +120,14 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - Alcance limitado a App Usuario y pruebas unitarias de sus estados vacio/cargando. Sin cambios de datos, backend ni contratos Supabase.
 - PR #14 fusionado mediante `f941e09`; Android CI actualizado correcto. Incluido y verificado publicamente en DEV 269; queda pendiente el recorrido fisico en telefono real.
 
+## ADMIN-DEVICE-OFFLINE-100H-01 candidato sin publicar - 2026-07-21
+
+- Causa raiz: Inicio de App Admin consideraba atrasado un heartbeat a los 15 minutos y la ficha de Usuario a las 24 horas. WorkManager puede diferir trabajo periodico con la pantalla apagada, aun con Internet, por lo que ambos umbrales producian avisos operativos demasiado tempranos.
+- Cambio candidato: un unico umbral compartido de 100 horas gobierna `Pendientes de verificacion`, el contador de usuarios activos y el estado `Sin comunicacion` de la ficha. Antes del plazo se conserva el ultimo estado sano; despues se muestra explicitamente `Sin comunicacion hace mas de 100 horas`.
+- Seguridad sin cambios: un componente reportado `Disabled` sigue siendo problema confirmado inmediato; un componente nuevo o `Unknown` sigue pendiente sin esperar 100 horas; `possible_uninstall` conserva la regla separada de Device Admin desactivado y mas de 30 minutos sin comunicacion.
+- Validacion: unitarios completos de App Admin, `ktlintCheck` y `assembleDevDebug` correctos; las pruebas dirigidas cubren antes/despues de 100 horas y posible desinstalacion. Falta el recorrido fisico posterior a una futura publicacion.
+- No se aumento `versionCode`, no se publico APK y el estado publicado permanece en DEV 269.
+
 ## DEV-OFFLINE-ALERT-100H-01 aplicado en Supabase DEV - 2026-07-21
 
 - La funcion `generate_device_offline_alerts` genera eventos ordinarios `device_offline` solo despues de 100 horas sin heartbeat. El cron conserva una unica ejecucion horaria a los 17 minutos, por lo que un evento nuevo aparece en la primera corrida posterior al limite, aproximadamente entre 100 y 101 horas.

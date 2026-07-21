@@ -1,5 +1,6 @@
 package com.contentfilter.admin.dashboard
 
+import com.contentfilter.admin.DeviceOfflineWarningWindowMillis
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DeviceProtectionAlert
 import com.contentfilter.core.domain.model.LicenseState
@@ -27,7 +28,7 @@ data class DashboardUiState(
         get() = protectedUsers.filter(ProtectedUserHealthUiState::possibleUninstall)
 
     val activeUserCount: Int
-        get() = protectedUsers.count(ProtectedUserHealthUiState::isRecentlySeen)
+        get() = protectedUsers.count { user -> !user.hasCommunicationTimedOut && user.lastSeenAtEpochMillis != null }
 }
 
 data class ProtectedUserHealthUiState(
@@ -57,23 +58,20 @@ data class ProtectedUserHealthUiState(
                 lastSeenAtEpochMillis = lastSeenAtEpochMillis,
             )
 
-    val isRecentlySeen: Boolean
+    val hasCommunicationTimedOut: Boolean
         get() =
             lastSeenAtEpochMillis?.let { lastSeen ->
-                System.currentTimeMillis() - lastSeen <= ACTIVE_USER_WINDOW_MILLIS
+                System.currentTimeMillis() - lastSeen > DeviceOfflineWarningWindowMillis
             } == true
 
     val requiresVerification: Boolean
         get() =
             !hasConfirmedProblem &&
                 (
-                    !isRecentlySeen ||
+                    lastSeenAtEpochMillis == null ||
+                        hasCommunicationTimedOut ||
                         vpnState != ComponentState.Enabled ||
                         accessibilityState != ComponentState.Enabled ||
                         deviceAdminState != ComponentState.Enabled
                 )
-
-    private companion object {
-        const val ACTIVE_USER_WINDOW_MILLIS = 15 * 60 * 1000L
-    }
 }

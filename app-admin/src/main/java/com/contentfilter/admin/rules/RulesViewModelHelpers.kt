@@ -1,5 +1,6 @@
 package com.contentfilter.admin.rules
 
+import com.contentfilter.admin.DeviceOfflineWarningWindowMillis
 import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DailyLimit
@@ -444,7 +445,8 @@ internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDevi
             val status =
                 when {
                     lastSeen == null -> UserDeviceStatus.Unknown
-                    System.currentTimeMillis() - lastSeen > OfflineDeviceWindowMillis -> UserDeviceStatus.Inactive
+                    System.currentTimeMillis() - lastSeen > DeviceOfflineWarningWindowMillis ->
+                        UserDeviceStatus.Inactive
                     !protectionComplete -> UserDeviceStatus.Unprotected
                     else -> UserDeviceStatus.Active
                 }
@@ -577,7 +579,6 @@ private fun Long?.toLastSeenLabel(): String =
 
 internal val PackageNameRegex = Regex("^[a-zA-Z][a-zA-Z0-9_]*(\\.[a-zA-Z][a-zA-Z0-9_]*)+$")
 internal val DomainRegex = Regex("^(?=.{1,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+[a-z]{2,63}$")
-internal const val OfflineDeviceWindowMillis = 24 * 60 * 60 * 1000L
 internal const val SwitchHoldMillis = 2_500L
 internal const val RoomConfirmTimeoutMillis = 5_000L
 internal const val MinuteMillis = 60_000L

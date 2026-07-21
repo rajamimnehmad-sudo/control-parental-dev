@@ -1,5 +1,6 @@
 package com.contentfilter.admin.dashboard
 
+import com.contentfilter.admin.DeviceOfflineWarningWindowMillis
 import com.contentfilter.core.domain.model.ComponentState
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -34,10 +35,24 @@ class DashboardUiStateTest {
     }
 
     @Test
-    fun `stale telemetry remains pending and is not counted as active`() {
+    fun `healthy telemetry remains active before one hundred hours`() {
         val user =
             protectedUser(
-                lastSeenAtEpochMillis = System.currentTimeMillis() - 16 * 60 * 1000L,
+                lastSeenAtEpochMillis =
+                    System.currentTimeMillis() - DeviceOfflineWarningWindowMillis + 60_000L,
+            )
+        val state = DashboardUiState(protectedUsers = listOf(user))
+
+        assertFalse(user.requiresVerification)
+        assertEquals(1, state.activeUserCount)
+    }
+
+    @Test
+    fun `healthy telemetry becomes pending after one hundred hours`() {
+        val user =
+            protectedUser(
+                lastSeenAtEpochMillis =
+                    System.currentTimeMillis() - DeviceOfflineWarningWindowMillis - 60_000L,
             )
         val state = DashboardUiState(protectedUsers = listOf(user))
 

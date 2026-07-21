@@ -347,10 +347,11 @@ internal fun ProtectionStatusRoute(
                     ) {
                         Text(user.name, style = MaterialTheme.typography.titleMedium)
                         Text(
-                            if (user.isRecentlySeen) {
-                                "Esperando confirmar todos los componentes"
-                            } else {
-                                "Sin conexión reciente"
+                            when {
+                                user.lastSeenAtEpochMillis == null -> "Todavía sin verificación"
+                                user.hasCommunicationTimedOut ->
+                                    "Sin comunicación hace más de $DeviceOfflineWarningWindowHours horas"
+                                else -> "Esperando confirmar todos los componentes"
                             },
                         )
                     }
