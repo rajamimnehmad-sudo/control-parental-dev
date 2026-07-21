@@ -10,11 +10,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -30,9 +31,8 @@ import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.ui.PremiumFeedbackBanner
-import com.contentfilter.core.ui.ProductCard
-import com.contentfilter.core.ui.ProductLargeFeatureCard
-import com.contentfilter.core.ui.ProductSun
+import com.contentfilter.core.ui.ProductListRow
+import com.contentfilter.core.ui.ProductListSurface
 import com.contentfilter.core.ui.ProductVisualPage
 import java.time.Instant
 import java.time.ZoneId
@@ -74,29 +74,27 @@ fun RequestsScreen(
                 null
             },
     ) {
-        ProductLargeFeatureCard(
-            title = "Permisos pedidos",
-            subtitle = "Acá ves si el administrador aprobó, rechazó o dejó pendiente cada solicitud.",
-            accent = ProductSun,
-        )
-        OutlinedButton(
+        Row(
             modifier = Modifier.fillMaxWidth(),
-            onClick = onRefresh,
-            enabled = !state.isRefreshing,
+            horizontalArrangement = Arrangement.End,
         ) {
-            Text(if (state.isRefreshing) "Actualizando..." else "Actualizar solicitudes")
+            TextButton(onClick = onRefresh, enabled = !state.isRefreshing) {
+                Text(if (state.isRefreshing) "Actualizando..." else "Actualizar")
+            }
         }
-        Column(
-            modifier = Modifier.fillMaxWidth(),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
+        ProductListSurface {
             if (state.requests.isEmpty()) {
-                Text("Todavía no hay solicitudes. Pedilas desde Mis apps.")
+                Text(
+                    "Todavía no hay solicitudes. Pedilas desde Mis apps.",
+                    modifier = Modifier.padding(16.dp),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
             } else {
-                state.requests.forEach { request ->
-                    UserRequestCard(
+                state.requests.forEachIndexed { index, request ->
+                    UserRequestRow(
                         request = request,
                         grant = state.extraTimeGrants.firstOrNull { it.requestId == request.id },
+                        showDivider = index < state.requests.lastIndex,
                     )
                 }
             }
@@ -105,42 +103,60 @@ fun RequestsScreen(
 }
 
 @Composable
-private fun UserRequestCard(
+private fun UserRequestRow(
     request: AccessRequest,
     grant: ExtraTimeGrant?,
+    showDivider: Boolean,
 ) {
     val target = rememberRequestTarget(request)
-    ProductCard {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            RequestIcon(target)
+    val statusColor =
+        when (request.status) {
+            RequestStatus.PendingLocal,
+            RequestStatus.PendingRemote,
+            -> MaterialTheme.colorScheme.primary
+            RequestStatus.Approved -> MaterialTheme.colorScheme.secondary
+            RequestStatus.Rejected -> MaterialTheme.colorScheme.error
+            RequestStatus.Expired -> MaterialTheme.colorScheme.outline
+        }
+    ProductListRow(
+        leading = { RequestIcon(target) },
+        headline = {
+            Text(target.title, style = MaterialTheme.typography.titleSmall)
+        },
+        supporting = {
             Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
-                Text(target.title, style = MaterialTheme.typography.titleSmall)
-                Text(request.requestType.displayName())
+                Text(
+                    "${request.requestType.displayName()} · ${request.createdAtEpochMillis.toDisplayDate()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
                 if (request.reason.isNotBlank()) {
-                    Text(request.reason)
-                }
-                Text("Pedido: ${request.createdAtEpochMillis.toDisplayDate()}")
-                Text(request.status.displayName())
-                grant?.let {
                     Text(
-                        "Tiempo extra: ${it.grantedMinutes} min hasta ${it.validUntilEpochMillis.toDisplayDate()}",
+                        request.reason,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                if (request.status == RequestStatus.Approved) {
-                    Text("Respuesta del administrador: aprobada.")
-                } else if (request.status == RequestStatus.Rejected) {
-                    Text("Respuesta del administrador: rechazada.")
+                grant?.let {
+                    Text(
+                        "Tiempo extra: ${it.grantedMinutes} min · hasta ${it.validUntilEpochMillis.toDisplayDate()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
                 }
             }
-        }
-    }
+        },
+        trailing = {
+            Text(
+                request.status.displayName(),
+                style = MaterialTheme.typography.labelMedium,
+                color = statusColor,
+            )
+        },
+        showDivider = showDivider,
+    )
 }
 
 private fun AccessRequestType.displayName(): String =

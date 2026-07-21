@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +41,7 @@ import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductListRow
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
@@ -86,7 +90,7 @@ fun AdminRequestsRoute(
             if (state.users.isEmpty()) {
                 Text("No hay solicitudes para revisar.")
             }
-            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            LazyColumn(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(0.dp)) {
                 items(state.users, key = { it.deviceId }) { user ->
                     RequestUserCard(
                         user = user,
@@ -153,12 +157,9 @@ private fun RequestUserCard(
     user: AdminRequestUserUiState,
     onClick: () -> Unit,
 ) {
-    ProductCard(onClick = onClick) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
+    ProductListRow(
+        onClick = onClick,
+        leading = {
             if (user.needsAttention) {
                 Box(
                     modifier =
@@ -168,19 +169,33 @@ private fun RequestUserCard(
                             .background(MaterialTheme.colorScheme.error),
                 )
             } else {
-                Box(modifier = Modifier.size(10.dp))
-            }
-            Column(modifier = Modifier.weight(1f)) {
-                Text(user.name, style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "${user.pendingCount} pendientes · ${user.resolvedCount} en historial",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Box(
+                    modifier =
+                        Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF17895D)),
                 )
             }
-            StatusChip("Ver", MaterialTheme.colorScheme.primary)
-        }
-    }
+        },
+        headline = {
+            Text(user.name, style = MaterialTheme.typography.titleMedium)
+        },
+        supporting = {
+            Text(
+                "${user.pendingCount} pendientes · ${user.resolvedCount} en historial",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        },
+        trailing = {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                contentDescription = "Ver solicitudes",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        },
+    )
 }
 
 @Composable

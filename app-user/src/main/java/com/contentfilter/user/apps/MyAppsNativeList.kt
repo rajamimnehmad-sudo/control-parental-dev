@@ -38,7 +38,7 @@ internal fun MyAppsNativeList(
                 setBackgroundColor(Color.TRANSPARENT)
                 setPadding(0, 0, 0, context.dp(8))
                 divider = null
-                dividerHeight = context.dp(8)
+                dividerHeight = 0
                 isVerticalScrollBarEnabled = true
                 overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
                 adapter = MyAppsListAdapter(context)
@@ -157,15 +157,15 @@ private class AppRowHolder private constructor(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.WRAP_CONTENT,
                         )
+                    orientation = LinearLayout.VERTICAL
+                    setBackgroundColor(Color.WHITE)
+                }
+            val contentRow =
+                LinearLayout(context).apply {
                     orientation = LinearLayout.HORIZONTAL
                     gravity = Gravity.CENTER_VERTICAL
-                    setPadding(context.dp(12), context.dp(10), context.dp(12), context.dp(10))
-                    minimumHeight = context.dp(76)
-                    background =
-                        GradientDrawable().apply {
-                            color = android.content.res.ColorStateList.valueOf(Color.WHITE)
-                            cornerRadius = context.dp(14).toFloat()
-                        }
+                    setPadding(context.dp(12), context.dp(8), context.dp(12), context.dp(8))
+                    minimumHeight = context.dp(68)
                 }
             val iconFrame = FrameLayout(context)
             val icon =
@@ -184,9 +184,9 @@ private class AppRowHolder private constructor(
                             shape = GradientDrawable.OVAL
                         }
                 }
-            iconFrame.addView(icon, FrameLayout.LayoutParams(context.dp(42), context.dp(42), Gravity.CENTER))
-            iconFrame.addView(fallback, FrameLayout.LayoutParams(context.dp(42), context.dp(42), Gravity.CENTER))
-            root.addView(iconFrame, LinearLayout.LayoutParams(context.dp(52), context.dp(52)))
+            iconFrame.addView(icon, FrameLayout.LayoutParams(context.dp(40), context.dp(40), Gravity.CENTER))
+            iconFrame.addView(fallback, FrameLayout.LayoutParams(context.dp(40), context.dp(40), Gravity.CENTER))
+            contentRow.addView(iconFrame, LinearLayout.LayoutParams(context.dp(50), context.dp(50)))
 
             val labels =
                 LinearLayout(context).apply {
@@ -208,7 +208,7 @@ private class AppRowHolder private constructor(
                 }
             labels.addView(name, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             labels.addView(limit, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-            root.addView(labels, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+            contentRow.addView(labels, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
 
             val actions =
                 LinearLayout(context).apply {
@@ -219,15 +219,17 @@ private class AppRowHolder private constructor(
             val status =
                 TextView(context).apply {
                     textSize = 13f
-                    setTypeface(typeface, Typeface.BOLD)
                     gravity = Gravity.END
                 }
             val requestButton =
                 Button(context).apply {
                     textSize = 12f
+                    isAllCaps = false
+                    setTextColor(Color.rgb(0, 125, 190))
+                    background = null
                     minHeight = 0
                     minimumHeight = 0
-                    setPadding(context.dp(10), context.dp(4), context.dp(10), context.dp(4))
+                    setPadding(context.dp(8), context.dp(2), 0, context.dp(2))
                 }
             actions.addView(status, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
             actions.addView(
@@ -235,7 +237,23 @@ private class AppRowHolder private constructor(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT,
             )
-            root.addView(actions, LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            contentRow.addView(actions, LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+            root.addView(
+                contentRow,
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+            root.addView(
+                View(context).apply { setBackgroundColor(Color.rgb(230, 235, 239)) },
+                LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    context.dp(1),
+                ).apply {
+                    marginStart = context.dp(62)
+                },
+            )
 
             return AppRowHolder(root, icon, fallback, name, limit, status, requestButton)
         }
