@@ -21,17 +21,22 @@ fun envValue(name: String): String {
 }
 
 val devSigningStorePath = providers.environmentVariable("ANDROID_DEV_KEYSTORE_PATH").orNull
+val minSupportedApi = 29
+val targetSupportedApi = 36
+val intermediateSupportedApi = (minSupportedApi + targetSupportedApi) / 2
 
 android {
     namespace = "com.contentfilter.admin"
-    compileSdk = 36
+    compileSdk = targetSupportedApi
+    testBuildType = "compatibility"
 
     defaultConfig {
         applicationId = "com.contentfilter.admin"
-        minSdk = 29
-        targetSdk = 36
+        minSdk = minSupportedApi
+        targetSdk = targetSupportedApi
         versionCode = 1
         versionName = "1.0.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${envValue("FIREBASE_APPLICATION_ID")}\"")
         buildConfigField("String", "FIREBASE_API_KEY", "\"${envValue("FIREBASE_API_KEY")}\"")
         buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${envValue("FIREBASE_PROJECT_ID")}\"")
@@ -76,10 +81,37 @@ android {
                 signingConfig = signingConfigs.getByName("devUpdate")
             }
         }
+        create("compatibility") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            isDebuggable = true
+        }
     }
 
     buildFeatures {
         buildConfig = true
+    }
+
+    testOptions {
+        managedDevices {
+            devices {
+                maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("compatSmallApi29").apply {
+                    device = "Pixel 2"
+                    apiLevel = minSupportedApi
+                    systemImageSource = "aosp"
+                }
+                maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("compatPhoneApi32").apply {
+                    device = "Pixel 6"
+                    apiLevel = intermediateSupportedApi
+                    systemImageSource = "aosp"
+                }
+                maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("compatTabletApi36").apply {
+                    device = "Pixel C"
+                    apiLevel = targetSupportedApi
+                    systemImageSource = "aosp"
+                }
+            }
+        }
     }
 }
 
@@ -108,4 +140,7 @@ dependencies {
     implementation(libs.hilt.android)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }

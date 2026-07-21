@@ -16,17 +16,22 @@ fun envValue(name: String): String {
 }
 
 val devSigningStorePath = providers.environmentVariable("ANDROID_DEV_KEYSTORE_PATH").orNull
+val minSupportedApi = 29
+val targetSupportedApi = 36
+val intermediateSupportedApi = (minSupportedApi + targetSupportedApi) / 2
 
 android {
     namespace = "com.contentfilter.user"
-    compileSdk = 36
+    compileSdk = targetSupportedApi
+    testBuildType = "compatibility"
 
     defaultConfig {
         applicationId = "com.contentfilter.user"
-        minSdk = 29
-        targetSdk = 36
+        minSdk = minSupportedApi
+        targetSdk = targetSupportedApi
         versionCode = 1
         versionName = "1.0.1"
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "FIREBASE_APPLICATION_ID", "\"${envValue("FIREBASE_APPLICATION_ID")}\"")
         buildConfigField("String", "FIREBASE_API_KEY", "\"${envValue("FIREBASE_API_KEY")}\"")
         buildConfigField("String", "FIREBASE_PROJECT_ID", "\"${envValue("FIREBASE_PROJECT_ID")}\"")
@@ -92,6 +97,16 @@ android {
                 signingConfig = signingConfigs.getByName("devUpdate")
             }
         }
+        create("compatibility") {
+            initWith(getByName("debug"))
+            matchingFallbacks += listOf("debug")
+            isDebuggable = true
+            isMinifyEnabled = false
+            ndk {
+                // Test-only ABI for x86_64 Android emulators. DEV stays ARM-only.
+                abiFilters += "x86_64"
+            }
+        }
     }
 
     buildFeatures {
@@ -114,6 +129,28 @@ android {
                     "lib/armeabi-v7a/libonnxruntime_extensions4j_jni.so",
                     "lib/armeabi-v7a/libortextensions.so",
                 )
+        }
+    }
+
+    testOptions {
+        managedDevices {
+            devices {
+                maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("compatSmallApi29").apply {
+                    device = "Pixel 2"
+                    apiLevel = minSupportedApi
+                    systemImageSource = "aosp"
+                }
+                maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("compatPhoneApi32").apply {
+                    device = "Pixel 6"
+                    apiLevel = intermediateSupportedApi
+                    systemImageSource = "aosp"
+                }
+                maybeCreate<com.android.build.api.dsl.ManagedVirtualDevice>("compatTabletApi36").apply {
+                    device = "Pixel C"
+                    apiLevel = targetSupportedApi
+                    systemImageSource = "aosp"
+                }
+            }
         }
     }
 }
@@ -155,4 +192,7 @@ dependencies {
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
     testImplementation("org.json:json:20240303")
+    androidTestImplementation(libs.androidx.test.core)
+    androidTestImplementation(libs.androidx.test.ext.junit)
+    androidTestImplementation(libs.androidx.test.runner)
 }
