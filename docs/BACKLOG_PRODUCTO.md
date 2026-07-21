@@ -286,6 +286,7 @@ Flujo de una entrada:
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
 | DEVICE-CONNECTIVITY-ALERTS-01 | Backend y Android publicados DEV 264; Superweb en fuente; sin bateria | P1 | Alerta tras 24 horas sin comunicacion para Admin y Superweb | M | Medio |
+| ADMIN-DEVICE-OFFLINE-100H-01 | Candidato Android sin publicar; unitarios, ktlint y build correctos | P1 | Unificar en 100 horas el aviso de falta de comunicacion de App Admin sin demorar componentes caidos | S | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Validado visualmente en SM-A235M DEV 248; pendiente evento real | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
@@ -1020,6 +1021,14 @@ Flujo de una entrada:
   - la interfaz distingue claramente proteccion incompleta, componente efectivamente caido y dispositivo simplemente sin comunicacion;
   - no se recopilan consultas, URLs, mensajes ni contenido para calcular la salud.
 - Decisiones pendientes para la entrevista del ticket: componentes obligatorios por modelo de telefono; autoridad y visibilidad Admin/Super Admin; textos y colores; antiguedad maxima del heartbeat; comportamiento durante onboarding offline; orden de reparacion; ventanas de mantenimiento; recordatorios, escalamiento y criterio exacto para los tres estados agregados.
+
+### ADMIN-DEVICE-OFFLINE-100H-01 - Aviso Admin despues de 100 horas
+
+- Estado: `Candidato Android sin publicar; unitarios, ktlint y build correctos`; aprobado explicitamente por el usuario el 2026-07-21. Tipo: correccion operativa y UX de App Admin. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Causa raiz: Home usaba 15 minutos para enviar un Usuario sano a `Pendientes de verificacion`, mientras la ficha usaba 24 horas para declararlo sin comunicacion. Android puede diferir WorkManager con la pantalla apagada aunque exista red, de modo que ambos criterios confundian demora de heartbeat con una degradacion confirmada.
+- Solucion candidata: compartir un plazo de 100 horas en Home y ficha. Hasta entonces se conserva el ultimo estado sano; al vencer se informa falta de comunicacion sin afirmar que la proteccion fue desactivada.
+- Limites de seguridad: `Disabled` alerta inmediatamente; `Unknown` o un dispositivo nunca verificado sigue pendiente inmediatamente; `possible_uninstall` conserva su regla especial de Device Admin desactivado y mas de 30 minutos sin comunicacion.
+- Aceptacion automatizada: unitarios completos, ktlint y build DEV de App Admin correctos; pruebas antes y despues de 100 horas en Dashboard y Rules y regresion de posible desinstalacion cubiertas. Pendiente publicar una futura version Admin autorizada y validar el comportamiento real durante reposo prolongado.
 
 ### DEVICE-CONNECTIVITY-ALERTS-01 - Dispositivo sin comunicacion
 
