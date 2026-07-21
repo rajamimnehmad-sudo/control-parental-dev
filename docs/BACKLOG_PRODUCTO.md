@@ -290,7 +290,7 @@ Flujo de una entrada:
 | ADMIN-USER-SECURITY-BADGES-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
 | ADMIN-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
 | USER-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
-| ADMIN-WEB-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
+| ADMIN-WEB-SETTINGS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
 | USER-INTERNET-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
 | USER-DAG-LAUNCHER-PREFERENCE-01 | Aprobado; pendiente implementacion | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
@@ -500,9 +500,10 @@ Flujo de una entrada:
 
 ### ADMIN-WEB-SETTINGS-UX-02 - Web y Ajustes Admin
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: UX App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: UX App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Web: resumen compacto y grupos por Navegacion, Busqueda segura, DAG, horarios/limites y sitios; filas continuas, switch directo y flecha solo para navegacion. Estado de refresco queda junto al icono circular.
 - Ajustes: Cuenta/comunidad, Apariencia, Notificaciones, Actualizaciones, Ayuda/privacidad y acciones sensibles mediante grupos con titulo y filas continuas. Acciones destructivas quedan al final y requieren confirmacion.
+- Resultado en fuente: Cuenta/comunidad, licencia y accesos a Panel/Actualizaciones/Ayuda usan grupos blancos continuos con iconos del catalogo. Web simplifica el selector de acceso, alinea switches con iconos y presenta sitios existentes como filas planas, conservando confirmaciones y acciones.
 - Fuera de alcance: `Agregar sitio` no se mueve, rediseña ni recibe foco automatico en este ticket.
 
 ### USER-INTERNET-SETTINGS-UX-02 - Internet y Ajustes Usuario
