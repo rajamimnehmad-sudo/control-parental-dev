@@ -169,7 +169,6 @@ private fun RulesScreen(
             onGeneratePairingCode = onGeneratePairingCode,
             onPairingCodeCopied = onPairingCodeCopied,
             onDeviceSelected = onDeviceSelected,
-            onDeviceDeleted = onDeviceDeleted,
             onShowArchivedUsers = {
                 showingArchivedUsers = true
                 onRefreshArchivedUsers()

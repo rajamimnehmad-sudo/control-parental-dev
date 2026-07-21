@@ -63,6 +63,9 @@ data class RulesUiState(
     val recoveryCode: String = "",
     val recoveryCodeDeviceId: String? = null,
     val recoveryKitRemainingByDevice: Map<String, Int> = emptyMap(),
+    val devicesRefreshing: Boolean = false,
+    val devicesLastRefreshedAtEpochMillis: Long? = null,
+    val devicesRefreshError: String? = null,
     val offlineMode: Boolean = true,
     val message: String = "",
 ) {

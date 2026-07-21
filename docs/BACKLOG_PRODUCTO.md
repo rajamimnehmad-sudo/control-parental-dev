@@ -286,7 +286,7 @@ Flujo de una entrada:
 | UI-ICON-SYSTEM-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
 | UI-SYSTEM-BAR-CONTINUITY-01 | Aprobado; pendiente implementacion | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
 | UI-MOTION-SMOOTH-01 | Aprobado; pendiente implementacion | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
-| ADMIN-USERS-HUB-UX-02 | Aprobado; pendiente implementacion | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
+| ADMIN-USERS-HUB-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
 | ADMIN-USER-SECURITY-BADGES-01 | Aprobado; pendiente implementacion | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
 | ADMIN-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
 | USER-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
@@ -465,9 +465,10 @@ Flujo de una entrada:
 
 ### ADMIN-USERS-HUB-UX-02 - Usuarios y alta simplificados
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Alcance: superficie blanca continua, filas icono/texto/flecha y toque completo para abrir detalle; desaparece el menu de tres puntos y sus acciones quedan en el detalle correspondiente. `Agregar usuario` enfoca el primer input.
 - Estado de refresco: junto a `+`, Buscar y el icono circular de actualizar se muestra `Actualizando`, `Actualizado ahora/hace X min` o error persistente. No se reserva un hueco vacio y no aparece otro banner debajo.
+- Resultado en fuente: Usuarios usa una superficie blanca continua, avatar neutro y fila completa con flecha; el archivo permanece en el detalle y se retiro el menu contextual duplicado. El alta solicita foco al campo de nombre y el refresco conserva progreso, error o tiempo relativo en la barra de acciones.
 - Aceptacion: busqueda, archivo, reenlace y recuperacion conservan comportamiento; carga/vacio/error no superponen contenido; iconos siguen `UI-ICON-SYSTEM-01`.
 
 ### ADMIN-USER-SECURITY-BADGES-01 - Indicadores de seguridad con evidencia
