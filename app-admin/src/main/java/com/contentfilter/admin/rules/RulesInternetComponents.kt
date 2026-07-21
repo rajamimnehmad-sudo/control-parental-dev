@@ -39,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.PolicyRule
-import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
@@ -119,7 +118,11 @@ internal fun DomainRuleEditor(
     onAllow: () -> Unit,
     onAllowWithLimit: () -> Unit,
 ) {
-    ProductCard {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Text("Agregar sitio", style = MaterialTheme.typography.titleMedium)
         Text(
             "Podés permitir un sitio, limitar sus minutos por DNS o agregarle después un horario exacto.",
@@ -149,6 +152,7 @@ internal fun DomainRuleEditor(
         ) {
             Text(if (minutes.isBlank()) "Permitir sitio" else "Permitir con límite aproximado")
         }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
     }
 }
 
