@@ -1,8 +1,8 @@
 package com.contentfilter.admin.rules
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -53,6 +53,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.contentfilter.admin.adminMotionDurationMillis
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
@@ -107,6 +108,7 @@ internal fun UserDetailContent(
     onToggle: (PolicyRule) -> Unit,
     onDelete: (PolicyRule) -> Unit,
 ) {
+    val motionDuration = adminMotionDurationMillis()
     var appFilter by rememberSaveable(selectedDevice.id) { mutableStateOf(AppQuickFilter.All) }
     var scheduleAppPackage by rememberSaveable(selectedDevice.id) { mutableStateOf<String?>(null) }
     var scheduleDomain by rememberSaveable(selectedDevice.id) { mutableStateOf<String?>(null) }
@@ -121,7 +123,7 @@ internal fun UserDetailContent(
     val headerTargetProgress = if (searchExpanded) 1f else scrollHeaderProgress
     val headerProgress by animateFloatAsState(
         targetValue = headerTargetProgress,
-        animationSpec = spring(dampingRatio = 0.92f, stiffness = 920f),
+        animationSpec = tween(durationMillis = motionDuration),
         label = "user-detail-header-progress",
     )
     val coroutineScope = rememberCoroutineScope()
@@ -444,6 +446,7 @@ private fun UserDetailHeader(
     onCompactPanelClick: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val motionDuration = adminMotionDurationMillis()
     val attentionLevel = device.securityAttentionLevel()
     val headerGap = lerpDp(14.dp, 10.dp, collapseProgress)
     val iconSize = lerpDp(44.dp, 40.dp, collapseProgress)
@@ -486,11 +489,11 @@ private fun UserDetailHeader(
                     AnimatedVisibility(
                         visible = compactMode && entryMode != RulesEntryMode.Web,
                         enter =
-                            expandHorizontally(animationSpec = tween(durationMillis = 180)) +
-                                fadeIn(animationSpec = tween(durationMillis = 150)),
+                            expandHorizontally(animationSpec = tween(durationMillis = motionDuration)) +
+                                fadeIn(animationSpec = tween(durationMillis = motionDuration)),
                         exit =
-                            shrinkHorizontally(animationSpec = tween(durationMillis = 140)) +
-                                fadeOut(animationSpec = tween(durationMillis = 110)),
+                            shrinkHorizontally(animationSpec = tween(durationMillis = motionDuration)) +
+                                fadeOut(animationSpec = tween(durationMillis = motionDuration)),
                     ) {
                         CompactPanelChip(
                             panel = selectedPanel,
@@ -504,8 +507,8 @@ private fun UserDetailHeader(
                 }
                 AnimatedVisibility(
                     visible = !compactMode,
-                    enter = expandVertically(animationSpec = tween(durationMillis = 90)) + fadeIn(animationSpec = tween(durationMillis = 90)),
-                    exit = shrinkVertically(animationSpec = tween(durationMillis = 70)) + fadeOut(animationSpec = tween(durationMillis = 70)),
+                    enter = expandVertically(animationSpec = tween(durationMillis = motionDuration)) + fadeIn(animationSpec = tween(durationMillis = motionDuration)),
+                    exit = shrinkVertically(animationSpec = tween(durationMillis = motionDuration)) + fadeOut(animationSpec = tween(durationMillis = motionDuration)),
                 ) {
                     Text(
                         text = "${device.lastSeenLabel} · ${device.appCount} apps",
@@ -519,11 +522,11 @@ private fun UserDetailHeader(
             AnimatedVisibility(
                 visible = !compactMode,
                 enter =
-                    expandVertically(animationSpec = tween(durationMillis = 180)) +
-                        fadeIn(animationSpec = tween(durationMillis = 150)),
+                    expandVertically(animationSpec = tween(durationMillis = motionDuration)) +
+                        fadeIn(animationSpec = tween(durationMillis = motionDuration)),
                 exit =
-                    shrinkVertically(animationSpec = tween(durationMillis = 150)) +
-                        fadeOut(animationSpec = tween(durationMillis = 110)),
+                    shrinkVertically(animationSpec = tween(durationMillis = motionDuration)) +
+                        fadeOut(animationSpec = tween(durationMillis = motionDuration)),
             ) {
                 GlassDetailSectionSelector(
                     device = device,
@@ -635,6 +638,17 @@ private fun DetailSegmentButton(
     attentionLevel: SecurityAttentionLevel = SecurityAttentionLevel.None,
 ) {
     val shape = RoundedCornerShape(18.dp)
+    val motionDuration = adminMotionDurationMillis()
+    val backgroundColor by animateColorAsState(
+        targetValue = if (selected) HeaderInk else Color.White.copy(alpha = 0.42f),
+        animationSpec = tween(durationMillis = motionDuration),
+        label = "detail-segment-background",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (selected) Color.White else HeaderInk,
+        animationSpec = tween(durationMillis = motionDuration),
+        label = "detail-segment-content",
+    )
     val attentionDescription =
         when (attentionLevel) {
             SecurityAttentionLevel.Critical -> "Error de seguridad"
@@ -653,7 +667,7 @@ private fun DetailSegmentButton(
                 )
                 .clip(shape)
                 .background(
-                    color = if (selected) HeaderInk else Color.White.copy(alpha = 0.42f),
+                    color = backgroundColor,
                     shape = shape,
                 ).clickable(onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 11.dp),
@@ -663,7 +677,7 @@ private fun DetailSegmentButton(
         Text(
             text = text,
             style = MaterialTheme.typography.labelLarge,
-            color = if (selected) Color.White else HeaderInk,
+            color = contentColor,
         )
         if (attentionLevel != SecurityAttentionLevel.None) {
             Box(

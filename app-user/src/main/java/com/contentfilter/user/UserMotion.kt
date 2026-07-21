@@ -1,0 +1,24 @@
+package com.contentfilter.user
+
+import android.provider.Settings
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
+
+@Composable
+internal fun userMotionDurationMillis(): Int {
+    val context = LocalContext.current
+    val reducedMotion =
+        remember(context) {
+            runCatching {
+                Settings.Global.getFloat(
+                    context.contentResolver,
+                    Settings.Global.ANIMATOR_DURATION_SCALE,
+                    1f,
+                ) == 0f
+            }.getOrDefault(false)
+        }
+    return if (reducedMotion) 0 else ProductMotionDurationMillis
+}
+
+private const val ProductMotionDurationMillis = 220

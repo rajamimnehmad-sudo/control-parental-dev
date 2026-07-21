@@ -4,7 +4,7 @@ import android.app.admin.DevicePolicyManager
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -256,6 +256,7 @@ private fun UserHomeHeader(
     onCancelRemovalAuthorization: () -> Unit,
     onAuthorizedRemoval: () -> Unit,
 ) {
+    val motionDuration = userMotionDurationMillis()
     val statusLabel =
         when (protectionLevel) {
             ProtectionLevel.Protected -> "Protección activa"
@@ -272,7 +273,6 @@ private fun UserHomeHeader(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .animateContentSize()
                 .background(
                     brush = Brush.linearGradient(listOf(UserHomeHeaderTop, UserHomeHeaderBottom)),
                     shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
@@ -324,8 +324,8 @@ private fun UserHomeHeader(
         }
         AnimatedVisibility(
             visible = expanded,
-            enter = expandVertically() + fadeIn(),
-            exit = shrinkVertically() + fadeOut(),
+            enter = expandVertically(animationSpec = tween(motionDuration)) + fadeIn(tween(motionDuration)),
+            exit = shrinkVertically(animationSpec = tween(motionDuration)) + fadeOut(tween(motionDuration)),
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 UserProtectionDetailRow(
@@ -546,8 +546,9 @@ private fun UserHomeLimitsCard(
     onToggle: () -> Unit,
     onMyApps: () -> Unit,
 ) {
+    val motionDuration = userMotionDurationMillis()
     Card(
-        modifier = Modifier.fillMaxWidth().animateContentSize().clickable(onClick = onToggle),
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onToggle),
         shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -578,8 +579,8 @@ private fun UserHomeLimitsCard(
             UserHomeLimitQueue(items)
             AnimatedVisibility(
                 visible = expanded,
-                enter = expandVertically() + fadeIn(),
-                exit = shrinkVertically() + fadeOut(),
+                enter = expandVertically(animationSpec = tween(motionDuration)) + fadeIn(tween(motionDuration)),
+                exit = shrinkVertically(animationSpec = tween(motionDuration)) + fadeOut(tween(motionDuration)),
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
                     items.take(MaxExpandedHomeLimits).forEach { item ->
