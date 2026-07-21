@@ -22,7 +22,6 @@ import com.contentfilter.core.domain.model.dagExtraKosherEnabled
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.InstalledAppRepository
-import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
 import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
@@ -31,7 +30,6 @@ import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObservePolicyRulesUseCase
 import com.contentfilter.core.domain.usecase.admin.SaveDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.SavePolicyRuleUseCase
-import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.PolicyApplicationState
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.engine.SyncResult
@@ -66,10 +64,8 @@ class RulesViewModel
         private val saveDailyLimit: SaveDailyLimitUseCase,
         private val deleteDailyLimitUseCase: DeleteDailyLimitUseCase,
         private val appGroupRepository: AppGroupRepository,
-        private val policyRepository: PolicyRepository,
         grantRepository: ExtraTimeGrantRepository,
         private val installedAppRepository: InstalledAppRepository,
-        private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
         private val installedAppsLoader: RulesInstalledAppsLoader,
         private val messageCoordinator: RulesMessageCoordinator,
@@ -745,7 +741,7 @@ class RulesViewModel
                     runCatching {
                         saveAllowedDomain(target, targetDeviceId)
                         saveDomainDailyLimit(target, minutes, targetDeviceId)
-                        syncScheduler.requestSync()
+                        rulesSyncCoordinator.requestSync()
                         syncNowWithResult()
                     }
                 if (!finishInternetSave(targetDeviceId, requestId)) {
@@ -990,7 +986,7 @@ class RulesViewModel
                 val saved =
                     runCatching {
                         saveRule(rule.copy(enabled = !rule.enabled), targetDeviceId)
-                        syncScheduler.requestSync()
+                        rulesSyncCoordinator.requestSync()
                         syncNowWithResult()
                     }
                 if (requestId != null) {
@@ -1041,7 +1037,7 @@ class RulesViewModel
                         if (associatedLimit != null) {
                             deleteDailyLimitUseCase(associatedLimit)
                         }
-                        syncScheduler.requestSync()
+                        rulesSyncCoordinator.requestSync()
                         syncNowWithResult()
                     }
                 if (requestId != null && !finishInternetSave(targetDeviceId, requestId)) {
@@ -1122,7 +1118,7 @@ class RulesViewModel
                             )
                         }
                         removed.forEach { deleteRule(it) }
-                        syncScheduler.requestSync()
+                        rulesSyncCoordinator.requestSync()
                         syncNowWithResult()
                     }
                 val syncResult = saved.getOrNull()
@@ -1157,7 +1153,7 @@ class RulesViewModel
                 val saved =
                     runCatching {
                         deleteDailyLimitUseCase(limit)
-                        syncScheduler.requestSync()
+                        rulesSyncCoordinator.requestSync()
                         syncNowWithResult()
                     }
                 if (!finishInternetSave(targetDeviceId, requestId)) {
@@ -1264,7 +1260,7 @@ class RulesViewModel
                     }
                     return@launch
                 }
-                syncScheduler.requestSync()
+                rulesSyncCoordinator.requestSync()
                 val syncResult =
                     withContext(Dispatchers.IO) {
                         syncEngine.syncPolicyChanges(receipt)
@@ -1377,7 +1373,7 @@ class RulesViewModel
                     )
                 }
                 val receipt = localSave.getOrNull() ?: return@launch
-                syncScheduler.requestSync()
+                rulesSyncCoordinator.requestSync()
                 val syncResult =
                     withContext(Dispatchers.IO) {
                         syncEngine.syncPolicyChanges(receipt)
@@ -1500,7 +1496,7 @@ class RulesViewModel
         }
 
         init {
-            syncScheduler.requestSync()
+            rulesSyncCoordinator.requestSync()
             form.value.selectedDeviceId?.let(::refreshInstalledApps)
         }
 
@@ -1577,7 +1573,7 @@ class RulesViewModel
                                 targetDeviceId,
                             )
                         }
-                        syncScheduler.requestSync()
+                        rulesSyncCoordinator.requestSync()
                         syncNowWithResult()
                     }
                 if (internetRequestId != null && !finishInternetSave(targetDeviceId, internetRequestId)) {
@@ -1667,7 +1663,7 @@ class RulesViewModel
                     ),
                     targetDeviceId,
                 )
-                syncScheduler.requestSync()
+                rulesSyncCoordinator.requestSync()
                 syncNow()
                 form.update {
                     when (targetType) {
@@ -1834,7 +1830,7 @@ class RulesViewModel
         private suspend fun syncNow(): Boolean = syncNowWithResult().success
 
         private suspend fun syncNowWithResult(): SyncResult =
-            withContext(Dispatchers.IO) { syncEngine.syncCoreDataFull() }
+            withContext(Dispatchers.IO) { rulesSyncCoordinator.syncNowWithResult() }
 
         private fun beginWebPreferenceSave(
             preference: WebPolicyPreference,
