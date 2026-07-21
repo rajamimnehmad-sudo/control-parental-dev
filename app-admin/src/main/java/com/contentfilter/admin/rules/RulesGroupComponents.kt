@@ -176,27 +176,25 @@ private fun GroupAppPickerRow(
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
-    Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        AppIcon(app.appName, app.iconBase64)
-        Column(modifier = Modifier.weight(1f)) {
-            Text(app.appName, style = MaterialTheme.typography.bodyMedium)
-            Text(helperText ?: app.packageName, style = MaterialTheme.typography.bodySmall)
-        }
-        OutlinedButton(
-            enabled = enabled,
-            onClick = onClick,
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            Text(actionText)
+            AppIcon(app.appName, app.iconBase64)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(app.appName, style = MaterialTheme.typography.bodyMedium)
+                Text(helperText ?: app.packageName, style = MaterialTheme.typography.bodySmall)
+            }
+            OutlinedButton(
+                enabled = enabled,
+                onClick = onClick,
+            ) {
+                Text(actionText)
+            }
         }
+        HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
     }
 }
 
@@ -212,9 +210,7 @@ private fun AppGroupSummaryCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(8.dp))
-                .background(MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.35f))
-                .padding(10.dp),
+                .padding(horizontal = 4.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Row(
@@ -254,6 +250,7 @@ private fun AppGroupSummaryCard(
         if (group.appPackages.size > 4) {
             Text("+${group.appPackages.size - 4} más", style = MaterialTheme.typography.bodySmall)
         }
+        HorizontalDivider()
     }
     if (confirmDelete) {
         AlertDialog(

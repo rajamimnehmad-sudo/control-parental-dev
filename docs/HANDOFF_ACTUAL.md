@@ -97,6 +97,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - El encabezado del usuario y el selector `Seguridad` replican el nivel con descripcion accesible; cuando todo esta verificado no aparece ninguna marca.
 - La clasificacion tiene pruebas unitarias. La publicacion DEV 270 y la comprobacion fisica de cada caso siguen pendientes del cierre agrupado.
 
+## ADMIN-SECONDARY-LISTS-UX-02 - Implementado en fuente
+
+- Solicitudes Admin muestra actualizar como icono circular y conserva en la misma barra progreso, error o tiempo relativo; el selector de usuarios queda como lista blanca continua.
+- Avisos usa superficie blanca continua. Apps y las filas internas de grupos eliminan tarjetas y fondos repetidos, pero preservan switches, limites, horarios, formularios y acciones.
+- Sitios, horarios y actualizaciones se completan en los tickets especificos de Web/Ajustes; `Agregar sitio` queda expresamente sin cambios. La publicacion DEV 270 y el recorrido fisico siguen pendientes.
+
 ## Publicacion DEV 269 - Refresco claro y formulario Web compacto - 2026-07-21
 
 - App Usuario muestra progreso y un mensaje correcto durante el primer escaneo de `Mis apps`; conserva el inventario visible durante refrescos posteriores y no declara un resultado vacio antes de finalizar.

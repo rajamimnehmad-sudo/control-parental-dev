@@ -15,9 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -25,6 +23,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -33,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -41,11 +42,13 @@ import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
-import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
+import kotlinx.coroutines.delay
 
 @Composable
 fun AdminRequestsRoute(
@@ -60,29 +63,37 @@ fun AdminRequestsRoute(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(MaterialTheme.colorScheme.background)
+                .background(Color.White)
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            OutlinedButton(
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = requestsRefreshStatus(state),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.labelMedium,
+                color = if (state.lastSyncMessage.startsWith("No se pudo") || state.offlineMode) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            IconButton(
                 onClick = viewModel::refresh,
                 enabled = !state.isLoading,
+                modifier =
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .semantics { contentDescription = "Actualizar solicitudes" },
             ) {
-                Text(if (state.isLoading) "Cargando..." else "Actualizar")
+                ProductGlyph(
+                    icon = ProductIcon.Refresh,
+                    color = MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(22.dp),
+                )
             }
-        }
-        val bannerText =
-            state.message.ifBlank {
-                state.lastSyncMessage.ifBlank {
-                    if (state.offlineMode) "Sin conexión. Mostrando datos guardados." else ""
-                }
-            }
-        if (bannerText.isNotBlank()) {
-            FeedbackBanner(
-                text = bannerText,
-                isError = state.offlineMode || bannerText.startsWith("No se pudo"),
-            )
         }
         val selectedUser = state.users.firstOrNull { it.deviceId == state.selectedDeviceId }
         if (selectedUser == null) {
@@ -160,23 +171,11 @@ private fun RequestUserCard(
     ProductListRow(
         onClick = onClick,
         leading = {
-            if (user.needsAttention) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.error),
-                )
-            } else {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(10.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF17895D)),
-                )
-            }
+            ProductGlyph(
+                icon = ProductIcon.Requests,
+                color = if (user.needsAttention) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
         },
         headline = {
             Text(user.name, style = MaterialTheme.typography.titleMedium)
@@ -189,14 +188,39 @@ private fun RequestUserCard(
             )
         },
         trailing = {
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = "Ver solicitudes",
-                tint = MaterialTheme.colorScheme.primary,
+            ProductGlyph(
+                icon = ProductIcon.ChevronRight,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(22.dp),
             )
         },
     )
 }
+
+@Composable
+private fun requestsRefreshStatus(state: AdminRequestsUiState): String {
+    var nowEpochMillis by remember(state.lastRefreshedAtEpochMillis) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(state.lastRefreshedAtEpochMillis) {
+        if (state.lastRefreshedAtEpochMillis != null) {
+            while (true) {
+                delay(60_000)
+                nowEpochMillis = System.currentTimeMillis()
+            }
+        }
+    }
+    return state.refreshStatusText(nowEpochMillis)
+}
+
+internal fun AdminRequestsUiState.refreshStatusText(nowEpochMillis: Long): String =
+    when {
+        isLoading -> "Actualizando…"
+        lastSyncMessage.startsWith("No se pudo") || offlineMode -> "No se pudo actualizar"
+        lastRefreshedAtEpochMillis != null -> {
+            val minutes = ((nowEpochMillis - lastRefreshedAtEpochMillis).coerceAtLeast(0L) / 60_000L)
+            if (minutes == 0L) "Actualizado ahora" else "Actualizado hace $minutes min"
+        }
+        else -> "Listo para actualizar"
+    }
 
 @Composable
 private fun RequestCard(

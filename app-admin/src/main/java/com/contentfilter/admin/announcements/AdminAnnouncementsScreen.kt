@@ -66,7 +66,10 @@ private fun AnnouncementInbox(
     onDismiss: (RemoteAnnouncement) -> Unit,
     onUndo: () -> Unit,
 ) {
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    Column(
+        Modifier.fillMaxSize().background(Color.White).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
         if (state.message.isNotBlank()) {
             PremiumFeedbackBanner(
                 text = state.message,
