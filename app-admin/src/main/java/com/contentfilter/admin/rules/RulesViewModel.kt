@@ -301,18 +301,24 @@ class RulesViewModel
         }
 
         fun refreshDevices() {
-            val messageToken = messageCoordinator.capture(form.value.selectedDeviceId)
-            form.update { it.copy(message = "Actualizando dispositivos...") }
+            if (form.value.devicesRefreshing) return
+            form.update {
+                it.copy(
+                    devicesRefreshing = true,
+                    devicesRefreshError = null,
+                )
+            }
             viewModelScope.launch(Dispatchers.IO) {
                 val devicesResult = syncEngine.syncDevicesFull()
                 refreshProtectionControls(devices.value.map { it.id })
                 form.value.selectedDeviceId?.let { refreshInstalledApps(deviceId = it, forceFull = false) }
                 form.update {
-                    if (messageCoordinator.isCurrent(messageToken, it.selectedDeviceId)) {
-                        it.copy(message = devicesResult.message.takeIf { message -> message.isNotBlank() }.orEmpty())
-                    } else {
-                        it
-                    }
+                    it.copy(
+                        devicesRefreshing = false,
+                        devicesLastRefreshedAtEpochMillis =
+                            if (devicesResult.success) System.currentTimeMillis() else it.devicesLastRefreshedAtEpochMillis,
+                        devicesRefreshError = devicesResult.message.takeUnless { devicesResult.success },
+                    )
                 }
             }
         }

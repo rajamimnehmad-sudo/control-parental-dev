@@ -85,6 +85,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - App Admin usa el mismo `ProductNavGlyph` de App Usuario en la navegacion inferior; DAG conserva su icono propio alineado al catalogo.
 - No se agregaron dependencias. La publicacion DEV 270 y la comprobacion visual fisica siguen pendientes del cierre agrupado.
 
+## ADMIN-USERS-HUB-UX-02 - Implementado en fuente
+
+- Usuarios Admin usa una superficie blanca continua y filas completas sin menu de tres puntos; `Archivar usuario` sigue disponible con confirmacion dentro del detalle.
+- El encabezado muestra junto a actualizar, buscar y agregar un estado persistente: progreso, error o tiempo relativo desde el ultimo refresco correcto.
+- `Agregar usuario` solicita foco al campo de nombre al abrirse. La publicacion DEV 270 y el recorrido fisico siguen pendientes del cierre agrupado.
+
 ## Publicacion DEV 269 - Refresco claro y formulario Web compacto - 2026-07-21
 
 - App Usuario muestra progreso y un mensaje correcto durante el primer escaneo de `Mis apps`; conserva el inventario visible durante refrescos posteriores y no declara un resultado vacio antes de finalizar.

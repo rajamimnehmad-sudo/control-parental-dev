@@ -16,19 +16,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -36,20 +28,26 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import com.contentfilter.core.ui.ActionButtonTone
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
-import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
+import kotlinx.coroutines.delay
 
 @Composable
 internal fun UsersListContent(
@@ -64,7 +62,6 @@ internal fun UsersListContent(
     onGeneratePairingCode: () -> Unit,
     onPairingCodeCopied: () -> Unit,
     onDeviceSelected: (String) -> Unit,
-    onDeviceDeleted: (String) -> Unit,
     onShowArchivedUsers: () -> Unit,
 ) {
     var showCreateDialog by rememberSaveable { mutableStateOf(false) }
@@ -93,13 +90,15 @@ internal fun UsersListContent(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(AdminSurface),
+                .background(Color.White),
     ) {
         UsersGlassHeader(
             entryMode = entryMode,
             searchQuery = userSearchQuery,
             searchExpanded = searchExpanded,
             totalCount = state.userDevices.size,
+            refreshStatus = deviceRefreshStatusText(state),
+            refreshStatusIsError = state.devicesRefreshError != null,
             onSearchChanged = { userSearchQuery = it },
             onSearchExpandedChanged = { expanded ->
                 searchExpanded = expanded
@@ -109,14 +108,6 @@ internal fun UsersListContent(
             onRefresh = onRefreshDevices,
             onBack = onBack,
         )
-        val bannerText = state.message.ifBlank { if (state.offlineMode) "Sin conexión. Mostrando datos guardados." else "" }
-        if (bannerText.isNotBlank()) {
-            FeedbackBanner(
-                text = bannerText,
-                modifier = Modifier.padding(horizontal = 16.dp),
-                isError = state.offlineMode || bannerText.startsWith("No se pudo"),
-            )
-        }
         LazyColumn(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.spacedBy(0.dp),
@@ -142,10 +133,7 @@ internal fun UsersListContent(
             items(filteredDevices, key = { it.id }) { device ->
                 ProtectedUserCard(
                     device = device,
-                    deleting = device.id in state.pendingDeviceDeleteIds,
-                    showActions = entryMode == RulesEntryMode.ManageUsers,
                     onClick = { onDeviceSelected(device.id) },
-                    onDelete = { onDeviceDeleted(device.id) },
                 )
             }
             if (entryMode == RulesEntryMode.ManageUsers) {
@@ -181,6 +169,8 @@ private fun UsersGlassHeader(
     searchQuery: String,
     searchExpanded: Boolean,
     totalCount: Int,
+    refreshStatus: String,
+    refreshStatusIsError: Boolean,
     onSearchChanged: (String) -> Unit,
     onSearchExpandedChanged: (Boolean) -> Unit,
     onCreateUser: () -> Unit,
@@ -192,7 +182,7 @@ private fun UsersGlassHeader(
         modifier =
             modifier
                 .fillMaxWidth()
-                .background(AdminSurface)
+                .background(Color.White)
                 .statusBarsPadding()
                 .padding(start = 10.dp, top = 18.dp, end = 16.dp, bottom = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -236,14 +226,6 @@ private fun UsersGlassHeader(
                     color = HeaderMuted,
                 )
             }
-            HeaderIconButton(onClick = onRefresh) {
-                Icon(
-                    imageVector = Icons.Filled.Refresh,
-                    contentDescription = "Actualizar",
-                    tint = HeaderMuted,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
         }
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -258,23 +240,31 @@ private fun UsersGlassHeader(
                     placeholder = { Text("Buscar protegido") },
                     singleLine = true,
                     leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = null,
-                            tint = HeaderMuted,
-                        )
+                        ProductGlyph(icon = ProductIcon.Search, color = HeaderMuted, modifier = Modifier.size(22.dp))
                     },
                     shape = RoundedCornerShape(18.dp),
                 )
             } else {
-                Box(modifier = Modifier.weight(1f))
+                Text(
+                    text = refreshStatus,
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (refreshStatusIsError) CriticalRed else HeaderMuted,
+                    maxLines = 2,
+                )
+            }
+            HeaderIconButton(onClick = onRefresh) {
+                ProductGlyph(
+                    icon = ProductIcon.Refresh,
+                    color = HeaderMuted,
+                    modifier = Modifier.size(22.dp).semantics { contentDescription = "Actualizar" },
+                )
             }
             HeaderIconButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
-                Icon(
-                    imageVector = Icons.Filled.Search,
-                    contentDescription = "Buscar usuario",
-                    tint = HeaderInk,
-                    modifier = Modifier.size(22.dp),
+                ProductGlyph(
+                    icon = ProductIcon.Search,
+                    color = HeaderInk,
+                    modifier = Modifier.size(22.dp).semantics { contentDescription = "Buscar usuario" },
                 )
             }
             if (entryMode == RulesEntryMode.ManageUsers) {
@@ -293,6 +283,10 @@ private fun NewUserDialog(
     onCopyToken: () -> Unit,
 ) {
     val hasToken = state.pairingCode.isNotBlank()
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(hasToken) {
+        if (!hasToken) focusRequester.requestFocus()
+    }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(if (hasToken) "Token de usuario" else "Nuevo usuario") },
@@ -315,7 +309,7 @@ private fun NewUserDialog(
                     )
                 } else {
                     OutlinedTextField(
-                        modifier = Modifier.fillMaxWidth(),
+                        modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
                         value = state.pairingUserName,
                         onValueChange = onPairingUserNameChanged,
                         label = { Text("Nombre del usuario") },
@@ -379,24 +373,13 @@ internal fun TokenReadyCard(
 @Composable
 private fun ProtectedUserCard(
     device: UserDeviceUiState,
-    deleting: Boolean,
-    showActions: Boolean,
     onClick: () -> Unit,
-    onDelete: () -> Unit,
 ) {
-    var confirmDelete by remember { mutableStateOf(false) }
-    var actionsExpanded by remember { mutableStateOf(false) }
     val healthy = device.status == UserDeviceStatus.Active && device.protectionComplete
-    val statusColor =
-        when {
-            device.possibleUninstall -> CriticalRed
-            healthy -> ActiveGreen
-            else -> PendingYellow
-        }
     ProductListRow(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
-        leading = { UserAvatar(name = device.name, color = statusColor) },
+        leading = { UserAvatar(name = device.name, color = HeaderInk) },
         headline = {
             Text(device.name, style = MaterialTheme.typography.titleMedium, color = HeaderInk)
         },
@@ -409,82 +392,16 @@ private fun ProtectedUserCard(
             )
         },
         trailing = {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(modifier = Modifier.size(10.dp).background(statusColor, CircleShape))
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                    contentDescription = null,
-                    tint = HeaderMuted,
-                )
-                if (showActions) {
-                    Box {
-                        IconButton(
-                            onClick = { actionsExpanded = true },
-                            enabled = !deleting,
-                        ) {
-                            Icon(
-                                imageVector = Icons.Filled.MoreVert,
-                                contentDescription = "Acciones",
-                                tint = HeaderMuted,
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = actionsExpanded,
-                            onDismissRequest = { actionsExpanded = false },
-                        ) {
-                            DropdownMenuItem(
-                                text = { Text(if (deleting) "Archivando..." else "Archivar") },
-                                enabled = !deleting,
-                                onClick = {
-                                    actionsExpanded = false
-                                    confirmDelete = true
-                                },
-                            )
-                        }
-                    }
-                }
-            }
+            ProductGlyph(icon = ProductIcon.ChevronRight, color = HeaderMuted, modifier = Modifier.size(22.dp))
         },
     )
-    if (confirmDelete) {
-        AlertDialog(
-            onDismissRequest = { confirmDelete = false },
-            title = { Text("Archivar usuario") },
-            text = {
-                Text(
-                    "El usuario perderá acceso de inmediato y saldrá de la lista activa. Su configuración y auditoría se conservarán para poder restaurarlo después.",
-                )
-            },
-            confirmButton = {
-                ProgressActionButton(
-                    onClick = {
-                        confirmDelete = false
-                        onDelete()
-                    },
-                    enabled = !deleting,
-                    modifier = Modifier,
-                    text = "Archivar usuario",
-                    loadingText = "Archivando...",
-                    successText = "Archivado",
-                    tone = ActionButtonTone.Destructive,
-                )
-            },
-            dismissButton = {
-                OutlinedButton(onClick = { confirmDelete = false }) {
-                    Text("Cancelar")
-                }
-            },
-        )
-    }
 }
 
 @Composable
 private fun UserCreateButton(onClick: () -> Unit) {
     Card(
         onClick = onClick,
+        modifier = Modifier.semantics { contentDescription = "Nuevo usuario" },
         shape = RoundedCornerShape(18.dp),
         colors = CardDefaults.cardColors(containerColor = HeaderInk),
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
@@ -496,10 +413,9 @@ private fun UserCreateButton(onClick: () -> Unit) {
                     .padding(10.dp),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = Icons.Filled.Add,
-                contentDescription = "Nuevo usuario",
-                tint = Color.White,
+            ProductGlyph(
+                icon = ProductIcon.UserPlus,
+                color = Color.White,
                 modifier = Modifier.size(28.dp),
             )
         }
@@ -560,6 +476,34 @@ private fun UserDeviceUiState.listSummary(healthy: Boolean): String =
                 UserDeviceStatus.Unknown -> "Configuración pendiente"
                 UserDeviceStatus.Active -> "Falta completar la protección"
             }
+    }
+
+@Composable
+private fun deviceRefreshStatusText(state: RulesUiState): String {
+    var nowEpochMillis by remember(state.devicesLastRefreshedAtEpochMillis) {
+        mutableLongStateOf(System.currentTimeMillis())
+    }
+    LaunchedEffect(state.devicesLastRefreshedAtEpochMillis) {
+        if (state.devicesLastRefreshedAtEpochMillis != null) {
+            while (true) {
+                delay(60_000)
+                nowEpochMillis = System.currentTimeMillis()
+            }
+        }
+    }
+    return state.deviceRefreshStatusText(nowEpochMillis)
+}
+
+internal fun RulesUiState.deviceRefreshStatusText(nowEpochMillis: Long): String =
+    when {
+        devicesRefreshing -> "Actualizando…"
+        devicesRefreshError != null -> "No se pudo actualizar"
+        devicesLastRefreshedAtEpochMillis != null -> {
+            val elapsedMinutes = ((nowEpochMillis - devicesLastRefreshedAtEpochMillis).coerceAtLeast(0L) / 60_000L)
+            if (elapsedMinutes == 0L) "Actualizado ahora" else "Actualizado hace $elapsedMinutes min"
+        }
+        offlineMode -> "Datos guardados"
+        else -> "Listo para actualizar"
     }
 
 private val UserDeviceStatus.label: String
