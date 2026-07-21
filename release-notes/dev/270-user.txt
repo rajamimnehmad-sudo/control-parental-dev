@@ -1,0 +1,3 @@
+Internet, Ajustes, Solicitudes y Mis apps ahora usan listas más limpias, continuas y fáciles de recorrer.
+Las transiciones son más suaves y la zona superior acompaña el color real de cada pantalla.
+DAG puede mantenerse como app separada o quedar disponible solo dentro de Content Filter.
