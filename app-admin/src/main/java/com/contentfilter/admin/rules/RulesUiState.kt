@@ -163,6 +163,8 @@ data class UserDeviceUiState(
     val protectionAlert: String? = null,
     val possibleUninstall: Boolean = false,
     val protectionComplete: Boolean = false,
+    val confirmedProtectionFailure: Boolean = false,
+    val protectionVerificationPending: Boolean = false,
     val vpnState: String = "Desconocida",
     val accessibilityState: String = "Desconocida",
     val deviceAdminState: String = "Desconocida",

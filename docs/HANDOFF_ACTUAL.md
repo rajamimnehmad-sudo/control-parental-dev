@@ -91,6 +91,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - El encabezado muestra junto a actualizar, buscar y agregar un estado persistente: progreso, error o tiempo relativo desde el ultimo refresco correcto.
 - `Agregar usuario` solicita foco al campo de nombre al abrirse. La publicacion DEV 270 y el recorrido fisico siguen pendientes del cierre agrupado.
 
+## ADMIN-USER-SECURITY-BADGES-01 - Implementado en fuente
+
+- La lista no muestra estado verde. Un escudo amarillo representa verificacion pendiente, estado desconocido o mas de 100 horas sin comunicacion; rojo queda reservado para un componente confirmadamente desactivado o posible desinstalacion.
+- El encabezado del usuario y el selector `Seguridad` replican el nivel con descripcion accesible; cuando todo esta verificado no aparece ninguna marca.
+- La clasificacion tiene pruebas unitarias. La publicacion DEV 270 y la comprobacion fisica de cada caso siguen pendientes del cierre agrupado.
+
 ## Publicacion DEV 269 - Refresco claro y formulario Web compacto - 2026-07-21
 
 - App Usuario muestra progreso y un mensaje correcto durante el primer escaneo de `Mis apps`; conserva el inventario visible durante refrescos posteriores y no declara un resultado vacio antes de finalizar.

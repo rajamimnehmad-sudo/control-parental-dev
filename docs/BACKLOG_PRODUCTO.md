@@ -287,7 +287,7 @@ Flujo de una entrada:
 | UI-SYSTEM-BAR-CONTINUITY-01 | Aprobado; pendiente implementacion | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
 | UI-MOTION-SMOOTH-01 | Aprobado; pendiente implementacion | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
 | ADMIN-USERS-HUB-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
-| ADMIN-USER-SECURITY-BADGES-01 | Aprobado; pendiente implementacion | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
+| ADMIN-USER-SECURITY-BADGES-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
 | ADMIN-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
 | USER-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
 | ADMIN-WEB-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
@@ -473,9 +473,10 @@ Flujo de una entrada:
 
 ### ADMIN-USER-SECURITY-BADGES-01 - Indicadores de seguridad con evidencia
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: seguridad visible y UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica`. Tipo: seguridad visible y UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Semantica: sin icono verde cuando todo esta bien; advertencia amarilla para nunca verificado, `Unknown` o mas de 100 horas sin comunicacion; rojo solo para VPN, Accesibilidad o Device Admin `Disabled`, o posible desinstalacion.
 - Detalle: la fila del Usuario y el segmento `Seguridad` muestran una burbuja roja hasta corregir un problema confirmado. Color, icono y descripcion accesible comunican juntos el estado.
+- Resultado en fuente: el mapeo conserva por separado falla confirmada y verificacion pendiente; lista y encabezado omiten toda marca cuando esta sano y muestran un escudo accesible amarillo/rojo solo por la evidencia definida. El selector `Seguridad` replica el nivel con una burbuja sin convertir todo el boton en alerta.
 - Aceptacion: no confundir atraso con proteccion caida; conservar la regla de posible desinstalacion; una nueva sincronizacion elimina el indicador aplicable sin borrar auditoria.
 
 ### ADMIN-SECONDARY-LISTS-UX-02 - Listas Admin continuas
