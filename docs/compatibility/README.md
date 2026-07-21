@@ -36,4 +36,4 @@ Los importes reales dependen de las cuotas/precios vigentes y siempre requieren 
 4. Aplicar los criterios de [RELEASE_CERTIFICATION.md](RELEASE_CERTIFICATION.md).
 5. Consultar [OEM_PROFILES.md](OEM_PROFILES.md) solo para planificar evidencia; todavía no hay excepciones OEM implementadas.
 
-La automatización de laboratorio está en `scripts/android_compatibility/` y `.github/workflows/android-device-lab.yml`. [FIREBASE_TEST_LAB.md](FIREBASE_TEST_LAB.md) documenta permisos, secretos, costos y operación. Firebase Test Lab queda preparado pero no se ejecuta automáticamente.
+La automatización de laboratorio está en `scripts/android_compatibility/` y `.github/workflows/android-device-lab.yml`. [FIREBASE_TEST_LAB.md](FIREBASE_TEST_LAB.md) documenta permisos, secretos, costos y operación. Firebase Test Lab queda preparado pero no se ejecuta automáticamente. El intento virtual bloqueado por configuración externa del 2026-07-21 está registrado en [results/test-lab-virtual-2026-07-21/summary.md](results/test-lab-virtual-2026-07-21/summary.md).

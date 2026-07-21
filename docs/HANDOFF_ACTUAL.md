@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-21:
 
 ```text
-App Usuario versionCode 268
-App Admin versionCode 268
+App Usuario versionCode 269
+App Admin versionCode 269
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-268-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-268-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-269-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-269-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 16912e19e60cee283c453612c57cf81dd1697bc8ca51e6412ee287da3129617c
-Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
+Usuario 54a85f844c9893dfa7d74a106751400bf22e9cdd53dceb6a8adb6a56616d15cb
+Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 ```
+
+## Publicacion DEV 269 - Refresco claro y formulario Web compacto - 2026-07-21
+
+- App Usuario muestra progreso y un mensaje correcto durante el primer escaneo de `Mis apps`; conserva el inventario visible durante refrescos posteriores y no declara un resultado vacio antes de finalizar.
+- App Admin presenta `Agregar sitio` como formulario plano, compacto y separado sutilmente, sin cambiar campos, validaciones, acciones ni sincronizacion Web.
+- Los cambios funcionales se fusionaron por separado en PR #12 (`318ce76`) y PR #14 (`f941e09`). El cierre coordinado incremento ambas apps a 269, agrego notas de version y se fusiono mediante PR #15 en `ec6ccbb`.
+- Validacion local del cierre: unitarios DEV de Usuario/Admin, builds DEV de ambas apps y ktlint correctos, 887 tareas. Android CI `29852125772` completo build, tests, ktlint, Android Lint y Detekt.
+- El workflow manual `Publicar APKs DEV` `29852785144` recompilo, probo y publico conjuntamente ambos APK exclusivamente en Supabase DEV.
+- Verificacion externa posterior: manifiestos publicos en version 269; SHA-256 Usuario `54a85f844c9893dfa7d74a106751400bf22e9cdd53dceb6a8adb6a56616d15cb` y Admin `b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734`. `aapt` confirma los paquetes DEV, version 269, `minSdk 29` y `targetSdk 36`; `apksigner` confirma en ambos el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- No se modificaron backend, datos ni contratos remotos. Supabase se uso solamente para publicar en Storage DEV; Production no fue tocado intencionalmente. El recorrido fisico de ambos cambios queda pendiente.
 
 ## Publicacion DEV 268 - Listas planas y compactas en ambas apps - 2026-07-21
 
@@ -89,12 +99,12 @@ Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 - PR #10 fusionado en `main` mediante `1124d69`; Android CI `29833738053` completo build, tests, ktlint, Android Lint y Detekt. El workflow manual `Publicar APKs DEV` `29834592446` recompilo, probo y publico conjuntamente ambos APK exclusivamente en Supabase DEV.
 - Verificacion externa posterior: manifiestos publicos en version 268; SHA-256 Usuario `16912e19e60cee283c453612c57cf81dd1697bc8ca51e6412ee287da3129617c` y Admin `dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c`. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, version `268` y `1.0.1-dev`; `apksigner` confirma en ambos el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
-## ADMIN-WEB-ADD-SITE-UX-01 fusionado; preparado para DEV 269 - 2026-07-21
+## ADMIN-WEB-ADD-SITE-UX-01 publicado en DEV 269 - 2026-07-21
 
 - Causa raiz: el formulario Web seguia visualmente pesado por su tarjeta exterior; su comportamiento, validaciones y contratos ya eran correctos.
 - Cambio candidato: `Agregar sitio` queda plano, compacto y delimitado por separadores sutiles, conservando exactamente sus campos, textos y acciones.
 - Alcance limitado a App Admin y documentacion. Sin cambios de datos, backend ni contratos Supabase.
-- PR #12 fusionado mediante `318ce76`; Android CI actualizado correcto. Queda incluido en el cierre coordinado DEV 269; pendiente publicacion y recorrido visual en telefono real.
+- PR #12 fusionado mediante `318ce76`; Android CI actualizado correcto. Incluido y verificado publicamente en DEV 269; queda pendiente el recorrido visual en telefono real.
 
 ## SUPERWEB-VERSION-01 fusionado y desplegado - 2026-07-21
 
@@ -103,12 +113,12 @@ Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 - La interfaz expone solo el commit corto o `local`; no muestra project ref, variables, claves ni sesion.
 - Validacion local: typecheck, ESLint, build de produccion Next y empaquetado OpenNext correctos. PR #13 fusionado mediante `d73c68a`; CI correcto y `/api/health` publico confirma exactamente esa build DEV. No se modifico Supabase ni se expusieron secretos.
 
-## USER-APPS-REFRESH-FEEDBACK-01 fusionado; preparado para DEV 269 - 2026-07-21
+## USER-APPS-REFRESH-FEEDBACK-01 publicado en DEV 269 - 2026-07-21
 
 - Causa raiz: el inventario anterior ya se conserva y el doble tap ya esta bloqueado; faltaba feedback inequívoco durante el primer escaneo, cuando todavia no existe inventario visible.
 - Cambio candidato: `Mis apps` muestra progreso lineal mientras escanea y un mensaje de busqueda en vez de declarar que no hay apps antes de terminar.
 - Alcance limitado a App Usuario y pruebas unitarias de sus estados vacio/cargando. Sin cambios de datos, backend ni contratos Supabase.
-- PR #14 fusionado mediante `f941e09`; Android CI actualizado correcto. Queda incluido en el cierre coordinado DEV 269; pendiente publicacion y recorrido fisico en telefono real.
+- PR #14 fusionado mediante `f941e09`; Android CI actualizado correcto. Incluido y verificado publicamente en DEV 269; queda pendiente el recorrido fisico en telefono real.
 
 ## Validacion fisica DEV 267 y refactor Admin/Rules - 2026-07-21
 
@@ -129,6 +139,7 @@ Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 - Gradle Managed Devices define una matriz pequeña API 29/32/36 en teléfono pequeño, teléfono normal y tablet. Firebase Test Lab queda preparado mediante catálogo dinámico, scripts y workflow manual con confirmación adicional para físico; no se ejecutaron dispositivos ni se configuraron proyecto, facturación o credenciales.
 - Validación local: unitarios DEV de Usuario/Admin, builds DEV, compilación de ambos APK de instrumentación, ktlint, Android Lint y detekt completaron 1.128 tareas sin fallos; los APK `compatibility` se ensamblaron en una pasada adicional de 448 tareas. Usuario `compatibility` contiene ARM64, ARM32 y x86_64. Bash, Python, JSON, YAML, resolución sintética de catálogo y `git diff --check` se validaron. No se ejecutó instrumentación porque no había emulador provisionado; no se ejecutó Test Lab.
 - No se implementaron perfiles ni excepciones OEM, no cambió comportamiento funcional, `versionCode` permanece en 268, no se publicó APK y no se tocaron Supabase, Production, datos ni contratos remotos.
+- La ejecución virtual de Firebase Test Lab del 2026-07-21 no pudo iniciarse: el repositorio no tiene configurados `FIREBASE_TEST_PROJECT_ID`, `FIREBASE_TEST_RESULTS_BUCKET`, `FIREBASE_TEST_WIF_PROVIDER` ni `FIREBASE_TEST_SERVICE_ACCOUNT`, y esta Mac no dispone de una sesión `gcloud` con autoridad para crear el proyecto de pruebas dedicado. No se creó matriz, no hubo identificadores, dispositivos ejecutados ni costo. Evidencia: `docs/compatibility/results/test-lab-virtual-2026-07-21/`.
 - Pendientes separados: validación física Samsung adicional; Firebase Test Lab físico; Xiaomi/HyperOS; Motorola; Honor; Oppo/Realme; Transsion; TCL; batería prolongada; actualización in-place; recuperación offline; alerta de posible desinstalación.
 
 ## Publicacion DEV 267 - Detalle de Usuario compacto en App Admin - 2026-07-20
