@@ -89,26 +89,26 @@ Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 - PR #10 fusionado en `main` mediante `1124d69`; Android CI `29833738053` completo build, tests, ktlint, Android Lint y Detekt. El workflow manual `Publicar APKs DEV` `29834592446` recompilo, probo y publico conjuntamente ambos APK exclusivamente en Supabase DEV.
 - Verificacion externa posterior: manifiestos publicos en version 268; SHA-256 Usuario `16912e19e60cee283c453612c57cf81dd1697bc8ca51e6412ee287da3129617c` y Admin `dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c`. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, version `268` y `1.0.1-dev`; `apksigner` confirma en ambos el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
-## Candidato ADMIN-WEB-ADD-SITE-UX-01 - 2026-07-21
+## ADMIN-WEB-ADD-SITE-UX-01 fusionado; preparado para DEV 269 - 2026-07-21
 
 - Causa raiz: el formulario Web seguia visualmente pesado por su tarjeta exterior; su comportamiento, validaciones y contratos ya eran correctos.
 - Cambio candidato: `Agregar sitio` queda plano, compacto y delimitado por separadores sutiles, conservando exactamente sus campos, textos y acciones.
-- Alcance limitado a App Admin y documentacion. Sin cambios de datos, backend, Supabase, `versionCode` ni publicacion.
-- Pendiente: CI del PR, publicacion DEV autorizada y recorrido visual en telefono real.
+- Alcance limitado a App Admin y documentacion. Sin cambios de datos, backend ni contratos Supabase.
+- PR #12 fusionado mediante `318ce76`; Android CI actualizado correcto. Queda incluido en el cierre coordinado DEV 269; pendiente publicacion y recorrido visual en telefono real.
 
-## Candidato SUPERWEB-VERSION-01 - 2026-07-21
+## SUPERWEB-VERSION-01 fusionado y desplegado - 2026-07-21
 
 - Causa raiz: el despliegue ya exponia su commit en `/api/health`, pero Login y el layout autenticado no consumian una fuente compartida ni mostraban esa referencia.
 - Cambio candidato: una utilidad unica resuelve el commit inyectado por Vercel/Cloudflare y genera una etiqueta compacta visible en Login y dentro de Superweb; `/api/health` usa la misma fuente.
 - La interfaz expone solo el commit corto o `local`; no muestra project ref, variables, claves ni sesion.
-- Validacion local: typecheck, ESLint, build de produccion Next y empaquetado OpenNext correctos. Pendiente: CI y comprobacion visual/funcional del preview de PR; no se publico Production.
+- Validacion local: typecheck, ESLint, build de produccion Next y empaquetado OpenNext correctos. PR #13 fusionado mediante `d73c68a`; CI correcto y `/api/health` publico confirma exactamente esa build DEV. No se modifico Supabase ni se expusieron secretos.
 
-## Candidato USER-APPS-REFRESH-FEEDBACK-01 - 2026-07-21
+## USER-APPS-REFRESH-FEEDBACK-01 fusionado; preparado para DEV 269 - 2026-07-21
 
 - Causa raiz: el inventario anterior ya se conserva y el doble tap ya esta bloqueado; faltaba feedback inequívoco durante el primer escaneo, cuando todavia no existe inventario visible.
 - Cambio candidato: `Mis apps` muestra progreso lineal mientras escanea y un mensaje de busqueda en vez de declarar que no hay apps antes de terminar.
-- Alcance limitado a App Usuario y pruebas unitarias de sus estados vacio/cargando. Sin cambios de datos, backend, Supabase, `versionCode` ni publicacion.
-- Pendiente: CI del PR, publicacion DEV autorizada y recorrido fisico en telefono real.
+- Alcance limitado a App Usuario y pruebas unitarias de sus estados vacio/cargando. Sin cambios de datos, backend ni contratos Supabase.
+- PR #14 fusionado mediante `f941e09`; Android CI actualizado correcto. Queda incluido en el cierre coordinado DEV 269; pendiente publicacion y recorrido fisico en telefono real.
 
 ## Validacion fisica DEV 267 y refactor Admin/Rules - 2026-07-21
 

@@ -175,6 +175,14 @@ curl -fsSL https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev
 10. Si cambio Android, bump versionCode, commit, push, verificar Actions y manifests.
 11. Si no cambio Android, commit opcional segun pedido y no publicar APK.
 
+## Cierre eficiente y completo
+
+- Cada ticket pequeno termina con pruebas proporcionales, PR y fusion a `main`; la documentacion no debe conservar `pendiente PR` despues de fusionarlo.
+- Varios tickets Android ya aprobados y listos pueden agruparse en una sola publicacion DEV: un unico aumento coordinado de `versionCode`, una sola compilacion/publicacion de Usuario y Admin y una verificacion comun de manifiestos, hashes y firma.
+- La agrupacion de publicacion no mezcla implementaciones: cada cambio conserva su PR, causa, pruebas y evidencia por separado.
+- Al publicar, actualizar `docs/HANDOFF_ACTUAL.md` y `docs/BACKLOG_PRODUCTO.md` de candidato a publicado. Las pruebas fisicas o de laboratorio pendientes se registran aparte y nunca se dan por realizadas.
+- No iniciar el siguiente lote dejando ramas, builds o estados documentales inconsistentes del lote anterior.
+
 ## NO TOCAR
 
 No revisar ni modificar estos componentes salvo que el ticket lo pida o la matriz de impacto los marque como necesarios:

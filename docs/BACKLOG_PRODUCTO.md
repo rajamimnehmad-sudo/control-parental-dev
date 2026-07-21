@@ -106,7 +106,7 @@ Flujo de una entrada:
 
 ### USER-APPS-REFRESH-FEEDBACK-01 - Refresco sin vaciar el inventario
 
-- Estado: `En progreso; implementado y validado localmente`; pendiente PR, publicacion DEV y recorrido fisico. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `Fusionado en main; preparado para DEV 269`; pendiente publicacion y recorrido fisico. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Evidencia: en DEV 267, al tocar actualizar en Mis apps el inventario paso de 161 a 163 aplicaciones, pero durante la carga la lista quedo transitoriamente vacia sin una indicacion de progreso clara.
 - Aceptacion propuesta: conservar el inventario anterior mientras se refresca o mostrar un estado de carga inequívoco; bloquear doble tap; reemplazar la lista solo al completar; conservar datos y mensaje anterior si el refresco falla.
 - Causa confirmada: el ViewModel ya conserva el inventario y bloquea refrescos simultaneos; la ambiguedad provenia del primer escaneo, cuando la lista aun vacia se mostraba sin progreso ni un texto de carga correcto.
@@ -114,7 +114,7 @@ Flujo de una entrada:
 
 ### ADMIN-WEB-ADD-SITE-UX-01 - Formulario Web plano y compacto
 
-- Estado: `En progreso; implementado y validado localmente`; pendiente PR, publicacion DEV y recorrido visual. Tipo: UX Admin. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `Fusionado en main; preparado para DEV 269`; pendiente publicacion y recorrido visual. Tipo: UX Admin. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Evidencia: el pedido del usuario fue dejar Web sin foto ni tarjeta. DEV 267 elimino correctamente la foto y la tarjeta exterior promocional, pero el formulario `Agregar sitio` sigue dentro de una tarjeta grande y visualmente pesada.
 - Aceptacion propuesta: presentar dominio, minutos DNS opcionales y accion como formulario plano, compacto y claramente separado por espaciado; conservar textos, validaciones y comportamiento Web sin tocar contratos remotos.
 - Causa confirmada: el peso visual provenia exclusivamente del `ProductCard` que envolvia `DomainRuleEditor`; los campos, validaciones y acciones ya eran correctos.
@@ -247,8 +247,8 @@ Flujo de una entrada:
 | HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; Usuario validado fisicamente, pendiente Admin y offline | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
-| USER-APPS-REFRESH-FEEDBACK-01 | En progreso; implementado y validado localmente | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
-| ADMIN-WEB-ADD-SITE-UX-01 | En progreso; implementado y validado localmente | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
+| USER-APPS-REFRESH-FEEDBACK-01 | Fusionado; preparado para DEV 269 | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
+| ADMIN-WEB-ADD-SITE-UX-01 | Fusionado; preparado para DEV 269 | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
@@ -257,7 +257,7 @@ Flujo de una entrada:
 | USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
-| SUPERWEB-VERSION-01 | En progreso; implementado y validado localmente | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
+| SUPERWEB-VERSION-01 | Resuelto; fusionado y desplegado | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | UI-BANNER-DYNAMIC-02 | Publicado DEV 263; pendiente prueba física | P1 | Línea de estado sutil con duración adaptada a textos largos y error contextual | M | Medio |
 | ANNOUNCEMENTS-INBOX-UX-02 | Publicado DEV 263; pendiente prueba física | P2 | Avisos leídos/no leídos, contador real y ocultado por dispositivo con deshacer | M | Medio |
@@ -361,7 +361,7 @@ Flujo de una entrada:
 
 ### SUPERWEB-VERSION-01 - Version publicada visible
 
-- Estado: `En progreso; implementado y validado localmente`; pendiente PR y comprobacion del preview/despliegue. Tipo: UX operativa, soporte y trazabilidad de despliegue. Prioridad: P2.
+- Estado: `Resuelto; fusionado y desplegado`; `/api/health` confirma la build `d73c68a`. Tipo: UX operativa, soporte y trazabilidad de despliegue. Prioridad: P2.
 - Problema: Superweb expone internamente el commit y entorno mediante `/api/health`, pero la interfaz no permite que el propietario identifique facilmente qué version o build esta usando.
 - Solucion propuesta: mostrar una referencia breve y visible de la version publicada, por ejemplo `Superweb DEV · build 6b12a60`, obtenida del mismo dato verificable del despliegue. Puede acompañarse con fecha de publicacion o estado actualizado, sin mostrar project ref, variables, claves ni informacion de sesion.
 - Evidencia: pedido explicito del usuario del 2026-07-18.
