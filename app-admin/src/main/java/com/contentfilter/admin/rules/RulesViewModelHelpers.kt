@@ -366,6 +366,27 @@ internal fun RulesUiState.clearPendingAppAllowed(
     )
 }
 
+internal fun RulesUiState.beginInternetSaving(deviceId: String): RulesUiState =
+    copy(internetSavingDeviceIds = internetSavingDeviceIds + deviceId)
+
+internal fun RulesUiState.endInternetSaving(deviceId: String): RulesUiState =
+    copy(internetSavingDeviceIds = internetSavingDeviceIds - deviceId)
+
+internal fun RulesUiState.completeInternetOperation(
+    deviceId: String,
+    visibleMessage: String,
+    updateSelectedDevice: (RulesUiState) -> RulesUiState = { it },
+): RulesUiState {
+    val completed = endInternetSaving(deviceId)
+    if (selectedDeviceId != deviceId) return completed
+    return updateSelectedDevice(completed).copy(message = visibleMessage)
+}
+
+internal fun RulesUiState.withDeviceMessage(
+    deviceId: String,
+    visibleMessage: String,
+): RulesUiState = if (selectedDeviceId == deviceId) copy(message = visibleMessage) else this
+
 internal fun scheduleSavingKey(
     deviceId: String,
     scope: RuleScope,

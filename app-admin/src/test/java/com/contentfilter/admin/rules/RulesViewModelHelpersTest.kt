@@ -13,6 +13,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.webNavigationBlocked
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -262,6 +263,151 @@ class RulesViewModelHelpersTest {
                 .pendingAppAllowedByDevice
                 .isEmpty(),
         )
+    }
+
+    @Test
+    fun `Internet saving state is isolated by selected device`() {
+        val savingFirst =
+            RulesUiState(selectedDeviceId = DeviceId)
+                .beginInternetSaving(DeviceId)
+
+        assertTrue(savingFirst.internetSaving)
+        assertFalse(savingFirst.copy(selectedDeviceId = OtherDeviceId).internetSaving)
+        assertFalse(savingFirst.endInternetSaving(DeviceId).internetSaving)
+    }
+
+    @Test
+    fun `Web completion for previous device clears its state without replacing selected device message`() {
+        val selectedSecond =
+            RulesUiState(
+                selectedDeviceId = DeviceId,
+                allowDomain = "first.example",
+                allowDomainMinutes = "15",
+                message = "Guardando sitio...",
+            ).beginInternetSaving(DeviceId)
+                .copy(
+                    selectedDeviceId = OtherDeviceId,
+                    allowDomain = "second.example",
+                    allowDomainMinutes = "30",
+                    message = "Mensaje de B",
+                )
+
+        val completed =
+            selectedSecond.completeInternetOperation(DeviceId, "Sitio permitido.") {
+                it.copy(allowDomain = "", allowDomainMinutes = "")
+            }
+
+        assertFalse(DeviceId in completed.internetSavingDeviceIds)
+        assertEquals(OtherDeviceId, completed.selectedDeviceId)
+        assertEquals("second.example", completed.allowDomain)
+        assertEquals("30", completed.allowDomainMinutes)
+        assertEquals("Mensaje de B", completed.message)
+    }
+
+    @Test
+    fun `operation tracker rejects double tap and ignores stale completion`() {
+        val tracker = RulesOperationTracker()
+        val key = DeviceOperationKey(DeviceId, "apps-refresh")
+        val first = tracker.beginIfIdle(key)
+
+        assertTrue(first != null)
+        assertEquals(null, tracker.beginIfIdle(key))
+        assertTrue(tracker.finish(key, first!!))
+
+        val second = tracker.begin(key)
+        val third = tracker.begin(key)
+        assertFalse(tracker.finish(key, second))
+        assertTrue(tracker.finish(key, third))
+    }
+
+    @Test
+    fun `apps refresh releases tracker and pending device when loader throws`() =
+        runBlocking {
+            val tracker = RulesOperationTracker()
+            val key = DeviceOperationKey(DeviceId, "apps-refresh")
+            val requestId = checkNotNull(tracker.beginIfIdle(key))
+            var pendingDeviceIds = setOf(DeviceId)
+            val loader: suspend () -> InstalledAppsRefreshResult = {
+                error("loader failed")
+            }
+
+            val tracked =
+                tracker.runTrackedOperation(
+                    key = key,
+                    requestId = requestId,
+                    onFinished = { wasCurrent ->
+                        if (wasCurrent) pendingDeviceIds -= DeviceId
+                    },
+                    operation = loader,
+                )
+
+            assertTrue(tracked.result.isFailure)
+            assertTrue(pendingDeviceIds.isEmpty())
+            assertTrue(tracker.beginIfIdle(key) != null)
+        }
+
+    @Test
+    fun `message token from previous user is invalid after rapid selection change`() {
+        val coordinator = RulesMessageCoordinator()
+        val first = coordinator.capture(DeviceId)
+
+        coordinator.selectionChanged()
+
+        assertFalse(coordinator.isCurrent(first, DeviceId))
+        assertFalse(coordinator.isCurrent(first, OtherDeviceId))
+        assertTrue(coordinator.isCurrent(coordinator.capture(OtherDeviceId), OtherDeviceId))
+    }
+
+    @Test
+    fun `app group validation rejects a duplicate name while editing another group`() {
+        val existing = appGroupUi(id = "group-a", name = "Estudio", packages = listOf("com.example.one"))
+        val draft =
+            AppGroupDraft(
+                id = "group-b",
+                deviceId = DeviceId,
+                name = "estudio",
+                limitMinutes = 30,
+                packages = listOf("com.example.two"),
+            )
+
+        assertEquals("Ya existe un grupo con ese nombre.", draft.validationMessage(listOf(existing)))
+    }
+
+    @Test
+    fun `app group validation rejects an app already assigned to another group`() {
+        val existing = appGroupUi(id = "group-a", name = "Estudio", packages = listOf("com.example.one"))
+        val draft =
+            AppGroupDraft(
+                id = null,
+                deviceId = DeviceId,
+                name = "Juegos",
+                limitMinutes = 30,
+                packages = listOf("com.example.one"),
+            )
+
+        assertEquals(
+            "Una app elegida ya está en Estudio. Sacala de ese grupo o editá ese grupo.",
+            draft.validationMessage(listOf(existing)),
+        )
+    }
+
+    @Test
+    fun `web preference tracker ignores an older response for the same device and preference`() {
+        val tracker = WebPreferenceRequestTracker()
+        val first = tracker.begin(WebPolicyPreference.SafeSearchEnabled, DeviceId)
+        val second = tracker.begin(WebPolicyPreference.SafeSearchEnabled, DeviceId)
+
+        assertFalse(tracker.isCurrent(DeviceId, WebPolicyPreference.SafeSearchEnabled, first))
+        assertTrue(tracker.isCurrent(DeviceId, WebPolicyPreference.SafeSearchEnabled, second))
+    }
+
+    @Test
+    fun `web preference message is not applied after selecting another device`() {
+        val tracker = WebPreferenceRequestTracker()
+        val requestId = tracker.begin(WebPolicyPreference.SafeSearchEnabled, DeviceId)
+
+        assertFalse(tracker.isLatestMessage(DeviceId, OtherDeviceId, requestId))
+        assertTrue(tracker.isLatestMessage(DeviceId, DeviceId, requestId))
     }
 
     @Test
@@ -630,6 +776,18 @@ class RulesViewModelHelpersTest {
             iconBase64 = null,
             updatedAtEpochMillis = 1L,
         )
+
+    private fun appGroupUi(
+        id: String,
+        name: String,
+        packages: List<String>,
+    ) = AppGroupUiState(
+        id = id,
+        name = name,
+        limitMinutes = 30,
+        resetLabel = "12 PM",
+        appPackages = packages,
+    )
 
     private fun List<PolicyRule>.applyTo(current: List<PolicyRule>): List<PolicyRule> {
         val changesById = associateBy { it.id }

@@ -24,7 +24,7 @@ data class RulesUiState(
     val dagEnabled: Boolean = false,
     val dagExtraKosherEnabled: Boolean = false,
     val dagEntitled: Boolean = false,
-    val internetSaving: Boolean = false,
+    val internetSavingDeviceIds: Set<String> = emptySet(),
     val pendingInternetBlockedByDevice: Map<String, Boolean> = emptyMap(),
     val pendingExternalSearchResultsAllowedByDevice: Map<String, Boolean> = emptyMap(),
     val pendingSafeSearchEnabledByDevice: Map<String, Boolean> = emptyMap(),
@@ -66,6 +66,9 @@ data class RulesUiState(
     val offlineMode: Boolean = true,
     val message: String = "",
 ) {
+    val internetSaving: Boolean
+        get() = selectedDeviceId in internetSavingDeviceIds
+
     val pendingInternetBlocked: Boolean?
         get() = selectedDeviceId?.let(pendingInternetBlockedByDevice::get)
 
