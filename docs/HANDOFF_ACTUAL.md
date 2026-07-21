@@ -89,6 +89,13 @@ Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 - PR #10 fusionado en `main` mediante `1124d69`; Android CI `29833738053` completo build, tests, ktlint, Android Lint y Detekt. El workflow manual `Publicar APKs DEV` `29834592446` recompilo, probo y publico conjuntamente ambos APK exclusivamente en Supabase DEV.
 - Verificacion externa posterior: manifiestos publicos en version 268; SHA-256 Usuario `16912e19e60cee283c453612c57cf81dd1697bc8ca51e6412ee287da3129617c` y Admin `dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c`. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, version `268` y `1.0.1-dev`; `apksigner` confirma en ambos el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
+## Candidato ADMIN-WEB-ADD-SITE-UX-01 - 2026-07-21
+
+- Causa raiz: el formulario Web seguia visualmente pesado por su tarjeta exterior; su comportamiento, validaciones y contratos ya eran correctos.
+- Cambio candidato: `Agregar sitio` queda plano, compacto y delimitado por separadores sutiles, conservando exactamente sus campos, textos y acciones.
+- Alcance limitado a App Admin y documentacion. Sin cambios de datos, backend, Supabase, `versionCode` ni publicacion.
+- Pendiente: CI del PR, publicacion DEV autorizada y recorrido visual en telefono real.
+
 ## Validacion fisica DEV 267 y refactor Admin/Rules - 2026-07-21
 
 - Samsung SM-A235M `R58T34V31AE`: App Usuario publica DEV 267 instalada in-place sobre DEV 266 mediante el APK publico y SHA-256 verificado. Se conservaron `firstInstallTime` (`2026-07-13 12:53:48`) y `ceDataInode` (`1239519`); App Admin ya estaba en DEV 267. No se borraron datos.

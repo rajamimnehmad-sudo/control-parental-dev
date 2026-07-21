@@ -112,9 +112,11 @@ Flujo de una entrada:
 
 ### ADMIN-WEB-ADD-SITE-UX-01 - Formulario Web plano y compacto
 
-- Estado: `Aprobado; pendiente ticket de implementacion`. Tipo: UX Admin. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `En progreso; implementado y validado localmente`; pendiente PR, publicacion DEV y recorrido visual. Tipo: UX Admin. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Evidencia: el pedido del usuario fue dejar Web sin foto ni tarjeta. DEV 267 elimino correctamente la foto y la tarjeta exterior promocional, pero el formulario `Agregar sitio` sigue dentro de una tarjeta grande y visualmente pesada.
 - Aceptacion propuesta: presentar dominio, minutos DNS opcionales y accion como formulario plano, compacto y claramente separado por espaciado; conservar textos, validaciones y comportamiento Web sin tocar contratos remotos.
+- Causa confirmada: el peso visual provenia exclusivamente del `ProductCard` que envolvia `DomainRuleEditor`; los campos, validaciones y acciones ya eran correctos.
+- Implementacion candidata: formulario plano con espaciado compacto y separadores sutiles; sin cambios funcionales ni remotos.
 
 ### ANDROID-BRAND-ICONS-01 - Iconos oficiales diferenciados
 
@@ -244,7 +246,7 @@ Flujo de una entrada:
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
 | USER-APPS-REFRESH-FEEDBACK-01 | Idea confirmada en prueba fisica | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
-| ADMIN-WEB-ADD-SITE-UX-01 | Aprobado; pendiente implementacion | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
+| ADMIN-WEB-ADD-SITE-UX-01 | En progreso; implementado y validado localmente | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
