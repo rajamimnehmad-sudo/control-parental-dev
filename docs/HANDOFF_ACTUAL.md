@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-20
+Fecha de corte: 2026-07-21
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -78,6 +78,16 @@ SHA-256 publicados:
 Usuario d042d80b56182ca2352cdbcabc9b10dfc8fef7b5d858498617c32c6b17d42cdd
 Admin   e03cabef737674e72a0f6602f3e42424ef2789688e3d48ea2f1b41664f4b758d
 ```
+
+## Validacion fisica DEV 267 y refactor Admin/Rules - 2026-07-21
+
+- Samsung SM-A235M `R58T34V31AE`: App Usuario publica DEV 267 instalada in-place sobre DEV 266 mediante el APK publico y SHA-256 verificado. Se conservaron `firstInstallTime` (`2026-07-13 12:53:48`) y `ceDataInode` (`1239519`); App Admin ya estaba en DEV 267. No se borraron datos.
+- Device Admin y el tunel VPN permanecieron activos y la VPN siguio no eludible. Android desactivo Accessibility por la restriccion propia de una actualizacion ADB/sideload; App Usuario detecto correctamente `Accesibilidad apagada`, explico la causa y condujo a repararla. Tras autorizar el ajuste restringido del paquete de prueba y habilitar el servicio desde la UI nativa, la app volvio a `Proteccion activa`.
+- App Usuario: Inicio, Mis apps, Internet, Ajustes y el asistente de Ayuda se recorrieron sin crash ni ANR de Content Filter. El asistente respondio de forma interactiva, acotada a la app y contextual al estado de Accessibility, y ofrecio preguntas de seguimiento. Mis apps refresco de 161 a 163 aplicaciones; durante el refresco la lista quedo transitoriamente vacia sin un progreso visual claro, seguimiento UX pendiente.
+- App Admin: Home, Usuarios, detalle de ambos usuarios, `Apps / Web / Seguridad`, horarios y grupos se recorrieron sin mutaciones. Los tres segmentos entran completos; al desplazar, la seccion activa aparece junto al nombre y al tocarla vuelve al inicio. Titulo, actualizar, buscar y filtros de Apps permanecen fijos. `Configurar horarios` y `Crear grupo de apps` abren pantallas dedicadas.
+- Web se presenta sin foto ni tarjeta exterior promocional. Seguridad separa estado, barrera y opciones avanzadas; se comprobaron visualmente desinstalacion temporal, reenlace, recuperacion offline y archivo sin generar codigos, tokens ni ejecutar acciones destructivas. Ambos usuarios visibles reportaron VPN, Accessibility y antidesinstalacion activas, por lo que no correspondia disparar una alerta real de posible desinstalacion.
+- PR #8 fusionado en `main` mediante `906f162`: `RulesViewModel` queda como fachada y coordinador de ciclo de vida con colaboradores por apps/grupos, Web, proteccion y archivo/reenlace; `RulesScreen` conserva ruta y navegacion mientras lista, archivo, detalle y toolbar viven en componentes responsables. Las correcciones finales aislan mensajes Web por dispositivo, liberan siempre el tracker de refresco y distinguen archivo remoto exitoso con reparacion local pendiente.
+- Validacion automatizada del PR #8: `:app-admin:testDevDebugUnitTest`, `:app-admin:assembleDevDebug`, `ktlintCheck`, `:app-admin:lintDevDebug` y `detekt` correctos localmente; Android CI del PR correcto. No cambio `versionCode`, no se publico APK, no se modifico backend y no se toco Supabase ni Production.
 
 ## Publicacion DEV 267 - Detalle de Usuario compacto en App Admin - 2026-07-20
 
@@ -938,6 +948,8 @@ Admin   e03cabef737674e72a0f6602f3e42424ef2789688e3d48ea2f1b41664f4b758d
 
 ## Limpieza/refactor reciente
 
+- `RulesViewModel` conserva una unica fachada publica y delega responsabilidades de aplicaciones/grupos, Web, proteccion, archivo/reenlace y coordinacion de operaciones a colaboradores inyectables.
+- `RulesScreen` conserva ruta, seleccion de flujo y navegacion; lista, usuarios archivados, detalle y toolbar de Apps estan extraidos por responsabilidad. PR #8 fusionado en `906f162` sin cambios de UI, backend, contratos remotos ni version.
 - Eliminado modulo vacio `core-license`.
 - Eliminado paquete Admin viejo `app-admin/.../devices`.
 - Eliminada UI y clase `AdminDevTools`.
