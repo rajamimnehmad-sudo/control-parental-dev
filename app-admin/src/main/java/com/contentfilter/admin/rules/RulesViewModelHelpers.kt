@@ -366,6 +366,12 @@ internal fun RulesUiState.clearPendingAppAllowed(
     )
 }
 
+internal fun RulesUiState.beginInternetSaving(deviceId: String): RulesUiState =
+    copy(internetSavingDeviceIds = internetSavingDeviceIds + deviceId)
+
+internal fun RulesUiState.endInternetSaving(deviceId: String): RulesUiState =
+    copy(internetSavingDeviceIds = internetSavingDeviceIds - deviceId)
+
 internal fun scheduleSavingKey(
     deviceId: String,
     scope: RuleScope,

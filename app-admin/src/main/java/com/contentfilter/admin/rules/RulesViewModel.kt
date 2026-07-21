@@ -7,7 +7,6 @@ import com.contentfilter.admin.BuildConfig
 import com.contentfilter.core.domain.model.AppGroup
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.ExtraTimeGrant
-import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy
@@ -15,22 +14,16 @@ import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicyTimeWindow
-import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
-import com.contentfilter.core.domain.model.RecoveryCodeVerifier
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
-import com.contentfilter.core.domain.model.TechnicalDiagnostic
 import com.contentfilter.core.domain.model.WebProtectionSemantics
 import com.contentfilter.core.domain.model.dagEnabled
 import com.contentfilter.core.domain.model.dagExtraKosherEnabled
 import com.contentfilter.core.domain.repository.AppGroupRepository
-import com.contentfilter.core.domain.repository.DeviceRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.InstalledAppRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
-import com.contentfilter.core.domain.repository.ProtectionControlRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
-import com.contentfilter.core.domain.repository.TelemetryRepository
 import com.contentfilter.core.domain.usecase.admin.DeleteDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDailyLimitsUseCase
@@ -38,12 +31,6 @@ import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObservePolicyRulesUseCase
 import com.contentfilter.core.domain.usecase.admin.SaveDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.SavePolicyRuleUseCase
-import com.contentfilter.core.network.dto.RemoteInstalledAppDto
-import com.contentfilter.core.network.remote.RemoteInstalledAppRepository
-import com.contentfilter.core.network.remote.RemoteResult
-import com.contentfilter.core.network.remote.SupabaseActivationClient
-import com.contentfilter.core.security.AdminRecoveryKitStore
-import com.contentfilter.core.security.RecoveryCodeHasher
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.PolicyApplicationState
 import com.contentfilter.core.sync.engine.SyncEngine
@@ -56,33 +43,21 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
-import java.time.Instant
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.util.UUID
 import javax.inject.Inject
-
-private data class WebPreferenceSaveKey(
-    val deviceId: String,
-    val preference: WebPolicyPreference,
-)
 
 @HiltViewModel
 @OptIn(ExperimentalCoroutinesApi::class)
 class RulesViewModel
     @Inject
-    constructor(
+    internal constructor(
         observePolicyRules: ObservePolicyRulesUseCase,
         observeDailyLimits: ObserveDailyLimitsUseCase,
         observeDevices: ObserveDevicesUseCase,
@@ -90,19 +65,20 @@ class RulesViewModel
         private val deleteRule: DeletePolicyRuleUseCase,
         private val saveDailyLimit: SaveDailyLimitUseCase,
         private val deleteDailyLimitUseCase: DeleteDailyLimitUseCase,
-        private val deviceRepository: DeviceRepository,
         private val appGroupRepository: AppGroupRepository,
         private val policyRepository: PolicyRepository,
         grantRepository: ExtraTimeGrantRepository,
-        private val remoteInstalledAppRepository: RemoteInstalledAppRepository,
         private val installedAppRepository: InstalledAppRepository,
-        private val activationClient: SupabaseActivationClient,
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
-        private val telemetryRepository: TelemetryRepository,
-        private val protectionControlRepository: ProtectionControlRepository,
-        private val recoveryCodeHasher: RecoveryCodeHasher,
-        private val adminRecoveryKitStore: AdminRecoveryKitStore,
+        private val installedAppsLoader: RulesInstalledAppsLoader,
+        private val messageCoordinator: RulesMessageCoordinator,
+        private val operationTracker: RulesOperationTracker,
+        private val rulesSyncCoordinator: RulesSyncCoordinator,
+        private val userLifecycleCoordinator: RulesUserLifecycleCoordinator,
+        private val protectionCoordinator: RulesProtectionCoordinator,
+        private val appGroupCoordinator: RulesAppGroupCoordinator,
+        private val webPolicyCoordinator: RulesWebPolicyCoordinator,
         systemStatusRepository: SystemStatusRepository,
     ) : ViewModel() {
         private val form =
@@ -115,11 +91,6 @@ class RulesViewModel
                 started = SharingStarted.Eagerly,
                 initialValue = emptyList(),
             )
-        private var internetSaveRequestId = 0L
-        private var webPreferenceSaveRequestId = 0L
-        private var latestWebPreferenceMessageRequestId = 0L
-        private val latestWebPreferenceRequestIds = mutableMapOf<WebPreferenceSaveKey, Long>()
-        private val webPreferenceMutationMutex = Mutex()
         private val selectedPolicyDeviceId = form.map { it.selectedDeviceId }.distinctUntilChanged()
         private val extraTimeGrants = grantRepository.observeGrants()
         private val devices =
@@ -334,13 +305,18 @@ class RulesViewModel
         }
 
         fun refreshDevices() {
+            val messageToken = messageCoordinator.capture(form.value.selectedDeviceId)
             form.update { it.copy(message = "Actualizando dispositivos...") }
             viewModelScope.launch(Dispatchers.IO) {
                 val devicesResult = syncEngine.syncDevicesFull()
                 refreshProtectionControls(devices.value.map { it.id })
                 form.value.selectedDeviceId?.let { refreshInstalledApps(deviceId = it, forceFull = false) }
                 form.update {
-                    it.copy(message = devicesResult.message.takeIf { message -> message.isNotBlank() }.orEmpty())
+                    if (messageCoordinator.isCurrent(messageToken, it.selectedDeviceId)) {
+                        it.copy(message = devicesResult.message.takeIf { message -> message.isNotBlank() }.orEmpty())
+                    } else {
+                        it
+                    }
                 }
             }
         }
@@ -349,18 +325,8 @@ class RulesViewModel
             if (form.value.archivedUsersLoading) return
             form.update { it.copy(archivedUsersLoading = true, message = "Cargando usuarios anteriores...") }
             viewModelScope.launch(Dispatchers.IO) {
-                when (val result = activationClient.listArchivedProtectedUsers()) {
-                    is RemoteResult.Success -> {
-                        val archivedUsers =
-                            result.value.map { archived ->
-                                ArchivedUserUiState(
-                                    archiveId = archived.archiveId,
-                                    deviceId = archived.deviceId,
-                                    name = archived.displayName,
-                                    archivedAtLabel = archived.archivedAt.archivedAtLabel(),
-                                    canRestore = archived.canRestore,
-                                )
-                            }
+                userLifecycleCoordinator.listArchivedUsers()
+                    .onSuccess { archivedUsers ->
                         form.update {
                             it.copy(
                                 archivedUsers = archivedUsers,
@@ -373,8 +339,7 @@ class RulesViewModel
                                     },
                             )
                         }
-                    }
-                    is RemoteResult.Failure -> {
+                    }.onFailure {
                         form.update {
                             it.copy(
                                 archivedUsersLoading = false,
@@ -382,7 +347,6 @@ class RulesViewModel
                             )
                         }
                     }
-                }
             }
         }
 
@@ -402,25 +366,18 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
-                when (
-                    val result =
-                        activationClient.createArchivedUserRestoreCode(
-                            archiveId = archiveId,
-                            ttlMinutes = UserPairingTokenTtlMinutes,
-                        )
-                ) {
-                    is RemoteResult.Success -> {
+                userLifecycleCoordinator.createRestoreCode(archiveId)
+                    .onSuccess { token ->
                         form.update {
                             it.copy(
                                 restoreLoadingArchiveIds = it.restoreLoadingArchiveIds - archiveId,
-                                restorePairingCode = result.value.code.withPairingName(archivedUser.name),
-                                restorePairingExpiresAt = result.value.expiresAt,
+                                restorePairingCode = token.code.withPairingName(archivedUser.name),
+                                restorePairingExpiresAt = token.expiresAt,
                                 restorePairingUserName = archivedUser.name,
                                 message = "Token de restauración listo.",
                             )
                         }
-                    }
-                    is RemoteResult.Failure -> {
+                    }.onFailure {
                         form.update {
                             it.copy(
                                 restoreLoadingArchiveIds = it.restoreLoadingArchiveIds - archiveId,
@@ -428,7 +385,6 @@ class RulesViewModel
                             )
                         }
                     }
-                }
             }
         }
 
@@ -458,16 +414,14 @@ class RulesViewModel
             deviceId: String,
             armed: Boolean,
         ) = mutateProtection(deviceId, if (armed) "Activando protección..." else "Desarmando protección...") { device ->
-            protectionControlRepository.setArmed(device.accountId, device.id, armed)
+            protectionCoordinator.setArmed(device.accountId, device.id, armed)
         }
 
         fun authorizeRemoval(deviceId: String) =
             mutateProtection(deviceId, "Autorizando retiro...") { device ->
-                protectionControlRepository.authorize(
+                protectionCoordinator.authorizeRemoval(
                     accountId = device.accountId,
                     deviceId = device.id,
-                    scope = ProtectionAuthorizationScope.Removal,
-                    durationMinutes = 30,
                 )
             }
 
@@ -477,18 +431,6 @@ class RulesViewModel
                 form.value.protectionControls[deviceId]
                     ?.recoveryKitRevision
                     ?.takeIf { it > 0 }
-            if (adminRecoveryKitStore.remaining(deviceId, expectedKitRevision) > 0) {
-                val revealed = adminRecoveryKitStore.revealNext(deviceId, expectedKitRevision) ?: return
-                form.update {
-                    it.copy(
-                        recoveryCode = revealed.code,
-                        recoveryCodeDeviceId = deviceId,
-                        recoveryKitRemainingByDevice = it.recoveryKitRemainingByDevice + (deviceId to revealed.remaining),
-                        message = "Código revelado. Se usa una sola vez.",
-                    )
-                }
-                return
-            }
             val device = uiState.value.userDevices.firstOrNull { it.id == deviceId }
             if (device == null) {
                 form.update { it.copy(message = "Dispositivo no disponible.") }
@@ -503,36 +445,44 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
-                val materials = List(RecoveryKitSize) { recoveryCodeHasher.generate() }
-                protectionControlRepository
-                    .rotateRecoveryKit(
+                protectionCoordinator
+                    .revealOrPrepareRecoveryKit(
                         accountId = device.accountId,
                         deviceId = device.id,
-                        verifiers =
-                            materials.mapIndexed { slot, material ->
-                                RecoveryCodeVerifier(slot, material.salt, material.verifier)
-                            },
-                    ).onSuccess { control ->
-                        adminRecoveryKitStore.save(
-                            deviceId = deviceId,
-                            revision = control.recoveryKitRevision,
-                            codes = materials.map { it.code },
-                        )
+                        expectedRevision = expectedKitRevision,
+                    ).onSuccess { result ->
                         form.update {
-                            it.copy(
-                                protectionControls = it.protectionControls + (deviceId to control),
-                                protectionLoadingDeviceIds = it.protectionLoadingDeviceIds - deviceId,
-                                recoveryCode = "",
-                                recoveryCodeDeviceId = deviceId,
-                                recoveryKitRemainingByDevice =
-                                    it.recoveryKitRemainingByDevice + (deviceId to RecoveryKitSize),
-                                message =
-                                    if (it.selectedDeviceId == deviceId) {
-                                        "Kit preparado. Ya podés revelar códigos incluso sin Internet."
-                                    } else {
-                                        it.message
-                                    },
-                            )
+                            when (result) {
+                                is RecoveryKitResult.CodeRevealed ->
+                                    it.copy(
+                                        protectionLoadingDeviceIds = it.protectionLoadingDeviceIds - deviceId,
+                                        recoveryCode = result.code,
+                                        recoveryCodeDeviceId = deviceId,
+                                        recoveryKitRemainingByDevice =
+                                            it.recoveryKitRemainingByDevice + (deviceId to result.remaining),
+                                        message =
+                                            if (it.selectedDeviceId == deviceId) {
+                                                "Código revelado. Se usa una sola vez."
+                                            } else {
+                                                it.message
+                                            },
+                                    )
+                                is RecoveryKitResult.KitPrepared ->
+                                    it.copy(
+                                        protectionControls = it.protectionControls + (deviceId to result.control),
+                                        protectionLoadingDeviceIds = it.protectionLoadingDeviceIds - deviceId,
+                                        recoveryCode = "",
+                                        recoveryCodeDeviceId = deviceId,
+                                        recoveryKitRemainingByDevice =
+                                            it.recoveryKitRemainingByDevice + (deviceId to result.remaining),
+                                        message =
+                                            if (it.selectedDeviceId == deviceId) {
+                                                "Kit preparado. Ya podés revelar códigos incluso sin Internet."
+                                            } else {
+                                                it.message
+                                            },
+                                    )
+                            }
                         }
                     }.onFailure {
                         form.update {
@@ -605,22 +555,12 @@ class RulesViewModel
         }
 
         private suspend fun refreshProtectionControls(deviceIds: List<String>) {
-            val refreshed =
-                deviceIds.distinct().mapNotNull { deviceId ->
-                    protectionControlRepository.get(deviceId).getOrNull()?.let { deviceId to it }
-                }.toMap()
-            if (refreshed.isNotEmpty()) {
+            val refreshed = protectionCoordinator.refresh(deviceIds)
+            if (refreshed.controls.isNotEmpty()) {
                 form.update {
                     it.copy(
-                        protectionControls = it.protectionControls + refreshed,
-                        recoveryKitRemainingByDevice =
-                            it.recoveryKitRemainingByDevice +
-                                refreshed.mapValues { (deviceId, control) ->
-                                    adminRecoveryKitStore.remaining(
-                                        deviceId,
-                                        control.recoveryKitRevision.takeIf { revision -> revision > 0 },
-                                    )
-                                },
+                        protectionControls = it.protectionControls + refreshed.controls,
+                        recoveryKitRemainingByDevice = it.recoveryKitRemainingByDevice + refreshed.remainingCodes,
                     )
                 }
             }
@@ -635,21 +575,21 @@ class RulesViewModel
             }
             form.update { it.copy(pairingLoading = true, message = "Generando código...") }
             viewModelScope.launch {
-                when (val result = activationClient.createDevicePairingCode(ttlMinutes = UserPairingTokenTtlMinutes)) {
-                    is RemoteResult.Success ->
+                userLifecycleCoordinator.createPairingCode()
+                    .onSuccess { token ->
                         form.update {
                             it.copy(
-                                pairingCode = result.value.code.withPairingName(userName),
-                                pairingExpiresAt = result.value.expiresAt,
+                                pairingCode = token.code.withPairingName(userName),
+                                pairingExpiresAt = token.expiresAt,
                                 pairingLoading = false,
                                 message = "Código listo. Pasalo a la App Usuario.",
                             )
                         }
-                    is RemoteResult.Failure ->
+                    }.onFailure {
                         form.update {
                             it.copy(pairingLoading = false, message = "No se pudo generar código.")
                         }
-                }
+                    }
             }
         }
 
@@ -676,12 +616,12 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch {
-                when (val result = activationClient.createDeviceRelinkCode(deviceId, RelinkTokenTtlMinutes)) {
-                    is RemoteResult.Success ->
+                userLifecycleCoordinator.createRelinkCode(deviceId)
+                    .onSuccess { token ->
                         form.update {
                             it.copy(
-                                relinkCode = result.value.code,
-                                relinkExpiresAt = result.value.expiresAt,
+                                relinkCode = token.code,
+                                relinkExpiresAt = token.expiresAt,
                                 relinkDeviceId = deviceId,
                                 relinkLoadingDeviceIds = it.relinkLoadingDeviceIds - deviceId,
                                 message =
@@ -692,7 +632,7 @@ class RulesViewModel
                                     },
                             )
                         }
-                    is RemoteResult.Failure ->
+                    }.onFailure {
                         form.update {
                             it.copy(
                                 relinkLoadingDeviceIds = it.relinkLoadingDeviceIds - deviceId,
@@ -704,7 +644,7 @@ class RulesViewModel
                                     },
                             )
                         }
-                }
+                    }
             }
         }
 
@@ -718,6 +658,7 @@ class RulesViewModel
             deviceId: String,
             refreshApps: Boolean = true,
         ) {
+            messageCoordinator.selectionChanged()
             form.update {
                 it.copy(
                     selectedDeviceId = deviceId,
@@ -733,6 +674,7 @@ class RulesViewModel
         }
 
         fun clearDeviceSelection() {
+            messageCoordinator.selectionChanged()
             form.update {
                 it.copy(
                     selectedDeviceId = null,
@@ -755,15 +697,8 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
-                when (activationClient.archiveProtectedUser(deviceId)) {
-                    is RemoteResult.Success -> {
-                        deviceRepository.deleteDevice(deviceId)
-                        installedAppRepository.deleteForDevice(deviceId)
-                        val syncResult = syncEngine.syncDevicesFull()
-                        Log.i(
-                            LogTag,
-                            "archiveUser finished deviceId=$deviceId syncSuccess=${syncResult.success} message=${syncResult.message}",
-                        )
+                userLifecycleCoordinator.archiveUser(deviceId)
+                    .onSuccess {
                         form.update {
                             it.copy(
                                 selectedDeviceId = it.selectedDeviceId.takeUnless { selected -> selected == deviceId },
@@ -771,8 +706,7 @@ class RulesViewModel
                                 message = if (it.selectedDeviceId == deviceId) "Usuario archivado." else it.message,
                             )
                         }
-                    }
-                    is RemoteResult.Failure -> {
+                    }.onFailure {
                         form.update {
                             it.copy(
                                 pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
@@ -780,7 +714,6 @@ class RulesViewModel
                             )
                         }
                     }
-                }
             }
         }
 
@@ -815,7 +748,7 @@ class RulesViewModel
                         syncScheduler.requestSync()
                         syncNowWithResult()
                     }
-                if (!isCurrentInternetSave(requestId)) {
+                if (!finishInternetSave(targetDeviceId, requestId)) {
                     Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=allow-domain-limit")
                     return@launch
                 }
@@ -826,8 +759,7 @@ class RulesViewModel
                 )
                 form.update {
                     if (saved.isSuccess) {
-                        it.copy(
-                            internetSaving = false,
+                        it.endInternetSaving(targetDeviceId).copy(
                             allowDomain = "",
                             allowDomainMinutes = "",
                             message =
@@ -838,8 +770,7 @@ class RulesViewModel
                                 },
                         )
                     } else {
-                        it.copy(
-                            internetSaving = false,
+                        it.endInternetSaving(targetDeviceId).copy(
                             message = "No se pudo guardar el sitio permitido con límite.",
                         )
                     }
@@ -952,71 +883,15 @@ class RulesViewModel
             }
             viewModelScope.launch {
                 val saved =
-                    webPreferenceMutationMutex.withLock {
-                        runCatching {
-                            refreshRemotePolicyBeforeWebMutation(targetDeviceId, traceRequestId)
-                            val before = policyRepository.getActivePolicy(targetDeviceId)
-                            check(before.deviceId == null || before.deviceId == targetDeviceId) {
-                                "Room devolvió una policy de otro dispositivo."
-                            }
-                            val desired =
-                                before.rules
-                                    .webPolicyPreferences()
-                                    .withPreference(preference, requestedState)
-                            val changes =
-                                before.rules.webPolicyPreferenceChanges(
-                                    preference = preference,
-                                    enabled = requestedState,
-                                    deviceId = targetDeviceId,
-                                )
-                            val receipt = saveRule.saveAll(changes, targetDeviceId, traceRequestId)
-                            val confirmed =
-                                withTimeoutOrNull(RoomConfirmTimeoutMillis) {
-                                    policyRepository.observeActivePolicy(targetDeviceId).first { snapshot ->
-                                        snapshot.deviceId == targetDeviceId &&
-                                            snapshot.version >= receipt.revision &&
-                                            snapshot.rules.webPolicyPreferences() == desired &&
-                                            snapshot.rules.activeWebAuxiliaryBlockCount() == 0
-                                    }
-                                }
-                            val applied =
-                                confirmed
-                                    ?: policyRepository.getActivePolicy(targetDeviceId).takeIf { snapshot ->
-                                        snapshot.deviceId == targetDeviceId &&
-                                            snapshot.rules.webPolicyPreferences().matchesPreference(
-                                                preference,
-                                                requestedState,
-                                            ) &&
-                                            snapshot.rules.activeWebAuxiliaryBlockCount() == 0
-                                    }
-                            if (applied == null) error("Room no confirmó $action.")
-                            if (BuildConfig.FLAVOR == "dev") {
-                                Log.i(
-                                    LogTag,
-                                    "web option room confirmed requestId=$traceRequestId " +
-                                        "deviceId=${targetDeviceId.safeDeviceId()} policyId=${receipt.policyId.take(8)} " +
-                                        "revision=${receipt.revision} changed=${preference.name} " +
-                                        "webBlocked=${applied.rules.internetBlocked()} " +
-                                        "externalSearchResultsAllowed=" +
-                                        "${applied.rules.externalSearchResultsAllowedForWeb()} " +
-                                        "safeSearchEnabled=${applied.rules.safeSearchEnabledForWeb()} " +
-                                        "activeDomainBlocks=${applied.rules.activeDomainBlockCount()} " +
-                                        "activeAuxiliaryBlocks=${applied.rules.activeWebAuxiliaryBlockCount()} " +
-                                        "changes=${changes.size}",
-                                )
-                            }
-                            receipt
-                        }
-                    }
+                    webPolicyCoordinator.saveLocal(
+                        preference = preference,
+                        requestedState = requestedState,
+                        deviceId = targetDeviceId,
+                        traceRequestId = traceRequestId,
+                    )
                 if (saved.isFailure) {
                     val alreadyApplied =
-                        runCatching {
-                            policyRepository
-                                .getActivePolicy(targetDeviceId)
-                                .rules
-                                .webPolicyPreferences()
-                                .matchesPreference(preference, requestedState)
-                        }.getOrDefault(false)
+                        webPolicyCoordinator.isApplied(targetDeviceId, preference, requestedState)
                     recordAdminDiagnostic(
                         action = action,
                         deviceId = targetDeviceId,
@@ -1043,7 +918,7 @@ class RulesViewModel
                             }
                         }
                     }
-                    if (alreadyApplied) syncScheduler.requestSync()
+                    if (alreadyApplied) webPolicyCoordinator.requestSync()
                     return@launch
                 }
                 recordAdminDiagnostic(
@@ -1065,9 +940,9 @@ class RulesViewModel
                         }
                     }
                 }
-                syncScheduler.requestSync()
+                webPolicyCoordinator.requestSync()
                 val receipt = saved.getOrThrow()
-                val syncResult = withContext(Dispatchers.IO) { syncEngine.syncPolicyChanges(receipt) }
+                val syncResult = withContext(Dispatchers.IO) { webPolicyCoordinator.sync(receipt) }
                 if (!isLatestWebPreferenceMessage(targetDeviceId, requestId)) return@launch
                 if (!syncResult.serverConfirmed) {
                     form.update {
@@ -1080,7 +955,7 @@ class RulesViewModel
                 }
                 val application =
                     withContext(Dispatchers.IO) {
-                        syncEngine.waitForPolicyApplied(receipt, PolicyApplicationWaitMillis)
+                        webPolicyCoordinator.waitUntilApplied(receipt)
                     }
                 if (!isLatestWebPreferenceMessage(targetDeviceId, requestId)) return@launch
                 form.update {
@@ -1119,7 +994,7 @@ class RulesViewModel
                         syncNowWithResult()
                     }
                 if (requestId != null) {
-                    if (!isCurrentInternetSave(requestId)) {
+                    if (!finishInternetSave(targetDeviceId, requestId)) {
                         Log.i(
                             LogTag,
                             "internetSave stale response ignored requestId=$requestId action=toggle-domain-rule",
@@ -1132,8 +1007,7 @@ class RulesViewModel
                         "internetSave finished requestId=$requestId action=toggle-domain-rule deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
                     )
                     form.update {
-                        it.copy(
-                            internetSaving = false,
+                        it.endInternetSaving(targetDeviceId).copy(
                             message =
                                 if (saved.isSuccess) {
                                     "Regla actualizada."
@@ -1170,7 +1044,7 @@ class RulesViewModel
                         syncScheduler.requestSync()
                         syncNowWithResult()
                     }
-                if (requestId != null && !isCurrentInternetSave(requestId)) {
+                if (requestId != null && !finishInternetSave(targetDeviceId, requestId)) {
                     Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=delete-domain-rule")
                     return@launch
                 }
@@ -1180,8 +1054,8 @@ class RulesViewModel
                     "internetSave finished requestId=${requestId ?: 0} action=delete-rule deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
                 )
                 form.update {
-                    it.copy(
-                        internetSaving = if (requestId != null) false else it.internetSaving,
+                    val completed = if (requestId != null) it.endInternetSaving(targetDeviceId) else it
+                    completed.copy(
                         message =
                             if (!saved.isSuccess) {
                                 "No se pudo eliminar la regla."
@@ -1286,7 +1160,7 @@ class RulesViewModel
                         syncScheduler.requestSync()
                         syncNowWithResult()
                     }
-                if (!isCurrentInternetSave(requestId)) {
+                if (!finishInternetSave(targetDeviceId, requestId)) {
                     Log.i(LogTag, "internetSave stale response ignored requestId=$requestId action=delete-domain-limit")
                     return@launch
                 }
@@ -1296,8 +1170,7 @@ class RulesViewModel
                     "internetSave finished requestId=$requestId action=delete-domain-limit deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
                 )
                 form.update {
-                    it.copy(
-                        internetSaving = false,
+                    it.endInternetSaving(targetDeviceId).copy(
                         message =
                             if (saved.isSuccess) {
                                 "Límite de dominio eliminado."
@@ -1536,71 +1409,26 @@ class RulesViewModel
             val targetDeviceId = selectedDeviceIdForRules() ?: return
             if (targetDeviceId in form.value.groupSavingDeviceIds) return
             val state = form.value
-            val name = state.groupName.trim()
-            val minutes = state.groupMinutes.toIntOrNull()
-            val packages = state.groupSelectedPackages.toList().sorted()
-            val editingGroupId = state.editingGroupId
-            val existingGroups = uiState.value.appGroups
-            val duplicateName =
-                existingGroups.firstOrNull {
-                    it.id != editingGroupId && it.name.equals(name, ignoreCase = true)
-                }
-            val packageInOtherGroup =
-                existingGroups.firstOrNull { group ->
-                    group.id != editingGroupId && group.appPackages.any { it in packages }
-                }
-            when {
-                name.isBlank() -> {
-                    form.update { it.copy(message = "Ingresá un nombre para el grupo.") }
-                    return
-                }
-                duplicateName != null -> {
-                    form.update { it.copy(message = "Ya existe un grupo con ese nombre.") }
-                    return
-                }
-                minutes == null || minutes <= 0 -> {
-                    form.update { it.copy(message = "Ingresá minutos válidos para el grupo.") }
-                    return
-                }
-                packages.isEmpty() -> {
-                    form.update { it.copy(message = "Elegí al menos una app para el grupo.") }
-                    return
-                }
-                packageInOtherGroup != null -> {
-                    form.update {
-                        it.copy(
-                            message =
-                                "Una app elegida ya está en ${packageInOtherGroup.name}. " +
-                                    "Sacala de ese grupo o editá ese grupo.",
-                        )
-                    }
-                    return
-                }
+            val draft =
+                AppGroupDraft(
+                    id = state.editingGroupId,
+                    deviceId = targetDeviceId,
+                    name = state.groupName.trim(),
+                    limitMinutes = state.groupMinutes.toIntOrNull(),
+                    packages = state.groupSelectedPackages.toList().sorted(),
+                )
+            draft.validationMessage(uiState.value.appGroups)?.let { validationMessage ->
+                form.update { it.copy(message = validationMessage) }
+                return
             }
             form.update {
                 it.copy(
                     groupSavingDeviceIds = it.groupSavingDeviceIds + targetDeviceId,
-                    message = if (editingGroupId == null) "Guardando grupo..." else "Actualizando grupo...",
+                    message = if (draft.id == null) "Guardando grupo..." else "Actualizando grupo...",
                 )
             }
             viewModelScope.launch {
-                val requestId = "group-${UUID.randomUUID()}"
-                val saved =
-                    runCatching {
-                        val group =
-                            AppGroup(
-                                id = editingGroupId ?: UUID.randomUUID().toString(),
-                                deviceId = targetDeviceId,
-                                name = name,
-                                color = "teal",
-                                limitMinutes = minutes,
-                                resetMinuteOfDay = NoonMinuteOfDay,
-                                enabled = true,
-                            )
-                        val receipt = appGroupRepository.replaceGroupApps(group, packages, requestId)
-                        syncScheduler.requestSync()
-                        withContext(Dispatchers.IO) { syncEngine.syncPolicyChanges(receipt) }
-                    }
+                val saved = withContext(Dispatchers.IO) { appGroupCoordinator.save(draft) }
                 form.update {
                     if (saved.isSuccess) {
                         if (it.selectedDeviceId == targetDeviceId) {
@@ -1641,25 +1469,7 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch {
-                val requestId = "group-delete-${UUID.randomUUID()}"
-                val saved =
-                    runCatching {
-                        val receipt =
-                            appGroupRepository.deleteGroup(
-                                AppGroup(
-                                    id = group.id,
-                                    deviceId = targetDeviceId,
-                                    name = group.name,
-                                    color = "teal",
-                                    limitMinutes = group.limitMinutes,
-                                    resetMinuteOfDay = NoonMinuteOfDay,
-                                    enabled = false,
-                                ),
-                                requestId,
-                            )
-                        syncScheduler.requestSync()
-                        withContext(Dispatchers.IO) { syncEngine.syncPolicyChanges(receipt) }
-                    }
+                val saved = withContext(Dispatchers.IO) { appGroupCoordinator.delete(group, targetDeviceId) }
                 form.update {
                     val selected = it.selectedDeviceId == targetDeviceId
                     it.copy(
@@ -1770,7 +1580,7 @@ class RulesViewModel
                         syncScheduler.requestSync()
                         syncNowWithResult()
                     }
-                if (internetRequestId != null && !isCurrentInternetSave(internetRequestId)) {
+                if (internetRequestId != null && !finishInternetSave(targetDeviceId, internetRequestId)) {
                     Log.i(
                         LogTag,
                         "internetSave stale response ignored requestId=$internetRequestId action=allow-domain",
@@ -1790,8 +1600,7 @@ class RulesViewModel
                         RuleScope.Domain ->
                             if (action == RuleAction.Allow) {
                                 if (saved.isSuccess) {
-                                    it.copy(
-                                        internetSaving = false,
+                                    it.endInternetSaving(targetDeviceId).copy(
                                         allowDomain = "",
                                         allowDomainMinutes = "",
                                         message =
@@ -1804,8 +1613,7 @@ class RulesViewModel
                                             },
                                     )
                                 } else {
-                                    it.copy(
-                                        internetSaving = false,
+                                    it.endInternetSaving(targetDeviceId).copy(
                                         message = "No se pudo guardar el sitio permitido.",
                                     )
                                 }
@@ -1879,46 +1687,15 @@ class RulesViewModel
             deviceId: String,
             forceFull: Boolean = false,
         ) {
-            if (deviceId in form.value.appRefreshDeviceIds) return
+            val key = DeviceOperationKey(deviceId, "apps-refresh")
+            val requestId = operationTracker.beginIfIdle(key) ?: return
             form.update { it.copy(appRefreshDeviceIds = it.appRefreshDeviceIds + deviceId) }
             viewModelScope.launch(Dispatchers.IO) {
-                val startedAt = System.currentTimeMillis()
                 val cachedCount = installedApps.value.count { it.deviceId == deviceId }
-                if (BuildConfig.DEBUG) {
-                    Log.i(
-                        LogTag,
-                        "appsRefresh stage=cache requestId=apps-$startedAt deviceId=${deviceId.safeDeviceId()} " +
-                            "count=$cachedCount durationMs=${System.currentTimeMillis() - startedAt}",
-                    )
-                }
-                val updatedAfter =
-                    if (forceFull) {
-                        null
-                    } else {
-                        installedAppRepository.latestUpdatedAt(deviceId)?.let {
-                            Instant.ofEpochMilli(it).toString()
-                        }
-                    }
-                val remoteStartedAt = System.currentTimeMillis()
-                when (
-                    val result =
-                        remoteInstalledAppRepository.pullInstalledApps(
-                            deviceId = deviceId,
-                            updatedAfterIso = updatedAfter,
-                        )
-                ) {
-                    is RemoteResult.Success -> {
-                        val remoteApps = result.value.map { it.toInstalledApp() }
-                        installedAppRepository.mergeInstalledApps(remoteApps)
-                        if (BuildConfig.DEBUG) {
-                            Log.i(
-                                LogTag,
-                                "appsRefresh stage=remote-merge requestId=apps-$startedAt " +
-                                    "deviceId=${deviceId.safeDeviceId()} deltaCount=${remoteApps.size} " +
-                                    "forceFull=$forceFull remoteDurationMs=${System.currentTimeMillis() - remoteStartedAt} " +
-                                    "totalDurationMs=${System.currentTimeMillis() - startedAt}",
-                            )
-                        }
+                val result = installedAppsLoader.refresh(deviceId, forceFull, cachedCount, requestId)
+                if (!operationTracker.finish(key, requestId)) return@launch
+                when (result) {
+                    InstalledAppsRefreshResult.Success -> {
                         form.update { state ->
                             state.copy(
                                 appRefreshDeviceIds = state.appRefreshDeviceIds - deviceId,
@@ -1933,8 +1710,7 @@ class RulesViewModel
                             )
                         }
                     }
-                    is RemoteResult.Failure -> {
-                        Log.w(LogTag, "appsRefresh result=failure reason=${result.reason}")
+                    is InstalledAppsRefreshResult.Failure -> {
                         form.update {
                             it.copy(
                                 appRefreshDeviceIds = it.appRefreshDeviceIds - deviceId,
@@ -1950,19 +1726,6 @@ class RulesViewModel
                 }
             }
         }
-
-        private fun RemoteInstalledAppDto.toInstalledApp(): InstalledApp =
-            InstalledApp(
-                id = id,
-                accountId = accountId,
-                deviceId = deviceId,
-                appName = appName,
-                packageName = packageName,
-                versionName = versionName,
-                isSystemApp = isSystemApp,
-                iconBase64 = iconBase64,
-                updatedAtEpochMillis = runCatching { Instant.parse(updatedAt).toEpochMilli() }.getOrDefault(0L),
-            )
 
         private suspend fun saveAllowedDomain(
             target: String,
@@ -2068,26 +1831,6 @@ class RulesViewModel
             return selectedDeviceId
         }
 
-        private suspend fun refreshRemotePolicyBeforeWebMutation(
-            deviceId: String,
-            requestId: String,
-        ) {
-            val result =
-                syncEngine.pullPolicyRevision(
-                    requestId = requestId,
-                    deviceId = deviceId,
-                    reason = "admin-web-preflight",
-                )
-            if (BuildConfig.FLAVOR == "dev") {
-                Log.i(
-                    LogTag,
-                    "web preflight requestId=$requestId deviceId=${deviceId.safeDeviceId()} " +
-                        "policyId=${result.policyId?.take(8) ?: "none"} revision=${result.revision ?: 0L} " +
-                        "roomApplied=${result.roomApplied} success=${result.success}",
-                )
-            }
-        }
-
         private suspend fun syncNow(): Boolean = syncNowWithResult().success
 
         private suspend fun syncNowWithResult(): SyncResult =
@@ -2100,9 +1843,7 @@ class RulesViewModel
             previousState: Boolean,
             requestedState: Boolean,
         ): Long {
-            val requestId = ++webPreferenceSaveRequestId
-            latestWebPreferenceRequestIds[WebPreferenceSaveKey(deviceId, preference)] = requestId
-            latestWebPreferenceMessageRequestId = requestId
+            val requestId = webPolicyCoordinator.begin(preference, deviceId)
             Log.i(
                 LogTag,
                 "webPreferenceSave start requestId=$requestId action=$action " +
@@ -2125,12 +1866,12 @@ class RulesViewModel
             deviceId: String,
             preference: WebPolicyPreference,
             requestId: Long,
-        ): Boolean = latestWebPreferenceRequestIds[WebPreferenceSaveKey(deviceId, preference)] == requestId
+        ): Boolean = webPolicyCoordinator.isCurrent(deviceId, preference, requestId)
 
         private fun isLatestWebPreferenceMessage(
             deviceId: String,
             requestId: Long,
-        ): Boolean = latestWebPreferenceMessageRequestId == requestId && form.value.selectedDeviceId == deviceId
+        ): Boolean = webPolicyCoordinator.isLatestMessage(deviceId, form.value.selectedDeviceId, requestId)
 
         private fun beginInternetSave(
             action: String,
@@ -2138,15 +1879,17 @@ class RulesViewModel
             previousState: String,
             requestedState: String,
         ): Long? {
-            if (form.value.internetSaving) {
+            val key = DeviceOperationKey(deviceId, "internet-save")
+            val requestId = operationTracker.beginIfIdle(key)
+            if (requestId == null) {
                 Log.i(
                     LogTag,
-                    "internetSave ignored action=$action deviceId=$deviceId previousState=$previousState requestedState=$requestedState reason=already-saving requestId=$internetSaveRequestId",
+                    "internetSave ignored action=$action deviceId=$deviceId previousState=$previousState " +
+                        "requestedState=$requestedState reason=already-saving",
                 )
                 form.update { it.copy(message = "Guardando cambio anterior...") }
                 return null
             }
-            val requestId = ++internetSaveRequestId
             Log.i(
                 LogTag,
                 "internetSave start requestId=$requestId action=$action deviceId=$deviceId previousState=$previousState requestedState=$requestedState",
@@ -2160,11 +1903,14 @@ class RulesViewModel
                 result = "start",
                 reason = "tap",
             )
-            form.update { it.copy(internetSaving = true, message = "Guardando...") }
+            form.update { it.beginInternetSaving(deviceId).copy(message = "Guardando...") }
             return requestId
         }
 
-        private fun isCurrentInternetSave(requestId: Long): Boolean = requestId == internetSaveRequestId
+        private fun finishInternetSave(
+            deviceId: String,
+            requestId: Long,
+        ): Boolean = operationTracker.finish(DeviceOperationKey(deviceId, "internet-save"), requestId)
 
         private fun recordAdminDiagnostic(
             action: String,
@@ -2175,19 +1921,15 @@ class RulesViewModel
             result: String,
             reason: String,
         ) {
-            if (BuildConfig.FLAVOR != "dev") return
             viewModelScope.launch(Dispatchers.IO) {
-                telemetryRepository.record(
-                    TechnicalDiagnostic(
-                        id = UUID.randomUUID().toString(),
-                        type = "admin-rules",
-                        message =
-                            "layer=admin action=$action requestId=$requestId deviceId=${deviceId.safeDeviceId()} " +
-                                "previousState=${previousState.take(MaxDiagnosticValueLength)} " +
-                                "requestedState=${requestedState.take(MaxDiagnosticValueLength)} " +
-                                "result=$result reason=${reason.take(MaxDiagnosticValueLength)}",
-                        occurredAtEpochMillis = System.currentTimeMillis(),
-                    ),
+                rulesSyncCoordinator.recordAdminDiagnostic(
+                    action = action,
+                    deviceId = deviceId,
+                    requestId = requestId,
+                    previousState = previousState,
+                    requestedState = requestedState,
+                    result = result,
+                    reason = reason,
                 )
             }
         }
@@ -2213,31 +1955,8 @@ class RulesViewModel
             }
         }
 
-        private fun String.safeDeviceId(): String = take(8)
-
-        private fun String.archivedAtLabel(): String =
-            runCatching { ArchiveDateFormatter.format(Instant.parse(this)) }
-                .getOrDefault("Fecha no disponible")
-
-        private fun String.withPairingName(userName: String): String {
-            val safeName =
-                userName
-                    .trim()
-                    .replace(Regex("\\s+"), "-")
-                    .trim('-')
-                    .take(32)
-            return "${safeName.ifBlank { "usuario" }}-${trim()}"
-        }
-
         private companion object {
-            const val NoonMinuteOfDay = 720
-            const val RecoveryKitSize = 5
-            const val UserPairingTokenTtlMinutes = 180
-            const val RelinkTokenTtlMinutes = 30
             const val PolicyApplicationWaitMillis = 8_000L
-            val ArchiveDateFormatter: DateTimeFormatter =
-                DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
-                    .withZone(ZoneId.of("America/Argentina/Buenos_Aires"))
         }
     }
 
