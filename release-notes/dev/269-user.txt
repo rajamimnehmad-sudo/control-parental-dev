@@ -1,0 +1,3 @@
+Mis apps ahora muestra claramente cuándo está buscando aplicaciones instaladas.
+El inventario visible se conserva durante el refresco y el resultado vacío aparece solo al finalizar.
+Se mantiene el funcionamiento actual de aplicaciones, grupos y solicitudes.

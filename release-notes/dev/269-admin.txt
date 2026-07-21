@@ -1,0 +1,3 @@
+Agregar sitio ahora usa un formulario más simple, plano y compacto.
+Se conservan el dominio, el límite aproximado por DNS, las validaciones y las acciones existentes.
+No cambian las reglas Web ni su sincronización.
