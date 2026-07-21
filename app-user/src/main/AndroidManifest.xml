@@ -66,20 +66,29 @@
 
         <activity
             android:name=".dag.DagActivity"
-            android:enabled="false"
+            android:enabled="true"
             android:excludeFromRecents="false"
-            android:exported="true"
+            android:exported="false"
             android:icon="@drawable/ic_dag_launcher"
             android:label="DAG"
             android:launchMode="singleTask"
             android:roundIcon="@drawable/ic_dag_launcher"
-            android:taskAffinity="${applicationId}.dag">
+            android:taskAffinity="${applicationId}.dag" />
+
+        <activity-alias
+            android:name=".dag.DagLauncherAlias"
+            android:enabled="false"
+            android:exported="true"
+            android:icon="@drawable/ic_dag_launcher"
+            android:label="DAG"
+            android:roundIcon="@drawable/ic_dag_launcher"
+            android:targetActivity=".dag.DagActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-        </activity>
+        </activity-alias>
 
         <provider
             android:name="androidx.startup.InitializationProvider"

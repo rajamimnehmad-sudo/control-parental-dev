@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.user.dag.DagLauncherController
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
@@ -26,13 +27,15 @@ class UserWebViewModel
     constructor(
         policyRepository: PolicyRepository,
         systemStatusRepository: SystemStatusRepository,
+        private val dagLauncherController: DagLauncherController,
     ) : ViewModel() {
         val uiState =
             combine(
                 policyRepository.observeActivePolicy(),
                 systemStatusRepository.observeHealth(),
                 minuteTicks(),
-            ) { snapshot, health, nowEpochMillis ->
+                dagLauncherController.keepSeparateLauncher,
+            ) { snapshot, health, nowEpochMillis, keepSeparateLauncher ->
                 val blocked = snapshot.rules.webNavigationBlocked()
                 Log.i(
                     LogTag,
@@ -48,6 +51,7 @@ class UserWebViewModel
                     safeSearchEnabled = snapshot.rules.safeSearchEnabled(),
                     dagEnabled = health.dagEntitled && snapshot.rules.dagEnabled(),
                     dagEntitled = health.dagEntitled,
+                    keepSeparateDagLauncher = keepSeparateLauncher,
                     schedule = resolveWebScheduleStatus(snapshot.rules, nowEpochMillis),
                 )
             }
@@ -56,6 +60,10 @@ class UserWebViewModel
                     started = SharingStarted.WhileSubscribed(5_000),
                     initialValue = UserWebUiState(),
                 )
+
+        fun setKeepSeparateDagLauncher(enabled: Boolean) {
+            dagLauncherController.setKeepSeparateLauncher(enabled)
+        }
     }
 
 data class UserWebUiState(
@@ -64,6 +72,7 @@ data class UserWebUiState(
     val safeSearchEnabled: Boolean = true,
     val dagEnabled: Boolean = false,
     val dagEntitled: Boolean = false,
+    val keepSeparateDagLauncher: Boolean = true,
     val schedule: WebScheduleStatus? = null,
 ) {
     val onlyResultsEnabled: Boolean

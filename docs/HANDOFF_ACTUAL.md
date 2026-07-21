@@ -109,6 +109,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - Solo una VPN inactiva ofrece la accion directa `Reparar`; DAG navega unicamente cuando la politica remota lo habilita. No se agregan switches de autoridad remota al Usuario.
 - Ajustes usa filas continuas para estado, version, activacion y Ayuda, conservando tarjetas para codigo de emergencia e instalacion por ser flujos complejos. Compilacion, unitarios y ktlint Usuario DEV son correctos; falta comprobacion visual fisica.
 
+## USER-DAG-LAUNCHER-PREFERENCE-01 - Implementado en fuente
+
+- Internet Usuario muestra `DAG como app separada` solo cuando DAG esta autorizado y disponible. La preferencia es local y nace activa para no ocultar accesos existentes durante la actualizacion.
+- Al desactivarla se oculta un `activity-alias` exclusivo del launcher con `DONT_KILL_APP`; la actividad interna permanece habilitada y no cambian la licencia, la politica remota, los permisos ni el paquete. La migracion tambien reactiva la actividad interna si una version anterior dejo un override deshabilitado.
+- La logica de visibilidad tiene cobertura unitaria; falta comprobar en un telefono real que cada launcher refleje el cambio sin demoras o cache visual propio.
+
 ## ADMIN-USERS-HUB-UX-02 - Implementado en fuente
 
 - Usuarios Admin usa una superficie blanca continua y filas completas sin menu de tres puntos; `Archivar usuario` sigue disponible con confirmacion dentro del detalle.

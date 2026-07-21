@@ -16,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -75,6 +76,7 @@ internal fun UserWebTab(
                     vpnActive = vpnActive,
                     onOpenDag = onOpenDag,
                     onActivateWebProtection = onActivateWebProtection,
+                    onKeepSeparateDagLauncherChange = viewModel::setKeepSeparateDagLauncher,
                 )
             }
         }
@@ -160,6 +162,7 @@ private fun InternetProtectionList(
     vpnActive: Boolean,
     onOpenDag: () -> Unit,
     onActivateWebProtection: () -> Unit,
+    onKeepSeparateDagLauncherChange: (Boolean) -> Unit,
 ) {
     ProductListSurface {
         InternetProtectionRow(
@@ -197,9 +200,29 @@ private fun InternetProtectionList(
                 },
             active = state.dagEnabled,
             onClick = onOpenDag.takeIf { state.dagEnabled },
-            showDivider = state.schedule != null,
+            showDivider = state.dagEnabled || state.schedule != null,
             navigation = state.dagEnabled,
         )
+        if (state.dagEnabled) {
+            ProductListRow(
+                leading = {
+                    ProductGlyph(
+                        icon = ProductIcon.Search,
+                        color = InternetAccent,
+                        modifier = Modifier.size(24.dp),
+                    )
+                },
+                headline = { Text("DAG como app separada", style = MaterialTheme.typography.titleMedium) },
+                supporting = { Text("Mantener un acceso propio en el inicio del teléfono") },
+                trailing = {
+                    Switch(
+                        checked = state.keepSeparateDagLauncher,
+                        onCheckedChange = onKeepSeparateDagLauncherChange,
+                    )
+                },
+                showDivider = state.schedule != null,
+            )
+        }
         state.schedule?.let { schedule ->
             InternetProtectionRow(
                 icon = ProductIcon.Update,
