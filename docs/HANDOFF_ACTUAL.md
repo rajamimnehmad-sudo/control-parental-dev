@@ -50,11 +50,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-20:
+Version publicada real al 2026-07-21:
 
 ```text
-App Usuario versionCode 267
-App Admin versionCode 267
+App Usuario versionCode 268
+App Admin versionCode 268
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-267-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-267-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-268-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-268-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario d042d80b56182ca2352cdbcabc9b10dfc8fef7b5d858498617c32c6b17d42cdd
-Admin   e03cabef737674e72a0f6602f3e42424ef2789688e3d48ea2f1b41664f4b758d
+Usuario 16912e19e60cee283c453612c57cf81dd1697bc8ca51e6412ee287da3129617c
+Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 ```
+
+## Publicacion DEV 268 - Listas planas y compactas en ambas apps - 2026-07-21
+
+- Se agregaron primitivas compartidas de lista plana en `core-ui`: filas continuas, separadores sutiles, altura compacta y acciones/estados sin tarjetas repetidas. Las tarjetas se conservan para proteccion, licencia, alertas y formularios complejos.
+- App Admin aplica el patron en Usuarios, selector de usuarios de Solicitudes y Avisos. Conserva busqueda, archivo reversible, estado verde/amarillo/rojo, navegacion y acciones existentes.
+- App Usuario aplica el patron en Solicitudes y Avisos. `Mis apps` mantiene el `ListView` nativo reciclable validado por rendimiento y cambia solo su presentacion a filas blancas continuas, con icono, estado y accion compactos.
+- No se agrego ninguna biblioteca. No cambiaron reglas, contratos remotos, backend, datos ni Supabase fuera de la publicacion autorizada en Storage DEV. Production no fue tocado.
+- Validacion local integral: `test`, `ktlintCheck`, Detekt, Android Lint DEV y `assembleDevDebug` de ambas apps correctos, 1.845 tareas. Los APK locales declararon paquetes DEV, version 268 y el certificado historico. No habia telefono ADB conectado, por lo que el recorrido fisico de esta version queda pendiente.
+- PR #10 fusionado en `main` mediante `1124d69`; Android CI `29833738053` completo build, tests, ktlint, Android Lint y Detekt. El workflow manual `Publicar APKs DEV` `29834592446` recompilo, probo y publico conjuntamente ambos APK exclusivamente en Supabase DEV.
+- Verificacion externa posterior: manifiestos publicos en version 268; SHA-256 Usuario `16912e19e60cee283c453612c57cf81dd1697bc8ca51e6412ee287da3129617c` y Admin `dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c`. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, version `268` y `1.0.1-dev`; `apksigner` confirma en ambos el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
 ## Validacion fisica DEV 267 y refactor Admin/Rules - 2026-07-21
 

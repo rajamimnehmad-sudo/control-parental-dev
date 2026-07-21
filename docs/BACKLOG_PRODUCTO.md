@@ -44,12 +44,19 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 267 y App Admin DEV 267, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 268 y App Admin DEV 268, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### ANDROID-FLAT-LISTS-UX-01 - Listas simples, compactas y modernas
+
+- Estado: `Publicado DEV 268; pendiente recorrido fisico`. Aprobado explicitamente el 2026-07-21. Tipo: UX Android compartida. Prioridad: P2. Esfuerzo: M. Riesgo: bajo.
+- Alcance: reemplazar pilas de tarjetas repetidas por filas continuas con separadores sutiles en Usuarios Admin, Solicitudes y Avisos de ambas apps. En Usuario, `Mis apps` conserva el `ListView` nativo reciclable y cambia solamente su presentacion.
+- Decision visual: mantener tarjetas solo cuando expresan una unidad importante, como proteccion, licencia, alertas o formularios complejos. No agregar una biblioteca externa: Compose Material 3 y los componentes nativos actuales cubren el patron.
+- Aceptacion alcanzada: matriz local completa de 1.845 tareas y Android CI correctos; APK Usuario/Admin DEV 268 publicados juntos mediante el workflow manual oficial y verificados por manifiesto, hash, paquete, version y certificado. No habia telefono ADB conectado; no se tocaron backend, datos ni Production.
 
 ### ADMIN-USER-SECTIONS-UX-05 - Detalle compacto y controles persistentes
 
@@ -222,6 +229,7 @@ Flujo de una entrada:
 
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
+| ANDROID-FLAT-LISTS-UX-01 | Publicado DEV 268; pendiente recorrido fisico | P2 | Listas continuas, compactas y modernas en ambas apps | M | Bajo |
 | PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; pendiente episodio real controlado | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
 | PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; UI fisica validada, pendiente ciclo offline real | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
 | HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; Usuario validado fisicamente, pendiente Admin y offline | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
