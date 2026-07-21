@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 268 y App Admin DEV 268, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 269 y App Admin DEV 269, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -60,9 +60,10 @@ Flujo de una entrada:
 
 ### ANDROID-COMPAT-FOUNDATION-01 - Matriz y certificación Android
 
-- Estado: `Implementado y validado localmente; PR borrador pendiente`. Aprobado explícitamente el 2026-07-21. Tipo: compatibilidad Android, pruebas e infraestructura. Prioridad: P0. Esfuerzo: L. Riesgo: medio.
+- Estado: `Base fusionada en PR #11; Test Lab virtual bloqueado por configuracion externa`. Aprobado explícitamente el 2026-07-21. Tipo: compatibilidad Android, pruebas e infraestructura. Prioridad: P0. Esfuerzo: L. Riesgo: medio.
 - Alcance: documentación de niveles/evidencia, matriz representativa API 29-36 y familias OEM de Argentina/Latinoamérica, smoke instrumentado para Usuario/Admin, Gradle Managed Devices y Firebase Test Lab exclusivamente manual y sin ejecución.
-- Restricciones: sin adaptación funcional OEM, sin Supabase/Production, sin dispositivos pagos, sin credenciales/proyectos, sin `versionCode` ni publicación de APK.
+- Restricciones: sin adaptación funcional OEM, sin Supabase/Production, sin dispositivos pagos y sin reutilizar el proyecto Firebase de la app. La base no cambió `versionCode` ni publicó APK.
+- Bloqueo virtual confirmado: faltan las variables `FIREBASE_TEST_PROJECT_ID` y `FIREBASE_TEST_RESULTS_BUCKET`, y los secretos `FIREBASE_TEST_WIF_PROVIDER` y `FIREBASE_TEST_SERVICE_ACCOUNT`; tampoco hay una sesión `gcloud` local autorizada para crearlos. No se creó matriz, no hubo costo ni resultados. Evidencia en `docs/compatibility/results/test-lab-virtual-2026-07-21/`.
 - Pendientes independientes: `ANDROID-COMPAT-SAMSUNG-PHYSICAL-02`, `ANDROID-COMPAT-FTL-PHYSICAL-03`, `ANDROID-COMPAT-XIAOMI-04`, `ANDROID-COMPAT-MOTOROLA-05`, `ANDROID-COMPAT-HONOR-06`, `ANDROID-COMPAT-OPPO-REALME-07`, `ANDROID-COMPAT-TRANSSION-08`, `ANDROID-COMPAT-TCL-09`, `ANDROID-COMPAT-BATTERY-10`, `ANDROID-COMPAT-UPGRADE-11`, `ANDROID-COMPAT-OFFLINE-12` y `ANDROID-COMPAT-UNINSTALL-ALERT-13`.
 - Aceptación: builds DEV de ambas apps, unitarios relacionados, compilación de androidTest, ktlint, Android Lint, detekt, sintaxis de scripts/workflow y `git diff --check`; el smoke virtual/físico solo cambia de estado cuando exista evidencia real.
 
@@ -106,19 +107,19 @@ Flujo de una entrada:
 
 ### USER-APPS-REFRESH-FEEDBACK-01 - Refresco sin vaciar el inventario
 
-- Estado: `Fusionado en main; preparado para DEV 269`; pendiente publicacion y recorrido fisico. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `Publicado DEV 269; pendiente recorrido fisico`. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Evidencia: en DEV 267, al tocar actualizar en Mis apps el inventario paso de 161 a 163 aplicaciones, pero durante la carga la lista quedo transitoriamente vacia sin una indicacion de progreso clara.
 - Aceptacion propuesta: conservar el inventario anterior mientras se refresca o mostrar un estado de carga inequívoco; bloquear doble tap; reemplazar la lista solo al completar; conservar datos y mensaje anterior si el refresco falla.
 - Causa confirmada: el ViewModel ya conserva el inventario y bloquea refrescos simultaneos; la ambiguedad provenia del primer escaneo, cuando la lista aun vacia se mostraba sin progreso ni un texto de carga correcto.
-- Implementacion candidata: indicador lineal durante el escaneo y mensaje explicito mientras el inventario inicial esta vacio; sin cambiar PackageManager, datos ni contratos remotos.
+- Implementacion publicada: indicador lineal durante el escaneo y mensaje explicito mientras el inventario inicial esta vacio; sin cambiar PackageManager, datos ni contratos remotos.
 
 ### ADMIN-WEB-ADD-SITE-UX-01 - Formulario Web plano y compacto
 
-- Estado: `Fusionado en main; preparado para DEV 269`; pendiente publicacion y recorrido visual. Tipo: UX Admin. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `Publicado DEV 269; pendiente recorrido visual`. Tipo: UX Admin. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Evidencia: el pedido del usuario fue dejar Web sin foto ni tarjeta. DEV 267 elimino correctamente la foto y la tarjeta exterior promocional, pero el formulario `Agregar sitio` sigue dentro de una tarjeta grande y visualmente pesada.
 - Aceptacion propuesta: presentar dominio, minutos DNS opcionales y accion como formulario plano, compacto y claramente separado por espaciado; conservar textos, validaciones y comportamiento Web sin tocar contratos remotos.
 - Causa confirmada: el peso visual provenia exclusivamente del `ProductCard` que envolvia `DomainRuleEditor`; los campos, validaciones y acciones ya eran correctos.
-- Implementacion candidata: formulario plano con espaciado compacto y separadores sutiles; sin cambios funcionales ni remotos.
+- Implementacion publicada: formulario plano con espaciado compacto y separadores sutiles; sin cambios funcionales ni remotos.
 
 ### ANDROID-BRAND-ICONS-01 - Iconos oficiales diferenciados
 
@@ -247,8 +248,8 @@ Flujo de una entrada:
 | HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; Usuario validado fisicamente, pendiente Admin y offline | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
-| USER-APPS-REFRESH-FEEDBACK-01 | Fusionado; preparado para DEV 269 | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
-| ADMIN-WEB-ADD-SITE-UX-01 | Fusionado; preparado para DEV 269 | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
+| USER-APPS-REFRESH-FEEDBACK-01 | Publicado DEV 269; pendiente recorrido fisico | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
+| ADMIN-WEB-ADD-SITE-UX-01 | Publicado DEV 269; pendiente recorrido visual | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
 | BARRIER-A11Y-RACE-01 | Validado candidato DEV 241 en SM-A235M; pendiente repetir en SM-S908E | P0 | Bypass rapido permite apagar Accessibility aunque Ajustes protegidos se cierre | M | Critico |
