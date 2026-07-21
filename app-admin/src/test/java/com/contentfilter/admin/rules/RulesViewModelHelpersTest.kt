@@ -1,5 +1,6 @@
 package com.contentfilter.admin.rules
 
+import com.contentfilter.admin.DeviceOfflineWarningWindowMillis
 import com.contentfilter.core.domain.model.ComponentState
 import com.contentfilter.core.domain.model.DailyLimit
 import com.contentfilter.core.domain.model.Device
@@ -653,9 +654,9 @@ class RulesViewModelHelpersTest {
     }
 
     @Test
-    fun `healthy device becomes offline only after 24 hours`() {
-        val recent = healthyDevice(System.currentTimeMillis() - OfflineDeviceWindowMillis + 60_000L)
-        val offline = healthyDevice(System.currentTimeMillis() - OfflineDeviceWindowMillis - 60_000L)
+    fun `healthy device becomes offline only after one hundred hours`() {
+        val recent = healthyDevice(System.currentTimeMillis() - DeviceOfflineWarningWindowMillis + 60_000L)
+        val offline = healthyDevice(System.currentTimeMillis() - DeviceOfflineWarningWindowMillis - 60_000L)
 
         assertEquals(UserDeviceStatus.Active, listOf(recent).toUserDevices(emptyList()).single().status)
         assertEquals(UserDeviceStatus.Inactive, listOf(offline).toUserDevices(emptyList()).single().status)
@@ -665,7 +666,9 @@ class RulesViewModelHelpersTest {
     fun `stale device with uninstall protection disabled gets maximum alert`() {
         val device =
             healthyDevice(
-                System.currentTimeMillis() - OfflineDeviceWindowMillis - 60_000L,
+                System.currentTimeMillis() -
+                    DeviceProtectionAlert.PossibleUninstallWindowMillis -
+                    60_000L,
             ).copy(deviceAdminState = ComponentState.Disabled)
 
         val user = listOf(device).toUserDevices(emptyList()).single()

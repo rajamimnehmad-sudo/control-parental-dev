@@ -295,7 +295,9 @@ Flujo de una entrada:
 | USER-DAG-LAUNCHER-PREFERENCE-01 | Aprobado; pendiente implementacion | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
-| DEVICE-CONNECTIVITY-ALERTS-01 | Backend y Android publicados DEV 264; Superweb en fuente; sin bateria | P1 | Alerta tras 24 horas sin comunicacion para Admin y Superweb | M | Medio |
+| DEVICE-CONNECTIVITY-ALERTS-01 | Backend DEV actualizado a 100 horas; Android publicado conserva 269 hasta proxima publicacion | P1 | Alerta ordinaria tras 100 horas sin comunicacion para Admin y Superweb | M | Medio |
+| DEV-OFFLINE-ALERT-100H-01 | Aplicado y verificado exclusivamente en Supabase DEV | P1 | Alinear la alerta remota ordinaria al margen de 100 horas sin cambiar posible desinstalacion | S | Medio |
+| ADMIN-DEVICE-OFFLINE-100H-01 | Candidato Android sin publicar; unitarios, ktlint y build correctos | P1 | Unificar en 100 horas el aviso de falta de comunicacion de App Admin sin demorar componentes caidos | S | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Validado visualmente en SM-A235M DEV 248; pendiente evento real | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
@@ -1102,11 +1104,27 @@ Flujo de una entrada:
   - no se recopilan consultas, URLs, mensajes ni contenido para calcular la salud.
 - Decisiones pendientes para la entrevista del ticket: componentes obligatorios por modelo de telefono; autoridad y visibilidad Admin/Super Admin; textos y colores; antiguedad maxima del heartbeat; comportamiento durante onboarding offline; orden de reparacion; ventanas de mantenimiento; recordatorios, escalamiento y criterio exacto para los tres estados agregados.
 
+### ADMIN-DEVICE-OFFLINE-100H-01 - Aviso Admin despues de 100 horas
+
+- Estado: `Candidato Android sin publicar; unitarios, ktlint y build correctos`; aprobado explicitamente por el usuario el 2026-07-21. Tipo: correccion operativa y UX de App Admin. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Causa raiz: Home usaba 15 minutos para enviar un Usuario sano a `Pendientes de verificacion`, mientras la ficha usaba 24 horas para declararlo sin comunicacion. Android puede diferir WorkManager con la pantalla apagada aunque exista red, de modo que ambos criterios confundian demora de heartbeat con una degradacion confirmada.
+- Solucion candidata: compartir un plazo de 100 horas en Home y ficha. Hasta entonces se conserva el ultimo estado sano; al vencer se informa falta de comunicacion sin afirmar que la proteccion fue desactivada.
+- Limites de seguridad: `Disabled` alerta inmediatamente; `Unknown` o un dispositivo nunca verificado sigue pendiente inmediatamente; `possible_uninstall` conserva su regla especial de Device Admin desactivado y mas de 30 minutos sin comunicacion.
+- Aceptacion automatizada: unitarios completos, ktlint y build DEV de App Admin correctos; pruebas antes y despues de 100 horas en Dashboard y Rules y regresion de posible desinstalacion cubiertas. Pendiente publicar una futura version Admin autorizada y validar el comportamiento real durante reposo prolongado.
+
+### DEV-OFFLINE-ALERT-100H-01 - Umbral remoto de 100 horas
+
+- Estado: `Aplicado y verificado exclusivamente en Supabase DEV`; aprobado explicitamente por el usuario el 2026-07-21. Tipo: backend de alertas operativas. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Causa raiz: el generador remoto conservaba 24 horas, un plazo demasiado corto frente a retrasos posibles del heartbeat durante reposo Android y distinto del nuevo criterio solicitado para App Admin.
+- Resultado DEV: migracion `20260721194835_device_offline_alert_100_hours.sql`; futuros eventos ordinarios `device_offline` requieren 100 horas y el cron horario, la deduplicacion por episodio y los permisos restringidos permanecen iguales.
+- Seguridad y datos: no se llamo al generador para fabricar alertas, no se borraron eventos historicos y `possible_uninstall` conserva 30 minutos con Device Admin desactivado. Asesores DEV de seguridad y rendimiento sin errores; Production no fue tocado.
+- Pendiente: integrar la migracion en `main` y publicar el candidato Android complementario solo con autorizacion. El margen efectivo remoto es de 100 a 101 horas por la cadencia horaria del cron.
+
 ### DEVICE-CONNECTIVITY-ALERTS-01 - Dispositivo sin comunicacion
 
-- Estado: `Backend y Android publicados DEV 264; Superweb implementado en fuente; pendiente prueba integral`; aprobado explicitamente el 2026-07-20. Bateria queda fuera por decision expresa del usuario. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
+- Estado: `Backend DEV actualizado a 100 horas; Android publicado conserva DEV 269 hasta proxima publicacion; pendiente prueba integral`; aprobado explicitamente el 2026-07-20 y ajustado a 100 horas por decision del 2026-07-21. Bateria queda fuera por decision expresa del usuario. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
 - Problema: un telefono apagado, sin red o con el proceso detenido puede dejar de reportar sin que el administrador sepa que perdio comunicacion.
-- Solucion implementada: despues de 24 horas sin heartbeat, crear como maximo una alerta por episodio para las bandejas existentes de App Admin y Superweb. Muestra el ultimo contacto y nunca afirma que la proteccion fue desactivada.
+- Solucion implementada: despues de 100 horas sin heartbeat, crear como maximo una alerta por episodio para las bandejas existentes de App Admin y Superweb. Muestra el ultimo contacto y nunca afirma que la proteccion fue desactivada.
 - Evidencia: idea 10 seleccionada explicitamente por el usuario el 2026-07-19 luego de revisar las mejores funciones no invasivas de FamilyTime. Content Filter ya transmite heartbeat y alertas de componentes; se propone aprovechar esa evidencia sin agregar vigilancia de contenido.
 - Esfuerzo: M estimado. Riesgo: medio; umbrales agresivos, Doze, falta de red, telefono apagado o retrasos de sincronizacion pueden producir ruido y falsas alarmas.
 - Dependencias: heartbeat y watchdog; bandejas existentes; `ALERT-ROUTING-01`; deduplicacion y estado de dispositivo; zona horaria, Doze y funcionamiento offline.
@@ -1117,7 +1135,7 @@ Flujo de una entrada:
   - la interfaz nunca presenta `proteccion desactivada` cuando la unica evidencia es falta de comunicacion;
   - destinatarios, severidad y canales respetan las reglas de ruteo vigentes;
   - no se transmiten ubicacion, mensajes, historial ni contenido de navegacion.
-- Decisiones aplicadas: 24 horas, destinatarios App Admin y Superweb, sin bateria y sin notificacion push nueva en este corte. Al volver a comunicarse, un episodio futuro puede generar una nueva alerta sin duplicar el anterior.
+- Decisiones aplicadas: 100 horas, destinatarios App Admin y Superweb, sin bateria y sin notificacion push nueva en este corte. Al volver a comunicarse, un episodio futuro puede generar una nueva alerta sin duplicar el anterior.
 
 ### SUPERADMIN-ALERTS-01 - Alertas de manipulacion en Super Admin
 
