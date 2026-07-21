@@ -85,6 +85,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - App Admin usa el mismo `ProductNavGlyph` de App Usuario en la navegacion inferior; DAG conserva su icono propio alineado al catalogo.
 - No se agregaron dependencias. La publicacion DEV 270 y la comprobacion visual fisica siguen pendientes del cierre agrupado.
 
+## UI-SYSTEM-BAR-CONTINUITY-01 - Implementado en fuente
+
+- Usuario y Admin activan edge-to-edge y sincronizan la barra de estado con la pantalla actual: Inicio prolonga el encabezado azul oscuro con iconos claros; las superficies claras usan fondo blanco e iconos oscuros.
+- DAG mantiene su ajuste independiente claro/oscuro. No se modificaron matrices, workflows ni infraestructura de compatibilidad.
+- Compilacion, unitarios y ktlint DEV de ambas apps son correctos. La comprobacion visual de recortes y variantes OEM queda pendiente para un telefono o laboratorio real.
+
 ## ADMIN-USERS-HUB-UX-02 - Implementado en fuente
 
 - Usuarios Admin usa una superficie blanca continua y filas completas sin menu de tres puntos; `Archivar usuario` sigue disponible con confirmacion dentro del detalle.
