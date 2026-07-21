@@ -289,7 +289,7 @@ Flujo de una entrada:
 | ADMIN-USERS-HUB-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
 | ADMIN-USER-SECURITY-BADGES-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
 | ADMIN-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
-| USER-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
+| USER-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
 | ADMIN-WEB-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
 | USER-INTERNET-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
 | USER-DAG-LAUNCHER-PREFERENCE-01 | Aprobado; pendiente implementacion | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
@@ -489,10 +489,11 @@ Flujo de una entrada:
 
 ### USER-SECONDARY-LISTS-UX-02 - Solicitudes y Mis apps estables
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: UX y rendimiento App Usuario. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: UX y rendimiento App Usuario. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Solicitudes: icono circular de actualizar y estado persistente en la misma linea; no aparece un banner separado ni queda espacio vacio.
 - Mis apps: titulo, Buscar, Actualizar, estado y filtros permanecen fijos; los filtros bajan a una segunda linea y solo se desplaza el inventario. La lista empieza debajo de controles y termina antes del nav inferior, sin superposicion ni corte abrupto.
 - Rendimiento: conservar la lista nativa reciclable. Refrescar mantiene posicion; cambiar busqueda o filtro vuelve arriba; claves/orden estables evitan saltos.
+- Resultado en fuente: Solicitudes y Mis apps integran progreso, error y tiempo relativo junto al refresco; Mis apps fija busqueda/actualizacion en la primera linea y filtros compactos en la segunda. La lista nativa solo vuelve arriba cuando cambia busqueda o filtro, no durante un refresco del inventario.
 - Aceptacion: superficie blanca continua, ultima fila visible, carga inicial/refresco/error correctos y ninguna alteracion de reglas, medicion o bloqueo.
 
 ### ADMIN-WEB-SETTINGS-UX-02 - Web y Ajustes Admin

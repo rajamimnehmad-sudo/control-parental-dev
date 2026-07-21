@@ -6,7 +6,6 @@ import android.util.Base64
 import android.util.LruCache
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -20,17 +19,12 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -38,6 +32,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -48,8 +43,9 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
@@ -57,13 +53,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.contentfilter.core.ui.FeedbackBanner
-import com.contentfilter.core.ui.ProductAppBackground
-import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductPageHeader
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.StatusChip
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 
 @Composable
@@ -129,7 +125,7 @@ private fun MyAppsScreen(
         modifier =
             modifier
                 .fillMaxSize()
-                .background(ProductAppBackground)
+                .background(Color.White)
                 .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -139,9 +135,6 @@ private fun MyAppsScreen(
             subtitle = "${state.apps.size} apps · permisos y tiempo disponible",
             onBack = onBack,
         )
-        if (state.message.isNotBlank()) {
-            FeedbackBanner(state.message, isError = state.message.startsWith("No se pudo"))
-        }
         AppsToolbar(
             apps = ungroupedApps,
             groups = state.appGroups,
@@ -149,6 +142,8 @@ private fun MyAppsScreen(
             searchQuery = state.searchQuery,
             searchExpanded = searchExpanded,
             refreshing = state.isRefreshing,
+            message = state.message,
+            lastRefreshedAtEpochMillis = state.lastRefreshedAtEpochMillis,
             onSelected = { quickFilter = it },
             onSearchExpandedChanged = { expanded ->
                 searchExpanded = expanded
@@ -184,6 +179,7 @@ private fun MyAppsScreen(
         } else {
             MyAppsNativeList(
                 apps = visibleApps,
+                scrollResetKey = "${quickFilter.name}:${state.searchQuery.trim()}",
                 onRequestAccess = onRequestAccess,
                 modifier = Modifier.weight(1f),
             )
@@ -209,6 +205,8 @@ private fun AppsToolbar(
     searchQuery: String,
     searchExpanded: Boolean,
     refreshing: Boolean,
+    message: String,
+    lastRefreshedAtEpochMillis: Long?,
     onSelected: (MyAppsQuickFilter) -> Unit,
     onSearchExpandedChanged: (Boolean) -> Unit,
     onSearchChanged: (String) -> Unit,
@@ -222,60 +220,107 @@ private fun AppsToolbar(
             keyboardController?.show()
         }
     }
-    Row(
+    Column(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        if (searchExpanded) {
-            OutlinedTextField(
-                modifier =
-                    Modifier
-                        .weight(1f)
-                        .focusRequester(focusRequester),
-                value = searchQuery,
-                onValueChange = onSearchChanged,
-                label = { Text("Buscar app") },
-                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
-                singleLine = true,
-            )
-        } else {
-            LazyRow(
-                modifier = Modifier.weight(1f),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(MyAppsQuickFilter.entries) { filter ->
-                    AppFilterBanner(
-                        filter = filter,
-                        selected = selected == filter,
-                        count = filter.count(apps, groups),
-                        onClick = { onSelected(filter) },
-                        modifier = Modifier.width(148.dp),
-                    )
-                }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (searchExpanded) {
+                OutlinedTextField(
+                    modifier =
+                        Modifier
+                            .weight(1f)
+                            .focusRequester(focusRequester),
+                    value = searchQuery,
+                    onValueChange = onSearchChanged,
+                    placeholder = { Text("Buscar app") },
+                    leadingIcon = {
+                        ProductGlyph(icon = ProductIcon.Search, color = UserMuted, modifier = Modifier.size(22.dp))
+                    },
+                    singleLine = true,
+                    shape = RoundedCornerShape(18.dp),
+                )
+            } else {
+                Text(
+                    text = myAppsRefreshStatus(message, refreshing, lastRefreshedAtEpochMillis),
+                    modifier = Modifier.weight(1f),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (message.isRefreshError()) MaterialTheme.colorScheme.error else UserMuted,
+                    maxLines = 2,
+                )
+            }
+            ToolbarCircleButton(onClick = onRefreshApps, enabled = !refreshing) {
+                ProductGlyph(
+                    icon = ProductIcon.Refresh,
+                    color = if (refreshing) UserMuted.copy(alpha = 0.45f) else UserMuted,
+                    modifier = Modifier.size(22.dp).semantics { contentDescription = "Actualizar apps" },
+                )
+            }
+            ToolbarCircleButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
+                ProductGlyph(
+                    icon = ProductIcon.Search,
+                    color = UserInk,
+                    modifier = Modifier.size(22.dp).semantics { contentDescription = "Buscar app" },
+                )
             }
         }
-        ToolbarCircleButton(onClick = onRefreshApps, enabled = !refreshing) {
-            Icon(
-                Icons.Filled.Refresh,
-                contentDescription = "Actualizar",
-                tint = if (refreshing) UserMuted.copy(alpha = 0.45f) else UserMuted,
-                modifier =
-                    Modifier
-                        .size(22.dp)
-                        .graphicsLayer { if (refreshing) rotationZ = 20f },
-            )
-        }
-        ToolbarCircleButton(onClick = { onSearchExpandedChanged(!searchExpanded) }) {
-            Icon(
-                Icons.Filled.Search,
-                contentDescription = "Buscar app",
-                tint = UserInk,
-                modifier = Modifier.size(22.dp),
-            )
+        LazyRow(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            items(MyAppsQuickFilter.entries) { filter ->
+                AppFilterBanner(
+                    filter = filter,
+                    selected = selected == filter,
+                    count = filter.count(apps, groups),
+                    onClick = { onSelected(filter) },
+                )
+            }
         }
     }
 }
+
+@Composable
+private fun myAppsRefreshStatus(
+    message: String,
+    refreshing: Boolean,
+    lastRefreshedAtEpochMillis: Long?,
+): String {
+    var nowEpochMillis by remember(lastRefreshedAtEpochMillis) { mutableLongStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(lastRefreshedAtEpochMillis) {
+        if (lastRefreshedAtEpochMillis != null) {
+            while (true) {
+                delay(60_000)
+                nowEpochMillis = System.currentTimeMillis()
+            }
+        }
+    }
+    return myAppsRefreshStatusText(message, refreshing, lastRefreshedAtEpochMillis, nowEpochMillis)
+}
+
+internal fun myAppsRefreshStatusText(
+    message: String,
+    refreshing: Boolean,
+    lastRefreshedAtEpochMillis: Long?,
+    nowEpochMillis: Long,
+): String =
+    when {
+        refreshing -> "Actualizando…"
+        message.isRefreshError() -> message
+        message.startsWith("Solicitud") || message.startsWith("Enviando") -> message
+        lastRefreshedAtEpochMillis != null -> {
+            val minutes = ((nowEpochMillis - lastRefreshedAtEpochMillis).coerceAtLeast(0L) / 60_000L)
+            if (minutes == 0L) "Actualizado ahora" else "Actualizado hace $minutes min"
+        }
+        else -> "Listo para actualizar"
+    }
+
+private fun String.isRefreshError(): Boolean =
+    startsWith("No se pudo") || startsWith("No se pudieron") || startsWith("Sin conexión")
 
 @Composable
 private fun ToolbarCircleButton(
@@ -289,7 +334,7 @@ private fun ToolbarCircleButton(
             Modifier
                 .size(48.dp)
                 .clip(CircleShape)
-                .background(Color.White.copy(alpha = if (enabled) 1f else 0.72f))
+                .background(Color(0xFFF3F6F7).copy(alpha = if (enabled) 1f else 0.72f))
                 .clickable(
                     interactionSource = interactionSource,
                     indication = null,
@@ -315,34 +360,24 @@ private fun AppFilterBanner(
     Box(
         modifier =
             modifier
-                .height(54.dp)
+                .height(40.dp)
                 .clip(shape)
-                .background(if (selected) Color(0xFFE9EEF0) else Color.White, shape)
-                .border(1.dp, if (selected) Color(0xFFB7C0C7) else Color(0xFFE1E7EA), shape)
+                .background(if (selected) Color(0xFFD6F4F0) else Color(0xFFF3F6F7), shape)
                 .clickable(interactionSource = interactionSource, indication = null, onClick = onClick),
     ) {
         Row(
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(9.dp)
-                        .clip(CircleShape)
-                        .background(filter.color),
+            Text(
+                filter.label,
+                style = MaterialTheme.typography.labelLarge,
+                color = UserInk,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
-            Column(verticalArrangement = Arrangement.spacedBy(1.dp)) {
-                Text(
-                    filter.label,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = UserInk,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text("$count apps", style = MaterialTheme.typography.labelSmall, color = UserMuted)
-            }
+            Text(count.toString(), style = MaterialTheme.typography.labelSmall, color = UserMuted)
         }
     }
 }
@@ -372,60 +407,55 @@ private val MyAppsQuickFilter.label: String
             MyAppsQuickFilter.InGroup -> "Apps en grupo"
         }
 
-private val MyAppsQuickFilter.color: Color
-    get() =
-        when (this) {
-            MyAppsQuickFilter.All -> Color(0xFF64748B)
-            MyAppsQuickFilter.WithTime -> Color(0xFFF9A825)
-            MyAppsQuickFilter.Blocked -> Color(0xFFC62828)
-            MyAppsQuickFilter.InGroup -> Color(0xFF00A6D6)
-        }
-
 @Composable
 private fun MyAppGroupCard(
     group: MyAppGroupUiState,
     apps: List<MyAppItemUiState>,
 ) {
     var expanded by remember(group.id) { mutableStateOf(false) }
-    ProductCard(onClick = { expanded = !expanded }) {
-        Column(
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = { expanded = !expanded })
+                .padding(vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(group.name, style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        "${group.appCount} apps · reinicia 12 PM",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                StatusChip("${group.usedMinutes}/${group.limitMinutes}m", MaterialTheme.colorScheme.primary)
+            Column(modifier = Modifier.weight(1f)) {
+                Text(group.name, style = MaterialTheme.typography.titleSmall)
+                Text(
+                    "${group.appCount} apps · reinicia 12 PM",
+                    style = MaterialTheme.typography.bodySmall,
+                )
             }
-            GroupIconStack(apps = apps, totalCount = group.appCount)
-            LinearProgressIndicator(
-                progress = { group.progress },
-                modifier = Modifier.fillMaxWidth(),
-            )
-            Text(group.label, style = MaterialTheme.typography.bodySmall)
-            if (expanded) {
-                if (apps.isEmpty()) {
-                    Text(
-                        text = "No se detectaron apps instaladas para este grupo.",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                } else {
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        apps.forEach { app ->
-                            GroupAppRow(app)
-                        }
+            StatusChip("${group.usedMinutes}/${group.limitMinutes}m", MaterialTheme.colorScheme.primary)
+        }
+        GroupIconStack(apps = apps, totalCount = group.appCount)
+        LinearProgressIndicator(
+            progress = { group.progress },
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Text(group.label, style = MaterialTheme.typography.bodySmall)
+        if (expanded) {
+            if (apps.isEmpty()) {
+                Text(
+                    text = "No se detectaron apps instaladas para este grupo.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    apps.forEach { app ->
+                        GroupAppRow(app)
                     }
                 }
             }
         }
+        HorizontalDivider(modifier = Modifier.padding(start = 44.dp))
     }
 }
 

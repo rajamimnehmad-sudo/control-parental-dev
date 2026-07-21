@@ -25,4 +25,30 @@ class MyAppsScreenStateTest {
             myAppsEmptyStateMessage(appsEmpty = true, refreshing = false),
         )
     }
+
+    @Test
+    fun `refresh status remains visible with relative time`() {
+        assertEquals(
+            "Actualizado hace 3 min",
+            myAppsRefreshStatusText(
+                message = "Apps actualizadas.",
+                refreshing = false,
+                lastRefreshedAtEpochMillis = 1_000_000L,
+                nowEpochMillis = 1_180_000L,
+            ),
+        )
+    }
+
+    @Test
+    fun `refresh error remains visible`() {
+        assertEquals(
+            "No se pudieron actualizar apps.",
+            myAppsRefreshStatusText(
+                message = "No se pudieron actualizar apps.",
+                refreshing = false,
+                lastRefreshedAtEpochMillis = 1_000_000L,
+                nowEpochMillis = 1_060_000L,
+            ),
+        )
+    }
 }

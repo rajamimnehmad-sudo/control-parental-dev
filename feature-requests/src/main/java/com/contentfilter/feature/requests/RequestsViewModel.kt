@@ -164,7 +164,8 @@ class RequestsViewModel
                     mutableState.update {
                         it.copy(
                             isRefreshing = false,
-                            lastRefreshedAtEpochMillis = System.currentTimeMillis(),
+                            lastRefreshedAtEpochMillis =
+                                if (success) System.currentTimeMillis() else it.lastRefreshedAtEpochMillis,
                             message =
                                 if (success) {
                                     "Solicitudes actualizadas."
@@ -178,7 +179,7 @@ class RequestsViewModel
                     mutableState.update {
                         it.copy(
                             isRefreshing = false,
-                            lastRefreshedAtEpochMillis = System.currentTimeMillis(),
+                            lastRefreshedAtEpochMillis = it.lastRefreshedAtEpochMillis,
                             message = "Sin conexión. Mostrando el historial guardado.",
                         )
                     }

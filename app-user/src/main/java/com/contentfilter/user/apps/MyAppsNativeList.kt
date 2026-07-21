@@ -27,6 +27,7 @@ import java.util.concurrent.Executors
 @Composable
 internal fun MyAppsNativeList(
     apps: List<MyAppItemUiState>,
+    scrollResetKey: String,
     onRequestAccess: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -41,11 +42,16 @@ internal fun MyAppsNativeList(
                 dividerHeight = 0
                 isVerticalScrollBarEnabled = true
                 overScrollMode = View.OVER_SCROLL_IF_CONTENT_SCROLLS
+                tag = scrollResetKey
                 adapter = MyAppsListAdapter(context)
             }
         },
         update = { listView ->
             (listView.adapter as MyAppsListAdapter).submit(apps, onRequestAccess)
+            if (listView.tag != scrollResetKey) {
+                listView.tag = scrollResetKey
+                listView.setSelection(0)
+            }
         },
     )
 }

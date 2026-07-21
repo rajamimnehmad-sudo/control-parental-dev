@@ -6,6 +6,7 @@ data class MyAppsUiState(
     val searchQuery: String = "",
     val message: String = "",
     val isRefreshing: Boolean = false,
+    val lastRefreshedAtEpochMillis: Long? = null,
 )
 
 data class MyAppGroupUiState(

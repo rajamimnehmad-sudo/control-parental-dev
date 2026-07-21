@@ -103,6 +103,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - Avisos usa superficie blanca continua. Apps y las filas internas de grupos eliminan tarjetas y fondos repetidos, pero preservan switches, limites, horarios, formularios y acciones.
 - Sitios, horarios y actualizaciones se completan en los tickets especificos de Web/Ajustes; `Agregar sitio` queda expresamente sin cambios. La publicacion DEV 270 y el recorrido fisico siguen pendientes.
 
+## USER-SECONDARY-LISTS-UX-02 - Implementado en fuente
+
+- Solicitudes Usuario usa una lista blanca continua y ubica el refresco circular junto a un estado persistente de progreso, error o tiempo relativo, sin banner separado.
+- Mis apps fija titulo y controles, baja los filtros compactos a una segunda linea y deja solo el inventario como contenido desplazable.
+- La lista nativa reciclable conserva la posicion al refrescar y vuelve arriba solamente cuando cambia filtro o busqueda. Reglas, medicion y bloqueo no cambian. La publicacion DEV 270 y el recorrido fisico siguen pendientes.
+
 ## Publicacion DEV 269 - Refresco claro y formulario Web compacto - 2026-07-21
 
 - App Usuario muestra progreso y un mensaje correcto durante el primer escaneo de `Mis apps`; conserva el inventario visible durante refrescos posteriores y no declara un resultado vacio antes de finalizar.
