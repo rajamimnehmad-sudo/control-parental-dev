@@ -288,7 +288,7 @@ Flujo de una entrada:
 | UI-MOTION-SMOOTH-01 | Aprobado; pendiente implementacion | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
 | ADMIN-USERS-HUB-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
 | ADMIN-USER-SECURITY-BADGES-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
-| ADMIN-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
+| ADMIN-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
 | USER-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
 | ADMIN-WEB-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
 | USER-INTERNET-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
@@ -481,9 +481,10 @@ Flujo de una entrada:
 
 ### ADMIN-SECONDARY-LISTS-UX-02 - Listas Admin continuas
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: sistema de listas App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: sistema de listas App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: Solicitudes, Avisos, apps, sitios, grupos, horarios y actualizaciones adoptan superficie blanca continua, separadores sutiles, icono, titulo, subtitulo opcional y flecha solo si navega. Switch/boton se conserva para accion directa.
 - Limites: proteccion, licencia, alertas criticas, formularios y tarjetas principales de Home permanecen como estan. No cambia logica, datos ni sincronizacion.
+- Resultado en fuente de esta seccion: Solicitudes integra el refresco circular y su estado persistente en la barra, con selector de usuarios continuo; Avisos usa fondo blanco continuo; apps y filas internas de grupos pierden tarjetas/bloques repetidos y conservan switch, reloj, formularios y acciones directas. Sitios, horarios y actualizaciones se resuelven en los tickets especificos de Web/Ajustes sin tocar `Agregar sitio`.
 - Aceptacion: encabezados/controles fijos donde corresponda, listas sin bloques repetidos, estados de carga/vacio/error coherentes y objetivos tactiles accesibles.
 
 ### USER-SECONDARY-LISTS-UX-02 - Solicitudes y Mis apps estables

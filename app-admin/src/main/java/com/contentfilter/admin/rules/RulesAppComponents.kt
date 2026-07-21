@@ -14,12 +14,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -65,11 +63,8 @@ internal fun AppControlCard(
         app.extraTimeRemainingMinutes?.let { "Tiempo extra: restan $it min" }
             ?: app.dailyLimitMinutes?.let { "Límite: $it min/día" }
             ?: "Sin límite"
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
+    Column(
+        modifier = Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface),
     ) {
         Column(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -155,6 +150,10 @@ internal fun AppControlCard(
                 }
             }
         }
+        HorizontalDivider(
+            modifier = Modifier.padding(start = 58.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
+        )
     }
     if (showLimitDialog) {
         AlertDialog(

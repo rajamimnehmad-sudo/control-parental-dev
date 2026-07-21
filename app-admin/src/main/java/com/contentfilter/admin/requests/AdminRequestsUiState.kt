@@ -11,6 +11,7 @@ data class AdminRequestsUiState(
     val message: String = "",
     val lastSyncMessage: String = "",
     val isLoading: Boolean = false,
+    val lastRefreshedAtEpochMillis: Long? = null,
     val pendingActionIds: Set<String> = emptySet(),
 )
 

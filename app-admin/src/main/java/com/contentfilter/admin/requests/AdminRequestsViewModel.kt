@@ -47,21 +47,26 @@ class AdminRequestsViewModel
     ) : ViewModel() {
         private val syncMessage = MutableStateFlow("")
         private val isLoading = MutableStateFlow(false)
+        private val lastRefreshedAtEpochMillis = MutableStateFlow<Long?>(null)
         private val selectedDeviceId = MutableStateFlow<String?>(null)
         private val pendingActionIds = MutableStateFlow<Set<String>>(emptySet())
         private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
+        private val refreshState =
+            combine(syncMessage, isLoading, lastRefreshedAtEpochMillis) { message, loading, refreshedAt ->
+                RequestsRefreshState(message = message, loading = loading, lastRefreshedAtEpochMillis = refreshedAt)
+            }
         private val localState =
             combine(
                 installedApps,
-                syncMessage,
-                isLoading,
+                refreshState,
                 selectedDeviceId,
                 pendingActionIds,
-            ) { apps, message, loading, selected, pendingActions ->
+            ) { apps, refresh, selected, pendingActions ->
                 RequestsLocalState(
                     apps = apps,
-                    message = message,
-                    loading = loading,
+                    message = refresh.message,
+                    loading = refresh.loading,
+                    lastRefreshedAtEpochMillis = refresh.lastRefreshedAtEpochMillis,
                     selectedDeviceId = selected,
                     pendingActionIds = pendingActions,
                 )
@@ -104,6 +109,7 @@ class AdminRequestsViewModel
                     offlineMode = false,
                     lastSyncMessage = local.message,
                     isLoading = local.loading,
+                    lastRefreshedAtEpochMillis = local.lastRefreshedAtEpochMillis,
                     pendingActionIds = local.pendingActionIds,
                 )
             }
@@ -220,18 +226,17 @@ class AdminRequestsViewModel
         }
 
         private fun syncNow() {
+            if (isLoading.value) return
+            isLoading.value = true
             viewModelScope.launch(Dispatchers.IO) {
-                isLoading.update { true }
                 runCatching {
-                    updateSyncMessage(syncNowBlocking())
+                    val success = syncNowBlocking()
+                    updateSyncMessage(success)
+                    if (success) lastRefreshedAtEpochMillis.value = System.currentTimeMillis()
                 }.onFailure { exception ->
                     Log.e(LogTag, "Immediate admin requests sync failed: ${exception.message}", exception)
                     syncMessage.update {
-                        if (exception.message == OfflineMessage) {
-                            OfflineMessage
-                        } else {
-                            "Sync solicitudes falló: ${exception.message.orEmpty()}"
-                        }
+                        "No se pudo actualizar. ${exception.message.orEmpty()}".trim()
                     }
                 }.also {
                     isLoading.update { false }
@@ -265,7 +270,7 @@ class AdminRequestsViewModel
                 if (success) {
                     "Solicitudes sincronizadas."
                 } else {
-                    "Cambio guardado localmente. Se sincronizará cuando haya conexión."
+                    "No se pudo actualizar. Los cambios locales se sincronizarán cuando haya conexión."
                 }
             }
         }
@@ -273,7 +278,6 @@ class AdminRequestsViewModel
         private companion object {
             const val DefaultGrantMinutes = 15
             const val LogTag = "AdminRequests"
-            const val OfflineMessage = "Sin conexión. Mostrando datos guardados."
             const val UnknownDeviceId = "unknown-device"
         }
 
@@ -281,8 +285,15 @@ class AdminRequestsViewModel
             val apps: List<RemoteInstalledAppDto>,
             val message: String,
             val loading: Boolean,
+            val lastRefreshedAtEpochMillis: Long?,
             val selectedDeviceId: String?,
             val pendingActionIds: Set<String>,
+        )
+
+        private data class RequestsRefreshState(
+            val message: String,
+            val loading: Boolean,
+            val lastRefreshedAtEpochMillis: Long?,
         )
     }
 
