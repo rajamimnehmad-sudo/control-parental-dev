@@ -35,6 +35,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
 @Composable
@@ -99,6 +100,7 @@ fun ProductLazyVisualPage(
     modifier: Modifier = Modifier,
     onBack: (() -> Unit)? = null,
     banner: (@Composable () -> Unit)? = null,
+    itemSpacing: Dp = 18.dp,
     content: LazyListScope.() -> Unit,
 ) {
     if (onBack != null || banner != null) {
@@ -123,7 +125,7 @@ fun ProductLazyVisualPage(
             LazyColumn(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(start = 18.dp, top = 18.dp, end = 18.dp, bottom = 18.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
+                verticalArrangement = Arrangement.spacedBy(itemSpacing),
                 content = content,
             )
         }
@@ -136,7 +138,7 @@ fun ProductLazyVisualPage(
                 .background(ProductAppBackground)
                 .statusBarsPadding(),
         contentPadding = PaddingValues(horizontal = 18.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(18.dp),
+        verticalArrangement = Arrangement.spacedBy(itemSpacing),
     ) {
         item(key = "product-page-header") {
             ProductPageHeader(title = title, subtitle = subtitle, onBack = onBack)

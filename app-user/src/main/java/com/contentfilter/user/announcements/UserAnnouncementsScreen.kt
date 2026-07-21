@@ -1,9 +1,12 @@
 package com.contentfilter.user.announcements
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -31,8 +34,8 @@ import com.contentfilter.core.network.remote.RemoteAnnouncement
 import com.contentfilter.core.network.remote.RemoteAnnouncementRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.ui.PremiumFeedbackBanner
-import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductLazyVisualPage
+import com.contentfilter.core.ui.ProductListRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -57,6 +60,7 @@ fun UserAnnouncementsRoute(
         title = "Avisos",
         subtitle = "Mensajes de tu comunidad",
         onBack = onBack,
+        itemSpacing = 0.dp,
         banner =
             if (state.message.isNotBlank()) {
                 {
@@ -111,22 +115,40 @@ private fun AnnouncementSwipeRow(
             }
         },
     ) {
-        ProductCard {
-            Text(
-                text = item.title,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = if (item.isRead) FontWeight.SemiBold else FontWeight.Bold,
-            )
-            Text(
-                text = item.body,
-                style = MaterialTheme.typography.bodyMedium,
-                fontWeight = if (item.isRead) FontWeight.Normal else FontWeight.Medium,
-            )
-            Text(
-                DateFormat.getDateTimeInstance().format(Date.from(item.createdAt)),
-                style = MaterialTheme.typography.bodySmall,
-            )
-        }
+        ProductListRow(
+            leading = {
+                Box(
+                    modifier =
+                        Modifier
+                            .size(9.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(
+                                if (item.isRead) Color.Transparent else MaterialTheme.colorScheme.primary,
+                            ),
+                )
+            },
+            headline = {
+                Text(
+                    text = item.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = if (item.isRead) FontWeight.Medium else FontWeight.Bold,
+                )
+            },
+            supporting = {
+                Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                    Text(
+                        text = item.body,
+                        style = MaterialTheme.typography.bodyMedium,
+                        fontWeight = if (item.isRead) FontWeight.Normal else FontWeight.Medium,
+                    )
+                    Text(
+                        DateFormat.getDateTimeInstance().format(Date.from(item.createdAt)),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            },
+        )
     }
 }
 

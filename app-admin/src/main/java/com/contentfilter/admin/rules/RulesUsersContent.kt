@@ -46,6 +46,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.ui.ActionButtonTone
+import com.contentfilter.core.ui.ProductListRow
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
@@ -118,7 +119,7 @@ internal fun UsersListContent(
         }
         LazyColumn(
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+            verticalArrangement = Arrangement.spacedBy(0.dp),
             contentPadding =
                 androidx.compose.foundation.layout.PaddingValues(
                     start = 16.dp,
@@ -392,69 +393,62 @@ private fun ProtectedUserCard(
             healthy -> ActiveGreen
             else -> PendingYellow
         }
-    Card(
+    ProductListRow(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
-        shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
-    ) {
-        Row(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 11.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            UserAvatar(name = device.name, color = statusColor)
-            Column(
-                modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(3.dp),
-            ) {
-                Text(device.name, style = MaterialTheme.typography.titleMedium, color = HeaderInk)
-                Text(
-                    text = device.listSummary(healthy),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = if (device.possibleUninstall) CriticalRed else HeaderMuted,
-                    maxLines = 2,
-                )
-            }
-            Box(modifier = Modifier.size(10.dp).background(statusColor, CircleShape))
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = HeaderMuted,
+        leading = { UserAvatar(name = device.name, color = statusColor) },
+        headline = {
+            Text(device.name, style = MaterialTheme.typography.titleMedium, color = HeaderInk)
+        },
+        supporting = {
+            Text(
+                text = device.listSummary(healthy),
+                style = MaterialTheme.typography.bodySmall,
+                color = if (device.possibleUninstall) CriticalRed else HeaderMuted,
+                maxLines = 2,
             )
-            if (showActions) {
-                Box {
-                    IconButton(
-                        onClick = { actionsExpanded = true },
-                        enabled = !deleting,
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.MoreVert,
-                            contentDescription = "Acciones",
-                            tint = HeaderMuted,
-                        )
-                    }
-                    DropdownMenu(
-                        expanded = actionsExpanded,
-                        onDismissRequest = { actionsExpanded = false },
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text(if (deleting) "Archivando..." else "Archivar") },
+        },
+        trailing = {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(modifier = Modifier.size(10.dp).background(statusColor, CircleShape))
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                    contentDescription = null,
+                    tint = HeaderMuted,
+                )
+                if (showActions) {
+                    Box {
+                        IconButton(
+                            onClick = { actionsExpanded = true },
                             enabled = !deleting,
-                            onClick = {
-                                actionsExpanded = false
-                                confirmDelete = true
-                            },
-                        )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.MoreVert,
+                                contentDescription = "Acciones",
+                                tint = HeaderMuted,
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = actionsExpanded,
+                            onDismissRequest = { actionsExpanded = false },
+                        ) {
+                            DropdownMenuItem(
+                                text = { Text(if (deleting) "Archivando..." else "Archivar") },
+                                enabled = !deleting,
+                                onClick = {
+                                    actionsExpanded = false
+                                    confirmDelete = true
+                                },
+                            )
+                        }
                     }
                 }
             }
-        }
-    }
+        },
+    )
     if (confirmDelete) {
         AlertDialog(
             onDismissRequest = { confirmDelete = false },
