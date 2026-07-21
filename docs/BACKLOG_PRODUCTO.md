@@ -106,9 +106,11 @@ Flujo de una entrada:
 
 ### USER-APPS-REFRESH-FEEDBACK-01 - Refresco sin vaciar el inventario
 
-- Estado: `Idea confirmada en prueba fisica`; no aprobada para codigo. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `En progreso; implementado y validado localmente`; pendiente PR, publicacion DEV y recorrido fisico. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Evidencia: en DEV 267, al tocar actualizar en Mis apps el inventario paso de 161 a 163 aplicaciones, pero durante la carga la lista quedo transitoriamente vacia sin una indicacion de progreso clara.
 - Aceptacion propuesta: conservar el inventario anterior mientras se refresca o mostrar un estado de carga inequívoco; bloquear doble tap; reemplazar la lista solo al completar; conservar datos y mensaje anterior si el refresco falla.
+- Causa confirmada: el ViewModel ya conserva el inventario y bloquea refrescos simultaneos; la ambiguedad provenia del primer escaneo, cuando la lista aun vacia se mostraba sin progreso ni un texto de carga correcto.
+- Implementacion candidata: indicador lineal durante el escaneo y mensaje explicito mientras el inventario inicial esta vacio; sin cambiar PackageManager, datos ni contratos remotos.
 
 ### ADMIN-WEB-ADD-SITE-UX-01 - Formulario Web plano y compacto
 
@@ -245,7 +247,7 @@ Flujo de una entrada:
 | HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; Usuario validado fisicamente, pendiente Admin y offline | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
-| USER-APPS-REFRESH-FEEDBACK-01 | Idea confirmada en prueba fisica | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
+| USER-APPS-REFRESH-FEEDBACK-01 | En progreso; implementado y validado localmente | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
 | ADMIN-WEB-ADD-SITE-UX-01 | En progreso; implementado y validado localmente | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
