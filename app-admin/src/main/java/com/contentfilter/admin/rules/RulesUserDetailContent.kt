@@ -380,6 +380,7 @@ internal fun UserDetailContent(
                                 RuleCard(
                                     rule = rule,
                                     dailyLimitMinutes = dailyLimit?.limitMinutes,
+                                    flat = true,
                                     onToggle = { onToggle(rule) },
                                     onDelete = { onDelete(rule) },
                                 )
