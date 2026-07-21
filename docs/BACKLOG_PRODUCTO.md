@@ -291,7 +291,7 @@ Flujo de una entrada:
 | ADMIN-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
 | USER-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
 | ADMIN-WEB-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
-| USER-INTERNET-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
+| USER-INTERNET-SETTINGS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
 | USER-DAG-LAUNCHER-PREFERENCE-01 | Aprobado; pendiente implementacion | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
@@ -507,9 +507,10 @@ Flujo de una entrada:
 
 ### USER-INTERNET-SETTINGS-UX-02 - Internet y Ajustes Usuario
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Internet conserva una unica pieza panoramica compacta; debajo usa filas de solo lectura para VPN, SafeSearch, modo de resultados, DAG y horario. No muestra switch cuando el Usuario no tiene autoridad; una degradacion ofrece una sola reparacion clara.
 - Ajustes comparte el lenguaje de grupos y filas de Admin, mostrando solo opciones del rol Usuario. Version queda en Actualizaciones; Ayuda reutiliza su flujo; acciones sensibles aparecen al final.
+- Resultado en fuente: Internet usa una unica pieza panoramica compacta y una lista blanca de VPN, SafeSearch, resultados, DAG y horario; solo VPN degradada ofrece Reparar. Ajustes integra estado, version, activacion y Ayuda como filas continuas, preservando como bloques los formularios y flujos de instalacion complejos.
 - Aceptacion: lenguaje no tecnico, estados reales, superficie blanca continua, navegacion/Volver coherentes y sin cambiar politica remota.
 
 ### USER-DAG-LAUNCHER-PREFERENCE-01 - DAG como app separada opcional

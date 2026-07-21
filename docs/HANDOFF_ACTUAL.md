@@ -97,6 +97,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - La cabecera y el selector Apps/Web/Seguridad de Admin sustituyen resortes y cambios instantaneos por interpolaciones de 220 ms.
 - Con la escala de animador de Android desactivada, las nuevas duraciones pasan a cero. Compilacion, unitarios y ktlint DEV de ambas apps son correctos; la percepcion final queda pendiente de recorrido fisico.
 
+## USER-INTERNET-SETTINGS-UX-02 - Implementado en fuente
+
+- Internet Usuario conserva una sola pieza panoramica, ahora compacta, y expone VPN, SafeSearch, Solo resultados, DAG y horario como filas blancas de lectura simple.
+- Solo una VPN inactiva ofrece la accion directa `Reparar`; DAG navega unicamente cuando la politica remota lo habilita. No se agregan switches de autoridad remota al Usuario.
+- Ajustes usa filas continuas para estado, version, activacion y Ayuda, conservando tarjetas para codigo de emergencia e instalacion por ser flujos complejos. Compilacion, unitarios y ktlint Usuario DEV son correctos; falta comprobacion visual fisica.
+
 ## ADMIN-USERS-HUB-UX-02 - Implementado en fuente
 
 - Usuarios Admin usa una superficie blanca continua y filas completas sin menu de tres puntos; `Archivar usuario` sigue disponible con confirmacion dentro del detalle.

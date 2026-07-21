@@ -1,45 +1,40 @@
 package com.contentfilter.user
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.contentfilter.core.ui.ProductLazyVisualPage
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
+import com.contentfilter.core.ui.ProductListRow
+import com.contentfilter.core.ui.ProductListSurface
+import com.contentfilter.core.ui.ProductPageHeader
 import com.contentfilter.user.internet.UserWebViewModel
 
 @Composable
@@ -51,31 +46,46 @@ internal fun UserWebTab(
     viewModel: UserWebViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    ProductLazyVisualPage(
-        title = "Internet",
-        subtitle = "Tu navegación protegida",
-        onBack = onBack,
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(Color.White)
+                .statusBarsPadding()
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item {
-            UserInternetStatusCard(
-                state = state,
-                vpnActive = vpnActive,
-                onOpenDag = onOpenDag,
-                onActivateWebProtection = onActivateWebProtection,
-            )
+        ProductPageHeader(title = "Internet", subtitle = "Tu navegación protegida", onBack = onBack)
+        LazyColumn(
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            item {
+                UserInternetHero(
+                    state = state,
+                    vpnActive = vpnActive,
+                )
+            }
+            item {
+                Text("Protecciones", style = MaterialTheme.typography.titleSmall, color = InternetMuted)
+            }
+            item {
+                InternetProtectionList(
+                    state = state,
+                    vpnActive = vpnActive,
+                    onOpenDag = onOpenDag,
+                    onActivateWebProtection = onActivateWebProtection,
+                )
+            }
         }
     }
 }
 
 @Composable
-private fun UserInternetStatusCard(
+private fun UserInternetHero(
     state: com.contentfilter.user.internet.UserWebUiState,
     vpnActive: Boolean,
-    onOpenDag: () -> Unit,
-    onActivateWebProtection: () -> Unit,
 ) {
-    var expanded by rememberSaveable { mutableStateOf(false) }
-    val motionDuration = userMotionDurationMillis()
     val scheduleBlocked = state.schedule?.isAllowed == false
     val blocked = state.webNavigationBlocked || scheduleBlocked
     val status =
@@ -94,12 +104,12 @@ private fun UserInternetStatusCard(
         }
     val shape = RoundedCornerShape(26.dp)
     Card(
-        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth(),
         shape = shape,
         colors = CardDefaults.cardColors(containerColor = Color(0xFF10243A)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
     ) {
-        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 238.dp).clip(shape)) {
+        Box(modifier = Modifier.fillMaxWidth().heightIn(min = 154.dp).clip(shape)) {
             Image(
                 painter = painterResource(R.drawable.user_internet_status_background),
                 contentDescription = null,
@@ -121,8 +131,8 @@ private fun UserInternetStatusCard(
                         ),
             )
             Column(
-                modifier = Modifier.fillMaxWidth().padding(20.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.fillMaxWidth().padding(18.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Text(
                     text = status.label,
@@ -139,83 +149,100 @@ private fun UserInternetStatusCard(
                     style = MaterialTheme.typography.labelLarge,
                     color = status.accent,
                 )
-                Text(
-                    text = if (expanded) "Ocultar detalle  ⌃" else "Ver detalle  ⌄",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = Color.White.copy(alpha = 0.78f),
-                )
-                AnimatedVisibility(
-                    visible = expanded,
-                    enter = expandVertically(animationSpec = tween(motionDuration)) + fadeIn(tween(motionDuration)),
-                    exit = shrinkVertically(animationSpec = tween(motionDuration)) + fadeOut(tween(motionDuration)),
-                ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
-                        InternetProtectionLine(
-                            "VPN",
-                            if (vpnActive) "Activa" else "Inactiva",
-                            vpnActive,
-                        )
-                        InternetProtectionLine(
-                            "SafeSearch",
-                            if (state.safeSearchEnabled) "Activo" else "Inactivo",
-                            state.safeSearchEnabled,
-                        )
-                        InternetProtectionLine(
-                            "Solo resultados",
-                            if (state.onlyResultsEnabled) "Activo" else "Navegación autorizada",
-                            true,
-                        )
-                        InternetProtectionLine(
-                            "Buscador DAG",
-                            when {
-                                state.dagEnabled -> "Activo"
-                                !state.dagEntitled -> "No incluido en la licencia"
-                                else -> "Cerrado por el administrador"
-                            },
-                            state.dagEnabled,
-                        )
-                        state.schedule?.let { schedule ->
-                            InternetProtectionLine("Horario", schedule.summary, schedule.isAllowed)
-                        }
-                        Text(
-                            text = "Configurado por tu administrador",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = Color.White.copy(alpha = 0.66f),
-                        )
-                    }
-                }
-                if (!vpnActive) {
-                    Button(onClick = onActivateWebProtection) {
-                        Text("Reparar protección")
-                    }
-                } else if (state.dagEnabled) {
-                    Button(onClick = onOpenDag) {
-                        Text("Abrir DAG")
-                    }
-                }
             }
         }
     }
 }
 
 @Composable
-private fun InternetProtectionLine(
+private fun InternetProtectionList(
+    state: com.contentfilter.user.internet.UserWebUiState,
+    vpnActive: Boolean,
+    onOpenDag: () -> Unit,
+    onActivateWebProtection: () -> Unit,
+) {
+    ProductListSurface {
+        InternetProtectionRow(
+            icon = ProductIcon.ShieldCheck,
+            label = "VPN",
+            value = if (vpnActive) "Activa" else "Inactiva",
+            active = vpnActive,
+            trailing =
+                if (vpnActive) {
+                    null
+                } else {
+                    { TextButton(onClick = onActivateWebProtection) { Text("Reparar") } }
+                },
+        )
+        InternetProtectionRow(
+            icon = ProductIcon.Search,
+            label = "SafeSearch",
+            value = if (state.safeSearchEnabled) "Activo" else "Inactivo",
+            active = state.safeSearchEnabled,
+        )
+        InternetProtectionRow(
+            icon = ProductIcon.Web,
+            label = "Solo resultados",
+            value = if (state.onlyResultsEnabled) "Activo" else "Navegación autorizada",
+            active = true,
+        )
+        InternetProtectionRow(
+            icon = ProductIcon.Search,
+            label = "Buscador DAG",
+            value =
+                when {
+                    state.dagEnabled -> "Activo"
+                    !state.dagEntitled -> "No incluido en la licencia"
+                    else -> "Cerrado por el administrador"
+                },
+            active = state.dagEnabled,
+            onClick = onOpenDag.takeIf { state.dagEnabled },
+            showDivider = state.schedule != null,
+            navigation = state.dagEnabled,
+        )
+        state.schedule?.let { schedule ->
+            InternetProtectionRow(
+                icon = ProductIcon.Update,
+                label = "Horario",
+                value = schedule.summary,
+                active = schedule.isAllowed,
+                showDivider = false,
+            )
+        }
+    }
+}
+
+@Composable
+private fun InternetProtectionRow(
+    icon: ProductIcon,
     label: String,
     value: String,
     active: Boolean,
+    onClick: (() -> Unit)? = null,
+    trailing: (@Composable () -> Unit)? = null,
+    navigation: Boolean = false,
+    showDivider: Boolean = true,
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(label, style = MaterialTheme.typography.bodyMedium, color = Color.White.copy(alpha = 0.82f))
-        Text(
-            text = value,
-            style = MaterialTheme.typography.labelMedium,
-            color = if (active) Color(0xFF8EF0C0) else Color(0xFFFFD27A),
-        )
-    }
+    ProductListRow(
+        leading = { ProductGlyph(icon = icon, color = InternetAccent, modifier = Modifier.size(24.dp)) },
+        headline = { Text(label, style = MaterialTheme.typography.titleMedium) },
+        supporting = {
+            Text(
+                text = value,
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (active) InternetActive else InternetWarning,
+            )
+        },
+        trailing =
+            trailing
+                ?: if (navigation) {
+                    { ProductGlyph(icon = ProductIcon.ChevronRight, color = InternetMuted, modifier = Modifier.size(22.dp)) }
+                } else {
+                    null
+                },
+        onClick = onClick,
+        showDivider = showDivider,
+    )
 }
 
 private val com.contentfilter.user.internet.UserWebUiState.compactProtectionSummary: String
@@ -235,3 +262,8 @@ private enum class InternetVisualStatus(
     Review("Internet por revisar", Color(0xFF443316), Color(0xFFFFD27A)),
     Blocked("Internet bloqueado", Color(0xFF321B25), Color(0xFFFFB0B7)),
 }
+
+private val InternetAccent = Color(0xFF008D93)
+private val InternetActive = Color(0xFF18794E)
+private val InternetWarning = Color(0xFF9A6700)
+private val InternetMuted = Color(0xFF68758A)
