@@ -58,6 +58,8 @@ App Admin versionCode 269
 versionName 1.0.1-dev
 ```
 
+DEV 270 esta preparado como candidato de publicacion con `versionCode 270` en ambas apps y notas de version separadas. Su publicacion DEV queda condicionada al CI y fusion del cierre; la comprobacion visual fisica sigue pendiente porque no hay un dispositivo conectado.
+
 Manifiestos:
 
 ```text

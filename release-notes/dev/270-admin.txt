@@ -1,0 +1,3 @@
+Usuarios, Solicitudes, Web y Ajustes ahora usan listas más limpias y estados de actualización persistentes.
+Las alertas visuales destacan solo problemas reales y la falta de comunicación ordinaria se avisa después de 100 horas.
+Las transiciones, iconos y zona superior de las pantallas son más coherentes y suaves.
