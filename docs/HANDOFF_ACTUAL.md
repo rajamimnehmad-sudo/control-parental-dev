@@ -96,6 +96,13 @@ Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 - Alcance limitado a App Admin y documentacion. Sin cambios de datos, backend, Supabase, `versionCode` ni publicacion.
 - Pendiente: CI del PR, publicacion DEV autorizada y recorrido visual en telefono real.
 
+## Candidato SUPERWEB-VERSION-01 - 2026-07-21
+
+- Causa raiz: el despliegue ya exponia su commit en `/api/health`, pero Login y el layout autenticado no consumian una fuente compartida ni mostraban esa referencia.
+- Cambio candidato: una utilidad unica resuelve el commit inyectado por Vercel/Cloudflare y genera una etiqueta compacta visible en Login y dentro de Superweb; `/api/health` usa la misma fuente.
+- La interfaz expone solo el commit corto o `local`; no muestra project ref, variables, claves ni sesion.
+- Validacion local: typecheck, ESLint, build de produccion Next y empaquetado OpenNext correctos. Pendiente: CI y comprobacion visual/funcional del preview de PR; no se publico Production.
+
 ## Validacion fisica DEV 267 y refactor Admin/Rules - 2026-07-21
 
 - Samsung SM-A235M `R58T34V31AE`: App Usuario publica DEV 267 instalada in-place sobre DEV 266 mediante el APK publico y SHA-256 verificado. Se conservaron `firstInstallTime` (`2026-07-13 12:53:48`) y `ceDataInode` (`1239519`); App Admin ya estaba en DEV 267. No se borraron datos.

@@ -255,7 +255,7 @@ Flujo de una entrada:
 | USAGE-REAL-01 | Validado fisicamente y publicado en DEV 241 | P1 | Uso real de app foreground y estabilidad de listas | L | Alto |
 | REQUESTS-UX-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Historial, estados y refresco manual claro de solicitudes | M | Medio |
 | SUPERWEB-DEPLOY-SYNC-01 | Resuelto; GitHub conectado, Production automatizada y health verificado | P0 | Publicar en la URL oficial todas las funciones Super Admin ya implementadas | M | Alto |
-| SUPERWEB-VERSION-01 | Idea | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
+| SUPERWEB-VERSION-01 | En progreso; implementado y validado localmente | P2 | Mostrar en la interfaz la version o build actualmente publicada de Superweb | S | Bajo |
 | UI-BANNER-UNIFY-01 | Publicado y validado visualmente en SM-A235M DEV 246 | P2 | Unificar feedback de Usuario/Admin con el banner premium sin recortar textos largos | S | Bajo |
 | UI-BANNER-DYNAMIC-02 | Publicado DEV 263; pendiente prueba física | P1 | Línea de estado sutil con duración adaptada a textos largos y error contextual | M | Medio |
 | ANNOUNCEMENTS-INBOX-UX-02 | Publicado DEV 263; pendiente prueba física | P2 | Avisos leídos/no leídos, contador real y ocultado por dispositivo con deshacer | M | Medio |
@@ -359,13 +359,14 @@ Flujo de una entrada:
 
 ### SUPERWEB-VERSION-01 - Version publicada visible
 
-- Estado: `Idea`; no aprobado para codigo. Tipo: UX operativa, soporte y trazabilidad de despliegue. Prioridad: P2.
+- Estado: `En progreso; implementado y validado localmente`; pendiente PR y comprobacion del preview/despliegue. Tipo: UX operativa, soporte y trazabilidad de despliegue. Prioridad: P2.
 - Problema: Superweb expone internamente el commit y entorno mediante `/api/health`, pero la interfaz no permite que el propietario identifique facilmente qué version o build esta usando.
 - Solucion propuesta: mostrar una referencia breve y visible de la version publicada, por ejemplo `Superweb DEV · build 6b12a60`, obtenida del mismo dato verificable del despliegue. Puede acompañarse con fecha de publicacion o estado actualizado, sin mostrar project ref, variables, claves ni informacion de sesion.
 - Evidencia: pedido explicito del usuario del 2026-07-18.
 - Esfuerzo: S estimado. Riesgo: bajo; una version calculada desde una fuente distinta de `/api/health` podria quedar desactualizada o confundir código fuente con despliegue real.
 - Dependencias: `SUPERWEB-DEPLOY-SYNC-01`; `/api/health`; commit inyectado por Vercel; layout autenticado y Login; diseño mobile-first.
 - Duplicados y relacion: complementa la comprobacion automatizada de despliegue, pero no la duplica: este ticket hace visible el dato para el usuario.
+- Implementacion candidata: una unica fuente de build alimenta tanto `/api/health` como la etiqueta compacta de Login y del layout autenticado; muestra solo los siete primeros caracteres del commit o `local`, sin project ref, variables ni datos de sesion.
 - Criterios de aceptacion propuestos:
   - la interfaz muestra la build realmente servida por Vercel y coincide con `/api/health`;
   - el dato es legible en celular y escritorio sin ocupar espacio principal;
