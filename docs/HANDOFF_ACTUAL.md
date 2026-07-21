@@ -103,6 +103,13 @@ Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 - La interfaz expone solo el commit corto o `local`; no muestra project ref, variables, claves ni sesion.
 - Validacion local: typecheck, ESLint, build de produccion Next y empaquetado OpenNext correctos. Pendiente: CI y comprobacion visual/funcional del preview de PR; no se publico Production.
 
+## Candidato USER-APPS-REFRESH-FEEDBACK-01 - 2026-07-21
+
+- Causa raiz: el inventario anterior ya se conserva y el doble tap ya esta bloqueado; faltaba feedback inequívoco durante el primer escaneo, cuando todavia no existe inventario visible.
+- Cambio candidato: `Mis apps` muestra progreso lineal mientras escanea y un mensaje de busqueda en vez de declarar que no hay apps antes de terminar.
+- Alcance limitado a App Usuario y pruebas unitarias de sus estados vacio/cargando. Sin cambios de datos, backend, Supabase, `versionCode` ni publicacion.
+- Pendiente: CI del PR, publicacion DEV autorizada y recorrido fisico en telefono real.
+
 ## Validacion fisica DEV 267 y refactor Admin/Rules - 2026-07-21
 
 - Samsung SM-A235M `R58T34V31AE`: App Usuario publica DEV 267 instalada in-place sobre DEV 266 mediante el APK publico y SHA-256 verificado. Se conservaron `firstInstallTime` (`2026-07-13 12:53:48`) y `ceDataInode` (`1239519`); App Admin ya estaba en DEV 267. No se borraron datos.

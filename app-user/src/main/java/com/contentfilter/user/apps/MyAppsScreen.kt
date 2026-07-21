@@ -157,8 +157,12 @@ private fun MyAppsScreen(
             onSearchChanged = onSearchChanged,
             onRefreshApps = onRefreshApps,
         )
-        if (state.apps.isEmpty()) {
-            Text("No hay apps detectadas todavía.")
+        if (state.isRefreshing) {
+            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+        }
+        val emptyStateMessage = myAppsEmptyStateMessage(state.apps.isEmpty(), state.isRefreshing)
+        if (emptyStateMessage != null) {
+            Text(emptyStateMessage)
         } else if (quickFilter == MyAppsQuickFilter.InGroup) {
             LazyColumn(
                 modifier = Modifier.weight(1f),
@@ -186,6 +190,16 @@ private fun MyAppsScreen(
         }
     }
 }
+
+internal fun myAppsEmptyStateMessage(
+    appsEmpty: Boolean,
+    refreshing: Boolean,
+): String? =
+    when {
+        !appsEmpty -> null
+        refreshing -> "Buscando aplicaciones instaladas…"
+        else -> "No hay apps detectadas todavía."
+    }
 
 @Composable
 private fun AppsToolbar(
