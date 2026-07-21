@@ -435,6 +435,10 @@ internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDevi
                 device?.vpnState == ComponentState.Enabled &&
                     device.accessibilityState == ComponentState.Enabled &&
                     device.deviceAdminState == ComponentState.Enabled
+            val protectionStates = listOf(device?.vpnState, device?.accessibilityState, device?.deviceAdminState)
+            val confirmedProtectionFailure = protectionStates.any { it == ComponentState.Disabled }
+            val protectionVerificationPending =
+                protectionStates.any { it == null || it == ComponentState.Unknown || it == ComponentState.Warning }
             val possibleUninstall =
                 device?.let {
                     DeviceProtectionAlert.isPossibleUninstall(
@@ -471,6 +475,8 @@ internal fun List<Device>.toUserDevices(apps: List<InstalledApp>): List<UserDevi
                     },
                 possibleUninstall = possibleUninstall,
                 protectionComplete = protectionComplete,
+                confirmedProtectionFailure = confirmedProtectionFailure,
+                protectionVerificationPending = protectionVerificationPending,
                 vpnState = device?.vpnState.displayName(),
                 accessibilityState = device?.accessibilityState.displayName(),
                 deviceAdminState = device?.deviceAdminState.displayName(),

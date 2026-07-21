@@ -376,6 +376,7 @@ private fun ProtectedUserCard(
     onClick: () -> Unit,
 ) {
     val healthy = device.status == UserDeviceStatus.Active && device.protectionComplete
+    val attentionLevel = device.securityAttentionLevel()
     ProductListRow(
         modifier = Modifier.fillMaxWidth(),
         onClick = onClick,
@@ -387,13 +388,38 @@ private fun ProtectedUserCard(
             Text(
                 text = device.listSummary(healthy),
                 style = MaterialTheme.typography.bodySmall,
-                color = if (device.possibleUninstall) CriticalRed else HeaderMuted,
+                color = if (attentionLevel == SecurityAttentionLevel.Critical) CriticalRed else HeaderMuted,
                 maxLines = 2,
             )
         },
         trailing = {
-            ProductGlyph(icon = ProductIcon.ChevronRight, color = HeaderMuted, modifier = Modifier.size(22.dp))
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                SecurityAttentionGlyph(level = attentionLevel)
+                ProductGlyph(icon = ProductIcon.ChevronRight, color = HeaderMuted, modifier = Modifier.size(22.dp))
+            }
         },
+    )
+}
+
+@Composable
+internal fun SecurityAttentionGlyph(
+    level: SecurityAttentionLevel,
+    modifier: Modifier = Modifier,
+) {
+    if (level == SecurityAttentionLevel.None) return
+    val description =
+        when (level) {
+            SecurityAttentionLevel.Critical -> "Error de seguridad"
+            SecurityAttentionLevel.Warning -> "Seguridad pendiente de verificar"
+            SecurityAttentionLevel.None -> return
+        }
+    ProductGlyph(
+        icon = ProductIcon.ShieldAlert,
+        color = level.color,
+        modifier = modifier.size(18.dp).semantics { contentDescription = description },
     )
 }
 
@@ -515,12 +541,27 @@ private val UserDeviceStatus.label: String
             UserDeviceStatus.Unknown -> "Pendiente"
         }
 
-internal fun UserDeviceUiState.detailHealthColor(): Color =
+internal enum class SecurityAttentionLevel {
+    None,
+    Warning,
+    Critical,
+}
+
+internal fun UserDeviceUiState.securityAttentionLevel(): SecurityAttentionLevel =
     when {
-        possibleUninstall -> CriticalRed
-        status == UserDeviceStatus.Active && protectionComplete -> ActiveGreen
-        else -> PendingYellow
+        possibleUninstall || confirmedProtectionFailure -> SecurityAttentionLevel.Critical
+        protectionVerificationPending || status == UserDeviceStatus.Inactive || status == UserDeviceStatus.Unknown ->
+            SecurityAttentionLevel.Warning
+        else -> SecurityAttentionLevel.None
     }
+
+internal val SecurityAttentionLevel.color: Color
+    get() =
+        when (this) {
+            SecurityAttentionLevel.Critical -> CriticalRed
+            SecurityAttentionLevel.Warning -> PendingYellow
+            SecurityAttentionLevel.None -> Color.Transparent
+        }
 
 internal fun UserDeviceUiState.detailAttentionSummary(): String =
     protectionAlert

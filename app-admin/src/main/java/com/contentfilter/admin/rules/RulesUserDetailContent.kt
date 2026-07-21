@@ -49,6 +49,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.PolicyRule
@@ -442,6 +444,7 @@ private fun UserDetailHeader(
     onCompactPanelClick: () -> Unit,
     onBack: () -> Unit,
 ) {
+    val attentionLevel = device.securityAttentionLevel()
     val headerGap = lerpDp(14.dp, 10.dp, collapseProgress)
     val iconSize = lerpDp(44.dp, 40.dp, collapseProgress)
     val titleGap = lerpDp(4.dp, 2.dp, collapseProgress)
@@ -491,16 +494,13 @@ private fun UserDetailHeader(
                     ) {
                         CompactPanelChip(
                             panel = selectedPanel,
-                            critical = device.possibleUninstall && selectedPanel == DevicePanel.Protection,
+                            attentionLevel =
+                                attentionLevel.takeIf { selectedPanel == DevicePanel.Protection }
+                                    ?: SecurityAttentionLevel.None,
                             onClick = onCompactPanelClick,
                         )
                     }
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(10.dp)
-                                .background(device.detailHealthColor(), CircleShape),
-                    )
+                    SecurityAttentionGlyph(level = attentionLevel)
                 }
                 AnimatedVisibility(
                     visible = !compactMode,
@@ -539,7 +539,7 @@ private fun UserDetailHeader(
 @Composable
 private fun CompactPanelChip(
     panel: DevicePanel,
-    critical: Boolean,
+    attentionLevel: SecurityAttentionLevel,
     onClick: () -> Unit,
 ) {
     val label =
@@ -548,13 +548,12 @@ private fun CompactPanelChip(
             DevicePanel.Web -> "Web"
             DevicePanel.Protection -> "Seguridad"
         }
-    val color = if (critical) CriticalRed else HeaderInk
     val shape = RoundedCornerShape(16.dp)
     Row(
         modifier =
             Modifier
                 .clip(shape)
-                .background(color, shape)
+                .background(HeaderInk, shape)
                 .clickable(onClick = onClick)
                 .padding(start = 11.dp, top = 7.dp, end = 7.dp, bottom = 7.dp),
         horizontalArrangement = Arrangement.spacedBy(2.dp),
@@ -566,6 +565,15 @@ private fun CompactPanelChip(
             color = Color.White,
             maxLines = 1,
         )
+        if (attentionLevel != SecurityAttentionLevel.None) {
+            Box(
+                modifier =
+                    Modifier
+                        .padding(start = 4.dp)
+                        .size(7.dp)
+                        .background(attentionLevel.color, CircleShape),
+            )
+        }
         Icon(
             imageVector = Icons.Filled.KeyboardArrowDown,
             contentDescription = "Mostrar secciones",
@@ -582,6 +590,7 @@ private fun GlassDetailSectionSelector(
     collapseProgress: Float,
     onPanelSelected: (DevicePanel) -> Unit,
 ) {
+    val attentionLevel = device.securityAttentionLevel()
     val outerRadius = lerpDp(24.dp, 20.dp, collapseProgress)
     val shape = RoundedCornerShape(outerRadius)
     Row(
@@ -611,8 +620,7 @@ private fun GlassDetailSectionSelector(
             modifier = Modifier.weight(1f),
             text = "Seguridad",
             selected = selectedPanel == DevicePanel.Protection,
-            attention = !device.protectionComplete || device.status != UserDeviceStatus.Active,
-            critical = device.possibleUninstall,
+            attentionLevel = attentionLevel,
             onClick = { onPanelSelected(DevicePanel.Protection) },
         )
     }
@@ -624,17 +632,28 @@ private fun DetailSegmentButton(
     text: String,
     selected: Boolean,
     onClick: () -> Unit,
-    attention: Boolean = false,
-    critical: Boolean = false,
+    attentionLevel: SecurityAttentionLevel = SecurityAttentionLevel.None,
 ) {
     val shape = RoundedCornerShape(18.dp)
-    val selectedColor = if (critical) CriticalRed else HeaderInk
+    val attentionDescription =
+        when (attentionLevel) {
+            SecurityAttentionLevel.Critical -> "Error de seguridad"
+            SecurityAttentionLevel.Warning -> "Seguridad pendiente de verificar"
+            SecurityAttentionLevel.None -> null
+        }
     Row(
         modifier =
             modifier
+                .then(
+                    if (attentionDescription == null) {
+                        Modifier
+                    } else {
+                        Modifier.semantics { stateDescription = attentionDescription }
+                    },
+                )
                 .clip(shape)
                 .background(
-                    color = if (selected) selectedColor else Color.White.copy(alpha = 0.42f),
+                    color = if (selected) HeaderInk else Color.White.copy(alpha = 0.42f),
                     shape = shape,
                 ).clickable(onClick = onClick)
                 .padding(horizontal = 12.dp, vertical = 11.dp),
@@ -646,19 +665,14 @@ private fun DetailSegmentButton(
             style = MaterialTheme.typography.labelLarge,
             color = if (selected) Color.White else HeaderInk,
         )
-        if (attention) {
+        if (attentionLevel != SecurityAttentionLevel.None) {
             Box(
                 modifier =
                     Modifier
                         .padding(start = 7.dp)
                         .size(7.dp)
                         .background(
-                            color =
-                                when {
-                                    selected -> Color.White
-                                    critical -> CriticalRed
-                                    else -> PendingYellow
-                                },
+                            color = attentionLevel.color,
                             shape = CircleShape,
                         ),
             )
