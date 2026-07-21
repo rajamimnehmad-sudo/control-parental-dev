@@ -4,13 +4,13 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.List
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.automirrored.rounded.List
+import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.Person
+import androidx.compose.material.icons.rounded.Refresh
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -482,17 +482,17 @@ private fun ProductIcon.materialVector(): ImageVector? =
     when (this) {
         ProductIcon.Back -> Icons.AutoMirrored.Filled.ArrowBack
         ProductIcon.ChevronRight -> Icons.AutoMirrored.Filled.KeyboardArrowRight
-        ProductIcon.Home -> Icons.Filled.Home
-        ProductIcon.People -> Icons.Filled.Person
-        ProductIcon.Settings -> Icons.Filled.Settings
-        ProductIcon.UserPlus -> Icons.Filled.Add
-        ProductIcon.Search -> Icons.Filled.Search
-        ProductIcon.Refresh -> Icons.Filled.Refresh
+        ProductIcon.Home -> Icons.Rounded.Home
+        ProductIcon.People -> Icons.Rounded.Person
+        ProductIcon.Settings -> Icons.Rounded.Settings
+        ProductIcon.UserPlus -> Icons.Rounded.Add
+        ProductIcon.Search -> Icons.Rounded.Search
+        ProductIcon.Refresh -> Icons.Rounded.Refresh
         ProductIcon.Bell -> null
         ProductIcon.ShieldCheck -> null
         ProductIcon.ShieldAlert -> null
-        ProductIcon.Panel -> Icons.Filled.List
-        ProductIcon.Update -> Icons.Filled.Refresh
+        ProductIcon.Panel -> Icons.AutoMirrored.Rounded.List
+        ProductIcon.Update -> Icons.Rounded.Refresh
         ProductIcon.Web -> null
         ProductIcon.Apps -> null
         ProductIcon.Requests -> null

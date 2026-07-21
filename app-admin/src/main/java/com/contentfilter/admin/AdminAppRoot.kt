@@ -8,11 +8,6 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,7 +24,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -49,6 +43,8 @@ import com.contentfilter.admin.updates.AdminUpdatesRoute
 import com.contentfilter.admin.updates.AdminUpdatesStatus
 import com.contentfilter.admin.updates.AdminUpdatesViewModel
 import com.contentfilter.core.domain.help.HelpAction
+import com.contentfilter.core.ui.ProductIcon
+import com.contentfilter.core.ui.ProductNavGlyph
 import kotlinx.coroutines.launch
 
 @Composable
@@ -137,7 +133,7 @@ internal fun AdminAppRoot(
                             tab = item
                             section = null
                         },
-                        icon = { NavGlyph(icon = item.icon, selected = tab == item && section == null) },
+                        icon = { ProductNavGlyph(icon = item.icon, selected = tab == item && section == null) },
                         label = { Text(item.label) },
                     )
                 }
@@ -307,12 +303,12 @@ internal fun AdminAppRoot(
 
 private enum class AdminTab(
     val label: String,
-    val icon: ImageVector,
+    val icon: ProductIcon,
 ) {
-    Home("Home", Icons.Filled.Home),
-    Users("Usuarios", Icons.Filled.Person),
-    Requests("Solicitudes", Icons.AutoMirrored.Filled.List),
-    Account("Cuenta", Icons.Filled.Settings),
+    Home("Home", ProductIcon.Home),
+    Users("Usuarios", ProductIcon.People),
+    Requests("Solicitudes", ProductIcon.Requests),
+    Account("Cuenta", ProductIcon.Settings),
 }
 
 private enum class AdminSection {
