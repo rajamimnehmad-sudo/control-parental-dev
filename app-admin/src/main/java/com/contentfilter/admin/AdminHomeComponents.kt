@@ -123,7 +123,7 @@ private fun AdminHomeHeader(
             Modifier
                 .fillMaxWidth()
                 .background(
-                    brush = Brush.linearGradient(listOf(Color(0xFF172033), Color(0xFF263A5A))),
+                    brush = Brush.linearGradient(listOf(AdminHomeStatusBarColor, Color(0xFF263A5A))),
                     shape = RoundedCornerShape(bottomStart = 22.dp, bottomEnd = 22.dp),
                 )
                 .statusBarsPadding()

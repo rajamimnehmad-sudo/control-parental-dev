@@ -284,7 +284,7 @@ Flujo de una entrada:
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | UI-ICON-SYSTEM-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
-| UI-SYSTEM-BAR-CONTINUITY-01 | Aprobado; pendiente implementacion | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
+| UI-SYSTEM-BAR-CONTINUITY-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
 | UI-MOTION-SMOOTH-01 | Aprobado; pendiente implementacion | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
 | ADMIN-USERS-HUB-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
 | ADMIN-USER-SECURITY-BADGES-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
@@ -452,9 +452,10 @@ Flujo de una entrada:
 
 ### UI-SYSTEM-BAR-CONTINUITY-01 - Barra superior integrada
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: visual, edge-to-edge y compatibilidad Android. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica`. Tipo: visual, edge-to-edge y compatibilidad Android. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
 - Problema: la zona de camara puede quedar blanca y cortar un encabezado turquesa/azul.
 - Solucion: barra de estado y zona de recorte toman el color efectivo que exista debajo en cada pantalla; los iconos del sistema cambian entre claros y oscuros para conservar contraste.
+- Resultado en fuente: ambas apps sincronizan edge-to-edge con el destino activo. Inicio prolonga el encabezado azul oscuro y usa iconos claros; activacion, listas y secciones secundarias usan superficie blanca e iconos oscuros. DAG conserva su control de tema propio.
 - Aceptacion: continuidad sin franjas en Usuario/Admin, navegacion, tema y recreacion; no se promete validacion OEM sin dispositivo real y no se modifica la infraestructura de compatibilidad.
 
 ### UI-MOTION-SMOOTH-01 - Movimiento sin saltos

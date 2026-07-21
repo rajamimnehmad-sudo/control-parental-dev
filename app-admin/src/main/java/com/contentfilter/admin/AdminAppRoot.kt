@@ -70,6 +70,13 @@ internal fun AdminAppRoot(
         }
     val updatesViewModel: AdminUpdatesViewModel = hiltViewModel()
     val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
+    AdminSystemBars(
+        darkHeader =
+            !rootState.loading &&
+                rootState.activated &&
+                tab == AdminTab.Home &&
+                section == null,
+    )
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         updatesViewModel.resumePendingInstallAfterPermission()
     }

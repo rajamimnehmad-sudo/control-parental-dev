@@ -97,6 +97,12 @@ internal fun UserAppRoot(
             pushViewModel.registerIfReady()
         }
     val updateState by updatesViewModel.uiState.collectAsStateWithLifecycle()
+    UserSystemBars(
+        darkHeader =
+            !rootState.checkingActivation &&
+                !rootState.needsActivation &&
+                destination == UserDestination.Home,
+    )
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         updatesViewModel.resumePendingInstallAfterPermission()
     }
