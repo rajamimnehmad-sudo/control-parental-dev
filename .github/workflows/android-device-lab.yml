@@ -1,0 +1,149 @@
+name: Android Device Lab
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: Escriba EJECUTAR_TEST_LAB para aceptar costo y ejecución
+        required: true
+        type: string
+      matrix_kind:
+        description: Matriz a ejecutar
+        required: true
+        default: virtual
+        type: choice
+        options:
+          - virtual
+          - physical
+      allow_physical:
+        description: Confirmación adicional para dispositivos físicos pagos
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: android-device-lab
+  cancel-in-progress: false
+
+jobs:
+  test-lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      FIREBASE_TEST_PROJECT_ID: ${{ vars.FIREBASE_TEST_PROJECT_ID }}
+      FIREBASE_TEST_RESULTS_BUCKET: ${{ vars.FIREBASE_TEST_RESULTS_BUCKET }}
+      FIREBASE_TEST_CONFIRMATION: ${{ inputs.confirmation }}
+      MATRIX_KIND: ${{ inputs.matrix_kind }}
+      ALLOW_PHYSICAL_TESTS: ${{ inputs.allow_physical }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate dedicated configuration
+        shell: bash
+        env:
+          WIF_PROVIDER: ${{ secrets.FIREBASE_TEST_WIF_PROVIDER }}
+          WIF_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_TEST_SERVICE_ACCOUNT }}
+        run: |
+          test "$FIREBASE_TEST_CONFIRMATION" = "EJECUTAR_TEST_LAB" || { echo "Confirmación inválida"; exit 2; }
+          if test "$MATRIX_KIND" = "physical" && test "$ALLOW_PHYSICAL_TESTS" != "true"; then
+            echo "La matriz física exige allow_physical=true"
+            exit 2
+          fi
+          test -n "$FIREBASE_TEST_PROJECT_ID" || { echo "Falta FIREBASE_TEST_PROJECT_ID"; exit 2; }
+          test -n "$FIREBASE_TEST_RESULTS_BUCKET" || { echo "Falta FIREBASE_TEST_RESULTS_BUCKET"; exit 2; }
+          test -n "$WIF_PROVIDER" || { echo "Falta FIREBASE_TEST_WIF_PROVIDER"; exit 2; }
+          test -n "$WIF_SERVICE_ACCOUNT" || { echo "Falta FIREBASE_TEST_SERVICE_ACCOUNT"; exit 2; }
+
+      - name: Authenticate to the dedicated test project
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.FIREBASE_TEST_WIF_PROVIDER }}
+          service_account: ${{ secrets.FIREBASE_TEST_SERVICE_ACCOUNT }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v3
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build compatibility APKs
+        run: >-
+          ./gradlew
+          :app-user:assembleDevCompatibility
+          :app-user:assembleDevCompatibilityAndroidTest
+          :app-admin:assembleDevCompatibility
+          :app-admin:assembleDevCompatibilityAndroidTest
+          -x uploadDevUpdatesToStorage
+          -x prepareDevUpdatesForStorage
+
+      - name: Run App Usuario matrix
+        id: user-matrix
+        continue-on-error: true
+        run: |
+          scripts/android_compatibility/run_firebase_matrix.sh \
+            --kind "$MATRIX_KIND" \
+            --project "$FIREBASE_TEST_PROJECT_ID" \
+            --confirm "$FIREBASE_TEST_CONFIRMATION" \
+            --results-bucket "$FIREBASE_TEST_RESULTS_BUCKET" \
+            --results-dir "${GITHUB_RUN_ID}-user" \
+            --app app-user/build/outputs/apk/dev/compatibility/app-user-dev-compatibility.apk \
+            --test app-user/build/outputs/apk/androidTest/dev/compatibility/app-user-dev-compatibility-androidTest.apk
+
+      - name: Run App Admin matrix
+        id: admin-matrix
+        continue-on-error: true
+        run: |
+          scripts/android_compatibility/run_firebase_matrix.sh \
+            --kind "$MATRIX_KIND" \
+            --project "$FIREBASE_TEST_PROJECT_ID" \
+            --confirm "$FIREBASE_TEST_CONFIRMATION" \
+            --results-bucket "$FIREBASE_TEST_RESULTS_BUCKET" \
+            --results-dir "${GITHUB_RUN_ID}-admin" \
+            --app app-admin/build/outputs/apk/dev/compatibility/app-admin-dev-compatibility.apk \
+            --test app-admin/build/outputs/apk/androidTest/dev/compatibility/app-admin-dev-compatibility-androidTest.apk
+
+      - name: Download detailed results
+        if: always()
+        shell: bash
+        run: |
+          for app in user admin; do
+            uri="gs://${FIREBASE_TEST_RESULTS_BUCKET}/${GITHUB_RUN_ID}-${app}"
+            destination="build/compatibility/downloaded-${app}"
+            if gcloud storage ls "$uri" >/dev/null 2>&1; then
+              scripts/android_compatibility/download_results.sh "$uri" "$destination"
+            else
+              echo "Sin resultados descargables para ${app}"
+            fi
+          done
+
+      - name: Preserve local matrix metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-device-lab-${{ github.run_id }}
+          path: build/compatibility/
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Enforce matrix result
+        if: always()
+        env:
+          USER_OUTCOME: ${{ steps.user-matrix.outcome }}
+          ADMIN_OUTCOME: ${{ steps.admin-matrix.outcome }}
+        run: |
+          test "$USER_OUTCOME" = "success" || exit 1
+          test "$ADMIN_OUTCOME" = "success" || exit 1
