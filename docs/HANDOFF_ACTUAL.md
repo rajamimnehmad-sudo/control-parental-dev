@@ -79,6 +79,12 @@ Usuario 54a85f844c9893dfa7d74a106751400bf22e9cdd53dceb6a8adb6a56616d15cb
 Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 ```
 
+## UI-ICON-SYSTEM-01 - Implementado en fuente
+
+- El catalogo compartido adopta las variantes Rounded y AutoMirrored Rounded incluidas en `material-icons-core` para navegacion y acciones comunes.
+- App Admin usa el mismo `ProductNavGlyph` de App Usuario en la navegacion inferior; DAG conserva su icono propio alineado al catalogo.
+- No se agregaron dependencias. La publicacion DEV 270 y la comprobacion visual fisica siguen pendientes del cierre agrupado.
+
 ## Publicacion DEV 269 - Refresco claro y formulario Web compacto - 2026-07-21
 
 - App Usuario muestra progreso y un mensaje correcto durante el primer escaneo de `Mis apps`; conserva el inventario visible durante refrescos posteriores y no declara un resultado vacio antes de finalizar.

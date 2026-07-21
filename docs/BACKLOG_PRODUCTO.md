@@ -283,7 +283,7 @@ Flujo de una entrada:
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
-| UI-ICON-SYSTEM-01 | Aprobado; pendiente implementacion | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
+| UI-ICON-SYSTEM-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
 | UI-SYSTEM-BAR-CONTINUITY-01 | Aprobado; pendiente implementacion | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
 | UI-MOTION-SMOOTH-01 | Aprobado; pendiente implementacion | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
 | ADMIN-USERS-HUB-UX-02 | Aprobado; pendiente implementacion | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
@@ -444,9 +444,10 @@ Flujo de una entrada:
 
 ### UI-ICON-SYSTEM-01 - Iconos coherentes y modernos
 
-- Estado: `Aprobado; pendiente implementacion`; definido con el usuario el 2026-07-21. Tipo: sistema visual Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`; definido con el usuario el 2026-07-21. Tipo: sistema visual Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Objetivo: unificar iconos de Usuario y Admin con Material Symbols Rounded seleccionados como vectores locales, reutilizando Material Icons Core ya presente y sin incorporar una dependencia pesada.
 - Criterio: contorno redondeado para navegacion y acciones; relleno solo para seleccion o alerta; mismo peso, caja optica y tamaño; DAG conserva identidad propia adaptada al sistema. No se usan emojis, clipart, copias de Mercado Pago ni familias mezcladas.
+- Resultado en fuente: el catalogo compartido usa las variantes Rounded/AutoMirrored Rounded disponibles en `material-icons-core` y la navegacion inferior Admin adopta el mismo `ProductNavGlyph` ya usado por Usuario. No se agregaron dependencias ni se altero el icono propio de DAG.
 - Aceptacion: iconos legibles en claro/oscuro, objetivos tactiles de al menos 44 dp, descripcion accesible cuando comunica una accion o estado y ausencia de aumento innecesario del APK.
 
 ### UI-SYSTEM-BAR-CONTINUITY-01 - Barra superior integrada
