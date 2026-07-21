@@ -13,6 +13,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.webNavigationBlocked
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -276,6 +277,34 @@ class RulesViewModelHelpersTest {
     }
 
     @Test
+    fun `Web completion for previous device clears its state without replacing selected device message`() {
+        val selectedSecond =
+            RulesUiState(
+                selectedDeviceId = DeviceId,
+                allowDomain = "first.example",
+                allowDomainMinutes = "15",
+                message = "Guardando sitio...",
+            ).beginInternetSaving(DeviceId)
+                .copy(
+                    selectedDeviceId = OtherDeviceId,
+                    allowDomain = "second.example",
+                    allowDomainMinutes = "30",
+                    message = "Mensaje de B",
+                )
+
+        val completed =
+            selectedSecond.completeInternetOperation(DeviceId, "Sitio permitido.") {
+                it.copy(allowDomain = "", allowDomainMinutes = "")
+            }
+
+        assertFalse(DeviceId in completed.internetSavingDeviceIds)
+        assertEquals(OtherDeviceId, completed.selectedDeviceId)
+        assertEquals("second.example", completed.allowDomain)
+        assertEquals("30", completed.allowDomainMinutes)
+        assertEquals("Mensaje de B", completed.message)
+    }
+
+    @Test
     fun `operation tracker rejects double tap and ignores stale completion`() {
         val tracker = RulesOperationTracker()
         val key = DeviceOperationKey(DeviceId, "apps-refresh")
@@ -290,6 +319,32 @@ class RulesViewModelHelpersTest {
         assertFalse(tracker.finish(key, second))
         assertTrue(tracker.finish(key, third))
     }
+
+    @Test
+    fun `apps refresh releases tracker and pending device when loader throws`() =
+        runBlocking {
+            val tracker = RulesOperationTracker()
+            val key = DeviceOperationKey(DeviceId, "apps-refresh")
+            val requestId = checkNotNull(tracker.beginIfIdle(key))
+            var pendingDeviceIds = setOf(DeviceId)
+            val loader: suspend () -> InstalledAppsRefreshResult = {
+                error("loader failed")
+            }
+
+            val tracked =
+                tracker.runTrackedOperation(
+                    key = key,
+                    requestId = requestId,
+                    onFinished = { wasCurrent ->
+                        if (wasCurrent) pendingDeviceIds -= DeviceId
+                    },
+                    operation = loader,
+                )
+
+            assertTrue(tracked.result.isFailure)
+            assertTrue(pendingDeviceIds.isEmpty())
+            assertTrue(tracker.beginIfIdle(key) != null)
+        }
 
     @Test
     fun `message token from previous user is invalid after rapid selection change`() {

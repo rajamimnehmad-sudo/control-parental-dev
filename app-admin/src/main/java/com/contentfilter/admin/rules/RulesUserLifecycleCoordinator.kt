@@ -6,6 +6,7 @@ import com.contentfilter.core.domain.repository.InstalledAppRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.network.remote.SupabaseActivationClient
 import com.contentfilter.core.sync.engine.SyncEngine
+import com.contentfilter.core.sync.engine.SyncResult
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -16,13 +17,103 @@ internal data class PairingTokenResult(
     val expiresAt: String,
 )
 
+internal enum class ArchiveLocalRepairStep {
+    Device,
+    InstalledApps,
+    FullSync,
+}
+
+internal sealed interface ArchiveUserResult {
+    data object CompleteSuccess : ArchiveUserResult
+
+    data class RemoteSuccessWithLocalRepairPending(
+        val pendingSteps: Set<ArchiveLocalRepairStep>,
+    ) : ArchiveUserResult
+
+    data class RemoteFailure(
+        val reason: String,
+    ) : ArchiveUserResult
+}
+
+internal class RulesUserArchiveCoordinator private constructor(
+    private val archiveRemote: suspend (String) -> RemoteResult<Unit>,
+    private val deleteDevice: suspend (String) -> Unit,
+    private val deleteInstalledApps: suspend (String) -> Unit,
+    private val syncDevices: suspend () -> SyncResult,
+    private val logResult: (String) -> Unit,
+) {
+    @Inject
+    constructor(
+        activationClient: SupabaseActivationClient,
+        deviceRepository: DeviceRepository,
+        installedAppRepository: InstalledAppRepository,
+        syncEngine: SyncEngine,
+    ) : this(
+        archiveRemote = activationClient::archiveProtectedUser,
+        deleteDevice = deviceRepository::deleteDevice,
+        deleteInstalledApps = installedAppRepository::deleteForDevice,
+        syncDevices = syncEngine::syncDevicesFull,
+        logResult = { Log.i(LogTag, it) },
+    )
+
+    suspend fun archiveUser(deviceId: String): ArchiveUserResult {
+        val remoteResult =
+            try {
+                archiveRemote(deviceId)
+            } catch (error: Throwable) {
+                return ArchiveUserResult.RemoteFailure(error.message ?: "Error remoto inesperado")
+            }
+        return when (remoteResult) {
+            is RemoteResult.Failure -> ArchiveUserResult.RemoteFailure(remoteResult.reason)
+            is RemoteResult.Success -> repairAfterRemoteArchive(deviceId)
+        }
+    }
+
+    private suspend fun repairAfterRemoteArchive(deviceId: String): ArchiveUserResult {
+        val pendingSteps = mutableSetOf<ArchiveLocalRepairStep>()
+        runCatching { deleteDevice(deviceId) }
+            .onFailure { pendingSteps += ArchiveLocalRepairStep.Device }
+        runCatching { deleteInstalledApps(deviceId) }
+            .onFailure { pendingSteps += ArchiveLocalRepairStep.InstalledApps }
+        val syncResult =
+            runCatching { syncDevices() }
+                .onFailure { pendingSteps += ArchiveLocalRepairStep.FullSync }
+                .getOrNull()
+        if (syncResult?.success == false) pendingSteps += ArchiveLocalRepairStep.FullSync
+        logResult(
+            "archiveUser remoteSuccess deviceId=$deviceId syncSuccess=${syncResult?.success} " +
+                "pendingLocalRepair=$pendingSteps message=${syncResult?.message.orEmpty()}",
+        )
+        return if (pendingSteps.isEmpty()) {
+            ArchiveUserResult.CompleteSuccess
+        } else {
+            ArchiveUserResult.RemoteSuccessWithLocalRepairPending(pendingSteps)
+        }
+    }
+
+    internal companion object {
+        fun forTest(
+            archiveRemote: suspend (String) -> RemoteResult<Unit>,
+            deleteDevice: suspend (String) -> Unit,
+            deleteInstalledApps: suspend (String) -> Unit,
+            syncDevices: suspend () -> SyncResult,
+            logResult: (String) -> Unit = {},
+        ): RulesUserArchiveCoordinator =
+            RulesUserArchiveCoordinator(
+                archiveRemote = archiveRemote,
+                deleteDevice = deleteDevice,
+                deleteInstalledApps = deleteInstalledApps,
+                syncDevices = syncDevices,
+                logResult = logResult,
+            )
+    }
+}
+
 internal class RulesUserLifecycleCoordinator
     @Inject
     constructor(
         private val activationClient: SupabaseActivationClient,
-        private val deviceRepository: DeviceRepository,
-        private val installedAppRepository: InstalledAppRepository,
-        private val syncEngine: SyncEngine,
+        private val archiveCoordinator: RulesUserArchiveCoordinator,
     ) {
         suspend fun listArchivedUsers(): Result<List<ArchivedUserUiState>> =
             runCatching {
@@ -71,22 +162,7 @@ internal class RulesUserLifecycleCoordinator
                 }
             }
 
-        suspend fun archiveUser(deviceId: String): Result<Unit> =
-            runCatching {
-                when (val result = activationClient.archiveProtectedUser(deviceId)) {
-                    is RemoteResult.Success -> {
-                        deviceRepository.deleteDevice(deviceId)
-                        installedAppRepository.deleteForDevice(deviceId)
-                        val syncResult = syncEngine.syncDevicesFull()
-                        Log.i(
-                            LogTag,
-                            "archiveUser finished deviceId=$deviceId syncSuccess=${syncResult.success} " +
-                                "message=${syncResult.message}",
-                        )
-                    }
-                    is RemoteResult.Failure -> error(result.reason)
-                }
-            }
+        suspend fun archiveUser(deviceId: String): ArchiveUserResult = archiveCoordinator.archiveUser(deviceId)
     }
 
 internal fun String.withPairingName(userName: String): String {

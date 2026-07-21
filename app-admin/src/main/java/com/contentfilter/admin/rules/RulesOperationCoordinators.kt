@@ -12,6 +12,7 @@ import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.engine.SyncResult
+import kotlinx.coroutines.CancellationException
 import java.time.Instant
 import java.util.UUID
 import javax.inject.Inject
@@ -84,6 +85,38 @@ internal class RulesOperationTracker
             currentRequests.remove(key)
         }
     }
+
+internal data class TrackedOperationResult<T>(
+    val result: Result<T>,
+    val wasCurrent: Boolean,
+)
+
+internal suspend fun <T> RulesOperationTracker.runTrackedOperation(
+    key: DeviceOperationKey,
+    requestId: Long,
+    onFinished: (wasCurrent: Boolean) -> Unit,
+    operation: suspend () -> T,
+): TrackedOperationResult<T> {
+    var result: Result<T>? = null
+    var wasCurrent = false
+    try {
+        result =
+            try {
+                Result.success(operation())
+            } catch (cancellation: CancellationException) {
+                throw cancellation
+            } catch (error: Throwable) {
+                Result.failure(error)
+            }
+    } finally {
+        wasCurrent = finish(key, requestId)
+        onFinished(wasCurrent)
+    }
+    return TrackedOperationResult(
+        result = checkNotNull(result),
+        wasCurrent = wasCurrent,
+    )
+}
 
 internal sealed interface InstalledAppsRefreshResult {
     data object Success : InstalledAppsRefreshResult

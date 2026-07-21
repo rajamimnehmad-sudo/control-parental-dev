@@ -693,8 +693,8 @@ class RulesViewModel
                 )
             }
             viewModelScope.launch(Dispatchers.IO) {
-                userLifecycleCoordinator.archiveUser(deviceId)
-                    .onSuccess {
+                when (userLifecycleCoordinator.archiveUser(deviceId)) {
+                    ArchiveUserResult.CompleteSuccess -> {
                         form.update {
                             it.copy(
                                 selectedDeviceId = it.selectedDeviceId.takeUnless { selected -> selected == deviceId },
@@ -702,7 +702,22 @@ class RulesViewModel
                                 message = if (it.selectedDeviceId == deviceId) "Usuario archivado." else it.message,
                             )
                         }
-                    }.onFailure {
+                    }
+                    is ArchiveUserResult.RemoteSuccessWithLocalRepairPending -> {
+                        form.update {
+                            it.copy(
+                                selectedDeviceId = it.selectedDeviceId.takeUnless { selected -> selected == deviceId },
+                                pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
+                                message =
+                                    if (it.selectedDeviceId == deviceId) {
+                                        "Usuario archivado. La reparación local quedó pendiente."
+                                    } else {
+                                        it.message
+                                    },
+                            )
+                        }
+                    }
+                    is ArchiveUserResult.RemoteFailure -> {
                         form.update {
                             it.copy(
                                 pendingDeviceDeleteIds = it.pendingDeviceDeleteIds - deviceId,
@@ -710,6 +725,7 @@ class RulesViewModel
                             )
                         }
                     }
+                }
             }
         }
 
@@ -754,21 +770,15 @@ class RulesViewModel
                     "internetSave finished requestId=$requestId action=allow-domain-limit deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
                 )
                 form.update {
-                    if (saved.isSuccess) {
-                        it.endInternetSaving(targetDeviceId).copy(
-                            allowDomain = "",
-                            allowDomainMinutes = "",
-                            message =
-                                if (result?.success == false) {
-                                    "Sitio permitido guardado localmente. Se sincronizará cuando haya conexión."
-                                } else {
-                                    "Sitio permitido con límite guardado."
-                                },
-                        )
-                    } else {
-                        it.endInternetSaving(targetDeviceId).copy(
-                            message = "No se pudo guardar el sitio permitido con límite.",
-                        )
+                    val message =
+                        when {
+                            saved.isFailure -> "No se pudo guardar el sitio permitido con límite."
+                            result?.success == false ->
+                                "Sitio permitido guardado localmente. Se sincronizará cuando haya conexión."
+                            else -> "Sitio permitido con límite guardado."
+                        }
+                    it.completeInternetOperation(targetDeviceId, message) { selected ->
+                        selected.copy(allowDomain = "", allowDomainMinutes = "")
                     }
                 }
             }
@@ -1003,8 +1013,9 @@ class RulesViewModel
                         "internetSave finished requestId=$requestId action=toggle-domain-rule deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
                     )
                     form.update {
-                        it.endInternetSaving(targetDeviceId).copy(
-                            message =
+                        it.completeInternetOperation(
+                            deviceId = targetDeviceId,
+                            visibleMessage =
                                 if (saved.isSuccess) {
                                     "Regla actualizada."
                                 } else {
@@ -1051,8 +1062,9 @@ class RulesViewModel
                 )
                 form.update {
                     val completed = if (requestId != null) it.endInternetSaving(targetDeviceId) else it
-                    completed.copy(
-                        message =
+                    completed.withDeviceMessage(
+                        deviceId = targetDeviceId,
+                        visibleMessage =
                             if (!saved.isSuccess) {
                                 "No se pudo eliminar la regla."
                             } else if (associatedLimit != null) {
@@ -1166,8 +1178,9 @@ class RulesViewModel
                     "internetSave finished requestId=$requestId action=delete-domain-limit deviceId=$targetDeviceId result=${saved.isSuccess} syncSuccess=${result?.success} message=${result?.message.orEmpty()}",
                 )
                 form.update {
-                    it.endInternetSaving(targetDeviceId).copy(
-                        message =
+                    it.completeInternetOperation(
+                        deviceId = targetDeviceId,
+                        visibleMessage =
                             if (saved.isSuccess) {
                                 "Límite de dominio eliminado."
                             } else {
@@ -1592,31 +1605,33 @@ class RulesViewModel
                 }
                 form.update {
                     when (scope) {
-                        RuleScope.App -> it.copy(appPackageName = "", message = "App bloqueada.")
+                        RuleScope.App ->
+                            it.withDeviceMessage(targetDeviceId, "App bloqueada.").let { selected ->
+                                if (selected.selectedDeviceId == targetDeviceId) {
+                                    selected.copy(appPackageName = "")
+                                } else {
+                                    selected
+                                }
+                            }
                         RuleScope.Domain ->
                             if (action == RuleAction.Allow) {
-                                if (saved.isSuccess) {
-                                    it.endInternetSaving(targetDeviceId).copy(
-                                        allowDomain = "",
-                                        allowDomainMinutes = "",
-                                        message =
-                                            if (result?.success == false) {
+                                it.completeInternetOperation(
+                                    deviceId = targetDeviceId,
+                                    visibleMessage =
+                                        when {
+                                            saved.isFailure -> "No se pudo guardar el sitio permitido."
+                                            result?.success == false ->
                                                 "Sitio permitido guardado localmente. Se sincronizará cuando haya conexión."
-                                            } else if (allowDomainMinutes != null) {
-                                                "Sitio permitido con límite guardado."
-                                            } else {
-                                                "Sitio permitido."
-                                            },
-                                    )
-                                } else {
-                                    it.endInternetSaving(targetDeviceId).copy(
-                                        message = "No se pudo guardar el sitio permitido.",
-                                    )
+                                            allowDomainMinutes != null -> "Sitio permitido con límite guardado."
+                                            else -> "Sitio permitido."
+                                        },
+                                ) { selected ->
+                                    selected.copy(allowDomain = "", allowDomainMinutes = "")
                                 }
                             } else {
-                                it.copy(message = "Regla guardada.")
+                                it.withDeviceMessage(targetDeviceId, "Regla guardada.")
                             }
-                        else -> it.copy(message = "Regla guardada.")
+                        else -> it.withDeviceMessage(targetDeviceId, "Regla guardada.")
                     }
                 }
             }
@@ -1687,14 +1702,30 @@ class RulesViewModel
             val requestId = operationTracker.beginIfIdle(key) ?: return
             form.update { it.copy(appRefreshDeviceIds = it.appRefreshDeviceIds + deviceId) }
             viewModelScope.launch(Dispatchers.IO) {
-                val cachedCount = installedApps.value.count { it.deviceId == deviceId }
-                val result = installedAppsLoader.refresh(deviceId, forceFull, cachedCount, requestId)
-                if (!operationTracker.finish(key, requestId)) return@launch
+                val tracked =
+                    operationTracker.runTrackedOperation(
+                        key = key,
+                        requestId = requestId,
+                        onFinished = { wasCurrent ->
+                            if (wasCurrent) {
+                                form.update { state ->
+                                    state.copy(appRefreshDeviceIds = state.appRefreshDeviceIds - deviceId)
+                                }
+                            }
+                        },
+                    ) {
+                        val cachedCount = installedApps.value.count { it.deviceId == deviceId }
+                        installedAppsLoader.refresh(deviceId, forceFull, cachedCount, requestId)
+                    }
+                if (!tracked.wasCurrent) return@launch
+                val result =
+                    tracked.result.getOrElse { error ->
+                        InstalledAppsRefreshResult.Failure(error.message ?: "Error inesperado")
+                    }
                 when (result) {
                     InstalledAppsRefreshResult.Success -> {
                         form.update { state ->
                             state.copy(
-                                appRefreshDeviceIds = state.appRefreshDeviceIds - deviceId,
                                 message =
                                     if (state.selectedDeviceId == deviceId) {
                                         state.message.takeUnless {
@@ -1709,7 +1740,6 @@ class RulesViewModel
                     is InstalledAppsRefreshResult.Failure -> {
                         form.update {
                             it.copy(
-                                appRefreshDeviceIds = it.appRefreshDeviceIds - deviceId,
                                 message =
                                     if (it.selectedDeviceId == deviceId) {
                                         "No se pudo cargar la lista de apps: ${result.reason}"
@@ -1906,7 +1936,11 @@ class RulesViewModel
         private fun finishInternetSave(
             deviceId: String,
             requestId: Long,
-        ): Boolean = operationTracker.finish(DeviceOperationKey(deviceId, "internet-save"), requestId)
+        ): Boolean {
+            val finished = operationTracker.finish(DeviceOperationKey(deviceId, "internet-save"), requestId)
+            if (!finished) form.update { it.endInternetSaving(deviceId) }
+            return finished
+        }
 
         private fun recordAdminDiagnostic(
             action: String,
