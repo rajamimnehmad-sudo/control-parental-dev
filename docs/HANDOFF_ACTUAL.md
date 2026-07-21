@@ -99,6 +99,17 @@ Admin   dfd91301392f96cb3300bb41b0c1fd22736c3e3d99f581b5fbeed3331085470c
 - PR #8 fusionado en `main` mediante `906f162`: `RulesViewModel` queda como fachada y coordinador de ciclo de vida con colaboradores por apps/grupos, Web, proteccion y archivo/reenlace; `RulesScreen` conserva ruta y navegacion mientras lista, archivo, detalle y toolbar viven en componentes responsables. Las correcciones finales aislan mensajes Web por dispositivo, liberan siempre el tracker de refresco y distinguen archivo remoto exitoso con reparacion local pendiente.
 - Validacion automatizada del PR #8: `:app-admin:testDevDebugUnitTest`, `:app-admin:assembleDevDebug`, `ktlintCheck`, `:app-admin:lintDevDebug` y `detekt` correctos localmente; Android CI del PR correcto. No cambio `versionCode`, no se publico APK, no se modifico backend y no se toco Supabase ni Production.
 
+## Base de compatibilidad Android - 2026-07-21
+
+- Rango diseñado confirmado: App Usuario y App Admin usan `minSdk 29`, `targetSdk 36` y `compileSdk 36`. Usuario distribuye ARM64/ARM32; ONNX queda excluido en ARM32 y el clasificador compacto permanece disponible. Admin no fija ABI.
+- `docs/compatibility/` separa soporte diseñado, automatizado, verificado en laboratorio, validado físicamente y certificado; define niveles por PR, publicación importante y certificación física/OEM.
+- La evidencia DEV 267 existente se transcribió sin ampliarla: Samsung SM-A235M con Android 13 es una validación física parcial, no una certificación de Samsung ni de Android 13 completo.
+- Se agregaron smoke tests instrumentados de arranque, recreación y captura técnica sin identificadores personales para ambas apps. Una variante exclusiva `compatibility` agrega x86_64 a Usuario para laboratorio sin cambiar el APK DEV.
+- Gradle Managed Devices define una matriz pequeña API 29/32/36 en teléfono pequeño, teléfono normal y tablet. Firebase Test Lab queda preparado mediante catálogo dinámico, scripts y workflow manual con confirmación adicional para físico; no se ejecutaron dispositivos ni se configuraron proyecto, facturación o credenciales.
+- Validación local: unitarios DEV de Usuario/Admin, builds DEV, compilación de ambos APK de instrumentación, ktlint, Android Lint y detekt completaron 1.128 tareas sin fallos; los APK `compatibility` se ensamblaron en una pasada adicional de 448 tareas. Usuario `compatibility` contiene ARM64, ARM32 y x86_64. Bash, Python, JSON, YAML, resolución sintética de catálogo y `git diff --check` se validaron. No se ejecutó instrumentación porque no había emulador provisionado; no se ejecutó Test Lab.
+- No se implementaron perfiles ni excepciones OEM, no cambió comportamiento funcional, `versionCode` permanece en 268, no se publicó APK y no se tocaron Supabase, Production, datos ni contratos remotos.
+- Pendientes separados: validación física Samsung adicional; Firebase Test Lab físico; Xiaomi/HyperOS; Motorola; Honor; Oppo/Realme; Transsion; TCL; batería prolongada; actualización in-place; recuperación offline; alerta de posible desinstalación.
+
 ## Publicacion DEV 267 - Detalle de Usuario compacto en App Admin - 2026-07-20
 
 - App Admin reemplaza los anchos fijos del selector por tres segmentos de igual ancho; `Apps`, `Web` y `Seguridad` entran completos incluso en el SM-A235M.

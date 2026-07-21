@@ -1,0 +1,28 @@
+{
+  "cells": [
+    {
+      "name": "small-min",
+      "api": "min",
+      "form_factor": "phone",
+      "model_regex": "Google|Pixel|Medium Phone",
+      "locale": "es_AR",
+      "orientation": "portrait"
+    },
+    {
+      "name": "phone-mid",
+      "api": "mid",
+      "form_factor": "phone",
+      "model_regex": "Google|Pixel|Medium Phone",
+      "locale": "es_AR",
+      "orientation": "landscape"
+    },
+    {
+      "name": "tablet-target",
+      "api": "target",
+      "form_factor": "tablet",
+      "model_regex": "Google|Pixel|Tablet",
+      "locale": "es_AR",
+      "orientation": "portrait"
+    }
+  ]
+}

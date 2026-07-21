@@ -1,0 +1,28 @@
+{
+  "cells": [
+    {
+      "name": "pixel-reference",
+      "api": "latest_supported",
+      "form_factor": "phone",
+      "model_regex": "Google|Pixel",
+      "locale": "es_AR",
+      "orientation": "portrait"
+    },
+    {
+      "name": "samsung-priority",
+      "api": "latest_supported",
+      "form_factor": "phone",
+      "model_regex": "Samsung|Galaxy",
+      "locale": "es_AR",
+      "orientation": "portrait"
+    },
+    {
+      "name": "other-priority-oem",
+      "api": "latest_supported",
+      "form_factor": "phone",
+      "model_regex": "Motorola|Xiaomi|Redmi|POCO|Honor|Oppo|Realme|OnePlus|Tecno|Infinix|itel|TCL",
+      "locale": "es_AR",
+      "orientation": "portrait"
+    }
+  ]
+}
