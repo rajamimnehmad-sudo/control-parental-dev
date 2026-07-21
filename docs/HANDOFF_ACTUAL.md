@@ -97,6 +97,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - La cabecera y el selector Apps/Web/Seguridad de Admin sustituyen resortes y cambios instantaneos por interpolaciones de 220 ms.
 - Con la escala de animador de Android desactivada, las nuevas duraciones pasan a cero. Compilacion, unitarios y ktlint DEV de ambas apps son correctos; la percepcion final queda pendiente de recorrido fisico.
 
+## ADMIN-WEB-SETTINGS-UX-02 - Implementado en fuente
+
+- Cuenta Admin reemplaza tarjetas repetidas por dos grupos blancos continuos: identidad/licencia y accesos a Panel, Actualizaciones y Ayuda, con iconos compartidos y flecha solo para navegacion.
+- Web usa un selector compacto, switches alineados con iconos y filas planas para los sitios ya configurados; políticas, guardado y confirmaciones no cambian.
+- `Agregar sitio` queda sin cambios y fuera de este rediseño, tal como se aprobo. Compilacion, unitarios y ktlint Admin DEV son correctos; falta comprobacion visual fisica.
+
 ## USER-INTERNET-SETTINGS-UX-02 - Implementado en fuente
 
 - Internet Usuario conserva una sola pieza panoramica, ahora compacta, y expone VPN, SafeSearch, Solo resultados, DAG y horario como filas blancas de lectura simple.

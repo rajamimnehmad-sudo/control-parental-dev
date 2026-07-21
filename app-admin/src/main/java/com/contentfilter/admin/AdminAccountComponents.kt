@@ -2,7 +2,6 @@ package com.contentfilter.admin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -11,16 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -34,6 +24,10 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.dashboard.DashboardViewModel
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
+import com.contentfilter.core.ui.ProductListRow
+import com.contentfilter.core.ui.ProductListSurface
 
 @Composable
 internal fun SettingsTab(
@@ -47,7 +41,7 @@ internal fun SettingsTab(
         modifier =
             Modifier
                 .fillMaxSize()
-                .background(AppBackground),
+                .background(Color.White),
     ) {
         Column(
             modifier =
@@ -59,46 +53,51 @@ internal fun SettingsTab(
             verticalArrangement = Arrangement.spacedBy(18.dp),
         ) {
             PageHeader(title = "Cuenta", subtitle = "Licencia, estado y versión")
-            AccountStatusCard(
-                title = state.guideName.ifBlank { "Administrador" },
-                lines =
-                    listOfNotNull(
-                        "Rol: Administrador (ADM)",
-                        state.communityName.takeIf(String::isNotBlank)?.let { "Comunidad: $it" },
-                        "Superweb: ${syncStatusLabel(state.offlineMode, state.syncState)}",
-                    ),
-                accent = Violet,
-            )
-            AccountStatusCard(
-                title = licenseSummary(state.licenseState, state.licenseExpiresAtEpochMillis),
-                lines =
-                    listOfNotNull(
-                        state.licenseExpiresAtEpochMillis?.let { "Vencimiento: ${formatArgentinaDate(it)}" },
-                        licenseEffectText(state.licenseState),
-                    ),
-                accent = state.licenseState.accountColor,
-            )
-            FeatureTile(
-                icon = Icons.Filled.Settings,
-                title = "Panel administrador",
-                subtitle = "Estado general, comunidad y sincronización",
-                accent = Teal,
-                onClick = onPanel,
-            )
-            FeatureTile(
-                icon = Icons.Filled.Refresh,
-                title = "Actualizaciones",
-                subtitle = "Buscar versión y cambiar administrador local",
-                accent = Sun,
-                onClick = onUpdates,
-            )
-            FeatureTile(
-                icon = Icons.Filled.Search,
-                title = "Ayuda",
-                subtitle = "Asistente interactivo según el estado actual",
-                accent = Violet,
-                onClick = onHelp,
-            )
+            Text("Cuenta y comunidad", style = MaterialTheme.typography.titleSmall, color = MutedInk)
+            ProductListSurface {
+                AccountStatusRow(
+                    icon = ProductIcon.People,
+                    title = state.guideName.ifBlank { "Administrador" },
+                    lines =
+                        listOfNotNull(
+                            "Rol: Administrador (ADM)",
+                            state.communityName.takeIf(String::isNotBlank)?.let { "Comunidad: $it" },
+                            "Superweb: ${syncStatusLabel(state.offlineMode, state.syncState)}",
+                        ),
+                )
+                AccountStatusRow(
+                    icon = ProductIcon.ShieldCheck,
+                    title = licenseSummary(state.licenseState, state.licenseExpiresAtEpochMillis),
+                    lines =
+                        listOfNotNull(
+                            state.licenseExpiresAtEpochMillis?.let { "Vencimiento: ${formatArgentinaDate(it)}" },
+                            licenseEffectText(state.licenseState),
+                        ),
+                    showDivider = false,
+                )
+            }
+            Text("Más", style = MaterialTheme.typography.titleSmall, color = MutedInk)
+            ProductListSurface {
+                SettingsNavigationRow(
+                    icon = ProductIcon.Panel,
+                    title = "Panel administrador",
+                    subtitle = "Estado general, comunidad y sincronización",
+                    onClick = onPanel,
+                )
+                SettingsNavigationRow(
+                    icon = ProductIcon.Update,
+                    title = "Actualizaciones",
+                    subtitle = "Buscar versión y cambiar administrador local",
+                    onClick = onUpdates,
+                )
+                SettingsNavigationRow(
+                    icon = ProductIcon.Search,
+                    title = "Ayuda",
+                    subtitle = "Asistente interactivo según el estado actual",
+                    onClick = onHelp,
+                    showDivider = false,
+                )
+            }
         }
         Row(
             modifier =
@@ -121,29 +120,38 @@ internal fun SettingsTab(
 }
 
 @Composable
-private fun AccountStatusCard(
+private fun AccountStatusRow(
+    icon: ProductIcon,
     title: String,
     lines: List<String>,
-    accent: Color,
+    showDivider: Boolean = true,
 ) {
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(containerColor = Color.White),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(18.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalAlignment = Alignment.Top,
-        ) {
-            Box(modifier = Modifier.size(12.dp).background(accent, CircleShape))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text(title, style = MaterialTheme.typography.titleMedium, color = Ink)
-                lines.forEach { line ->
-                    Text(line, style = MaterialTheme.typography.bodyMedium, color = MutedInk)
-                }
+    ProductListRow(
+        leading = { ProductGlyph(icon = icon, color = Teal, modifier = Modifier.size(24.dp)) },
+        headline = { Text(title, style = MaterialTheme.typography.titleMedium, color = Ink) },
+        supporting = {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                lines.forEach { line -> Text(line, style = MaterialTheme.typography.bodyMedium, color = MutedInk) }
             }
-        }
-    }
+        },
+        showDivider = showDivider,
+    )
+}
+
+@Composable
+private fun SettingsNavigationRow(
+    icon: ProductIcon,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit,
+    showDivider: Boolean = true,
+) {
+    ProductListRow(
+        leading = { ProductGlyph(icon = icon, color = Teal, modifier = Modifier.size(24.dp)) },
+        headline = { Text(title, style = MaterialTheme.typography.titleMedium, color = Ink) },
+        supporting = { Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MutedInk) },
+        trailing = { ProductGlyph(icon = ProductIcon.ChevronRight, color = MutedInk, modifier = Modifier.size(22.dp)) },
+        onClick = onClick,
+        showDivider = showDivider,
+    )
 }

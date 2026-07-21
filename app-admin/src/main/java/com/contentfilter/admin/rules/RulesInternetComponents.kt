@@ -2,11 +2,9 @@ package com.contentfilter.admin.rules
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,14 +12,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -39,6 +33,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.PolicyRule
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductSky
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
@@ -47,11 +43,12 @@ internal fun RuleCard(
     rule: PolicyRule,
     dailyLimitMinutes: Int? = null,
     enabled: Boolean = true,
+    flat: Boolean = false,
     onToggle: () -> Unit,
     onDelete: () -> Unit,
 ) {
     var confirmDelete by remember { mutableStateOf(false) }
-    Card(modifier = Modifier.fillMaxWidth()) {
+    val content: @Composable () -> Unit = {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
@@ -83,6 +80,14 @@ internal fun RuleCard(
                 Text("Eliminar")
             }
         }
+    }
+    if (flat) {
+        Column(modifier = Modifier.fillMaxWidth().background(Color.White)) {
+            content()
+            HorizontalDivider(modifier = Modifier.padding(start = 52.dp))
+        }
+    } else {
+        Card(modifier = Modifier.fillMaxWidth()) { content() }
     }
     if (confirmDelete) {
         AlertDialog(
@@ -209,6 +214,7 @@ internal fun WebNavigationPanel(
                     color = HeaderMuted,
                 )
                 WebSwitchRow(
+                    icon = ProductIcon.Search,
                     title = "Solo resultados",
                     description = "Permite buscar y ver resultados, pero bloquea los sitios externos.",
                     checked = onlyResultsEnabled,
@@ -219,6 +225,7 @@ internal fun WebNavigationPanel(
             }
         }
         WebSwitchRow(
+            icon = ProductIcon.Web,
             title = "Buscador DAG",
             description =
                 if (dagEntitled) {
@@ -232,6 +239,7 @@ internal fun WebNavigationPanel(
             onCheckedChange = onDagEnabledChanged,
         )
         WebSwitchRow(
+            icon = ProductIcon.ShieldCheck,
             title = "Modo Extra Kosher",
             description = "Difumina fotos de contenido y mantiene los videos bloqueados.",
             checked = dagExtraKosherEnabled,
@@ -260,10 +268,9 @@ private fun InternetModeSelector(
             modifier =
                 Modifier
                     .fillMaxWidth()
-                    .height(58.dp)
-                    .clip(RoundedCornerShape(8.dp))
+                    .height(52.dp)
+                    .clip(RoundedCornerShape(18.dp))
                     .background(Color(0xFFF1F4F5))
-                    .border(1.dp, Color(0xFFD2DADD), RoundedCornerShape(8.dp))
                     .pointerInput(blocked, saving) {
                         if (!saving) {
                             val swipeThreshold = 48.dp.toPx()
@@ -286,17 +293,17 @@ private fun InternetModeSelector(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             InternetModeOption(
-                title = "INTERNET ABIERTO",
+                title = "Internet abierto",
                 selected = !blocked,
                 enabled = !saving,
-                icon = { Icon(Icons.Default.Search, contentDescription = null) },
+                icon = ProductIcon.Web,
                 onClick = { if (blocked) onBlockedChanged(false) },
             )
             InternetModeOption(
-                title = "INTERNET BLOQUEADO",
+                title = "Internet bloqueado",
                 selected = blocked,
                 enabled = !saving,
-                icon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                icon = ProductIcon.ShieldAlert,
                 onClick = { if (!blocked) onBlockedChanged(true) },
             )
         }
@@ -311,21 +318,25 @@ private fun androidx.compose.foundation.layout.RowScope.InternetModeOption(
     title: String,
     selected: Boolean,
     enabled: Boolean,
-    icon: @Composable () -> Unit,
+    icon: ProductIcon,
     onClick: () -> Unit,
 ) {
     Row(
         modifier =
             Modifier
                 .weight(1f)
-                .height(58.dp)
+                .height(52.dp)
                 .background(if (selected) ProductSky else Color.Transparent)
                 .clickable(enabled = enabled, onClick = onClick)
                 .padding(horizontal = 8.dp),
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(modifier = Modifier.size(20.dp), contentAlignment = Alignment.Center) { icon() }
+        ProductGlyph(
+            icon = icon,
+            color = if (selected) Color.White else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(20.dp),
+        )
         Text(
             text = title,
             modifier = Modifier.padding(start = 6.dp),
@@ -337,6 +348,7 @@ private fun androidx.compose.foundation.layout.RowScope.InternetModeOption(
 
 @Composable
 private fun WebSwitchRow(
+    icon: ProductIcon,
     title: String,
     description: String,
     checked: Boolean,
@@ -345,12 +357,13 @@ private fun WebSwitchRow(
     onCheckedChange: (Boolean) -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().background(Color.White).padding(vertical = 10.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        ProductGlyph(icon = icon, color = ProductSky, modifier = Modifier.size(24.dp))
         Column(
-            modifier = Modifier.weight(1f),
+            modifier = Modifier.weight(1f).padding(horizontal = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             Text(title, style = MaterialTheme.typography.titleMedium)
