@@ -117,6 +117,19 @@ Indice tecnico por areas para que cada ticket pueda empezar con `Area: ...` y ev
 - Publicacion DEV: `scripts/publicar_dev.sh`
 - Docs: `docs/DEV_APK_UPDATES.md`, `docs/PUBLICAR_DEV_REMOTO.md`
 
+## Compatibilidad Android
+
+- Entrada y niveles: `docs/compatibility/README.md`
+- Matriz: `docs/compatibility/DEVICE_MATRIX.md`
+- Escenarios: `docs/compatibility/TEST_SCENARIOS.md`
+- Perfiles OEM futuros: `docs/compatibility/OEM_PROFILES.md`
+- Límites/certificación: `docs/compatibility/KNOWN_LIMITATIONS.md`, `docs/compatibility/RELEASE_CERTIFICATION.md`
+- Evidencia: `docs/compatibility/results/`, `docs/compatibility/templates/`
+- Smoke instrumentado: `app-user/src/androidTest/`, `app-admin/src/androidTest/`
+- Matriz virtual: `app-user/build.gradle.kts`, `app-admin/build.gradle.kts`
+- Firebase Test Lab: `scripts/android_compatibility/`, `.github/workflows/android-device-lab.yml`
+- No tocar para esta área: lógica OEM funcional, VPN, Accessibility, Device Admin, Supabase o publicación de APK.
+
 ## Activation / Login
 
 - Usuario activacion: `feature-activation/src/main/java/com/contentfilter/feature/activation/ActivationScreen.kt`

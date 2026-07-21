@@ -58,6 +58,14 @@ Flujo de una entrada:
 - Decision visual: mantener tarjetas solo cuando expresan una unidad importante, como proteccion, licencia, alertas o formularios complejos. No agregar una biblioteca externa: Compose Material 3 y los componentes nativos actuales cubren el patron.
 - Aceptacion alcanzada: matriz local completa de 1.845 tareas y Android CI correctos; APK Usuario/Admin DEV 268 publicados juntos mediante el workflow manual oficial y verificados por manifiesto, hash, paquete, version y certificado. No habia telefono ADB conectado; no se tocaron backend, datos ni Production.
 
+### ANDROID-COMPAT-FOUNDATION-01 - Matriz y certificación Android
+
+- Estado: `Implementado y validado localmente; PR borrador pendiente`. Aprobado explícitamente el 2026-07-21. Tipo: compatibilidad Android, pruebas e infraestructura. Prioridad: P0. Esfuerzo: L. Riesgo: medio.
+- Alcance: documentación de niveles/evidencia, matriz representativa API 29-36 y familias OEM de Argentina/Latinoamérica, smoke instrumentado para Usuario/Admin, Gradle Managed Devices y Firebase Test Lab exclusivamente manual y sin ejecución.
+- Restricciones: sin adaptación funcional OEM, sin Supabase/Production, sin dispositivos pagos, sin credenciales/proyectos, sin `versionCode` ni publicación de APK.
+- Pendientes independientes: `ANDROID-COMPAT-SAMSUNG-PHYSICAL-02`, `ANDROID-COMPAT-FTL-PHYSICAL-03`, `ANDROID-COMPAT-XIAOMI-04`, `ANDROID-COMPAT-MOTOROLA-05`, `ANDROID-COMPAT-HONOR-06`, `ANDROID-COMPAT-OPPO-REALME-07`, `ANDROID-COMPAT-TRANSSION-08`, `ANDROID-COMPAT-TCL-09`, `ANDROID-COMPAT-BATTERY-10`, `ANDROID-COMPAT-UPGRADE-11`, `ANDROID-COMPAT-OFFLINE-12` y `ANDROID-COMPAT-UNINSTALL-ALERT-13`.
+- Aceptación: builds DEV de ambas apps, unitarios relacionados, compilación de androidTest, ktlint, Android Lint, detekt, sintaxis de scripts/workflow y `git diff --check`; el smoke virtual/físico solo cambia de estado cuando exista evidencia real.
+
 ### ADMIN-USER-SECTIONS-UX-05 - Detalle compacto y controles persistentes
 
 - Estado: `Resuelto y validado fisicamente en DEV 267`. Aprobado explicitamente el 2026-07-20. Tipo: UX Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.

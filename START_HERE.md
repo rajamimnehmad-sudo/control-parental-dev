@@ -8,6 +8,7 @@ Antes de cualquier tarea leer:
 - `docs/DEV_FLOW.md`
 - `docs/HANDOFF_ACTUAL.md`
 - `docs/BACKLOG_PRODUCTO.md`
+- `docs/compatibility/README.md` cuando el ticket afecte compatibilidad, configuración o pruebas Android.
 
 Reglas de trabajo:
 
