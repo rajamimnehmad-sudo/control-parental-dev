@@ -292,7 +292,7 @@ Flujo de una entrada:
 | USER-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
 | ADMIN-WEB-SETTINGS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
 | USER-INTERNET-SETTINGS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
-| USER-DAG-LAUNCHER-PREFERENCE-01 | Aprobado; pendiente implementacion | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
+| USER-DAG-LAUNCHER-PREFERENCE-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
 | DEVICE-CONNECTIVITY-ALERTS-01 | Backend DEV actualizado a 100 horas; Android publicado conserva 269 hasta proxima publicacion | P1 | Alerta ordinaria tras 100 horas sin comunicacion para Admin y Superweb | M | Medio |
@@ -516,7 +516,11 @@ Flujo de una entrada:
 
 ### USER-DAG-LAUNCHER-PREFERENCE-01 - DAG como app separada opcional
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: preferencia local y launcher App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Internet muestra el switch local `DAG como app separada` solo cuando DAG esta habilitado y contemplado por la licencia. El valor predeterminado es activo para conservar el comportamiento de instalaciones existentes.
+- Al apagarlo se oculta unicamente la entrada independiente del launcher Android; DAG sigue disponible dentro de Content Filter y no se modifica ninguna politica remota, permiso, paquete ni APK adicional.
+- Implementacion: la actividad interna queda siempre habilitada y un `activity-alias` separado controla solo el icono externo; al actualizar tambien se repara el estado deshabilitado que pudiera conservar el componente historico.
+
 - Interfaz: Internet muestra icono DAG moderno y el switch `Mostrar DAG como app separada` solo cuando DAG esta autorizado.
 - Comportamiento: encendido muestra el launcher independiente existente; apagado lo oculta pero DAG sigue accesible desde Usuario. No instala otro APK ni cambia permiso, historial, consumo, reglas o actualizaciones.
 - Autoridad: Admin/licencia prevalecen y ocultan DAG cuando no esta permitido. Al reabrir, se restaura la preferencia local; usuarios existentes comienzan encendidos para evitar una desaparicion inesperada.

@@ -18,5 +18,12 @@ class DagLauncherControllerTest {
                 dagEntitled = false,
             ),
         )
+        assertFalse(
+            dagLauncherShouldBeEnabled(
+                hasActivation = true,
+                dagEnabled = true,
+                keepSeparateLauncher = false,
+            ),
+        )
     }
 }
