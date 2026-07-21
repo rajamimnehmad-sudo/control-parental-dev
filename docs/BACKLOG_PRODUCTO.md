@@ -283,6 +283,16 @@ Flujo de una entrada:
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
+| UI-ICON-SYSTEM-01 | Aprobado; pendiente implementacion | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
+| UI-SYSTEM-BAR-CONTINUITY-01 | Aprobado; pendiente implementacion | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
+| UI-MOTION-SMOOTH-01 | Aprobado; pendiente implementacion | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
+| ADMIN-USERS-HUB-UX-02 | Aprobado; pendiente implementacion | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
+| ADMIN-USER-SECURITY-BADGES-01 | Aprobado; pendiente implementacion | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
+| ADMIN-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
+| USER-SECONDARY-LISTS-UX-02 | Aprobado; pendiente implementacion | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
+| ADMIN-WEB-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
+| USER-INTERNET-SETTINGS-UX-02 | Aprobado; pendiente implementacion | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
+| USER-DAG-LAUNCHER-PREFERENCE-01 | Aprobado; pendiente implementacion | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
 | DEVICE-CONNECTIVITY-ALERTS-01 | Backend DEV actualizado a 100 horas; Android publicado conserva 269 hasta proxima publicacion | P1 | Alerta ordinaria tras 100 horas sin comunicacion para Admin y Superweb | M | Medio |
@@ -431,6 +441,77 @@ Flujo de una entrada:
   - la interfaz aclara que datos exclusivamente locales perdidos —por ejemplo historial local cifrado de DAG— no pueden restaurarse desde el servidor;
   - generar, revocar, vencer y consumir el token queda auditado sin borrar datos del Usuario.
 - Decision aplicada: mismo Usuario y `device_id`, sea el mismo telefono reparado o uno nuevo; token de un solo uso por 30 minutos. El enlace anterior sigue operativo hasta que el nuevo completa la primera sincronizacion segura y entonces se revoca atomicamente. Los datos exclusivamente locales perdidos no se prometen como recuperables.
+
+### UI-ICON-SYSTEM-01 - Iconos coherentes y modernos
+
+- Estado: `Aprobado; pendiente implementacion`; definido con el usuario el 2026-07-21. Tipo: sistema visual Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Objetivo: unificar iconos de Usuario y Admin con Material Symbols Rounded seleccionados como vectores locales, reutilizando Material Icons Core ya presente y sin incorporar una dependencia pesada.
+- Criterio: contorno redondeado para navegacion y acciones; relleno solo para seleccion o alerta; mismo peso, caja optica y tamaño; DAG conserva identidad propia adaptada al sistema. No se usan emojis, clipart, copias de Mercado Pago ni familias mezcladas.
+- Aceptacion: iconos legibles en claro/oscuro, objetivos tactiles de al menos 44 dp, descripcion accesible cuando comunica una accion o estado y ausencia de aumento innecesario del APK.
+
+### UI-SYSTEM-BAR-CONTINUITY-01 - Barra superior integrada
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: visual, edge-to-edge y compatibilidad Android. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Problema: la zona de camara puede quedar blanca y cortar un encabezado turquesa/azul.
+- Solucion: barra de estado y zona de recorte toman el color efectivo que exista debajo en cada pantalla; los iconos del sistema cambian entre claros y oscuros para conservar contraste.
+- Aceptacion: continuidad sin franjas en Usuario/Admin, navegacion, tema y recreacion; no se promete validacion OEM sin dispositivo real y no se modifica la infraestructura de compatibilidad.
+
+### UI-MOTION-SMOOTH-01 - Movimiento sin saltos
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: UX, animacion y accesibilidad. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Alcance: expansiones, cierres, cambios de seccion, insercion de estados y desplazamiento de contenido usan transiciones sobrias de 200-250 ms, sin rebote ni animacion continua.
+- Aceptacion: cerrar tarjetas de Home no produce saltos; `Apps / Web / Seguridad` cambia suavemente; listas conservan posicion y claves estables; reduccion de movimiento de Android elimina o acorta efectos; no se agrega trabajo costoso constante.
+
+### ADMIN-USERS-HUB-UX-02 - Usuarios y alta simplificados
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Alcance: superficie blanca continua, filas icono/texto/flecha y toque completo para abrir detalle; desaparece el menu de tres puntos y sus acciones quedan en el detalle correspondiente. `Agregar usuario` enfoca el primer input.
+- Estado de refresco: junto a `+`, Buscar y el icono circular de actualizar se muestra `Actualizando`, `Actualizado ahora/hace X min` o error persistente. No se reserva un hueco vacio y no aparece otro banner debajo.
+- Aceptacion: busqueda, archivo, reenlace y recuperacion conservan comportamiento; carga/vacio/error no superponen contenido; iconos siguen `UI-ICON-SYSTEM-01`.
+
+### ADMIN-USER-SECURITY-BADGES-01 - Indicadores de seguridad con evidencia
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: seguridad visible y UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Semantica: sin icono verde cuando todo esta bien; advertencia amarilla para nunca verificado, `Unknown` o mas de 100 horas sin comunicacion; rojo solo para VPN, Accesibilidad o Device Admin `Disabled`, o posible desinstalacion.
+- Detalle: la fila del Usuario y el segmento `Seguridad` muestran una burbuja roja hasta corregir un problema confirmado. Color, icono y descripcion accesible comunican juntos el estado.
+- Aceptacion: no confundir atraso con proteccion caida; conservar la regla de posible desinstalacion; una nueva sincronizacion elimina el indicador aplicable sin borrar auditoria.
+
+### ADMIN-SECONDARY-LISTS-UX-02 - Listas Admin continuas
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: sistema de listas App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Alcance: Solicitudes, Avisos, apps, sitios, grupos, horarios y actualizaciones adoptan superficie blanca continua, separadores sutiles, icono, titulo, subtitulo opcional y flecha solo si navega. Switch/boton se conserva para accion directa.
+- Limites: proteccion, licencia, alertas criticas, formularios y tarjetas principales de Home permanecen como estan. No cambia logica, datos ni sincronizacion.
+- Aceptacion: encabezados/controles fijos donde corresponda, listas sin bloques repetidos, estados de carga/vacio/error coherentes y objetivos tactiles accesibles.
+
+### USER-SECONDARY-LISTS-UX-02 - Solicitudes y Mis apps estables
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: UX y rendimiento App Usuario. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Solicitudes: icono circular de actualizar y estado persistente en la misma linea; no aparece un banner separado ni queda espacio vacio.
+- Mis apps: titulo, Buscar, Actualizar, estado y filtros permanecen fijos; los filtros bajan a una segunda linea y solo se desplaza el inventario. La lista empieza debajo de controles y termina antes del nav inferior, sin superposicion ni corte abrupto.
+- Rendimiento: conservar la lista nativa reciclable. Refrescar mantiene posicion; cambiar busqueda o filtro vuelve arriba; claves/orden estables evitan saltos.
+- Aceptacion: superficie blanca continua, ultima fila visible, carga inicial/refresco/error correctos y ninguna alteracion de reglas, medicion o bloqueo.
+
+### ADMIN-WEB-SETTINGS-UX-02 - Web y Ajustes Admin
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: UX App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Web: resumen compacto y grupos por Navegacion, Busqueda segura, DAG, horarios/limites y sitios; filas continuas, switch directo y flecha solo para navegacion. Estado de refresco queda junto al icono circular.
+- Ajustes: Cuenta/comunidad, Apariencia, Notificaciones, Actualizaciones, Ayuda/privacidad y acciones sensibles mediante grupos con titulo y filas continuas. Acciones destructivas quedan al final y requieren confirmacion.
+- Fuera de alcance: `Agregar sitio` no se mueve, rediseña ni recibe foco automatico en este ticket.
+
+### USER-INTERNET-SETTINGS-UX-02 - Internet y Ajustes Usuario
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Internet conserva una unica pieza panoramica compacta; debajo usa filas de solo lectura para VPN, SafeSearch, modo de resultados, DAG y horario. No muestra switch cuando el Usuario no tiene autoridad; una degradacion ofrece una sola reparacion clara.
+- Ajustes comparte el lenguaje de grupos y filas de Admin, mostrando solo opciones del rol Usuario. Version queda en Actualizaciones; Ayuda reutiliza su flujo; acciones sensibles aparecen al final.
+- Aceptacion: lenguaje no tecnico, estados reales, superficie blanca continua, navegacion/Volver coherentes y sin cambiar politica remota.
+
+### USER-DAG-LAUNCHER-PREFERENCE-01 - DAG como app separada opcional
+
+- Estado: `Aprobado; pendiente implementacion`. Tipo: preferencia local y launcher App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Interfaz: Internet muestra icono DAG moderno y el switch `Mostrar DAG como app separada` solo cuando DAG esta autorizado.
+- Comportamiento: encendido muestra el launcher independiente existente; apagado lo oculta pero DAG sigue accesible desde Usuario. No instala otro APK ni cambia permiso, historial, consumo, reglas o actualizaciones.
+- Autoridad: Admin/licencia prevalecen y ocultan DAG cuando no esta permitido. Al reabrir, se restaura la preferencia local; usuarios existentes comienzan encendidos para evitar una desaparicion inesperada.
+- Aceptacion: cambio reversible sin reinicio/reinstalacion, acceso interno siempre coherente y launcher historico sin bypass cuando DAG esta cerrado.
 
 ### UI-BANNER-UNIFY-01 - Feedback premium compartido
 
