@@ -1,5 +1,6 @@
 import { ShieldCheck } from "lucide-react";
 import { LoginForm } from "@/components/LoginForm";
+import { getDeploymentBuildLabel } from "@/lib/build-info";
 
 export default async function LoginPage({
   searchParams,
@@ -7,6 +8,7 @@ export default async function LoginPage({
   searchParams: Promise<{ passwordUpdated?: string; recoveryError?: string }>;
 }) {
   const params = await searchParams;
+  const buildLabel = getDeploymentBuildLabel();
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-canvas px-4 py-10">
@@ -24,6 +26,7 @@ export default async function LoginPage({
           passwordUpdated={params.passwordUpdated === "1"}
           recoveryError={params.recoveryError}
         />
+        <p className="mt-6 text-center text-xs text-slate-400">{buildLabel}</p>
       </section>
     </main>
   );

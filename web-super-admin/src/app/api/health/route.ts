@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getDeploymentCommit } from "@/lib/build-info";
 import { devSupabaseProjectRef, requireDevSupabaseUrl } from "@/lib/environment";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +13,7 @@ export function GET() {
         status: "ok",
         environment: "DEV",
         supabaseProjectRef: devSupabaseProjectRef,
-        commit: process.env.VERCEL_GIT_COMMIT_SHA ?? process.env.CF_PAGES_COMMIT_SHA ?? "local",
+        commit: getDeploymentCommit(),
       },
       { headers: { "Cache-Control": "no-store" } },
     );

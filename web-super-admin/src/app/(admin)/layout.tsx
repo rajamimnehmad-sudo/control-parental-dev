@@ -3,12 +3,14 @@ import { LogOut, ShieldCheck } from "lucide-react";
 import { AdminNavigation } from "@/components/AdminNavigation";
 import { requireSuperAdmin } from "@/lib/auth";
 import { signOutAction } from "@/lib/actions";
+import { getDeploymentBuildLabel } from "@/lib/build-info";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
   const claims = await requireSuperAdmin();
   const email = typeof claims.email === "string" ? claims.email : "Super Admin";
+  const buildLabel = getDeploymentBuildLabel();
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -20,7 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </div>
             <div>
               <p className="text-base font-semibold text-ink">Super Admin</p>
-              <p className="hidden text-xs text-slate-500 sm:block">Comunidades, licencias y dispositivos</p>
+              <p className="text-xs text-slate-500">{buildLabel}</p>
             </div>
           </Link>
           <div className="flex items-center gap-2">
