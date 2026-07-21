@@ -285,7 +285,7 @@ Flujo de una entrada:
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
 | UI-ICON-SYSTEM-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
 | UI-SYSTEM-BAR-CONTINUITY-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
-| UI-MOTION-SMOOTH-01 | Aprobado; pendiente implementacion | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
+| UI-MOTION-SMOOTH-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
 | ADMIN-USERS-HUB-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
 | ADMIN-USER-SECURITY-BADGES-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
 | ADMIN-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
@@ -460,8 +460,9 @@ Flujo de una entrada:
 
 ### UI-MOTION-SMOOTH-01 - Movimiento sin saltos
 
-- Estado: `Aprobado; pendiente implementacion`. Tipo: UX, animacion y accesibilidad. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica`. Tipo: UX, animacion y accesibilidad. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: expansiones, cierres, cambios de seccion, insercion de estados y desplazamiento de contenido usan transiciones sobrias de 200-250 ms, sin rebote ni animacion continua.
+- Resultado en fuente: las tarjetas expandibles de Inicio e Internet eliminan la doble animacion de contenedor/contenido y usan una sola transicion de 220 ms; Apps/Web/Seguridad suaviza cabecera y seleccion sin resortes. Si Android desactiva la escala de animador, estas duraciones pasan a cero.
 - Aceptacion: cerrar tarjetas de Home no produce saltos; `Apps / Web / Seguridad` cambia suavemente; listas conservan posicion y claves estables; reduccion de movimiento de Android elimina o acorta efectos; no se agrega trabajo costoso constante.
 
 ### ADMIN-USERS-HUB-UX-02 - Usuarios y alta simplificados

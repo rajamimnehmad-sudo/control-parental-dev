@@ -91,6 +91,12 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - DAG mantiene su ajuste independiente claro/oscuro. No se modificaron matrices, workflows ni infraestructura de compatibilidad.
 - Compilacion, unitarios y ktlint DEV de ambas apps son correctos. La comprobacion visual de recortes y variantes OEM queda pendiente para un telefono o laboratorio real.
 
+## UI-MOTION-SMOOTH-01 - Implementado en fuente
+
+- Inicio Usuario e Internet ya no combinan `animateContentSize` con otra expansion simultanea: usan una unica transicion vertical de 220 ms sin rebote.
+- La cabecera y el selector Apps/Web/Seguridad de Admin sustituyen resortes y cambios instantaneos por interpolaciones de 220 ms.
+- Con la escala de animador de Android desactivada, las nuevas duraciones pasan a cero. Compilacion, unitarios y ktlint DEV de ambas apps son correctos; la percepcion final queda pendiente de recorrido fisico.
+
 ## ADMIN-USERS-HUB-UX-02 - Implementado en fuente
 
 - Usuarios Admin usa una superficie blanca continua y filas completas sin menu de tres puntos; `Archivar usuario` sigue disponible con confirmacion dentro del detalle.

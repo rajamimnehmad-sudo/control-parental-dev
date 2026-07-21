@@ -1,7 +1,7 @@
 package com.contentfilter.user
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -75,6 +75,7 @@ private fun UserInternetStatusCard(
     onActivateWebProtection: () -> Unit,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
+    val motionDuration = userMotionDurationMillis()
     val scheduleBlocked = state.schedule?.isAllowed == false
     val blocked = state.webNavigationBlocked || scheduleBlocked
     val status =
@@ -93,7 +94,7 @@ private fun UserInternetStatusCard(
         }
     val shape = RoundedCornerShape(26.dp)
     Card(
-        modifier = Modifier.fillMaxWidth().animateContentSize().clickable { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded },
         shape = shape,
         colors = CardDefaults.cardColors(containerColor = Color(0xFF10243A)),
         elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
@@ -145,8 +146,8 @@ private fun UserInternetStatusCard(
                 )
                 AnimatedVisibility(
                     visible = expanded,
-                    enter = expandVertically() + fadeIn(),
-                    exit = shrinkVertically() + fadeOut(),
+                    enter = expandVertically(animationSpec = tween(motionDuration)) + fadeIn(tween(motionDuration)),
+                    exit = shrinkVertically(animationSpec = tween(motionDuration)) + fadeOut(tween(motionDuration)),
                 ) {
                     Column(verticalArrangement = Arrangement.spacedBy(9.dp)) {
                         InternetProtectionLine(
