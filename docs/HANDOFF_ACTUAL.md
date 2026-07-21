@@ -128,6 +128,13 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 - Validacion: unitarios completos de App Admin, `ktlintCheck` y `assembleDevDebug` correctos; las pruebas dirigidas cubren antes/despues de 100 horas y posible desinstalacion. Falta el recorrido fisico posterior a una futura publicacion.
 - No se aumento `versionCode`, no se publico APK y el estado publicado permanece en DEV 269.
 
+## DEV-OFFLINE-ALERT-100H-01 aplicado en Supabase DEV - 2026-07-21
+
+- La funcion `generate_device_offline_alerts` genera eventos ordinarios `device_offline` solo despues de 100 horas sin heartbeat. El cron conserva una unica ejecucion horaria a los 17 minutos, por lo que un evento nuevo aparece en la primera corrida posterior al limite, aproximadamente entre 100 y 101 horas.
+- Migracion `20260721194835_device_offline_alert_100_hours.sql` aplicada y registrada exclusivamente en Supabase DEV `syeycayasyufedwoprea`. La definicion remota contiene `100 hours`, ya no contiene `24 hours`, y `anon`/`authenticated` no pueden ejecutar la funcion.
+- No se genero ninguna alerta de prueba ni se modificaron dispositivos. Los eventos historicos se conservan y un heartbeat nuevo sigue abriendo un episodio futuro sin duplicar el anterior. La funcion y el cron separado de `possible_uninstall` a 30 minutos no cambiaron.
+- Asesores DEV de seguridad y rendimiento sin errores. Production no fue tocado; no se aumento `versionCode` ni se publico APK. App Admin DEV 269 conserva su comportamiento publicado hasta que el candidato Android de 100 horas sea autorizado y publicado.
+
 ## Validacion fisica DEV 267 y refactor Admin/Rules - 2026-07-21
 
 - Samsung SM-A235M `R58T34V31AE`: App Usuario publica DEV 267 instalada in-place sobre DEV 266 mediante el APK publico y SHA-256 verificado. Se conservaron `firstInstallTime` (`2026-07-13 12:53:48`) y `ceDataInode` (`1239519`); App Admin ya estaba en DEV 267. No se borraron datos.
