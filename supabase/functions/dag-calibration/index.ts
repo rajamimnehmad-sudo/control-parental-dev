@@ -20,7 +20,7 @@ const ClearPageSize = 500;
 const StorageDeleteBatchSize = 1000;
 const DatabaseUpdateBatchSize = 500;
 const AllowedScoreKeys = new Set([
-  "professional", "legacy", "female_face", "female_breast_covered",
+  "professional", "legacy", "female_face", "male_face", "male_breast_exposed", "female_breast_covered",
   "female_genitalia_covered", "buttocks_covered", "armpits_exposed",
   "belly_exposed", "explicit_region",
   "sleeves_above_elbow", "hem_above_knee",
