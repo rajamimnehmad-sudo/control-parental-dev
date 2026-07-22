@@ -1,0 +1,4 @@
+DAG ahora continúa las búsquedas aunque la consulta necesite más contexto y conserva los bloqueos firmes.
+Los menús y controles dinámicos se procesan por lotes para responder con mayor fluidez.
+Los CAPTCHA conocidos usan una sesión temporal y limitada dentro de páginas permitidas.
+Las fotos marcadas para Calibración DAG quedan cifradas y se reintentan hasta recibir confirmación.
