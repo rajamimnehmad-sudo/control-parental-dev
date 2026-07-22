@@ -21,6 +21,6 @@ Para planificacion, captura de ideas o seleccion de tickets:
 
 - Area: `feature-accessibility`, barrera antimanipulacion tipo Rimon.
 - Implementar en tickets pequenos, empezando por navegacion segura desde Ajustes protegidos.
-- Se permite modificar Android, ejecutar tests/builds, incrementar ambos `versionCode`, hacer commit/push y publicar APKs solo en DEV.
+- Se permite modificar Android, ejecutar tests/builds, incrementar el `versionCode` de cada app afectada, hacer commit/push y publicar esas APKs solo en DEV. Usuario y Admin versionan de forma independiente; coordinar ambos solo cuando el cambio entra en las dos apps.
 - Para alertas remotas se permite usar exclusivamente Supabase DEV `syeycayasyufedwoprea`.
 - No tocar Production, no borrar datos y no incluir Service Role Key en Android.

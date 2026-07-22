@@ -16,12 +16,12 @@ Entonces:
 
 1. Ejecutar build.
 2. Ejecutar tests adecuados.
-3. Si pasan, incrementar `versionCode` DEV de `app-user` y `app-admin`.
+3. Si pasan, incrementar `versionCode` DEV solo de cada app afectada.
 4. Mantener `versionName` salvo pedido explicito.
 5. Commit.
 6. Push.
-7. Dejar que GitHub Actions publique APK DEV.
-8. Verificar manifiestos publicos con el nuevo `versionCode`.
+7. Dejar que GitHub Actions publique solo las APK DEV afectadas; usar ambas si el cambio es compartido.
+8. Verificar cada manifiesto publico actualizado con su nuevo `versionCode`.
 9. Informar commit, versionCode y que ya se puede actualizar desde las apps.
 
 Si solo cambian docs, SQL, scripts, GitHub Actions o archivos que no entran en APK:
@@ -42,7 +42,7 @@ Si solo cambian docs, SQL, scripts, GitHub Actions o archivos que no entran en A
 | `core-policy` | `./gradlew --no-daemon :core-policy:test :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | `./gradlew --no-daemon :core-policy:test -x uploadDevUpdatesToStorage` | Revisar tests de VPN/Accessibility si cambia decision |
 | `core-data` / `core-database` | `./gradlew --no-daemon :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | tests de modulo afectado, si existen | Revisar migrations/schemas si cambia DB |
 | `core-sync` / `core-network` | `./gradlew --no-daemon :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | tests del modulo o app afectada | Validar outbox/realtime en CI |
-| Updates/publicacion Android | `./gradlew --no-daemon :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | app-user/app-admin unit tests | Verificar manifests locales y publicos |
+| Updates/publicacion Android | build de cada app afectada; ambas si cambia infraestructura compartida | unitarios de cada app afectada | Verificar manifests locales y publicos actualizados |
 
 ## Modulos a compilar por area
 
@@ -70,11 +70,11 @@ Publicar DEV cuando cambia cualquier archivo Android que entra al APK:
 
 Publicacion DEV significa:
 
-1. Subir `versionCode` DEV en `app-user/build.gradle.kts`.
-2. Subir `versionCode` DEV en `app-admin/build.gradle.kts`.
+1. Determinar si cambia Usuario, Admin o ambas.
+2. Subir `versionCode` DEV solo en cada app afectada.
 3. Commit y push a `main`.
-4. GitHub Actions `Publicar APKs DEV` genera y sube APKs a Supabase Storage.
-5. Verificar manifests publicos.
+4. GitHub Actions `Publicar APKs DEV` se ejecuta con `target=user`, `target=admin` o `target=both` y sube solo ese alcance a Supabase Storage.
+5. Verificar solo los manifests publicos modificados; el de la otra app debe permanecer intacto.
 
 ## Cuando NO publicar APK
 
@@ -109,17 +109,18 @@ create("dev") {
 
 Regla:
 
-- Subir ambos al mismo numero.
-- No reutilizar versionCode publicado.
+- Usuario y Admin tienen secuencias independientes; no necesitan coincidir.
+- Incrementar solo la app cuyo APK cambia. Si el cambio entra en ambas, incrementar ambas, aunque sus numeros previos sean distintos.
+- No reutilizar un `versionCode` ya publicado para esa app.
 - No cambiar `versionName` salvo pedido explicito.
-- Si el publish detecta mismo versionCode, detener y corregir antes de continuar.
+- Si el publish detecta el mismo `versionCode` de la app elegida, detener y corregir antes de continuar.
 
 ## GitHub Actions
 
 Workflows relevantes:
 
-- `Android CI`: compila, corre unit tests, ktlint, Android lint y detekt.
-- `Publicar APKs DEV`: ejecuta publicacion DEV y sube APKs/manifests.
+- `Android CI`: detecta el alcance. Para cambios exclusivos de `app-user` o `app-admin`, compila y valida solo esa app; ante codigo compartido o cambios en ambas, ejecuta la suite completa.
+- `Publicar APKs DEV`: permite elegir `user`, `admin` o `both`; ejecuta publicacion DEV y sube solo las APK/manifests elegidas.
 
 Verificacion:
 
@@ -136,9 +137,12 @@ Notas:
 
 ## Runner / publicacion DEV
 
-Script principal:
+Scripts:
 
-- `scripts/publicar_dev.sh`
+- Ambas apps: `scripts/publicar_dev.sh`.
+- Una app: `scripts/publicar_dev_app.sh usuario|admin`.
+
+Ambos publicadores exigen incremento por app, notas de version y firma DEV historica. La reparacion excepcional de la misma version requiere confirmacion explicita.
 
 Docs existentes:
 
@@ -172,14 +176,15 @@ curl -fsSL https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev
 7. No revisar todo el repo salvo auditoria explicita.
 8. Cambiar lo minimo.
 9. Validar con build/test minimo del area.
-10. Si cambio Android, bump versionCode, commit, push, verificar Actions y manifests.
+10. Si cambio Android, incrementar solo la app afectada, commit, push, verificar Actions y el manifest actualizado.
 11. Si no cambio Android, commit opcional segun pedido y no publicar APK.
 
 ## Cierre eficiente y completo
 
 - Cada ticket pequeno termina con pruebas proporcionales, PR y fusion a `main`; la documentacion no debe conservar `pendiente PR` despues de fusionarlo.
-- Varios tickets Android ya aprobados y listos pueden agruparse en una sola publicacion DEV: un unico aumento coordinado de `versionCode`, una sola compilacion/publicacion de Usuario y Admin y una verificacion comun de manifiestos, hashes y firma.
-- La agrupacion de publicacion no mezcla implementaciones: cada cambio conserva su PR, causa, pruebas y evidencia por separado.
+- Varios tickets Android ya aprobados y listos deben agruparse en una sola publicacion por app afectada: un aumento de `versionCode` por app, una sola ronda de CI/publicacion y una verificacion de sus manifiestos, hashes y firma.
+- La agrupacion ocurre antes de publicar: nunca sacar varias APK y actualizar GitHub despues. El commit de `main` debe identificar exactamente el codigo de toda APK publica.
+- La agrupacion no mezcla la evidencia: cada cambio conserva causa, pruebas y trazabilidad dentro del lote, aunque use un unico PR cuando forman una entrega coherente.
 - Al publicar, actualizar `docs/HANDOFF_ACTUAL.md` y `docs/BACKLOG_PRODUCTO.md` de candidato a publicado. Las pruebas fisicas o de laboratorio pendientes se registran aparte y nunca se dan por realizadas.
 - No iniciar el siguiente lote dejando ramas, builds o estados documentales inconsistentes del lote anterior.
 
@@ -206,8 +211,8 @@ Para cambios Android:
 - Archivos modificados.
 - Build/tests ejecutados.
 - Commit.
-- versionCode.
-- Confirmacion de manifests publicos.
+- versionCode de cada app publicada.
+- Confirmacion de los manifests publicos actualizados y de que los no seleccionados permanecieron intactos.
 - "Ya podes actualizar desde las apps."
 
 Para cambios no Android:

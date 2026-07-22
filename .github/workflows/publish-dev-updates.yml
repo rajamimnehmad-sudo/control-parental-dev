@@ -8,10 +8,19 @@ on:
   workflow_dispatch:
     inputs:
       confirm_publish:
-        description: "Confirmo que quiero publicar ambas APK en Supabase DEV"
+        description: "Confirmo que quiero publicar el alcance elegido en Supabase DEV"
         required: true
         default: false
         type: boolean
+      target:
+        description: "Aplicacion a publicar"
+        required: true
+        default: "both"
+        type: choice
+        options:
+          - both
+          - user
+          - admin
       confirm_same_version_repair:
         description: "Reparar excepcionalmente los artefactos de la misma version ya publicada"
         required: true
@@ -42,6 +51,8 @@ jobs:
           set -euo pipefail
           supabase --version
           bash -n scripts/publicar_dev.sh
+          bash -n scripts/publicar_dev_app.sh
+          bash -n scripts/android_ci_scope.sh
           bash -n scripts/prepare_dev_updates.sh
           bash -n scripts/upload_dev_updates.sh
 
@@ -148,4 +159,10 @@ jobs:
           ANDROID_DEV_KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}
           ANDROID_DEV_KEY_PASSWORD: ${{ secrets.ANDROID_DEV_KEY_PASSWORD }}
           ALLOW_SAME_VERSION_REPAIR: ${{ inputs.confirm_same_version_repair }}
-        run: scripts/publicar_dev.sh
+        run: |
+          case "${{ inputs.target }}" in
+            user) scripts/publicar_dev_app.sh usuario ;;
+            admin) scripts/publicar_dev_app.sh admin ;;
+            both) scripts/publicar_dev.sh ;;
+            *) echo "Target de publicacion invalido." >&2; exit 1 ;;
+          esac

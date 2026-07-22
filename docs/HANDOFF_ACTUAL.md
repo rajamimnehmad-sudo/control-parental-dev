@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-22:
 
 ```text
-App Usuario versionCode 274
-App Admin versionCode 274
+App Usuario versionCode 275
+App Admin versionCode 275
 versionName 1.0.1-dev
 ```
 
@@ -68,25 +68,35 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-274-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-274-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-275-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-275-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario a7b8de8d75c604a582c83a5555417b522bed186e201ecaea52e306bf1f9c218b
-Admin   5ba96ffc37752b058a6bd6ef2a0edc1489886ff5a7886771fa4bbee7965db258
+Usuario b549a7e12fc2486acf1dd82fa425e72f3dfd42e9f92c08cdb4d8da13c76736aa
+Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ```
 
-## Candidato DEV 275 - rollback de apertura anticipada DAG - 2026-07-22
+## Flujo selectivo Android - candidato operativo - 2026-07-22
+
+- Decision del usuario: Usuario y Admin dejan de compartir obligatoriamente el mismo `versionCode`. Solo se incrementa, valida y publica cada app cuyo APK cambia; `both` queda para codigo compartido o cambios en ambas.
+- `Android CI` detecta archivos modificados y usa alcance `user`, `admin`, `both` o `none`. Los cambios exclusivos de una app ejecutan build, unitarios, ktlint, Android Lint y Detekt solo de ese modulo; cambios compartidos conservan la suite completa.
+- `Publicar APKs DEV` incorpora selector `target`. El publicador individual existente se endurece con firma DEV historica, proteccion de version, reparacion explicita y staging/archivo seguro equivalentes al flujo doble.
+- Regla de lotes: agrupar varios tickets normales antes de una unica APK por app; nunca publicar APK sin que su codigo exacto este antes en GitHub. Las correcciones urgentes pueden salir solas.
+- Pendiente en este punto: validacion local del workflow/scripts, PR, CI y fusion. Al no cambiar codigo que entra en APK, este ajuste operativo no incrementa version ni publica una nueva APK.
+
+## Publicacion DEV 275 - rollback de apertura anticipada DAG - 2026-07-22
 
 - El usuario reporto que DEV 274 se siente mucho peor porque las fotos tardan demasiado en aparecer y la experiencia anterior era preferible.
 - Causa confirmada: `DAG-CATEGORY-FAST-PATH-04` no aceleraba descarga, decodificacion ni clasificacion local de raster. Marcaba el viewport como listo despues de permitir la pagina y revelaba texto/estructura mientras la cola visual seguia trabajando; por eso exponia durante mas tiempo los espacios vacios que antes permanecian detras de `Analizando`.
 - La medicion de aproximadamente 4.059 ms en DEV 274 correspondia a estructura visible, no a fotos listas. No sirve como criterio de exito para la experiencia reportada y no debe interpretarse como mejora de carga visual.
 - Correccion DEV 275: se elimina solamente la politica de apertura anticipada, su estado/log y sus tests. `DagBrowserViewModel` vuelve exactamente al comportamiento previo a DEV 274: la pagina se revela cuando analisis de pagina y fotos iniciales del viewport estan listos. Se conservan Calibracion DAG, CAPTCHA, busquedas inciertas, menus dinamicos y todos los demas cambios publicados.
 - Validacion local: `ktlintCheck`, unitarios y `assembleDevDebug` de Usuario y Admin completaron 779 tareas correctamente. `aapt` y `apksigner` confirman versionCode 275, paquetes DEV y certificado historico en ambos APK. Los candidatos 275 se instalaron in-place en el SM-A235M y conservaron `firstInstallTime`; la pantalla seguia protegida por huella/patron, por lo que la comprobacion visual posterior requiere desbloqueo del usuario.
-- Pendiente en este punto: PR, CI, publicacion publica 275 y verificacion externa de manifiestos/hashes/paquetes/firma.
+- PR #51 fusionado en `main` mediante commit `4c4a2f4`. Android CI `29958857692` completo build, unitarios, ktlint, Android Lint y Detekt en 11m25s; publicacion DEV `29959946654` completo correctamente en 10m04s sin reparacion de misma version.
+- Verificacion externa: ambos manifiestos declaran 275; los APK descargados recalculan exactamente los SHA-256 registrados arriba. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, versionName `1.0.1-dev`, minSdk 29 y targetSdk 36; `apksigner` confirma el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- Ambos APK publicos 275 se reinstalaron in-place en el SM-A235M, conservaron sus `firstInstallTime` y no borraron datos. La pantalla sigue protegida por huella/patron, por lo que el smoke visual posterior requiere desbloqueo del usuario.
 
 ## Publicacion DEV 274 - apertura segura por categoria y Calibracion DAG - 2026-07-22
 
