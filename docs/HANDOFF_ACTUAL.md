@@ -79,13 +79,15 @@ Usuario b549a7e12fc2486acf1dd82fa425e72f3dfd42e9f92c08cdb4d8da13c76736aa
 Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ```
 
-## Flujo selectivo Android - candidato operativo - 2026-07-22
+## Flujo selectivo Android - activo - 2026-07-22
 
 - Decision del usuario: Usuario y Admin dejan de compartir obligatoriamente el mismo `versionCode`. Solo se incrementa, valida y publica cada app cuyo APK cambia; `both` queda para codigo compartido o cambios en ambas.
 - `Android CI` detecta archivos modificados y usa alcance `user`, `admin`, `both` o `none`. Los cambios exclusivos de una app ejecutan build, unitarios, ktlint, Android Lint y Detekt solo de ese modulo; cambios compartidos conservan la suite completa.
 - `Publicar APKs DEV` incorpora selector `target`. El publicador individual existente se endurece con firma DEV historica, proteccion de version, reparacion explicita y staging/archivo seguro equivalentes al flujo doble.
 - Regla de lotes: agrupar varios tickets normales antes de una unica APK por app; nunca publicar APK sin que su codigo exacto este antes en GitHub. Las correcciones urgentes pueden salir solas.
-- Pendiente en este punto: validacion local del workflow/scripts, PR, CI y fusion. Al no cambiar codigo que entra en APK, este ajuste operativo no incrementa version ni publica una nueva APK.
+- Validacion local: `bash -n` completo; ambos YAML parsearon correctamente; el detector devolvio `user`, `admin`, `both`, `both` para compartido y `none` en sus cinco matrices. El propio diff operativo fue clasificado `none`.
+- PR #52 fusionado en `main` mediante commit `dc51e38`. Android CI de PR `29960966172` completo en 10s sin preparar JDK/SDK/Gradle; preflight del publicador `29960966070` completo en 20s; Android CI posterior de `main` `29961022263` completo en 6s y confirmo el mismo alcance `none`.
+- Al no cambiar codigo que entra en APK, este ajuste operativo no incremento versiones ni publico otra APK. La primera medicion real `user` o `admin` se registrara con el siguiente ticket Android de una sola app; no se genero un cambio artificial para forzarla.
 
 ## Publicacion DEV 275 - rollback de apertura anticipada DAG - 2026-07-22
 
