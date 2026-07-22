@@ -112,6 +112,7 @@ class DagBrowserViewModel
 
         private suspend fun refreshCalibrationFromDev() {
             val activation = activationRepository.currentActivation() ?: return
+            runCatching { calibrationRepository.flushPending(activation.deviceId) }
             val result = runCatching { calibrationRepository.refresh(activation.deviceId) }.getOrNull()
             if (result is RemoteResult.Success) {
                 mutableState.update { it.copy(calibrationVersion = calibrationRepository.currentVersion()) }
@@ -147,7 +148,11 @@ class DagBrowserViewModel
                 val activation = activationRepository.currentActivation() ?: return@launch
                 runCatching {
                     calibrationRepository.submitReview(activation.deviceId, thumbnail, classification)
-                }.onFailure { Log.d("DagCalibration", "candidate_upload_failed") }
+                }.onSuccess { result ->
+                    if (result == DagCalibrationDeliveryResult.Queued) {
+                        Log.d("DagCalibration", "candidate_queued_for_retry")
+                    }
+                }.onFailure { Log.d("DagCalibration", "candidate_outbox_failed") }
             }
         }
 
@@ -164,10 +169,13 @@ class DagBrowserViewModel
                     mutableState.update {
                         it.copy(
                             message =
-                                if (result is RemoteResult.Success) {
-                                    "Foto marcada para revisar en Calibración DAG."
-                                } else {
-                                    "La foto quedó difuminada, pero no se pudo enviar para revisión."
+                                when (result) {
+                                    DagCalibrationDeliveryResult.Accepted ->
+                                        "Foto marcada para revisar en Calibración DAG."
+                                    DagCalibrationDeliveryResult.Queued ->
+                                        "Foto guardada; se enviará para revisión cuando vuelva la conexión."
+                                    is DagCalibrationDeliveryResult.Rejected ->
+                                        "La foto quedó difuminada, pero el servidor no la agregó a revisión."
                                 },
                         )
                     }
@@ -198,10 +206,13 @@ class DagBrowserViewModel
                     mutableState.update {
                         it.copy(
                             message =
-                                if (result is RemoteResult.Success) {
-                                    "Foto enviada para revisar un posible falso positivo."
-                                } else {
-                                    "No se pudo enviar la foto para revisión."
+                                when (result) {
+                                    DagCalibrationDeliveryResult.Accepted ->
+                                        "Foto enviada para revisar un posible falso positivo."
+                                    DagCalibrationDeliveryResult.Queued ->
+                                        "Foto guardada; se enviará para revisión cuando vuelva la conexión."
+                                    is DagCalibrationDeliveryResult.Rejected ->
+                                        "El servidor no agregó la foto a revisión."
                                 },
                         )
                     }

@@ -341,8 +341,8 @@ Flujo de una entrada:
 | DAG-SHARE-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Compartir de forma segura el enlace de la pagina actual desde DAG | S | Medio |
 | DAG-AUTOCOMPLETE-02 | Implementado DEV 238; pendiente prueba fisica | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
 | DAG-CAPTCHA-01 | Publicado DEV 271; iframe visible pero flujo aun falla | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
-| DAG-CAPTCHA-02 | Propuesto; diagnostico 2026-07-22 | P1 | Completar una sesion CAPTCHA temporal y aislada sin abrir iframes generales | L | Alto |
-| DAG-CALIBRATION-DELIVERY-11 | Propuesto; causa de perdida confirmada en cliente | P0 | Garantizar entrega, confirmacion y reintento de revisiones DAG privadas | L | Alto |
+| DAG-CAPTCHA-02 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P1 | Completar una sesion CAPTCHA temporal y aislada sin abrir iframes generales | L | Alto |
+| DAG-CALIBRATION-DELIVERY-11 | Implementado candidato DEV 272; pendiente publicacion y prueba integral | P0 | Garantizar entrega, confirmacion y reintento de revisiones DAG privadas | L | Alto |
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
@@ -1129,7 +1129,7 @@ Flujo de una entrada:
 
 #### DAG-CAPTCHA-02 - Sesion CAPTCHA temporal y aislada
 
-- Estado: `Propuesto`; diagnostico preparado el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: compatibilidad Web, privacidad y seguridad. Prioridad: P1.
+- Estado: `Implementado candidato DEV 272`; autorizado el 2026-07-22, pendiente publicacion y validacion fisica. Tipo: compatibilidad Web, privacidad y seguridad. Prioridad: P1.
 - Evidencia: el usuario confirma que el CAPTCHA de MiBA sigue sin funcionar con DEV 271. La ampliacion anterior solo evita eliminar el iframe inicial de reCAPTCHA, hCaptcha o Turnstile; no garantiza el protocolo completo del desafio.
 - Diagnostico: WebView rechaza todas las cookies de terceros, elimina todo canvas, bloquea `blob:`, registro de Service Workers, ventanas auxiliares y navegaciones externas. Un proveedor puede necesitar parte de esas capacidades, rutas o hosts durante la sesion y fallar aunque su iframe sea visible. Habilitarlas globalmente seria una regresion de privacidad y una ruta de contenido no analizado.
 - Alcance propuesto: detectar un desafio cerrado de proveedor conocido dentro de una pagina HTTPS ya permitida; crear una sesion efimera por pagina/proveedor; permitir solo las capacidades minimas demostradas por el flujo real; mantener la imagen del desafio dentro de la politica acordada; aceptar el token de respuesta en la pagina principal; y limpiar cookies/estado temporal al completar, vencer, navegar o cerrar la pestaña.
@@ -1143,6 +1143,7 @@ Flujo de una entrada:
   - terminar, vencer, cambiar de sitio o cerrar pestaña elimina el estado temporal sin afectar otras paginas;
   - un sitio bloqueado o incierto no usa CAPTCHA para abrir contenido ni navegacion externa;
   - pruebas registran solo proveedor, etapa y codigo de fallo; nunca token, respuesta, imagen, URL completa ni datos del formulario.
+- Implementacion: el cliente conserva una lista nativa cerrada de rutas HTTPS para reCAPTCHA, Cloudflare Turnstile y hCaptcha. Al detectar un iframe valido habilita cookies de terceros solamente en ese `WebView` durante hasta dos minutos, conserva las APIs internas del documento del proveedor y cierra la sesion al navegar o vencer el plazo. No habilita ventanas, descargas, camara, microfono, ubicacion ni iframes generales.
 
 #### DAG-TABS-UX-02 - Selector reciente, limpio y sin vacias duplicadas
 
@@ -1500,7 +1501,7 @@ Flujo de una entrada:
 
 #### DAG-CALIBRATION-DELIVERY-11 - Entrega confirmada y recuperable
 
-- Estado: `Propuesto`; causa de perdida confirmada en el cliente el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: confiabilidad Android, privacidad, Storage y operacion Super Admin. Prioridad: P0.
+- Estado: `Implementado candidato DEV 272`; autorizado el 2026-07-22, pendiente publicacion y prueba integral. Tipo: confiabilidad Android, privacidad, Storage y operacion Super Admin. Prioridad: P0.
 - Evidencia: el usuario reporta que fotos dudosas o marcadas para revision no aparecen en Calibracion DAG. Una tarjeta con miniatura fallida seguiria apareciendo como `Miniatura no disponible`; la ausencia total apunta principalmente a que la fila nunca se inserto, fue filtrada/vencio o el envio se perdio antes de confirmarse. No se consultaron filas DEV ni se modificaron datos durante este diagnostico.
 - Causas confirmadas en Android: el envio automatico envuelve `submitReview` en `runCatching` pero ignora un `RemoteResult.Failure`; no hay outbox persistente ni reintento. En el modo manual, `takeManualCalibrationCandidate` retira el candidato de memoria antes del acuse remoto; si la URL JavaScript no coincide con la normalizada, no encuentra candidato y no envia. Un 403, 429, 503 o corte de red puede perder el caso y no existe estado recuperable.
 - Alcance propuesto Android: outbox local cifrado y acotado para miniatura, hash, modelo, señales, puntajes, origen y resultado solicitado; identidad estable por hash en vez de URL mutable; estados `Enviando`, `Enviado` y `Pendiente de enviar`; WorkManager con backoff y restricciones de red; conservar el candidato hasta un acuse valido; deduplicacion e idempotencia; expiracion y borrado seguro.
@@ -1517,6 +1518,7 @@ Flujo de una entrada:
   - el caso aceptado aparece en Super Admin, su miniatura privada abre con URL firmada y el conteo coincide con el acuse;
   - pruebas cubren online, offline, reinicio, duplicado, token invalido, limite, Storage fallido, DB fallida, vencimiento y limpieza local;
   - asesores de seguridad/rendimiento, RLS y denegacion a `anon`/`authenticated` se verifican antes de aplicar exclusivamente en DEV.
+- Implementacion Android: cada envio se cifra con AES-GCM respaldado por Android Keystore y se persiste antes de iniciar la llamada. La cola admite hasta 24 miniaturas, vence localmente a los siete dias, deduplica por dispositivo/accion/hash/modelo y WorkManager reintenta con red y backoff exponencial incluso tras reiniciar el proceso. Solo `accepted:true` se muestra como enviado; `accepted:false` es rechazo terminal y 400/403 no se reintentan indefinidamente. La Edge Function existente ya devuelve el acuse estructurado y deduplica por dispositivo/hash/modelo, por lo que este candidato no requiere migracion ni despliegue Supabase.
 
 ### AI-SEARCH-01A - Intencion semantica local compacta
 
