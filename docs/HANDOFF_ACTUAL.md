@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-21:
 
 ```text
-App Usuario versionCode 270
-App Admin versionCode 270
+App Usuario versionCode 271
+App Admin versionCode 271
 versionName 1.0.1-dev
 ```
 
@@ -68,15 +68,15 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-270-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-270-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-271-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-271-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 8ab8c63bd0bb1a8746170eb176820306a0042eda9f7e95829b3e74e7d8e40510
-Admin   ee44aa950b50fc3a80fa4520192e91eb147ee6eba61b9e1e2febbc95966cc25e
+Usuario a24c52f4e87925c0fd3630a2e386c6a23005b847cbae683257dfae4ca6839d9c
+Admin   9fe20c90894c2eecf8151cd44db34122fcf2dbd80318c8bcc11a769b8b664a9d
 ```
 
 ## Publicacion DEV 270 - UX agrupada y umbral de 100 horas - 2026-07-21
@@ -86,14 +86,16 @@ Admin   ee44aa950b50fc3a80fa4520192e91eb147ee6eba61b9e1e2febbc95966cc25e
 - Verificacion externa: ambos manifiestos publicos declaran 270 y sus APK recalculan exactamente los SHA-256 de este handoff. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, `minSdk 29` y `targetSdk 36`; `apksigner` confirma el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 - Cobertura publicada: listas continuas, estados persistentes, indicadores de seguridad, Web/Ajustes, barras del sistema, movimiento, preferencia local del launcher DAG y aviso Admin ordinario despues de 100 horas. Sin telefono conectado, los recorridos visuales, reposo prolongado y cache del launcher OEM siguen pendientes de prueba fisica.
 
-## Candidato DEV 271 - interaccion Web y CAPTCHA general - 2026-07-21
+## Publicacion DEV 271 - interaccion Web, CAPTCHA y velocidad DAG - 2026-07-21
 
 - `DAG-WEB-INTERACTION-02`: se corrigio el recorrido profundo que el observador DOM repetia ante cada cambio de clase o estilo. Las mutaciones de atributos revisan solo el nodo afectado; los subarboles nuevos y el documento inicial conservan inspeccion profunda. Zara Argentina es la referencia funcional para menus dinamicos.
 - `DAG-CAPTCHA-01`: la excepcion deja de depender de una unica URL de CABA. Dentro de paginas HTTPS ya permitidas por DAG se aceptan solamente iframes HTTPS con rutas cerradas de Google reCAPTCHA, hCaptcha o Cloudflare Turnstile; el resto de los iframes sigue bloqueado.
 - No se habilitaron iframes generales, video, audio ni canvas; no se relajaron la clasificacion local de imagenes ni las decisiones de pagina.
-- Validacion automatica local: tests unitarios DEV de App Usuario y ktlint correctos. Pendiente CI completo, publicacion DEV y comprobacion funcional en Zara y MiBA/CAPTCHA.
+- Validacion automatica: tests unitarios DEV de App Usuario, ktlint y builds locales de Usuario/Admin correctos. Android CI `29886148340` completo build, unitarios, ktlint, Android Lint y Detekt. PR #35 y #36 fusionados.
 - `DAG-LOCAL-IMAGE-PERF-03`: dos clasificadores TFLite locales trabajan con concurrencia limitada; la primera pantalla recibe prioridad, se precarga solo la siguiente y el asentamiento visual baja de 1.200 a 300 ms. No se incorporaron servicios externos, claves ni persistencia de fotos.
 - Rendimiento pendiente de medicion fisica antes/despues en la misma pagina y dispositivo. La cache entre paginas por hash y NNAPI adaptativo no se habilitan sin invalidacion de calibracion y benchmarks seguros.
+- Publicacion oficial: el primer workflow `29886599426` se detuvo antes de subir archivos porque faltaban las notas DEV 271. PR #37 agrego las notas y el workflow `29887062901` publico correctamente ambos APK en Supabase DEV, sin reparacion de misma version y sin tocar Production.
+- Verificacion externa: los manifiestos publicos declaran versionCode 271 y versionName `1.0.1-dev`; los APK descargados recalculan exactamente los SHA-256 documentados arriba. Pendiente instalacion y recorrido fisico de Zara, MiBA/CAPTCHA y medicion comparativa de carga visual.
 
 ## Validacion fisica DEV 270 en Samsung SM-A235M - 2026-07-21
 
