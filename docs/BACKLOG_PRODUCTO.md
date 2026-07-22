@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-21
+Ultima sincronizacion: 2026-07-22
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -44,7 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 270 y App Admin DEV 270, `1.0.1-dev`.
+- Estado publicado: App Usuario DEV 271 y App Admin DEV 271, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -309,7 +309,10 @@ Flujo de una entrada:
 | BARRIER-LAUNCHER-01 | Resuelto y validado DEV 242 en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
-| DAG-WEB-INTERACTION-02 | Causa identificada; implementacion en curso | P1 | Evitar que el saneamiento DAG congele menus y controles dinamicos de paginas permitidas | M | Medio |
+| DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
+| DAG-WEB-INTERACTION-03 | Propuesto; diagnostico 2026-07-22 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
+| DAG-SEARCH-CONTINUITY-03 | Propuesto; causa confirmada | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
+| DAG-PROTECTED-MODE-UX-04 | Propuesto; causa confirmada | P2 | Quitar o explicar claramente el mensaje tecnico de proteccion adicional | S | Bajo |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | Corregido DEV 239; pendiente prueba fisica | P2 | Integrar la zona de camara con DAG y evitar recortar el texto de busqueda | S | Bajo |
@@ -337,7 +340,9 @@ Flujo de una entrada:
 | DAG-REQUEST-STATUS-01 | Implementado parcial DEV 238; ampliacion pendiente | P1 | Deduplicar pedidos, restringir reenvio y avisar visualmente/push cuando Admin resuelve | L | Medio |
 | DAG-SHARE-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Compartir de forma segura el enlace de la pagina actual desde DAG | S | Medio |
 | DAG-AUTOCOMPLETE-02 | Implementado DEV 238; pendiente prueba fisica | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
-| DAG-CAPTCHA-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
+| DAG-CAPTCHA-01 | Publicado DEV 271; iframe visible pero flujo aun falla | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
+| DAG-CAPTCHA-02 | Propuesto; diagnostico 2026-07-22 | P1 | Completar una sesion CAPTCHA temporal y aislada sin abrir iframes generales | L | Alto |
+| DAG-CALIBRATION-DELIVERY-11 | Propuesto; causa de perdida confirmada en cliente | P0 | Garantizar entrega, confirmacion y reintento de revisiones DAG privadas | L | Alto |
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
@@ -805,7 +810,7 @@ Flujo de una entrada:
 
 #### DAG-WEB-INTERACTION-02 - Menus y controles dinamicos de paginas permitidas
 
-- Estado: `Causa identificada el 2026-07-21; implementacion y validacion en curso`. Tipo: bug funcional, rendimiento del hilo principal y compatibilidad WebView. Prioridad: P1.
+- Estado: `Publicado en DEV 271; mejora parcial y seguimiento abierto`. Tipo: bug funcional, rendimiento del hilo principal y compatibilidad WebView. Prioridad: P1.
 - Problema: menus y otros controles propios de algunas paginas permitidas no abren dentro de DAG. Zara Argentina es el caso de referencia aportado por el usuario; su menu funciona en un navegador normal.
 - Causa: el observador de seguridad reaccionaba a cada cambio de `class` o `style` recorriendo nuevamente todos los descendientes del nodo y calculando sus fondos. En aplicaciones Web grandes y dinamicas, una interaccion puede provocar trabajo sincronico masivo antes de que el panel se dibuje.
 - Alcance: en mutaciones de atributos, volver a revisar solamente el elemento que cambio. El recorrido profundo se conserva para el documento inicial y para subarboles nuevos, por lo que no se relaja la inspeccion de imagenes, fondos, video, audio, canvas o iframes incorporados dinamicamente.
@@ -819,6 +824,55 @@ Flujo de una entrada:
   - nodos nuevos siguen siendo inspeccionados profundamente antes de quedar disponibles;
   - menus, acordeones, selectores y dialogos de paginas permitidas conservan interaccion sin habilitar video, audio, canvas o iframes ordinarios;
   - las pruebas automaticas cubren la diferencia entre mutacion de atributos y agregado de subarboles, y la comprobacion funcional incluye Zara y otra aplicacion Web dinamica.
+- Resultado DEV 271: las mutaciones de atributos revisan solo el nodo afectado. El usuario reporto despues de la publicacion que el menu de Zara y otros botones siguen fallando; el recorrido profundo de subarboles nuevos queda fuera del fix original y pasa a `DAG-WEB-INTERACTION-03`.
+
+#### DAG-WEB-INTERACTION-03 - Subarboles dinamicos sin bloqueo del hilo principal
+
+- Estado: `Propuesto`; diagnostico preparado el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: bug funcional, rendimiento WebView y seguridad de contenido. Prioridad: P1.
+- Evidencia: el usuario confirma que DEV 271 no resolvio todos los botones. En un navegador normal, el menu actual de Zara Argentina abre correctamente y crea un dialogo grande con pestañas, acordeones y muchos enlaces; no depende de canvas. En DAG, cada nodo agregado puede activar `dagSecureNode(node, true)`, que recorre sincronamente videos, audios, canvas, iframes, imagenes y fondos de todo el subarbol.
+- Diagnostico: DEV 271 corrigio la ruta de cambios de atributos, pero no la insercion o hidratacion de subarboles grandes. Registros solapados del `MutationObserver` pueden volver a recorrer descendientes y competir con el evento tactil y el pintado del menu. Service Workers bloqueados, iframes eliminados y otras restricciones pueden explicar sitios diferentes y deben distinguirse mediante codigos diagnosticos locales, no relajarse en conjunto.
+- Alcance propuesto: cola unica de saneamiento por pagina, deduplicada por raiz; bloqueo inmediato por CSS/intercepcion para video, audio, canvas, iframes e imagenes mientras el trabajo se procesa; recorrido acotado por lote fuera del callback del observador; cancelacion por navegacion; y diagnostico local por capacidad bloqueada. No agregar excepciones por dominio para Zara.
+- Esfuerzo: M estimado. Riesgo: alto; diferir demasiado el saneamiento podria mostrar contenido antes de decidir y hacerlo completamente sincronico mantiene el congelamiento.
+- Dependencias: `DAG-WEB-INTERACTION-02`, `DagWebViewComponents`, `MutationObserver`, intercepcion local de imagenes, ciclo de vida de pagina y pruebas WebView/instrumentadas.
+- Criterios de aceptacion:
+  - el menu actual de Zara abre y cierra, permite cambiar categoria y desplegar un acordeon sin congelamiento ni doble toque;
+  - otra aplicacion Web dinamica con dialogo o drawer pasa el mismo recorrido para evitar una excepcion puntual;
+  - subarboles agregados se deduplican y procesan por lotes con un presupuesto medible del hilo principal;
+  - video, audio, canvas, iframes no autorizados e imagenes no clasificadas permanecen invisibles desde su insercion;
+  - cambiar de pagina cancela la cola anterior y no mezcla nodos ni decisiones;
+  - pruebas automaticas cubren raices solapadas, rafagas de mutaciones, cancelacion y barreras inmediatas; la aceptacion final incluye prueba fisica con DEV publico.
+
+#### DAG-SEARCH-CONTINUITY-03 - Buscar aunque la consulta sea incierta
+
+- Estado: `Propuesto`; causa confirmada el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: comportamiento de busqueda, precision local y UX. Prioridad: P1.
+- Problema: DAG a veces no consulta el buscador y muestra `no tiene suficiente certeza`, obligando a reformular incluso consultas legitimas. El usuario rechazo expresamente este comportamiento.
+- Causa confirmada: `DagBrowserViewModel.search` cancela la busqueda antes de `DagSearchRepository.search` cuando `classifyQuery` devuelve `Uncertain`. Esa salida incluye terminos ambiguos, contexto sensible, confianza semantica media y modelo no disponible; hoy todos reciben el mismo tratamiento aunque no exista una regla dura de bloqueo.
+- Decision de producto propuesta: una consulta incierta pero no bloqueada debe continuar una sola vez hacia Brave. DAG filtra cada resultado y vuelve a analizar cada pagina; resultados bloqueados no se muestran y paginas ambiguas abren con las barreras preventivas existentes. Reglas Admin, dominios prohibidos, terminos explicitos y evidencia semantica alta siguen bloqueando antes de consumir una consulta.
+- Privacidad y costo: continuar envia a Brave la consulta que el usuario decidio buscar y consume el cupo normal; no agrega telemetria, cache remoto ni historial en Supabase. Un estado tecnico de modelo ausente debe registrarse sin incluir la consulta.
+- Esfuerzo: M estimado. Riesgo: alto; permitir indiscriminadamente toda incertidumbre podria enviar o mostrar una intencion que debia bloquearse, y reintentos pueden duplicar consumo.
+- Dependencias: clasificador de consulta, embudo de resultados, contador Brave, `DagSearchRequestTracker`, politica adaptativa de pagina y mensajes DAG.
+- Criterios de aceptacion:
+  - una consulta cotidiana clasificada `Uncertain` ejecuta exactamente una busqueda y nunca pide reformular por falta de certeza;
+  - resultados se filtran individualmente y una pagina incierta se analiza de forma preventiva antes de mostrarse;
+  - reglas duras, categorias explicitas, dominios y plataformas bloqueadas siguen cerrando antes de Brave;
+  - doble toque, sugerencias y cambio de pestaña no duplican consultas ni mezclan resultados;
+  - modelo ausente o corrupto tiene una politica explicita y probada, sin permitir por accidente ni exponer la consulta en logs;
+  - tests incluyen español, ingles y hebreo, contexto educativo/medico, terminos ambiguos y riesgo explicito.
+
+#### DAG-PROTECTED-MODE-UX-04 - Estado preventivo entendible
+
+- Estado: `Propuesto`; causa confirmada el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: claridad UX y explicabilidad. Prioridad: P2.
+- Problema: el mensaje `Abierto con proteccion adicional` no explica qué ocurrio, qué cambia ni si el usuario debe hacer algo.
+- Significado tecnico actual: aparece cuando el texto esta vacio, la clasificacion es incierta o la evidencia semantica no alcanza el bloqueo. La pagina se muestra con las barreras Web normales y no se guarda como aprobacion rapida completa. No activa un segundo antivirus, una VPN distinta ni una revision humana automatica.
+- Solucion recomendada: no mostrar un aviso persistente cuando no hay una accion necesaria. Mantener `Analizando` durante la compuerta y luego abrir la pagina normalmente; si se conserva una explicacion, usar una ayuda breve y accesible como `Modo preventivo: DAG seguirá revisando esta página`, sin prometer proteccion total.
+- Esfuerzo: S estimado. Riesgo: bajo; ocultar demasiado contexto puede dificultar soporte, mientras que un mensaje tecnico permanente confunde y parece un error.
+- Dependencias: `DAG-SEARCH-CONTINUITY-03`, estado de pagina, linea de feedback y accesibilidad.
+- Criterios de aceptacion:
+  - una pagina abierta no muestra `proteccion adicional` como error ni exige una accion inexistente;
+  - el usuario puede entender en lenguaje simple que DAG sigue filtrando contenido;
+  - `Analizando`, `Bloqueado`, `Sin conexion` y `Pendiente de aprobacion` permanecen diferenciados;
+  - el mensaje no tapa controles ni reaparece en cada mutacion o navegacion interna;
+  - TalkBack y fuente grande comunican el estado sin texto recortado.
 
 #### DAG-HOME-UX-01 - Home con buscador central
 
@@ -1050,7 +1104,7 @@ Flujo de una entrada:
 
 #### DAG-CAPTCHA-01 - Compatibilidad segura y general con CAPTCHA
 
-- Estado: `Implementado de forma puntual en DEV 238; ampliacion general aprobada el 2026-07-21 y en curso`. Tipo: bug de compatibilidad Web y seguridad. Prioridad: P1.
+- Estado: `Publicado en DEV 271; iframe habilitado pero flujo real aun falla`. Tipo: bug de compatibilidad Web y seguridad. Prioridad: P1.
 - Problema: DAG no muestra el CAPTCHA de la pagina de multas de CABA, por lo que el usuario no puede completar el tramite aunque la pagina principal sea accesible.
 - Solucion propuesta: incorporar un tratamiento acotado para desafios CAPTCHA utilizados por paginas permitidas, cargando solamente los recursos, scripts, iframes y comunicaciones indispensables del proveedor validado. El desafio y su resultado deben permanecer dentro de la navegacion protegida y no convertirse en una excepcion general para contenido externo.
 - Resultado DEV 238: la primera excepcion quedo limitada a Google reCAPTCHA y a una URL exacta de CABA. La ampliacion aprobada permite iframes HTTPS con rutas cerradas de Google reCAPTCHA, hCaptcha y Cloudflare Turnstile dentro de cualquier pagina principal que DAG ya haya permitido; todos los iframes ordinarios siguen eliminados y las imagenes del desafio conservan la intercepcion/clasificacion local. MiBA es el caso de referencia aportado por el usuario.
@@ -1067,6 +1121,23 @@ Flujo de una entrada:
   - sitios bloqueados o inciertos no usan el soporte CAPTCHA para evitar su decision;
   - se prueban desafio correcto, vencido, recarga, error de red, modo claro/oscuro y regreso desde segundo plano.
 - Validacion pendiente: comprobar en el telefono MiBA y el tramite de infracciones, incluyendo checkbox, desafio visual cuando aparezca, vencimiento, recarga y regreso desde segundo plano. Proveedores nuevos requieren ampliar explicitamente la lista cerrada; ningun sitio hereda permiso para iframes ordinarios.
+
+#### DAG-CAPTCHA-02 - Sesion CAPTCHA temporal y aislada
+
+- Estado: `Propuesto`; diagnostico preparado el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: compatibilidad Web, privacidad y seguridad. Prioridad: P1.
+- Evidencia: el usuario confirma que el CAPTCHA de MiBA sigue sin funcionar con DEV 271. La ampliacion anterior solo evita eliminar el iframe inicial de reCAPTCHA, hCaptcha o Turnstile; no garantiza el protocolo completo del desafio.
+- Diagnostico: WebView rechaza todas las cookies de terceros, elimina todo canvas, bloquea `blob:`, registro de Service Workers, ventanas auxiliares y navegaciones externas. Un proveedor puede necesitar parte de esas capacidades, rutas o hosts durante la sesion y fallar aunque su iframe sea visible. Habilitarlas globalmente seria una regresion de privacidad y una ruta de contenido no analizado.
+- Alcance propuesto: detectar un desafio cerrado de proveedor conocido dentro de una pagina HTTPS ya permitida; crear una sesion efimera por pagina/proveedor; permitir solo las capacidades minimas demostradas por el flujo real; mantener la imagen del desafio dentro de la politica acordada; aceptar el token de respuesta en la pagina principal; y limpiar cookies/estado temporal al completar, vencer, navegar o cerrar la pestaña.
+- No alcance: iframes generales, video/audio, ventanas arbitrarias, descargas, permisos de camara/microfono/ubicacion, persistencia de seguimiento o excepciones abiertas por dominio principal.
+- Esfuerzo: L estimado. Riesgo: alto; una lista incompleta rompe el tramite y una lista amplia permite rastreo o contenido externo fuera de control.
+- Dependencias: `DAG-CAPTCHA-01`, CookieManager/WebView, saneamiento DOM, hosts/rutas por proveedor, ciclo de vida de pestaña y pruebas instrumentadas. MiBA y el tramite de infracciones son referencias, no allowlists de producto.
+- Criterios de aceptacion:
+  - MiBA y el tramite oficial de infracciones completan checkbox, desafio cuando aparezca y envio del formulario dentro de DAG;
+  - desafio correcto, incorrecto, vencido, recargado y retomado desde segundo plano tienen estados claros;
+  - solo el proveedor detectado recibe capacidades temporales y todos los iframes ordinarios siguen bloqueados;
+  - terminar, vencer, cambiar de sitio o cerrar pestaña elimina el estado temporal sin afectar otras paginas;
+  - un sitio bloqueado o incierto no usa CAPTCHA para abrir contenido ni navegacion externa;
+  - pruebas registran solo proveedor, etapa y codigo de fallo; nunca token, respuesta, imagen, URL completa ni datos del formulario.
 
 #### DAG-TABS-UX-02 - Selector reciente, limpio y sin vacias duplicadas
 
@@ -1421,6 +1492,26 @@ Flujo de una entrada:
 - Cierre DEV 253: tests Android y Web correctos; una sola publicacion Supabase DEV; manifiestos, hashes, paquetes y firma verificados; Edge v3 recibio lectura autenticada y casos reales; Superweb Vercel `bfab78d` desplego `/dag-calibration` y el acceso anonimo redirigio a Login.
 - Cierre DEV 255: matriz local de 903 tareas Android y controles Web correctos; Android CI `29608399118` y publicacion unica `29608399103` exitosos. Ambos manifiestos, hashes, paquetes, SDK y firma fueron verificados publicamente en 255. Edge v6 y las dos migraciones nuevas estan activas solo en DEV, sin archivar ni borrar las 106 revisiones existentes. Vercel sirve `b54f7cd` y sus rutas privadas pasaron la verificacion anonima. Pendiente el recorrido autenticado de `Borrar todas` y Calibracion DAG; no habia telefono ADB visible para la prueba fisica.
 - Cierre DEV 256: la matriz Android final completo 903 tareas y la repeticion Usuario posterior al hallazgo fisico completo 690; TypeScript, ESLint y build Next correctos. SM-A235M con ambas APK 256 confirmo el menu, dialogo, X visibles, blur inmediato y un pendiente `manual_dag` real. Edge v8 y la migracion nueva estan activas solo en DEV. El ejemplo de telefono marcado durante QA queda pendiente y no se borro, para verificar su insignia y revision desde la Superweb.
+
+#### DAG-CALIBRATION-DELIVERY-11 - Entrega confirmada y recuperable
+
+- Estado: `Propuesto`; causa de perdida confirmada en el cliente el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: confiabilidad Android, privacidad, Storage y operacion Super Admin. Prioridad: P0.
+- Evidencia: el usuario reporta que fotos dudosas o marcadas para revision no aparecen en Calibracion DAG. Una tarjeta con miniatura fallida seguiria apareciendo como `Miniatura no disponible`; la ausencia total apunta principalmente a que la fila nunca se inserto, fue filtrada/vencio o el envio se perdio antes de confirmarse. No se consultaron filas DEV ni se modificaron datos durante este diagnostico.
+- Causas confirmadas en Android: el envio automatico envuelve `submitReview` en `runCatching` pero ignora un `RemoteResult.Failure`; no hay outbox persistente ni reintento. En el modo manual, `takeManualCalibrationCandidate` retira el candidato de memoria antes del acuse remoto; si la URL JavaScript no coincide con la normalizada, no encuentra candidato y no envia. Un 403, 429, 503 o corte de red puede perder el caso y no existe estado recuperable.
+- Alcance propuesto Android: outbox local cifrado y acotado para miniatura, hash, modelo, señales, puntajes, origen y resultado solicitado; identidad estable por hash en vez de URL mutable; estados `Enviando`, `Enviado` y `Pendiente de enviar`; WorkManager con backoff y restricciones de red; conservar el candidato hasta un acuse valido; deduplicacion e idempotencia; expiracion y borrado seguro.
+- Alcance propuesto backend/Superweb: respuesta estructurada distingue `accepted`, deduplicado, rechazo de evidencia clara, limite y error recuperable; Android no interpreta cualquier HTTP 2xx como entrega; Super Admin permite diagnosticar conteos por estado sin exponer contenido; las miniaturas privadas siguen usando URL firmada breve. Cualquier cambio de tabla o RPC debe mantener RLS y autorizacion por dispositivo y Super Admin; nunca Service Role en Android.
+- Privacidad: no enviar original, URL, consulta, texto de pagina ni historial. La cola local debe cifrarse, tener maximo de tamaño/edad, borrarse tras acuse o vencimiento y excluirse de backups si corresponde.
+- Esfuerzo: L estimado. Riesgo: alto; reintentos no idempotentes pueden duplicar casos, una cola sin limites retiene datos sensibles y un acuse ambiguo puede declarar enviada una revision inexistente.
+- Dependencias: `DagCalibrationRepository`, `DagBrowserViewModel`, `DagImageResourceLoader`, Room/WorkManager, Edge Function `dag-calibration`, Storage privado, RPC Super Admin y version de calibracion. Solo Supabase DEV `syeycayasyufedwoprea`; no Production.
+- Criterios de aceptacion:
+  - una revision automatica, X o R no desaparece hasta recibir un acuse estructurado y verificable;
+  - sin red, tras reinicio de app/proceso y ante 429/503, queda `Pendiente de enviar` y se reintenta sin duplicar;
+  - 400/403 no se reintentan indefinidamente y muestran una accion simple mientras Logcat conserva solo un codigo no sensible;
+  - una URL DOM distinta para el mismo contenido se resuelve por identidad estable y no pierde el candidato;
+  - `accepted:false` por evidencia clara o limite no se presenta como `Enviado`; cada resultado tiene un estado entendible;
+  - el caso aceptado aparece en Super Admin, su miniatura privada abre con URL firmada y el conteo coincide con el acuse;
+  - pruebas cubren online, offline, reinicio, duplicado, token invalido, limite, Storage fallido, DB fallida, vencimiento y limpieza local;
+  - asesores de seguridad/rendimiento, RLS y denegacion a `anon`/`authenticated` se verifican antes de aplicar exclusivamente en DEV.
 
 ### AI-SEARCH-01A - Intencion semantica local compacta
 

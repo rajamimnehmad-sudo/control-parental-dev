@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-21
+Fecha de corte: 2026-07-22
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -96,6 +96,16 @@ Admin   9fe20c90894c2eecf8151cd44db34122fcf2dbd80318c8bcc11a769b8b664a9d
 - Rendimiento pendiente de medicion fisica antes/despues en la misma pagina y dispositivo. La cache entre paginas por hash y NNAPI adaptativo no se habilitan sin invalidacion de calibracion y benchmarks seguros.
 - Publicacion oficial: el primer workflow `29886599426` se detuvo antes de subir archivos porque faltaban las notas DEV 271. PR #37 agrego las notas y el workflow `29887062901` publico correctamente ambos APK en Supabase DEV, sin reparacion de misma version y sin tocar Production.
 - Verificacion externa: los manifiestos publicos declaran versionCode 271 y versionName `1.0.1-dev`; los APK descargados recalculan exactamente los SHA-256 documentados arriba. Pendiente instalacion y recorrido fisico de Zara, MiBA/CAPTCHA y medicion comparativa de carga visual.
+
+## Diagnostico posterior a DEV 271 - confiabilidad DAG - 2026-07-22
+
+- Evidencia reportada por el usuario, todavía no reproducida mediante ADB en este checkout: el menu de Zara y algunos botones de otras paginas siguen sin responder; el CAPTCHA de MiBA sigue sin completar su flujo; algunas fotos dudosas o marcadas para revision no aparecen en Calibracion DAG de Super Admin; y ciertas consultas se detienen con `DAG no tiene suficiente certeza`.
+- Interaccion Web: DEV 271 elimino el recorrido profundo ante una mutacion de `class` o `style`, pero un menu moderno puede insertar un subarbol grande. El observador todavia inspecciona ese subarbol completo de forma sincronica y puede repetir trabajo sobre nodos agregados solapados. En un navegador normal, Zara Argentina abre un dialogo dinamico grande con categorias, acordeones y enlaces; por eso el seguimiento queda separado como `DAG-WEB-INTERACTION-03`.
+- Busqueda: la causa del mensaje de certeza esta confirmada en Android. `DagBrowserViewModel.search` cancela la operacion cuando `classifyQuery` devuelve `Uncertain`, antes de llamar al buscador. El producto solicitado es continuar la busqueda en modo preventivo y conservar el bloqueo solamente para reglas duras o evidencia explicita/alta; ticket `DAG-SEARCH-CONTINUITY-03`.
+- Mensaje preventivo: `Abierto con proteccion adicional` significa que el texto fue vacio, incierto o moderadamente riesgoso y que la pagina no se guarda como aprobacion rapida. No activa una segunda tecnologia distinta: DAG mantiene sus barreras normales de imagenes, video, descargas, ventanas y navegacion. El texto actual es ambiguo y queda en `DAG-PROTECTED-MODE-UX-04`.
+- CAPTCHA: DEV 271 habilita el iframe inicial, pero WebView sigue rechazando cookies de terceros, todo canvas, ventanas auxiliares, `blob:` y Service Workers. Esas restricciones pueden impedir la sesion completa del desafio aunque el cuadro aparezca. El seguimiento `DAG-CAPTCHA-02` debe aislar una sesion temporal por proveedor y comprobar el flujo real sin habilitar iframes generales.
+- Calibracion: los envios automaticos ignoran un `RemoteResult.Failure`; no existe outbox persistente ni reintento y el candidato manual se retira de memoria antes de recibir confirmacion remota. Una falla 403/429/503, un corte de red o una diferencia de URL puede perder el reporte sin dejar una entrega recuperable. `DAG-CALIBRATION-DELIVERY-11` define confirmacion explicita, cola local y reintento seguro. La Edge Function `dag-calibration` permanece activa en DEV y no se modificaron Supabase, Storage ni datos durante este diagnostico.
+- Los cinco seguimientos quedaron propuestos en `docs/BACKLOG_PRODUCTO.md`. Este diagnostico no cambia Android, `versionCode`, APK, backend ni Production; no sustituye las pruebas fisicas de los fixes futuros.
 
 ## Validacion fisica DEV 270 en Samsung SM-A235M - 2026-07-21
 
