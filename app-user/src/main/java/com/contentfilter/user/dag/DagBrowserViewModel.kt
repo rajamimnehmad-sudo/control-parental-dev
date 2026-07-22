@@ -565,7 +565,7 @@ class DagBrowserViewModel
                     address = url,
                     pageAnalysisReady = true,
                     analysisProgress = maxOf(it.analysisProgress, 0.65f),
-                    message = "Abierto con protección adicional.",
+                    message = "",
                     reviewCandidate = null,
                 )
             }
