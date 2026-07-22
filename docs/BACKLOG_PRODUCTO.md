@@ -309,6 +309,7 @@ Flujo de una entrada:
 | BARRIER-LAUNCHER-01 | Resuelto y validado DEV 242 en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
+| DAG-MENU-RELIABILITY-02 | Reportado; pendiente reproduccion y causa raiz | P1 | Garantizar que el menu de tres puntos abra y funcione sobre cualquier pagina o estado DAG | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | Corregido DEV 239; pendiente prueba fisica | P2 | Integrar la zona de camara con DAG y evitar recortar el texto de busqueda | S | Bajo |
@@ -320,6 +321,7 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
+| DAG-LOCAL-IMAGE-PERF-03 | Aprobado; pendiente implementacion y medicion | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
 | DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 259; validado en SM-A235M | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-CALIBRATION-CLOSED-LOOP-10 | Publicado DEV 260; validado en SM-A235M | P0 | Hacer persistentes las decisiones calibradas, separar motivos positivos/negativos y agregar criterio local de mangas/corte sobre rodillas | L | Alto |
 | DAG-AUDIENCE-POLICY-11 | Publicado DEV 261; validación física previa correcta, pendiente repetir APK público | P0 | Permitir imagenes normales de bebes y hombres, aplicar criterio femenino a niñas y mantener ropa interior/desnudez como bloqueo universal | M | Alto |
@@ -801,6 +803,22 @@ Flujo de una entrada:
 - Criterios de aceptacion propuestos: Home y nueva pestana son acciones visibles; atras, adelante y actualizar funcionan desde el menu; Home conserva acceso al menu de tres puntos; los estados no disponibles se ocultan o representan correctamente; no se pierde historial ni estado de pestanas.
 - Decisiones pendientes para el ticket: iconografia, orden y acciones disponibles del menu en Home; gestos alternativos y comportamiento del boton fisico Atras.
 
+#### DAG-MENU-RELIABILITY-02 - Menu disponible sobre cualquier pagina
+
+- Estado: `Reportado por el usuario el 2026-07-21; pendiente reproduccion y causa raiz`. Tipo: bug funcional, navegacion y compatibilidad WebView. Prioridad: P1.
+- Problema: en algunas paginas el boton de tres puntos no abre el menu DAG. La falla deja inaccesibles acciones como Atras, Adelante, Actualizar, Historial y Pendientes de revision.
+- Alcance: diagnosticar las dos variantes actuales del menu, su anclaje y estado compartido, y la interaccion entre Compose, WebView, teclado, overlays del sitio y cambios de estado. No se presume una causa hasta reproducirla.
+- Privacidad y seguridad: la correccion no debe permitir que la pagina capture acciones del menu, superponerse a controles de seguridad ni exponer URL, historial o contenido fuera del dispositivo.
+- Esfuerzo: M estimado. Riesgo: medio; una correccion de capas o foco puede introducir regresiones tactiles, visuales o de navegacion.
+- Dependencias: `DAG-NAV-UX-01`, barra DAG, estados Home/resultados/pagina/analisis/error, WebView, ventanas Compose, teclado, orientacion y pestanas.
+- Duplicados y relacion: seguimiento de confiabilidad de `DAG-NAV-UX-01`; no reabre su rediseno visual ni duplica el comportamiento de Atras.
+- Criterios de aceptacion:
+  - el menu abre al primer toque en Home, resultados, pagina Web visible, analisis, error e historial cuando corresponda;
+  - se dibuja por encima del WebView y de overlays de la pagina, y ningun sitio puede capturar el toque destinado al menu;
+  - las acciones visibles funcionan y sus estados habilitado/deshabilitado son correctos;
+  - cerrar, volver, rotar, mostrar u ocultar el teclado y cambiar de pestana no dejan el menu trabado ni invisible;
+  - existen pruebas automaticas proporcionales para el estado del menu y una comprobacion funcional con al menos una pagina simple y una pagina con overlays.
+
 #### DAG-HOME-UX-01 - Home con buscador central
 
 - Estado: `Resuelto` en DEV 234; aprobado por el usuario e implementado progresivamente desde DEV 224. Pendiente prueba fisica. Tipo: UX, identidad y Home DAG. Prioridad: P2.
@@ -861,6 +879,26 @@ Flujo de una entrada:
 - Alcance: espera justa sin vencimiento interno del turno, cancelacion por generacion al cambiar o cerrar pagina, presupuesto de 400 recursos y cache efimera de 64 entradas/16 MiB. Persisten el timeout de red de ocho segundos, HTTPS, defensa SSRF, maximo de descarga, clasificacion previa y fallo cerrado.
 - Riesgos: una pagina muy grande puede tardar mas en completar su cola y usar mas memoria efimera; los topes siguen acotados y abandonar la pagina cancela el trabajo pendiente.
 - Criterios de aceptacion: al desplazarse por una tienda densa se procesan tambien las fotos posteriores; ninguna imagen se muestra antes de clasificarse; cambiar de pagina no mezcla resultados ni deja trabajo viejo; fallos reales de red o formato permanecen neutros y seguros.
+
+#### DAG-LOCAL-IMAGE-PERF-03 - Apertura local rapida de fotos
+
+- Estado: `Aprobado por el usuario el 2026-07-21; pendiente implementacion, validacion automatica y medicion`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
+- Problema: una pagina con varias fotos puede tardar aproximadamente entre 6 y 8 segundos en completar su primera carga visual porque la descarga, decodificacion y clasificacion local forman una cola costosa y parte del trabajo puede repetirse.
+- Decision aprobada: mantener todo el analisis de imagenes dentro del telefono. No se usara un modelo de IA online, no se enviaran fotos a terceros y no se persistiran originales para acelerar cargas futuras.
+- Solucion propuesta: dos clasificadores locales con limite estricto; prioridad para recursos visibles; una sola decodificacion por imagen; cache efimera de decisiones por hash de contenido, audiencia y version de calibracion; precarga maxima de la siguiente pantalla; y XNNPACK o NNAPI solo cuando una medicion controlada del dispositivo demuestre que mejora el tiempo con fallback seguro.
+- Objetivo de rendimiento, no promesa: intentar reducir una primera carga comparable de 6-8 segundos a aproximadamente 2,5-3,5 segundos, y una repeticion dentro de la misma sesion a aproximadamente 1-2 segundos. El resultado real debe medirse en hardware objetivo y documentarse con percentiles, cantidad y tamano de imagenes.
+- Guardas de seguridad: ninguna imagen se entrega al WebView antes de una decision local; errores, cancelaciones y formatos no admitidos fallan cerrados; cambiar de pagina invalida trabajo viejo; los limites de CPU, memoria, red y concurrencia prevalecen sobre la velocidad.
+- Privacidad de diagnostico: las metricas pueden registrar tiempos, conteos, tamanos, aciertos de cache y tipo de acelerador, pero no URLs, consultas, fotos, miniaturas ni pixeles.
+- Esfuerzo: M estimado. Riesgo: alto; demasiada concurrencia puede empeorar memoria, temperatura o latencia, y una cache mal versionada podria reutilizar una decision obsoleta.
+- Dependencias: `DAG-IMAGE-DELIVERY-02`, politica por audiencia, versiones de calibracion, ciclo de vida de pagina, presupuesto de memoria y modelos TFLite locales.
+- Duplicados y relacion: extiende el rendimiento de la entrega ya implementada; no cambia criterios kosher, umbrales, reglas Admin ni el modo Extra Kosher.
+- Criterios de aceptacion:
+  - las imagenes visibles se atienden antes que la precarga y no quedan bloqueadas detras de recursos fuera de pantalla;
+  - cada recurso se descarga y decodifica como maximo una vez por intento, salvo reintento explicito seguro;
+  - la cache se invalida por cambio de contenido, audiencia o calibracion y se borra al cerrar la sesion o por presion de memoria;
+  - la concurrencia queda limitada a dos clasificaciones y conserva una ruta serial de respaldo;
+  - se comparan antes/despues en la misma pagina y dispositivo, incluyendo primera carga, repeticion, scroll, cambio de pagina, memoria y temperatura;
+  - no se agregan servicios externos, claves, costos por IA ni salida de imagenes del telefono.
 
 #### DAG-ULTRA-KOSHER-01 - Modos de imagenes administrables
 
