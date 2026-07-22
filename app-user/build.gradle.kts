@@ -189,6 +189,7 @@ dependencies {
     implementation(libs.onnxruntime.android)
     implementation(libs.onnxruntime.extensions.android)
     implementation(libs.tflite)
+    ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
     testImplementation("org.json:json:20240303")
