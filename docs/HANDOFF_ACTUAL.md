@@ -107,6 +107,11 @@ Admin   9fe20c90894c2eecf8151cd44db34122fcf2dbd80318c8bcc11a769b8b664a9d
 - Calibracion: los envios automaticos ignoran un `RemoteResult.Failure`; no existe outbox persistente ni reintento y el candidato manual se retira de memoria antes de recibir confirmacion remota. Una falla 403/429/503, un corte de red o una diferencia de URL puede perder el reporte sin dejar una entrega recuperable. `DAG-CALIBRATION-DELIVERY-11` define confirmacion explicita, cola local y reintento seguro. La Edge Function `dag-calibration` permanece activa en DEV y no se modificaron Supabase, Storage ni datos durante este diagnostico.
 - Los cinco seguimientos quedaron propuestos en `docs/BACKLOG_PRODUCTO.md`. Este diagnostico no cambia Android, `versionCode`, APK, backend ni Production; no sustituye las pruebas fisicas de los fixes futuros.
 
+### Candidato DEV 272 - continuidad de busquedas inciertas
+
+- `DAG-SEARCH-CONTINUITY-03`: una consulta `Uncertain` ya no se cancela ni pide reformular. Continúa una sola vez hacia el proveedor y conserva el filtrado local de cada resultado y el analisis preventivo de cada pagina. Las decisiones `Blocked` por reglas duras o evidencia explicita siguen cerrando antes de consumir Brave.
+- Baseline fisica SM-S908E con APK publica 271: la consulta de control incierta se detuvo con `DAG no tiene suficiente certeza`, confirmando la causa previa al cambio. Pruebas unitarias dirigidas y `ktlintCheck` Usuario correctos; falta publicar el lote 272 y repetir el recorrido exacto.
+
 ## Validacion fisica DEV 270 en Samsung SM-A235M - 2026-07-21
 
 - Los APK publicos DEV 270 se instalaron in-place en el Samsung SM-A235M `R58T34V31AE`, Android 14/API 34, sin borrar datos. App Usuario y App Admin conservaron activacion, sesion y datos; el telefono confirma `versionCode 270` y `versionName 1.0.1-dev` en ambos paquetes.

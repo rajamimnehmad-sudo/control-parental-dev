@@ -12,6 +12,13 @@ import org.junit.Test
 
 class DagResultsActionsTest {
     @Test
+    fun `searches allowed and uncertain queries but stops blocked intent`() {
+        assertEquals(DagQueryAction.Search, dagQueryAction(DagClassification.Allowed))
+        assertEquals(DagQueryAction.Search, dagQueryAction(DagClassification.Uncertain))
+        assertEquals(DagQueryAction.Block, dagQueryAction(DagClassification.Blocked))
+    }
+
+    @Test
     fun `offers exactly one additional Brave page when provider reports more`() {
         assertTrue(dagCanLoadMoreResults(page = 0, providerHasMoreResults = true))
         assertFalse(dagCanLoadMoreResults(page = 0, providerHasMoreResults = false))

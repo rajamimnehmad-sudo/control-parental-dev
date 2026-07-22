@@ -311,7 +311,7 @@ Flujo de una entrada:
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Propuesto; diagnostico 2026-07-22 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
-| DAG-SEARCH-CONTINUITY-03 | Propuesto; causa confirmada | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
+| DAG-SEARCH-CONTINUITY-03 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
 | DAG-PROTECTED-MODE-UX-04 | Propuesto; causa confirmada | P2 | Quitar o explicar claramente el mensaje tecnico de proteccion adicional | S | Bajo |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
@@ -844,7 +844,7 @@ Flujo de una entrada:
 
 #### DAG-SEARCH-CONTINUITY-03 - Buscar aunque la consulta sea incierta
 
-- Estado: `Propuesto`; causa confirmada el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: comportamiento de busqueda, precision local y UX. Prioridad: P1.
+- Estado: `Implementado candidato DEV 272; pendiente publicacion y prueba fisica`. Aprobado explicitamente el 2026-07-22. Tipo: comportamiento de busqueda, precision local y UX. Prioridad: P1.
 - Problema: DAG a veces no consulta el buscador y muestra `no tiene suficiente certeza`, obligando a reformular incluso consultas legitimas. El usuario rechazo expresamente este comportamiento.
 - Causa confirmada: `DagBrowserViewModel.search` cancela la busqueda antes de `DagSearchRepository.search` cuando `classifyQuery` devuelve `Uncertain`. Esa salida incluye terminos ambiguos, contexto sensible, confianza semantica media y modelo no disponible; hoy todos reciben el mismo tratamiento aunque no exista una regla dura de bloqueo.
 - Decision de producto propuesta: una consulta incierta pero no bloqueada debe continuar una sola vez hacia Brave. DAG filtra cada resultado y vuelve a analizar cada pagina; resultados bloqueados no se muestran y paginas ambiguas abren con las barreras preventivas existentes. Reglas Admin, dominios prohibidos, terminos explicitos y evidencia semantica alta siguen bloqueando antes de consumir una consulta.
@@ -858,6 +858,8 @@ Flujo de una entrada:
   - doble toque, sugerencias y cambio de pestaña no duplican consultas ni mezclan resultados;
   - modelo ausente o corrupto tiene una politica explicita y probada, sin permitir por accidente ni exponer la consulta en logs;
   - tests incluyen español, ingles y hebreo, contexto educativo/medico, terminos ambiguos y riesgo explicito.
+- Implementacion: `Blocked` sigue cerrando antes de Brave; `Allowed` y `Uncertain` ejecutan exactamente el mismo flujo protegido de busqueda, filtrado individual de resultados y analisis posterior de pagina. La prueba fisica de baseline en SM-S908E/DEV 271 reprodujo que `educacion sxual medica` se detenia por certeza antes del cambio.
+- Validacion candidata: pruebas dirigidas de clasificador y acciones de resultados, mas `ktlintCheck` de App Usuario, correctas. La publicacion y repeticion fisica quedan agrupadas al final del lote DEV 272.
 
 #### DAG-PROTECTED-MODE-UX-04 - Estado preventivo entendible
 
