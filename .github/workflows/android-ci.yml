@@ -15,33 +15,69 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detectar alcance Android
+        id: scope
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          set -euo pipefail
+          chmod +x scripts/android_ci_scope.sh
+          if [[ -z "${BASE_SHA:-}" || "$BASE_SHA" =~ ^0+$ ]]; then
+            git diff-tree --root --no-commit-id --name-only -r "$GITHUB_SHA" > "$RUNNER_TEMP/changed-files.txt"
+          else
+            git diff --name-only "$BASE_SHA" "$GITHUB_SHA" > "$RUNNER_TEMP/changed-files.txt"
+          fi
+          scope="$(scripts/android_ci_scope.sh < "$RUNNER_TEMP/changed-files.txt")"
+          echo "scope=$scope" >> "$GITHUB_OUTPUT"
+          echo "Alcance Android: $scope"
 
       - name: Set up JDK
+        if: ${{ steps.scope.outputs.scope != 'none' }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
       - name: Set up Android SDK
+        if: ${{ steps.scope.outputs.scope != 'none' }}
         uses: android-actions/setup-android@v3
 
       - name: Set up Gradle
+        if: ${{ steps.scope.outputs.scope != 'none' }}
         uses: gradle/actions/setup-gradle@v4
 
       - name: Make Gradle wrapper executable
+        if: ${{ steps.scope.outputs.scope != 'none' }}
         run: chmod +x ./gradlew
 
-      - name: Build dev debug
+      - name: Build dev debug Usuario
+        if: ${{ steps.scope.outputs.scope == 'user' }}
+        run: ./gradlew :app-user:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
+
+      - name: Build dev debug Admin
+        if: ${{ steps.scope.outputs.scope == 'admin' }}
+        run: ./gradlew :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
+
+      - name: Build dev debug ambas apps
+        if: ${{ steps.scope.outputs.scope == 'both' }}
         run: ./gradlew :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage
 
-      - name: Unit tests
-        run: ./gradlew testDevDebugUnitTest test
+      - name: Calidad Usuario
+        if: ${{ steps.scope.outputs.scope == 'user' }}
+        run: ./gradlew :app-user:testDevDebugUnitTest :app-user:ktlintCheck :app-user:lintDevDebug :app-user:detekt
 
-      - name: Ktlint
-        run: ./gradlew ktlintCheck
+      - name: Calidad Admin
+        if: ${{ steps.scope.outputs.scope == 'admin' }}
+        run: ./gradlew :app-admin:testDevDebugUnitTest :app-admin:ktlintCheck :app-admin:lintDevDebug :app-admin:detekt
 
-      - name: Android lint
-        run: ./gradlew lintDevDebug
+      - name: Calidad compartida
+        if: ${{ steps.scope.outputs.scope == 'both' }}
+        run: ./gradlew testDevDebugUnitTest test ktlintCheck lintDevDebug detekt
 
-      - name: Detekt
-        run: ./gradlew detekt
+      - name: Sin cambios Android
+        if: ${{ steps.scope.outputs.scope == 'none' }}
+        run: echo "No hay codigo Android que compilar."

@@ -93,6 +93,59 @@ except urllib.error.HTTPError as error:
 PY
 }
 
+archive_public_object_if_present() {
+    local object_name="$1"
+    local status
+    status="$(curl --silent --show-error --output /dev/null --write-out '%{http_code}' --range 0-0 \
+        "$BUCKET_URL/$object_name")"
+
+    case "$status" in
+        200|206)
+            supabase storage mv --experimental --linked \
+                "ss:///dev-updates/$object_name" \
+                "ss:///dev-updates/$object_name.$ARCHIVE_SUFFIX"
+            ;;
+        400|404)
+            ;;
+        *)
+            printf 'No se pudo comprobar %s antes de publicar (HTTP %s).\n' "$object_name" "$status" >&2
+            return 1
+            ;;
+    esac
+}
+
+assert_stable_dev_signature() {
+    local expected_digest="d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832"
+    local build_tools_dir="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-$HOME/Library/Android/sdk}}/build-tools"
+    local apksigner
+    local actual_digest
+    local certificate_pem
+
+    apksigner="$(find "$build_tools_dir" -mindepth 2 -maxdepth 2 -type f -name apksigner | sort -V | tail -n 1)"
+    if [[ -z "$apksigner" ]]; then
+        printf 'No se encontro apksigner para validar la firma DEV.\n' >&2
+        exit 1
+    fi
+
+    certificate_pem="$(
+        "$apksigner" verify --print-certs-pem "$LOCAL_APK" 2>&1 |
+            sed -n '/-----BEGIN CERTIFICATE-----/,/-----END CERTIFICATE-----/p'
+    )"
+    actual_digest="$(
+        printf '%s\n' "$certificate_pem" |
+            openssl x509 -noout -fingerprint -sha256 2>/dev/null |
+            awk -F= '{ print tolower($2) }' |
+            tr -d ':'
+    )"
+    if [[ "$actual_digest" != "$expected_digest" ]]; then
+        printf 'Firma DEV incorrecta en %s. Esperada=%s, actual=%s.\n' \
+            "$LOCAL_APK" "$expected_digest" "${actual_digest:-ausente}" >&2
+        exit 1
+    fi
+
+    printf 'Firma DEV estable verificada en App %s (%s).\n' "$LABEL" "$expected_digest"
+}
+
 write_manifest() {
     local target="$1"
     local version_code="$2"
@@ -136,6 +189,8 @@ OUT_MANIFEST="$OUT_DIR/$FILE_PREFIX-dev-manifest.json"
 printf 'Compilando App %s DEV...\n' "$LABEL"
 ./gradlew ":$MODULE:assembleDevDebug" ":$MODULE:testDevDebugUnitTest" -x uploadDevUpdatesToStorage
 
+assert_stable_dev_signature
+
 mkdir -p "$OUT_DIR"
 
 VERSION_CODE="$(json_value "$LOCAL_META" versionCode)"
@@ -155,10 +210,14 @@ cp "$LOCAL_APK" "$OUT_APK"
 APK_SHA="$(shasum -a 256 "$OUT_APK" | awk '{print $1}')"
 REMOTE_VERSION="$(remote_version_code "$REMOTE_MANIFEST")"
 
-if [[ -n "$REMOTE_VERSION" && "$VERSION_CODE" -le "$REMOTE_VERSION" ]]; then
+if [[ -n "$REMOTE_VERSION" && "$VERSION_CODE" == "$REMOTE_VERSION" && "${ALLOW_SAME_VERSION_REPAIR:-false}" == "true" ]]; then
+    printf '%s: reparacion confirmada de la misma version DEV (%s).\n' "$LABEL" "$VERSION_CODE"
+elif [[ -n "$REMOTE_VERSION" && "$VERSION_CODE" -le "$REMOTE_VERSION" ]]; then
     printf '%s: versionCode DEV no subio. Local=%s, publicado=%s. Abortando publicacion.\n' \
         "$LABEL" "$VERSION_CODE" "$REMOTE_VERSION" >&2
     exit 1
+else
+    printf '%s: versionCode DEV OK (%s > %s).\n' "$LABEL" "$VERSION_CODE" "${REMOTE_VERSION:-sin-publicar}"
 fi
 
 write_manifest \
@@ -179,7 +238,8 @@ supabase storage cp --experimental --linked --content-type application/json "$OU
 supabase storage cp --experimental --linked --content-type application/vnd.android.package-archive "$OUT_APK" "ss:///dev-updates/$STAGING_PREFIX/$APK_NAME"
 
 printf 'Archivando App %s DEV anterior si existe...\n' "$LABEL"
-supabase storage mv --experimental --linked "ss:///dev-updates/$FILE_PREFIX-dev-manifest.json" "ss:///dev-updates/$FILE_PREFIX-dev-manifest.json.$ARCHIVE_SUFFIX" >/dev/null 2>&1 || true
+archive_public_object_if_present "$FILE_PREFIX-dev-manifest.json"
+archive_public_object_if_present "$APK_NAME"
 
 printf 'Publicando App %s DEV...\n' "$LABEL"
 supabase storage mv --experimental --linked "ss:///dev-updates/$STAGING_PREFIX/$APK_NAME" "ss:///dev-updates/$APK_NAME"
