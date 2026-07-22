@@ -309,7 +309,7 @@ Flujo de una entrada:
 | BARRIER-LAUNCHER-01 | Resuelto y validado DEV 242 en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
-| DAG-MENU-RELIABILITY-02 | Reportado; pendiente reproduccion y causa raiz | P1 | Garantizar que el menu de tres puntos abra y funcione sobre cualquier pagina o estado DAG | M | Medio |
+| DAG-WEB-INTERACTION-02 | Causa identificada; implementacion en curso | P1 | Evitar que el saneamiento DAG congele menus y controles dinamicos de paginas permitidas | M | Medio |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | Corregido DEV 239; pendiente prueba fisica | P2 | Integrar la zona de camara con DAG y evitar recortar el texto de busqueda | S | Bajo |
@@ -803,21 +803,22 @@ Flujo de una entrada:
 - Criterios de aceptacion propuestos: Home y nueva pestana son acciones visibles; atras, adelante y actualizar funcionan desde el menu; Home conserva acceso al menu de tres puntos; los estados no disponibles se ocultan o representan correctamente; no se pierde historial ni estado de pestanas.
 - Decisiones pendientes para el ticket: iconografia, orden y acciones disponibles del menu en Home; gestos alternativos y comportamiento del boton fisico Atras.
 
-#### DAG-MENU-RELIABILITY-02 - Menu disponible sobre cualquier pagina
+#### DAG-WEB-INTERACTION-02 - Menus y controles dinamicos de paginas permitidas
 
-- Estado: `Reportado por el usuario el 2026-07-21; pendiente reproduccion y causa raiz`. Tipo: bug funcional, navegacion y compatibilidad WebView. Prioridad: P1.
-- Problema: en algunas paginas el boton de tres puntos no abre el menu DAG. La falla deja inaccesibles acciones como Atras, Adelante, Actualizar, Historial y Pendientes de revision.
-- Alcance: diagnosticar las dos variantes actuales del menu, su anclaje y estado compartido, y la interaccion entre Compose, WebView, teclado, overlays del sitio y cambios de estado. No se presume una causa hasta reproducirla.
+- Estado: `Causa identificada el 2026-07-21; implementacion y validacion en curso`. Tipo: bug funcional, rendimiento del hilo principal y compatibilidad WebView. Prioridad: P1.
+- Problema: menus y otros controles propios de algunas paginas permitidas no abren dentro de DAG. Zara Argentina es el caso de referencia aportado por el usuario; su menu funciona en un navegador normal.
+- Causa: el observador de seguridad reaccionaba a cada cambio de `class` o `style` recorriendo nuevamente todos los descendientes del nodo y calculando sus fondos. En aplicaciones Web grandes y dinamicas, una interaccion puede provocar trabajo sincronico masivo antes de que el panel se dibuje.
+- Alcance: en mutaciones de atributos, volver a revisar solamente el elemento que cambio. El recorrido profundo se conserva para el documento inicial y para subarboles nuevos, por lo que no se relaja la inspeccion de imagenes, fondos, video, audio, canvas o iframes incorporados dinamicamente.
 - Privacidad y seguridad: la correccion no debe permitir que la pagina capture acciones del menu, superponerse a controles de seguridad ni exponer URL, historial o contenido fuera del dispositivo.
 - Esfuerzo: M estimado. Riesgo: medio; una correccion de capas o foco puede introducir regresiones tactiles, visuales o de navegacion.
-- Dependencias: `DAG-NAV-UX-01`, barra DAG, estados Home/resultados/pagina/analisis/error, WebView, ventanas Compose, teclado, orientacion y pestanas.
-- Duplicados y relacion: seguimiento de confiabilidad de `DAG-NAV-UX-01`; no reabre su rediseno visual ni duplica el comportamiento de Atras.
+- Dependencias: saneamiento DOM, MutationObserver, WebView, aplicaciones Web de pagina unica, carga dinamica e intercepcion visual.
+- Duplicados y relacion: corrige la interaccion dentro del contenido Web; no cambia el menu de tres puntos de DAG ni reabre `DAG-NAV-UX-01`.
 - Criterios de aceptacion:
-  - el menu abre al primer toque en Home, resultados, pagina Web visible, analisis, error e historial cuando corresponda;
-  - se dibuja por encima del WebView y de overlays de la pagina, y ningun sitio puede capturar el toque destinado al menu;
-  - las acciones visibles funcionan y sus estados habilitado/deshabilitado son correctos;
-  - cerrar, volver, rotar, mostrar u ocultar el teclado y cambiar de pestana no dejan el menu trabado ni invisible;
-  - existen pruebas automaticas proporcionales para el estado del menu y una comprobacion funcional con al menos una pagina simple y una pagina con overlays.
+  - el menu propio de Zara abre y cierra sin congelar la pagina;
+  - cambios repetidos de clase o estilo no disparan recorridos profundos del subarbol;
+  - nodos nuevos siguen siendo inspeccionados profundamente antes de quedar disponibles;
+  - menus, acordeones, selectores y dialogos de paginas permitidas conservan interaccion sin habilitar video, audio, canvas o iframes ordinarios;
+  - las pruebas automaticas cubren la diferencia entre mutacion de atributos y agregado de subarboles, y la comprobacion funcional incluye Zara y otra aplicacion Web dinamica.
 
 #### DAG-HOME-UX-01 - Home con buscador central
 
@@ -1046,12 +1047,12 @@ Flujo de una entrada:
   - pulsaciones rapidas, recomposiciones y cambios de pestana no duplican ni cruzan busquedas.
 - Decisiones pendientes para la entrevista del ticket: si todas las sugerencias buscan directamente o si las del historial pueden abrir su URL; comportamiento con pulsacion larga; feedback durante la transicion; accesibilidad y accion del teclado.
 
-#### DAG-CAPTCHA-01 - Compatibilidad segura con CAPTCHA
+#### DAG-CAPTCHA-01 - Compatibilidad segura y general con CAPTCHA
 
-- Estado: `Implementado en DEV 238; pendiente prueba fisica`. Tipo: bug de compatibilidad Web y seguridad. Prioridad: P1.
+- Estado: `Implementado de forma puntual en DEV 238; ampliacion general aprobada el 2026-07-21 y en curso`. Tipo: bug de compatibilidad Web y seguridad. Prioridad: P1.
 - Problema: DAG no muestra el CAPTCHA de la pagina de multas de CABA, por lo que el usuario no puede completar el tramite aunque la pagina principal sea accesible.
 - Solucion propuesta: incorporar un tratamiento acotado para desafios CAPTCHA utilizados por paginas permitidas, cargando solamente los recursos, scripts, iframes y comunicaciones indispensables del proveedor validado. El desafio y su resultado deben permanecer dentro de la navegacion protegida y no convertirse en una excepcion general para contenido externo.
-- Resultado DEV 238: la inspeccion del tramite oficial identifico Google reCAPTCHA. DAG permite exclusivamente `https://www.google.com/recaptcha/*` o `https://www.recaptcha.net/recaptcha/*` como iframe dentro de `https://buenosaires.gob.ar/licenciasdeconducir/consulta-de-infracciones/`; todos los demas iframes siguen eliminados y las imagenes del desafio conservan la intercepcion/clasificacion local. Falta validar interaccion y vencimiento en el telefono.
+- Resultado DEV 238: la primera excepcion quedo limitada a Google reCAPTCHA y a una URL exacta de CABA. La ampliacion aprobada permite iframes HTTPS con rutas cerradas de Google reCAPTCHA, hCaptcha y Cloudflare Turnstile dentro de cualquier pagina principal que DAG ya haya permitido; todos los iframes ordinarios siguen eliminados y las imagenes del desafio conservan la intercepcion/clasificacion local. MiBA es el caso de referencia aportado por el usuario.
 - Evidencia: prueba fisica informada por el usuario el 2026-07-16; la inspeccion posterior de la URL oficial confirmo un iframe Google reCAPTCHA que DAG eliminaba por su bloqueo general de iframes.
 - Esfuerzo: M estimado. Riesgo: alto; los CAPTCHAs suelen depender de scripts, iframes, cookies y dominios externos, y una habilitacion demasiado amplia podria crear una ruta de contenido no analizado, rastreo adicional o navegacion externa.
 - Dependencias: intercepcion de recursos WebView; politica de iframes, JavaScript, cookies y dominios secundarios; clasificacion de imagenes; navegacion y sesiones; listas dinamicas; proveedores reCAPTCHA, hCaptcha, Turnstile u otros a identificar.
@@ -1064,7 +1065,7 @@ Flujo de una entrada:
   - cookies o tokens del desafio tienen alcance y persistencia minimos y no se incorporan al historial ni a solicitudes Admin;
   - sitios bloqueados o inciertos no usan el soporte CAPTCHA para evitar su decision;
   - se prueban desafio correcto, vencido, recarga, error de red, modo claro/oscuro y regreso desde segundo plano.
-- Validacion pendiente: comprobar en el telefono el checkbox, desafio visual cuando aparezca, vencimiento, recarga y regreso desde segundo plano. Otros proveedores o sitios requieren otro alcance explicito y no heredan esta excepcion.
+- Validacion pendiente: comprobar en el telefono MiBA y el tramite de infracciones, incluyendo checkbox, desafio visual cuando aparezca, vencimiento, recarga y regreso desde segundo plano. Proveedores nuevos requieren ampliar explicitamente la lista cerrada; ningun sitio hereda permiso para iframes ordinarios.
 
 #### DAG-TABS-UX-02 - Selector reciente, limpio y sin vacias duplicadas
 

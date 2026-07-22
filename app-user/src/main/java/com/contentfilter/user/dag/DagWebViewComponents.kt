@@ -727,23 +727,22 @@ private fun WebView.sanitizeAndExtractVisibleText(
             }
           }
           function dagAllowedCaptchaFrame(frame) {
-            if (!frame || !window.location) return false;
-            var pageHost = (window.location.hostname || '').toLowerCase();
-            var pagePath = window.location.pathname || '';
-            if (pageHost !== 'buenosaires.gob.ar' || pagePath !== '/licenciasdeconducir/consulta-de-infracciones/') {
-              return false;
-            }
+            if (!frame || !window.location || window.location.protocol !== 'https:') return false;
             try {
               var source = new URL(frame.getAttribute('src') || '', document.baseURI);
               var provider = source.hostname.toLowerCase();
-              return source.protocol === 'https:' &&
-                (provider === 'www.google.com' || provider === 'www.recaptcha.net') &&
-                source.pathname.indexOf('/recaptcha/') === 0;
+              if (source.protocol !== 'https:') return false;
+              if ((provider === 'www.google.com' || provider === 'www.recaptcha.net') &&
+                  source.pathname.indexOf('/recaptcha/') === 0) return true;
+              if (provider === 'challenges.cloudflare.com' &&
+                  source.pathname.indexOf('/cdn-cgi/challenge-platform/') === 0) return true;
+              return provider === 'newassets.hcaptcha.com' &&
+                source.pathname.indexOf('/captcha/') === 0;
             } catch (_) {
               return false;
             }
           }
-          function dagSecureNode(node) {
+          function dagSecureNode(node, includeDescendants) {
             if (!node || node.nodeType !== 1) return;
             var tag = node.tagName ? node.tagName.toLowerCase() : '';
             if (tag === 'iframe') {
@@ -769,6 +768,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               dagQueueImage(node);
             }
             dagSecureBackground(node);
+            if (includeDescendants !== true) return;
             node.querySelectorAll && node.querySelectorAll('video,audio,video source,audio source,canvas,iframe').forEach(dagSecureNode);
             node.querySelectorAll && node.querySelectorAll('img').forEach(function(image) {
               dagQueueImage(image);
@@ -862,7 +862,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               if (window.__dagVisualCalibrationEnabled) window.requestAnimationFrame(window.__dagRefreshCalibrationMarkers);
             });
           }
-          dagSecureNode(document.documentElement);
+          dagSecureNode(document.documentElement, true);
           if (document.documentElement) {
             if (window.__dagExtraKosherEnabled) {
               document.documentElement.setAttribute('data-dag-extra-kosher', 'true');
@@ -882,13 +882,13 @@ private fun WebView.sanitizeAndExtractVisibleText(
               var calibrationNeedsRefresh = false;
               records.forEach(function(record) {
                 record.addedNodes.forEach(function(node) {
-                  dagSecureNode(node);
+                  dagSecureNode(node, true);
                   if (!(node.nodeType === 1 && node.getAttribute('data-dag-calibration-marker') === 'true')) {
                     calibrationNeedsRefresh = true;
                   }
                 });
                 if (record.type === 'attributes') {
-                  dagSecureNode(record.target);
+                  dagSecureNode(record.target, false);
                   if (record.target.getAttribute('data-dag-calibration-marker') !== 'true') {
                     calibrationNeedsRefresh = true;
                   }
