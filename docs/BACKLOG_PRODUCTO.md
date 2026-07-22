@@ -351,6 +351,13 @@ Flujo de una entrada:
 | DAG-CALIBRATION-DELIVERY-12 | Resuelto en Edge DEV, validado en Superweb y publicado con DEV 274 | P0 | Corregir que no llegue ninguna revision manual ni dudosa a Superweb | M | Critico |
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
+| DAG-CHROME-UX-01 | Idea autorizada para backlog; no aprobada para codigo | P1 | Acercar la experiencia cotidiana de DAG a Chrome sin copiar marca ni relajar protecciones | XL | Alto |
+| DAG-TABS-UX-03 | Idea autorizada para backlog; no aprobada para codigo | P1 | Hasta 50 pestanas, selector a pantalla completa con miniaturas reales y Cerrar todo | L | Alto |
+| DAG-HOME-RECENTS-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Abrir DAG en Home y mostrar accesos circulares a sitios recientes | M | Medio |
+| DAG-SEARCH-SUGGEST-03 | Idea autorizada para backlog; no aprobada para codigo | P1 | Sugerencias en tiempo real y Tal vez quisiste decir sin saltar clasificacion | L | Alto |
+| DAG-RESULTS-CLARITY-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Resultados mas claros con dominio destacado e iconos de sitio no engañosos | M | Medio |
+| DAG-ANALYSIS-SEARCH-02 | Idea autorizada para backlog; no aprobada para codigo | P1 | Permitir una nueva busqueda desde la barra mientras DAG analiza | S | Medio |
+| DAG-ADBLOCK-01 | Idea autorizada para backlog; no aprobada para codigo | P1 | Bloquear anuncios y recursos publicitarios para mejorar velocidad sin romper sitios | L | Alto |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
 | DAG-CALIBRATION-QUEUE-02 | Resuelto DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
 | DAG-CALIBRATION-REVIEW-03 | Publicado DEV 253; recorrido autenticado pendiente | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
@@ -1194,7 +1201,7 @@ Flujo de una entrada:
 
 #### DAG-GEOLOCATION-01 - Ubicacion acotada dentro de sitios permitidos
 
-- Estado: `Idea`, autorizada para registro en backlog el 2026-07-22; no aprobada para diagnostico tecnico ni implementacion. Tipo: compatibilidad Web, permisos Android y privacidad. Prioridad: P2. Esfuerzo estimado: M. Riesgo: alto.
+- Estado: `Idea`, autorizada para registro en backlog y reafirmada por el usuario el 2026-07-22; no aprobada para diagnostico tecnico ni implementacion. Tipo: compatibilidad Web, permisos Android y privacidad. Prioridad: P2. Esfuerzo estimado: M. Riesgo: alto.
 - Problema: DAG bloquea ubicacion, por lo que mapas, sucursales, tramites, entregas y otros sitios permitidos no pueden ofrecer funciones que dependen de la posicion del dispositivo.
 - Propuesta preliminar: permitir geolocalizacion solamente cuando una pagina HTTPS ya aprobada la solicita, con explicacion visible y consentimiento puntual del Usuario. La autorizacion debe quedar acotada al sitio y a la sesion o a una decision administrada expresamente; nunca habilitar ubicacion global por abrir DAG.
 - Privacidad y seguridad: preferir ubicacion aproximada cuando alcance; no guardar ni sincronizar coordenadas, recorridos o consultas; no incluir ubicacion en historial, solicitudes Admin, Calibracion DAG ni telemetria. Denegar en paginas bloqueadas, inciertas, iframes, contenido mixto o sin gesto del Usuario.
@@ -1222,6 +1229,67 @@ Flujo de una entrada:
 - Implementacion: el selector se titula `Pestañas recientes`, ordena las pestañas abiertas por ultimo uso y persiste esa marca junto al estado cifrado. No conserva ni reabre pestañas cerradas. Las tarjetas sin miniatura muestran una superficie neutra con `DAG`, sin peces.
 - Reutilizacion: se considera vacia solamente una pestaña en Home sin texto, consulta, resultados ni URL. `Nueva` enfoca la vacia usada mas recientemente —incluida la activa— antes de crear otra; las vacias heredadas restantes se pueden cerrar normalmente. El limite continua en ocho.
 - Compatibilidad: sesiones cifradas anteriores sin fecha se restauran con un orden determinista; resultados y paginas no se recargan al abrir el selector ni se ejecuta una consulta Brave.
+
+#### DAG-CHROME-UX-01 - Direccion de experiencia familiar tipo Chrome
+
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Evidencia: pedido del usuario del 2026-07-22 de que DAG sea lo mas parecido posible a Chrome. Tipo: direccion UX transversal. Prioridad: P1. Esfuerzo: XL. Riesgo: alto.
+- Objetivo: usar patrones familiares de navegador para Home, buscador, resultados, pestanas y navegacion, reduciendo aprendizaje sin copiar marca, assets ni promesas de Google Chrome.
+- Alcance relacionado: coordina `DAG-TABS-UX-03`, `DAG-HOME-RECENTS-02`, `DAG-SEARCH-SUGGEST-03`, `DAG-RESULTS-CLARITY-02`, `DAG-ANALYSIS-SEARCH-02`, `DAG-GEOLOCATION-01` y `DAG-ADBLOCK-01`. Cada capacidad conserva ticket, riesgo y aprobacion propios.
+- No alcance: sincronizacion con cuenta Google, modo incognito, descargas abiertas, extensiones, reproduccion multimedia, permisos globales ni cualquier atajo que evite clasificacion, reglas Admin o barreras DAG.
+- Criterio transversal: acciones, gestos y jerarquia deben resultar reconocibles para una persona acostumbrada a Chrome, pero los estados de analisis, bloqueo, revision y privacidad siguen siendo explicitamente DAG.
+
+#### DAG-TABS-UX-03 - Hasta 50 pestanas con selector visual completo
+
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: gestion de pestanas, rendimiento y privacidad visual. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- Problema: el limite actual es ocho y el selector puede mostrar una superficie neutra/Home en lugar de una miniatura util de la pagina. Tampoco ocupa toda la pantalla como un selector moderno ni ofrece una accion evidente para cerrar todo.
+- Propuesta: permitir un maximo estricto de 50 pestanas; abrir un selector a pantalla completa con tarjetas amplias y miniatura efimera de la ultima pagina aprobada; incluir cierre individual y `Cerrar todo` con confirmacion cuando haya varias pestanas.
+- Presupuesto: mantener un solo WebView activo. Las demas pestanas quedan suspendidas con estado cifrado y, si corresponde, una miniatura efimera acotada; no conservar 50 WebViews ni decodificaciones activas en memoria. Al llegar a 50, enfocar el selector y pedir cerrar una antes de crear otra.
+- Privacidad y seguridad: no persistir pixeles de miniaturas en disco; paginas bloqueadas, inciertas, en analisis o sensibles usan tarjeta neutra. Una miniatura nunca cuenta como aprobacion y restaurar una pagina vuelve a validarla.
+- Relacion: reemplaza la decision historica de maximo ocho de `DAG-TABS-UX-01` y extiende `DAG-TABS-UX-02`; no reabre sus correcciones de orden, cifrado ni pestanas vacias.
+- Aceptacion: 1, 10 y 50 pestanas mantienen cambio/cierre fluido; selector usa toda la pantalla; la tarjeta representa la pagina correcta y no Home salvo que esa pestana este realmente en Home; `Cerrar todo` deja una Home segura; reinicio no restaura miniaturas persistidas ni carga paginas automaticamente.
+
+#### DAG-HOME-RECENTS-02 - Inicio limpio y accesos circulares recientes
+
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: Home, sesion y accesos rapidos. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Problema: al abrir DAG puede recargar automaticamente una pagina anterior. El usuario quiere comenzar en Home y elegir conscientemente que abrir.
+- Propuesta: cada apertura en frio de DAG enfoca una Home limpia sin navegar ni consumir busqueda. Las pestanas anteriores pueden conservarse en el selector, pero ninguna pagina se recarga solo por iniciar la app.
+- Accesos rapidos: debajo del buscador mostrar los ultimos sitios como iconos redondos con favicon/logo seguro y nombre breve. Se derivan del historial cifrado local, permiten quitar un acceso y no se sincronizan ni consultan remotamente para armar la lista.
+- Seguridad: tocar un reciente inicia una navegacion normal y vuelve a aplicar reglas, clasificacion y compuertas. Sitios bloqueados, pendientes o sin historial permitido no aparecen.
+- Aceptacion: cierre/reapertura muestra Home sin red; recientes correctos y deduplicados aparecen debajo; tocar uno analiza antes de mostrar; borrar historial limpia los accesos; ninguna pagina previa se carga hasta una accion del usuario.
+
+#### DAG-SEARCH-SUGGEST-03 - Sugerencias en tiempo real y correccion ortografica
+
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: busqueda, proveedor externo y privacidad. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- Problema: las sugerencias actuales dependen de historial/reformulaciones locales y no ofrecen autocompletado vivo amplio ni `Tal vez quisiste decir...` como un buscador moderno.
+- Propuesta: combinar historial cifrado local con sugerencias en tiempo real de un proveedor autorizado y una correccion ortografica para consulta/resultados. La sugerencia tocada usa el flujo seguro ya definido y `Tal vez quisiste decir` nunca reemplaza silenciosamente el texto original.
+- Privacidad/costo: definir proveedor y contrato antes de codigo; aplicar minimo de caracteres y debounce; cancelar solicitudes viejas; no enviar pulsaciones bloqueadas ni registrar texto. Toda sugerencia visible y toda consulta corregida vuelven a pasar por clasificacion local antes de buscar.
+- Relacion: extiende `DAG-AUTOCOMPLETE-01/02`; no convierte cada pulsacion en una consulta Brave de resultados y no duplica consumo al tocar.
+- Aceptacion: sugerencias cambian durante escritura sin mezclar pestanas; errores ortograficos razonables ofrecen una alternativa clara; aceptar/rechazar conserva control del usuario; consultas riesgosas no aparecen ni se envian; sin red siguen disponibles historial y sugerencias locales.
+
+#### DAG-RESULTS-CLARITY-02 - Dominio e identidad visual mas claros
+
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: UX de resultados y anti-suplantacion. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Problema: los resultados no diferencian con suficiente claridad titulo, dominio y procedencia; servicios conocidos como Instagram resultan dificiles de reconocer rapidamente.
+- Propuesta: destacar el dominio registrable en una linea propia, usar favicon/icono validado y una jerarquia mas clara para titulo, resumen y estado DAG. Servicios conocidos pueden tener icono reconocible sin ocultar el dominio real.
+- Seguridad: el icono es orientativo, nunca un sello de confianza. Mostrar siempre el dominio normalizado para evitar que un favicon o nombre imite otro servicio; usar icono neutro si falla validacion o la fuente es insegura.
+- Aceptacion: dominio legible con fuente grande y temas; Instagram y otros sitios conocidos se reconocen sin perder la URL real; homografos/subdominios engañosos no heredan iconos confiables; iconos fallidos no retrasan ni rompen resultados.
+
+#### DAG-ANALYSIS-SEARCH-02 - Nueva busqueda mientras analiza
+
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: navegacion concurrente y UX. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Problema: cuando la barra muestra `Analizando...`, el usuario queda atrapado esperando aunque quiera buscar otra cosa.
+- Propuesta: tocar la barra durante analisis la vuelve editable, enfoca el teclado y permite enviar otra consulta. La nueva accion cancela la generacion/navegacion anterior y mantiene visible un estado claro hasta que empieza la nueva busqueda.
+- Seguridad: cancelar no revela la pagina anterior ni reutiliza decisiones parciales. Respuestas tardias, imagenes y callbacks del intento viejo se descartan por generacion y no pueden reemplazar la nueva pestana.
+- Aceptacion: se puede cambiar de consulta con un toque; la busqueda vieja no consume reintentos ni reaparece; teclado/lector de pantalla funcionan; bloqueo o revision ya decididos no se disfrazan como cancelacion.
+
+#### DAG-ADBLOCK-01 - Bloqueo de anuncios con mejora medible
+
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: rendimiento WebView, privacidad y compatibilidad. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- Hipotesis: bloquear solicitudes publicitarias, trackers y elementos cosmeticos puede reducir red, trabajo DOM, imagenes a clasificar y tiempo de primera pantalla, especialmente en noticias y sitios comerciales.
+- Propuesta: filtro local y versionado de hosts/rutas publicitarias mas reglas cosmeticas acotadas. Aplicar antes de descargar cuando la coincidencia sea segura; nunca usar el bloqueador como sustituto del analisis DAG ni bloquear contenido solo por parecer visualmente un anuncio.
+- Compatibilidad: CAPTCHA, pagos, login, mapas, contenido principal y recursos esenciales quedan fuera de reglas genericas. Fallos se diagnostican por categoria local sin URL completa; cualquier excepcion por sitio requiere alcance y autoridad definidos, no un boton libre para desactivar DAG.
+- Rendimiento: comparar en el mismo Samsung primera carga, recarga, bytes/solicitudes, cantidad de imagenes enviadas al clasificador, tiempo hasta primera pantalla completa, memoria y roturas visibles. Implementar solo si mejora de forma repetible sin aumentar huecos ni falsos bloqueos.
+- Aceptacion: anuncios conocidos desaparecen antes de descargar; una muestra de tiendas, noticias, tramites y CAPTCHA sigue funcional; no salen historial ni URLs a un servicio de bloqueo; listas se actualizan de forma autenticada/versionada y pueden revertirse.
 - Validacion: codec de sesiones y compatibilidad de marca de uso, definicion estricta de vacia, tests DEV, compilacion y `ktlintCheck` de App Usuario correctos. Falta prueba visual y de restauracion fisica en Samsung SM-S908E; no hubo publicacion intermedia.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
