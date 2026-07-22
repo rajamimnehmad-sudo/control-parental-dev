@@ -128,7 +128,11 @@ class DagImagePolicyTest {
         assertTrue(isProbableImageRequest("https://cdn.example/photo.heic", emptyMap()))
         assertTrue(isProbableImageRequest("https://cdn.example/favicon.ico", emptyMap()))
         assertFalse(isProbableImageRequest("https://cdn.example/site.css", mapOf("Accept" to "text/css")))
-        assertTrue(DagImageDeliveryPolicy.MaximumConcurrentImages > 3)
+        assertEquals(2, DagImageDeliveryPolicy.MaximumConcurrentClassifications)
+        assertTrue(
+            DagImageDeliveryPolicy.MaximumConcurrentImages >=
+                DagImageDeliveryPolicy.MaximumConcurrentClassifications,
+        )
     }
 
     @Test
@@ -147,7 +151,9 @@ class DagImagePolicyTest {
             DagViewportReadinessAction.HidePending,
             dagViewportReadinessAction(2, DagViewportReadinessPolicy.MaximumWaitMillis),
         )
-        assertEquals(3, DagViewportReadinessPolicy.PreparedViewportCount)
+        assertEquals(1, DagViewportReadinessPolicy.PreparedViewportCount)
+        assertEquals(1, DagViewportReadinessPolicy.PrefetchViewportCount)
+        assertTrue(DagViewportReadinessPolicy.VisualSettleMillis <= 300L)
     }
 
     @Test

@@ -69,7 +69,10 @@ internal fun DagWebContent(
     onNavigationStateChanged: (Boolean, Boolean) -> Unit,
 ) {
     val context = LocalContext.current
-    val imageClassifier = remember(context) { DagImageClassifier(context) }
+    val imageClassifiers =
+        remember(context) {
+            List(DagImageDeliveryPolicy.MaximumConcurrentClassifications) { DagImageClassifier(context) }
+        }
     val currentCalibrationCandidate by rememberUpdatedState(onCalibrationCandidate)
     val currentManualCalibrationCandidate by rememberUpdatedState(onManualCalibrationCandidate)
     val currentManualBlurReviewCandidate by rememberUpdatedState(onManualBlurReviewCandidate)
@@ -78,9 +81,9 @@ internal fun DagWebContent(
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val imageLoader =
-        remember(imageClassifier) {
+        remember(imageClassifiers) {
             DagImageResourceLoader(
-                classifier = imageClassifier,
+                classifiers = imageClassifiers,
                 onCalibrationCandidate = { image, classification ->
                     currentCalibrationCandidate(image, classification)
                 },
@@ -140,7 +143,7 @@ internal fun DagWebContent(
             webView = null
             onWebViewChanged(null)
             imageLoader.cancel()
-            imageClassifier.close()
+            imageClassifiers.forEach(DagImageClassifier::close)
         }
     }
 
@@ -631,7 +634,10 @@ private fun WebView.sanitizeAndExtractVisibleText(
               image.hasAttribute('data-dag-held-src');
             if (lazy && window.IntersectionObserver && image.getAttribute('data-dag-image-ready') !== 'true') {
               if (!window.__dagImageObserver) {
-                var dagPrefetchMargin = Math.max((window.innerHeight || 0) * 2, 1200);
+                var dagPrefetchMargin = Math.max(
+                  (window.innerHeight || 0) * ${DagViewportReadinessPolicy.PrefetchViewportCount},
+                  600
+                );
                 window.__dagImageObserver = new IntersectionObserver(function(entries) {
                   entries.forEach(function(entry) {
                     if (!entry.isIntersecting) return;
@@ -991,10 +997,13 @@ internal fun dagViewportReadinessAction(
     }
 
 internal object DagViewportReadinessPolicy {
-    const val PreparedViewportCount = 3
+    // Resolve the visible viewport first. Nearby lazy photos begin loading just
+    // before scrolling reaches them instead of competing with initial content.
+    const val PreparedViewportCount = 1
+    const val PrefetchViewportCount = 1
     const val MaximumWaitMillis = 8_000L
     const val PollDelayMillis = 150L
-    const val VisualSettleMillis = 1_200L
+    const val VisualSettleMillis = 300L
 }
 
 private fun String?.decodeJavascriptString(): String? {
