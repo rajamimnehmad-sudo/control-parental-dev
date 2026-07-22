@@ -312,7 +312,7 @@ Flujo de una entrada:
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Propuesto; diagnostico 2026-07-22 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
-| DAG-PROTECTED-MODE-UX-04 | Propuesto; causa confirmada | P2 | Quitar o explicar claramente el mensaje tecnico de proteccion adicional | S | Bajo |
+| DAG-PROTECTED-MODE-UX-04 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P2 | Quitar el mensaje tecnico de proteccion adicional | S | Bajo |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | Corregido DEV 239; pendiente prueba fisica | P2 | Integrar la zona de camara con DAG y evitar recortar el texto de busqueda | S | Bajo |
@@ -863,7 +863,7 @@ Flujo de una entrada:
 
 #### DAG-PROTECTED-MODE-UX-04 - Estado preventivo entendible
 
-- Estado: `Propuesto`; causa confirmada el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: claridad UX y explicabilidad. Prioridad: P2.
+- Estado: `Implementado candidato DEV 272; pendiente publicacion y prueba fisica`. Aprobado explicitamente el 2026-07-22. Tipo: claridad UX y explicabilidad. Prioridad: P2.
 - Problema: el mensaje `Abierto con proteccion adicional` no explica qué ocurrio, qué cambia ni si el usuario debe hacer algo.
 - Significado tecnico actual: aparece cuando el texto esta vacio, la clasificacion es incierta o la evidencia semantica no alcanza el bloqueo. La pagina se muestra con las barreras Web normales y no se guarda como aprobacion rapida completa. No activa un segundo antivirus, una VPN distinta ni una revision humana automatica.
 - Solucion recomendada: no mostrar un aviso persistente cuando no hay una accion necesaria. Mantener `Analizando` durante la compuerta y luego abrir la pagina normalmente; si se conserva una explicacion, usar una ayuda breve y accesible como `Modo preventivo: DAG seguirá revisando esta página`, sin prometer proteccion total.
@@ -875,6 +875,7 @@ Flujo de una entrada:
   - `Analizando`, `Bloqueado`, `Sin conexion` y `Pendiente de aprobacion` permanecen diferenciados;
   - el mensaje no tapa controles ni reaparece en cada mutacion o navegacion interna;
   - TalkBack y fuente grande comunican el estado sin texto recortado.
+- Implementacion: al completar la compuerta preventiva la pagina queda visible sin un mensaje tecnico persistente. `Analizando`, bloqueos, errores y revisiones continúan usando sus estados especificos; las barreras preventivas y la decision de no guardar una aprobacion rapida no cambian.
 
 #### DAG-HOME-UX-01 - Home con buscador central
 
