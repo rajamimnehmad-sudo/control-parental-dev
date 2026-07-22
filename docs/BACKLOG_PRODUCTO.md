@@ -310,7 +310,7 @@ Flujo de una entrada:
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
-| DAG-WEB-INTERACTION-03 | Propuesto; diagnostico 2026-07-22 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
+| DAG-WEB-INTERACTION-03 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
 | DAG-PROTECTED-MODE-UX-04 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P2 | Quitar el mensaje tecnico de proteccion adicional | S | Bajo |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
@@ -828,7 +828,7 @@ Flujo de una entrada:
 
 #### DAG-WEB-INTERACTION-03 - Subarboles dinamicos sin bloqueo del hilo principal
 
-- Estado: `Propuesto`; diagnostico preparado el 2026-07-22, pendiente aprobacion explicita para codigo. Tipo: bug funcional, rendimiento WebView y seguridad de contenido. Prioridad: P1.
+- Estado: `Implementado candidato DEV 272; pendiente publicacion y prueba fisica`. Aprobado explicitamente el 2026-07-22. Tipo: bug funcional, rendimiento WebView y seguridad de contenido. Prioridad: P1.
 - Evidencia: el usuario confirma que DEV 271 no resolvio todos los botones. En un navegador normal, el menu actual de Zara Argentina abre correctamente y crea un dialogo grande con pestañas, acordeones y muchos enlaces; no depende de canvas. En DAG, cada nodo agregado puede activar `dagSecureNode(node, true)`, que recorre sincronamente videos, audios, canvas, iframes, imagenes y fondos de todo el subarbol.
 - Diagnostico: DEV 271 corrigio la ruta de cambios de atributos, pero no la insercion o hidratacion de subarboles grandes. Registros solapados del `MutationObserver` pueden volver a recorrer descendientes y competir con el evento tactil y el pintado del menu. Service Workers bloqueados, iframes eliminados y otras restricciones pueden explicar sitios diferentes y deben distinguirse mediante codigos diagnosticos locales, no relajarse en conjunto.
 - Alcance propuesto: cola unica de saneamiento por pagina, deduplicada por raiz; bloqueo inmediato por CSS/intercepcion para video, audio, canvas, iframes e imagenes mientras el trabajo se procesa; recorrido acotado por lote fuera del callback del observador; cancelacion por navegacion; y diagnostico local por capacidad bloqueada. No agregar excepciones por dominio para Zara.
@@ -841,6 +841,8 @@ Flujo de una entrada:
   - video, audio, canvas, iframes no autorizados e imagenes no clasificadas permanecen invisibles desde su insercion;
   - cambiar de pagina cancela la cola anterior y no mezcla nodos ni decisiones;
   - pruebas automaticas cubren raices solapadas, rafagas de mutaciones, cancelacion y barreras inmediatas; la aceptacion final incluye prueba fisica con DEV publico.
+- Implementacion: los subarboles nuevos se incorporan una sola vez mediante `WeakSet` y se recorren en lotes maximos de 48 elementos por cuadro. El callback del observador deja de recorrer descendientes completos; CSS mantiene ocultos video, audio, canvas e iframes no autorizados mientras la cola avanza, y las imagenes siguen pasando por intercepcion local.
+- Validacion candidata: prueba unitaria del presupuesto por cuadro, unitarios dirigidos y `ktlintCheck` Usuario correctos. Zara y una segunda pagina dinamica quedan para el APK agrupado 272 en el SM-S908E.
 
 #### DAG-SEARCH-CONTINUITY-03 - Buscar aunque la consulta sea incierta
 

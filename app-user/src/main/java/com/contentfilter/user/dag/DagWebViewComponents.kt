@@ -781,6 +781,36 @@ private fun WebView.sanitizeAndExtractVisibleText(
             });
             node.querySelectorAll && node.querySelectorAll('*').forEach(dagSecureBackground);
           }
+          var dagSecurityQueue = [];
+          var dagSecurityQueued = new WeakSet();
+          var dagSecurityFlushScheduled = false;
+          function dagScheduleSecurityFlush() {
+            if (dagSecurityFlushScheduled || !dagSecurityQueue.length) return;
+            dagSecurityFlushScheduled = true;
+            window.requestAnimationFrame(function() {
+              dagSecurityFlushScheduled = false;
+              var remaining = ${DagDomSecurityBatchPolicy.MaximumNodesPerFrame};
+              while (remaining > 0 && dagSecurityQueue.length) {
+                var current = dagSecurityQueue.shift();
+                remaining -= 1;
+                if (!current || !current.isConnected) continue;
+                dagSecureNode(current, false);
+                if (!current.isConnected) continue;
+                var child = current.firstElementChild;
+                while (child) {
+                  dagQueueSecurityNode(child);
+                  child = child.nextElementSibling;
+                }
+              }
+              dagScheduleSecurityFlush();
+            });
+          }
+          function dagQueueSecurityNode(node) {
+            if (!node || node.nodeType !== 1 || dagSecurityQueued.has(node)) return;
+            dagSecurityQueued.add(node);
+            dagSecurityQueue.push(node);
+            dagScheduleSecurityFlush();
+          }
           function dagRemoveCalibrationMarkers() {
             document.querySelectorAll('[data-dag-calibration-marker="true"]').forEach(function(marker) {
               marker.remove();
@@ -888,7 +918,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               var calibrationNeedsRefresh = false;
               records.forEach(function(record) {
                 record.addedNodes.forEach(function(node) {
-                  dagSecureNode(node, true);
+                  dagQueueSecurityNode(node);
                   if (!(node.nodeType === 1 && node.getAttribute('data-dag-calibration-marker') === 'true')) {
                     calibrationNeedsRefresh = true;
                   }
@@ -1005,6 +1035,14 @@ internal object DagViewportReadinessPolicy {
     const val PollDelayMillis = 150L
     const val VisualSettleMillis = 300L
 }
+
+internal object DagDomSecurityBatchPolicy {
+    const val MaximumNodesPerFrame = 48
+}
+
+internal fun dagDomSecurityBatchCount(nodeCount: Int): Int =
+    if (nodeCount <= 0) 0 else (nodeCount + DagDomSecurityBatchPolicy.MaximumNodesPerFrame - 1) /
+        DagDomSecurityBatchPolicy.MaximumNodesPerFrame
 
 private fun String?.decodeJavascriptString(): String? {
     if (this == null || this == "null") return null
