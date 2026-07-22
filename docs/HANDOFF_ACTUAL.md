@@ -50,11 +50,11 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-21:
+Version publicada real al 2026-07-22:
 
 ```text
-App Usuario versionCode 271
-App Admin versionCode 271
+App Usuario versionCode 273
+App Admin versionCode 273
 versionName 1.0.1-dev
 ```
 
@@ -68,16 +68,40 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-271-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-271-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-273-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-273-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario a24c52f4e87925c0fd3630a2e386c6a23005b847cbae683257dfae4ca6839d9c
-Admin   9fe20c90894c2eecf8151cd44db34122fcf2dbd80318c8bcc11a769b8b664a9d
+Usuario 287be90addbdc86ba483d1fcd472fd09b78a7e4b20b1f6dbcc28cfbfe0797138
+Admin   6145b75a21061f2313d8bfc2e07571897d122b7b95d21ec98f9e74a836e5238f
 ```
+
+## Candidato DEV 274 - apertura segura por categoria y Calibracion DAG - 2026-07-22
+
+- `DAG-CATEGORY-FAST-PATH-04` permite mostrar antes texto, controles y estructura solamente cuando la pagina ya fue permitida y coincide con gobierno o con al menos dos señales de electronica, finanzas o documentacion. Ropa, ambiguedad, `Uncertain` y `Blocked` siguen esperando el viewport completo; cada raster conserva descarga HTTPS, defensa SSRF, clasificacion local y fallo cerrado antes de entregarse.
+- En el Samsung SM-A235M, el probe comparable sobre Samsung Argentina paso de aproximadamente 9.589 ms con la APK publica 273 a 4.059 ms con el candidato 274. Es evidencia operativa sensible a red/cache, no un benchmark de laboratorio. Zara cargo con la barrera estricta y su menu abrio con `MUJER`, `HOMBRE`, `NIÑOS` y acordeones sin congelamiento.
+- La consulta `educacion sexual medica` continuo hasta resultados filtrados; una pagina educativa abrio dentro de DAG sin el mensaje tecnico `Abierto con proteccion adicional`. La pagina oficial de infracciones CABA mostro el reCAPTCHA y el usuario confirmo que al activarlo funciona; no se automatizo ni resolvio el desafio. El aviso de cuota gratuita visible pertenece al proveedor del sitio.
+- La causa de `DAG-CALIBRATION-DELIVERY-12` estaba en el contrato cerrado de Edge: Android ya enviaba `male_face` y `male_breast_exposed`, pero la lista remota las rechazaba con HTTP 400 antes de Storage/base. `dag-calibration` v12 las acepta exclusivamente en Supabase DEV, sin cambiar autenticacion, limites, RLS ni datos existentes.
+- Con APK publica 273 se comprobaron una duda automatica y una X manual con acuse y filas `pending`. En Superweb autenticada aparecieron tres casos nuevos con miniatura; la X mostro `Marcada desde DAG`. No se resolvieron, etiquetaron, archivaron ni borraron casos.
+- Validacion local del lote Android: `ktlintCheck`, unitarios y `assembleDevDebug` de Usuario y Admin completaron 779 tareas correctamente; `aapt` confirma versionCode 274 en ambos APK y `apksigner` el certificado DEV historico. El candidato 274 quedo instalado in-place en el SM-A235M para los recorridos anteriores.
+- Publicacion publica 274, hashes externos, GitHub Actions e instalacion final de los APK descargados siguen pendientes en este punto del handoff y deben registrarse antes de declarar cierre.
+
+## Publicacion DEV 273 - CAPTCHA y reintentos de Calibracion DAG - 2026-07-22
+
+- `DAG-CAPTCHA-02` recibio el cierre adicional necesario para conservar la interaccion del desafio dentro de la sesion temporal protegida. La excepcion sigue limitada a rutas HTTPS cerradas de reCAPTCHA, hCaptcha y Cloudflare Turnstile; no habilita iframes generales, ventanas, descargas ni permisos sensibles.
+- `DAG-CALIBRATION-DELIVERY-11` registra correctamente el worker de reintento en App Usuario, por lo que los envios cifrados pendientes pueden reanudarse despues de cerrar o reiniciar la app.
+- PR #46 y #47 fusionados; cierre de publicacion mediante PR #48 y commit `b54112d018cacb41b735b651866894bce5734310`.
+- Android CI `29947179342` y publicacion DEV `29947206438` completaron correctamente. Los manifiestos publicos declaran 273 y apuntan a los APK y SHA-256 registrados arriba. Production no fue tocado.
+- Validacion posterior: en SM-A235M el flujo principal de CAPTCHA CABA quedo visible e interactivo, Zara abrio su menu dinamico, la busqueda incierta continuo y una X junto con dudas automaticas aparecieron en Superweb. Persisten como matrices separadas el vencimiento/recarga/segundo plano del CAPTCHA, una segunda Web dinamica y la recuperacion de Calibracion ante corte de red, reinicio y 429/503.
+
+## Publicacion DEV 272 - confiabilidad DAG agrupada - 2026-07-22
+
+- Publico `DAG-SEARCH-CONTINUITY-03`, `DAG-PROTECTED-MODE-UX-04`, `DAG-WEB-INTERACTION-03`, la primera implementacion de `DAG-CAPTCHA-02` y la cola cifrada/reintentable de `DAG-CALIBRATION-DELIVERY-11`.
+- Android CI `29928420113` y publicacion DEV `29928438230` completaron correctamente. DEV 273 reemplaza esta version como APK publica actual sin retirar sus correcciones.
+- Las pruebas automaticas quedaron correctas; los recorridos fisicos enumerados en DEV 273 siguen pendientes y no se consideran validados por inferencia.
 
 ## Publicacion DEV 270 - UX agrupada y umbral de 100 horas - 2026-07-21
 
@@ -107,14 +131,14 @@ Admin   9fe20c90894c2eecf8151cd44db34122fcf2dbd80318c8bcc11a769b8b664a9d
 - Calibracion: los envios automaticos ignoran un `RemoteResult.Failure`; no existe outbox persistente ni reintento y el candidato manual se retira de memoria antes de recibir confirmacion remota. Una falla 403/429/503, un corte de red o una diferencia de URL puede perder el reporte sin dejar una entrega recuperable. `DAG-CALIBRATION-DELIVERY-11` define confirmacion explicita, cola local y reintento seguro. La Edge Function `dag-calibration` permanece activa en DEV y no se modificaron Supabase, Storage ni datos durante este diagnostico.
 - Los cinco seguimientos quedaron propuestos en `docs/BACKLOG_PRODUCTO.md`. Este diagnostico no cambia Android, `versionCode`, APK, backend ni Production; no sustituye las pruebas fisicas de los fixes futuros.
 
-### Candidato DEV 272 - continuidad de busquedas inciertas
+### Implementacion publicada desde DEV 272 - continuidad de busquedas inciertas
 
 - `DAG-SEARCH-CONTINUITY-03`: una consulta `Uncertain` ya no se cancela ni pide reformular. Continúa una sola vez hacia el proveedor y conserva el filtrado local de cada resultado y el analisis preventivo de cada pagina. Las decisiones `Blocked` por reglas duras o evidencia explicita siguen cerrando antes de consumir Brave.
-- Baseline fisica SM-S908E con APK publica 271: la consulta de control incierta se detuvo con `DAG no tiene suficiente certeza`, confirmando la causa previa al cambio. Pruebas unitarias dirigidas y `ktlintCheck` Usuario correctos; falta publicar el lote 272 y repetir el recorrido exacto.
+- Baseline fisica SM-S908E con APK publica 271: la consulta de control incierta se detuvo con `DAG no tiene suficiente certeza`, confirmando la causa previa al cambio. Pruebas unitarias dirigidas y `ktlintCheck` Usuario correctos; el cambio esta publicado desde DEV 272 y el recorrido se repitio correctamente en SM-A235M con el candidato 274.
 - `DAG-PROTECTED-MODE-UX-04`: al abrir una pagina preventivamente se retiro `Abierto con proteccion adicional`. No era una accion ni una capa distinta; DAG conserva analisis visual, bloqueo de video/descargas/ventanas y evita cachear una aprobacion completa. Los estados accionables siguen visibles.
-- `DAG-WEB-INTERACTION-03`: el saneamiento de subarboles dinamicos deja de recorrer todo dentro del callback del `MutationObserver`. Deduplica nodos y procesa hasta 48 por cuadro; las barreras inmediatas por CSS/intercepcion siguen cerradas. Prueba unitaria del presupuesto y controles Usuario correctos; falta medir y recorrer Zara con el APK 272.
-- `DAG-CAPTCHA-02`: los iframes HTTPS de reCAPTCHA, Cloudflare Turnstile y hCaptcha conservan sus APIs internas y, solo cuando la pagina detecta uno de esos proveedores, reciben una ventana temporal de cookies de terceros de dos minutos. La sesion se cierra al navegar o vencer el plazo; los demas iframes y barreras siguen bloqueados. Falta recorrer un CAPTCHA real con el APK 272 sin automatizar su resolucion.
-- `DAG-CALIBRATION-DELIVERY-11`: los reportes automaticos, X y R se guardan cifrados antes de enviarse y WorkManager reintenta con red/backoff tras cortes o reinicios. La identidad estable deduplica dispositivo/accion/hash/modelo; la cola queda acotada a 24 casos y siete dias. Android interpreta el JSON de la Edge existente: solamente `accepted:true` confirma entrega, `accepted:false` se informa como rechazo y los errores no recuperables no generan bucles. No se cambio Supabase ni Production; falta validar una entrega real en DEV y su aparicion en Super Admin con APK 272.
+- `DAG-WEB-INTERACTION-03`: el saneamiento de subarboles dinamicos deja de recorrer todo dentro del callback del `MutationObserver`. Deduplica nodos y procesa hasta 48 por cuadro; las barreras inmediatas por CSS/intercepcion siguen cerradas. Prueba unitaria del presupuesto y controles Usuario correctos; Zara quedo validada fisicamente con el candidato 274.
+- `DAG-CAPTCHA-02`: los iframes HTTPS de reCAPTCHA, Cloudflare Turnstile y hCaptcha conservan sus APIs internas y, solo cuando la pagina detecta uno de esos proveedores, reciben una ventana temporal de cookies de terceros de dos minutos. La sesion se cierra al navegar o vencer el plazo; los demas iframes y barreras siguen bloqueados. El flujo principal CABA quedo validado por el usuario sin automatizar su resolucion; vencimiento, recarga y segundo plano siguen como matriz de endurecimiento.
+- `DAG-CALIBRATION-DELIVERY-11`: los reportes automaticos, X y R se guardan cifrados antes de enviarse y WorkManager reintenta con red/backoff tras cortes o reinicios. La identidad estable deduplica dispositivo/accion/hash/modelo; la cola queda acotada a 24 casos y siete dias. Android interpreta el JSON de la Edge existente: solamente `accepted:true` confirma entrega, `accepted:false` se informa como rechazo y los errores no recuperables no generan bucles. DEV 273 corrigio el registro del worker y la Edge v12 restablecio el contrato; entrega, acuse y aparicion en Superweb quedaron validados. La matriz de recuperacion sigue pendiente.
 
 ## Validacion fisica DEV 270 en Samsung SM-A235M - 2026-07-21
 

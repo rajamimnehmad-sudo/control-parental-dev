@@ -296,6 +296,7 @@ Flujo de una entrada:
 | USER-DAG-LAUNCHER-PREFERENCE-01 | Validado fisicamente en SM-A235M DEV 270 | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
+| ACCESSIBILITY-REPAIR-UX-02 | Idea autorizada para backlog; no aprobada para codigo | P1 | Evitar el bucle al activar Accessibility y señalar claramente donde tocar | S | Alto |
 | DEVICE-CONNECTIVITY-ALERTS-01 | Backend DEV y Android publicados DEV 270; pendiente comprobacion fisica | P1 | Alerta ordinaria tras 100 horas sin comunicacion para Admin y Superweb | M | Medio |
 | DEV-OFFLINE-ALERT-100H-01 | Aplicado y verificado exclusivamente en Supabase DEV | P1 | Alinear la alerta remota ordinaria al margen de 100 horas sin cambiar posible desinstalacion | S | Medio |
 | ADMIN-DEVICE-OFFLINE-100H-01 | Publicado DEV 270; pendiente comprobacion fisica | P1 | Unificar en 100 horas el aviso de falta de comunicacion de App Admin sin demorar componentes caidos | S | Medio |
@@ -308,11 +309,13 @@ Flujo de una entrada:
 | SUPERADMIN-DAG-USER-01 | Publicado en Superweb y backend DEV; pendiente prueba funcional autenticada | P1 | Habilitar o deshabilitar DAG por Usuario desde Superweb | S | Alto |
 | BARRIER-LAUNCHER-01 | Resuelto y validado DEV 242 en SM-S908E | P2 | Mantener acceso Usuario sin debilitar la instalacion protegida en Android normal | M | Medio |
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
+| BARRIER-FACTORY-RESET-01 | Idea autorizada para backlog; no aprobada para codigo | P0 | Bloquear el restablecimiento desde Ajustes salvo autorizacion destructiva independiente | M | Critico |
+| BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
-| DAG-WEB-INTERACTION-03 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
-| DAG-SEARCH-CONTINUITY-03 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
-| DAG-PROTECTED-MODE-UX-04 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P2 | Quitar el mensaje tecnico de proteccion adicional | S | Bajo |
+| DAG-WEB-INTERACTION-03 | Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
+| DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
+| DAG-PROTECTED-MODE-UX-04 | Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274 | P2 | Quitar el mensaje tecnico de proteccion adicional | S | Bajo |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | Corregido DEV 239; pendiente prueba fisica | P2 | Integrar la zona de camara con DAG y evitar recortar el texto de busqueda | S | Bajo |
@@ -324,7 +327,8 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
-| DAG-LOCAL-IMAGE-PERF-03 | Implementado candidato DEV 271; pendiente medicion fisica | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
+| DAG-LOCAL-IMAGE-PERF-03 | Publicado DEV 271; medicion fisica indicativa completada junto al candidato DEV 274 | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
+| DAG-CATEGORY-FAST-PATH-04 | Implementado y validado candidato DEV 274; pendiente publicacion | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
 | DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 259; validado en SM-A235M | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-CALIBRATION-CLOSED-LOOP-10 | Publicado DEV 260; validado en SM-A235M | P0 | Hacer persistentes las decisiones calibradas, separar motivos positivos/negativos y agregar criterio local de mangas/corte sobre rodillas | L | Alto |
 | DAG-AUDIENCE-POLICY-11 | Publicado DEV 261; validación física previa correcta, pendiente repetir APK público | P0 | Permitir imagenes normales de bebes y hombres, aplicar criterio femenino a niñas y mantener ropa interior/desnudez como bloqueo universal | M | Alto |
@@ -340,9 +344,11 @@ Flujo de una entrada:
 | DAG-REQUEST-STATUS-01 | Implementado parcial DEV 238; ampliacion pendiente | P1 | Deduplicar pedidos, restringir reenvio y avisar visualmente/push cuando Admin resuelve | L | Medio |
 | DAG-SHARE-01 | Implementado DEV 238; pendiente prueba fisica | P2 | Compartir de forma segura el enlace de la pagina actual desde DAG | S | Medio |
 | DAG-AUTOCOMPLETE-02 | Implementado DEV 238; pendiente prueba fisica | P2 | Ejecutar directamente la busqueda al tocar una sugerencia DAG | S | Bajo |
-| DAG-CAPTCHA-01 | Publicado DEV 271; iframe visible pero flujo aun falla | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
-| DAG-CAPTCHA-02 | Implementado candidato DEV 272; pendiente publicacion y prueba fisica | P1 | Completar una sesion CAPTCHA temporal y aislada sin abrir iframes generales | L | Alto |
-| DAG-CALIBRATION-DELIVERY-11 | Implementado candidato DEV 272; pendiente publicacion y prueba integral | P0 | Garantizar entrega, confirmacion y reintento de revisiones DAG privadas | L | Alto |
+| DAG-CAPTCHA-01 | Publicado DEV 271; iframe visible e interactivo en SM-A235M | P1 | Mostrar CAPTCHAs seguros necesarios para completar sitios y tramites permitidos | M | Alto |
+| DAG-CAPTCHA-02 | Publicado y reforzado DEV 273; flujo principal validado por el usuario | P1 | Completar una sesion CAPTCHA temporal y aislada sin abrir iframes generales | L | Alto |
+| DAG-GEOLOCATION-01 | Idea autorizada para backlog; no aprobada para codigo | P2 | Permitir ubicacion en sitios autorizados con consentimiento y alcance minimo | M | Alto |
+| DAG-CALIBRATION-DELIVERY-11 | Publicado DEV 273; acuse y llegada integral validados, matriz de recuperacion pendiente | P0 | Garantizar entrega, confirmacion y reintento de revisiones DAG privadas | L | Alto |
+| DAG-CALIBRATION-DELIVERY-12 | Resuelto en Edge DEV y validado visualmente en Superweb; acompaña lote DEV 274 | P0 | Corregir que no llegue ninguna revision manual ni dudosa a Superweb | M | Critico |
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
@@ -642,6 +648,24 @@ Flujo de una entrada:
 - Decision aplicada: eliminacion logica inmediata de datos operativos y retencion de auditoria, alertas y contadores. No se hace `DELETE` fisico ni se borra la cuenta/comunidad.
 - Cierre: la cuenta tecnica se conserva como exige la decision de retencion; dispositivo y datos operativos quedan archivados. No se borro fisicamente ninguna fila.
 
+### BARRIER-FACTORY-RESET-01 - Restablecimiento desde Ajustes bajo autorizacion separada
+
+- Estado: `Idea`, autorizada para registro en backlog el 2026-07-22; no aprobada para implementacion. Tipo: seguridad Android y prevencion de perdida de datos. Prioridad: P0. Esfuerzo estimado: M. Riesgo: critico.
+- Objetivo: en la modalidad online actual, detectar y cerrar las rutas de `Restablecer datos de fabrica` o `Borrar todos los datos` mientras la barrera este armada. Ajustes no relacionados y restablecimientos parciales inocuos no deben quedar bloqueados por coincidencias amplias.
+- Autorizacion: crear una accion destructiva propia desde Admin, separada de mantenimiento y desinstalacion, con duracion acotada, confirmacion explicita, dispositivo objetivo, auditoria y vencimiento automatico. Autorizar una desinstalacion nunca debe autorizar tambien el borrado total del telefono.
+- Alcance real: defensa best-effort mediante Accessibility para rutas dentro de Android y variantes OEM soportadas. No prometer bloqueo de un borrado iniciado con botones fisicos desde Recovery, porque App Usuario no se ejecuta en ese entorno; sin Device Owner/FRP/zero-touch tampoco puede sobrevivir ni volver a instalarse automaticamente despues del borrado.
+- Seguimiento remoto: si el dispositivo deja de comunicarse despues de un intento o autorizacion, conservar evidencia y alertar sin afirmar como hecho un restablecimiento que el backend no puede confirmar. Una eventual cuarentena posterior a reinstalacion necesita identidad recuperable y queda fuera hasta diagnosticarla.
+- Aceptacion preliminar: cubrir Samsung y Android generico con pruebas negativas; impedir toques rapidos sin bloquear copias de seguridad, reinicio normal, restablecimiento de red o equipos ajenos; permitir el recorrido solo durante la autorizacion exacta; documentar expresamente Recovery como limite.
+
+### BARRIER-ESCAPE-AUDIT-02 - Auditoria integral de vias de escape Android
+
+- Estado: `Idea`, autorizada para registro en backlog el 2026-07-22; no aprobada para implementacion. Tipo: seguridad Android, antimanipulacion y compatibilidad. Prioridad: P0. Esfuerzo estimado: XL por etapas. Riesgo: critico.
+- Objetivo de producto: buscar de forma sistematica toda via practica para desarmar, eludir o retirar la proteccion y cerrar cada ruta que Android normal permita, sin dejar controles peligrosos abiertos por omision. Incluye desinstalacion, desactivacion o caida de Accessibility/Device Admin/VPN, cierre forzado, bateria, instaladores y tiendas, otras VPN/proxies/DNS, modo seguro, usuarios secundarios/perfiles, ADB/opciones de desarrollador, fichas y Ajustes OEM, reinicio y restablecimiento de fabrica.
+- Metodo: convertir el inventario en tickets pequenos por superficie y causa raiz; mantener pruebas negativas, autorizaciones temporales exactas, watchdog, alertas y recuperacion. Cada cierre debe distinguir prevencion real, deteccion posterior, recuperacion y limite no solucionable sin Device Owner/root/OEM.
+- Cobertura: aplicar la estrategia a todo Android dentro del soporte declarado del producto y validar por API 29-36 y familias Samsung, Xiaomi/HyperOS, Motorola, Honor, Oppo/Realme, Transsion y TCL usando `docs/compatibility/`. No afirmar compatibilidad universal por inferencia: una familia/version solo queda cubierta con evidencia automatica y fisica o de laboratorio registrada.
+- Relacion: agrupa y ordena el seguimiento transversal; no reemplaza `BARRIER-FACTORY-RESET-01`, `BARRIER-A11Y-RACE-01`, `BARRIER-USER-HARDENING-01`, alertas ni tickets OEM existentes. Recovery, modo seguro, ADB previamente autorizado, root, bootloader y fallos de fabricante deben permanecer como limites explicitos cuando Android normal no permita bloquearlos.
+- Aceptacion preliminar: matriz versionada de superficies/rutas/resultado; cero rutas conocidas sin clasificar; cada ruta queda bloqueada, detectada y recuperable o documentada con su limite exacto; pruebas de no regresion para autorizaciones legitimas; validacion gradual por fabricante sin borrar datos salvo prueba destructiva separada y expresamente autorizada.
+
 ### BARRIER-UNINSTALL-SCOPE-01 - Proteger solo la desinstalacion de Usuario
 
 - Estado: `Validacion fisica no destructiva correcta en SM-A235M DEV 248; pendiente SM-S908E y desinstalacion efectiva autorizada`. Aprobado por el reporte correctivo explicito del usuario el 2026-07-16. Prioridad: P0. Riesgo: alto.
@@ -828,7 +852,7 @@ Flujo de una entrada:
 
 #### DAG-WEB-INTERACTION-03 - Subarboles dinamicos sin bloqueo del hilo principal
 
-- Estado: `Implementado candidato DEV 272; pendiente publicacion y prueba fisica`. Aprobado explicitamente el 2026-07-22. Tipo: bug funcional, rendimiento WebView y seguridad de contenido. Prioridad: P1.
+- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: bug funcional, rendimiento WebView y seguridad de contenido. Prioridad: P1.
 - Evidencia: el usuario confirma que DEV 271 no resolvio todos los botones. En un navegador normal, el menu actual de Zara Argentina abre correctamente y crea un dialogo grande con pestañas, acordeones y muchos enlaces; no depende de canvas. En DAG, cada nodo agregado puede activar `dagSecureNode(node, true)`, que recorre sincronamente videos, audios, canvas, iframes, imagenes y fondos de todo el subarbol.
 - Diagnostico: DEV 271 corrigio la ruta de cambios de atributos, pero no la insercion o hidratacion de subarboles grandes. Registros solapados del `MutationObserver` pueden volver a recorrer descendientes y competir con el evento tactil y el pintado del menu. Service Workers bloqueados, iframes eliminados y otras restricciones pueden explicar sitios diferentes y deben distinguirse mediante codigos diagnosticos locales, no relajarse en conjunto.
 - Alcance propuesto: cola unica de saneamiento por pagina, deduplicada por raiz; bloqueo inmediato por CSS/intercepcion para video, audio, canvas, iframes e imagenes mientras el trabajo se procesa; recorrido acotado por lote fuera del callback del observador; cancelacion por navegacion; y diagnostico local por capacidad bloqueada. No agregar excepciones por dominio para Zara.
@@ -843,10 +867,11 @@ Flujo de una entrada:
   - pruebas automaticas cubren raices solapadas, rafagas de mutaciones, cancelacion y barreras inmediatas; la aceptacion final incluye prueba fisica con DEV publico.
 - Implementacion: los subarboles nuevos se incorporan una sola vez mediante `WeakSet` y se recorren en lotes maximos de 48 elementos por cuadro. El callback del observador deja de recorrer descendientes completos; CSS mantiene ocultos video, audio, canvas e iframes no autorizados mientras la cola avanza, y las imagenes siguen pasando por intercepcion local.
 - Validacion candidata: prueba unitaria del presupuesto por cuadro, unitarios dirigidos y `ktlintCheck` Usuario correctos. Zara y una segunda pagina dinamica quedan para el APK agrupado 272 en el SM-S908E.
+- Validacion fisica 2026-07-22: Zara Argentina cargo con la compuerta estricta de imagenes; el menu abrio con un toque y expuso `MUJER`, `HOMBRE`, `NIÑOS` y los acordeones de coleccion sin congelamiento. El primer intento reutilizo una pestaña que seguia analizando otra navegacion; la repeticion desde una pestaña limpia completo correctamente y no se reprodujo como regresion.
 
 #### DAG-SEARCH-CONTINUITY-03 - Buscar aunque la consulta sea incierta
 
-- Estado: `Implementado candidato DEV 272; pendiente publicacion y prueba fisica`. Aprobado explicitamente el 2026-07-22. Tipo: comportamiento de busqueda, precision local y UX. Prioridad: P1.
+- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: comportamiento de busqueda, precision local y UX. Prioridad: P1.
 - Problema: DAG a veces no consulta el buscador y muestra `no tiene suficiente certeza`, obligando a reformular incluso consultas legitimas. El usuario rechazo expresamente este comportamiento.
 - Causa confirmada: `DagBrowserViewModel.search` cancela la busqueda antes de `DagSearchRepository.search` cuando `classifyQuery` devuelve `Uncertain`. Esa salida incluye terminos ambiguos, contexto sensible, confianza semantica media y modelo no disponible; hoy todos reciben el mismo tratamiento aunque no exista una regla dura de bloqueo.
 - Decision de producto propuesta: una consulta incierta pero no bloqueada debe continuar una sola vez hacia Brave. DAG filtra cada resultado y vuelve a analizar cada pagina; resultados bloqueados no se muestran y paginas ambiguas abren con las barreras preventivas existentes. Reglas Admin, dominios prohibidos, terminos explicitos y evidencia semantica alta siguen bloqueando antes de consumir una consulta.
@@ -862,10 +887,11 @@ Flujo de una entrada:
   - tests incluyen español, ingles y hebreo, contexto educativo/medico, terminos ambiguos y riesgo explicito.
 - Implementacion: `Blocked` sigue cerrando antes de Brave; `Allowed` y `Uncertain` ejecutan exactamente el mismo flujo protegido de busqueda, filtrado individual de resultados y analisis posterior de pagina. La prueba fisica de baseline en SM-S908E/DEV 271 reprodujo que `educacion sxual medica` se detenia por certeza antes del cambio.
 - Validacion candidata: pruebas dirigidas de clasificador y acciones de resultados, mas `ktlintCheck` de App Usuario, correctas. La publicacion y repeticion fisica quedan agrupadas al final del lote DEV 272.
+- Validacion fisica 2026-07-22: `educacion sexual medica` continuo hasta resultados filtrados sin mostrar `DAG no tiene suficiente certeza`. Desde esos resultados abrio dentro de DAG una pagina educativa de Medicos del Mundo con texto e imagenes, conservando el analisis preventivo.
 
 #### DAG-PROTECTED-MODE-UX-04 - Estado preventivo entendible
 
-- Estado: `Implementado candidato DEV 272; pendiente publicacion y prueba fisica`. Aprobado explicitamente el 2026-07-22. Tipo: claridad UX y explicabilidad. Prioridad: P2.
+- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: claridad UX y explicabilidad. Prioridad: P2.
 - Problema: el mensaje `Abierto con proteccion adicional` no explica qué ocurrio, qué cambia ni si el usuario debe hacer algo.
 - Significado tecnico actual: aparece cuando el texto esta vacio, la clasificacion es incierta o la evidencia semantica no alcanza el bloqueo. La pagina se muestra con las barreras Web normales y no se guarda como aprobacion rapida completa. No activa un segundo antivirus, una VPN distinta ni una revision humana automatica.
 - Solucion recomendada: no mostrar un aviso persistente cuando no hay una accion necesaria. Mantener `Analizando` durante la compuerta y luego abrir la pagina normalmente; si se conserva una explicacion, usar una ayuda breve y accesible como `Modo preventivo: DAG seguirá revisando esta página`, sin prometer proteccion total.
@@ -878,6 +904,7 @@ Flujo de una entrada:
   - el mensaje no tapa controles ni reaparece en cada mutacion o navegacion interna;
   - TalkBack y fuente grande comunican el estado sin texto recortado.
 - Implementacion: al completar la compuerta preventiva la pagina queda visible sin un mensaje tecnico persistente. `Analizando`, bloqueos, errores y revisiones continúan usando sus estados especificos; las barreras preventivas y la decision de no guardar una aprobacion rapida no cambian.
+- Validacion fisica 2026-07-22: la pagina educativa abierta desde una consulta incierta quedo visible sin el texto `Abierto con proteccion adicional` ni una accion inexistente; los estados de busqueda y analisis siguieron separados.
 
 #### DAG-HOME-UX-01 - Home con buscador central
 
@@ -942,7 +969,7 @@ Flujo de una entrada:
 
 #### DAG-LOCAL-IMAGE-PERF-03 - Apertura local rapida de fotos
 
-- Estado: `Implementado candidato DEV 271; pendiente CI, publicacion y medicion fisica`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
+- Estado: `Publicado DEV 271; medicion fisica indicativa completada junto al candidato DEV 274`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
 - Problema: una pagina con varias fotos puede tardar aproximadamente entre 6 y 8 segundos en completar su primera carga visual porque la descarga, decodificacion y clasificacion local forman una cola costosa y parte del trabajo puede repetirse.
 - Decision aprobada: mantener todo el analisis de imagenes dentro del telefono. No se usara un modelo de IA online, no se enviaran fotos a terceros y no se persistiran originales para acelerar cargas futuras.
 - Solucion propuesta: dos clasificadores locales con limite estricto; prioridad para recursos visibles; una sola decodificacion por imagen; cache efimera de decisiones por hash de contenido, audiencia y version de calibracion; precarga maxima de la siguiente pantalla; y XNNPACK o NNAPI solo cuando una medicion controlada del dispositivo demuestre que mejora el tiempo con fallback seguro.
@@ -960,6 +987,23 @@ Flujo de una entrada:
   - se comparan antes/despues en la misma pagina y dispositivo, incluyendo primera carga, repeticion, scroll, cambio de pagina, memoria y temperatura;
   - no se agregan servicios externos, claves, costos por IA ni salida de imagenes del telefono.
 - Resultado candidato DEV 271: dos clasificadores locales independientes atienden la cola acotada; la preparacion inicial prioriza una pantalla y precarga como maximo la siguiente; el asentamiento visual baja de 1.200 a 300 ms. La cache de respuestas efimera existente sigue evitando reclasificar una URL ya resuelta dentro de la pagina. La cache por hash entre paginas y la seleccion adaptativa NNAPI quedan fuera de este primer candidato hasta contar con una invalidacion de calibracion y benchmarks seguros.
+- Medicion fisica 2026-07-22: en el mismo SM-A235M y la portada de Samsung Argentina, el probe ADB/UiAutomator comparable paso de aproximadamente 9.589 ms con APK publica DEV 273 a 4.059 ms con candidato DEV 274. Es una medicion operativa indicativa, sensible a red y cache, no un benchmark de laboratorio; no se registraron URL, texto, consulta ni imagenes en la aplicacion.
+
+#### DAG-CATEGORY-FAST-PATH-04 - Apertura temprana por categoria segura
+
+- Estado: `Implementado y validado candidato DEV 274; pendiente publicacion`; aprobado explicitamente por el usuario el 2026-07-22 como parte del lote DAG. Tipo: rendimiento, clasificacion local y seguridad visual. Prioridad: P1. Esfuerzo: S. Riesgo: alto.
+- Causa confirmada: DAG mantiene invisible toda la pagina hasta aprobar el texto y resolver cada imagen visible del primer viewport. Aunque las imagenes se clasifican en paralelo, una sola descarga o inferencia lenta puede sostener la pantalla de analisis hasta el limite de ocho segundos incluso en electronica, banca, documentacion o tramites.
+- Alcance aprobado: cuando la pagina ya fue permitida y una categoria de bajo riesgo queda identificada con evidencia suficiente, mostrar inmediatamente texto, controles y estructura. Las imagenes siguen pasando individualmente por descarga HTTPS, defensa SSRF, clasificacion local y fallo cerrado; una imagen pendiente no se muestra por anticipado.
+- Categorias iniciales cerradas: electronica, finanzas, documentacion tecnica y dominios gubernamentales. Ropa, contenido mixto, categorias ambiguas, decisiones inciertas y cualquier bloqueo conservan la barrera estricta del viewport.
+- Seguridad: la categoria es solo una politica de espera visual y nunca reemplaza reglas explicitas, listas, analisis semantico, clasificacion de imagenes, bloqueo de video/iframes/descargas ni modo Extra Kosher. No se agregan excepciones por comercio o dominio privado.
+- Aceptacion:
+  - una pagina de electronica claramente reconocida muestra texto y controles al terminar el analisis de pagina sin esperar toda la cola visual;
+  - cada foto permanece vacia, difuminada o bloqueada hasta su propia decision local;
+  - ropa y paginas sin dos señales claras conservan la espera estricta existente;
+  - decisiones bloqueadas o inciertas nunca usan el atajo;
+  - se compara fisicamente tiempo de apertura en el mismo Samsung y pagina, sin registrar URL, consulta, texto ni imagenes.
+- Implementacion: una politica local exige decision de pagina `Allowed` y dos señales distintas para electronica, finanzas o documentacion, o un sufijo gubernamental cerrado. Solo adelanta `viewportImagesReady` para mostrar estructura y controles; la intercepcion y clasificacion de cada raster no cambian. Ropa, paginas ambiguas, `Uncertain` y `Blocked` conservan la barrera estricta. El registro de rendimiento contiene unicamente milisegundos y nombre de compuerta.
+- Validacion candidata: unitarios cubren electronica realista, gobierno, ropa, ambiguedad y decisiones no permitidas. `ktlintCheck`, unitarios y builds DEV de ambas aplicaciones completaron correctamente. En SM-A235M Samsung mostro estructura en aproximadamente 4.059 ms frente a 9.589 ms del probe previo; Zara mantuvo la compuerta estricta y su menu siguio operativo; la pagina gubernamental de infracciones cargo y mostro su reCAPTCHA.
 
 #### DAG-ULTRA-KOSHER-01 - Modos de imagenes administrables
 
@@ -1129,7 +1173,7 @@ Flujo de una entrada:
 
 #### DAG-CAPTCHA-02 - Sesion CAPTCHA temporal y aislada
 
-- Estado: `Implementado candidato DEV 272`; autorizado el 2026-07-22, pendiente publicacion y validacion fisica. Tipo: compatibilidad Web, privacidad y seguridad. Prioridad: P1.
+- Estado: `Publicado DEV 272 y reforzado DEV 273`; flujo principal validado por el usuario y repetido en SM-A235M el 2026-07-22. Tipo: compatibilidad Web, privacidad y seguridad. Prioridad: P1.
 - Evidencia: el usuario confirma que el CAPTCHA de MiBA sigue sin funcionar con DEV 271. La ampliacion anterior solo evita eliminar el iframe inicial de reCAPTCHA, hCaptcha o Turnstile; no garantiza el protocolo completo del desafio.
 - Diagnostico: WebView rechaza todas las cookies de terceros, elimina todo canvas, bloquea `blob:`, registro de Service Workers, ventanas auxiliares y navegaciones externas. Un proveedor puede necesitar parte de esas capacidades, rutas o hosts durante la sesion y fallar aunque su iframe sea visible. Habilitarlas globalmente seria una regresion de privacidad y una ruta de contenido no analizado.
 - Alcance propuesto: detectar un desafio cerrado de proveedor conocido dentro de una pagina HTTPS ya permitida; crear una sesion efimera por pagina/proveedor; permitir solo las capacidades minimas demostradas por el flujo real; mantener la imagen del desafio dentro de la politica acordada; aceptar el token de respuesta en la pagina principal; y limpiar cookies/estado temporal al completar, vencer, navegar o cerrar la pestaña.
@@ -1144,6 +1188,17 @@ Flujo de una entrada:
   - un sitio bloqueado o incierto no usa CAPTCHA para abrir contenido ni navegacion externa;
   - pruebas registran solo proveedor, etapa y codigo de fallo; nunca token, respuesta, imagen, URL completa ni datos del formulario.
 - Implementacion: el cliente conserva una lista nativa cerrada de rutas HTTPS para reCAPTCHA, Cloudflare Turnstile y hCaptcha. Al detectar un iframe valido habilita cookies de terceros solamente en ese `WebView` durante hasta dos minutos, conserva las APIs internas del documento del proveedor y cierra la sesion al navegar o vencer el plazo. No habilita ventanas, descargas, camara, microfono, ubicacion ni iframes generales.
+- Cierre DEV 273: se corrigio la interaccion interna del desafio dentro de la sesion aislada. Android CI `29947179342` y publicacion `29947206438` correctos. En SM-A235M la pagina oficial de infracciones CABA mostro el checkbox `No soy un robot`; el usuario confirmo que al activarlo funciona. El aviso visible de cuota gratuita pertenece al reCAPTCHA Enterprise del sitio. No se automatizo ni resolvio el desafio. Vencimiento, recarga y segundo plano quedan como matriz de endurecimiento, no como falla reproducida del flujo principal.
+
+#### DAG-GEOLOCATION-01 - Ubicacion acotada dentro de sitios permitidos
+
+- Estado: `Idea`, autorizada para registro en backlog el 2026-07-22; no aprobada para diagnostico tecnico ni implementacion. Tipo: compatibilidad Web, permisos Android y privacidad. Prioridad: P2. Esfuerzo estimado: M. Riesgo: alto.
+- Problema: DAG bloquea ubicacion, por lo que mapas, sucursales, tramites, entregas y otros sitios permitidos no pueden ofrecer funciones que dependen de la posicion del dispositivo.
+- Propuesta preliminar: permitir geolocalizacion solamente cuando una pagina HTTPS ya aprobada la solicita, con explicacion visible y consentimiento puntual del Usuario. La autorizacion debe quedar acotada al sitio y a la sesion o a una decision administrada expresamente; nunca habilitar ubicacion global por abrir DAG.
+- Privacidad y seguridad: preferir ubicacion aproximada cuando alcance; no guardar ni sincronizar coordenadas, recorridos o consultas; no incluir ubicacion en historial, solicitudes Admin, Calibracion DAG ni telemetria. Denegar en paginas bloqueadas, inciertas, iframes, contenido mixto o sin gesto del Usuario.
+- Relacion: amplia una capacidad que `DAG-BROWSER-01A` mantiene deliberadamente bloqueada. No modifica reglas de contenido, CAPTCHA, ventanas, descargas, camara ni microfono.
+- Decisiones pendientes antes de aprobar codigo: ubicacion aproximada o precisa; permiso por uso, sesion o sitio; autoridad Usuario/Admin; comportamiento offline; revocacion; tratamiento de mapas embebidos; texto de consentimiento y lista inicial de recorridos reales a validar.
+- Aceptacion preliminar: un sitio permitido puede pedir ubicacion mediante el dialogo de DAG y el permiso Android correspondiente; rechazar no rompe la pagina ni genera nuevos pedidos automaticos; cambiar de sitio o cerrar la sesion revoca el alcance temporal; ninguna coordenada sale del telefono salvo hacia el sitio que el Usuario autorizo en ese momento.
 
 #### DAG-TABS-UX-02 - Selector reciente, limpio y sin vacias duplicadas
 
@@ -1245,6 +1300,17 @@ Flujo de una entrada:
   - la interfaz distingue claramente proteccion incompleta, componente efectivamente caido y dispositivo simplemente sin comunicacion;
   - no se recopilan consultas, URLs, mensajes ni contenido para calcular la salud.
 - Decisiones pendientes para la entrevista del ticket: componentes obligatorios por modelo de telefono; autoridad y visibilidad Admin/Super Admin; textos y colores; antiguedad maxima del heartbeat; comportamiento durante onboarding offline; orden de reparacion; ventanas de mantenimiento; recordatorios, escalamiento y criterio exacto para los tres estados agregados.
+
+### ACCESSIBILITY-REPAIR-UX-02 - Regreso estable y guia visual para activar Accessibility
+
+- Estado: `Idea`, autorizada para registro en backlog el 2026-07-22; no aprobada para implementacion. Tipo: bug de ciclo de vida, reparacion guiada y UX Android/OEM. Prioridad: P1. Esfuerzo estimado: S. Riesgo: alto por tratarse de una ventana legitima dentro de Ajustes protegidos.
+- Evidencia: al abrir desde App Usuario la configuracion interna de Accessibility de Content Filter y activar el servicio, Ajustes se cierra correctamente. Sin embargo, si la app no se fuerza a cerrar por completo, tocar nuevamente su icono vuelve a lanzar la misma pantalla de Accessibility y la barrera la expulsa; la app queda atrapada en ese recorrido.
+- Causa a diagnosticar: la orden o estado de reparacion parece sobrevivir al regreso aun cuando Android ya informa el servicio activo. Confirmar ciclo `Activity`/navegacion, consumo del evento, `onResume`, estado guardado y ventana autorizada antes de modificar codigo.
+- Comportamiento requerido: la apertura de Accessibility debe ser de un solo uso. Al regresar, App Usuario comprueba el estado real; si esta activo, consume y borra la orden, cierra la ventana temporal y abre normalmente. Si sigue inactivo, conserva una explicacion y permite reintentar solo mediante una nueva accion explicita, sin relanzar Ajustes al tocar el icono de la app.
+- Guia visual: antes de salir de App Usuario, mostrar una indicacion breve y simple con animacion tipo dedo, pulso o atenuado que explique donde tocar. Abrir directamente el detalle de Content Filter cuando Android/OEM lo permita. Un resaltado nativo dentro de Ajustes puede usarse como mejora opcional si el fabricante lo soporta, pero no depender de overlays, APIs privadas ni de modificar la interfaz protegida del sistema antes de que Accessibility este activa.
+- Seguridad: la guia no debe ampliar la autorizacion a otros servicios ni permitir apagar Accessibility despues. Activar, cancelar, volver, vencer la ventana o cambiar de pantalla deben cerrar exactamente el recorrido correspondiente; la barrera antimanipulacion conserva su proteccion normal fuera de esa reparacion.
+- Relacion: ticket pequeno derivado de `PROTECTION-ONBOARDING-HEALTH-01` y coordinado con `BARRIER-A11Y-RACE-01`; no reabre el bypass rapido ni autoriza un rediseño completo del onboarding.
+- Aceptacion preliminar: activar y regresar abre Content Filter normalmente sin forzar cierre; cancelar no crea relanzamientos automaticos; rotacion, segundo plano, reinicio de proceso y doble toque no duplican el intent; la indicacion previa es accesible y entendible; Samsung objetivo y Android generico conservan la barrera fuera de la ventana legitima.
 
 ### ADMIN-DEVICE-OFFLINE-100H-01 - Aviso Admin despues de 100 horas
 
@@ -1501,7 +1567,7 @@ Flujo de una entrada:
 
 #### DAG-CALIBRATION-DELIVERY-11 - Entrega confirmada y recuperable
 
-- Estado: `Implementado candidato DEV 272`; autorizado el 2026-07-22, pendiente publicacion y prueba integral. Tipo: confiabilidad Android, privacidad, Storage y operacion Super Admin. Prioridad: P0.
+- Estado: `Publicado DEV 272 y corregido DEV 273`; entrega y acuse integral validados, matriz de recuperacion pendiente. Tipo: confiabilidad Android, privacidad, Storage y operacion Super Admin. Prioridad: P0.
 - Evidencia: el usuario reporta que fotos dudosas o marcadas para revision no aparecen en Calibracion DAG. Una tarjeta con miniatura fallida seguiria apareciendo como `Miniatura no disponible`; la ausencia total apunta principalmente a que la fila nunca se inserto, fue filtrada/vencio o el envio se perdio antes de confirmarse. No se consultaron filas DEV ni se modificaron datos durante este diagnostico.
 - Causas confirmadas en Android: el envio automatico envuelve `submitReview` en `runCatching` pero ignora un `RemoteResult.Failure`; no hay outbox persistente ni reintento. En el modo manual, `takeManualCalibrationCandidate` retira el candidato de memoria antes del acuse remoto; si la URL JavaScript no coincide con la normalizada, no encuentra candidato y no envia. Un 403, 429, 503 o corte de red puede perder el caso y no existe estado recuperable.
 - Alcance propuesto Android: outbox local cifrado y acotado para miniatura, hash, modelo, señales, puntajes, origen y resultado solicitado; identidad estable por hash en vez de URL mutable; estados `Enviando`, `Enviado` y `Pendiente de enviar`; WorkManager con backoff y restricciones de red; conservar el candidato hasta un acuse valido; deduplicacion e idempotencia; expiracion y borrado seguro.
@@ -1519,6 +1585,19 @@ Flujo de una entrada:
   - pruebas cubren online, offline, reinicio, duplicado, token invalido, limite, Storage fallido, DB fallida, vencimiento y limpieza local;
   - asesores de seguridad/rendimiento, RLS y denegacion a `anon`/`authenticated` se verifican antes de aplicar exclusivamente en DEV.
 - Implementacion Android: cada envio se cifra con AES-GCM respaldado por Android Keystore y se persiste antes de iniciar la llamada. La cola admite hasta 24 miniaturas, vence localmente a los siete dias, deduplica por dispositivo/accion/hash/modelo y WorkManager reintenta con red y backoff exponencial incluso tras reiniciar el proceso. Solo `accepted:true` se muestra como enviado; `accepted:false` es rechazo terminal y 400/403 no se reintentan indefinidamente. La Edge Function existente ya devuelve el acuse estructurado y deduplica por dispositivo/hash/modelo, por lo que este candidato no requiere migracion ni despliegue Supabase.
+- Cierre DEV 273: App Usuario registra correctamente el worker de reintento requerido por la cola persistente. Android CI `29947179342` y publicacion `29947206438` correctos. Despues de corregir el contrato remoto en `DAG-CALIBRATION-DELIVERY-12`, una duda automatica y una X manual recibieron acuse y aparecieron pendientes con miniatura en Superweb. La matriz separada de corte de red, reinicio, 429/503 y deduplicacion sigue pendiente y no se declara probada por inferencia.
+
+#### DAG-CALIBRATION-DELIVERY-12 - Ninguna revision llega desde DEV 273
+
+- Estado: `Resuelto y validado visualmente en Supabase DEV y Superweb`; aprobado explicitamente el 2026-07-22 dentro del lote DAG. La correccion acompaña la publicacion Android DEV 274. Tipo: confiabilidad Android, entrega remota y operacion Super Admin. Prioridad: P0. Esfuerzo: M. Riesgo: critico para la mejora continua de DAG.
+- Evidencia del Usuario: las fotos marcadas para revisar desde `Calibracion DEV` no aparecen en Calibracion DAG de Superweb. DAG tambien informa que no llegaron. Las imagenes detectadas automaticamente como dudosas tampoco aparecen; la cola remota queda sin ningun caso nuevo.
+- Causa raiz confirmada: Android DEV 273 envia los puntajes nuevos `male_face` y `male_breast_exposed`, incorporados con la politica por audiencia, pero la lista cerrada de claves de Edge no habia sido actualizada. La funcion rechazaba todo caso completo con HTTP 400 `Caso de calibracion invalido` antes de Storage y base; outbox y WorkManager funcionaban, pero reintentaban un contrato incompatible.
+- Diagnostico requerido: reproducir una X/R y una duda automatica con identificadores locales no sensibles; observar estados de outbox y WorkManager; comprobar respuesta estructurada de Edge; contrastar conteos DEV de fila, objeto privado y vista/RPC de Superweb; revisar autenticacion, limites, expiracion, filtros y modelo activo. No enviar URL, consulta, original ni datos personales y no borrar casos existentes.
+- Resultado esperado: cada intento muestra un estado verdadero (`Pendiente`, `Enviando`, `Enviado` o rechazo concreto); un acuse `accepted:true` corresponde a una fila visible y miniatura privada accesible para Super Admin; fallos recuperables permanecen en cola y reintentan; fallos terminales no se presentan como entrega exitosa.
+- Seguridad y alcance: usar exclusivamente Supabase DEV `syeycayasyufedwoprea`; no tocar Production, no usar Service Role en Android, no relajar RLS y no fabricar ni borrar datos fuera de los casos de prueba expresamente controlados.
+- Relacion: seguimiento correctivo de `DAG-CALIBRATION-DELIVERY-11`; no duplica Calibracion visual, criterios X/R ni entrenamiento. La prioridad es restablecer entrega y trazabilidad antes de ajustar umbrales o modelos.
+- Correccion DEV: Edge `dag-calibration` v12 acepta las dos claves de puntaje que ya produce Android, sin ampliar señales, origenes, autenticacion, limites, Storage ni RLS. En SM-A235M con APK publica DEV 273 se comprobaron una duda automatica y una X manual nuevas: ambas recibieron acuse, salieron del worker y quedaron como filas `pending` separadas en Supabase DEV. No se borro ningun caso de prueba ni dato existente.
+- Cierre visual: con la sesion autenticada del usuario, `/dag-calibration` mostro tres casos pendientes nuevos, incluida la X manual con insignia `Marcada desde DAG` y casos dudosos automaticos, todos con miniatura real. No se resolvio, etiqueto, archivo ni borro ningun caso durante la comprobacion.
 
 ### AI-SEARCH-01A - Intencion semantica local compacta
 
