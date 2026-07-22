@@ -321,7 +321,7 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
-| DAG-LOCAL-IMAGE-PERF-03 | Aprobado; pendiente implementacion y medicion | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
+| DAG-LOCAL-IMAGE-PERF-03 | Implementado candidato DEV 271; pendiente medicion fisica | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
 | DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 259; validado en SM-A235M | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-CALIBRATION-CLOSED-LOOP-10 | Publicado DEV 260; validado en SM-A235M | P0 | Hacer persistentes las decisiones calibradas, separar motivos positivos/negativos y agregar criterio local de mangas/corte sobre rodillas | L | Alto |
 | DAG-AUDIENCE-POLICY-11 | Publicado DEV 261; validación física previa correcta, pendiente repetir APK público | P0 | Permitir imagenes normales de bebes y hombres, aplicar criterio femenino a niñas y mantener ropa interior/desnudez como bloqueo universal | M | Alto |
@@ -883,7 +883,7 @@ Flujo de una entrada:
 
 #### DAG-LOCAL-IMAGE-PERF-03 - Apertura local rapida de fotos
 
-- Estado: `Aprobado por el usuario el 2026-07-21; pendiente implementacion, validacion automatica y medicion`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
+- Estado: `Implementado candidato DEV 271; pendiente CI, publicacion y medicion fisica`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
 - Problema: una pagina con varias fotos puede tardar aproximadamente entre 6 y 8 segundos en completar su primera carga visual porque la descarga, decodificacion y clasificacion local forman una cola costosa y parte del trabajo puede repetirse.
 - Decision aprobada: mantener todo el analisis de imagenes dentro del telefono. No se usara un modelo de IA online, no se enviaran fotos a terceros y no se persistiran originales para acelerar cargas futuras.
 - Solucion propuesta: dos clasificadores locales con limite estricto; prioridad para recursos visibles; una sola decodificacion por imagen; cache efimera de decisiones por hash de contenido, audiencia y version de calibracion; precarga maxima de la siguiente pantalla; y XNNPACK o NNAPI solo cuando una medicion controlada del dispositivo demuestre que mejora el tiempo con fallback seguro.
@@ -900,6 +900,7 @@ Flujo de una entrada:
   - la concurrencia queda limitada a dos clasificaciones y conserva una ruta serial de respaldo;
   - se comparan antes/despues en la misma pagina y dispositivo, incluyendo primera carga, repeticion, scroll, cambio de pagina, memoria y temperatura;
   - no se agregan servicios externos, claves, costos por IA ni salida de imagenes del telefono.
+- Resultado candidato DEV 271: dos clasificadores locales independientes atienden la cola acotada; la preparacion inicial prioriza una pantalla y precarga como maximo la siguiente; el asentamiento visual baja de 1.200 a 300 ms. La cache de respuestas efimera existente sigue evitando reclasificar una URL ya resuelta dentro de la pagina. La cache por hash entre paginas y la seleccion adaptativa NNAPI quedan fuera de este primer candidato hasta contar con una invalidacion de calibracion y benchmarks seguros.
 
 #### DAG-ULTRA-KOSHER-01 - Modos de imagenes administrables
 

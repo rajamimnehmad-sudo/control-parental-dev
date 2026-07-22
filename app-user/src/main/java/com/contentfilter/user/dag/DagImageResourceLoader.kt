@@ -12,13 +12,14 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.InetAddress
+import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicInteger
 
 internal class DagImageResourceLoader(
-    private val classifier: DagImageClassifier,
+    classifiers: List<DagImageClassifier>,
     private val onCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit = { _, _ -> },
     private val onManualCandidateReady: (String, DagImageDecision) -> Unit = { _, _ -> },
     private val cookieManager: CookieManager = CookieManager.getInstance(),
@@ -39,6 +40,10 @@ internal class DagImageResourceLoader(
             )
             .build(),
 ) {
+    init {
+        require(classifiers.isNotEmpty()) { "DAG requires at least one image classifier" }
+    }
+
     private val imageCount = AtomicInteger(0)
     private val allowedCount = AtomicInteger(0)
     private val blockedCount = AtomicInteger(0)
@@ -47,6 +52,8 @@ internal class DagImageResourceLoader(
     private val closed = AtomicBoolean(false)
     private val devCalibrationRevealEnabled = AtomicBoolean(false)
     private val imageSlots = Semaphore(DagImageDeliveryPolicy.MaximumConcurrentImages, true)
+    private val classifierPool = ArrayBlockingQueue(classifiers.size, true, classifiers)
+    private val calibrationClassifier = classifiers.first()
     private val responseCache = LinkedHashMap<String, CachedImageResource>(16, 0.75f, true)
     private val manualCalibrationCandidates = LinkedHashMap<String, DagManualCalibrationCandidate>(16, 0.75f, true)
     private var responseCacheBytes = 0
@@ -162,16 +169,18 @@ internal class DagImageResourceLoader(
                 return cacheAndCreateResource(request.url.toString(), bytes, "image/svg+xml", "safe-icon")
             }
             val measuredClassification =
-                classifier.classify(
-                    bytes,
-                    mimeType,
-                    dagImageAudienceContext(request.url.toString(), pageUrl),
-                )
+                withClassifier { classifier ->
+                    classifier.classify(
+                        bytes,
+                        mimeType,
+                        dagImageAudienceContext(request.url.toString(), pageUrl),
+                    )
+                }
             val calibrationThumbnail =
                 if (measuredClassification.scores.isNotEmpty()) dagCalibrationThumbnail(bytes) else null
             val classification =
                 calibrationThumbnail
-                    ?.let { classifier.exactDecision(it.dagCalibrationHash()) }
+                    ?.let { calibrationClassifier.exactDecision(it.dagCalibrationHash()) }
                     ?.let { measuredClassification.copy(decision = it) }
                     ?: measuredClassification
             if (calibrationThumbnail != null) {
@@ -335,6 +344,21 @@ internal class DagImageResourceLoader(
         return output.toByteArray()
     }
 
+    private inline fun <T> withClassifier(block: (DagImageClassifier) -> T): T {
+        val classifier =
+            try {
+                classifierPool.take()
+            } catch (error: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw IOException("DAG image classification interrupted", error)
+            }
+        return try {
+            block(classifier)
+        } finally {
+            check(classifierPool.offer(classifier)) { "DAG classifier pool overflow" }
+        }
+    }
+
     private companion object {
         const val MaximumImagesPerPage = 400
         const val RequestTimeoutSeconds = 15L
@@ -392,6 +416,10 @@ internal object DagImageDeliveryPolicy {
     // WebView has its own bounded resource pool. Keeping only three synchronous
     // callbacks occupied starves lazy-loaded pages after their first viewport.
     const val MaximumConcurrentImages = 8
+
+    // Two independent model stacks keep visible photos moving without letting
+    // inference contend across all WebView resource threads or exhaust memory.
+    const val MaximumConcurrentClassifications = 2
 }
 
 internal data class DagImagePageSummary(

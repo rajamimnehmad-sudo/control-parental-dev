@@ -92,6 +92,8 @@ Admin   ee44aa950b50fc3a80fa4520192e91eb147ee6eba61b9e1e2febbc95966cc25e
 - `DAG-CAPTCHA-01`: la excepcion deja de depender de una unica URL de CABA. Dentro de paginas HTTPS ya permitidas por DAG se aceptan solamente iframes HTTPS con rutas cerradas de Google reCAPTCHA, hCaptcha o Cloudflare Turnstile; el resto de los iframes sigue bloqueado.
 - No se habilitaron iframes generales, video, audio ni canvas; no se relajaron la clasificacion local de imagenes ni las decisiones de pagina.
 - Validacion automatica local: tests unitarios DEV de App Usuario y ktlint correctos. Pendiente CI completo, publicacion DEV y comprobacion funcional en Zara y MiBA/CAPTCHA.
+- `DAG-LOCAL-IMAGE-PERF-03`: dos clasificadores TFLite locales trabajan con concurrencia limitada; la primera pantalla recibe prioridad, se precarga solo la siguiente y el asentamiento visual baja de 1.200 a 300 ms. No se incorporaron servicios externos, claves ni persistencia de fotos.
+- Rendimiento pendiente de medicion fisica antes/despues en la misma pagina y dispositivo. La cache entre paginas por hash y NNAPI adaptativo no se habilitan sin invalidacion de calibracion y benchmarks seguros.
 
 ## Validacion fisica DEV 270 en Samsung SM-A235M - 2026-07-21
 
