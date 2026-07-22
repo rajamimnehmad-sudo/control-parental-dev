@@ -53,8 +53,8 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-22:
 
 ```text
-App Usuario versionCode 273
-App Admin versionCode 273
+App Usuario versionCode 274
+App Admin versionCode 274
 versionName 1.0.1-dev
 ```
 
@@ -68,18 +68,18 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-273-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-273-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-274-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-274-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 287be90addbdc86ba483d1fcd472fd09b78a7e4b20b1f6dbcc28cfbfe0797138
-Admin   6145b75a21061f2313d8bfc2e07571897d122b7b95d21ec98f9e74a836e5238f
+Usuario a7b8de8d75c604a582c83a5555417b522bed186e201ecaea52e306bf1f9c218b
+Admin   5ba96ffc37752b058a6bd6ef2a0edc1489886ff5a7886771fa4bbee7965db258
 ```
 
-## Candidato DEV 274 - apertura segura por categoria y Calibracion DAG - 2026-07-22
+## Publicacion DEV 274 - apertura segura por categoria y Calibracion DAG - 2026-07-22
 
 - `DAG-CATEGORY-FAST-PATH-04` permite mostrar antes texto, controles y estructura solamente cuando la pagina ya fue permitida y coincide con gobierno o con al menos dos señales de electronica, finanzas o documentacion. Ropa, ambiguedad, `Uncertain` y `Blocked` siguen esperando el viewport completo; cada raster conserva descarga HTTPS, defensa SSRF, clasificacion local y fallo cerrado antes de entregarse.
 - En el Samsung SM-A235M, el probe comparable sobre Samsung Argentina paso de aproximadamente 9.589 ms con la APK publica 273 a 4.059 ms con el candidato 274. Es evidencia operativa sensible a red/cache, no un benchmark de laboratorio. Zara cargo con la barrera estricta y su menu abrio con `MUJER`, `HOMBRE`, `NIÑOS` y acordeones sin congelamiento.
@@ -87,7 +87,9 @@ Admin   6145b75a21061f2313d8bfc2e07571897d122b7b95d21ec98f9e74a836e5238f
 - La causa de `DAG-CALIBRATION-DELIVERY-12` estaba en el contrato cerrado de Edge: Android ya enviaba `male_face` y `male_breast_exposed`, pero la lista remota las rechazaba con HTTP 400 antes de Storage/base. `dag-calibration` v12 las acepta exclusivamente en Supabase DEV, sin cambiar autenticacion, limites, RLS ni datos existentes.
 - Con APK publica 273 se comprobaron una duda automatica y una X manual con acuse y filas `pending`. En Superweb autenticada aparecieron tres casos nuevos con miniatura; la X mostro `Marcada desde DAG`. No se resolvieron, etiquetaron, archivaron ni borraron casos.
 - Validacion local del lote Android: `ktlintCheck`, unitarios y `assembleDevDebug` de Usuario y Admin completaron 779 tareas correctamente; `aapt` confirma versionCode 274 en ambos APK y `apksigner` el certificado DEV historico. El candidato 274 quedo instalado in-place en el SM-A235M para los recorridos anteriores.
-- Publicacion publica 274, hashes externos, GitHub Actions e instalacion final de los APK descargados siguen pendientes en este punto del handoff y deben registrarse antes de declarar cierre.
+- PR #49 fusionado en `main` mediante commit `ac3d8f7`. Android CI `29955044604` completo build, unitarios, ktlint, Android Lint y Detekt; publicacion DEV `29955838881` completo correctamente sin reparacion de misma version y sin tocar Production.
+- Verificacion externa: los manifiestos publicos declaran 274 y los APK descargados recalculan exactamente los SHA-256 registrados arriba. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, versionName `1.0.1-dev`, minSdk 29 y targetSdk 36; `apksigner` confirma el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- Ambos APK publicos 274 se reinstalaron in-place en el SM-A235M sin borrar datos y conservaron sus `firstInstallTime`. Accessibility ya estaba desactivada despues de la instalacion local por ADB y permanecio asi; no se intento habilitarla por comandos. El smoke visual posterior quedo bloqueado porque el telefono cerro la sesion y exige huella o patron; los recorridos funcionales completos se hicieron con el mismo codigo candidato 274 antes de la publicacion.
 
 ## Publicacion DEV 273 - CAPTCHA y reintentos de Calibracion DAG - 2026-07-22
 

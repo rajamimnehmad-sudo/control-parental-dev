@@ -313,9 +313,9 @@ Flujo de una entrada:
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
-| DAG-WEB-INTERACTION-03 | Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
-| DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
-| DAG-PROTECTED-MODE-UX-04 | Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274 | P2 | Quitar el mensaje tecnico de proteccion adicional | S | Bajo |
+| DAG-WEB-INTERACTION-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
+| DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
+| DAG-PROTECTED-MODE-UX-04 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P2 | Quitar el mensaje tecnico de proteccion adicional | S | Bajo |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
 | DAG-TABS-UX-01 | Resuelto DEV 226 | P2 | Mejorar manejo cotidiano de multiples pestanas DAG | M | Medio |
 | DAG-THEME-01 | Corregido DEV 239; pendiente prueba fisica | P2 | Integrar la zona de camara con DAG y evitar recortar el texto de busqueda | S | Bajo |
@@ -328,7 +328,7 @@ Flujo de una entrada:
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
 | DAG-LOCAL-IMAGE-PERF-03 | Publicado DEV 271; medicion fisica indicativa completada junto al candidato DEV 274 | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
-| DAG-CATEGORY-FAST-PATH-04 | Implementado y validado candidato DEV 274; pendiente publicacion | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
+| DAG-CATEGORY-FAST-PATH-04 | Publicado y validado DEV 274 | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
 | DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 259; validado en SM-A235M | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-CALIBRATION-CLOSED-LOOP-10 | Publicado DEV 260; validado en SM-A235M | P0 | Hacer persistentes las decisiones calibradas, separar motivos positivos/negativos y agregar criterio local de mangas/corte sobre rodillas | L | Alto |
 | DAG-AUDIENCE-POLICY-11 | Publicado DEV 261; validación física previa correcta, pendiente repetir APK público | P0 | Permitir imagenes normales de bebes y hombres, aplicar criterio femenino a niñas y mantener ropa interior/desnudez como bloqueo universal | M | Alto |
@@ -348,7 +348,7 @@ Flujo de una entrada:
 | DAG-CAPTCHA-02 | Publicado y reforzado DEV 273; flujo principal validado por el usuario | P1 | Completar una sesion CAPTCHA temporal y aislada sin abrir iframes generales | L | Alto |
 | DAG-GEOLOCATION-01 | Idea autorizada para backlog; no aprobada para codigo | P2 | Permitir ubicacion en sitios autorizados con consentimiento y alcance minimo | M | Alto |
 | DAG-CALIBRATION-DELIVERY-11 | Publicado DEV 273; acuse y llegada integral validados, matriz de recuperacion pendiente | P0 | Garantizar entrega, confirmacion y reintento de revisiones DAG privadas | L | Alto |
-| DAG-CALIBRATION-DELIVERY-12 | Resuelto en Edge DEV y validado visualmente en Superweb; acompaña lote DEV 274 | P0 | Corregir que no llegue ninguna revision manual ni dudosa a Superweb | M | Critico |
+| DAG-CALIBRATION-DELIVERY-12 | Resuelto en Edge DEV, validado en Superweb y publicado con DEV 274 | P0 | Corregir que no llegue ninguna revision manual ni dudosa a Superweb | M | Critico |
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
@@ -852,7 +852,7 @@ Flujo de una entrada:
 
 #### DAG-WEB-INTERACTION-03 - Subarboles dinamicos sin bloqueo del hilo principal
 
-- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: bug funcional, rendimiento WebView y seguridad de contenido. Prioridad: P1.
+- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: bug funcional, rendimiento WebView y seguridad de contenido. Prioridad: P1.
 - Evidencia: el usuario confirma que DEV 271 no resolvio todos los botones. En un navegador normal, el menu actual de Zara Argentina abre correctamente y crea un dialogo grande con pestañas, acordeones y muchos enlaces; no depende de canvas. En DAG, cada nodo agregado puede activar `dagSecureNode(node, true)`, que recorre sincronamente videos, audios, canvas, iframes, imagenes y fondos de todo el subarbol.
 - Diagnostico: DEV 271 corrigio la ruta de cambios de atributos, pero no la insercion o hidratacion de subarboles grandes. Registros solapados del `MutationObserver` pueden volver a recorrer descendientes y competir con el evento tactil y el pintado del menu. Service Workers bloqueados, iframes eliminados y otras restricciones pueden explicar sitios diferentes y deben distinguirse mediante codigos diagnosticos locales, no relajarse en conjunto.
 - Alcance propuesto: cola unica de saneamiento por pagina, deduplicada por raiz; bloqueo inmediato por CSS/intercepcion para video, audio, canvas, iframes e imagenes mientras el trabajo se procesa; recorrido acotado por lote fuera del callback del observador; cancelacion por navegacion; y diagnostico local por capacidad bloqueada. No agregar excepciones por dominio para Zara.
@@ -871,7 +871,7 @@ Flujo de una entrada:
 
 #### DAG-SEARCH-CONTINUITY-03 - Buscar aunque la consulta sea incierta
 
-- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: comportamiento de busqueda, precision local y UX. Prioridad: P1.
+- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: comportamiento de busqueda, precision local y UX. Prioridad: P1.
 - Problema: DAG a veces no consulta el buscador y muestra `no tiene suficiente certeza`, obligando a reformular incluso consultas legitimas. El usuario rechazo expresamente este comportamiento.
 - Causa confirmada: `DagBrowserViewModel.search` cancela la busqueda antes de `DagSearchRepository.search` cuando `classifyQuery` devuelve `Uncertain`. Esa salida incluye terminos ambiguos, contexto sensible, confianza semantica media y modelo no disponible; hoy todos reciben el mismo tratamiento aunque no exista una regla dura de bloqueo.
 - Decision de producto propuesta: una consulta incierta pero no bloqueada debe continuar una sola vez hacia Brave. DAG filtra cada resultado y vuelve a analizar cada pagina; resultados bloqueados no se muestran y paginas ambiguas abren con las barreras preventivas existentes. Reglas Admin, dominios prohibidos, terminos explicitos y evidencia semantica alta siguen bloqueando antes de consumir una consulta.
@@ -891,7 +891,7 @@ Flujo de una entrada:
 
 #### DAG-PROTECTED-MODE-UX-04 - Estado preventivo entendible
 
-- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con candidato DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: claridad UX y explicabilidad. Prioridad: P2.
+- Estado: `Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274`. Aprobado explicitamente el 2026-07-22. Tipo: claridad UX y explicabilidad. Prioridad: P2.
 - Problema: el mensaje `Abierto con proteccion adicional` no explica qué ocurrio, qué cambia ni si el usuario debe hacer algo.
 - Significado tecnico actual: aparece cuando el texto esta vacio, la clasificacion es incierta o la evidencia semantica no alcanza el bloqueo. La pagina se muestra con las barreras Web normales y no se guarda como aprobacion rapida completa. No activa un segundo antivirus, una VPN distinta ni una revision humana automatica.
 - Solucion recomendada: no mostrar un aviso persistente cuando no hay una accion necesaria. Mantener `Analizando` durante la compuerta y luego abrir la pagina normalmente; si se conserva una explicacion, usar una ayuda breve y accesible como `Modo preventivo: DAG seguirá revisando esta página`, sin prometer proteccion total.
@@ -991,7 +991,7 @@ Flujo de una entrada:
 
 #### DAG-CATEGORY-FAST-PATH-04 - Apertura temprana por categoria segura
 
-- Estado: `Implementado y validado candidato DEV 274; pendiente publicacion`; aprobado explicitamente por el usuario el 2026-07-22 como parte del lote DAG. Tipo: rendimiento, clasificacion local y seguridad visual. Prioridad: P1. Esfuerzo: S. Riesgo: alto.
+- Estado: `Publicado y validado DEV 274`; aprobado explicitamente por el usuario el 2026-07-22 como parte del lote DAG. Tipo: rendimiento, clasificacion local y seguridad visual. Prioridad: P1. Esfuerzo: S. Riesgo: alto.
 - Causa confirmada: DAG mantiene invisible toda la pagina hasta aprobar el texto y resolver cada imagen visible del primer viewport. Aunque las imagenes se clasifican en paralelo, una sola descarga o inferencia lenta puede sostener la pantalla de analisis hasta el limite de ocho segundos incluso en electronica, banca, documentacion o tramites.
 - Alcance aprobado: cuando la pagina ya fue permitida y una categoria de bajo riesgo queda identificada con evidencia suficiente, mostrar inmediatamente texto, controles y estructura. Las imagenes siguen pasando individualmente por descarga HTTPS, defensa SSRF, clasificacion local y fallo cerrado; una imagen pendiente no se muestra por anticipado.
 - Categorias iniciales cerradas: electronica, finanzas, documentacion tecnica y dominios gubernamentales. Ropa, contenido mixto, categorias ambiguas, decisiones inciertas y cualquier bloqueo conservan la barrera estricta del viewport.
@@ -1589,7 +1589,7 @@ Flujo de una entrada:
 
 #### DAG-CALIBRATION-DELIVERY-12 - Ninguna revision llega desde DEV 273
 
-- Estado: `Resuelto y validado visualmente en Supabase DEV y Superweb`; aprobado explicitamente el 2026-07-22 dentro del lote DAG. La correccion acompaña la publicacion Android DEV 274. Tipo: confiabilidad Android, entrega remota y operacion Super Admin. Prioridad: P0. Esfuerzo: M. Riesgo: critico para la mejora continua de DAG.
+- Estado: `Resuelto y validado visualmente en Supabase DEV y Superweb; publicado con DEV 274`; aprobado explicitamente el 2026-07-22 dentro del lote DAG. Tipo: confiabilidad Android, entrega remota y operacion Super Admin. Prioridad: P0. Esfuerzo: M. Riesgo: critico para la mejora continua de DAG.
 - Evidencia del Usuario: las fotos marcadas para revisar desde `Calibracion DEV` no aparecen en Calibracion DAG de Superweb. DAG tambien informa que no llegaron. Las imagenes detectadas automaticamente como dudosas tampoco aparecen; la cola remota queda sin ningun caso nuevo.
 - Causa raiz confirmada: Android DEV 273 envia los puntajes nuevos `male_face` y `male_breast_exposed`, incorporados con la politica por audiencia, pero la lista cerrada de claves de Edge no habia sido actualizada. La funcion rechazaba todo caso completo con HTTP 400 `Caso de calibracion invalido` antes de Storage y base; outbox y WorkManager funcionaban, pero reintentaban un contrato incompatible.
 - Diagnostico requerido: reproducir una X/R y una duda automatica con identificadores locales no sensibles; observar estados de outbox y WorkManager; comprobar respuesta estructurada de Edge; contrastar conteos DEV de fila, objeto privado y vista/RPC de Superweb; revisar autenticacion, limites, expiracion, filtros y modelo activo. No enviar URL, consulta, original ni datos personales y no borrar casos existentes.
@@ -1598,6 +1598,7 @@ Flujo de una entrada:
 - Relacion: seguimiento correctivo de `DAG-CALIBRATION-DELIVERY-11`; no duplica Calibracion visual, criterios X/R ni entrenamiento. La prioridad es restablecer entrega y trazabilidad antes de ajustar umbrales o modelos.
 - Correccion DEV: Edge `dag-calibration` v12 acepta las dos claves de puntaje que ya produce Android, sin ampliar señales, origenes, autenticacion, limites, Storage ni RLS. En SM-A235M con APK publica DEV 273 se comprobaron una duda automatica y una X manual nuevas: ambas recibieron acuse, salieron del worker y quedaron como filas `pending` separadas en Supabase DEV. No se borro ningun caso de prueba ni dato existente.
 - Cierre visual: con la sesion autenticada del usuario, `/dag-calibration` mostro tres casos pendientes nuevos, incluida la X manual con insignia `Marcada desde DAG` y casos dudosos automaticos, todos con miniatura real. No se resolvio, etiqueto, archivo ni borro ningun caso durante la comprobacion.
+- Cierre de publicacion: PR #49 y commit de merge `ac3d8f7`; Android CI `29955044604` y publicacion DEV `29955838881` correctos. Los manifiestos, hashes, paquetes, version 274 y firma de ambos APK publicos fueron verificados externamente; Production no fue tocado.
 
 ### AI-SEARCH-01A - Intencion semantica local compacta
 
