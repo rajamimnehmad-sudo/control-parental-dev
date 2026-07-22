@@ -44,8 +44,7 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 269 y App Admin DEV 269, `1.0.1-dev`.
-- Candidato agrupado: DEV 270 preparado en ambas apps con notas separadas; pendiente CI, fusion y publicacion exclusiva en DEV.
+- Estado publicado: App Usuario DEV 270 y App Admin DEV 270, `1.0.1-dev`.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -284,21 +283,21 @@ Flujo de una entrada:
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
-| UI-ICON-SYSTEM-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
-| UI-SYSTEM-BAR-CONTINUITY-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
-| UI-MOTION-SMOOTH-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
-| ADMIN-USERS-HUB-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
-| ADMIN-USER-SECURITY-BADGES-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
-| ADMIN-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
-| USER-SECONDARY-LISTS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
-| ADMIN-WEB-SETTINGS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
-| USER-INTERNET-SETTINGS-UX-02 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
-| USER-DAG-LAUNCHER-PREFERENCE-01 | Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
+| UI-ICON-SYSTEM-01 | Publicado DEV 270; pendiente comprobacion visual | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
+| UI-SYSTEM-BAR-CONTINUITY-01 | Publicado DEV 270; pendiente comprobacion fisica | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
+| UI-MOTION-SMOOTH-01 | Publicado DEV 270; pendiente comprobacion fisica | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
+| ADMIN-USERS-HUB-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
+| ADMIN-USER-SECURITY-BADGES-01 | Publicado DEV 270; pendiente comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
+| ADMIN-SECONDARY-LISTS-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
+| USER-SECONDARY-LISTS-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
+| ADMIN-WEB-SETTINGS-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
+| USER-INTERNET-SETTINGS-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
+| USER-DAG-LAUNCHER-PREFERENCE-01 | Publicado DEV 270; pendiente comprobacion fisica | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
-| DEVICE-CONNECTIVITY-ALERTS-01 | Backend DEV actualizado a 100 horas; Android publicado conserva 269 hasta proxima publicacion | P1 | Alerta ordinaria tras 100 horas sin comunicacion para Admin y Superweb | M | Medio |
+| DEVICE-CONNECTIVITY-ALERTS-01 | Backend DEV y Android publicados DEV 270; pendiente comprobacion fisica | P1 | Alerta ordinaria tras 100 horas sin comunicacion para Admin y Superweb | M | Medio |
 | DEV-OFFLINE-ALERT-100H-01 | Aplicado y verificado exclusivamente en Supabase DEV | P1 | Alinear la alerta remota ordinaria al margen de 100 horas sin cambiar posible desinstalacion | S | Medio |
-| ADMIN-DEVICE-OFFLINE-100H-01 | Candidato Android sin publicar; unitarios, ktlint y build correctos | P1 | Unificar en 100 horas el aviso de falta de comunicacion de App Admin sin demorar componentes caidos | S | Medio |
+| ADMIN-DEVICE-OFFLINE-100H-01 | Publicado DEV 270; pendiente comprobacion fisica | P1 | Unificar en 100 horas el aviso de falta de comunicacion de App Admin sin demorar componentes caidos | S | Medio |
 | SUPERADMIN-MSG-01 | Bandejas y creacion resueltas en DEV 241; pendiente push FCM con sesion Superweb | P2 | Avisos push y bandeja interna, no chat libre | L | Medio |
 | SUPERADMIN-ALERTS-01 | Implementado candidato DEV 241; pendiente prueba funcional | P2 | Visibilidad en Super Admin de intentos de desinstalacion o manipulacion de protecciones | M | Medio |
 | ADMIN-ALERTS-UX-01 | Validado visualmente en SM-A235M DEV 248; pendiente evento real | P2 | Campanita y bandeja de alertas de seguridad en App Admin, separadas de Solicitudes | M | Medio |
@@ -445,7 +444,7 @@ Flujo de una entrada:
 
 ### UI-ICON-SYSTEM-01 - Iconos coherentes y modernos
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`; definido con el usuario el 2026-07-21. Tipo: sistema visual Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `Publicado DEV 270; pendiente comprobacion visual`; definido con el usuario el 2026-07-21. Tipo: sistema visual Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Objetivo: unificar iconos de Usuario y Admin con Material Symbols Rounded seleccionados como vectores locales, reutilizando Material Icons Core ya presente y sin incorporar una dependencia pesada.
 - Criterio: contorno redondeado para navegacion y acciones; relleno solo para seleccion o alerta; mismo peso, caja optica y tamaño; DAG conserva identidad propia adaptada al sistema. No se usan emojis, clipart, copias de Mercado Pago ni familias mezcladas.
 - Resultado en fuente: el catalogo compartido usa las variantes Rounded/AutoMirrored Rounded disponibles en `material-icons-core` y la navegacion inferior Admin adopta el mismo `ProductNavGlyph` ya usado por Usuario. No se agregaron dependencias ni se altero el icono propio de DAG.
@@ -453,7 +452,7 @@ Flujo de una entrada:
 
 ### UI-SYSTEM-BAR-CONTINUITY-01 - Barra superior integrada
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica`. Tipo: visual, edge-to-edge y compatibilidad Android. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion fisica`. Tipo: visual, edge-to-edge y compatibilidad Android. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
 - Problema: la zona de camara puede quedar blanca y cortar un encabezado turquesa/azul.
 - Solucion: barra de estado y zona de recorte toman el color efectivo que exista debajo en cada pantalla; los iconos del sistema cambian entre claros y oscuros para conservar contraste.
 - Resultado en fuente: ambas apps sincronizan edge-to-edge con el destino activo. Inicio prolonga el encabezado azul oscuro y usa iconos claros; activacion, listas y secciones secundarias usan superficie blanca e iconos oscuros. DAG conserva su control de tema propio.
@@ -461,14 +460,14 @@ Flujo de una entrada:
 
 ### UI-MOTION-SMOOTH-01 - Movimiento sin saltos
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica`. Tipo: UX, animacion y accesibilidad. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion fisica`. Tipo: UX, animacion y accesibilidad. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: expansiones, cierres, cambios de seccion, insercion de estados y desplazamiento de contenido usan transiciones sobrias de 200-250 ms, sin rebote ni animacion continua.
 - Resultado en fuente: las tarjetas expandibles de Inicio e Internet eliminan la doble animacion de contenedor/contenido y usan una sola transicion de 220 ms; Apps/Web/Seguridad suaviza cabecera y seleccion sin resortes. Si Android desactiva la escala de animador, estas duraciones pasan a cero.
 - Aceptacion: cerrar tarjetas de Home no produce saltos; `Apps / Web / Seguridad` cambia suavemente; listas conservan posicion y claves estables; reduccion de movimiento de Android elimina o acorta efectos; no se agrega trabajo costoso constante.
 
 ### ADMIN-USERS-HUB-UX-02 - Usuarios y alta simplificados
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Alcance: superficie blanca continua, filas icono/texto/flecha y toque completo para abrir detalle; desaparece el menu de tres puntos y sus acciones quedan en el detalle correspondiente. `Agregar usuario` enfoca el primer input.
 - Estado de refresco: junto a `+`, Buscar y el icono circular de actualizar se muestra `Actualizando`, `Actualizado ahora/hace X min` o error persistente. No se reserva un hueco vacio y no aparece otro banner debajo.
 - Resultado en fuente: Usuarios usa una superficie blanca continua, avatar neutro y fila completa con flecha; el archivo permanece en el detalle y se retiro el menu contextual duplicado. El alta solicita foco al campo de nombre y el refresco conserva progreso, error o tiempo relativo en la barra de acciones.
@@ -476,7 +475,7 @@ Flujo de una entrada:
 
 ### ADMIN-USER-SECURITY-BADGES-01 - Indicadores de seguridad con evidencia
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica`. Tipo: seguridad visible y UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Estado: `Publicado DEV 270; pendiente comprobacion fisica`. Tipo: seguridad visible y UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Semantica: sin icono verde cuando todo esta bien; advertencia amarilla para nunca verificado, `Unknown` o mas de 100 horas sin comunicacion; rojo solo para VPN, Accesibilidad o Device Admin `Disabled`, o posible desinstalacion.
 - Detalle: la fila del Usuario y el segmento `Seguridad` muestran una burbuja roja hasta corregir un problema confirmado. Color, icono y descripcion accesible comunican juntos el estado.
 - Resultado en fuente: el mapeo conserva por separado falla confirmada y verificacion pendiente; lista y encabezado omiten toda marca cuando esta sano y muestran un escudo accesible amarillo/rojo solo por la evidencia definida. El selector `Seguridad` replica el nivel con una burbuja sin convertir todo el boton en alerta.
@@ -484,7 +483,7 @@ Flujo de una entrada:
 
 ### ADMIN-SECONDARY-LISTS-UX-02 - Listas Admin continuas
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: sistema de listas App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: sistema de listas App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: Solicitudes, Avisos, apps, sitios, grupos, horarios y actualizaciones adoptan superficie blanca continua, separadores sutiles, icono, titulo, subtitulo opcional y flecha solo si navega. Switch/boton se conserva para accion directa.
 - Limites: proteccion, licencia, alertas criticas, formularios y tarjetas principales de Home permanecen como estan. No cambia logica, datos ni sincronizacion.
 - Resultado en fuente de esta seccion: Solicitudes integra el refresco circular y su estado persistente en la barra, con selector de usuarios continuo; Avisos usa fondo blanco continuo; apps y filas internas de grupos pierden tarjetas/bloques repetidos y conservan switch, reloj, formularios y acciones directas. Sitios, horarios y actualizaciones se resuelven en los tickets especificos de Web/Ajustes sin tocar `Agregar sitio`.
@@ -492,7 +491,7 @@ Flujo de una entrada:
 
 ### USER-SECONDARY-LISTS-UX-02 - Solicitudes y Mis apps estables
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: UX y rendimiento App Usuario. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: UX y rendimiento App Usuario. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Solicitudes: icono circular de actualizar y estado persistente en la misma linea; no aparece un banner separado ni queda espacio vacio.
 - Mis apps: titulo, Buscar, Actualizar, estado y filtros permanecen fijos; los filtros bajan a una segunda linea y solo se desplaza el inventario. La lista empieza debajo de controles y termina antes del nav inferior, sin superposicion ni corte abrupto.
 - Rendimiento: conservar la lista nativa reciclable. Refrescar mantiene posicion; cambiar busqueda o filtro vuelve arriba; claves/orden estables evitan saltos.
@@ -501,7 +500,7 @@ Flujo de una entrada:
 
 ### ADMIN-WEB-SETTINGS-UX-02 - Web y Ajustes Admin
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: UX App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: UX App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Web: resumen compacto y grupos por Navegacion, Busqueda segura, DAG, horarios/limites y sitios; filas continuas, switch directo y flecha solo para navegacion. Estado de refresco queda junto al icono circular.
 - Ajustes: Cuenta/comunidad, Apariencia, Notificaciones, Actualizaciones, Ayuda/privacidad y acciones sensibles mediante grupos con titulo y filas continuas. Acciones destructivas quedan al final y requieren confirmacion.
 - Resultado en fuente: Cuenta/comunidad, licencia y accesos a Panel/Actualizaciones/Ayuda usan grupos blancos continuos con iconos del catalogo. Web simplifica el selector de acceso, alinea switches con iconos y presenta sitios existentes como filas planas, conservando confirmaciones y acciones.
@@ -509,7 +508,7 @@ Flujo de una entrada:
 
 ### USER-INTERNET-SETTINGS-UX-02 - Internet y Ajustes Usuario
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion visual`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Internet conserva una unica pieza panoramica compacta; debajo usa filas de solo lectura para VPN, SafeSearch, modo de resultados, DAG y horario. No muestra switch cuando el Usuario no tiene autoridad; una degradacion ofrece una sola reparacion clara.
 - Ajustes comparte el lenguaje de grupos y filas de Admin, mostrando solo opciones del rol Usuario. Version queda en Actualizaciones; Ayuda reutiliza su flujo; acciones sensibles aparecen al final.
 - Resultado en fuente: Internet usa una unica pieza panoramica compacta y una lista blanca de VPN, SafeSearch, resultados, DAG y horario; solo VPN degradada ofrece Reparar. Ajustes integra estado, version, activacion y Ayuda como filas continuas, preservando como bloques los formularios y flujos de instalacion complejos.
@@ -517,7 +516,7 @@ Flujo de una entrada:
 
 ### USER-DAG-LAUNCHER-PREFERENCE-01 - DAG como app separada opcional
 
-- Estado: `Implementado en fuente; pendiente publicacion DEV 270 y comprobacion fisica`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion fisica`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Internet muestra el switch local `DAG como app separada` solo cuando DAG esta habilitado y contemplado por la licencia. El valor predeterminado es activo para conservar el comportamiento de instalaciones existentes.
 - Al apagarlo se oculta unicamente la entrada independiente del launcher Android; DAG sigue disponible dentro de Content Filter y no se modifica ninguna politica remota, permiso, paquete ni APK adicional.
 - Implementacion: la actividad interna queda siempre habilitada y un `activity-alias` separado controla solo el icono externo; al actualizar tambien se repara el estado deshabilitado que pudiera conservar el componente historico.
@@ -1120,11 +1119,11 @@ Flujo de una entrada:
 
 ### ADMIN-DEVICE-OFFLINE-100H-01 - Aviso Admin despues de 100 horas
 
-- Estado: `Candidato Android sin publicar; unitarios, ktlint y build correctos`; aprobado explicitamente por el usuario el 2026-07-21. Tipo: correccion operativa y UX de App Admin. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Estado: `Publicado DEV 270; pendiente comprobacion fisica`; aprobado explicitamente por el usuario el 2026-07-21. Tipo: correccion operativa y UX de App Admin. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
 - Causa raiz: Home usaba 15 minutos para enviar un Usuario sano a `Pendientes de verificacion`, mientras la ficha usaba 24 horas para declararlo sin comunicacion. Android puede diferir WorkManager con la pantalla apagada aunque exista red, de modo que ambos criterios confundian demora de heartbeat con una degradacion confirmada.
-- Solucion candidata: compartir un plazo de 100 horas en Home y ficha. Hasta entonces se conserva el ultimo estado sano; al vencer se informa falta de comunicacion sin afirmar que la proteccion fue desactivada.
+- Solucion publicada: compartir un plazo de 100 horas en Home y ficha. Hasta entonces se conserva el ultimo estado sano; al vencer se informa falta de comunicacion sin afirmar que la proteccion fue desactivada.
 - Limites de seguridad: `Disabled` alerta inmediatamente; `Unknown` o un dispositivo nunca verificado sigue pendiente inmediatamente; `possible_uninstall` conserva su regla especial de Device Admin desactivado y mas de 30 minutos sin comunicacion.
-- Aceptacion automatizada: unitarios completos, ktlint y build DEV de App Admin correctos; pruebas antes y despues de 100 horas en Dashboard y Rules y regresion de posible desinstalacion cubiertas. Pendiente publicar una futura version Admin autorizada y validar el comportamiento real durante reposo prolongado.
+- Aceptacion automatizada: unitarios completos, ktlint y build DEV de App Admin correctos; pruebas antes y despues de 100 horas en Dashboard y Rules y regresion de posible desinstalacion cubiertas. Publicado en DEV 270; resta validar el comportamiento real durante reposo prolongado.
 
 ### DEV-OFFLINE-ALERT-100H-01 - Umbral remoto de 100 horas
 
@@ -1132,11 +1131,11 @@ Flujo de una entrada:
 - Causa raiz: el generador remoto conservaba 24 horas, un plazo demasiado corto frente a retrasos posibles del heartbeat durante reposo Android y distinto del nuevo criterio solicitado para App Admin.
 - Resultado DEV: migracion `20260721194835_device_offline_alert_100_hours.sql`; futuros eventos ordinarios `device_offline` requieren 100 horas y el cron horario, la deduplicacion por episodio y los permisos restringidos permanecen iguales.
 - Seguridad y datos: no se llamo al generador para fabricar alertas, no se borraron eventos historicos y `possible_uninstall` conserva 30 minutos con Device Admin desactivado. Asesores DEV de seguridad y rendimiento sin errores; Production no fue tocado.
-- Pendiente: integrar la migracion en `main` y publicar el candidato Android complementario solo con autorizacion. El margen efectivo remoto es de 100 a 101 horas por la cadencia horaria del cron.
+- Cierre: migracion integrada en `main` y complemento Android publicado en DEV 270. El margen efectivo remoto es de 100 a 101 horas por la cadencia horaria del cron; Production no fue tocado.
 
 ### DEVICE-CONNECTIVITY-ALERTS-01 - Dispositivo sin comunicacion
 
-- Estado: `Backend DEV actualizado a 100 horas; Android publicado conserva DEV 269 hasta proxima publicacion; pendiente prueba integral`; aprobado explicitamente el 2026-07-20 y ajustado a 100 horas por decision del 2026-07-21. Bateria queda fuera por decision expresa del usuario. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
+- Estado: `Backend DEV y Android publicados DEV 270; pendiente prueba fisica integral`; aprobado explicitamente el 2026-07-20 y ajustado a 100 horas por decision del 2026-07-21. Bateria queda fuera por decision expresa del usuario. Tipo: alertas operativas, seguridad y continuidad. Prioridad: P1.
 - Problema: un telefono apagado, sin red o con el proceso detenido puede dejar de reportar sin que el administrador sepa que perdio comunicacion.
 - Solucion implementada: despues de 100 horas sin heartbeat, crear como maximo una alerta por episodio para las bandejas existentes de App Admin y Superweb. Muestra el ultimo contacto y nunca afirma que la proteccion fue desactivada.
 - Evidencia: idea 10 seleccionada explicitamente por el usuario el 2026-07-19 luego de revisar las mejores funciones no invasivas de FamilyTime. Content Filter ya transmite heartbeat y alertas de componentes; se propone aprovechar esa evidencia sin agregar vigilancia de contenido.

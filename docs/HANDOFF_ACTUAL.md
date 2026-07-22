@@ -53,12 +53,10 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-21:
 
 ```text
-App Usuario versionCode 269
-App Admin versionCode 269
+App Usuario versionCode 270
+App Admin versionCode 270
 versionName 1.0.1-dev
 ```
-
-DEV 270 esta preparado como candidato de publicacion con `versionCode 270` en ambas apps y notas de version separadas. Su publicacion DEV queda condicionada al CI y fusion del cierre; la comprobacion visual fisica sigue pendiente porque no hay un dispositivo conectado.
 
 Manifiestos:
 
@@ -70,22 +68,29 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-269-debug.apk
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-269-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-270-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-270-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 54a85f844c9893dfa7d74a106751400bf22e9cdd53dceb6a8adb6a56616d15cb
-Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
+Usuario 8ab8c63bd0bb1a8746170eb176820306a0042eda9f7e95829b3e74e7d8e40510
+Admin   ee44aa950b50fc3a80fa4520192e91eb147ee6eba61b9e1e2febbc95966cc25e
 ```
+
+## Publicacion DEV 270 - UX agrupada y umbral de 100 horas - 2026-07-21
+
+- Cierre funcional: PR #17 a #30 fusionados; commit de publicacion `8d7ce42fe80bdc164e5d5f152e613f1b2f5f6c89`. Android CI final `29876923435` completo build, unitarios, ktlint, Android Lint y Detekt.
+- Publicacion oficial unica: workflow `Publicar APKs DEV` `29879643071`, correcto en 10m31s con firma DEV historica y destino exclusivo Supabase DEV. No se habilito reparacion de la misma version y Production no fue tocado.
+- Verificacion externa: ambos manifiestos publicos declaran 270 y sus APK recalculan exactamente los SHA-256 de este handoff. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, `minSdk 29` y `targetSdk 36`; `apksigner` confirma el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- Cobertura publicada: listas continuas, estados persistentes, indicadores de seguridad, Web/Ajustes, barras del sistema, movimiento, preferencia local del launcher DAG y aviso Admin ordinario despues de 100 horas. Sin telefono conectado, los recorridos visuales, reposo prolongado y cache del launcher OEM siguen pendientes de prueba fisica.
 
 ## UI-ICON-SYSTEM-01 - Implementado en fuente
 
 - El catalogo compartido adopta las variantes Rounded y AutoMirrored Rounded incluidas en `material-icons-core` para navegacion y acciones comunes.
 - App Admin usa el mismo `ProductNavGlyph` de App Usuario en la navegacion inferior; DAG conserva su icono propio alineado al catalogo.
-- No se agregaron dependencias. La publicacion DEV 270 y la comprobacion visual fisica siguen pendientes del cierre agrupado.
+- No se agregaron dependencias. Publicado en DEV 270; la comprobacion visual fisica sigue pendiente.
 
 ## UI-SYSTEM-BAR-CONTINUITY-01 - Implementado en fuente
 
@@ -121,25 +126,25 @@ Admin   b9f097bc071212ada58cb6b7091fb1567b6223ecbd1da4bfc901bdf960021734
 
 - Usuarios Admin usa una superficie blanca continua y filas completas sin menu de tres puntos; `Archivar usuario` sigue disponible con confirmacion dentro del detalle.
 - El encabezado muestra junto a actualizar, buscar y agregar un estado persistente: progreso, error o tiempo relativo desde el ultimo refresco correcto.
-- `Agregar usuario` solicita foco al campo de nombre al abrirse. La publicacion DEV 270 y el recorrido fisico siguen pendientes del cierre agrupado.
+- `Agregar usuario` solicita foco al campo de nombre al abrirse. Publicado en DEV 270; el recorrido fisico sigue pendiente.
 
 ## ADMIN-USER-SECURITY-BADGES-01 - Implementado en fuente
 
 - La lista no muestra estado verde. Un escudo amarillo representa verificacion pendiente, estado desconocido o mas de 100 horas sin comunicacion; rojo queda reservado para un componente confirmadamente desactivado o posible desinstalacion.
 - El encabezado del usuario y el selector `Seguridad` replican el nivel con descripcion accesible; cuando todo esta verificado no aparece ninguna marca.
-- La clasificacion tiene pruebas unitarias. La publicacion DEV 270 y la comprobacion fisica de cada caso siguen pendientes del cierre agrupado.
+- La clasificacion tiene pruebas unitarias. Publicado en DEV 270; la comprobacion fisica de cada caso sigue pendiente.
 
 ## ADMIN-SECONDARY-LISTS-UX-02 - Implementado en fuente
 
 - Solicitudes Admin muestra actualizar como icono circular y conserva en la misma barra progreso, error o tiempo relativo; el selector de usuarios queda como lista blanca continua.
 - Avisos usa superficie blanca continua. Apps y las filas internas de grupos eliminan tarjetas y fondos repetidos, pero preservan switches, limites, horarios, formularios y acciones.
-- Sitios, horarios y actualizaciones se completan en los tickets especificos de Web/Ajustes; `Agregar sitio` queda expresamente sin cambios. La publicacion DEV 270 y el recorrido fisico siguen pendientes.
+- Sitios, horarios y actualizaciones se completan en los tickets especificos de Web/Ajustes; `Agregar sitio` queda expresamente sin cambios. Publicado en DEV 270; el recorrido fisico sigue pendiente.
 
 ## USER-SECONDARY-LISTS-UX-02 - Implementado en fuente
 
 - Solicitudes Usuario usa una lista blanca continua y ubica el refresco circular junto a un estado persistente de progreso, error o tiempo relativo, sin banner separado.
 - Mis apps fija titulo y controles, baja los filtros compactos a una segunda linea y deja solo el inventario como contenido desplazable.
-- La lista nativa reciclable conserva la posicion al refrescar y vuelve arriba solamente cuando cambia filtro o busqueda. Reglas, medicion y bloqueo no cambian. La publicacion DEV 270 y el recorrido fisico siguen pendientes.
+- La lista nativa reciclable conserva la posicion al refrescar y vuelve arriba solamente cuando cambia filtro o busqueda. Reglas, medicion y bloqueo no cambian. Publicado en DEV 270; el recorrido fisico sigue pendiente.
 
 ## Publicacion DEV 269 - Refresco claro y formulario Web compacto - 2026-07-21
 
