@@ -1,6 +1,5 @@
 package com.contentfilter.user.dag
 
-import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -63,8 +62,6 @@ class DagBrowserViewModel
         private var approvalPollingJob: Job? = null
         private var suggestionJob: Job? = null
         private var searchJob: Job? = null
-        private var pageStartedAtElapsedMillis = 0L
-        private var pageFastRevealCategory: String? = null
         private val searchRequestTracker = DagSearchRequestTracker()
         private val reviewSubmissionsInFlight = mutableSetOf<String>()
 
@@ -525,13 +522,6 @@ class DagBrowserViewModel
                         applyExplicitRule(domain, classifier.classifyPage(url, title, text, images))
                     }
                 val pageDecision = dagAdaptivePageDecision(result)
-                val fastRevealCategory =
-                    dagFastRevealCategory(
-                        url = url,
-                        title = title,
-                        text = text,
-                        classification = result,
-                    )
                 if (pageDecision != DagAdaptivePageDecision.Blocked) {
                     withContext(Dispatchers.IO) {
                         if (!cachedApproval && pageDecision == DagAdaptivePageDecision.Allowed) {
@@ -547,14 +537,12 @@ class DagBrowserViewModel
                 }
                 withContext(Dispatchers.Main) {
                     if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return@withContext
-                    pageFastRevealCategory = fastRevealCategory
                     when (pageDecision) {
                         DagAdaptivePageDecision.Allowed -> {
                             mutableState.update {
                                 it.copy(
                                     address = url,
                                     pageAnalysisReady = true,
-                                    viewportImagesReady = it.viewportImagesReady || fastRevealCategory != null,
                                     analysisProgress = maxOf(it.analysisProgress, 0.65f),
                                     message = "",
                                     reviewCandidate = null,
@@ -615,7 +603,6 @@ class DagBrowserViewModel
         }
 
         private fun revealPageIfReady(url: String) {
-            var becameVisible = false
             mutableState.update { state ->
                 if (
                     state.requestedUrl == url &&
@@ -623,18 +610,10 @@ class DagBrowserViewModel
                     state.viewportImagesReady &&
                     state.pageStatus == DagPageStatus.Loading
                 ) {
-                    becameVisible = true
                     state.copy(pageStatus = DagPageStatus.Visible, analysisProgress = 1f)
                 } else {
                     state
                 }
-            }
-            if (becameVisible) {
-                val elapsedMillis = (SystemClock.elapsedRealtime() - pageStartedAtElapsedMillis).coerceAtLeast(0L)
-                Log.i(
-                    "DagPagePerf",
-                    "visible_elapsed_ms=$elapsedMillis reveal_gate=${pageFastRevealCategory ?: "strict_viewport"}",
-                )
             }
         }
 
@@ -650,8 +629,6 @@ class DagBrowserViewModel
                 }
                 return false
             }
-            pageStartedAtElapsedMillis = SystemClock.elapsedRealtime()
-            pageFastRevealCategory = null
             mutableState.update {
                 it.copy(
                     address = url,

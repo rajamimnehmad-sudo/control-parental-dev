@@ -1,0 +1,2 @@
+DAG vuelve a esperar que las fotos iniciales terminen su análisis local antes de mostrar la página, evitando espacios vacíos prolongados.
+Se mantienen las correcciones de Calibración DAG, CAPTCHA, búsquedas inciertas y menús dinámicos.
