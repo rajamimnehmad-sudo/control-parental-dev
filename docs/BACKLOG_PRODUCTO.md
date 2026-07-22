@@ -327,8 +327,8 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
-| DAG-LOCAL-IMAGE-PERF-03 | Publicado DEV 271; medicion fisica indicativa completada junto al candidato DEV 274 | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
-| DAG-CATEGORY-FAST-PATH-04 | Publicado y validado DEV 274 | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
+| DAG-LOCAL-IMAGE-PERF-03 | Publicado DEV 271; reabierto por latencia real de fotos reportada en DEV 274 | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
+| DAG-CATEGORY-FAST-PATH-04 | Retirado en candidato DEV 275 por regresion de experiencia | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
 | DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 259; validado en SM-A235M | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-CALIBRATION-CLOSED-LOOP-10 | Publicado DEV 260; validado en SM-A235M | P0 | Hacer persistentes las decisiones calibradas, separar motivos positivos/negativos y agregar criterio local de mangas/corte sobre rodillas | L | Alto |
 | DAG-AUDIENCE-POLICY-11 | Publicado DEV 261; validación física previa correcta, pendiente repetir APK público | P0 | Permitir imagenes normales de bebes y hombres, aplicar criterio femenino a niñas y mantener ropa interior/desnudez como bloqueo universal | M | Alto |
@@ -969,7 +969,7 @@ Flujo de una entrada:
 
 #### DAG-LOCAL-IMAGE-PERF-03 - Apertura local rapida de fotos
 
-- Estado: `Publicado DEV 271; medicion fisica indicativa completada junto al candidato DEV 274`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
+- Estado: `Publicado DEV 271; reabierto por latencia real de fotos reportada en DEV 274`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
 - Problema: una pagina con varias fotos puede tardar aproximadamente entre 6 y 8 segundos en completar su primera carga visual porque la descarga, decodificacion y clasificacion local forman una cola costosa y parte del trabajo puede repetirse.
 - Decision aprobada: mantener todo el analisis de imagenes dentro del telefono. No se usara un modelo de IA online, no se enviaran fotos a terceros y no se persistiran originales para acelerar cargas futuras.
 - Solucion propuesta: dos clasificadores locales con limite estricto; prioridad para recursos visibles; una sola decodificacion por imagen; cache efimera de decisiones por hash de contenido, audiencia y version de calibracion; precarga maxima de la siguiente pantalla; y XNNPACK o NNAPI solo cuando una medicion controlada del dispositivo demuestre que mejora el tiempo con fallback seguro.
@@ -987,11 +987,11 @@ Flujo de una entrada:
   - se comparan antes/despues en la misma pagina y dispositivo, incluyendo primera carga, repeticion, scroll, cambio de pagina, memoria y temperatura;
   - no se agregan servicios externos, claves, costos por IA ni salida de imagenes del telefono.
 - Resultado candidato DEV 271: dos clasificadores locales independientes atienden la cola acotada; la preparacion inicial prioriza una pantalla y precarga como maximo la siguiente; el asentamiento visual baja de 1.200 a 300 ms. La cache de respuestas efimera existente sigue evitando reclasificar una URL ya resuelta dentro de la pagina. La cache por hash entre paginas y la seleccion adaptativa NNAPI quedan fuera de este primer candidato hasta contar con una invalidacion de calibracion y benchmarks seguros.
-- Medicion fisica 2026-07-22: en el mismo SM-A235M y la portada de Samsung Argentina, el probe ADB/UiAutomator comparable paso de aproximadamente 9.589 ms con APK publica DEV 273 a 4.059 ms con candidato DEV 274. Es una medicion operativa indicativa, sensible a red y cache, no un benchmark de laboratorio; no se registraron URL, texto, consulta ni imagenes en la aplicacion.
+- Medicion corregida 2026-07-22: el probe ADB/UiAutomator paso de aproximadamente 9.589 ms con DEV 273 a 4.059 ms con DEV 274, pero solo detectaba estructura visible. No media fotos listas y por eso no demuestra una mejora de carga visual. El usuario reporto que los espacios tardaban mucho mas en completarse; cualquier optimizacion futura debe medir tiempo hasta raster decidido/mostrado, primera pantalla completa, repeticion, scroll, memoria y temperatura.
 
 #### DAG-CATEGORY-FAST-PATH-04 - Apertura temprana por categoria segura
 
-- Estado: `Publicado y validado DEV 274`; aprobado explicitamente por el usuario el 2026-07-22 como parte del lote DAG. Tipo: rendimiento, clasificacion local y seguridad visual. Prioridad: P1. Esfuerzo: S. Riesgo: alto.
+- Estado: `Retirado en candidato DEV 275 por regresion de experiencia`; aprobado originalmente el 2026-07-22 y revertido con autorizacion explicita despues del reporte fisico. Tipo: rendimiento, clasificacion local y seguridad visual. Prioridad: P1. Esfuerzo: S. Riesgo: alto.
 - Causa confirmada: DAG mantiene invisible toda la pagina hasta aprobar el texto y resolver cada imagen visible del primer viewport. Aunque las imagenes se clasifican en paralelo, una sola descarga o inferencia lenta puede sostener la pantalla de analisis hasta el limite de ocho segundos incluso en electronica, banca, documentacion o tramites.
 - Alcance aprobado: cuando la pagina ya fue permitida y una categoria de bajo riesgo queda identificada con evidencia suficiente, mostrar inmediatamente texto, controles y estructura. Las imagenes siguen pasando individualmente por descarga HTTPS, defensa SSRF, clasificacion local y fallo cerrado; una imagen pendiente no se muestra por anticipado.
 - Categorias iniciales cerradas: electronica, finanzas, documentacion tecnica y dominios gubernamentales. Ropa, contenido mixto, categorias ambiguas, decisiones inciertas y cualquier bloqueo conservan la barrera estricta del viewport.
@@ -1004,6 +1004,8 @@ Flujo de una entrada:
   - se compara fisicamente tiempo de apertura en el mismo Samsung y pagina, sin registrar URL, consulta, texto ni imagenes.
 - Implementacion: una politica local exige decision de pagina `Allowed` y dos señales distintas para electronica, finanzas o documentacion, o un sufijo gubernamental cerrado. Solo adelanta `viewportImagesReady` para mostrar estructura y controles; la intercepcion y clasificacion de cada raster no cambian. Ropa, paginas ambiguas, `Uncertain` y `Blocked` conservan la barrera estricta. El registro de rendimiento contiene unicamente milisegundos y nombre de compuerta.
 - Validacion candidata: unitarios cubren electronica realista, gobierno, ropa, ambiguedad y decisiones no permitidas. `ktlintCheck`, unitarios y builds DEV de ambas aplicaciones completaron correctamente. En SM-A235M Samsung mostro estructura en aproximadamente 4.059 ms frente a 9.589 ms del probe previo; Zara mantuvo la compuerta estricta y su menu siguio operativo; la pagina gubernamental de infracciones cargo y mostro su reCAPTCHA.
+- Regresion DEV 274: el atajo no reducia el tiempo de la cola visual; exponia la pagina antes de que las fotos iniciales estuvieran decididas y hacia visible una espera larga con espacios vacios. La metrica usada observaba estructura, no fotos, y no represento la experiencia real.
+- Correccion candidata DEV 275: se elimina por completo el atajo y DAG vuelve a exigir `pageAnalysisReady && viewportImagesReady` antes de revelar la pagina, igual que antes de DEV 274. La optimizacion futura de fotos debe actuar sobre descarga/decodificacion/inferencia/cache y demostrar tiempo real hasta imagen visible, sin usar una revelacion temprana como sustituto.
 
 #### DAG-ULTRA-KOSHER-01 - Modos de imagenes administrables
 

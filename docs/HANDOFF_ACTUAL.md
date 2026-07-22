@@ -79,6 +79,15 @@ Usuario a7b8de8d75c604a582c83a5555417b522bed186e201ecaea52e306bf1f9c218b
 Admin   5ba96ffc37752b058a6bd6ef2a0edc1489886ff5a7886771fa4bbee7965db258
 ```
 
+## Candidato DEV 275 - rollback de apertura anticipada DAG - 2026-07-22
+
+- El usuario reporto que DEV 274 se siente mucho peor porque las fotos tardan demasiado en aparecer y la experiencia anterior era preferible.
+- Causa confirmada: `DAG-CATEGORY-FAST-PATH-04` no aceleraba descarga, decodificacion ni clasificacion local de raster. Marcaba el viewport como listo despues de permitir la pagina y revelaba texto/estructura mientras la cola visual seguia trabajando; por eso exponia durante mas tiempo los espacios vacios que antes permanecian detras de `Analizando`.
+- La medicion de aproximadamente 4.059 ms en DEV 274 correspondia a estructura visible, no a fotos listas. No sirve como criterio de exito para la experiencia reportada y no debe interpretarse como mejora de carga visual.
+- Correccion DEV 275: se elimina solamente la politica de apertura anticipada, su estado/log y sus tests. `DagBrowserViewModel` vuelve exactamente al comportamiento previo a DEV 274: la pagina se revela cuando analisis de pagina y fotos iniciales del viewport estan listos. Se conservan Calibracion DAG, CAPTCHA, busquedas inciertas, menus dinamicos y todos los demas cambios publicados.
+- Validacion local: `ktlintCheck`, unitarios y `assembleDevDebug` de Usuario y Admin completaron 779 tareas correctamente. `aapt` y `apksigner` confirman versionCode 275, paquetes DEV y certificado historico en ambos APK. Los candidatos 275 se instalaron in-place en el SM-A235M y conservaron `firstInstallTime`; la pantalla seguia protegida por huella/patron, por lo que la comprobacion visual posterior requiere desbloqueo del usuario.
+- Pendiente en este punto: PR, CI, publicacion publica 275 y verificacion externa de manifiestos/hashes/paquetes/firma.
+
 ## Publicacion DEV 274 - apertura segura por categoria y Calibracion DAG - 2026-07-22
 
 - `DAG-CATEGORY-FAST-PATH-04` permite mostrar antes texto, controles y estructura solamente cuando la pagina ya fue permitida y coincide con gobierno o con al menos dos señales de electronica, finanzas o documentacion. Ropa, ambiguedad, `Uncertain` y `Blocked` siguen esperando el viewport completo; cada raster conserva descarga HTTPS, defensa SSRF, clasificacion local y fallo cerrado antes de entregarse.
