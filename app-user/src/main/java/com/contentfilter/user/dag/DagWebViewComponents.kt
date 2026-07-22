@@ -47,6 +47,7 @@ import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.contentfilter.user.BuildConfig
 import org.json.JSONArray
+import java.util.concurrent.atomic.AtomicLong
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
@@ -157,9 +158,11 @@ internal fun DagWebContent(
                     val dagWebView = this
                     val cookieManager = CookieManager.getInstance()
                     var captchaSessionRevision = 0
+                    val captchaSessionExpiresAt = AtomicLong(0L)
 
                     fun closeCaptchaSession() {
                         captchaSessionRevision += 1
+                        captchaSessionExpiresAt.set(0L)
                         cookieManager.setAcceptThirdPartyCookies(dagWebView, false)
                     }
 
@@ -181,7 +184,11 @@ internal fun DagWebContent(
                         onCaptchaDetected = { _ ->
                             captchaSessionRevision += 1
                             val sessionRevision = captchaSessionRevision
+                            captchaSessionExpiresAt.set(
+                                SystemClock.elapsedRealtime() + DagCaptchaSessionDurationMillis,
+                            )
                             cookieManager.setAcceptThirdPartyCookies(dagWebView, true)
+                            dagWebView.restartDagCaptchaFramesForSession()
                             dagWebView.postDelayed(
                                 {
                                     if (captchaSessionRevision == sessionRevision) closeCaptchaSession()
@@ -267,6 +274,9 @@ internal fun DagWebContent(
                                 }
                             },
                             imageLoader = imageLoader,
+                            captchaSessionActive = {
+                                SystemClock.elapsedRealtime() < captchaSessionExpiresAt.get()
+                            },
                         )
                     setDownloadListener { _, _, _, _, _ -> onBlockedAction("Las descargas están bloqueadas en DAG.") }
                 }
@@ -370,6 +380,23 @@ private fun WebView.setDagImageCalibrationDecision(
     )
 }
 
+private fun WebView.restartDagCaptchaFramesForSession() {
+    evaluateJavascript(
+        """
+        (function() {
+          document.querySelectorAll('iframe[data-dag-safe-captcha="true"]').forEach(function(frame) {
+            if (frame.getAttribute('data-dag-captcha-reloaded') === 'true') return;
+            var source = frame.getAttribute('src') || '';
+            if (source.indexOf('https://') !== 0) return;
+            frame.setAttribute('data-dag-captcha-reloaded', 'true');
+            frame.setAttribute('src', source);
+          });
+        })();
+        """.trimIndent(),
+        null,
+    )
+}
+
 private fun WebView.setDagImageCalibrationDecisions(decisions: Map<String, DagImageDecision>) {
     if (decisions.isEmpty()) return
     val payload =
@@ -468,6 +495,7 @@ private class DagWebViewClient(
     private val onBlocked: (String) -> Unit,
     private val onRendererGone: (WebView) -> Unit,
     private val imageLoader: DagImageResourceLoader,
+    private val captchaSessionActive: () -> Boolean,
 ) : WebViewClient() {
     private val pageUrlTracker = DagPageUrlTracker()
 
@@ -549,7 +577,10 @@ private class DagWebViewClient(
     override fun shouldInterceptRequest(
         view: WebView?,
         request: WebResourceRequest,
-    ): WebResourceResponse? = imageLoader.intercept(request, pageUrlTracker.current())
+    ): WebResourceResponse? {
+        if (captchaSessionActive() && isDagCaptchaSessionResourceUrl(request.url.toString())) return null
+        return imageLoader.intercept(request, pageUrlTracker.current())
+    }
 }
 
 internal class DagPageUrlTracker {
@@ -780,7 +811,9 @@ private fun WebView.sanitizeAndExtractVisibleText(
           function dagAllowedCaptchaFrame(frame) {
             if (!frame || !window.location || window.location.protocol !== 'https:') return false;
             try {
-              var source = new URL(frame.getAttribute('src') || '', document.baseURI);
+              var rawSource = frame.getAttribute('src') || '';
+              if (!rawSource || rawSource === 'about:blank') return false;
+              var source = new URL(rawSource, document.baseURI);
               var provider = source.hostname.toLowerCase();
               if (source.protocol !== 'https:') return false;
               var allowed =
@@ -805,6 +838,17 @@ private fun WebView.sanitizeAndExtractVisibleText(
               return false;
             }
           }
+          function dagDeferIncompleteCaptchaFrame(frame) {
+            if (!frame || frame.getAttribute('data-dag-captcha-deferred') === 'true') return false;
+            var rawSource = frame.getAttribute('src') || '';
+            if (rawSource && rawSource !== 'about:blank') return false;
+            frame.setAttribute('data-dag-captcha-deferred', 'true');
+            window.requestAnimationFrame(function() {
+              if (!frame.isConnected) return;
+              dagSecureNode(frame, false);
+            });
+            return true;
+          }
           function dagSecureNode(node, includeDescendants) {
             if (!node || node.nodeType !== 1) return;
             var tag = node.tagName ? node.tagName.toLowerCase() : '';
@@ -815,6 +859,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
                 }
                 return;
               }
+              if (dagDeferIncompleteCaptchaFrame(node)) return;
               node.remove();
               return;
             }
@@ -1106,6 +1151,16 @@ internal fun isDagCaptchaProviderUrl(url: String): Boolean =
         ((host == "www.google.com" || host == "www.recaptcha.net") && path.startsWith("/recaptcha/")) ||
             (host == "challenges.cloudflare.com" && path.startsWith("/cdn-cgi/challenge-platform/")) ||
             (host == "newassets.hcaptcha.com" && path.startsWith("/captcha/"))
+    }.getOrDefault(false)
+
+internal fun isDagCaptchaSessionResourceUrl(url: String): Boolean =
+    runCatching {
+        val parsed = java.net.URI(url)
+        if (parsed.scheme != "https") return@runCatching false
+        val host = parsed.host?.lowercase().orEmpty()
+        val path = parsed.path.orEmpty()
+        isDagCaptchaProviderUrl(url) ||
+            (host == "www.gstatic.com" && path.startsWith("/recaptcha/"))
     }.getOrDefault(false)
 
 internal fun dagDomSecurityBatchCount(nodeCount: Int): Int {
