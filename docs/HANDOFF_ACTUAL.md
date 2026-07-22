@@ -86,23 +86,33 @@ Admin   ee44aa950b50fc3a80fa4520192e91eb147ee6eba61b9e1e2febbc95966cc25e
 - Verificacion externa: ambos manifiestos publicos declaran 270 y sus APK recalculan exactamente los SHA-256 de este handoff. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, `minSdk 29` y `targetSdk 36`; `apksigner` confirma el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 - Cobertura publicada: listas continuas, estados persistentes, indicadores de seguridad, Web/Ajustes, barras del sistema, movimiento, preferencia local del launcher DAG y aviso Admin ordinario despues de 100 horas. Sin telefono conectado, los recorridos visuales, reposo prolongado y cache del launcher OEM siguen pendientes de prueba fisica.
 
+## Validacion fisica DEV 270 en Samsung SM-A235M - 2026-07-21
+
+- Los APK publicos DEV 270 se instalaron in-place en el Samsung SM-A235M `R58T34V31AE`, Android 14/API 34, sin borrar datos. App Usuario y App Admin conservaron activacion, sesion y datos; el telefono confirma `versionCode 270` y `versionName 1.0.1-dev` en ambos paquetes.
+- App Admin: Home, Usuarios, alta, detalle, Apps/Web/Seguridad, Solicitudes y Cuenta abrieron correctamente. Usuarios quedo como lista continua sin menu de tres puntos; el alta enfoco el primer campo y abrio el teclado; el refresco mostro `Actualizando…` y despues mantuvo `Actualizado ahora` en la barra. Solicitudes repitio el mismo comportamiento junto al icono circular. Cuenta y Web conservaron las tarjetas o formularios complejos y simplificaron las filas de navegacion/estado.
+- Android desactivo Accessibility de App Usuario al instalar la actualizacion por ADB. La app detecto correctamente `Accesibilidad apagada` y `Proteccion incompleta`; VPN y Device Admin siguieron activos. Tras sincronizar, Admin mostro para ese usuario solo el escudo rojo en la lista, el encabezado y la burbuja de `Seguridad`; la pantalla detallo `Accesibilidad: Inactiva`. El otro usuario sano no mostro indicador. No se habilito el permiso mediante ADB ni se simulo el caso amarillo.
+- App Usuario: Inicio, Mis apps, Internet, Solicitudes y Ajustes se recorrieron sin crash ni ANR. Mis apps mantuvo titulo/acciones/filtros fijos, refresco con `Actualizando…` y luego `Actualizado ahora`, y desplazamiento vertical largo sin superposicion ni corte del inventario. Solicitudes mantuvo el mismo estado persistente. Internet mostro la pieza panoramica y las filas de VPN, SafeSearch, resultados y DAG; Ajustes confirmo activacion y version 270.
+- `DAG como app separada` se probo de extremo a extremo: al apagar el switch, PackageManager retiro solo `DagLauncherAlias`; DAG siguio abriendo desde la fila interna. El switch se restauro a encendido y el alias volvio a estar habilitado, sin reinicio, reinstalacion ni cambio de politica.
+- La barra de estado se integro con el encabezado oscuro de ambos Home y con las superficies claras de las secciones recorridas. Los cierres de la tarjeta de Inicio y los cambios Apps/Web/Seguridad se observaron suaves y sin salto visible en este telefono. No se probaron tema oscuro, escala de animacion cero ni otros OEM.
+- No se cambiaron reglas, usuarios, solicitudes, sitios, horarios ni datos remotos. No se uso Supabase, no se toco Production y no se publico otra APK. Siguen pendientes el umbral temporal real de 100 horas, el caso amarillo, la limpieza del rojo despues de reactivar Accessibility, estados con datos de Avisos/sitios/grupos y la matriz fisica/virtual de compatibilidad.
+
 ## UI-ICON-SYSTEM-01 - Implementado en fuente
 
 - El catalogo compartido adopta las variantes Rounded y AutoMirrored Rounded incluidas en `material-icons-core` para navegacion y acciones comunes.
 - App Admin usa el mismo `ProductNavGlyph` de App Usuario en la navegacion inferior; DAG conserva su icono propio alineado al catalogo.
-- No se agregaron dependencias. Publicado en DEV 270; la comprobacion visual fisica sigue pendiente.
+- No se agregaron dependencias. En SM-A235M/API 34 los iconos de navegacion, acciones, DAG y alerta resultaron legibles y coherentes en tema claro; tema oscuro y otros tamaños/OEM siguen pendientes.
 
 ## UI-SYSTEM-BAR-CONTINUITY-01 - Implementado en fuente
 
 - Usuario y Admin activan edge-to-edge y sincronizan la barra de estado con la pantalla actual: Inicio prolonga el encabezado azul oscuro con iconos claros; las superficies claras usan fondo blanco e iconos oscuros.
 - DAG mantiene su ajuste independiente claro/oscuro. No se modificaron matrices, workflows ni infraestructura de compatibilidad.
-- Compilacion, unitarios y ktlint DEV de ambas apps son correctos. La comprobacion visual de recortes y variantes OEM queda pendiente para un telefono o laboratorio real.
+- Compilacion, unitarios y ktlint DEV de ambas apps son correctos. En SM-A235M/API 34 ambos Home prolongaron el azul oscuro hasta la zona de camara y las secciones claras usaron barra blanca sin franja discordante; faltan tema oscuro y variantes OEM.
 
 ## UI-MOTION-SMOOTH-01 - Implementado en fuente
 
 - Inicio Usuario e Internet ya no combinan `animateContentSize` con otra expansion simultanea: usan una unica transicion vertical de 220 ms sin rebote.
 - La cabecera y el selector Apps/Web/Seguridad de Admin sustituyen resortes y cambios instantaneos por interpolaciones de 220 ms.
-- Con la escala de animador de Android desactivada, las nuevas duraciones pasan a cero. Compilacion, unitarios y ktlint DEV de ambas apps son correctos; la percepcion final queda pendiente de recorrido fisico.
+- Con la escala de animador de Android desactivada, las nuevas duraciones pasan a cero. En SM-A235M/API 34 el cierre de Inicio y los cambios Apps/Web/Seguridad se observaron sin salto visible; falta probar reduccion de movimiento y otros equipos.
 
 ## ADMIN-WEB-SETTINGS-UX-02 - Implementado en fuente
 
@@ -120,31 +130,31 @@ Admin   ee44aa950b50fc3a80fa4520192e91eb147ee6eba61b9e1e2febbc95966cc25e
 
 - Internet Usuario muestra `DAG como app separada` solo cuando DAG esta autorizado y disponible. La preferencia es local y nace activa para no ocultar accesos existentes durante la actualizacion.
 - Al desactivarla se oculta un `activity-alias` exclusivo del launcher con `DONT_KILL_APP`; la actividad interna permanece habilitada y no cambian la licencia, la politica remota, los permisos ni el paquete. La migracion tambien reactiva la actividad interna si una version anterior dejo un override deshabilitado.
-- La logica de visibilidad tiene cobertura unitaria; falta comprobar en un telefono real que cada launcher refleje el cambio sin demoras o cache visual propio.
+- La logica de visibilidad tiene cobertura unitaria. En SM-A235M/API 34 apagar el switch retiro `DagLauncherAlias`, mantuvo la apertura interna de DAG y volver a encenderlo restauro el alias sin reinicio ni reinstalacion.
 
 ## ADMIN-USERS-HUB-UX-02 - Implementado en fuente
 
 - Usuarios Admin usa una superficie blanca continua y filas completas sin menu de tres puntos; `Archivar usuario` sigue disponible con confirmacion dentro del detalle.
 - El encabezado muestra junto a actualizar, buscar y agregar un estado persistente: progreso, error o tiempo relativo desde el ultimo refresco correcto.
-- `Agregar usuario` solicita foco al campo de nombre al abrirse. Publicado en DEV 270; el recorrido fisico sigue pendiente.
+- `Agregar usuario` solicita foco al campo de nombre al abrirse. En SM-A235M/API 34 se validaron lista sin menu contextual, foco y teclado iniciales, y estado persistente `Actualizando…` -> `Actualizado ahora`.
 
 ## ADMIN-USER-SECURITY-BADGES-01 - Implementado en fuente
 
 - La lista no muestra estado verde. Un escudo amarillo representa verificacion pendiente, estado desconocido o mas de 100 horas sin comunicacion; rojo queda reservado para un componente confirmadamente desactivado o posible desinstalacion.
 - El encabezado del usuario y el selector `Seguridad` replican el nivel con descripcion accesible; cuando todo esta verificado no aparece ninguna marca.
-- La clasificacion tiene pruebas unitarias. Publicado en DEV 270; la comprobacion fisica de cada caso sigue pendiente.
+- La clasificacion tiene pruebas unitarias. En SM-A235M/API 34 se comprobaron el estado sano sin marca y una falla roja real de Accessibility en lista, encabezado y burbuja de Seguridad. Quedan el caso amarillo y comprobar que el rojo desaparezca despues de reparar.
 
 ## ADMIN-SECONDARY-LISTS-UX-02 - Implementado en fuente
 
 - Solicitudes Admin muestra actualizar como icono circular y conserva en la misma barra progreso, error o tiempo relativo; el selector de usuarios queda como lista blanca continua.
 - Avisos usa superficie blanca continua. Apps y las filas internas de grupos eliminan tarjetas y fondos repetidos, pero preservan switches, limites, horarios, formularios y acciones.
-- Sitios, horarios y actualizaciones se completan en los tickets especificos de Web/Ajustes; `Agregar sitio` queda expresamente sin cambios. Publicado en DEV 270; el recorrido fisico sigue pendiente.
+- Sitios, horarios y actualizaciones se completan en los tickets especificos de Web/Ajustes; `Agregar sitio` queda expresamente sin cambios. En SM-A235M/API 34 se validaron Solicitudes, Cuenta y las filas principales de Web; Avisos, grupos/horarios y listas con datos configurados siguen pendientes.
 
 ## USER-SECONDARY-LISTS-UX-02 - Implementado en fuente
 
 - Solicitudes Usuario usa una lista blanca continua y ubica el refresco circular junto a un estado persistente de progreso, error o tiempo relativo, sin banner separado.
 - Mis apps fija titulo y controles, baja los filtros compactos a una segunda linea y deja solo el inventario como contenido desplazable.
-- La lista nativa reciclable conserva la posicion al refrescar y vuelve arriba solamente cuando cambia filtro o busqueda. Reglas, medicion y bloqueo no cambian. Publicado en DEV 270; el recorrido fisico sigue pendiente.
+- La lista nativa reciclable conserva la posicion al refrescar y vuelve arriba solamente cuando cambia filtro o busqueda. En SM-A235M/API 34 Mis apps mantuvo controles fijos y scroll largo sin superposicion; Mis apps y Solicitudes conservaron `Actualizado ahora`. Falta recorrer busqueda/filtros y estados con solicitudes reales.
 
 ## Publicacion DEV 269 - Refresco claro y formulario Web compacto - 2026-07-21
 

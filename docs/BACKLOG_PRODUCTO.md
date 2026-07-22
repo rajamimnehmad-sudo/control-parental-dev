@@ -53,10 +53,10 @@ Flujo de una entrada:
 
 ### ANDROID-FLAT-LISTS-UX-01 - Listas simples, compactas y modernas
 
-- Estado: `Publicado DEV 268; pendiente recorrido fisico`. Aprobado explicitamente el 2026-07-21. Tipo: UX Android compartida. Prioridad: P2. Esfuerzo: M. Riesgo: bajo.
+- Estado: `Validacion fisica parcial ampliada en SM-A235M DEV 270`. Aprobado explicitamente el 2026-07-21. Tipo: UX Android compartida. Prioridad: P2. Esfuerzo: M. Riesgo: bajo.
 - Alcance: reemplazar pilas de tarjetas repetidas por filas continuas con separadores sutiles en Usuarios Admin, Solicitudes y Avisos de ambas apps. En Usuario, `Mis apps` conserva el `ListView` nativo reciclable y cambia solamente su presentacion.
 - Decision visual: mantener tarjetas solo cuando expresan una unidad importante, como proteccion, licencia, alertas o formularios complejos. No agregar una biblioteca externa: Compose Material 3 y los componentes nativos actuales cubren el patron.
-- Aceptacion alcanzada: matriz local completa de 1.845 tareas y Android CI correctos; APK Usuario/Admin DEV 268 publicados juntos mediante el workflow manual oficial y verificados por manifiesto, hash, paquete, version y certificado. No habia telefono ADB conectado; no se tocaron backend, datos ni Production.
+- Aceptacion alcanzada: matriz local completa de 1.845 tareas y Android CI correctos; APK Usuario/Admin DEV 268 publicados juntos mediante el workflow manual oficial y verificados por manifiesto, hash, paquete, version y certificado. En DEV 270/SM-A235M se recorrieron Usuarios, Solicitudes, Cuenta, Web, Mis apps, Internet y Ajustes con filas continuas y sin superposicion; faltan Avisos y listas con sitios, grupos u horarios configurados. No se tocaron backend, datos ni Production.
 
 ### ANDROID-COMPAT-FOUNDATION-01 - Matriz y certificación Android
 
@@ -107,11 +107,12 @@ Flujo de una entrada:
 
 ### USER-APPS-REFRESH-FEEDBACK-01 - Refresco sin vaciar el inventario
 
-- Estado: `Publicado DEV 269; pendiente recorrido fisico`. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `Validado fisicamente en SM-A235M DEV 270 para refresco con inventario existente`. Tipo: UX Usuario. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Evidencia: en DEV 267, al tocar actualizar en Mis apps el inventario paso de 161 a 163 aplicaciones, pero durante la carga la lista quedo transitoriamente vacia sin una indicacion de progreso clara.
 - Aceptacion propuesta: conservar el inventario anterior mientras se refresca o mostrar un estado de carga inequívoco; bloquear doble tap; reemplazar la lista solo al completar; conservar datos y mensaje anterior si el refresco falla.
 - Causa confirmada: el ViewModel ya conserva el inventario y bloquea refrescos simultaneos; la ambiguedad provenia del primer escaneo, cuando la lista aun vacia se mostraba sin progreso ni un texto de carga correcto.
 - Implementacion publicada: indicador lineal durante el escaneo y mensaje explicito mientras el inventario inicial esta vacio; sin cambiar PackageManager, datos ni contratos remotos.
+- Evidencia fisica DEV 270: con 161 apps visibles, actualizar mostro `Actualizando…`, mantuvo el inventario y termino en `Actualizado ahora`; dos desplazamientos largos no superpusieron ni cortaron la lista. El primer escaneo de una instalacion nueva no se repitio para no borrar datos.
 
 ### ADMIN-WEB-ADD-SITE-UX-01 - Formulario Web plano y compacto
 
@@ -242,13 +243,13 @@ Flujo de una entrada:
 
 | ID | Estado | Pri. | Ticket | Esfuerzo | Riesgo |
 | --- | --- | --- | --- | --- | --- |
-| ANDROID-FLAT-LISTS-UX-01 | Publicado DEV 268; pendiente recorrido fisico | P2 | Listas continuas, compactas y modernas en ambas apps | M | Bajo |
+| ANDROID-FLAT-LISTS-UX-01 | Validacion fisica parcial ampliada en SM-A235M DEV 270 | P2 | Listas continuas, compactas y modernas en ambas apps | M | Bajo |
 | PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; pendiente episodio real controlado | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
 | PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; UI fisica validada, pendiente ciclo offline real | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
 | HELP-CONTEXTUAL-CHAT-01 | Publicado DEV 266; Usuario validado fisicamente, pendiente Admin y offline | P1 | Chat privado de ayuda, acotado a la app y contextual a todos los dispositivos | M | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
-| USER-APPS-REFRESH-FEEDBACK-01 | Publicado DEV 269; pendiente recorrido fisico | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
+| USER-APPS-REFRESH-FEEDBACK-01 | Validado fisicamente en SM-A235M DEV 270 con inventario existente | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
 | ADMIN-WEB-ADD-SITE-UX-01 | Publicado DEV 269; pendiente recorrido visual | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
@@ -277,22 +278,22 @@ Flujo de una entrada:
 | SUPERWEB-MOBILE-UX-01 | Publicado; pendiente validar autenticado en celular | P1 | Navegacion mobile-first, controles tactiles y Uso DAG sin tabla horizontal en celular | S | Bajo |
 | SUPERWEB-OPS-UX-01 | Archivo seguro, agrupacion y claridad Base implementados; busqueda/filtros pendientes | P2 | Busqueda, filtros y ciclo seguro de lectura/archivo para alertas y avisos | M | Medio |
 | APP-UPDATE-CHANGELOG-01 | Pulido publicado DEV 265; pendiente prueba fisica | P2 | Mostrar en Usuario y Admin las novedades especificas de la actualizacion ofrecida | M | Medio |
-| ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 248; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
+| ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 270; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado DEV 241 y hotfix de visualizacion 2026-07-18; pendiente prueba funcional autenticada | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | SUPERADMIN-ADMIN-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
-| UI-ICON-SYSTEM-01 | Publicado DEV 270; pendiente comprobacion visual | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
-| UI-SYSTEM-BAR-CONTINUITY-01 | Publicado DEV 270; pendiente comprobacion fisica | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
-| UI-MOTION-SMOOTH-01 | Publicado DEV 270; pendiente comprobacion fisica | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
-| ADMIN-USERS-HUB-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
-| ADMIN-USER-SECURITY-BADGES-01 | Publicado DEV 270; pendiente comprobacion fisica | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
-| ADMIN-SECONDARY-LISTS-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
-| USER-SECONDARY-LISTS-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
-| ADMIN-WEB-SETTINGS-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
-| USER-INTERNET-SETTINGS-UX-02 | Publicado DEV 270; pendiente comprobacion visual | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
-| USER-DAG-LAUNCHER-PREFERENCE-01 | Publicado DEV 270; pendiente comprobacion fisica | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
+| UI-ICON-SYSTEM-01 | Validacion visual tema claro SM-A235M DEV 270; faltan variantes | P2 | Catalogo coherente Material Symbols Rounded, sin mezclar familias ni agregar una dependencia pesada | S | Bajo |
+| UI-SYSTEM-BAR-CONTINUITY-01 | Validado fisicamente en tema claro SM-A235M DEV 270 | P1 | Integrar barra de estado y zona de camara con el color efectivo de cada pantalla | S | Medio |
+| UI-MOTION-SMOOTH-01 | Validacion fisica principal SM-A235M DEV 270; falta reduccion de movimiento | P2 | Transiciones sobrias de 200-250 ms, sin saltos y respetando reduccion de movimiento | M | Medio |
+| ADMIN-USERS-HUB-UX-02 | Validado fisicamente en SM-A235M DEV 270 | P1 | Lista Usuarios moderna, alta con foco y estado de refresco persistente en el encabezado | M | Medio |
+| ADMIN-USER-SECURITY-BADGES-01 | Sano y rojo validados en SM-A235M DEV 270; falta amarillo y reparacion | P1 | Indicadores amarillos/rojos accesibles solo segun evidencia real y burbuja en Seguridad | M | Alto |
+| ADMIN-SECONDARY-LISTS-UX-02 | Validacion fisica parcial SM-A235M DEV 270 | P2 | Listas secundarias Admin continuas, blancas y sin tarjetas repetidas | M | Medio |
+| USER-SECONDARY-LISTS-UX-02 | Validacion fisica principal SM-A235M DEV 270; faltan estados con datos | P1 | Solicitudes y Mis apps con estado persistente, filtros fijos y desplazamiento estable | M | Medio |
+| ADMIN-WEB-SETTINGS-UX-02 | Validacion fisica principal SM-A235M DEV 270; faltan filas con sitios | P2 | Web y Ajustes Admin con filas continuas y jerarquia simple; Agregar sitio queda fuera | M | Medio |
+| USER-INTERNET-SETTINGS-UX-02 | Validacion fisica principal SM-A235M DEV 270; falta estado degradado | P2 | Internet y Ajustes Usuario con una sola pieza visual y listas de estado legibles | M | Medio |
+| USER-DAG-LAUNCHER-PREFERENCE-01 | Validado fisicamente en SM-A235M DEV 270 | P2 | Preferencia local para mostrar DAG como app separada sin cambiar permiso ni APK | M | Medio |
 | USER-RESILIENCE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Recuperacion guiada de estados degradados sin confundir al usuario | M | Medio |
 | PROTECTION-ONBOARDING-HEALTH-01 | Implementado parcial candidato DEV 264 | P1 | Salud coherente y reparacion guiada; onboarding completo queda separado | L | Alto |
 | DEVICE-CONNECTIVITY-ALERTS-01 | Backend DEV y Android publicados DEV 270; pendiente comprobacion fisica | P1 | Alerta ordinaria tras 100 horas sin comunicacion para Admin y Superweb | M | Medio |
@@ -444,79 +445,88 @@ Flujo de una entrada:
 
 ### UI-ICON-SYSTEM-01 - Iconos coherentes y modernos
 
-- Estado: `Publicado DEV 270; pendiente comprobacion visual`; definido con el usuario el 2026-07-21. Tipo: sistema visual Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Estado: `Validacion visual tema claro en SM-A235M DEV 270; faltan tema oscuro y variantes`; definido con el usuario el 2026-07-21. Tipo: sistema visual Android. Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Objetivo: unificar iconos de Usuario y Admin con Material Symbols Rounded seleccionados como vectores locales, reutilizando Material Icons Core ya presente y sin incorporar una dependencia pesada.
 - Criterio: contorno redondeado para navegacion y acciones; relleno solo para seleccion o alerta; mismo peso, caja optica y tamaño; DAG conserva identidad propia adaptada al sistema. No se usan emojis, clipart, copias de Mercado Pago ni familias mezcladas.
 - Resultado en fuente: el catalogo compartido usa las variantes Rounded/AutoMirrored Rounded disponibles en `material-icons-core` y la navegacion inferior Admin adopta el mismo `ProductNavGlyph` ya usado por Usuario. No se agregaron dependencias ni se altero el icono propio de DAG.
 - Aceptacion: iconos legibles en claro/oscuro, objetivos tactiles de al menos 44 dp, descripcion accesible cuando comunica una accion o estado y ausencia de aumento innecesario del APK.
+- Evidencia fisica: navegacion, acciones de actualizar/buscar/agregar, DAG y escudo de alerta se vieron coherentes y legibles en tema claro del SM-A235M/API 34. No se declara cobertura de tema oscuro, fuente ampliada u otros OEM.
 
 ### UI-SYSTEM-BAR-CONTINUITY-01 - Barra superior integrada
 
-- Estado: `Publicado DEV 270; pendiente comprobacion fisica`. Tipo: visual, edge-to-edge y compatibilidad Android. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Estado: `Validado fisicamente en tema claro SM-A235M DEV 270`. Tipo: visual, edge-to-edge y compatibilidad Android. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
 - Problema: la zona de camara puede quedar blanca y cortar un encabezado turquesa/azul.
 - Solucion: barra de estado y zona de recorte toman el color efectivo que exista debajo en cada pantalla; los iconos del sistema cambian entre claros y oscuros para conservar contraste.
 - Resultado en fuente: ambas apps sincronizan edge-to-edge con el destino activo. Inicio prolonga el encabezado azul oscuro y usa iconos claros; activacion, listas y secciones secundarias usan superficie blanca e iconos oscuros. DAG conserva su control de tema propio.
 - Aceptacion: continuidad sin franjas en Usuario/Admin, navegacion, tema y recreacion; no se promete validacion OEM sin dispositivo real y no se modifica la infraestructura de compatibilidad.
+- Evidencia fisica: los dos Home prolongaron el azul oscuro por la zona de camara con iconos claros; Usuarios, Solicitudes, Web, Internet, Cuenta y Ajustes usaron superficie/barra blanca con iconos oscuros, sin franja discordante. Faltan tema oscuro y otros OEM.
 
 ### UI-MOTION-SMOOTH-01 - Movimiento sin saltos
 
-- Estado: `Publicado DEV 270; pendiente comprobacion fisica`. Tipo: UX, animacion y accesibilidad. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Validacion fisica principal en SM-A235M DEV 270; falta reduccion de movimiento`. Tipo: UX, animacion y accesibilidad. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: expansiones, cierres, cambios de seccion, insercion de estados y desplazamiento de contenido usan transiciones sobrias de 200-250 ms, sin rebote ni animacion continua.
 - Resultado en fuente: las tarjetas expandibles de Inicio e Internet eliminan la doble animacion de contenedor/contenido y usan una sola transicion de 220 ms; Apps/Web/Seguridad suaviza cabecera y seleccion sin resortes. Si Android desactiva la escala de animador, estas duraciones pasan a cero.
 - Aceptacion: cerrar tarjetas de Home no produce saltos; `Apps / Web / Seguridad` cambia suavemente; listas conservan posicion y claves estables; reduccion de movimiento de Android elimina o acorta efectos; no se agrega trabajo costoso constante.
+- Evidencia fisica: se abrio y cerro la proteccion de Inicio y se cambiaron Apps/Web/Seguridad sin salto visible; el inventario se desplazo y refresco de forma estable. No se cambio la escala de animacion del telefono.
 
 ### ADMIN-USERS-HUB-UX-02 - Usuarios y alta simplificados
 
-- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Validado fisicamente en SM-A235M DEV 270`. Tipo: UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Alcance: superficie blanca continua, filas icono/texto/flecha y toque completo para abrir detalle; desaparece el menu de tres puntos y sus acciones quedan en el detalle correspondiente. `Agregar usuario` enfoca el primer input.
 - Estado de refresco: junto a `+`, Buscar y el icono circular de actualizar se muestra `Actualizando`, `Actualizado ahora/hace X min` o error persistente. No se reserva un hueco vacio y no aparece otro banner debajo.
 - Resultado en fuente: Usuarios usa una superficie blanca continua, avatar neutro y fila completa con flecha; el archivo permanece en el detalle y se retiro el menu contextual duplicado. El alta solicita foco al campo de nombre y el refresco conserva progreso, error o tiempo relativo en la barra de acciones.
 - Aceptacion: busqueda, archivo, reenlace y recuperacion conservan comportamiento; carga/vacio/error no superponen contenido; iconos siguen `UI-ICON-SYSTEM-01`.
+- Evidencia fisica: lista continua sin menu de tres puntos, toque de fila, foco y teclado en el primer input del alta, y refresco `Actualizando…` -> `Actualizado ahora` persistente en la barra. No se creo ni archivo ningun usuario.
 
 ### ADMIN-USER-SECURITY-BADGES-01 - Indicadores de seguridad con evidencia
 
-- Estado: `Publicado DEV 270; pendiente comprobacion fisica`. Tipo: seguridad visible y UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Estado: `Estado sano y falla roja validados en SM-A235M DEV 270; falta amarillo y limpieza posterior`. Tipo: seguridad visible y UX App Admin. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Semantica: sin icono verde cuando todo esta bien; advertencia amarilla para nunca verificado, `Unknown` o mas de 100 horas sin comunicacion; rojo solo para VPN, Accesibilidad o Device Admin `Disabled`, o posible desinstalacion.
 - Detalle: la fila del Usuario y el segmento `Seguridad` muestran una burbuja roja hasta corregir un problema confirmado. Color, icono y descripcion accesible comunican juntos el estado.
 - Resultado en fuente: el mapeo conserva por separado falla confirmada y verificacion pendiente; lista y encabezado omiten toda marca cuando esta sano y muestran un escudo accesible amarillo/rojo solo por la evidencia definida. El selector `Seguridad` replica el nivel con una burbuja sin convertir todo el boton en alerta.
 - Aceptacion: no confundir atraso con proteccion caida; conservar la regla de posible desinstalacion; una nueva sincronizacion elimina el indicador aplicable sin borrar auditoria.
+- Evidencia fisica: un usuario sano no mostro marca. Al quedar Accessibility realmente inactiva despues del update, el usuario afectado mostro escudo rojo en lista/encabezado, burbuja roja en `Seguridad` y detalle `Accesibilidad: Inactiva`, mientras VPN y antidesinstalacion siguieron activas. No se provoco `Unknown`, 100 horas ni posible desinstalacion.
 
 ### ADMIN-SECONDARY-LISTS-UX-02 - Listas Admin continuas
 
-- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: sistema de listas App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Validacion fisica parcial en SM-A235M DEV 270`. Tipo: sistema de listas App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Alcance: Solicitudes, Avisos, apps, sitios, grupos, horarios y actualizaciones adoptan superficie blanca continua, separadores sutiles, icono, titulo, subtitulo opcional y flecha solo si navega. Switch/boton se conserva para accion directa.
 - Limites: proteccion, licencia, alertas criticas, formularios y tarjetas principales de Home permanecen como estan. No cambia logica, datos ni sincronizacion.
 - Resultado en fuente de esta seccion: Solicitudes integra el refresco circular y su estado persistente en la barra, con selector de usuarios continuo; Avisos usa fondo blanco continuo; apps y filas internas de grupos pierden tarjetas/bloques repetidos y conservan switch, reloj, formularios y acciones directas. Sitios, horarios y actualizaciones se resuelven en los tickets especificos de Web/Ajustes sin tocar `Agregar sitio`.
 - Aceptacion: encabezados/controles fijos donde corresponda, listas sin bloques repetidos, estados de carga/vacio/error coherentes y objetivos tactiles accesibles.
+- Evidencia fisica: Solicitudes sostuvo el estado junto a actualizar; Cuenta y Web usaron filas continuas y jerarquia legible. Quedan Avisos y filas reales de sitios, grupos y horarios para cerrar todos los estados.
 
 ### USER-SECONDARY-LISTS-UX-02 - Solicitudes y Mis apps estables
 
-- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: UX y rendimiento App Usuario. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Estado: `Validacion fisica principal en SM-A235M DEV 270; faltan estados con datos`. Tipo: UX y rendimiento App Usuario. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
 - Solicitudes: icono circular de actualizar y estado persistente en la misma linea; no aparece un banner separado ni queda espacio vacio.
 - Mis apps: titulo, Buscar, Actualizar, estado y filtros permanecen fijos; los filtros bajan a una segunda linea y solo se desplaza el inventario. La lista empieza debajo de controles y termina antes del nav inferior, sin superposicion ni corte abrupto.
 - Rendimiento: conservar la lista nativa reciclable. Refrescar mantiene posicion; cambiar busqueda o filtro vuelve arriba; claves/orden estables evitan saltos.
 - Resultado en fuente: Solicitudes y Mis apps integran progreso, error y tiempo relativo junto al refresco; Mis apps fija busqueda/actualizacion en la primera linea y filtros compactos en la segunda. La lista nativa solo vuelve arriba cuando cambia busqueda o filtro, no durante un refresco del inventario.
 - Aceptacion: superficie blanca continua, ultima fila visible, carga inicial/refresco/error correctos y ninguna alteracion de reglas, medicion o bloqueo.
+- Evidencia fisica: Mis apps mantuvo encabezado, acciones y filtros fijos durante dos desplazamientos largos, sin solaparse con el nav; el refresco con 161 apps conservo el inventario y termino en `Actualizado ahora`. Solicitudes vacia repitio `Actualizando…` -> `Actualizado ahora`. Faltan busqueda/filtros y solicitudes con datos.
 
 ### ADMIN-WEB-SETTINGS-UX-02 - Web y Ajustes Admin
 
-- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: UX App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Validacion fisica principal en SM-A235M DEV 270; faltan sitios configurados`. Tipo: UX App Admin. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Web: resumen compacto y grupos por Navegacion, Busqueda segura, DAG, horarios/limites y sitios; filas continuas, switch directo y flecha solo para navegacion. Estado de refresco queda junto al icono circular.
 - Ajustes: Cuenta/comunidad, Apariencia, Notificaciones, Actualizaciones, Ayuda/privacidad y acciones sensibles mediante grupos con titulo y filas continuas. Acciones destructivas quedan al final y requieren confirmacion.
 - Resultado en fuente: Cuenta/comunidad, licencia y accesos a Panel/Actualizaciones/Ayuda usan grupos blancos continuos con iconos del catalogo. Web simplifica el selector de acceso, alinea switches con iconos y presenta sitios existentes como filas planas, conservando confirmaciones y acciones.
 - Fuera de alcance: `Agregar sitio` no se mueve, rediseña ni recibe foco automatico en este ticket.
+- Evidencia fisica: Web mostro selector compacto, SafeSearch/DAG con iconos y switches, y Cuenta agrupo identidad/licencia y Panel/Actualizaciones/Ayuda en filas continuas. No habia sitios configurados para inspeccionar sus filas; `Agregar sitio` no se modifico ni uso.
 
 ### USER-INTERNET-SETTINGS-UX-02 - Internet y Ajustes Usuario
 
-- Estado: `Publicado DEV 270; pendiente comprobacion visual`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Validacion fisica principal en SM-A235M DEV 270; falta estado degradado de VPN`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Internet conserva una unica pieza panoramica compacta; debajo usa filas de solo lectura para VPN, SafeSearch, modo de resultados, DAG y horario. No muestra switch cuando el Usuario no tiene autoridad; una degradacion ofrece una sola reparacion clara.
 - Ajustes comparte el lenguaje de grupos y filas de Admin, mostrando solo opciones del rol Usuario. Version queda en Actualizaciones; Ayuda reutiliza su flujo; acciones sensibles aparecen al final.
 - Resultado en fuente: Internet usa una unica pieza panoramica compacta y una lista blanca de VPN, SafeSearch, resultados, DAG y horario; solo VPN degradada ofrece Reparar. Ajustes integra estado, version, activacion y Ayuda como filas continuas, preservando como bloques los formularios y flujos de instalacion complejos.
 - Aceptacion: lenguaje no tecnico, estados reales, superficie blanca continua, navegacion/Volver coherentes y sin cambiar politica remota.
+- Evidencia fisica: Internet mostro una pieza panoramica compacta y filas legibles de VPN activa, SafeSearch, Solo resultados y DAG; Ajustes mostro actualizacion, version 270, activacion y Ayuda, conservando Codigo de emergencia como bloque complejo. No se desactivo VPN para probar Reparar.
 
 ### USER-DAG-LAUNCHER-PREFERENCE-01 - DAG como app separada opcional
 
-- Estado: `Publicado DEV 270; pendiente comprobacion fisica`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Validado fisicamente en SM-A235M DEV 270`. Tipo: UX App Usuario. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Internet muestra el switch local `DAG como app separada` solo cuando DAG esta habilitado y contemplado por la licencia. El valor predeterminado es activo para conservar el comportamiento de instalaciones existentes.
 - Al apagarlo se oculta unicamente la entrada independiente del launcher Android; DAG sigue disponible dentro de Content Filter y no se modifica ninguna politica remota, permiso, paquete ni APK adicional.
 - Implementacion: la actividad interna queda siempre habilitada y un `activity-alias` separado controla solo el icono externo; al actualizar tambien se repara el estado deshabilitado que pudiera conservar el componente historico.
@@ -525,6 +535,7 @@ Flujo de una entrada:
 - Comportamiento: encendido muestra el launcher independiente existente; apagado lo oculta pero DAG sigue accesible desde Usuario. No instala otro APK ni cambia permiso, historial, consumo, reglas o actualizaciones.
 - Autoridad: Admin/licencia prevalecen y ocultan DAG cuando no esta permitido. Al reabrir, se restaura la preferencia local; usuarios existentes comienzan encendidos para evitar una desaparicion inesperada.
 - Aceptacion: cambio reversible sin reinicio/reinstalacion, acceso interno siempre coherente y launcher historico sin bypass cuando DAG esta cerrado.
+- Evidencia fisica: el switch comenzo encendido; al apagarlo PackageManager quito solo `DagLauncherAlias` y DAG siguio abriendo desde Internet. Al reencenderlo el alias reaparecio; la preferencia quedo restaurada y no cambiaron permisos, reglas ni APK.
 
 ### UI-BANNER-UNIFY-01 - Feedback premium compartido
 
@@ -591,11 +602,12 @@ Flujo de una entrada:
 
 ### ANDROID-PHYSICAL-CLOSEOUT-01 - Cierre agrupado sin publicaciones intermedias
 
-- Estado: `Cierre parcial SM-A235M ampliado correctamente en DEV 248; quedan recorridos especificos y SM-S908E`; aprobado explicitamente el 2026-07-16. El telefono auxiliar estuvo disponible despues de la publicacion.
+- Estado: `Cierre parcial SM-A235M ampliado correctamente en DEV 270; quedan recorridos especificos y SM-S908E`; aprobado explicitamente el 2026-07-16. El telefono auxiliar estuvo disponible despues de la publicacion.
 - Tipo: QA Android, compatibilidad y cierre de candidatos. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Alcance automatizado completado: tests, ktlint, detekt, lint y builds DEV de Usuario/Admin pasaron localmente con el mismo versionCode. La unica publicacion DEV termino correctamente; manifiestos y APK publicos 246 coinciden en version, paquetes, `minSdk 29`, firma y SHA-256.
 - Alcance fisico planificado: banners y fuentes/modo oscuro; actualizacion Usuario/Admin; Play Store/APK/aprobacion; bypass rapido Accessibility; licencia/renovacion; estados DAG candidatos y notificacion push. Cada recorrido se declara solo cuando existe evidencia en el dispositivo correspondiente.
 - Evidencia fisica SM-A235M: actualizacion in-place 245 a 246 de ambas apps; firma/datos y las tres protecciones preservados; banner premium, campana Admin y header fijo correctos; ficha y control de fuentes desconocidas Admin accesibles; ficha Usuario y ruta hacia el interruptor Accessibility interceptadas. DAG cargo desde Historial varias imagenes seguras de Wikipedia sin consumir Brave.
+- Evidencia fisica DEV 270/API 34: actualizacion in-place de ambas apps con datos y activacion preservados; Android apago Accessibility y la recuperacion guiada/alerta Admin roja respondieron de forma coherente, mientras VPN y Device Admin siguieron activos. Se recorrieron las secciones principales de Usuario/Admin, refrescos persistentes, scroll largo, barras del sistema y el switch reversible de DAG sin crash ni ANR.
 - Pendiente fisico: repetir la instalacion iniciada dentro de cada app cuando exista 247 o superior; flujo Play Store/APK/aprobacion; licencia/renovacion; `Mas resultados`; aprobaciones/rechazos DAG y push; calibracion visual sensible; recorrido determinante en SM-S908E.
 - Aceptacion: matriz automatizada y CI correctos; publicacion DEV unica; manifiestos/hashes verificables; una lista reproducible conserva cada recorrido fisico pendiente para el proximo acceso al Samsung.
 
