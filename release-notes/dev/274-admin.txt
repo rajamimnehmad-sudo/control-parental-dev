@@ -1,0 +1,2 @@
+Esta actualización acompaña la mejora de velocidad segura y la corrección de entrega de Calibración DAG de App Usuario.
+No cambia reglas, usuarios ni configuraciones administradas.
