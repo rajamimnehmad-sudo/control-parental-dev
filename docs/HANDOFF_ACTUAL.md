@@ -86,6 +86,13 @@ Admin   ee44aa950b50fc3a80fa4520192e91eb147ee6eba61b9e1e2febbc95966cc25e
 - Verificacion externa: ambos manifiestos publicos declaran 270 y sus APK recalculan exactamente los SHA-256 de este handoff. `aapt` confirma paquetes `com.contentfilter.user.dev` y `com.contentfilter.admin.dev`, `minSdk 29` y `targetSdk 36`; `apksigner` confirma el certificado historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 - Cobertura publicada: listas continuas, estados persistentes, indicadores de seguridad, Web/Ajustes, barras del sistema, movimiento, preferencia local del launcher DAG y aviso Admin ordinario despues de 100 horas. Sin telefono conectado, los recorridos visuales, reposo prolongado y cache del launcher OEM siguen pendientes de prueba fisica.
 
+## Candidato DEV 271 - interaccion Web y CAPTCHA general - 2026-07-21
+
+- `DAG-WEB-INTERACTION-02`: se corrigio el recorrido profundo que el observador DOM repetia ante cada cambio de clase o estilo. Las mutaciones de atributos revisan solo el nodo afectado; los subarboles nuevos y el documento inicial conservan inspeccion profunda. Zara Argentina es la referencia funcional para menus dinamicos.
+- `DAG-CAPTCHA-01`: la excepcion deja de depender de una unica URL de CABA. Dentro de paginas HTTPS ya permitidas por DAG se aceptan solamente iframes HTTPS con rutas cerradas de Google reCAPTCHA, hCaptcha o Cloudflare Turnstile; el resto de los iframes sigue bloqueado.
+- No se habilitaron iframes generales, video, audio ni canvas; no se relajaron la clasificacion local de imagenes ni las decisiones de pagina.
+- Validacion automatica local: tests unitarios DEV de App Usuario y ktlint correctos. Pendiente CI completo, publicacion DEV y comprobacion funcional en Zara y MiBA/CAPTCHA.
+
 ## Validacion fisica DEV 270 en Samsung SM-A235M - 2026-07-21
 
 - Los APK publicos DEV 270 se instalaron in-place en el Samsung SM-A235M `R58T34V31AE`, Android 14/API 34, sin borrar datos. App Usuario y App Admin conservaron activacion, sesion y datos; el telefono confirma `versionCode 270` y `versionName 1.0.1-dev` en ambos paquetes.
