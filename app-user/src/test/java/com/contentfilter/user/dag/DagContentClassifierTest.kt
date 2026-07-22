@@ -121,6 +121,17 @@ class DagContentClassifierTest {
     }
 
     @Test
+    fun `uncertain searches remain eligible for result filtering`() {
+        listOf(
+            "educación sexual médica",
+            "sexual health education",
+            "הלכה רפואה מין",
+        ).forEach { query ->
+            assertTrue(classifier.classifyQuery(query).decision != DagClassification.Blocked, query)
+        }
+    }
+
+    @Test
     fun `known blocked domain overrides harmless metadata`() {
         blockedDomains["unsafe.example"] = "adult"
 

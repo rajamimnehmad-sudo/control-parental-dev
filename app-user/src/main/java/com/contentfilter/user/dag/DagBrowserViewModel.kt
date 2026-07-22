@@ -227,8 +227,8 @@ class DagBrowserViewModel
             val normalizedQuery = query.trim().take(MaxAddressCharacters)
             if (!mutableState.value.dagEnabled || normalizedQuery.isBlank()) return
             val classification = classifier.classifyQuery(normalizedQuery)
-            when (classification.decision) {
-                DagClassification.Blocked -> {
+            when (dagQueryAction(classification.decision)) {
+                DagQueryAction.Block -> {
                     cancelActiveSearch()
                     mutableState.update {
                         it.copy(
@@ -241,20 +241,7 @@ class DagBrowserViewModel
                         )
                     }
                 }
-                DagClassification.Uncertain -> {
-                    cancelActiveSearch()
-                    mutableState.update {
-                        it.copy(
-                            view = DagView.Start,
-                            loading = false,
-                            message = "DAG no tiene suficiente certeza. Reformulá la búsqueda con más contexto.",
-                            results = emptyList(),
-                            suggestions = emptyList(),
-                            reviewCandidate = null,
-                        )
-                    }
-                }
-                DagClassification.Allowed -> performSearch(normalizedQuery)
+                DagQueryAction.Search -> performSearch(normalizedQuery)
             }
         }
 
@@ -987,6 +974,14 @@ internal fun dagCanLoadMoreResults(
     page: Int,
     providerHasMoreResults: Boolean,
 ): Boolean = page == 0 && providerHasMoreResults
+
+internal enum class DagQueryAction {
+    Block,
+    Search,
+}
+
+internal fun dagQueryAction(decision: DagClassification): DagQueryAction =
+    if (decision == DagClassification.Blocked) DagQueryAction.Block else DagQueryAction.Search
 
 internal fun AccessRequest.isPendingDagReviewFor(domain: String): Boolean {
     val requestDomain = (targetDomain ?: target).lowercase(Locale.ROOT).removePrefix("www.").removeSuffix(".")
