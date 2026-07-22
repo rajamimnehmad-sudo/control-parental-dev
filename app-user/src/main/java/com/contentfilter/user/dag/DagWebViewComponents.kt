@@ -1040,9 +1040,11 @@ internal object DagDomSecurityBatchPolicy {
     const val MaximumNodesPerFrame = 48
 }
 
-internal fun dagDomSecurityBatchCount(nodeCount: Int): Int =
-    if (nodeCount <= 0) 0 else (nodeCount + DagDomSecurityBatchPolicy.MaximumNodesPerFrame - 1) /
+internal fun dagDomSecurityBatchCount(nodeCount: Int): Int {
+    if (nodeCount <= 0) return 0
+    return (nodeCount + DagDomSecurityBatchPolicy.MaximumNodesPerFrame - 1) /
         DagDomSecurityBatchPolicy.MaximumNodesPerFrame
+}
 
 private fun String?.decodeJavascriptString(): String? {
     if (this == null || this == "null") return null
