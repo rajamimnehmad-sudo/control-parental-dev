@@ -1,0 +1,2 @@
+Esta actualización acompaña las mejoras de compatibilidad, CAPTCHA y velocidad local de DAG en App Usuario.
+No cambia reglas, usuarios ni configuraciones administradas.

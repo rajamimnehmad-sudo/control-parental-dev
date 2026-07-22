@@ -1,0 +1,3 @@
+DAG carga y analiza las fotos visibles con mayor prioridad y concurrencia local limitada.
+Los menús y controles dinámicos de páginas como Zara responden sin recorridos innecesarios del contenido.
+Los CAPTCHA seguros de reCAPTCHA, hCaptcha y Cloudflare Turnstile funcionan dentro de páginas permitidas.
