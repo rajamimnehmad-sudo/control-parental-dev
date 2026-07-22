@@ -112,6 +112,7 @@ Admin   9fe20c90894c2eecf8151cd44db34122fcf2dbd80318c8bcc11a769b8b664a9d
 - `DAG-SEARCH-CONTINUITY-03`: una consulta `Uncertain` ya no se cancela ni pide reformular. Continúa una sola vez hacia el proveedor y conserva el filtrado local de cada resultado y el analisis preventivo de cada pagina. Las decisiones `Blocked` por reglas duras o evidencia explicita siguen cerrando antes de consumir Brave.
 - Baseline fisica SM-S908E con APK publica 271: la consulta de control incierta se detuvo con `DAG no tiene suficiente certeza`, confirmando la causa previa al cambio. Pruebas unitarias dirigidas y `ktlintCheck` Usuario correctos; falta publicar el lote 272 y repetir el recorrido exacto.
 - `DAG-PROTECTED-MODE-UX-04`: al abrir una pagina preventivamente se retiro `Abierto con proteccion adicional`. No era una accion ni una capa distinta; DAG conserva analisis visual, bloqueo de video/descargas/ventanas y evita cachear una aprobacion completa. Los estados accionables siguen visibles.
+- `DAG-WEB-INTERACTION-03`: el saneamiento de subarboles dinamicos deja de recorrer todo dentro del callback del `MutationObserver`. Deduplica nodos y procesa hasta 48 por cuadro; las barreras inmediatas por CSS/intercepcion siguen cerradas. Prueba unitaria del presupuesto y controles Usuario correctos; falta medir y recorrer Zara con el APK 272.
 
 ## Validacion fisica DEV 270 en Samsung SM-A235M - 2026-07-21
 
