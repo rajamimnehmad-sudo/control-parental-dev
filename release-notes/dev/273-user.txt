@@ -1,0 +1,2 @@
+Los CAPTCHA compatibles completan mejor su carga y responden dentro de una sesión temporal protegida.
+Los reintentos pendientes de Calibración DAG vuelven a iniciarse correctamente después de cerrar o reiniciar la app.
