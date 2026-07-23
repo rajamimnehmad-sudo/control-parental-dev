@@ -85,6 +85,12 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 - Build local `assembleDevDebug` correcto. PR #59 fusionado en `main`; publicacion selectiva Usuario DEV `30043838543` correcta en 5m02s. No se uso el celular de prueba, no se modifico Admin y no se invoco Production.
 - Verificacion externa: el manifiesto publico declara 278, el APK descargado confirma paquete `com.contentfilter.user.dev`, versionCode 278 y SHA-256 `e7b99d1fbc3b257ea6541f51301ceff4ddd5cb5d287522d6d7af0bfdb5e6c6ce`. Admin permanece en 275 con su SHA-256 anterior.
 
+## Candidato local DAG-UX-POLISH-04 - no publicado - 2026-07-23
+
+- Pulido limitado a tres archivos Compose de DAG: objetivos tactiles uniformes, barra y dirección mas legibles, mejor jerarquia de Home/resultados/mensajes/historial/revisiones, sugerencias accesibles y cierre evidente del selector existente.
+- No cambia comportamiento, ViewModel, WebView, filtros, clasificacion, red, Brave, permisos, pestañas ni rendimiento. `ktlintCheck`, unitarios DEV y `assembleDevDebug` Usuario correctos.
+- Por pedido explicito del usuario no se incremento `versionCode`, no se uso dispositivo y no se publico APK. La version publica real continua siendo Usuario 278 y Admin 275.
+
 ## Publicacion Usuario DEV 277 - optimizacion integral DAG - 2026-07-23
 
 - Se optimizo el recorrido completo de pagina e imagenes sin permitir contenido antes de decidirlo: clasificacion monotona por dominio, URL, titulo y texto; reglas explicitas siempre prioritarias; evaluacion neuronal solo cuando puede elevar el riesgo; y preparacion unica del viewport sin sondeo artificial de fotos. Cada raster sigue interceptado, descargado por HTTPS con defensa SSRF, clasificado localmente y reemplazado por un recurso neutro ante duda, error o cancelacion.

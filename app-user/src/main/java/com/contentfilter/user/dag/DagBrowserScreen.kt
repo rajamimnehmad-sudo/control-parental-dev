@@ -295,29 +295,39 @@ private fun DagBrowserContent(
         ) {
             if (state.view == DagView.Start) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.End,
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(56.dp)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
+                    Text(
+                        "DAG",
+                        modifier = Modifier.weight(1f).padding(start = 8.dp),
+                        style = MaterialTheme.typography.titleMedium,
+                    )
                     TextButton(
                         onClick = ::newTab,
                         enabled =
                             tabs.size < MaximumTabs ||
                                 viewModel.captureTab().isEmptyTab() ||
                                 tabs.any { it.snapshot.isEmptyTab() },
-                        modifier = Modifier.width(44.dp).semantics { contentDescription = "Nueva pestaña" },
+                        modifier = Modifier.width(48.dp).semantics { contentDescription = "Nueva pestaña" },
                     ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
                     TextButton(
                         onClick = {
                             persistActiveTab()
                             tabsExpanded = true
                         },
-                        modifier = Modifier.width(44.dp).semantics { contentDescription = "Pestañas: ${tabs.size}" },
-                    ) { Text(tabs.size.toString()) }
+                        modifier = Modifier.width(48.dp).semantics { contentDescription = "Pestañas: ${tabs.size}" },
+                    ) { Text(tabs.size.toString(), style = MaterialTheme.typography.labelLarge) }
                     Box {
                         TextButton(
                             onClick = { menuExpanded = true },
-                            modifier = Modifier.width(44.dp).semantics { contentDescription = "Menú de DAG" },
+                            modifier = Modifier.width(48.dp).semantics { contentDescription = "Menú de DAG" },
                         ) { Text("⋮", style = MaterialTheme.typography.headlineSmall) }
                         DropdownMenu(expanded = menuExpanded, onDismissRequest = { menuExpanded = false }) {
                             DropdownMenuItem(
@@ -394,13 +404,18 @@ private fun DagBrowserContent(
             }
             if (state.view != DagView.Start) {
                 Row(
-                    modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(2.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .background(MaterialTheme.colorScheme.surface)
+                            .padding(horizontal = 2.dp),
+                    horizontalArrangement = Arrangement.spacedBy(0.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     TextButton(
                         onClick = viewModel::showStart,
-                        modifier = Modifier.width(40.dp).semantics { contentDescription = "Inicio" },
+                        modifier = Modifier.width(48.dp).semantics { contentDescription = "Inicio" },
                     ) {
                         Text("⌂", style = MaterialTheme.typography.titleLarge)
                     }
@@ -428,7 +443,7 @@ private fun DagBrowserContent(
                             },
                             readOnly = analyzing,
                             singleLine = true,
-                            textStyle = MaterialTheme.typography.bodySmall,
+                            textStyle = MaterialTheme.typography.bodyMedium,
                             shape = RoundedCornerShape(26.dp),
                             colors =
                                 OutlinedTextFieldDefaults.colors(
@@ -445,10 +460,14 @@ private fun DagBrowserContent(
                                                 alpha = 0.10f,
                                             )
                                         } else {
-                                            Color.Transparent
+                                            MaterialTheme.colorScheme.surface
                                         },
                                     unfocusedContainerColor =
-                                        if (analyzing) DagNeonViolet.copy(alpha = 0.08f) else Color.Transparent,
+                                        if (analyzing) {
+                                            DagNeonViolet.copy(alpha = 0.08f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surface
+                                        },
                                 ),
                             keyboardOptions =
                                 androidx.compose.foundation.text.KeyboardOptions(
@@ -466,7 +485,7 @@ private fun DagBrowserContent(
                             tabs.size < MaximumTabs ||
                                 viewModel.captureTab().isEmptyTab() ||
                                 tabs.any { it.snapshot.isEmptyTab() },
-                        modifier = Modifier.width(40.dp).semantics { contentDescription = "Nueva pestaña" },
+                        modifier = Modifier.width(48.dp).semantics { contentDescription = "Nueva pestaña" },
                     ) { Text("＋", style = MaterialTheme.typography.titleLarge) }
                     Box {
                         TextButton(
@@ -477,14 +496,14 @@ private fun DagBrowserContent(
                             },
                             modifier =
                                 Modifier
-                                    .width(40.dp)
+                                    .width(48.dp)
                                     .semantics { contentDescription = "Pestañas: ${tabs.size}" },
-                        ) { Text(tabs.size.toString()) }
+                        ) { Text(tabs.size.toString(), style = MaterialTheme.typography.labelLarge) }
                     }
                     Box {
                         TextButton(
                             onClick = { menuExpanded = true },
-                            modifier = Modifier.width(40.dp).semantics { contentDescription = "Menú de DAG" },
+                            modifier = Modifier.width(48.dp).semantics { contentDescription = "Menú de DAG" },
                         ) {
                             Text("⋮", style = MaterialTheme.typography.headlineSmall)
                         }
@@ -612,9 +631,10 @@ private fun DagBrowserContent(
 
             if (state.message.isNotBlank() && !analyzing) {
                 Surface(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    shape = RoundedCornerShape(16.dp),
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+                    shape = RoundedCornerShape(14.dp),
                     color = MaterialTheme.colorScheme.surfaceContainer,
+                    tonalElevation = 1.dp,
                 ) {
                     Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp)) {
                         Text(state.message, style = MaterialTheme.typography.bodyMedium)
