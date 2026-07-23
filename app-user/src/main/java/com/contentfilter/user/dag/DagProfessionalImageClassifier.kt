@@ -56,6 +56,10 @@ internal class DagProfessionalImageClassifier(
 
     internal fun isAvailable(): Boolean = supportsOnnxRuntime()
 
+    internal fun prepare() {
+        if (supportsOnnxRuntime()) model()
+    }
+
     private fun Bitmap.toModelInput(): FloatArray {
         val side = minOf(width, height)
         val cropped = Bitmap.createBitmap(this, (width - side) / 2, (height - side) / 2, side, side)

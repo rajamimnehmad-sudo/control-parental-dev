@@ -46,6 +46,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.contentfilter.user.BuildConfig
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import java.util.concurrent.atomic.AtomicLong
 
@@ -109,6 +113,11 @@ internal fun DagWebContent(
         if (!state.dagEnabled) {
             webView?.stopLoading()
             webView?.loadUrl("about:blank")
+        }
+    }
+    LaunchedEffect(imageClassifiers) {
+        withContext(Dispatchers.Default) {
+            imageClassifiers.map { classifier -> async { classifier.prepare() } }.awaitAll()
         }
     }
     LaunchedEffect(webView, state.navigationRevision, state.requestedUrl) {

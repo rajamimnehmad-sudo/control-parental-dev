@@ -69,6 +69,15 @@ internal class DagImageClassifier(
 
     fun exactDecision(imageHash: String): DagImageDecision? = calibrationStore.exactDecision(imageHash)
 
+    fun prepare() {
+        synchronized(lock) {
+            runCatching {
+                professionalClassifier.prepare()
+                modestyClassifier.prepare()
+            }
+        }
+    }
+
     fun classify(
         bytes: ByteArray,
         mimeType: String?,

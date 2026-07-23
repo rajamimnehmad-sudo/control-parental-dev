@@ -177,7 +177,11 @@ internal class DagImageResourceLoader(
                     )
                 }
             val calibrationThumbnail =
-                if (measuredClassification.scores.isNotEmpty()) dagCalibrationThumbnail(bytes) else null
+                if (shouldCreateCalibrationThumbnail(measuredClassification, devCalibrationRevealEnabled.get())) {
+                    dagCalibrationThumbnail(bytes)
+                } else {
+                    null
+                }
             val classification =
                 calibrationThumbnail
                     ?.let { calibrationClassifier.exactDecision(it.dagCalibrationHash()) }
@@ -377,6 +381,13 @@ internal class DagImageResourceLoader(
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }
 }
+
+internal fun shouldCreateCalibrationThumbnail(
+    classification: DagImageClassification,
+    calibrationRevealEnabled: Boolean,
+): Boolean =
+    classification.scores.isNotEmpty() &&
+        (classification.decision == DagImageDecision.Uncertain || calibrationRevealEnabled)
 
 internal data class DagManualCalibrationCandidate(
     val thumbnail: ByteArray,

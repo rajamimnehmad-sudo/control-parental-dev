@@ -1,0 +1,2 @@
+DAG prepara sus modelos visuales mientras carga la página y evita generar miniaturas de calibración para fotos permitidas.
+La clasificación sigue siendo local y conserva las mismas decisiones, umbrales y barreras de seguridad.
