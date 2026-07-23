@@ -37,4 +37,15 @@ class DagSearchSuggestionsTest {
     fun `blank input has no suggestions`() {
         assertTrue(dagSearchSuggestionCandidates("  ", emptyList()).isEmpty())
     }
+
+    @Test
+    fun `live local catalog suggests without history`() {
+        assertTrue(dagSearchSuggestionCandidates("frav", emptyList()).contains("Frávega electrodomésticos"))
+    }
+
+    @Test
+    fun `safe spelling proposes a close correction`() {
+        assertEquals("fravega", dagDidYouMeanSuggestion("frabega"))
+        assertEquals(null, dagDidYouMeanSuggestion("fravega"))
+    }
 }

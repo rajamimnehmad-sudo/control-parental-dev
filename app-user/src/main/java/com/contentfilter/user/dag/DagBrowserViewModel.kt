@@ -141,6 +141,21 @@ class DagBrowserViewModel
                 }
         }
 
+        fun beginAddressEdit() {
+            val state = mutableState.value
+            if (!state.loading && state.pageStatus != DagPageStatus.Loading) return
+            cancelActiveSearch()
+            mutableState.update {
+                it.toDagStart().copy(
+                    address = "",
+                    loading = false,
+                    analysisProgress = 0f,
+                    suggestions = emptyList(),
+                    message = "",
+                )
+            }
+        }
+
         internal fun submitDagCalibrationCandidate(
             thumbnail: ByteArray,
             classification: DagImageClassification,

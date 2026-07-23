@@ -51,6 +51,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicLong
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -68,6 +69,7 @@ internal fun DagWebContent(
     onManualCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit,
     onManualBlurReviewCandidate: (ByteArray, DagImageClassification) -> Unit,
     onBlockedAction: (String) -> Unit,
+    onGeolocationPrompt: (String, (Boolean) -> Unit) -> Unit,
     onPageBlocked: (String) -> Unit,
     onRendererGone: () -> Unit,
     onWebViewChanged: (WebView?) -> Unit,
@@ -83,6 +85,7 @@ internal fun DagWebContent(
     val currentManualBlurReviewCandidate by rememberUpdatedState(onManualBlurReviewCandidate)
     val currentVisualCalibrationEnabled by rememberUpdatedState(visualCalibrationEnabled)
     val currentExtraKosherEnabled by rememberUpdatedState(state.dagExtraKosherEnabled)
+    val currentGeolocationPrompt by rememberUpdatedState(onGeolocationPrompt)
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val imageLoader =
@@ -211,7 +214,13 @@ internal fun DagWebContent(
                         setAcceptCookie(true)
                         setAcceptThirdPartyCookies(dagWebView, false)
                     }
-                    webChromeClient = DagChromeClient(onBlockedAction)
+                    webChromeClient =
+                        DagChromeClient(
+                            onBlocked = onBlockedAction,
+                            onGeolocationPrompt = { origin, decision ->
+                                currentGeolocationPrompt(origin, decision)
+                            },
+                        )
 
                     fun prepareViewport(
                         view: WebView,
@@ -375,6 +384,7 @@ private fun WebView.configureDagSettings(
     settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
     settings.cacheMode = WebSettings.LOAD_DEFAULT
     settings.safeBrowsingEnabled = true
+    settings.setGeolocationEnabled(true)
 }
 
 private fun WebView.setDagImageCalibrationDecision(
@@ -471,6 +481,7 @@ private val DagDocumentStartScript =
 
 private class DagChromeClient(
     private val onBlocked: (String) -> Unit,
+    private val onGeolocationPrompt: (String, (Boolean) -> Unit) -> Unit,
 ) : WebChromeClient() {
     override fun onPermissionRequest(request: PermissionRequest) {
         request.deny()
@@ -481,8 +492,14 @@ private class DagChromeClient(
         origin: String?,
         callback: GeolocationPermissions.Callback?,
     ) {
-        callback?.invoke(origin, false, false)
-        onBlocked("La ubicación está bloqueada en DAG.")
+        val safeOrigin = origin?.takeIf { it.startsWith("https://", ignoreCase = true) }
+        if (safeOrigin == null || callback == null) {
+            callback?.invoke(origin, false, false)
+            return
+        }
+        onGeolocationPrompt(safeOrigin) { allowed ->
+            callback.invoke(safeOrigin, allowed, false)
+        }
     }
 
     override fun onShowFileChooser(
@@ -588,6 +605,16 @@ private class DagWebViewClient(
         request: WebResourceRequest,
     ): WebResourceResponse? {
         if (captchaSessionActive() && isDagCaptchaSessionResourceUrl(request.url.toString())) return null
+        if (dagShouldBlockAdRequest(request.url.toString(), request.isForMainFrame)) {
+            return WebResourceResponse(
+                "text/plain",
+                "utf-8",
+                204,
+                "No Content",
+                emptyMap(),
+                ByteArrayInputStream(ByteArray(0)),
+            )
+        }
         return imageLoader.intercept(request, pageUrlTracker.current())
     }
 }

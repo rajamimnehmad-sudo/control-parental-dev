@@ -405,7 +405,7 @@ class DagHistoryStore
             private const val TagLengthBits = 128
             private const val MaxEntries = 200
             private const val MaxPageApprovals = 200
-            private const val MaxSavedTabs = 8
+            private const val MaxSavedTabs = 50
             private const val MaxSavedResults = 20
             private const val PageApprovalLifetimeMillis = 7L * 24L * 60L * 60L * 1_000L
             private const val MaxValueCharacters = 2_048

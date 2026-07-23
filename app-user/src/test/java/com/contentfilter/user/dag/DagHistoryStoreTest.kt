@@ -113,4 +113,22 @@ class DagHistoryStoreTest {
         assertEquals(false, DagTabSnapshot(view = DagView.History).isEmptyTab())
         assertEquals(false, DagTabSnapshot(requestedUrl = "https://example.com").isEmptyTab())
     }
+
+    @Test
+    fun `tab session persists at most fifty suspended tabs`() {
+        val tabs =
+            (1..55).map { index ->
+                DagSavedTab(
+                    id = "tab-$index",
+                    snapshot = DagTabSnapshot(address = "consulta $index", view = DagView.Results),
+                    lastUsedAtEpochMillis = index.toLong(),
+                )
+            }
+        val decoded =
+            DagHistoryStore.decodeTabSession(
+                DagHistoryStore.encodeTabSession(DagSavedTabSession(activeTabId = "tab-1", tabs = tabs)),
+            )
+
+        assertEquals(50, decoded.tabs.size)
+    }
 }
