@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-22
+Fecha de corte: 2026-07-23
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -50,10 +50,10 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-22:
+Version publicada real al 2026-07-23:
 
 ```text
-App Usuario versionCode 275
+App Usuario versionCode 277
 App Admin versionCode 275
 versionName 1.0.1-dev
 ```
@@ -68,16 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-275-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-277-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-275-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario b549a7e12fc2486acf1dd82fa425e72f3dfd42e9f92c08cdb4d8da13c76736aa
+Usuario 09a6cb91af46ec2e6d55d0b9f57eaf2891ecb0ad0c8dea0bb079ada158d136b2
 Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ```
+
+## Publicacion Usuario DEV 277 - optimizacion integral DAG - 2026-07-23
+
+- Se optimizo el recorrido completo de pagina e imagenes sin permitir contenido antes de decidirlo: clasificacion monotona por dominio, URL, titulo y texto; reglas explicitas siempre prioritarias; evaluacion neuronal solo cuando puede elevar el riesgo; y preparacion unica del viewport sin sondeo artificial de fotos. Cada raster sigue interceptado, descargado por HTTPS con defensa SSRF, clasificado localmente y reemplazado por un recurso neutro ante duda, error o cancelacion.
+- Se corrigio de forma general la compatibilidad con layouts y controles dinamicos, sin excepciones por comercio. Zara abre menu y acordeones; Cheeky abre menu y submenu; Fravega responde a controles y entrega fotos. Una insercion dinamica de contenido sexual fue bloqueada en la misma pagina, confirmando que la optimizacion no omite el analisis posterior.
+- Mediciones fisicas comparables en SM-A235M: Fravega fria hasta pagina visible `781 ms` (`630 ms` hasta texto y `148 ms` de clasificacion); Cheeky fria con evaluacion neuronal `1.097 ms`; Zara `1.082 ms`; Mi Argentina `650 ms`. Son muestras operativas sensibles a red y cache, no percentiles de laboratorio.
+- La memoria se mantuvo acotada despues de navegar varias paginas: aproximadamente 497 MiB PSS en primer plano y 455 MiB en segundo plano, con una sola Activity/WebView y sin crash ni OOM. Se retiro la depuracion WebView del artefacto final.
+- Validacion final local de App Usuario: `ktlintCheck`, unitarios y `assembleDevDebug` completaron 694 tareas correctamente. PR #57 fue fusionado en `main` mediante commit `5146c311123b116a95e0e44a2b59036cd91fdf80`; Android CI `30040131065` y publicacion selectiva Usuario DEV `30040663025` finalizaron correctamente.
+- Verificacion externa: el manifiesto Usuario declara versionCode 277 y el APK publico recalcula SHA-256 `09a6cb91af46ec2e6d55d0b9f57eaf2891ecb0ad0c8dea0bb079ada158d136b2`; `aapt` confirma paquete `com.contentfilter.user.dev`, versionName `1.0.1-dev`, minSdk 29 y targetSdk 36. `apksigner` confirma el certificado DEV historico `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
+- El APK Usuario publico exacto se instalo in-place en el SM-A235M, conservo `firstInstallTime`, inicio correctamente y no expuso socket de depuracion WebView. Admin permanecio en 275 y su APK publico conserva exactamente el SHA-256 anterior. El workflow invocado fue el publicador DEV con `target=user`; no se invoco ningun flujo ni recurso de Production.
 
 ## Flujo selectivo Android - activo - 2026-07-22
 
