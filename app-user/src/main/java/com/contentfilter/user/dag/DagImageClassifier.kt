@@ -12,6 +12,10 @@ import java.io.FileInputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.channels.FileChannel
+import java.security.MessageDigest
+import java.util.LinkedHashMap
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.FutureTask
 import kotlin.math.max
 
 internal enum class DagImageDecision {
@@ -28,6 +32,89 @@ internal data class DagImageClassification(
     val signals: Set<String> = emptySet(),
     val calibrationVersion: Long = 0,
 )
+
+internal class DagSharedImageClassifiers(
+    context: Context,
+) : Closeable {
+    internal val professional = DagProfessionalImageClassifier(context.applicationContext)
+    internal val modesty = DagModestyImageClassifier(context.applicationContext)
+    private val lifecycleLock = Any()
+    private val classificationCacheLock = Any()
+    private val classificationCache = LinkedHashMap<String, DagImageClassification>(32, 0.75f, true)
+    private val classificationsInFlight = ConcurrentHashMap<String, FutureTask<DagImageClassification>>()
+    private var closed = false
+
+    fun prepare() {
+        synchronized(lifecycleLock) {
+            if (closed) return
+            prepareDagSharedImageClassifiers(
+                prepareProfessional = professional::prepare,
+                prepareModesty = modesty::prepare,
+            )
+        }
+    }
+
+    override fun close() {
+        synchronized(lifecycleLock) {
+            if (closed) return
+            closed = true
+            professional.close()
+            modesty.close()
+        }
+        classificationsInFlight.clear()
+        synchronized(classificationCacheLock) {
+            classificationCache.clear()
+        }
+    }
+
+    internal fun classifyOnce(
+        key: String,
+        classify: () -> DagImageClassification,
+    ): DagImageClassification {
+        synchronized(classificationCacheLock) {
+            classificationCache[key]?.let { return it }
+        }
+        val candidate = FutureTask(classify)
+        val existing = classificationsInFlight.putIfAbsent(key, candidate)
+        val selected = existing ?: candidate
+        if (existing == null) candidate.run()
+        val result =
+            try {
+                selected.get()
+            } catch (error: InterruptedException) {
+                Thread.currentThread().interrupt()
+                DagImageClassification(DagImageDecision.Uncertain)
+            } catch (_: Exception) {
+                DagImageClassification(DagImageDecision.Uncertain)
+            } finally {
+                if (existing == null) classificationsInFlight.remove(key, candidate)
+            }
+        if (result.scores.isNotEmpty()) {
+            synchronized(classificationCacheLock) {
+                classificationCache[key] = result
+                while (classificationCache.size > MaximumCachedClassifications) {
+                    classificationCache.entries.iterator().run {
+                        next()
+                        remove()
+                    }
+                }
+            }
+        }
+        return result
+    }
+
+    private companion object {
+        const val MaximumCachedClassifications = 128
+    }
+}
+
+internal fun prepareDagSharedImageClassifiers(
+    prepareProfessional: () -> Unit,
+    prepareModesty: () -> Unit,
+) {
+    runCatching(prepareProfessional)
+    runCatching(prepareModesty)
+}
 
 internal fun dagImageDecision(
     unsafeScore: Float,
@@ -56,25 +143,40 @@ internal fun dagEnsembleImageDecision(
     legacy: DagImageDecision,
 ): DagImageDecision = if (professional != DagImageDecision.Uncertain) professional else legacy
 
+internal fun dagImageClassificationCacheKey(
+    bytes: ByteArray,
+    audienceContext: DagImageAudienceContext,
+    calibrationVersion: Long,
+): String {
+    val digest = MessageDigest.getInstance("SHA-256").digest(bytes)
+    val hash =
+        buildString(digest.size * 2) {
+            digest.forEach { byte -> append("%02x".format(byte.toInt() and 0xff)) }
+        }
+    return "$calibrationVersion:${audienceContext.name}:$hash"
+}
+
 internal class DagImageClassifier(
     context: Context,
+    sharedClassifiers: DagSharedImageClassifiers? = null,
 ) : Closeable {
     private val applicationContext = context.applicationContext
     private val lock = Any()
     private var interpreter: Interpreter? = null
-    private val professionalClassifier = DagProfessionalImageClassifier(applicationContext)
-    private val modestyClassifier = DagModestyImageClassifier(applicationContext)
+    private val ownsSharedClassifiers = sharedClassifiers == null
+    private val sharedClassifiers = sharedClassifiers ?: DagSharedImageClassifiers(applicationContext)
+    private val professionalClassifier = this.sharedClassifiers.professional
+    private val modestyClassifier = this.sharedClassifiers.modesty
     private val tzniutPoseClassifier = DagTzniutPoseClassifier(applicationContext)
     private val calibrationStore = DagImageCalibrationStore(applicationContext)
+    private var closed = false
 
     fun exactDecision(imageHash: String): DagImageDecision? = calibrationStore.exactDecision(imageHash)
 
     fun prepare() {
         synchronized(lock) {
-            runCatching {
-                professionalClassifier.prepare()
-                modestyClassifier.prepare()
-            }
+            if (closed) return
+            runCatching { sharedClassifiers.prepare() }
         }
     }
 
@@ -84,98 +186,114 @@ internal class DagImageClassifier(
         audienceContext: DagImageAudienceContext = DagImageAudienceContext.Unknown,
     ): DagImageClassification =
         synchronized(lock) {
+            if (closed) {
+                return@synchronized DagImageClassification(DagImageDecision.Uncertain)
+            }
             val detectedMime = supportedStaticImageMime(bytes, mimeType)
             if (detectedMime == null) {
                 return@synchronized DagImageClassification(DagImageDecision.Uncertain)
             }
-            val bitmap =
-                decodeForClassification(bytes)
-                    ?: return@synchronized DagImageClassification(DagImageDecision.Uncertain)
-            try {
-                val classificationStartedAt = SystemClock.elapsedRealtime()
-                val calibration = calibrationStore.current()
-                val professionalAvailable = professionalClassifier.isAvailable()
-                val professional =
-                    if (professionalAvailable) {
-                        professionalClassifier.classify(bitmap, calibration)
-                    } else {
-                        DagImageClassification(DagImageDecision.Uncertain)
-                    }
-                var legacyScore: Float? = null
-                val ensembleDecision =
-                    if (professionalAvailable && professional.decision != DagImageDecision.Uncertain) {
-                        professional.decision
-                    } else {
-                        val output = Array(1) { FloatArray(OutputClasses) }
-                        model().run(bitmapToInput(bitmap), output)
-                        legacyScore = output[0][UnsafeOutputIndex]
-                        dagEnsembleImageDecision(professional.decision, dagImageDecision(legacyScore, calibration))
-                    }
-                var modestyScores =
-                    if (ensembleDecision != DagImageDecision.Blocked) {
-                        modestyClassifier.classify(
-                            bitmap,
-                        )
-                    } else {
-                        null
-                    }
-                if (
-                    modestyScores != null &&
-                    modestyScores.femaleFace >= calibration.femaleFace * PoseFemaleContextRatio
-                ) {
-                    decodeForPose(bytes)?.let { poseBitmap ->
-                        try {
-                            modestyScores = modestyScores.withTzniutPose(tzniutPoseClassifier.classify(poseBitmap))
-                        } finally {
-                            poseBitmap.recycle()
-                        }
-                    }
-                }
-                val modestyDecision =
-                    modestyScores?.let { dagModestyImageDecision(it, calibration, audienceContext) }
-                        ?: DagImageDecision.Allowed
-                val decision =
-                    dagAudienceAwareImageDecision(
-                        ensembleDecision,
-                        modestyDecision,
-                        modestyScores,
-                        calibration,
-                        audienceContext,
-                    )
-                Log.d(
-                    ImageMetricsTag,
-                    "decision=${decision.name.lowercase()} elapsed_ms=" +
-                        (SystemClock.elapsedRealtime() - classificationStartedAt) +
-                        " fallback=${legacyScore != null} modesty=${modestyDecision.name.lowercase()} " +
-                        "audience=${audienceContext.name.lowercase()}",
-                )
-                val scores =
-                    buildMap {
-                        professional.unsafeScore?.let { put("professional", it) }
-                        legacyScore?.let { put("legacy", it) }
-                        modestyScores?.toCalibrationScores()?.let(::putAll)
-                    }
-                DagImageClassification(
-                    decision = decision,
-                    unsafeScore = maxOf(professional.unsafeScore ?: 0f, legacyScore ?: 0f),
-                    mimeType = detectedMime,
-                    scores = scores,
-                    signals = dagImageDecisionSignals(decision, scores, calibration),
-                    calibrationVersion = calibration.version,
-                )
-            } catch (_: RuntimeException) {
-                DagImageClassification(DagImageDecision.Uncertain)
-            } finally {
-                bitmap.recycle()
+            val calibration = calibrationStore.current()
+            val cacheKey = dagImageClassificationCacheKey(bytes, audienceContext, calibration.version)
+            sharedClassifiers.classifyOnce(cacheKey) {
+                classifyUncached(bytes, detectedMime, audienceContext, calibration)
             }
         }
 
+    private fun classifyUncached(
+        bytes: ByteArray,
+        detectedMime: String,
+        audienceContext: DagImageAudienceContext,
+        calibration: DagImageCalibration,
+    ): DagImageClassification {
+        val bitmap =
+            decodeForClassification(bytes)
+                ?: return DagImageClassification(DagImageDecision.Uncertain)
+        try {
+            val classificationStartedAt = SystemClock.elapsedRealtime()
+            val professionalAvailable = professionalClassifier.isAvailable()
+            val professional =
+                if (professionalAvailable) {
+                    professionalClassifier.classify(bitmap, calibration)
+                } else {
+                    DagImageClassification(DagImageDecision.Uncertain)
+                }
+            var legacyScore: Float? = null
+            val ensembleDecision =
+                if (professionalAvailable && professional.decision != DagImageDecision.Uncertain) {
+                    professional.decision
+                } else {
+                    val output = Array(1) { FloatArray(OutputClasses) }
+                    model().run(bitmapToInput(bitmap), output)
+                    legacyScore = output[0][UnsafeOutputIndex]
+                    dagEnsembleImageDecision(professional.decision, dagImageDecision(legacyScore, calibration))
+                }
+            var modestyScores =
+                if (ensembleDecision != DagImageDecision.Blocked) {
+                    modestyClassifier.classify(
+                        bitmap,
+                    )
+                } else {
+                    null
+                }
+            if (
+                modestyScores != null &&
+                modestyScores.femaleFace >= calibration.femaleFace * PoseFemaleContextRatio
+            ) {
+                decodeForPose(bytes)?.let { poseBitmap ->
+                    try {
+                        modestyScores = modestyScores.withTzniutPose(tzniutPoseClassifier.classify(poseBitmap))
+                    } finally {
+                        poseBitmap.recycle()
+                    }
+                }
+            }
+            val modestyDecision =
+                modestyScores?.let { dagModestyImageDecision(it, calibration, audienceContext) }
+                    ?: DagImageDecision.Allowed
+            val decision =
+                dagAudienceAwareImageDecision(
+                    ensembleDecision,
+                    modestyDecision,
+                    modestyScores,
+                    calibration,
+                    audienceContext,
+                )
+            Log.d(
+                ImageMetricsTag,
+                "decision=${decision.name.lowercase()} elapsed_ms=" +
+                    (SystemClock.elapsedRealtime() - classificationStartedAt) +
+                    " fallback=${legacyScore != null} modesty=${modestyDecision.name.lowercase()} " +
+                    "audience=${audienceContext.name.lowercase()}",
+            )
+            val scores =
+                buildMap {
+                    professional.unsafeScore?.let { put("professional", it) }
+                    legacyScore?.let { put("legacy", it) }
+                    modestyScores?.toCalibrationScores()?.let(::putAll)
+                }
+            return DagImageClassification(
+                decision = decision,
+                unsafeScore = maxOf(professional.unsafeScore ?: 0f, legacyScore ?: 0f),
+                mimeType = detectedMime,
+                scores = scores,
+                signals = dagImageDecisionSignals(decision, scores, calibration),
+                calibrationVersion = calibration.version,
+            )
+        } catch (_: RuntimeException) {
+            return DagImageClassification(DagImageDecision.Uncertain)
+        } finally {
+            bitmap.recycle()
+        }
+    }
+
     override fun close() {
         synchronized(lock) {
+            if (closed) return
+            closed = true
             interpreter?.close()
             interpreter = null
-            professionalClassifier.close()
-            modestyClassifier.close()
+            if (ownsSharedClassifiers) sharedClassifiers.close()
             tzniutPoseClassifier.close()
         }
     }

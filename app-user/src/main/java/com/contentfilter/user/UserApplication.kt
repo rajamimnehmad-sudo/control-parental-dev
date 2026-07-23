@@ -1,6 +1,9 @@
 package com.contentfilter.user
 
+import android.app.Activity
 import android.app.Application
+import android.content.ComponentCallbacks2
+import android.os.Bundle
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
@@ -30,6 +33,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -85,6 +89,7 @@ class UserApplication :
     lateinit var dagNeuralTextClassifier: DagNeuralTextClassifier
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val startedActivityCount = AtomicInteger(0)
 
     override val workManagerConfiguration: Configuration
         get() =
@@ -94,6 +99,33 @@ class UserApplication :
 
     override fun onCreate() {
         super.onCreate()
+        registerActivityLifecycleCallbacks(
+            object : ActivityLifecycleCallbacks {
+                override fun onActivityStarted(activity: Activity) {
+                    if (startedActivityCount.incrementAndGet() == 1) prepareDagNeuralModel()
+                }
+
+                override fun onActivityCreated(
+                    activity: Activity,
+                    savedInstanceState: Bundle?,
+                ) = Unit
+
+                override fun onActivityResumed(activity: Activity) = Unit
+
+                override fun onActivityPaused(activity: Activity) = Unit
+
+                override fun onActivityStopped(activity: Activity) {
+                    startedActivityCount.updateAndGet { count -> (count - 1).coerceAtLeast(0) }
+                }
+
+                override fun onActivitySaveInstanceState(
+                    activity: Activity,
+                    outState: Bundle,
+                ) = Unit
+
+                override fun onActivityDestroyed(activity: Activity) = Unit
+            },
+        )
         runCatching { VpnController.enableDevProtection(this) }
             .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }
@@ -106,10 +138,7 @@ class UserApplication :
             runCatching { userLauncherController.monitorVisibility() }
                 .logFailure("user-launcher-monitor")
         }
-        appScope.launch {
-            runCatching { dagNeuralTextClassifier.prepare() }
-                .logFailure("dag-neural-model-prepare")
-        }
+        prepareDagNeuralModel()
         appScope.launch {
             runCatching { webDomainListUpdater.refreshIfDue() }
                 .logFailure("domain-list-refresh")
@@ -198,6 +227,38 @@ class UserApplication :
                 runCatching { protectionHealthMonitor.checkNow() }
                     .logFailure("protection-health-check")
             }
+        }
+    }
+
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) {
+            releaseDagNeuralModelIfBackground()
+        }
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        releaseDagNeuralModelIfBackground()
+    }
+
+    private fun releaseDagNeuralModelIfBackground() {
+        appScope.launch {
+            if (startedActivityCount.get() > 0) return@launch
+            runCatching { dagNeuralTextClassifier.release() }
+                .logFailure("dag-neural-model-release")
+            // An Activity may have started after the background check while a
+            // queued release was waiting on the classifier mutex. Re-prepare
+            // after that release so an obsolete trim cannot leave DAG on the
+            // compact-only fallback for the rest of the process lifetime.
+            if (startedActivityCount.get() > 0) prepareDagNeuralModel()
+        }
+    }
+
+    private fun prepareDagNeuralModel() {
+        appScope.launch {
+            runCatching { dagNeuralTextClassifier.prepare() }
+                .logFailure("dag-neural-model-prepare")
         }
     }
 

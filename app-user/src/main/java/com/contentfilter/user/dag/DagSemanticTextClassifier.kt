@@ -13,7 +13,7 @@ import javax.inject.Singleton
 import kotlin.math.exp
 import kotlin.math.sqrt
 
-internal data class DagSemanticPrediction(
+data class DagSemanticPrediction(
     val category: String,
     val confidence: Float,
     val margin: Float,

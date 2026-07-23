@@ -63,7 +63,10 @@ class DagBrowserViewModel
         private var approvalPollingJob: Job? = null
         private var suggestionJob: Job? = null
         private var searchJob: Job? = null
+        private var queryClassificationJob: Job? = null
+        private var pageClassificationJob: Job? = null
         private val searchRequestTracker = DagSearchRequestTracker()
+        private val pageAnalysisTracker = DagPageAnalysisTracker()
         private val reviewSubmissionsInFlight = mutableSetOf<String>()
         private var pageAnalysisStartedAtMillis = 0L
 
@@ -86,7 +89,10 @@ class DagBrowserViewModel
                         activePolicyVersion = snapshot.version
                         val enabled = activation != null && health.dagEntitled && snapshot.rules.dagEnabled()
                         val extraKosherEnabled = enabled && snapshot.rules.dagExtraKosherEnabled()
-                        if (!enabled) cancelActiveSearch()
+                        if (!enabled) {
+                            cancelActiveSearch()
+                            invalidatePageAnalysis()
+                        }
                         mutableState.update { state ->
                             state.withDagAvailability(enabled).copy(dagExtraKosherEnabled = extraKosherEnabled)
                         }
@@ -239,22 +245,44 @@ class DagBrowserViewModel
         fun search(query: String) {
             val normalizedQuery = query.trim().take(MaxAddressCharacters)
             if (!mutableState.value.dagEnabled || normalizedQuery.isBlank()) return
-            val classification = classifier.classifyQuery(normalizedQuery)
-            when (dagQueryAction(classification.decision)) {
-                DagQueryAction.Block -> {
-                    cancelActiveSearch()
-                    mutableState.update {
-                        it.copy(
-                            view = DagView.Start,
-                            loading = false,
-                            message = "La búsqueda fue bloqueada por la protección DAG.",
-                            results = emptyList(),
-                            suggestions = emptyList(),
-                            reviewCandidate = null,
-                        )
+            cancelActiveSearch()
+            invalidatePageAnalysis()
+            mutableState.update {
+                it.copy(
+                    loading = true,
+                    analysisProgress = 0.03f,
+                    message = "",
+                    suggestions = emptyList(),
+                    reviewCandidate = null,
+                )
+            }
+            val job =
+                viewModelScope.launch {
+                    val classification =
+                        withContext(Dispatchers.Default) {
+                            classifier.classifyQueryStaged(normalizedQuery)
+                        }
+                    if (!mutableState.value.dagEnabled) return@launch
+                    when (dagQueryAction(classification.decision)) {
+                        DagQueryAction.Block -> {
+                            mutableState.update {
+                                it.copy(
+                                    view = DagView.Start,
+                                    loading = false,
+                                    analysisProgress = 0f,
+                                    message = "La búsqueda fue bloqueada por la protección DAG.",
+                                    results = emptyList(),
+                                    suggestions = emptyList(),
+                                    reviewCandidate = null,
+                                )
+                            }
+                        }
+                        DagQueryAction.Search -> performSearch(normalizedQuery)
                     }
                 }
-                DagQueryAction.Search -> performSearch(normalizedQuery)
+            queryClassificationJob = job
+            job.invokeOnCompletion {
+                if (queryClassificationJob === job) queryClassificationJob = null
             }
         }
 
@@ -311,16 +339,29 @@ class DagBrowserViewModel
                         is RemoteResult.Success -> {
                             val classifiedWithReasons =
                                 withContext(Dispatchers.Default) {
-                                    response.value.results.mapNotNull { remote ->
-                                        val domain = DagContentClassifier.domainFrom(remote.url)
-                                        if (domain.isBlank()) return@mapNotNull null
-                                        val local =
-                                            classifier.classifyResultWithReason(
-                                                remote.title,
-                                                remote.description,
-                                                remote.url,
+                                    val validResults =
+                                        response.value.results.mapNotNull { remote ->
+                                            val domain = DagContentClassifier.domainFrom(remote.url)
+                                            if (domain.isBlank()) return@mapNotNull null
+                                            remote to domain
+                                        }
+                                    val localDecisions =
+                                        classifier.classifyResultsWithReasonStaged(
+                                            validResults.map { (remote, _) ->
+                                                DagSearchClassificationInput(
+                                                    title = remote.title,
+                                                    description = remote.description,
+                                                    url = remote.url,
+                                                )
+                                            },
+                                        )
+                                    validResults.zip(localDecisions).map { (remoteWithDomain, classifiedLocal) ->
+                                        val (remote, domain) = remoteWithDomain
+                                        val decision =
+                                            applyExplicitRule(
+                                                domain = domain,
+                                                result = classifiedLocal.classification,
                                             )
-                                        val decision = applyExplicitRule(domain = domain, result = local.classification)
                                         val reason =
                                             if (
                                                 decision.decision == DagClassification.Blocked &&
@@ -328,7 +369,7 @@ class DagBrowserViewModel
                                             ) {
                                                 DagSearchDecisionReason.AdminRuleBlock
                                             } else {
-                                                local.reason
+                                                classifiedLocal.reason
                                             }
                                         reason to
                                             DagSearchResult(
@@ -445,6 +486,7 @@ class DagBrowserViewModel
                 return
             }
             cancelActiveSearch()
+            invalidatePageAnalysis()
             val domain = DagContentClassifier.domainFrom(url)
             val classification = applyExplicitRule(domain, classifier.classifyDirectUrl(url))
             when (classification.decision) {
@@ -500,32 +542,96 @@ class DagBrowserViewModel
             text: String?,
             images: DagImagePageSummary,
         ) {
-            if (!mutableState.value.dagEnabled || url != mutableState.value.requestedUrl) return
-            if (text == null || text.isBlank()) {
-                showProtectedPage(url, title)
+            val hasMeaningfulText = !text.isNullOrBlank()
+            val currentState = mutableState.value
+            if (
+                !currentState.dagEnabled ||
+                !dagCanAnalyzePageText(
+                    state = currentState,
+                    url = url,
+                    hasMeaningfulText = hasMeaningfulText,
+                )
+            ) {
                 return
             }
-            viewModelScope.launch(Dispatchers.Default) {
-                val domain = DagContentClassifier.domainFrom(url)
-                val fingerprint = dagPageFingerprint(url, title, text, images)
-                val policyVersion = activePolicyVersion
-                val cachedApproval =
-                    withContext(Dispatchers.IO) {
-                        historyStore.hasFreshPageApproval(
-                            url = url,
-                            fingerprint = fingerprint,
-                            policyVersion = policyVersion,
-                            modelVersion = PageApprovalModelVersion,
-                        )
-                    }
-                val result =
-                    if (cachedApproval) {
-                        applyExplicitRule(domain, classifier.classifyDirectUrl(url))
-                    } else {
-                        applyExplicitRule(domain, classifier.classifyPage(url, title, text, images))
-                    }
-                val pageDecision = dagAdaptivePageDecision(result)
-                if (pageDecision != DagAdaptivePageDecision.Blocked) {
+            Log.d(
+                PerformanceLogTag,
+                "page_text_ready elapsed_ms=${SystemClock.elapsedRealtime() - pageAnalysisStartedAtMillis} " +
+                    "chars=${text?.length ?: 0}",
+            )
+            val analysis = beginPageAnalysis(url)
+            mutableState.update { state ->
+                state.beginDagPageTextAnalysis(url, hasMeaningfulText)
+            }
+            if (!hasMeaningfulText) {
+                showUncertainPage(
+                    url = analysis.url,
+                    title = title,
+                    category = DAG_UNREADABLE_PAGE_CATEGORY,
+                    modelVersion = DagContentClassifier.ModelVersion,
+                )
+                return
+            }
+            pageClassificationJob =
+                viewModelScope.launch(Dispatchers.Default) {
+                    val classificationStartedAtMillis = SystemClock.elapsedRealtime()
+                    val domain = DagContentClassifier.domainFrom(url)
+                    val fingerprint = dagPageFingerprint(url, title, text, images)
+                    val policyVersion = activePolicyVersion
+                    val cachedApproval =
+                        withContext(Dispatchers.IO) {
+                            historyStore.hasFreshPageApproval(
+                                url = url,
+                                fingerprint = fingerprint,
+                                policyVersion = policyVersion,
+                                modelVersion = PageApprovalModelVersion,
+                            )
+                        }
+                    val result =
+                        if (cachedApproval) {
+                            applyExplicitRule(domain, classifier.classifyDirectUrl(url))
+                        } else {
+                            applyExplicitRule(domain, classifier.classifyPageStaged(url, title, text, images))
+                        }
+                    Log.d(
+                        PerformanceLogTag,
+                        "page_classified elapsed_ms=${SystemClock.elapsedRealtime() - classificationStartedAtMillis} " +
+                            "cached=$cachedApproval decision=${result.decision} category=${result.category} " +
+                            "model=${result.modelVersion}",
+                    )
+                    val pageDecision = dagAdaptivePageDecision(result)
+                    val applied =
+                        withContext(Dispatchers.Main) {
+                            if (!isCurrentPageAnalysis(analysis)) {
+                                return@withContext false
+                            }
+                            when (pageDecision) {
+                                DagAdaptivePageDecision.Allowed -> {
+                                    mutableState.update {
+                                        it.copy(
+                                            address = url,
+                                            pageAnalysisReady = true,
+                                            analysisProgress = maxOf(it.analysisProgress, 0.65f),
+                                            message = "",
+                                            reviewCandidate = null,
+                                        )
+                                    }
+                                    revealPageIfReady(analysis)
+                                }
+                                DagAdaptivePageDecision.Protected ->
+                                    showProtectedPage(analysis)
+                                DagAdaptivePageDecision.Blocked ->
+                                    mutableState.update {
+                                        it.copy(
+                                            pageStatus = DagPageStatus.Blocked,
+                                            message = "DAG bloqueó el contenido de esta página.",
+                                            reviewCandidate = null,
+                                        )
+                                    }
+                            }
+                            true
+                        }
+                    if (!applied || pageDecision == DagAdaptivePageDecision.Blocked) return@launch
                     withContext(Dispatchers.IO) {
                         if (!cachedApproval && pageDecision == DagAdaptivePageDecision.Allowed) {
                             historyStore.savePageApproval(
@@ -538,60 +644,29 @@ class DagBrowserViewModel
                         historyStore.addPage(url, title)
                     }
                 }
-                withContext(Dispatchers.Main) {
-                    if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return@withContext
-                    when (pageDecision) {
-                        DagAdaptivePageDecision.Allowed -> {
-                            mutableState.update {
-                                it.copy(
-                                    address = url,
-                                    pageAnalysisReady = true,
-                                    analysisProgress = maxOf(it.analysisProgress, 0.65f),
-                                    message = "",
-                                    reviewCandidate = null,
-                                )
-                            }
-                            revealPageIfReady(url)
-                        }
-                        DagAdaptivePageDecision.Protected -> showProtectedPage(url, title, recordHistory = false)
-                        DagAdaptivePageDecision.Blocked ->
-                            mutableState.update {
-                                it.copy(
-                                    pageStatus = DagPageStatus.Blocked,
-                                    message = "DAG bloqueó el contenido de esta página.",
-                                    reviewCandidate = null,
-                                )
-                            }
-                    }
-                }
-            }
         }
 
-        private fun showProtectedPage(
-            url: String,
-            title: String,
-            recordHistory: Boolean = true,
-        ) {
-            if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
-            if (recordHistory) viewModelScope.launch(Dispatchers.IO) { historyStore.addPage(url, title) }
+        private fun showProtectedPage(analysis: DagPageAnalysis) {
+            if (!isCurrentPageAnalysis(analysis)) return
             mutableState.update {
                 it.copy(
-                    address = url,
+                    address = analysis.url,
                     pageAnalysisReady = true,
                     analysisProgress = maxOf(it.analysisProgress, 0.65f),
                     message = "",
                     reviewCandidate = null,
                 )
             }
-            revealPageIfReady(url)
+            revealPageIfReady(analysis)
         }
 
         fun onViewportImagesReady(url: String) {
-            if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
+            val analysis = pageAnalysisTracker.current(url) ?: return
+            if (!isCurrentPageAnalysis(analysis)) return
             mutableState.update {
                 it.copy(viewportImagesReady = true, analysisProgress = maxOf(it.analysisProgress, 0.95f))
             }
-            revealPageIfReady(url)
+            revealPageIfReady(analysis)
         }
 
         fun onViewportImageProgress(
@@ -599,17 +674,23 @@ class DagBrowserViewModel
             resolved: Int,
             total: Int,
         ) {
-            if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
+            val analysis = pageAnalysisTracker.current(url) ?: return
+            if (!isCurrentPageAnalysis(analysis)) return
             val ratio = if (total <= 0) 1f else (resolved.toFloat() / total).coerceIn(0f, 1f)
             val progress = (0.65f + ratio * 0.30f).coerceAtMost(0.95f)
             mutableState.update { it.copy(analysisProgress = maxOf(it.analysisProgress, progress)) }
         }
 
-        private fun revealPageIfReady(url: String) {
+        private fun revealPageIfReady(analysis: DagPageAnalysis) {
             var revealed = false
             mutableState.update { state ->
                 if (
-                    state.requestedUrl == url &&
+                    dagPageAnalysisMatches(
+                        activeUrl = state.requestedUrl,
+                        activeAnalysis = pageAnalysisTracker.current(analysis.url),
+                        candidate = analysis,
+                        dagEnabled = state.dagEnabled,
+                    ) &&
                     state.pageAnalysisReady &&
                     state.viewportImagesReady &&
                     state.pageStatus == DagPageStatus.Loading
@@ -628,19 +709,26 @@ class DagBrowserViewModel
             }
         }
 
-        fun onPageStarted(url: String): Boolean {
+        fun canNavigateToPage(url: String): Boolean {
             if (!mutableState.value.dagEnabled || !url.startsWith("https://", ignoreCase = true)) return false
-            pageAnalysisStartedAtMillis = SystemClock.elapsedRealtime()
             val domain = DagContentClassifier.domainFrom(url)
             val result = applyExplicitRule(domain, classifier.classifyDirectUrl(url))
             if (result.decision != DagClassification.Allowed) {
                 if (result.decision == DagClassification.Uncertain) {
+                    invalidatePageAnalysis()
                     showUncertainPage(url, domain, result.category)
                 } else {
                     onPageBlocked("DAG bloqueó este sitio.")
                 }
                 return false
             }
+            return true
+        }
+
+        fun onPageStarted(url: String): Boolean {
+            if (!canNavigateToPage(url)) return false
+            beginPageAnalysis(url)
+            pageAnalysisStartedAtMillis = SystemClock.elapsedRealtime()
             mutableState.update {
                 it.copy(
                     address = url,
@@ -661,11 +749,14 @@ class DagBrowserViewModel
             url: String,
             title: String,
             category: String,
+            modelVersion: String = DagContentClassifier.ModelVersion,
         ) {
             val domain = DagContentClassifier.domainFrom(url)
             mutableState.update {
                 it.copy(
                     pageStatus = DagPageStatus.Uncertain,
+                    pageAnalysisReady = false,
+                    viewportImagesReady = false,
                     message = "DAG no mostró la página porque necesita revisión.",
                     reviewCandidate =
                         DagReviewCandidate(
@@ -673,7 +764,7 @@ class DagBrowserViewModel
                             domain = domain,
                             title = title.ifBlank { domain },
                             category = category,
-                            modelVersion = DagContentClassifier.ModelVersion,
+                            modelVersion = modelVersion,
                         ),
                 )
             }
@@ -761,6 +852,7 @@ class DagBrowserViewModel
         fun showHistory() {
             if (mutableState.value.dagEnabled) {
                 cancelActiveSearch()
+                invalidatePageAnalysis()
                 mutableState.update {
                     it.copy(view = DagView.History, loading = false, message = "", suggestions = emptyList())
                 }
@@ -770,6 +862,7 @@ class DagBrowserViewModel
         fun showReviewRequests() {
             if (mutableState.value.dagEnabled) {
                 cancelActiveSearch()
+                invalidatePageAnalysis()
                 mutableState.update {
                     it.copy(view = DagView.Reviews, loading = false, message = "", suggestions = emptyList())
                 }
@@ -800,10 +893,12 @@ class DagBrowserViewModel
 
         fun showStart() {
             cancelActiveSearch()
+            invalidatePageAnalysis()
             mutableState.update(DagBrowserUiState::toDagStart)
         }
 
         fun backFromBrowser() {
+            invalidatePageAnalysis()
             mutableState.update { state ->
                 if (state.results.isNotEmpty()) state.toDagResults() else state.toDagStart()
             }
@@ -827,6 +922,7 @@ class DagBrowserViewModel
 
         fun restoreTab(tab: DagTabSnapshot) {
             cancelActiveSearch()
+            invalidatePageAnalysis()
             mutableState.update {
                 it.copy(
                     address = tab.address,
@@ -850,6 +946,7 @@ class DagBrowserViewModel
 
         fun openNewTab() {
             cancelActiveSearch()
+            invalidatePageAnalysis()
             mutableState.update {
                 it.copy(
                     address = "",
@@ -894,6 +991,7 @@ class DagBrowserViewModel
         }
 
         fun onPageBlocked(message: String) {
+            invalidatePageAnalysis()
             mutableState.update {
                 it.copy(
                     pageStatus = DagPageStatus.Blocked,
@@ -905,6 +1003,7 @@ class DagBrowserViewModel
 
         fun onBrowserRendererGone() {
             cancelActiveSearch()
+            invalidatePageAnalysis()
             mutableState.update {
                 it.copy(
                     address = "",
@@ -921,8 +1020,32 @@ class DagBrowserViewModel
 
         private fun cancelActiveSearch() {
             searchRequestTracker.cancel()
+            queryClassificationJob?.cancel()
+            queryClassificationJob = null
             searchJob?.cancel()
             searchJob = null
+        }
+
+        private fun beginPageAnalysis(url: String): DagPageAnalysis {
+            pageClassificationJob?.cancel()
+            pageClassificationJob = null
+            return pageAnalysisTracker.begin(url)
+        }
+
+        private fun invalidatePageAnalysis() {
+            pageClassificationJob?.cancel()
+            pageClassificationJob = null
+            pageAnalysisTracker.cancel()
+        }
+
+        private fun isCurrentPageAnalysis(analysis: DagPageAnalysis): Boolean {
+            val state = mutableState.value
+            return dagPageAnalysisMatches(
+                activeUrl = state.requestedUrl,
+                activeAnalysis = pageAnalysisTracker.current(analysis.url),
+                candidate = analysis,
+                dagEnabled = state.dagEnabled,
+            )
         }
 
         private fun applyExplicitRule(
@@ -989,9 +1112,90 @@ class DagBrowserViewModel
             const val DiagnosticsLogTag = "DagSearchDiagnostics"
             const val PerformanceLogTag = "DagPerformance"
             const val PageApprovalModelVersion =
-                "dag-page-approval-1:${DagContentClassifier.ModelVersion}:${DagNeuralTextClassifier.ModelVersion}:" +
+                "dag-page-approval-3:${DagContentClassifier.ModelVersion}:" +
                     DagProfessionalImageClassifier.ModelVersion
         }
+    }
+
+internal data class DagPageAnalysis(
+    val url: String,
+    val revision: Long,
+)
+
+internal class DagPageAnalysisTracker {
+    private var revision = 0L
+    private var activeAnalysis: DagPageAnalysis? = null
+
+    fun begin(url: String): DagPageAnalysis =
+        DagPageAnalysis(url = url, revision = ++revision)
+            .also { activeAnalysis = it }
+
+    fun current(url: String): DagPageAnalysis? = activeAnalysis?.takeIf { it.url == url }
+
+    fun cancel() {
+        revision += 1
+        activeAnalysis = null
+    }
+}
+
+internal fun dagPageAnalysisMatches(
+    activeUrl: String?,
+    activeAnalysis: DagPageAnalysis?,
+    candidate: DagPageAnalysis,
+    dagEnabled: Boolean,
+): Boolean =
+    dagEnabled &&
+        activeUrl == candidate.url &&
+        activeAnalysis == candidate
+
+internal const val DAG_UNREADABLE_PAGE_CATEGORY = "unreadable_page"
+
+internal fun dagCanAnalyzePageText(
+    state: DagBrowserUiState,
+    url: String,
+    hasMeaningfulText: Boolean,
+): Boolean {
+    if (state.requestedUrl != url) return false
+    return when {
+        !hasMeaningfulText -> state.pageStatus == DagPageStatus.Loading
+        state.pageStatus == DagPageStatus.Loading || state.pageStatus == DagPageStatus.Visible -> true
+        else -> state.isRecoverableUnreadablePage(url)
+    }
+}
+
+internal fun DagBrowserUiState.isRecoverableUnreadablePage(url: String): Boolean =
+    requestedUrl == url &&
+        dagIsRecoverableUnreadablePage(
+            pageStatus = pageStatus,
+            reviewCandidate = reviewCandidate,
+            url = url,
+        )
+
+internal fun dagIsRecoverableUnreadablePage(
+    pageStatus: DagPageStatus,
+    reviewCandidate: DagReviewCandidate?,
+    url: String,
+): Boolean =
+    pageStatus == DagPageStatus.Uncertain &&
+        reviewCandidate?.url == url &&
+        reviewCandidate.category == DAG_UNREADABLE_PAGE_CATEGORY
+
+internal fun DagBrowserUiState.beginDagPageTextAnalysis(
+    url: String,
+    hasMeaningfulText: Boolean,
+): DagBrowserUiState =
+    when {
+        hasMeaningfulText && isRecoverableUnreadablePage(url) ->
+            copy(
+                pageStatus = DagPageStatus.Loading,
+                pageAnalysisReady = false,
+                viewportImagesReady = false,
+                analysisProgress = maxOf(analysisProgress, 0.15f),
+                message = "Analizando la página antes de mostrarla…",
+                reviewCandidate = null,
+            )
+        pageStatus == DagPageStatus.Loading -> copy(pageAnalysisReady = false)
+        else -> this
     }
 
 internal fun dagCanLoadMoreResults(

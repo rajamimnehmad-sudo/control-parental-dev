@@ -158,16 +158,23 @@ class DagImagePolicyTest {
     }
 
     @Test
-    fun `viewport waits for pending images and fails closed at its deadline`() {
-        assertEquals(DagViewportReadinessAction.Ready, dagViewportReadinessAction(0, 0L))
-        assertEquals(DagViewportReadinessAction.Wait, dagViewportReadinessAction(2, 1_000L))
-        assertEquals(
-            DagViewportReadinessAction.HidePending,
-            dagViewportReadinessAction(2, DagViewportReadinessPolicy.MaximumWaitMillis),
+    fun `ephemeral image decision cache is content audience and calibration scoped`() {
+        val bytes = "same-image".encodeToByteArray()
+        val base = dagImageClassificationCacheKey(bytes, DagImageAudienceContext.Unknown, 7L)
+
+        assertEquals(base, dagImageClassificationCacheKey(bytes.copyOf(), DagImageAudienceContext.Unknown, 7L))
+        assertFalse(base == dagImageClassificationCacheKey(bytes, DagImageAudienceContext.FemaleSixPlus, 7L))
+        assertFalse(base == dagImageClassificationCacheKey(bytes, DagImageAudienceContext.Unknown, 8L))
+        assertFalse(
+            base == dagImageClassificationCacheKey("different-image".encodeToByteArray(), DagImageAudienceContext.Unknown, 7L),
         )
+    }
+
+    @Test
+    fun `viewport queues visible images without making safe page reveal wait`() {
         assertEquals(1, DagViewportReadinessPolicy.PreparedViewportCount)
-        assertEquals(1, DagViewportReadinessPolicy.PrefetchViewportCount)
-        assertTrue(DagViewportReadinessPolicy.VisualSettleMillis <= 300L)
+        assertEquals(0, DagViewportReadinessPolicy.PrefetchViewportCount)
+        assertFalse(DagViewportReadinessPolicy.PendingImagesBlockPageReveal)
     }
 
     @Test
@@ -417,6 +424,189 @@ class DagImagePolicyTest {
 
         assertEquals(thumbnail.dagCalibrationHash(), thumbnail.dagCalibrationHash())
         assertEquals(64, thumbnail.dagCalibrationHash().length)
+    }
+
+    @Test
+    fun `synthetic viewport image resolves only to its encoded https source`() {
+        val original = "https://images.example.test/photo.webp?width=640"
+        val encoded = java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(original.encodeToByteArray())
+        val synthetic = "https://images.example.test/.dag-safe-image/$encoded.png"
+
+        assertEquals(original, dagOriginalImageUrl(synthetic))
+        assertEquals(null, dagOriginalImageUrl("https://images.example.test/photo.png"))
+        val crossOrigin =
+            java.util.Base64.getUrlEncoder().withoutPadding()
+                .encodeToString("https://private.example.test/photo.png".encodeToByteArray())
+        assertEquals(
+            null,
+            dagOriginalImageUrl("https://images.example.test/.dag-safe-image/$crossOrigin.png"),
+        )
+        assertEquals(
+            null,
+            dagOriginalImageUrl(
+                "https://images.example.test/.dag-safe-image/" +
+                    java.util.Base64.getUrlEncoder().withoutPadding()
+                        .encodeToString("http://unsafe.test/photo.png".encodeToByteArray()) +
+                    ".png",
+            ),
+        )
+        assertEquals(
+            null,
+            dagOriginalImageUrl(
+                "https://images.example.test:8443/.dag-safe-image/$encoded.png",
+            ),
+        )
+    }
+
+    @Test
+    fun `intercepted images preserve only valid upstream cors origins`() {
+        assertEquals("*", dagSafeCorsAllowOrigin("*"))
+        assertEquals("https://shop.example", dagSafeCorsAllowOrigin("https://shop.example"))
+        assertEquals(null, dagSafeCorsAllowOrigin("http://shop.example"))
+        assertEquals(null, dagSafeCorsAllowOrigin("https://shop.example/path"))
+        assertEquals(null, dagSafeCorsAllowOrigin("https://shop.example/"))
+        assertEquals(null, dagSafeCorsAllowOrigin("https://user@shop.example"))
+        assertTrue(
+            dagSafeCorsAllowCredentials(
+                value = "true",
+                allowOrigin = "https://shop.example",
+                requestOrigin = "https://shop.example",
+            ),
+        )
+        assertFalse(
+            dagSafeCorsAllowCredentials(
+                value = "true",
+                allowOrigin = "https://shop.example",
+                requestOrigin = "https://shop.example:443",
+            ),
+        )
+        assertFalse(
+            dagSafeCorsAllowCredentials(
+                value = "true",
+                allowOrigin = "*",
+                requestOrigin = "https://shop.example",
+            ),
+        )
+        assertFalse(
+            dagSafeCorsAllowCredentials(
+                value = "true",
+                allowOrigin = "https://cdn.example",
+                requestOrigin = "https://shop.example",
+            ),
+        )
+        assertFalse(
+            dagSafeCorsAllowCredentials(
+                value = "TRUE",
+                allowOrigin = "https://shop.example",
+                requestOrigin = "https://shop.example",
+            ),
+        )
+    }
+
+    @Test
+    fun `image proxy preserves browser headers without inventing referer or cross origin cookies`() {
+        val pageUrl = "https://shop.example/product/1"
+        val sameOriginHeaders =
+            dagForwardedImageRequestHeaders(
+                requestHeaders =
+                    mapOf(
+                        "Origin" to "https://shop.example",
+                        "User-Agent" to "browser",
+                        "Cookie" to "session=browser",
+                        "Authorization" to "secret",
+                    ),
+                imageUrl = "https://shop.example/assets/photo.webp",
+                pageUrl = pageUrl,
+                storedCookie = "session=store",
+            )
+
+        assertEquals("https://shop.example", sameOriginHeaders["Origin"])
+        assertEquals("browser", sameOriginHeaders["User-Agent"])
+        assertEquals("session=browser", sameOriginHeaders["Cookie"])
+        assertFalse("Referer" in sameOriginHeaders)
+        assertFalse("Authorization" in sameOriginHeaders)
+        assertEquals(
+            "session=store",
+            dagForwardedImageRequestHeaders(
+                requestHeaders = emptyMap(),
+                imageUrl = "https://shop.example/assets/account-photo.webp",
+                pageUrl = pageUrl,
+                storedCookie = "session=store",
+            )["Cookie"],
+        )
+
+        val crossOriginHeaders =
+            dagForwardedImageRequestHeaders(
+                requestHeaders =
+                    mapOf(
+                        "Origin" to "https://shop.example",
+                        "Cookie" to "session=browser",
+                    ),
+                imageUrl = "https://cdn.example/assets/photo.webp",
+                pageUrl = pageUrl,
+                storedCookie = "session=store",
+            )
+        assertEquals("https://shop.example", crossOriginHeaders["Origin"])
+        assertFalse("Cookie" in crossOriginHeaders)
+        assertFalse("Referer" in crossOriginHeaders)
+    }
+
+    @Test
+    fun `redirect cookie policy never sends page cookies to another origin`() {
+        val pageUrl = "https://shop.example/product/1"
+
+        assertEquals(
+            "session=store",
+            dagImageCookieHeader(
+                imageUrl = "https://shop.example/redirected/photo.webp",
+                pageUrl = pageUrl,
+                cookie = "session=store",
+            ),
+        )
+        assertEquals(
+            null,
+            dagImageCookieHeader(
+                imageUrl = "https://cdn.example/redirected/photo.webp",
+                pageUrl = pageUrl,
+                cookie = "session=store",
+            ),
+        )
+        assertEquals(
+            null,
+            dagImageCookieHeader(
+                imageUrl = "https://shop.example:8443/redirected/photo.webp",
+                pageUrl = pageUrl,
+                cookie = "session=store",
+            ),
+        )
+    }
+
+    @Test
+    fun `page image priorities stay bounded and discard invalid oversized input`() {
+        val priorities = linkedSetOf<String>()
+        dagAddBoundedPrioritizedImageUrls(
+            target = priorities,
+            imageUrls =
+                listOf(
+                    "https://images.example/1.webp",
+                    "http://images.example/insecure.webp",
+                    "https://images.example/2.webp",
+                    "https://images.example/3.webp",
+                    "https://images.example/4.webp",
+                    "https://images.example/" + "x".repeat(4_096),
+                ),
+            maximumSize = 3,
+        )
+
+        assertEquals(
+            listOf(
+                "https://images.example/2.webp",
+                "https://images.example/3.webp",
+                "https://images.example/4.webp",
+            ),
+            priorities.toList(),
+        )
+        assertEquals(400, DagImageDeliveryPolicy.MaximumPrioritizedImageUrls)
     }
 
     @Test

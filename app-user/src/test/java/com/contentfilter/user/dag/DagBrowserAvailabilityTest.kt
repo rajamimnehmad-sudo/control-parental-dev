@@ -55,6 +55,96 @@ class DagBrowserAvailabilityTest {
     }
 
     @Test
+    fun `natural cross domain navigation does not dispatch a second programmatic load`() {
+        val initial =
+            DagBrowserUiState(
+                requestedUrl = "https://shop.example",
+                navigationRevision = 7L,
+            )
+        val naturalNavigation =
+            initial.copy(
+                requestedUrl = "https://payments.example",
+            )
+        val explicitNavigation =
+            naturalNavigation.copy(
+                navigationRevision = naturalNavigation.navigationRevision + 1L,
+            )
+
+        assertEquals(
+            dagProgrammaticNavigationEffectKey(initial),
+            dagProgrammaticNavigationEffectKey(naturalNavigation),
+        )
+        assertTrue(
+            dagProgrammaticNavigationEffectKey(explicitNavigation) !=
+                dagProgrammaticNavigationEffectKey(naturalNavigation),
+        )
+    }
+
+    @Test
+    fun `transient empty extraction cannot degrade an already visible page`() {
+        val url = "https://shop.example/app"
+        val visible =
+            DagBrowserUiState(
+                dagEnabled = true,
+                view = DagView.Browser,
+                pageStatus = DagPageStatus.Visible,
+                pageAnalysisReady = true,
+                viewportImagesReady = true,
+                requestedUrl = url,
+            )
+
+        assertFalse(
+            dagCanAnalyzePageText(
+                state = visible,
+                url = url,
+                hasMeaningfulText = false,
+            ),
+        )
+        assertEquals(visible, visible.beginDagPageTextAnalysis(url, hasMeaningfulText = false))
+    }
+
+    @Test
+    fun `meaningful spa content recovers only an unreadable uncertain page`() {
+        val url = "https://example.com"
+        val unreadable =
+            DagBrowserUiState(
+                dagEnabled = true,
+                view = DagView.Browser,
+                pageStatus = DagPageStatus.Uncertain,
+                pageAnalysisReady = false,
+                viewportImagesReady = true,
+                requestedUrl = url,
+                message = "DAG no mostró la página porque necesita revisión.",
+                reviewCandidate = reviewCandidate(category = DAG_UNREADABLE_PAGE_CATEGORY),
+            )
+
+        assertTrue(
+            dagCanAnalyzePageText(
+                state = unreadable,
+                url = url,
+                hasMeaningfulText = true,
+            ),
+        )
+        val retry = unreadable.beginDagPageTextAnalysis(url, hasMeaningfulText = true)
+        assertEquals(DagPageStatus.Loading, retry.pageStatus)
+        assertFalse(retry.pageAnalysisReady)
+        assertFalse(retry.viewportImagesReady)
+        assertNull(retry.reviewCandidate)
+
+        val semanticReview =
+            unreadable.copy(
+                reviewCandidate = reviewCandidate(category = "semantic_sensitive_context"),
+            )
+        assertFalse(
+            dagCanAnalyzePageText(
+                state = semanticReview,
+                url = url,
+                hasMeaningfulText = true,
+            ),
+        )
+    }
+
+    @Test
     fun `closing dag clears the visual session but preserves local history`() {
         val history = listOf(historyEntry())
         val closed =
@@ -136,12 +226,12 @@ class DagBrowserAvailabilityTest {
                 ),
         )
 
-    private fun reviewCandidate() =
+    private fun reviewCandidate(category: String = "unreadable") =
         DagReviewCandidate(
             url = "https://example.com",
             domain = "example.com",
             title = "Ejemplo",
-            category = "unreadable",
+            category = category,
             modelVersion = DagContentClassifier.ModelVersion,
         )
 }

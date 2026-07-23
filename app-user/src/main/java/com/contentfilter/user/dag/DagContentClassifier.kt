@@ -1,10 +1,17 @@
 package com.contentfilter.user.dag
 
 import com.contentfilter.feature.vpn.domainlist.DynamicDomainBlocklist
+import kotlinx.coroutines.CancellationException
 import java.net.URI
 import java.text.Normalizer
 import java.util.Locale
 import javax.inject.Inject
+
+internal data class DagSearchClassificationInput(
+    val title: String,
+    val description: String,
+    val url: String,
+)
 
 class DagContentClassifier
     @Inject
@@ -13,7 +20,56 @@ class DagContentClassifier
         private val semanticClassifier: DagSemanticTextClassifier,
     ) {
         @Inject
-        lateinit var neuralClassifier: DagNeuralTextClassifier
+        lateinit var neuralTextClassifier: DagNeuralTextClassifier
+
+        internal var neuralTextStageOverride: DagNeuralTextStage? = null
+
+        suspend fun classifyQueryStaged(text: String): DagClassificationResult {
+            if (text.isClearlySafeCocaColaQuery() || text.isClearlySafeYeshurunQuery()) return allowed()
+            return resolveNeuralStages(
+                listOf(classifyCandidate(text, directUrl = false, reviewSingleAmbiguousTerm = true)),
+            ).single()
+        }
+
+        internal suspend fun classifyResultsWithReasonStaged(
+            inputs: List<DagSearchClassificationInput>,
+        ): List<DagClassifiedSearchResult> {
+            val candidates =
+                inputs.map { input ->
+                    classifyResultCandidateWithReason(
+                        title = input.title,
+                        description = input.description,
+                        url = input.url,
+                    )
+                }
+            val resolved = resolveNeuralStages(candidates.map(DagStagedSearchDecision::candidate))
+            return candidates.zip(resolved) { candidate, classification ->
+                DagClassifiedSearchResult(
+                    classification = classification,
+                    reason = candidate.reasonFor(classification),
+                )
+            }
+        }
+
+        internal suspend fun classifyPageStaged(
+            url: String,
+            title: String,
+            text: String,
+            images: DagImagePageSummary = DagImagePageSummary(0, 0, 0),
+        ): DagClassificationResult {
+            val domain = domainFrom(url)
+            blockedVisualPlatform(domain)?.let { return it }
+            domainBlocklist.categoryFor(domain)?.let { category ->
+                return DagClassificationResult(
+                    decision = DagClassification.Blocked,
+                    category = category,
+                    confidence = 1f,
+                    modelVersion = ModelVersion,
+                )
+            }
+            val candidate = classifyPageCandidate(domain, title, text)
+            return resolveNeuralStages(listOf(candidate)).single()
+        }
 
         fun classifyQuery(text: String): DagClassificationResult =
             if (text.isClearlySafeCocaColaQuery() || text.isClearlySafeYeshurunQuery()) {
@@ -33,36 +89,46 @@ class DagContentClassifier
             description: String,
             url: String,
         ): DagClassifiedSearchResult {
+            val staged = classifyResultCandidateWithReason(title, description, url)
+            return DagClassifiedSearchResult(
+                classification = staged.candidate.classification,
+                reason = staged.reasonFor(staged.candidate.classification),
+            )
+        }
+
+        private fun classifyResultCandidateWithReason(
+            title: String,
+            description: String,
+            url: String,
+        ): DagStagedSearchDecision {
             val domain = domainFrom(url)
             blockedVisualPlatform(domain)?.let {
-                return DagClassifiedSearchResult(it, DagSearchDecisionReason.PlatformBlock)
+                return DagStagedSearchDecision(
+                    candidate = DagStagedTextDecision(it),
+                    fixedReason = DagSearchDecisionReason.PlatformBlock,
+                )
             }
             domainBlocklist.categoryFor(domain)?.let { category ->
-                return DagClassifiedSearchResult(
-                    classification =
-                        DagClassificationResult(
-                            decision = DagClassification.Blocked,
-                            category = category,
-                            confidence = 1f,
-                            modelVersion = ModelVersion,
+                return DagStagedSearchDecision(
+                    candidate =
+                        DagStagedTextDecision(
+                            DagClassificationResult(
+                                decision = DagClassification.Blocked,
+                                category = category,
+                                confidence = 1f,
+                                modelVersion = ModelVersion,
+                            ),
                         ),
-                    reason = DagSearchDecisionReason.DomainListBlock,
+                    fixedReason = DagSearchDecisionReason.DomainListBlock,
                 )
             }
-            val classification =
-                classify(
-                    "$domain $title $description".withoutIntimateApparelTerms(),
-                    directUrl = false,
-                    reviewSingleAmbiguousTerm = true,
-                )
-            return DagClassifiedSearchResult(
-                classification = classification,
-                reason =
-                    when (classification.decision) {
-                        DagClassification.Allowed -> DagSearchDecisionReason.Allowed
-                        DagClassification.Uncertain -> DagSearchDecisionReason.Uncertain
-                        DagClassification.Blocked -> DagSearchDecisionReason.LocalClassifierBlock
-                    },
+            return DagStagedSearchDecision(
+                candidate =
+                    classifyCandidate(
+                        "$domain $title $description".withoutIntimateApparelTerms(),
+                        directUrl = false,
+                        reviewSingleAmbiguousTerm = true,
+                    ),
             )
         }
 
@@ -82,13 +148,7 @@ class DagContentClassifier
                     modelVersion = ModelVersion,
                 )
             }
-            val textResult =
-                classify(
-                    "$domain $title ${text.take(MaxPageCharacters)}".withoutIntimateApparelTerms(),
-                    directUrl = false,
-                    reviewSingleAmbiguousTerm = false,
-                )
-            return textResult
+            return classifyPageCandidate(domain, title, text).classification
         }
 
         fun classifyDirectUrl(url: String): DagClassificationResult {
@@ -115,53 +175,190 @@ class DagContentClassifier
             rawText: String,
             directUrl: Boolean,
             reviewSingleAmbiguousTerm: Boolean,
-        ): DagClassificationResult {
+        ): DagClassificationResult = classifyCandidate(rawText, directUrl, reviewSingleAmbiguousTerm).classification
+
+        private fun classifyPageCandidate(
+            domain: String,
+            title: String,
+            text: String,
+        ): DagStagedTextDecision {
+            val visiblePageText =
+                text
+                    .take(MaxPageCharacters)
+                    .withoutIntimateApparelTerms()
+            val pageText =
+                "$domain $title $visiblePageText"
+                    .withoutIntimateApparelTerms()
+            classifyPolicyCandidate(
+                rawText = pageText,
+                directUrl = false,
+                reviewSingleAmbiguousTerm = false,
+            )?.let { return it }
+
+            val segmentCandidates =
+                listOf(
+                    domain.withoutIntimateApparelTerms(),
+                    title.withoutIntimateApparelTerms(),
+                    pageText,
+                ).filter(String::isNotBlank)
+                    .map(::classifySemantically)
+            val compact =
+                segmentCandidates
+                    .map(DagStagedTextDecision::classification)
+                    .reduce(::dagStrictestClassification)
+            return DagStagedTextDecision(
+                classification = compact,
+                // One neural inference over the bounded complete sample keeps
+                // latency stable. Compact host/title decisions were already
+                // fused monotonically with the complete page, so this stage can
+                // raise risk but never let body boilerplate dilute the title.
+                neuralText =
+                    pageText
+                        .take(MaxNeuralCharacters)
+                        .takeIf {
+                            compact.decision == DagClassification.Uncertain ||
+                                segmentCandidates.last().neuralText != null
+                        },
+            )
+        }
+
+        private fun classifyCandidate(
+            rawText: String,
+            directUrl: Boolean,
+            reviewSingleAmbiguousTerm: Boolean,
+        ): DagStagedTextDecision {
+            classifyPolicyCandidate(rawText, directUrl, reviewSingleAmbiguousTerm)?.let { return it }
+            return classifySemantically(rawText)
+        }
+
+        private fun classifyPolicyCandidate(
+            rawText: String,
+            directUrl: Boolean,
+            reviewSingleAmbiguousTerm: Boolean,
+        ): DagStagedTextDecision? {
             val text = rawText.normalizedForDag()
-            if (text.isBlank()) return uncertain("empty", confidence = 1f)
+            if (text.isBlank()) return DagStagedTextDecision(uncertain("empty", confidence = 1f))
             val explicit =
                 ExplicitCategories.firstOrNull {
                         (_, terms) ->
                     terms.any { term -> term.matches(text) }
                 }
-            val contextPresent = ContextTerms.any { term -> term.matches(text) }
             val ambiguous =
                 AmbiguousCategories.firstOrNull {
                         (_, terms) ->
                     terms.any { term -> term.matches(text) }
                 }
             return when {
-                explicit != null && contextPresent -> uncertain("${explicit.first}_context", confidence = 0.72f)
-                explicit != null -> blocked(explicit.first, confidence = 0.97f)
-                ambiguous != null && reviewSingleAmbiguousTerm -> uncertain(ambiguous.first, confidence = 0.68f)
-                directUrl && !text.contains('.') -> uncertain("invalid_domain", confidence = 1f)
-                directUrl -> allowed()
-                else -> classifySemantically(rawText)
+                explicit != null ->
+                    DagStagedTextDecision(blocked(explicit.first, confidence = 0.97f))
+                ambiguous != null && reviewSingleAmbiguousTerm ->
+                    DagStagedTextDecision(
+                        classification = uncertain(ambiguous.first, confidence = 0.68f),
+                        neuralText = rawText,
+                    )
+                directUrl && !text.contains('.') ->
+                    DagStagedTextDecision(uncertain("invalid_domain", confidence = 1f))
+                directUrl -> DagStagedTextDecision(allowed())
+                else -> null
             }
         }
 
-        private fun classifySemantically(rawText: String): DagClassificationResult {
-            val semantic =
-                neuralClassifierOrNull()?.classify(rawText.take(MaxNeuralCharacters))
-                    ?: semanticClassifier.classify(rawText.take(MaxSemanticCharacters))
-            return when (dagSemanticDecision(semantic)) {
+        private fun classifySemantically(rawText: String): DagStagedTextDecision {
+            val semantic = semanticClassifier.classify(rawText.take(MaxSemanticCharacters))
+            val classification = semanticResult(semantic, compactModelVersion(semantic))
+            return DagStagedTextDecision(
+                classification = classification,
+                neuralText =
+                    rawText
+                        .take(MaxNeuralCharacters)
+                        .takeIf {
+                            classification.decision != DagClassification.Blocked &&
+                                dagNeedsNeuralStage(semantic)
+                        },
+            )
+        }
+
+        private suspend fun resolveNeuralStages(
+            candidates: List<DagStagedTextDecision>,
+        ): List<DagClassificationResult> {
+            val staged =
+                candidates.withIndex().filter { (_, candidate) ->
+                    candidate.neuralText != null
+                }
+            if (staged.isEmpty()) return candidates.map(DagStagedTextDecision::classification)
+            val predictions =
+                try {
+                    neuralTextStageOrNull()?.classifyBatch(staged.map { it.value.neuralText.orEmpty() })
+                        ?: List(staged.size) { null }
+                } catch (exception: CancellationException) {
+                    throw exception
+                } catch (_: Exception) {
+                    List(staged.size) { null }
+                }
+            val byIndex =
+                staged.mapIndexed { predictionIndex, indexedCandidate ->
+                    indexedCandidate.index to predictions.getOrNull(predictionIndex)
+                }.toMap()
+            return candidates.mapIndexed { index, candidate ->
+                if (index !in byIndex) {
+                    candidate.classification
+                } else {
+                    resolveNeuralPrediction(candidate, byIndex[index])
+                }
+            }
+        }
+
+        private fun neuralTextStageOrNull(): DagNeuralTextStage? =
+            neuralTextStageOverride ?: if (::neuralTextClassifier.isInitialized) neuralTextClassifier else null
+
+        private fun resolveNeuralPrediction(
+            candidate: DagStagedTextDecision,
+            neural: DagSemanticPrediction?,
+        ): DagClassificationResult {
+            val compact = candidate.classification
+            if (neural == null) return compact
+            val neuralResult = semanticResult(neural, neuralModelVersion(neural))
+            return when {
+                compact.decision == DagClassification.Blocked -> compact
+                neuralResult.decision == DagClassification.Blocked -> neuralResult
+                compact.decision == DagClassification.Allowed &&
+                    neuralResult.decision == DagClassification.Uncertain -> neuralResult
+                compact.decision == DagClassification.Uncertain ->
+                    uncertain(
+                        category = "semantic_model_uncertain",
+                        confidence = maxOf(compact.confidence, neuralResult.confidence),
+                        modelVersion = neuralModelVersion(neural),
+                    )
+                else -> compact
+            }
+        }
+
+        private fun semanticResult(
+            semantic: DagSemanticPrediction?,
+            modelVersion: String,
+        ): DagClassificationResult =
+            when (dagSemanticDecision(semantic)) {
                 DagClassification.Blocked ->
                     blocked(
                         "semantic_${semantic?.category}",
                         semantic?.confidence ?: 1f,
-                        semantic?.modelVersion ?: ModelVersion,
+                        modelVersion,
                     )
                 DagClassification.Uncertain ->
                     uncertain(
                         if (semantic == null) "model_unavailable" else "semantic_${semantic.category}",
                         semantic?.confidence ?: 1f,
-                        semantic?.modelVersion ?: ModelVersion,
+                        modelVersion,
                     )
-                DagClassification.Allowed -> allowed(semantic?.modelVersion ?: ModelVersion)
+                DagClassification.Allowed ->
+                    allowed(modelVersion).copy(confidence = semantic?.confidence ?: 0.82f)
             }
-        }
 
-        private fun neuralClassifierOrNull(): DagNeuralTextClassifier? =
-            if (::neuralClassifier.isInitialized) neuralClassifier else null
+        private fun compactModelVersion(semantic: DagSemanticPrediction?): String =
+            "$ModelVersion/compact:${semantic?.modelVersion ?: "unavailable"}"
+
+        private fun neuralModelVersion(semantic: DagSemanticPrediction): String =
+            "$ModelVersion/neural:${semantic.modelVersion}"
 
         private fun String.isSearchPortal(): Boolean =
             runCatching {
@@ -196,8 +393,26 @@ class DagContentClassifier
             modelVersion: String = ModelVersion,
         ) = DagClassificationResult(DagClassification.Uncertain, category, confidence, modelVersion)
 
+        private data class DagStagedTextDecision(
+            val classification: DagClassificationResult,
+            val neuralText: String? = null,
+        )
+
+        private data class DagStagedSearchDecision(
+            val candidate: DagStagedTextDecision,
+            val fixedReason: DagSearchDecisionReason? = null,
+        ) {
+            fun reasonFor(classification: DagClassificationResult): DagSearchDecisionReason =
+                fixedReason
+                    ?: when (classification.decision) {
+                        DagClassification.Allowed -> DagSearchDecisionReason.Allowed
+                        DagClassification.Uncertain -> DagSearchDecisionReason.Uncertain
+                        DagClassification.Blocked -> DagSearchDecisionReason.LocalClassifierBlock
+                    }
+        }
+
         companion object {
-            const val ModelVersion = "dag-local-text-7"
+            const val ModelVersion = "dag-local-text-12-staged-minilm-2"
             const val MaxPageCharacters = 24_000
             private const val MaxSemanticCharacters = 4_000
             private const val MaxNeuralCharacters = 2_000
@@ -262,7 +477,10 @@ class DagContentClassifier
                     "sexual" to
                         setOf(
                             "porn", "porno", "pornografia", "pornography", "xxx", "nude", "nudes", "nudity",
-                            "desnudo", "desnuda", "desnudez", "explicit sex", "sexo explicito", "escort", "prostitucion",
+                            "nsfw", "desnudo", "desnuda", "desnudez", "explicit sex", "sexo explicito", "escort",
+                            "prostitucion", "adult photo gallery", "nsfw photo gallery", "sex toy", "sex toys",
+                            "adult store", "adult shop", "sex shop", "juguete sexual", "juguetes sexuales",
+                            "tienda erotica", "tienda para adultos", "productos eroticos",
                             "פורנו", "פורנוגרפיה", "עירום", "זנות", "מין מפורש",
                         ).toMatchers(),
                     "dating" to
@@ -273,7 +491,7 @@ class DagContentClassifier
                     "gambling" to
                         setOf(
                             "online casino", "casino online", "sports betting", "apuestas deportivas", "betting odds",
-                            "poker por dinero", "הימורים", "קזינו", "הימורי ספורט",
+                            "sportsbook", "poker por dinero", "הימורים", "קזינו", "הימורי ספורט",
                         ).toMatchers(),
                     "drugs" to
                         setOf(
@@ -283,7 +501,8 @@ class DagContentClassifier
                     "violence" to
                         setOf(
                             "gore video", "graphic killing", "torture video", "video gore", "asesinato explicito",
-                            "video de tortura", "סרטון רצח", "אלימות גרפית", "סרטון עינויים",
+                            "video de tortura", "ver como matan", "watch people being killed",
+                            "סרטון רצח", "אלימות גרפית", "סרטון עינויים",
                         ).toMatchers(),
                 )
 
@@ -303,14 +522,6 @@ class DagContentClassifier
                         setOf("violence", "violent", "violencia", "murder", "asesinato", "אלימות", "רצח")
                             .toMatchers(),
                 )
-
-            private val ContextTerms =
-                setOf(
-                    "medical", "medicine", "health", "doctor", "educational", "education", "biology", "history",
-                    "medico", "medica", "medicina", "salud", "doctor", "doctora", "educativo", "educacion", "biologia",
-                    "halacha", "torah", "talmud", "judaism", "rabi", "rabbi", "halaja", "tora", "judaismo",
-                    "רפואה", "בריאות", "רופא", "חינוך", "לימוד", "ביולוגיה", "הלכה", "תורה", "תלמוד", "יהדות", "רב",
-                ).toMatchers()
 
             private val IntimateApparelTerms =
                 setOf(
@@ -362,6 +573,36 @@ class DagContentClassifier
         }
     }
 
+internal fun dagNeedsNeuralStage(prediction: DagSemanticPrediction?): Boolean =
+    prediction == null ||
+        prediction.category != "general" ||
+        prediction.confidence < ClearCompactSafeConfidence ||
+        prediction.margin < ClearCompactSafeMargin
+
+internal fun dagStrictestClassification(
+    first: DagClassificationResult,
+    second: DagClassificationResult,
+): DagClassificationResult {
+    val firstRank = first.decision.riskRank()
+    val secondRank = second.decision.riskRank()
+    return when {
+        firstRank > secondRank -> first
+        secondRank > firstRank -> second
+        first.confidence >= second.confidence -> first
+        else -> second
+    }
+}
+
+private fun DagClassification.riskRank(): Int =
+    when (this) {
+        DagClassification.Allowed -> 0
+        DagClassification.Uncertain -> 1
+        DagClassification.Blocked -> 2
+    }
+
+private const val ClearCompactSafeConfidence = 0.50f
+private const val ClearCompactSafeMargin = 0.20f
+
 internal enum class DagAdaptivePageDecision {
     Allowed,
     Protected,
@@ -372,12 +613,8 @@ internal fun dagAdaptivePageDecision(result: DagClassificationResult): DagAdapti
     when (result.decision) {
         DagClassification.Allowed -> DagAdaptivePageDecision.Allowed
         DagClassification.Uncertain -> DagAdaptivePageDecision.Protected
-        DagClassification.Blocked ->
-            if (result.category.startsWith("semantic_") && result.confidence < AdaptiveSemanticPageBlockThreshold) {
-                DagAdaptivePageDecision.Protected
-            } else {
-                DagAdaptivePageDecision.Blocked
-            }
+        // The staged classifier has already applied the review threshold and
+        // neural disagreement handling. Relaxing a remaining Blocked decision
+        // here could reveal the very content the semantic gate identified.
+        DagClassification.Blocked -> DagAdaptivePageDecision.Blocked
     }
-
-private const val AdaptiveSemanticPageBlockThreshold = 0.82f
