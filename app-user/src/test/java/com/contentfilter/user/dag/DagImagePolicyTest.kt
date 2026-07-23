@@ -144,6 +144,20 @@ class DagImagePolicyTest {
     }
 
     @Test
+    fun `normal allowed images skip calibration thumbnail work`() {
+        val allowed =
+            DagImageClassification(
+                decision = DagImageDecision.Allowed,
+                scores = mapOf("professional" to 0.01f),
+            )
+        val uncertain = allowed.copy(decision = DagImageDecision.Uncertain)
+
+        assertFalse(shouldCreateCalibrationThumbnail(allowed, calibrationRevealEnabled = false))
+        assertTrue(shouldCreateCalibrationThumbnail(uncertain, calibrationRevealEnabled = false))
+        assertTrue(shouldCreateCalibrationThumbnail(allowed, calibrationRevealEnabled = true))
+    }
+
+    @Test
     fun `viewport waits for pending images and fails closed at its deadline`() {
         assertEquals(DagViewportReadinessAction.Ready, dagViewportReadinessAction(0, 0L))
         assertEquals(DagViewportReadinessAction.Wait, dagViewportReadinessAction(2, 1_000L))

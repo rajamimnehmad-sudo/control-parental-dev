@@ -1,5 +1,6 @@
 package com.contentfilter.user.dag
 
+import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -64,6 +65,7 @@ class DagBrowserViewModel
         private var searchJob: Job? = null
         private val searchRequestTracker = DagSearchRequestTracker()
         private val reviewSubmissionsInFlight = mutableSetOf<String>()
+        private var pageAnalysisStartedAtMillis = 0L
 
         init {
             viewModelScope.launch {
@@ -474,6 +476,7 @@ class DagBrowserViewModel
                     }
                 DagClassification.Allowed ->
                     mutableState.update {
+                        pageAnalysisStartedAtMillis = SystemClock.elapsedRealtime()
                         it.copy(
                             address = url,
                             loading = false,
@@ -603,6 +606,7 @@ class DagBrowserViewModel
         }
 
         private fun revealPageIfReady(url: String) {
+            var revealed = false
             mutableState.update { state ->
                 if (
                     state.requestedUrl == url &&
@@ -610,15 +614,23 @@ class DagBrowserViewModel
                     state.viewportImagesReady &&
                     state.pageStatus == DagPageStatus.Loading
                 ) {
+                    revealed = true
                     state.copy(pageStatus = DagPageStatus.Visible, analysisProgress = 1f)
                 } else {
                     state
                 }
             }
+            if (revealed) {
+                Log.d(
+                    PerformanceLogTag,
+                    "page_visible elapsed_ms=${SystemClock.elapsedRealtime() - pageAnalysisStartedAtMillis}",
+                )
+            }
         }
 
         fun onPageStarted(url: String): Boolean {
             if (!mutableState.value.dagEnabled || !url.startsWith("https://", ignoreCase = true)) return false
+            pageAnalysisStartedAtMillis = SystemClock.elapsedRealtime()
             val domain = DagContentClassifier.domainFrom(url)
             val result = applyExplicitRule(domain, classifier.classifyDirectUrl(url))
             if (result.decision != DagClassification.Allowed) {
@@ -975,6 +987,7 @@ class DagBrowserViewModel
             const val ApprovalPollingAttempts = 24
             const val SuggestionDebounceMillis = 120L
             const val DiagnosticsLogTag = "DagSearchDiagnostics"
+            const val PerformanceLogTag = "DagPerformance"
             const val PageApprovalModelVersion =
                 "dag-page-approval-1:${DagContentClassifier.ModelVersion}:${DagNeuralTextClassifier.ModelVersion}:" +
                     DagProfessionalImageClassifier.ModelVersion

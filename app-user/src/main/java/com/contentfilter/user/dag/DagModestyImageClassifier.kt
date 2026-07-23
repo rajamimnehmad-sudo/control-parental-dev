@@ -180,6 +180,10 @@ internal class DagModestyImageClassifier(
 
     internal fun isAvailable(): Boolean = android.os.Build.SUPPORTED_ABIS.any { it == "arm64-v8a" }
 
+    internal fun prepare() {
+        if (isAvailable()) model()
+    }
+
     private fun model(): OrtSession =
         session ?: applicationContext.assets.open(ModelAsset).use { input ->
             OrtSession.SessionOptions().use { options ->
