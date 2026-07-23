@@ -1,2 +1,0 @@
-DAG mejora la carga y la interacción en páginas dinámicas sin adelantar fotos sin revisar.
-El análisis local reutiliza modelos y recursos de forma acotada, conserva los filtros de texto e imágenes y refuerza los cambios dinámicos de contenido.

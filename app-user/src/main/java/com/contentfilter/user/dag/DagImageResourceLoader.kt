@@ -5,18 +5,14 @@ import android.graphics.BitmapFactory
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
-import okhttp3.Call
-import okhttp3.CookieJar
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
-import okhttp3.Response
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
 import java.net.InetAddress
 import java.util.concurrent.ArrayBlockingQueue
-import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -27,12 +23,12 @@ internal class DagImageResourceLoader(
     private val onCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit = { _, _ -> },
     private val onManualCandidateReady: (String, DagImageDecision) -> Unit = { _, _ -> },
     private val cookieManager: CookieManager = CookieManager.getInstance(),
-    client: OkHttpClient =
+    private val client: OkHttpClient =
         OkHttpClient.Builder()
             .connectTimeout(RequestTimeoutSeconds, TimeUnit.SECONDS)
             .readTimeout(RequestTimeoutSeconds, TimeUnit.SECONDS)
             .callTimeout(RequestTimeoutSeconds, TimeUnit.SECONDS)
-            .followRedirects(false)
+            .followRedirects(true)
             .followSslRedirects(false)
             .dns(
                 object : Dns {
@@ -55,61 +51,36 @@ internal class DagImageResourceLoader(
     private val pageGeneration = AtomicInteger(0)
     private val closed = AtomicBoolean(false)
     private val devCalibrationRevealEnabled = AtomicBoolean(false)
-    private val pageStateLock = Any()
-    private val prioritizedImageUrls = LinkedHashSet<String>()
-    private val activeCalls = ConcurrentHashMap<Call, Int>()
     private val imageSlots = Semaphore(DagImageDeliveryPolicy.MaximumConcurrentImages, true)
     private val classifierPool = ArrayBlockingQueue(classifiers.size, true, classifiers)
     private val calibrationClassifier = classifiers.first()
     private val responseCache = LinkedHashMap<String, CachedImageResource>(16, 0.75f, true)
     private val manualCalibrationCandidates = LinkedHashMap<String, DagManualCalibrationCandidate>(16, 0.75f, true)
     private var responseCacheBytes = 0
-    private val client =
-        client
-            .newBuilder()
-            .cookieJar(CookieJar.NO_COOKIES)
-            .followRedirects(false)
-            .followSslRedirects(false)
-            .build()
 
     fun resetPage() {
-        val currentGeneration =
-            synchronized(pageStateLock) {
-                val generation = pageGeneration.incrementAndGet()
-                imageCount.set(0)
-                allowedCount.set(0)
-                blockedCount.set(0)
-                uncertainCount.set(0)
-                responseCache.clear()
-                responseCacheBytes = 0
-                manualCalibrationCandidates.clear()
-                prioritizedImageUrls.clear()
-                generation
-            }
-        activeCalls.forEach { (call, generation) ->
-            if (generation != currentGeneration) call.cancel()
+        pageGeneration.incrementAndGet()
+        imageCount.set(0)
+        allowedCount.set(0)
+        blockedCount.set(0)
+        uncertainCount.set(0)
+        synchronized(responseCache) {
+            responseCache.clear()
+            responseCacheBytes = 0
         }
+        synchronized(manualCalibrationCandidates) { manualCalibrationCandidates.clear() }
     }
 
     fun pageSummary(): DagImagePageSummary =
-        synchronized(pageStateLock) {
-            DagImagePageSummary(
-                allowed = allowedCount.get(),
-                blocked = blockedCount.get(),
-                uncertain = uncertainCount.get(),
-            )
-        }
+        DagImagePageSummary(
+            allowed = allowedCount.get(),
+            blocked = blockedCount.get(),
+            uncertain = uncertainCount.get(),
+        )
 
     fun cancel() {
-        synchronized(pageStateLock) {
-            closed.set(true)
-            pageGeneration.incrementAndGet()
-            responseCache.clear()
-            responseCacheBytes = 0
-            manualCalibrationCandidates.clear()
-            prioritizedImageUrls.clear()
-        }
-        activeCalls.keys.forEach(Call::cancel)
+        closed.set(true)
+        pageGeneration.incrementAndGet()
     }
 
     fun setDevCalibrationRevealEnabled(enabled: Boolean): Boolean {
@@ -119,28 +90,17 @@ internal class DagImageResourceLoader(
     }
 
     fun manualCalibrationDecision(imageUrl: String): DagImageDecision? =
-        synchronized(pageStateLock) {
+        synchronized(manualCalibrationCandidates) {
             manualCalibrationCandidates[normalizeImageUrl(imageUrl)]?.classification?.decision
         }
 
-    fun prioritizeImageUrls(imageUrls: Collection<String>) {
-        synchronized(pageStateLock) {
-            if (closed.get()) return
-            dagAddBoundedPrioritizedImageUrls(
-                target = prioritizedImageUrls,
-                imageUrls = imageUrls,
-                maximumSize = DagImageDeliveryPolicy.MaximumPrioritizedImageUrls,
-            )
-        }
-    }
-
     fun manualCalibrationDecisions(): Map<String, DagImageDecision> =
-        synchronized(pageStateLock) {
+        synchronized(manualCalibrationCandidates) {
             manualCalibrationCandidates.mapValues { it.value.classification.decision }
         }
 
     fun takeManualCalibrationCandidate(imageUrl: String): DagManualCalibrationCandidate? =
-        synchronized(pageStateLock) {
+        synchronized(manualCalibrationCandidates) {
             manualCalibrationCandidates.remove(normalizeImageUrl(imageUrl))
         }
 
@@ -150,38 +110,30 @@ internal class DagImageResourceLoader(
     ): WebResourceResponse? {
         if (closed.get()) return unavailableImageResource()
         if (request.isForMainFrame) return null
-        val requestUrl = request.url.toString()
-        val originalImageUrl = dagOriginalImageUrl(requestUrl)
-        val imageUrl = originalImageUrl ?: requestUrl
-        if (isBlockedMediaRequest(imageUrl, request.requestHeaders)) return blockedResource()
-        if (!isProbableImageRequest(requestUrl, request.requestHeaders)) return null
+        if (isBlockedMediaRequest(request.url.toString(), request.requestHeaders)) return blockedResource()
+        if (!isProbableImageRequest(request.url.toString(), request.requestHeaders)) return null
+        cachedResource(request.url.toString())?.let { return it }
+        if (request.url.scheme != "https" || imageCount.incrementAndGet() > MaximumImagesPerPage) {
+            return unavailableImageResource()
+        }
         val generation = pageGeneration.get()
-        cachedResource(imageUrl, generation)?.let { return it }
-        if (!admitImageUrl(imageUrl, originalImageUrl != null, generation)) {
-            return unavailableImageResource()
-        }
-        if (
-            !imageUrl.startsWith("https://", ignoreCase = true) ||
-            !reserveImage(generation)
-        ) {
-            return unavailableImageResource()
-        }
 
-        var acquired = false
-        try {
-            while (!acquired && isCurrentGeneration(generation)) {
-                acquired = imageSlots.tryAcquire(ResourceWaitMillis, TimeUnit.MILLISECONDS)
+        val acquired =
+            try {
+                imageSlots.acquire()
+                true
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                false
             }
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
-        }
         if (!acquired) {
+            uncertainCount.incrementAndGet()
             return unavailableImageResource()
         }
         return try {
-            if (!isCurrentGeneration(generation)) return unavailableImageResource()
-            runCatching { loadClassifiedImage(request, pageUrl, imageUrl, generation) }.getOrElse {
-                incrementIfCurrent(generation, uncertainCount)
+            if (closed.get() || generation != pageGeneration.get()) return unavailableImageResource()
+            runCatching { loadClassifiedImage(request, pageUrl) }.getOrElse {
+                uncertainCount.incrementAndGet()
                 unavailableImageResource()
             }
         } finally {
@@ -192,264 +144,88 @@ internal class DagImageResourceLoader(
     private fun loadClassifiedImage(
         request: WebResourceRequest,
         pageUrl: String?,
-        imageUrl: String,
-        generation: Int,
     ): WebResourceResponse {
-        val requestBuilder =
-            Request
-                .Builder()
-                .url(imageUrl)
-                .get()
-                .header("Accept", DisplayImageAcceptHeader)
-        val storedCookie =
-            if (dagShouldForwardImageCookie(imageUrl, pageUrl)) {
-                runCatching { cookieManager.getCookie(imageUrl) }.getOrNull()
-            } else {
-                null
+        val requestBuilder = Request.Builder().url(request.url.toString()).get()
+        ForwardedHeaders.forEach { name ->
+            request.requestHeaders.headerValue(name).takeIf { it.isNotBlank() }?.let { requestBuilder.header(name, it) }
+        }
+        cookieManager.getCookie(
+            request.url.toString(),
+        )?.takeIf { it.isNotBlank() }?.let { requestBuilder.header("Cookie", it) }
+        if (request.requestHeaders.headerValue("Referer").isBlank()) {
+            pageUrl?.takeIf { it.startsWith("https://", ignoreCase = true) }?.let {
+                requestBuilder.header("Referer", it)
             }
-        dagForwardedImageRequestHeaders(
-            requestHeaders = request.requestHeaders,
-            imageUrl = imageUrl,
-            pageUrl = pageUrl,
-            storedCookie = storedCookie,
-        ).forEach { (name, value) ->
-            requestBuilder.header(name, value)
         }
 
-        val trackedResponse =
-            executeImageRequest(
-                initialRequest = requestBuilder.build(),
-                pageUrl = pageUrl,
-                generation = generation,
-            ) ?: return unavailableImageResource()
-        try {
-            trackedResponse.response.use { response ->
-                if (!isCurrentGeneration(generation)) return unavailableImageResource()
-                if (!response.isSuccessful || response.request.url.scheme != "https") {
-                    return unavailableImageResource()
-                }
-                val body = response.body ?: return unavailableImageResource()
-                if (body.contentLength() > DagImageClassifier.MaximumImageBytes) return unavailableImageResource()
-                val bytes = body.byteStream().readLimited(DagImageClassifier.MaximumImageBytes)
-                if (!isCurrentGeneration(generation)) return unavailableImageResource()
-                val mimeType = body.contentType()?.toString()
-                val corsAllowOrigin = dagSafeCorsAllowOrigin(response.header("Access-Control-Allow-Origin"))
-                val corsAllowCredentials =
-                    dagSafeCorsAllowCredentials(
-                        value = response.header("Access-Control-Allow-Credentials"),
-                        allowOrigin = corsAllowOrigin,
-                        requestOrigin = response.request.header("Origin"),
-                    )
-                if (isSafeStaticSvg(bytes, mimeType)) {
-                    incrementIfCurrent(generation, allowedCount)
-                    return cacheAndCreateResource(
-                        imageUrl,
+        client.newCall(requestBuilder.build()).execute().use { response ->
+            if (!response.isSuccessful || response.request.url.scheme != "https") return unavailableImageResource()
+            val body = response.body ?: return unavailableImageResource()
+            if (body.contentLength() > DagImageClassifier.MaximumImageBytes) return unavailableImageResource()
+            val bytes = body.byteStream().readLimited(DagImageClassifier.MaximumImageBytes)
+            val mimeType = body.contentType()?.toString()
+            if (isSafeStaticSvg(bytes, mimeType)) {
+                allowedCount.incrementAndGet()
+                return cacheAndCreateResource(request.url.toString(), bytes, "image/svg+xml", "safe-icon")
+            }
+            val measuredClassification =
+                withClassifier { classifier ->
+                    classifier.classify(
                         bytes,
-                        "image/svg+xml",
-                        "safe-icon",
-                        corsAllowOrigin,
-                        corsAllowCredentials,
-                        generation,
+                        mimeType,
+                        dagImageAudienceContext(request.url.toString(), pageUrl),
                     )
                 }
-                val measuredClassification =
-                    withClassifier(generation) { classifier ->
-                        classifier.classify(
-                            bytes,
-                            mimeType,
-                            dagImageAudienceContext(imageUrl, pageUrl),
-                        )
-                    }
-                if (!isCurrentGeneration(generation)) return unavailableImageResource()
-                val calibrationThumbnail =
-                    if (shouldCreateCalibrationThumbnail(measuredClassification, devCalibrationRevealEnabled.get())) {
-                        dagCalibrationThumbnail(bytes)
-                    } else {
-                        null
-                    }
-                if (!isCurrentGeneration(generation)) return unavailableImageResource()
-                val classification =
-                    calibrationThumbnail
-                        ?.let { calibrationClassifier.exactDecision(it.dagCalibrationHash()) }
-                        ?.let { measuredClassification.copy(decision = it) }
-                        ?: measuredClassification
-                if (calibrationThumbnail != null) {
-                    calibrationThumbnail.let { thumbnail ->
-                        rememberManualCalibrationCandidate(
-                            imageUrl,
-                            thumbnail,
-                            classification,
-                            generation,
-                        )
-                    }
-                    if (isCurrentGeneration(generation)) {
-                        onManualCandidateReady(imageUrl, classification.decision)
-                    }
-                }
-                when (classification.decision) {
-                    DagImageDecision.Allowed -> incrementIfCurrent(generation, allowedCount)
-                    DagImageDecision.Blocked -> incrementIfCurrent(generation, blockedCount)
-                    DagImageDecision.Uncertain -> incrementIfCurrent(generation, uncertainCount)
-                }
-                if (!isCurrentGeneration(generation)) return unavailableImageResource()
-                if (classification.decision != DagImageDecision.Allowed) {
-                    if (classification.decision == DagImageDecision.Uncertain) {
-                        calibrationThumbnail?.let {
-                            if (isCurrentGeneration(generation)) onCalibrationCandidate(it, classification)
-                        }
-                    }
-                    if (devCalibrationRevealEnabled.get()) {
-                        return cacheAndCreateResource(
-                            imageUrl,
-                            bytes,
-                            classification.mimeType ?: return unavailableImageResource(),
-                            classification.decision.name.lowercase(),
-                            corsAllowOrigin,
-                            corsAllowCredentials,
-                            generation,
-                        )
-                    }
-                    return blurredImageResource(
-                        imageUrl,
-                        bytes,
-                        corsAllowOrigin,
-                        corsAllowCredentials,
-                        generation,
-                    )
-                        ?: unavailableImageResource()
-                }
-
-                val displayResource =
-                    displayCompatibleImage(bytes, classification.mimeType)
-                        ?: return unavailableImageResource()
-                if (!isCurrentGeneration(generation)) return unavailableImageResource()
-                return cacheAndCreateResource(
-                    imageUrl,
-                    displayResource.bytes,
-                    displayResource.mimeType,
-                    corsAllowOrigin = corsAllowOrigin,
-                    corsAllowCredentials = corsAllowCredentials,
-                    generation = generation,
-                )
-            }
-        } finally {
-            activeCalls.remove(trackedResponse.call)
-        }
-    }
-
-    private fun executeImageRequest(
-        initialRequest: Request,
-        pageUrl: String?,
-        generation: Int,
-    ): TrackedImageResponse? {
-        var currentRequest = initialRequest
-        var redirectCount = 0
-        val deadlineNanos =
-            System.nanoTime() +
-                TimeUnit.SECONDS.toNanos(RequestTimeoutSeconds)
-        while (isCurrentGeneration(generation)) {
-            val remainingNanos = deadlineNanos - System.nanoTime()
-            if (remainingNanos <= 0L) return null
-            val call = client.newCall(currentRequest)
-            call.timeout().timeout(remainingNanos, TimeUnit.NANOSECONDS)
-            activeCalls[call] = generation
-            if (!isCurrentGeneration(generation)) {
-                activeCalls.remove(call)
-                call.cancel()
-                return null
-            }
-            val response =
-                try {
-                    call.execute()
-                } catch (error: Throwable) {
-                    activeCalls.remove(call)
-                    throw error
-                }
-            if (!isCurrentGeneration(generation)) {
-                response.close()
-                activeCalls.remove(call)
-                return null
-            }
-            val location =
-                response
-                    .takeIf { it.code in ImageRedirectStatusCodes }
-                    ?.header("Location")
-            if (location == null) {
-                return TrackedImageResponse(call, response)
-            }
-            if (redirectCount >= MaximumImageRedirects) {
-                response.close()
-                activeCalls.remove(call)
-                return null
-            }
-            val redirectUrl = response.request.url.resolve(location)
-            response.close()
-            activeCalls.remove(call)
-            if (redirectUrl == null || redirectUrl.scheme != "https") return null
-
-            val redirectCookie =
-                if (dagShouldForwardImageCookie(redirectUrl.toString(), pageUrl)) {
-                    runCatching { cookieManager.getCookie(redirectUrl.toString()) }.getOrNull()
+            val calibrationThumbnail =
+                if (shouldCreateCalibrationThumbnail(measuredClassification, devCalibrationRevealEnabled.get())) {
+                    dagCalibrationThumbnail(bytes)
                 } else {
                     null
                 }
-            val redirectRequestBuilder =
-                currentRequest
-                    .newBuilder()
-                    .url(redirectUrl)
-                    .removeHeader("Cookie")
-            dagImageCookieHeader(redirectUrl.toString(), pageUrl, redirectCookie)?.let {
-                redirectRequestBuilder.header("Cookie", it)
+            val classification =
+                calibrationThumbnail
+                    ?.let { calibrationClassifier.exactDecision(it.dagCalibrationHash()) }
+                    ?.let { measuredClassification.copy(decision = it) }
+                    ?: measuredClassification
+            if (calibrationThumbnail != null) {
+                calibrationThumbnail.let { thumbnail ->
+                    rememberManualCalibrationCandidate(request.url.toString(), thumbnail, classification)
+                }
+                onManualCandidateReady(request.url.toString(), classification.decision)
             }
-            currentRequest = redirectRequestBuilder.build()
-            redirectCount += 1
-        }
-        return null
-    }
+            when (classification.decision) {
+                DagImageDecision.Allowed -> allowedCount.incrementAndGet()
+                DagImageDecision.Blocked -> blockedCount.incrementAndGet()
+                DagImageDecision.Uncertain -> uncertainCount.incrementAndGet()
+            }
+            if (classification.decision != DagImageDecision.Allowed) {
+                if (classification.decision == DagImageDecision.Uncertain) {
+                    calibrationThumbnail?.let { onCalibrationCandidate(it, classification) }
+                }
+                if (devCalibrationRevealEnabled.get()) {
+                    return cacheAndCreateResource(
+                        request.url.toString(),
+                        bytes,
+                        classification.mimeType ?: return unavailableImageResource(),
+                        classification.decision.name.lowercase(),
+                    )
+                }
+                return blurredImageResource(request.url.toString(), bytes) ?: unavailableImageResource()
+            }
 
-    private fun displayCompatibleImage(
-        bytes: ByteArray,
-        mimeType: String?,
-    ): DisplayImageResource? {
-        val detectedMime = mimeType ?: return null
-        if (detectedMime != "image/avif") {
-            return DisplayImageResource(bytes, detectedMime)
-        }
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        var sampleSize = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > MaximumDisplayDimension) {
-            sampleSize *= 2
-        }
-        val source =
-            BitmapFactory.decodeByteArray(
+            return cacheAndCreateResource(
+                request.url.toString(),
                 bytes,
-                0,
-                bytes.size,
-                BitmapFactory.Options().apply { inSampleSize = sampleSize },
-            ) ?: return null
-        return try {
-            ByteArrayOutputStream().use { output ->
-                val hasAlpha = source.hasAlpha()
-                val format = if (hasAlpha) Bitmap.CompressFormat.PNG else Bitmap.CompressFormat.JPEG
-                if (!source.compress(format, DisplayJpegQuality, output)) return null
-                DisplayImageResource(output.toByteArray(), if (hasAlpha) "image/png" else "image/jpeg")
-            }
-        } finally {
-            source.recycle()
+                classification.mimeType ?: return unavailableImageResource(),
+            )
         }
     }
 
     private fun blurredImageResource(
         cacheKey: String,
         bytes: ByteArray,
-        corsAllowOrigin: String?,
-        corsAllowCredentials: Boolean,
-        generation: Int,
     ): WebResourceResponse? {
-        if (!isCurrentGeneration(generation)) return null
-        val source = decodeSampledImage(bytes, MaximumBlurredDimension) ?: return null
+        val source = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
         return try {
             val outputWidth = minOf(source.width, MaximumBlurredDimension)
             val outputHeight = maxOf(1, source.height * outputWidth / source.width)
@@ -461,15 +237,7 @@ internal class DagImageResourceLoader(
             try {
                 if (!blurred.compress(Bitmap.CompressFormat.JPEG, BlurJpegQuality, output)) return null
                 val blurredBytes = output.toByteArray()
-                cacheAndCreateResource(
-                    cacheKey,
-                    blurredBytes,
-                    "image/jpeg",
-                    "blurred",
-                    corsAllowOrigin,
-                    corsAllowCredentials,
-                    generation,
-                )
+                cacheAndCreateResource(cacheKey, blurredBytes, "image/jpeg", "blurred")
             } finally {
                 if (blurred !== tiny && blurred !== source) blurred.recycle()
                 if (tiny !== source) tiny.recycle()
@@ -480,7 +248,7 @@ internal class DagImageResourceLoader(
     }
 
     private fun dagCalibrationThumbnail(bytes: ByteArray): ByteArray? {
-        val source = decodeSampledImage(bytes, CalibrationThumbnailDimension) ?: return null
+        val source = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
         return try {
             val scale = minOf(1f, CalibrationThumbnailDimension.toFloat() / maxOf(source.width, source.height))
             val width = maxOf(1, (source.width * scale).toInt())
@@ -506,37 +274,12 @@ internal class DagImageResourceLoader(
         }
     }
 
-    private fun decodeSampledImage(
-        bytes: ByteArray,
-        maximumDimension: Int,
-    ): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        if (bounds.outWidth !in 1..MaximumSourceImageDimension) return null
-        if (bounds.outHeight !in 1..MaximumSourceImageDimension) return null
-        var sampleSize = 1
-        while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > maximumDimension) {
-            sampleSize *= 2
-        }
-        return BitmapFactory.decodeByteArray(
-            bytes,
-            0,
-            bytes.size,
-            BitmapFactory.Options().apply {
-                inSampleSize = sampleSize
-                inPreferredConfig = Bitmap.Config.ARGB_8888
-            },
-        )
-    }
-
     private fun rememberManualCalibrationCandidate(
         imageUrl: String,
         thumbnail: ByteArray,
         classification: DagImageClassification,
-        generation: Int,
     ) {
-        synchronized(pageStateLock) {
-            if (!isCurrentGeneration(generation)) return
+        synchronized(manualCalibrationCandidates) {
             manualCalibrationCandidates[normalizeImageUrl(imageUrl)] =
                 DagManualCalibrationCandidate(thumbnail, classification)
             while (manualCalibrationCandidates.size > MaximumManualCalibrationCandidates) {
@@ -545,21 +288,9 @@ internal class DagImageResourceLoader(
         }
     }
 
-    private fun cachedResource(
-        key: String,
-        generation: Int,
-    ): WebResourceResponse? =
-        synchronized(pageStateLock) {
-            if (!isCurrentGeneration(generation)) return@synchronized null
-            responseCache[normalizeImageUrl(key)]?.let {
-                imageResource(
-                    it.bytes,
-                    it.mimeType,
-                    it.decision,
-                    it.corsAllowOrigin,
-                    it.corsAllowCredentials,
-                )
-            }
+    private fun cachedResource(key: String): WebResourceResponse? =
+        synchronized(responseCache) { responseCache[key] }?.let {
+            imageResource(it.bytes, it.mimeType, it.decision)
         }
 
     private fun cacheAndCreateResource(
@@ -567,24 +298,11 @@ internal class DagImageResourceLoader(
         bytes: ByteArray,
         mimeType: String,
         decision: String? = null,
-        corsAllowOrigin: String? = null,
-        corsAllowCredentials: Boolean = false,
-        generation: Int,
     ): WebResourceResponse {
-        if (!isCurrentGeneration(generation)) return unavailableImageResource()
-        val normalizedKey = normalizeImageUrl(key)
-        val cached =
-            CachedImageResource(
-                bytes,
-                mimeType,
-                decision,
-                corsAllowOrigin,
-                corsAllowCredentials,
-            )
-        synchronized(pageStateLock) {
-            if (!isCurrentGeneration(generation)) return unavailableImageResource()
-            if (bytes.size <= MaximumCachedImageBytes) {
-                responseCache.put(normalizedKey, cached)?.let { responseCacheBytes -= it.bytes.size }
+        val cached = CachedImageResource(bytes, mimeType, decision)
+        if (bytes.size <= MaximumCachedImageBytes) {
+            synchronized(responseCache) {
+                responseCache.put(key, cached)?.let { responseCacheBytes -= it.bytes.size }
                 responseCacheBytes += bytes.size
                 while (responseCacheBytes > MaximumResponseCacheBytes || responseCache.size > MaximumCachedImages) {
                     val eldest = responseCache.entries.iterator().next()
@@ -593,21 +311,13 @@ internal class DagImageResourceLoader(
                 }
             }
         }
-        return imageResource(
-            cached.bytes,
-            cached.mimeType,
-            cached.decision,
-            cached.corsAllowOrigin,
-            cached.corsAllowCredentials,
-        )
+        return imageResource(cached.bytes, cached.mimeType, cached.decision)
     }
 
     private fun imageResource(
         bytes: ByteArray,
         mimeType: String,
         decision: String? = null,
-        corsAllowOrigin: String? = null,
-        corsAllowCredentials: Boolean = false,
     ): WebResourceResponse =
         WebResourceResponse(
             mimeType,
@@ -615,11 +325,10 @@ internal class DagImageResourceLoader(
             200,
             "OK",
             buildMap {
+                put("Access-Control-Allow-Origin", "*")
                 put("Cache-Control", "no-store")
                 put("Content-Length", bytes.size.toString())
                 put("X-Content-Type-Options", "nosniff")
-                corsAllowOrigin?.let { put("Access-Control-Allow-Origin", it) }
-                if (corsAllowCredentials) put("Access-Control-Allow-Credentials", "true")
                 decision?.let { put("X-DAG-Image-Decision", it) }
             },
             ByteArrayInputStream(bytes),
@@ -639,25 +348,14 @@ internal class DagImageResourceLoader(
         return output.toByteArray()
     }
 
-    private inline fun <T> withClassifier(
-        generation: Int,
-        block: (DagImageClassifier) -> T,
-    ): T {
+    private inline fun <T> withClassifier(block: (DagImageClassifier) -> T): T {
         val classifier =
             try {
-                var available: DagImageClassifier? = null
-                while (available == null && isCurrentGeneration(generation)) {
-                    available = classifierPool.poll(ResourceWaitMillis, TimeUnit.MILLISECONDS)
-                }
-                available ?: throw IOException("Obsolete DAG image classification")
+                classifierPool.take()
             } catch (error: InterruptedException) {
                 Thread.currentThread().interrupt()
                 throw IOException("DAG image classification interrupted", error)
             }
-        if (!isCurrentGeneration(generation)) {
-            check(classifierPool.offer(classifier)) { "DAG classifier pool overflow" }
-            throw IOException("Obsolete DAG image classification")
-        }
         return try {
             block(classifier)
         } finally {
@@ -665,47 +363,14 @@ internal class DagImageResourceLoader(
         }
     }
 
-    private fun isCurrentGeneration(generation: Int): Boolean = !closed.get() && pageGeneration.get() == generation
-
-    private fun admitImageUrl(
-        imageUrl: String,
-        isSynthetic: Boolean,
-        generation: Int,
-    ): Boolean =
-        synchronized(pageStateLock) {
-            if (!isCurrentGeneration(generation)) return@synchronized false
-            isSynthetic || normalizeImageUrl(imageUrl) in prioritizedImageUrls
-        }
-
-    private fun reserveImage(generation: Int): Boolean =
-        synchronized(pageStateLock) {
-            if (!isCurrentGeneration(generation)) return@synchronized false
-            imageCount.incrementAndGet() <= MaximumImagesPerPage
-        }
-
-    private fun incrementIfCurrent(
-        generation: Int,
-        counter: AtomicInteger,
-    ): Boolean =
-        synchronized(pageStateLock) {
-            if (!isCurrentGeneration(generation)) return@synchronized false
-            counter.incrementAndGet()
-            true
-        }
-
     private companion object {
-        const val MaximumImagesPerPage = DagImageDeliveryPolicy.MaximumPrioritizedImageUrls
-        const val MaximumImageRedirects = 5
+        const val MaximumImagesPerPage = 400
         const val RequestTimeoutSeconds = 15L
-        const val ResourceWaitMillis = 100L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
         const val MaximumBlurredDimension = 480
         const val BlurSampleSide = 4
         const val BlurJpegQuality = 72
-        const val DisplayJpegQuality = 88
-        const val MaximumDisplayDimension = 2_048
-        const val MaximumSourceImageDimension = 16_384
         const val CalibrationThumbnailDimension = 512
         const val CalibrationThumbnailQuality = 65
         const val CalibrationThumbnailMaximumBytes = 128 * 1024
@@ -713,20 +378,9 @@ internal class DagImageResourceLoader(
         const val MaximumCachedImageBytes = 1024 * 1024
         const val MaximumResponseCacheBytes = 16 * 1024 * 1024
         const val MaximumManualCalibrationCandidates = 160
-        const val DisplayImageAcceptHeader = "image/webp,image/png,image/jpeg,image/svg+xml;q=0.9,*/*;q=0.5"
-        val ImageRedirectStatusCodes = setOf(301, 302, 303, 307, 308)
+        val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }
 }
-
-private data class TrackedImageResponse(
-    val call: Call,
-    val response: Response,
-)
-
-private data class DisplayImageResource(
-    val bytes: ByteArray,
-    val mimeType: String,
-)
 
 internal fun shouldCreateCalibrationThumbnail(
     classification: DagImageClassification,
@@ -742,144 +396,11 @@ internal data class DagManualCalibrationCandidate(
 
 internal fun normalizeImageUrl(value: String): String = value.substringBefore('#')
 
-internal fun dagAddBoundedPrioritizedImageUrls(
-    target: LinkedHashSet<String>,
-    imageUrls: Collection<String>,
-    maximumSize: Int,
-) {
-    require(maximumSize > 0) { "DAG image priority limit must be positive" }
-    imageUrls.forEach { candidate ->
-        if (candidate.length > DagMaximumOriginalImageUrlLength) return@forEach
-        val normalized = normalizeImageUrl(candidate)
-        if (!normalized.startsWith("https://", ignoreCase = true)) return@forEach
-        target.remove(normalized)
-        target.add(normalized)
-        while (target.size > maximumSize) {
-            target.remove(target.first())
-        }
-    }
-}
-
-internal fun dagShouldForwardImageCookie(
-    imageUrl: String,
-    pageUrl: String?,
-): Boolean = pageUrl != null && dagSameOrigin(imageUrl, pageUrl)
-
-internal fun dagImageCookieHeader(
-    imageUrl: String,
-    pageUrl: String?,
-    cookie: String?,
-): String? =
-    cookie
-        ?.trim()
-        ?.takeIf(String::isNotEmpty)
-        ?.takeIf { dagShouldForwardImageCookie(imageUrl, pageUrl) }
-
-internal fun dagForwardedImageRequestHeaders(
-    requestHeaders: Map<String, String>,
-    imageUrl: String,
-    pageUrl: String?,
-    storedCookie: String?,
-): Map<String, String> =
-    buildMap {
-        DagForwardedImageRequestHeaderNames.forEach { name ->
-            requestHeaders.headerValue(name).takeIf(String::isNotBlank)?.let { put(name, it) }
-        }
-        val cookie =
-            requestHeaders
-                .headerValue("Cookie")
-                .takeIf(String::isNotBlank)
-                ?: storedCookie
-        dagImageCookieHeader(imageUrl, pageUrl, cookie)?.let { put("Cookie", it) }
-    }
-
-internal fun dagOriginalImageUrl(requestUrl: String): String? =
-    runCatching {
-        val requestUri = java.net.URI(requestUrl)
-        if (requestUri.scheme != "https" || requestUri.host.isNullOrBlank()) return@runCatching null
-        val path = requestUri.path.orEmpty()
-        if (!path.startsWith(DagSyntheticImagePathPrefix)) return@runCatching null
-        val encoded =
-            path
-                .removePrefix(DagSyntheticImagePathPrefix)
-                .substringBefore('/')
-                .removeSuffix(DagSyntheticImagePathSuffix)
-                .takeIf { it.length in 8..DagMaximumEncodedImageUrlLength }
-                ?: return@runCatching null
-        val original =
-            String(
-                java.util.Base64.getUrlDecoder().decode(encoded),
-                Charsets.UTF_8,
-            )
-        original.takeIf {
-            it.length <= DagMaximumOriginalImageUrlLength &&
-                dagSameOrigin(requestUrl, original)
-        }
-    }.getOrNull()
-
-internal fun dagSameOrigin(
-    firstUrl: String,
-    secondUrl: String,
-): Boolean =
-    runCatching {
-        val first = java.net.URI(firstUrl)
-        val second = java.net.URI(secondUrl)
-        first.scheme.equals("https", ignoreCase = true) &&
-            second.scheme.equals("https", ignoreCase = true) &&
-            !first.host.isNullOrBlank() &&
-            first.host.equals(second.host, ignoreCase = true) &&
-            (if (first.port == -1) 443 else first.port) == (if (second.port == -1) 443 else second.port) &&
-            first.userInfo == null &&
-            second.userInfo == null
-    }.getOrDefault(false)
-
-internal fun dagSafeCorsAllowOrigin(value: String?): String? {
-    val candidate = value?.trim().orEmpty()
-    if (candidate == "*") return candidate
-    return runCatching {
-        val origin = java.net.URI(candidate)
-        candidate.takeIf {
-            origin.scheme == "https" &&
-                !origin.host.isNullOrBlank() &&
-                origin.userInfo == null &&
-                origin.query == null &&
-                origin.fragment == null &&
-                origin.path.isNullOrBlank() &&
-                (origin.port == -1 || origin.port in 1..65_535)
-        }
-    }.getOrNull()
-}
-
-internal fun dagSafeCorsAllowCredentials(
-    value: String?,
-    allowOrigin: String?,
-    requestOrigin: String?,
-): Boolean =
-    value?.trim() == "true" &&
-        allowOrigin != null &&
-        allowOrigin != "*" &&
-        requestOrigin != null &&
-        allowOrigin == requestOrigin.trim()
-
 private data class CachedImageResource(
     val bytes: ByteArray,
     val mimeType: String,
     val decision: String?,
-    val corsAllowOrigin: String?,
-    val corsAllowCredentials: Boolean,
 )
-
-private const val DagSyntheticImagePathPrefix = "/.dag-safe-image/"
-private const val DagSyntheticImagePathSuffix = ".png"
-private const val DagMaximumEncodedImageUrlLength = 8_192
-private const val DagMaximumOriginalImageUrlLength = 4_096
-private val DagForwardedImageRequestHeaderNames =
-    setOf(
-        "Accept-Language",
-        "Origin",
-        "Referer",
-        "User-Agent",
-    )
 
 internal fun isSafeStaticSvg(
     bytes: ByteArray,
@@ -903,17 +424,13 @@ internal fun isSafeStaticSvg(
 }
 
 internal object DagImageDeliveryPolicy {
-    // Keep downloads and decoded buffers bounded on lower-memory phones while
-    // still feeding both classifier workers.
-    const val MaximumConcurrentImages = 4
+    // WebView has its own bounded resource pool. Keeping only three synchronous
+    // callbacks occupied starves lazy-loaded pages after their first viewport.
+    const val MaximumConcurrentImages = 8
 
     // Two independent model stacks keep visible photos moving without letting
     // inference contend across all WebView resource threads or exhaust memory.
     const val MaximumConcurrentClassifications = 2
-
-    // The DOM bridge is untrusted input. One page cannot retain more image
-    // priorities than the native loader can ever classify for that generation.
-    const val MaximumPrioritizedImageUrls = 400
 }
 
 internal data class DagImagePageSummary(
@@ -979,6 +496,7 @@ private fun unavailableImageResource(): WebResourceResponse =
         200,
         "OK",
         mapOf(
+            "Access-Control-Allow-Origin" to "*",
             "Cache-Control" to "no-store",
             "Content-Length" to NeutralPlaceholderPng.size.toString(),
             "X-Content-Type-Options" to "nosniff",
@@ -1011,7 +529,7 @@ private const val MaximumSafeSvgBytes = 64 * 1024
 
 private val NeutralPlaceholderPng by lazy(LazyThreadSafetyMode.PUBLICATION) {
     android.util.Base64.decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
         android.util.Base64.DEFAULT,
     )
 }

@@ -154,9 +154,6 @@ internal class DagModestyImageClassifier(
 ) : Closeable {
     private val applicationContext = context.applicationContext
     private val environment by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { OrtEnvironment.getEnvironment() }
-    private val sessionLock = Any()
-
-    @Volatile
     private var session: OrtSession? = null
 
     fun classify(bitmap: Bitmap): DagModestyScores? {
@@ -177,10 +174,8 @@ internal class DagModestyImageClassifier(
     }
 
     override fun close() {
-        synchronized(sessionLock) {
-            session?.close()
-            session = null
-        }
+        session?.close()
+        session = null
     }
 
     internal fun isAvailable(): Boolean = android.os.Build.SUPPORTED_ABIS.any { it == "arm64-v8a" }
@@ -190,11 +185,9 @@ internal class DagModestyImageClassifier(
     }
 
     private fun model(): OrtSession =
-        session ?: synchronized(sessionLock) {
-            session ?: applicationContext.assets.open(ModelAsset).use { input ->
-                OrtSession.SessionOptions().use { options ->
-                    environment.createSession(input.readBytes(), options).also { session = it }
-                }
+        session ?: applicationContext.assets.open(ModelAsset).use { input ->
+            OrtSession.SessionOptions().use { options ->
+                environment.createSession(input.readBytes(), options).also { session = it }
             }
         }
 
