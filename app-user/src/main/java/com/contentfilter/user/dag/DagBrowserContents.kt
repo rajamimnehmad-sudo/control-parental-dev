@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -65,14 +66,14 @@ internal fun DagStartContent(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Top,
     ) {
-        Spacer(Modifier.height(if (keyboardVisible) 56.dp else 112.dp))
-        Text("DAG", style = MaterialTheme.typography.headlineLarge)
+        Spacer(Modifier.height(if (keyboardVisible) 48.dp else 88.dp))
+        Text("DAG", style = MaterialTheme.typography.displaySmall)
         Text(
             "Internet kosher con protección local",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(28.dp))
         DagAnalysisFrame(
             analyzing = analyzing,
             progress = if (analyzing) analysisProgress else 0f,
@@ -120,7 +121,7 @@ internal fun DagStartContent(
                     if (analyzing) {
                         null
                     } else {
-                        { TextButton(onClick = onSubmit, enabled = address.isNotBlank()) { Text("Ir") } }
+                        { TextButton(onClick = onSubmit, enabled = address.isNotBlank()) { Text("Buscar") } }
                     },
             )
         }
@@ -143,17 +144,26 @@ internal fun DagSearchSuggestions(
 ) {
     Surface(
         modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surfaceContainer,
+        tonalElevation = 1.dp,
     ) {
         Column {
-            suggestions.forEach { suggestion ->
+            suggestions.forEachIndexed { index, suggestion ->
                 Text(
                     text = suggestion,
-                    modifier = Modifier.fillMaxWidth().clickable { onSelect(suggestion) }.padding(14.dp, 10.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 48.dp)
+                            .clickable { onSelect(suggestion) }
+                            .padding(horizontal = 16.dp, vertical = 12.dp),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurface,
                 )
+                if (index != suggestions.lastIndex) {
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.35f))
+                }
             }
         }
     }
@@ -168,6 +178,17 @@ internal fun DagResultsContent(
     onLoadMore: () -> Unit,
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item(key = "results-header") {
+            Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
+                Text("Resultados", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "${results.size} resultados filtrados por DAG",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
+        }
         items(results, key = { it.url }) { result ->
             Column(
                 modifier =
@@ -176,7 +197,8 @@ internal fun DagResultsContent(
                         .clickable(enabled = result.classification.decision != DagClassification.Blocked) {
                             onOpen(result)
                         }
-                        .padding(horizontal = 12.dp, vertical = 9.dp),
+                        .heightIn(min = 88.dp)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 Text(
                     result.domain,
@@ -229,9 +251,13 @@ internal fun DagReviewRequestsContent(
     onOpenApproved: (AccessRequest) -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 14.dp)) {
             Text("Revisiones de DAG", style = MaterialTheme.typography.titleLarge)
-            Text("Estados guardados en este teléfono", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Estados guardados en este teléfono",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         if (requests.isEmpty()) {
             Text(
@@ -295,13 +321,17 @@ internal fun DagHistoryContent(
 ) {
     var confirmClear by remember { mutableStateOf(false) }
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column {
             Text("Historial", style = MaterialTheme.typography.titleLarge)
-            Text("Guardado solo en este teléfono", style = MaterialTheme.typography.bodySmall)
+            Text(
+                "Guardado solo en este teléfono",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
         TextButton(onClick = { confirmClear = true }, enabled = history.isNotEmpty()) { Text("Borrar todo") }
     }

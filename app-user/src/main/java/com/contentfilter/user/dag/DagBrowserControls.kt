@@ -167,25 +167,29 @@ internal fun DagTabSwitcher(
             color = MaterialTheme.colorScheme.surface,
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
-                Column(modifier = Modifier.fillMaxWidth()) {
-                    Column {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
                         Text("Pestañas recientes", style = MaterialTheme.typography.titleLarge)
                         Text("${tabs.size} de $MaximumTabs", color = MaterialTheme.colorScheme.onSurfaceVariant)
                     }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        TextButton(onClick = onCloseAll, enabled = tabs.size > 1) { Text("Cerrar todas") }
-                        TextButton(
-                            onClick = onNew,
-                            enabled =
-                                tabs.size < MaximumTabs ||
-                                    currentSnapshot.isEmptyTab() ||
-                                    tabs.any { it.snapshot.isEmptyTab() },
-                        ) { Text("＋ Nueva") }
-                    }
+                    TextButton(onClick = onDismiss) { Text("Listo") }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(onClick = onCloseAll, enabled = tabs.size > 1) { Text("Cerrar todas") }
+                    TextButton(
+                        onClick = onNew,
+                        enabled =
+                            tabs.size < MaximumTabs ||
+                                currentSnapshot.isEmptyTab() ||
+                                tabs.any { it.snapshot.isEmptyTab() },
+                    ) { Text("＋ Nueva") }
                 }
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
