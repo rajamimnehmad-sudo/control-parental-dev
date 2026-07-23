@@ -53,7 +53,7 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 Version publicada real al 2026-07-23:
 
 ```text
-App Usuario versionCode 277
+App Usuario versionCode 278
 App Admin versionCode 275
 versionName 1.0.1-dev
 ```
@@ -68,16 +68,22 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-277-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-278-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-275-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario 09a6cb91af46ec2e6d55d0b9f57eaf2891ecb0ad0c8dea0bb079ada158d136b2
+Usuario e7b99d1fbc3b257ea6541f51301ceff4ddd5cb5d287522d6d7af0bfdb5e6c6ce
 Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ```
+
+## Publicacion Usuario DEV 278 - rollback integral de DEV 277 - 2026-07-23
+
+- El usuario reporto que DEV 277 se sentia lento y torpe en el uso real. Se revirtio integramente PR #57 y se restauro el codigo de App Usuario de DEV 276; solo se incremento a versionCode 278 para permitir la actualizacion sobre 277.
+- Build local `assembleDevDebug` correcto. PR #59 fusionado en `main`; publicacion selectiva Usuario DEV `30043838543` correcta en 5m02s. No se uso el celular de prueba, no se modifico Admin y no se invoco Production.
+- Verificacion externa: el manifiesto publico declara 278, el APK descargado confirma paquete `com.contentfilter.user.dev`, versionCode 278 y SHA-256 `e7b99d1fbc3b257ea6541f51301ceff4ddd5cb5d287522d6d7af0bfdb5e6c6ce`. Admin permanece en 275 con su SHA-256 anterior.
 
 ## Publicacion Usuario DEV 277 - optimizacion integral DAG - 2026-07-23
 

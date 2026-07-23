@@ -313,7 +313,7 @@ Flujo de una entrada:
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
-| DAG-WEB-INTERACTION-03 | Revalidado integralmente en DEV 277 con Zara y Cheeky | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
+| DAG-WEB-INTERACTION-03 | Estado DEV 276 restaurado en DEV 278 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
 | DAG-PROTECTED-MODE-UX-04 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P2 | Quitar el mensaje tecnico de proteccion adicional | S | Bajo |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
@@ -327,8 +327,8 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
-| DAG-LOCAL-IMAGE-PERF-03 | Resuelto y validado fisicamente en DEV 277 | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
-| DAG-CATEGORY-FAST-PATH-04 | Reemplazado por clasificacion monotona segura en DEV 277 | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
+| DAG-LOCAL-IMAGE-PERF-03 | DEV 277 revertido; estado DEV 276 restaurado en DEV 278 | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
+| DAG-CATEGORY-FAST-PATH-04 | DEV 277 revertido; permanece retirado como en DEV 276 | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
 | DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 259; validado en SM-A235M | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
 | DAG-CALIBRATION-CLOSED-LOOP-10 | Publicado DEV 260; validado en SM-A235M | P0 | Hacer persistentes las decisiones calibradas, separar motivos positivos/negativos y agregar criterio local de mangas/corte sobre rodillas | L | Alto |
 | DAG-AUDIENCE-POLICY-11 | Publicado DEV 261; validación física previa correcta, pendiente repetir APK público | P0 | Permitir imagenes normales de bebes y hombres, aplicar criterio femenino a niñas y mantener ropa interior/desnudez como bloqueo universal | M | Alto |
@@ -987,6 +987,7 @@ Flujo de una entrada:
 - Dependencias: `DAG-IMAGE-DELIVERY-02`, politica por audiencia, versiones de calibracion, ciclo de vida de pagina, presupuesto de memoria y modelos TFLite locales.
 - Cierre DEV 277: se elimino la espera artificial por sondeo de recursos del viewport. La pagina se decide una vez y cada raster permanece interceptado por el cargador nativo: solo recibe bytes permitidos y ante duda, error o cancelacion recibe un recurso neutro. Fravega fria quedo visible en `781 ms` (`630 ms` hasta texto y `148 ms` de clasificacion), con fotos y controles funcionales. Cheeky fria con evaluacion neuronal quedo en `1.097 ms`, Zara en `1.082 ms` y Mi Argentina en `650 ms`.
 - Recursos y seguridad DEV 277: despues de varias paginas el SM-A235M se mantuvo aproximadamente en 497 MiB PSS en primer plano y 455 MiB en segundo plano, con una sola Activity/WebView, sin crash ni OOM. Zara y Cheeky conservaron menus/submenus dinamicos; una insercion dinamica sexual fue bloqueada. No se enviaron fotos fuera del telefono ni se agregaron permisos por dominio.
+- Resultado posterior: DEV 277 fue revertido integramente en DEV 278 porque el usuario reporto una experiencia real lenta y torpe. DEV 278 restaura el codigo de comportamiento de DEV 276; las mediciones de DEV 277 quedan como evidencia historica y no como cierre vigente.
 - Duplicados y relacion: extiende el rendimiento de la entrega ya implementada; no cambia criterios kosher, umbrales, reglas Admin ni el modo Extra Kosher.
 - Criterios de aceptacion:
   - las imagenes visibles se atienden antes que la precarga y no quedan bloqueadas detras de recursos fuera de pantalla;
@@ -1019,6 +1020,7 @@ Flujo de una entrada:
 - Regresion DEV 274: el atajo no reducia el tiempo de la cola visual; exponia la pagina antes de que las fotos iniciales estuvieran decididas y hacia visible una espera larga con espacios vacios. La metrica usada observaba estructura, no fotos, y no represento la experiencia real.
 - Correccion publicada DEV 275: se elimina por completo el atajo y DAG vuelve a exigir `pageAnalysisReady && viewportImagesReady` antes de revelar la pagina, igual que antes de DEV 274. La optimizacion futura de fotos debe actuar sobre descarga/decodificacion/inferencia/cache y demostrar tiempo real hasta imagen visible, sin usar una revelacion temprana como sustituto.
 - Reemplazo seguro DEV 277: la categoria deja de ser un atajo visual independiente y pasa a integrar una decision monotona de pagina. Dominio, URL, titulo y texto compacto aportan señales; las categorias explicitas de riesgo siempre bloquean y la evaluacion neuronal se ejecuta solo cuando puede elevar el riesgo. La pagina no espera una cola global de imagenes, pero cada raster individual sigue cerrado hasta su decision nativa. Las pruebas fisicas anteriores y la inyeccion dinamica bloqueada confirman que velocidad y compatibilidad no sustituyen las barreras.
+- Resultado posterior: el reemplazo de DEV 277 fue retirado junto con el resto del lote en DEV 278 por regresion de experiencia percibida. Permanece vigente el comportamiento de DEV 276 y no se conserva ninguna parte del atajo.
 
 #### DAG-ULTRA-KOSHER-01 - Modos de imagenes administrables
 
