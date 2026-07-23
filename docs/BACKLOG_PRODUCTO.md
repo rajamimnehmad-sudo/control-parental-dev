@@ -352,6 +352,7 @@ Flujo de una entrada:
 | DAG-UPDATE-01 | Decision cerrada DEV 238 | P1 | DAG se actualiza con App Usuario y Android normal confirma la instalacion | S | Bajo |
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
 | DAG-CHROME-UX-01 | Idea autorizada para backlog; no aprobada para codigo | P1 | Acercar la experiencia cotidiana de DAG a Chrome sin copiar marca ni relajar protecciones | XL | Alto |
+| DAG-UX-POLISH-04 | Idea autorizada para backlog; no aprobada para codigo | P2 | Pulir exclusivamente la interfaz y ergonomia cotidiana de DAG sin cambiar logica, seguridad ni rendimiento | M | Bajo |
 | DAG-TABS-UX-03 | Idea autorizada para backlog; no aprobada para codigo | P1 | Hasta 50 pestanas, selector a pantalla completa con miniaturas reales y Cerrar todo | L | Alto |
 | DAG-HOME-RECENTS-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Abrir DAG en Home y mostrar accesos circulares a sitios recientes | M | Medio |
 | DAG-SEARCH-SUGGEST-03 | Idea autorizada para backlog; no aprobada para codigo | P1 | Sugerencias en tiempo real y Tal vez quisiste decir sin saltar clasificacion | L | Alto |
@@ -1245,6 +1246,15 @@ Flujo de una entrada:
 - Alcance relacionado: coordina `DAG-TABS-UX-03`, `DAG-HOME-RECENTS-02`, `DAG-SEARCH-SUGGEST-03`, `DAG-RESULTS-CLARITY-02`, `DAG-ANALYSIS-SEARCH-02`, `DAG-GEOLOCATION-01` y `DAG-ADBLOCK-01`. Cada capacidad conserva ticket, riesgo y aprobacion propios.
 - No alcance: sincronizacion con cuenta Google, modo incognito, descargas abiertas, extensiones, reproduccion multimedia, permisos globales ni cualquier atajo que evite clasificacion, reglas Admin o barreras DAG.
 - Criterio transversal: acciones, gestos y jerarquia deben resultar reconocibles para una persona acostumbrada a Chrome, pero los estados de analisis, bloqueo, revision y privacidad siguen siendo explicitamente DAG.
+
+#### DAG-UX-POLISH-04 - Pulido visual y ergonomia sin cambios funcionales
+
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: UX/UI pura. Prioridad: P2. Esfuerzo: M. Riesgo: bajo.
+- Objetivo: hacer que DAG se sienta mas claro, simple y familiar mediante jerarquia visual, espaciado, tamanos, alineacion, contraste, estados y respuesta tactil coherentes, sin alterar capacidades ni comportamiento tecnico.
+- Alcance: Home, barra de busqueda/direccion, controles de navegacion, resultados, estados `Analizando`, bloqueo y error, historial, menu y selector de pestanas existente. Incluye objetivos tactiles accesibles, textos consistentes, foco/teclado predecible, transiciones breves y ausencia de saltos visuales.
+- Fuera de alcance: rendimiento o tiempos de carga; WebView y compatibilidad de sitios; filtros, modelos, clasificacion, permisos o seguridad; red, Brave, anuncios y ubicacion; aumentar pestañas; miniaturas nuevas; sugerencias remotas; cambiar flujos o agregar funciones.
+- Relacion: separa el pulido puramente visual de la direccion transversal `DAG-CHROME-UX-01`. No reemplaza `DAG-TABS-UX-03`, `DAG-RESULTS-CLARITY-02`, `DAG-ANALYSIS-SEARCH-02` ni otros tickets que requieren logica nueva.
+- Criterios de aceptacion: se aprueba primero una propuesta visual acotada; las mismas acciones producen los mismos resultados antes y despues; no cambian llamadas de red, consumo Brave, decisiones DAG ni ciclo de vida de paginas; tema claro/oscuro, escalado de texto y lector de pantalla siguen legibles; se compara visualmente Home, resultados, pagina, analisis, bloqueo, historial y pestanas sin medirlo como optimizacion tecnica.
 
 #### DAG-TABS-UX-03 - Hasta 50 pestanas con selector visual completo
 
