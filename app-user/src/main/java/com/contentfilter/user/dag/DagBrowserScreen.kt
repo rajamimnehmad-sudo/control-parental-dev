@@ -663,7 +663,7 @@ private fun DagBrowserContent(
                     DagWebContent(
                         state = state,
                         onBackFromBrowser = viewModel::backFromBrowser,
-                        onNavigate = viewModel::requestNavigation,
+                        onNavigationRequested = viewModel::canNavigateToPage,
                         onPageStarted = viewModel::onPageStarted,
                         onPageTextReady = viewModel::onPageTextReady,
                         onViewportImagesReady = viewModel::onViewportImagesReady,
