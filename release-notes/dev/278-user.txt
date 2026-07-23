@@ -1,0 +1,2 @@
+DAG vuelve al comportamiento estable anterior a DEV 277 para recuperar una navegación más fluida.
+No cambia reglas, configuraciones ni datos del Usuario.

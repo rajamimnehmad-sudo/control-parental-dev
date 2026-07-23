@@ -13,9 +13,6 @@ internal class DagProfessionalImageClassifier(
     private val context: Context,
 ) : Closeable {
     private val environment by lazy(LazyThreadSafetyMode.SYNCHRONIZED) { OrtEnvironment.getEnvironment() }
-    private val sessionLock = Any()
-
-    @Volatile
     private var session: OrtSession? = null
 
     fun classify(
@@ -46,18 +43,14 @@ internal class DagProfessionalImageClassifier(
     }
 
     override fun close() {
-        synchronized(sessionLock) {
-            session?.close()
-            session = null
-        }
+        session?.close()
+        session = null
     }
 
     private fun model(): OrtSession =
-        session ?: synchronized(sessionLock) {
-            session ?: context.assets.open(ModelAsset).use { input ->
-                OrtSession.SessionOptions().use { options ->
-                    environment.createSession(input.readBytes(), options).also { session = it }
-                }
+        session ?: context.assets.open(ModelAsset).use { input ->
+            OrtSession.SessionOptions().use { options ->
+                environment.createSession(input.readBytes(), options).also { session = it }
             }
         }
 
