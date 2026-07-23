@@ -976,7 +976,7 @@ Flujo de una entrada:
 
 #### DAG-LOCAL-IMAGE-PERF-03 - Apertura local rapida de fotos
 
-- Estado: `Candidato DEV 276 validado en SM-A235M; pendiente publicación`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
+- Estado: `Publicado DEV 276 y validado en SM-A235M`. Tipo: rendimiento, privacidad y seguridad visual. Prioridad: P1.
 - Problema: una pagina con varias fotos puede tardar aproximadamente entre 6 y 8 segundos en completar su primera carga visual porque la descarga, decodificacion y clasificacion local forman una cola costosa y parte del trabajo puede repetirse.
 - Decision aprobada: mantener todo el analisis de imagenes dentro del telefono. No se usara un modelo de IA online, no se enviaran fotos a terceros y no se persistiran originales para acelerar cargas futuras.
 - Solucion propuesta: dos clasificadores locales con limite estricto; prioridad para recursos visibles; una sola decodificacion por imagen; cache efimera de decisiones por hash de contenido, audiencia y version de calibracion; precarga maxima de la siguiente pantalla; y XNNPACK o NNAPI solo cuando una medicion controlada del dispositivo demuestre que mejora el tiempo con fallback seguro.
@@ -997,6 +997,7 @@ Flujo de una entrada:
 - Medicion corregida 2026-07-22: el probe ADB/UiAutomator paso de aproximadamente 9.589 ms con DEV 273 a 4.059 ms con DEV 274, pero solo detectaba estructura visible. No media fotos listas y por eso no demuestra una mejora de carga visual. El usuario reporto que los espacios tardaban mucho mas en completarse; cualquier optimizacion futura debe medir tiempo hasta raster decidido/mostrado, primera pantalla completa, repeticion, scroll, memoria y temperatura.
 - Candidato DEV 276: los cuatro modelos que sostienen los dos clasificadores se preparan en paralelo mientras WebView descarga HTML, y una foto permitida deja de producir una miniatura JPEG de calibracion que no se utilizaba. Las fotos inciertas y el modo visual DEV conservan la miniatura, la decision exacta y la entrega a Super Admin. En el SM-A235M, la referencia Samsung bajo de unos 9,5 s en DEV 275 a 5,9 s en el primer recorrido y 4,0 s en la repeticion; memoria PSS aproximada 555-561 MB, heap nativo 342-348 MB y temperatura 26,2 C. No se modificaron umbrales ni se mostraron fotos antes de decidir.
 - Benchmark descartado: el clasificador TFLite compacto promedio 180 ms frente a 640 ms del modelo profesional y coincidio en 19/19 fotos seguras disponibles, pero ese conjunto no contiene suficientes bloqueos etiquetados. No se cambia el modelo hasta contar con validacion representativa de permitidos, dudosos y bloqueados; velocidad sin cobertura de seguridad no satisface el ticket.
+- Cierre: PR #55 fusionado en `ebea11c`; Android CI `29970047220` y publicacion selectiva Usuario `29970343318` correctos. El manifiesto publico declara 276 y su APK coincide con SHA-256 `5d38e574be73a368c1a4cccd9639da57d68058d27d595a578b40981a7eae78c0` y certificado DEV historico. Admin permanece sin cambios en 275. El usuario confirmo desde un telefono no enlazado que la carga va mucho mejor con la APK publica.
 
 #### DAG-CATEGORY-FAST-PATH-04 - Apertura temprana por categoria segura
 
