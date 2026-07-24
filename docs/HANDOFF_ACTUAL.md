@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-23
+Fecha de corte: 2026-07-24
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -50,10 +50,10 @@ Al cerrar trabajo, no dejar `.gradle`, `.gradle-home` ni `app-user/build`.
 
 ## Estado publicado DEV
 
-Version publicada real al 2026-07-23:
+Version publicada real al 2026-07-24:
 
 ```text
-App Usuario versionCode 278
+App Usuario versionCode 279
 App Admin versionCode 275
 versionName 1.0.1-dev
 ```
@@ -68,16 +68,26 @@ https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/ap
 APKs:
 
 ```text
-https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-278-debug.apk
+https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-user-dev-279-debug.apk
 https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/app-admin-dev-275-debug.apk
 ```
 
 SHA-256 publicados:
 
 ```text
-Usuario e7b99d1fbc3b257ea6541f51301ceff4ddd5cb5d287522d6d7af0bfdb5e6c6ce
+Usuario 5d98a83b992042477059a7809df140b6545ded03f8e52704c883a8add0aee2cc
 Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ```
+
+## Publicacion Usuario DEV 279 - carga progresiva y calibracion binaria - 2026-07-24
+
+- DAG muestra de inmediato la estructura funcional de la pagina y mantiene menus, inputs, botones y scripts disponibles mientras las imagenes siguen protegidas. Reserva el espacio visual, prioriza el viewport con concurrencia limitada, revela cada imagen segura al terminar, difiere las inferiores hasta acercarse por scroll y deja aislada cualquier imagen lenta mediante timeout; una linea fina indica el trabajo visible pendiente.
+- El clasificador profesional local permanece siempre activo. La calibracion DEV ya no pide motivos: cada muestra se marca con `✓` o `×`, no crea un bloqueo por hash de esa misma imagen y actualiza la interfaz sin recargar.
+- Supabase DEV propone un candidato inicial tras 40 etiquetas equilibradas, con al menos 10 por clase, y luego cada 10 etiquetas nuevas. La activacion sigue siendo manual. Super Web muestra umbrales activos y propuestos, permite un valor manual dentro de limites seguros y agrupa señales sexuales o sugerentes —incluidos dibujos— bajo `NSFW`; tambien expone contexto de mujer, hombre y abdomen.
+- Android: `ktlintCheck`, unitarios DEV, `assembleDevDebug`, Android Lint y Detekt correctos. Super Web: lint y builds Next/Sites correctos. Edge: formato y `deno check` correctos. Migracion y Edge Function aplicadas solo en Supabase DEV; no se tocaron Production ni datos existentes.
+- Prueba fisica sin cache en SM-S908E por Wi-Fi y LTE sobre Fravega, Mimo y Cheeky. La pagina quedo utilizable progresivamente; en Wi-Fi Cheeky mostro estructura a 1,729 s mientras sus imagenes terminaron despues. Calibracion se activo sin recarga y mostro 14 controles `✓` y 14 controles `×`; luego se desactivo.
+- Super Web fue publicada en Sites. PR #64 se fusiono en `main` mediante `b857e49b7337e03cad7af6d07f071a6cf7f12a50`; Android CI de PR y `main` correcto. La publicacion inicial se detuvo sin subir por faltar `279-user.txt`; PR #65 agrego exclusivamente esas novedades y el workflow oficial `30099801556` publico Usuario correctamente.
+- Verificacion final: manifiesto Usuario 279, APK con SHA-256 `5d98a83b992042477059a7809df140b6545ded03f8e52704c883a8add0aee2cc`, paquete `com.contentfilter.user.dev` y firma DEV estable. El APK se instalo in-place y abrio en el SM-S908E. Admin permanecio en 275 con SHA-256 `abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298`.
 
 ## Publicacion Usuario DEV 278 - rollback integral de DEV 277 - 2026-07-23
 
