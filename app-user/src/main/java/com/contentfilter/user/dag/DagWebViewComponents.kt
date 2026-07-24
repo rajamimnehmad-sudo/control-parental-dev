@@ -70,6 +70,7 @@ internal fun DagWebContent(
     onManualBlurReviewCandidate: (ByteArray, DagImageClassification) -> Unit,
     onBlockedAction: (String) -> Unit,
     onGeolocationPrompt: (String, (Boolean) -> Unit) -> Unit,
+    onFaviconChanged: (String, Bitmap) -> Unit,
     onPageBlocked: (String) -> Unit,
     onRendererGone: () -> Unit,
     onWebViewChanged: (WebView?) -> Unit,
@@ -86,6 +87,7 @@ internal fun DagWebContent(
     val currentVisualCalibrationEnabled by rememberUpdatedState(visualCalibrationEnabled)
     val currentExtraKosherEnabled by rememberUpdatedState(state.dagExtraKosherEnabled)
     val currentGeolocationPrompt by rememberUpdatedState(onGeolocationPrompt)
+    val currentFaviconChanged by rememberUpdatedState(onFaviconChanged)
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val imageLoader =
@@ -108,6 +110,8 @@ internal fun DagWebContent(
     var canGoForward by remember { mutableStateOf(false) }
     var inspectedUrl by remember { mutableStateOf<String?>(null) }
     var preparedUrl by remember { mutableStateOf<String?>(null) }
+    var loadedNavigationRevision by remember { mutableStateOf(-1L) }
+    var pendingFavicon by remember { mutableStateOf<Pair<String, Bitmap>?>(null) }
 
     BackHandler {
         if (webView?.canGoBack() == true) webView?.goBack() else onBackFromBrowser()
@@ -125,10 +129,29 @@ internal fun DagWebContent(
     }
     LaunchedEffect(webView, state.navigationRevision, state.requestedUrl) {
         state.requestedUrl?.let { url ->
-            if (url.startsWith("https://", ignoreCase = true) && webView?.url != url) {
-                webView?.settings?.blockNetworkImage = true
-                webView?.loadUrl(url)
+            val view = webView
+            if (
+                url.startsWith("https://", ignoreCase = true) &&
+                view != null &&
+                loadedNavigationRevision != state.navigationRevision
+            ) {
+                loadedNavigationRevision = state.navigationRevision
+                view.settings.blockNetworkImage = true
+                if (view.url == url) view.reload() else view.loadUrl(url)
             }
+        }
+    }
+    LaunchedEffect(state.pageStatus, state.requestedUrl, pendingFavicon) {
+        val pending = pendingFavicon ?: return@LaunchedEffect
+        val requestedDomain = DagContentClassifier.domainFrom(state.requestedUrl.orEmpty())
+        val faviconDomain = DagContentClassifier.domainFrom(pending.first)
+        if (
+            state.pageStatus == DagPageStatus.Visible &&
+            requestedDomain.isNotBlank() &&
+            requestedDomain == faviconDomain
+        ) {
+            pendingFavicon = null
+            currentFaviconChanged(pending.first, pending.second)
         }
     }
     LaunchedEffect(webView, visualCalibrationEnabled) {
@@ -151,6 +174,8 @@ internal fun DagWebContent(
     }
     DisposableEffect(Unit) {
         onDispose {
+            pendingFavicon?.second?.recycle()
+            pendingFavicon = null
             webView?.stopLoading()
             webView?.destroy()
             webView = null
@@ -219,6 +244,10 @@ internal fun DagWebContent(
                             onBlocked = onBlockedAction,
                             onGeolocationPrompt = { origin, decision ->
                                 currentGeolocationPrompt(origin, decision)
+                            },
+                            onFaviconChanged = { url, icon ->
+                                pendingFavicon?.second?.recycle()
+                                pendingFavicon = url to icon.copy(Bitmap.Config.ARGB_8888, false)
                             },
                         )
 
@@ -482,7 +511,16 @@ private val DagDocumentStartScript =
 private class DagChromeClient(
     private val onBlocked: (String) -> Unit,
     private val onGeolocationPrompt: (String, (Boolean) -> Unit) -> Unit,
+    private val onFaviconChanged: (String, Bitmap) -> Unit,
 ) : WebChromeClient() {
+    override fun onReceivedIcon(
+        view: WebView?,
+        icon: Bitmap?,
+    ) {
+        val url = view?.url?.takeIf { it.startsWith("https://", ignoreCase = true) } ?: return
+        icon?.takeIf { it.width > 0 && it.height > 0 }?.let { onFaviconChanged(url, it) }
+    }
+
     override fun onPermissionRequest(request: PermissionRequest) {
         request.deny()
         onBlocked("Cámara y micrófono están bloqueados en DAG.")

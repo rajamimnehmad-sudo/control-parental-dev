@@ -55,11 +55,57 @@ class DagSearchRepository
             }
         }
 
+        suspend fun suggestions(
+            deviceId: String,
+            query: String,
+            language: String,
+        ): RemoteResult<DagRemoteSuggestionResponse> {
+            val payload =
+                JSONObject()
+                    .put("action", "suggest")
+                    .put("device_id", deviceId)
+                    .put("query", query)
+                    .put("language", language)
+            return when (val response = client.invokeFunctionForObject(FunctionName, payload)) {
+                is RemoteResult.Failure -> response
+                is RemoteResult.Success ->
+                    runCatching {
+                        val remote = response.value.optJSONArray("suggestions")
+                        val suggestions =
+                            if (remote == null) {
+                                emptyList()
+                            } else {
+                                (0 until remote.length())
+                                    .mapNotNull { index -> remote.optString(index).trim().takeIf(String::isNotBlank) }
+                                    .distinct()
+                                    .take(MaxSuggestions)
+                            }
+                        DagRemoteSuggestionResponse(
+                            suggestions = suggestions,
+                            correctedQuery =
+                                response.value
+                                    .optString("corrected_query")
+                                    .trim()
+                                    .takeIf { it.isNotBlank() && it != "null" },
+                        )
+                    }.fold(
+                        onSuccess = { RemoteResult.Success(it) },
+                        onFailure = {
+                            RemoteResult.Failure(
+                                "Las sugerencias no están disponibles en este momento.",
+                                retryable = true,
+                            )
+                        },
+                    )
+            }
+        }
+
         private companion object {
             const val FunctionName = "dag-search"
             const val MaxTitleCharacters = 240
             const val MaxUrlCharacters = 2_048
             const val MaxDescriptionCharacters = 600
+            const val MaxSuggestions = 8
         }
     }
 
@@ -74,4 +120,9 @@ data class DagRemoteSearchResponse(
     val hasMoreResults: Boolean,
     val braveReceived: Int,
     val serverRejected: Int,
+)
+
+data class DagRemoteSuggestionResponse(
+    val suggestions: List<String>,
+    val correctedQuery: String?,
 )

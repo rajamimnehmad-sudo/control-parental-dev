@@ -6,8 +6,13 @@ import org.junit.Test
 
 class DagSearchSuggestionsTest {
     @Test
-    fun `coca offers explicit soft drink context`() {
-        val suggestions = dagSearchSuggestionCandidates("coca", emptyList())
+    fun `remote suggestions provide broad live context`() {
+        val suggestions =
+            dagSearchSuggestionCandidates(
+                "coca",
+                emptyList(),
+                listOf("Coca-Cola gaseosa", "Precio de Coca-Cola", "Historia de Coca-Cola"),
+            )
 
         assertEquals("Coca-Cola gaseosa", suggestions.first())
         assertTrue(suggestions.all { it.contains("Coca-Cola", ignoreCase = true) })
@@ -29,7 +34,7 @@ class DagSearchSuggestionsTest {
 
         val suggestions = dagSearchSuggestionCandidates("carre", history)
 
-        assertEquals(5, suggestions.size)
+        assertEquals(8, suggestions.size)
         assertEquals(suggestions.distinct(), suggestions)
     }
 
@@ -39,13 +44,26 @@ class DagSearchSuggestionsTest {
     }
 
     @Test
-    fun `live local catalog suggests without history`() {
-        assertTrue(dagSearchSuggestionCandidates("frav", emptyList()).contains("Frávega electrodomésticos"))
-    }
+    fun `history is shown before remote and duplicates are removed`() {
+        val history =
+            listOf(
+                DagHistoryEntry(
+                    id = "1",
+                    type = DagHistoryType.Search,
+                    value = "Frávega electrodomésticos",
+                    url = null,
+                    title = null,
+                    visitedAtEpochMillis = 1L,
+                ),
+            )
 
-    @Test
-    fun `safe spelling proposes a close correction`() {
-        assertEquals("fravega", dagDidYouMeanSuggestion("frabega"))
-        assertEquals(null, dagDidYouMeanSuggestion("fravega"))
+        val suggestions =
+            dagSearchSuggestionCandidates(
+                "frav",
+                history,
+                listOf("Frávega electrodomésticos", "Frávega ofertas"),
+            )
+
+        assertEquals(listOf("Frávega electrodomésticos", "Frávega ofertas"), suggestions)
     }
 }

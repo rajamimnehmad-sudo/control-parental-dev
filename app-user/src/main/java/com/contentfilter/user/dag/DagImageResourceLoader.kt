@@ -529,7 +529,7 @@ private const val MaximumSafeSvgBytes = 64 * 1024
 
 private val NeutralPlaceholderPng by lazy(LazyThreadSafetyMode.PUBLICATION) {
     android.util.Base64.decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
         android.util.Base64.DEFAULT,
     )
 }

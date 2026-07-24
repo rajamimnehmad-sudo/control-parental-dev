@@ -1,6 +1,7 @@
 package com.contentfilter.user.dag
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class DagHistoryStoreTest {
@@ -48,6 +49,18 @@ class DagHistoryStoreTest {
         val decoded = DagHistoryStore.decodePageApprovals(DagHistoryStore.encodePageApprovals(expected))
 
         assertEquals(expected, decoded)
+    }
+
+    @Test
+    fun `favicon codec preserves bounded png bytes`() {
+        val expected = byteArrayOf(1, 2, 3, 4)
+
+        val decoded =
+            DagHistoryStore.decodeFavicons(
+                DagHistoryStore.encodeFavicons(mapOf("example.com" to expected)),
+            )
+
+        assertContentEquals(expected, decoded.getValue("example.com"))
     }
 
     @Test

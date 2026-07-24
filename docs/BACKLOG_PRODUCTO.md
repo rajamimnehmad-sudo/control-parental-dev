@@ -355,14 +355,14 @@ Flujo de una entrada:
 | DAG-UX-POLISH-04 | Implementado localmente; no publicado por pedido del usuario | P2 | Pulir exclusivamente la interfaz y ergonomia cotidiana de DAG sin cambiar logica, seguridad ni rendimiento | M | Bajo |
 | DAG-TABS-UX-03 | Idea autorizada para backlog; no aprobada para codigo | P1 | Hasta 50 pestanas, selector a pantalla completa con miniaturas reales y Cerrar todo | L | Alto |
 | DAG-HOME-RECENTS-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Abrir DAG en Home y mostrar accesos circulares a sitios recientes | M | Medio |
-| DAG-SEARCH-SUGGEST-03 | Idea autorizada para backlog; no aprobada para codigo | P1 | Sugerencias en tiempo real y Tal vez quisiste decir sin saltar clasificacion | L | Alto |
+| DAG-SEARCH-SUGGEST-03 | Implementado y validado en candidato local; Edge DEV activo | P1 | Sugerencias en tiempo real y Tal vez quisiste decir sin saltar clasificacion | L | Alto |
 | DAG-RESULTS-CLARITY-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Resultados mas claros con dominio destacado e iconos de sitio no engañosos | M | Medio |
 | DAG-ANALYSIS-SEARCH-02 | Idea autorizada para backlog; no aprobada para codigo | P1 | Permitir una nueva busqueda desde la barra mientras DAG analiza | S | Medio |
 | DAG-ADBLOCK-01 | Idea autorizada para backlog; no aprobada para codigo | P1 | Bloquear anuncios y recursos publicitarios para mejorar velocidad sin romper sitios | L | Alto |
-| DAG-BLACK-RESOURCES-05 | Reportado en candidato local; pendiente diagnostico | P1 | Evitar rectangulos negros en recursos seguros sin mostrar contenido no aprobado | M | Alto |
-| DAG-REFRESH-03 | Reportado en candidato local; pendiente diagnostico | P1 | Hacer que Actualizar recargue realmente la pestana activa con estado visible y seguro | S | Medio |
-| DAG-RECENTS-FAVICON-03 | Reportado en candidato local; pendiente implementacion | P2 | Mostrar el favicon real y seguro del sitio en los accesos recientes de Home | M | Medio |
-| DAG-TAB-PREVIEW-04 | Reportado en candidato local; pendiente implementacion | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
+| DAG-BLACK-RESOURCES-05 | Implementado y validado en candidato local | P1 | Evitar rectangulos negros en recursos seguros sin mostrar contenido no aprobado | M | Alto |
+| DAG-REFRESH-03 | Implementado en candidato local; validacion automatica correcta | P1 | Hacer que Actualizar recargue realmente la pestana activa con estado visible y seguro | S | Medio |
+| DAG-RECENTS-FAVICON-03 | Implementado y validado en candidato local | P2 | Mostrar el favicon real y seguro del sitio en los accesos recientes de Home | M | Medio |
+| DAG-TAB-PREVIEW-04 | Implementado y validado en candidato local | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
 | DAG-CALIBRATION-QUEUE-02 | Resuelto DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
 | DAG-CALIBRATION-REVIEW-03 | Publicado DEV 253; recorrido autenticado pendiente | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
@@ -1283,12 +1283,13 @@ Flujo de una entrada:
 
 #### DAG-SEARCH-SUGGEST-03 - Sugerencias en tiempo real y correccion ortografica
 
-- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: busqueda, proveedor externo y privacidad. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- Estado: `Implementado y validado en candidato local; Edge DEV activo`. Tipo: busqueda, proveedor externo y privacidad. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
 - Problema: las sugerencias actuales dependen de historial/reformulaciones locales y no ofrecen autocompletado vivo amplio ni `Tal vez quisiste decir...` como un buscador moderno.
 - Propuesta: combinar historial cifrado local con sugerencias en tiempo real de un proveedor autorizado y una correccion ortografica para consulta/resultados. La sugerencia tocada usa el flujo seguro ya definido y `Tal vez quisiste decir` nunca reemplaza silenciosamente el texto original.
 - Privacidad/costo: definir proveedor y contrato antes de codigo; aplicar minimo de caracteres y debounce; cancelar solicitudes viejas; no enviar pulsaciones bloqueadas ni registrar texto. Toda sugerencia visible y toda consulta corregida vuelven a pasar por clasificacion local antes de buscar.
 - Relacion: extiende `DAG-AUTOCOMPLETE-01/02`; no convierte cada pulsacion en una consulta Brave de resultados y no duplica consumo al tocar.
 - Aceptacion: sugerencias cambian durante escritura sin mezclar pestanas; errores ortograficos razonables ofrecen una alternativa clara; aceptar/rechazar conserva control del usuario; consultas riesgosas no aparecen ni se envian; sin red siguen disponibles historial y sugerencias locales.
+- Implementacion candidata: autocompletado online gratuito con debounce de 250 ms, cancelacion, cache acotada y autorizacion por dispositivo en Supabase DEV. Android no contiene claves; cada sugerencia y correccion vuelve a pasar por la clasificacion local de DAG. En SM-A235M, `frabega` mostro sugerencias completas y `Tal vez quisiste decir: fravega`.
 
 #### DAG-RESULTS-CLARITY-02 - Dominio e identidad visual mas claros
 
@@ -1318,34 +1319,38 @@ Flujo de una entrada:
 
 #### DAG-BLACK-RESOURCES-05 - Rectangulos negros en contenido seguro
 
-- Estado: `Reportado en candidato local; pendiente diagnostico`. Evidencia: captura aportada por el usuario el 2026-07-23; la barra visible comienza con `https://www.mim...`, aunque el reporte menciona Cheeky. Tipo: compatibilidad visual y seguridad. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Estado: `Implementado y validado en candidato local`. Evidencia: captura aportada por el usuario el 2026-07-23; la barra visible comienza con `https://www.mim...`, aunque el reporte menciona Cheeky. Tipo: compatibilidad visual y seguridad. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Problema: la pagina conserva su foto principal, pero presenta rectangulos negros grandes en cabecera, iconos y beneficios de envio/retiro. Todavia no esta demostrado si esos bloques son imagenes, fondos CSS, SVG, placeholders del filtro visual, recursos fallidos o coincidencias del bloqueo publicitario.
 - Causa raiz requerida: identificar por recurso y por capa si intervienen WebView/red, bloqueo de anuncios, sanitizacion CSS/SVG, clasificacion visual, respuesta neutra o un error propio del sitio. No crear una excepcion por dominio antes de aislar la causa comun.
 - Seguridad: una correccion no puede mostrar una imagen antes de aprobarla ni convertir el fallo en un bypass. El contenido inseguro conserva bloqueo o blur; logos, controles y recursos seguros recuperan su representacion normal.
 - Aceptacion: el sitio de la captura y una segunda tienda dinamica no muestran rectangulos negros en recursos seguros; los bloqueos intencionales son distinguibles de un recurso roto; se mantienen los filtros de imagenes; recarga y navegacion interna no reintroducen los bloques; queda una prueba general que no dependa de Cheeky/Mimo.
+- Implementacion candidata: la respuesta PNG neutra del filtro dejo de ser un pixel negro opaco y ahora es transparente. Mimo fue repetido fisicamente sin los rectangulos negros de la captura y sin liberar imagenes antes de su decision.
 
 #### DAG-REFRESH-03 - Actualizar la pestana activa
 
-- Estado: `Reportado en candidato local; pendiente diagnostico`. Evidencia: el usuario informa el 2026-07-23 que el boton `Actualizar` no actualiza. Tipo: navegacion WebView. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Estado: `Implementado en candidato local; validacion automatica correcta`. Evidencia: el usuario informa el 2026-07-23 que el boton `Actualizar` no actualiza. Tipo: navegacion WebView. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
 - Problema: la accion puede no producir una recarga observable, especialmente si la pestana fue restaurada, esta suspendida o conserva un estado de analisis anterior.
 - Propuesta: recargar la pagina activa y mostrar progreso inmediato; invalidar callbacks de la generacion anterior y volver a aplicar las compuertas DAG sin crear una busqueda Brave ni otra pestana.
 - Aceptacion: funciona en una pagina visible, despues de restaurar/suspender y tras recuperacion del renderer; la pagina demuestra una solicitud nueva; no vuelve a Home, no duplica historial ni pestanas y no reutiliza una decision parcial; error/sin red queda visible y permite reintentar.
+- Implementacion candidata: `Actualizar` inicia una nueva revision de navegacion sobre la URL HTTPS activa; WebView usa `reload()` para la misma URL y vuelve a ejecutar las compuertas DAG.
 
 #### DAG-RECENTS-FAVICON-03 - Favicon real en accesos recientes
 
-- Estado: `Reportado en candidato local; pendiente implementacion`. Evidencia: el usuario informa el 2026-07-23 que los ultimos sitios de Home no muestran el icono de la pagina. Tipo: Home e identidad visual segura. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Estado: `Implementado y validado en candidato local`. Evidencia: el usuario informa el 2026-07-23 que los ultimos sitios de Home no muestran el icono de la pagina. Tipo: Home e identidad visual segura. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
 - Problema: el candidato local usa letras o abreviaturas de marca como reemplazo seguro; eso no satisface el acceso circular con favicon real definido en `DAG-HOME-RECENTS-02`.
 - Propuesta: obtener el icono desde la pagina ya aprobada o mediante el cargador seguro propio, validarlo y almacenarlo solo en cache local acotada. No consultar un proxy publico de favicons ni retrasar la apertura de Home.
 - Seguridad: el favicon es orientativo y nunca un sello de confianza; el dominio/nombre sigue visible, iconos fallidos o sospechosos usan inicial neutra y borrar historial elimina tambien esta cache.
 - Aceptacion: recientes de tiendas y servicios conocidos muestran el favicon correcto al volver a Home; subdominios no heredan una identidad engañosa; sin red aparece el ultimo icono seguro o el fallback; Home abre instantaneamente y tocarlo sigue revalidando la pagina.
+- Implementacion candidata: se guarda solo el icono recibido por una pagina ya visible y permitida, en cache local cifrada de 24 entradas y 48 KiB por icono. Mimo y Cheeky mostraron sus iconos reales al volver a Home; los fallos conservan la inicial neutra.
 
 #### DAG-TAB-PREVIEW-04 - Miniatura real por pestana
 
-- Estado: `Reportado en candidato local; pendiente implementacion`. Evidencia: el usuario informa el 2026-07-23 que el selector no muestra las paginas en miniatura. Tipo: pestanas, privacidad y memoria. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Estado: `Implementado y validado en candidato local`. Evidencia: el usuario informa el 2026-07-23 que el selector no muestra las paginas en miniatura. Tipo: pestanas, privacidad y memoria. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Problema: el candidato local solo puede capturar de forma efimera el WebView activo y visible al abrir el selector; las demas tarjetas pueden quedar neutras o representar Home, por lo que el alcance de `DAG-TABS-UX-03` esta incompleto.
 - Propuesta: actualizar la miniatura efimera aprobada antes de suspender o cambiar de pestana y asociarla estrictamente con su identificador. Mantener un solo WebView activo y un presupuesto de memoria limitado.
 - Privacidad y seguridad: no escribir pixeles en disco; bloqueo, analisis, CAPTCHA, formularios sensibles o contenido incierto usan tarjeta neutra; una miniatura nunca evita la revalidacion al restaurar.
 - Aceptacion: con 1, 10 y 50 pestanas cada tarjeta representa su ultima pagina segura y solo muestra Home si esa pestana esta en Home; cambiar/cerrar no cruza miniaturas; `Cerrar todo` libera memoria; reiniciar no restaura capturas; el selector sigue fluido bajo el presupuesto definido.
+- Implementacion candidata: la pagina visible se captura antes de abrir, crear, cambiar o cerrar pestañas; la miniatura queda solo en memoria y asociada al identificador de la pestaña. El selector mostro fisicamente la pagina de Fravega en su tarjeta.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 

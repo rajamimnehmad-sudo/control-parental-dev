@@ -243,6 +243,7 @@ private fun DagBrowserContent(
     }
 
     fun openTab(tab: DagTab) {
+        captureActiveTabPreview()
         persistActiveTab()
         activeTabId = tab.id
         viewModel.restoreTab(tab.snapshot)
@@ -254,6 +255,7 @@ private fun DagBrowserContent(
     }
 
     fun newTab() {
+        captureActiveTabPreview()
         persistActiveTab()
         val currentSnapshot = viewModel.captureTab()
         val reusable =
@@ -293,6 +295,7 @@ private fun DagBrowserContent(
     }
 
     fun closeTab(tab: DagTab) {
+        captureActiveTabPreview()
         persistActiveTab()
         val remaining = tabs.filterNot { it.id == tab.id }
         if (remaining.isEmpty()) {
@@ -574,7 +577,7 @@ private fun DagBrowserContent(
                                 enabled = state.view == DagView.Browser,
                                 onClick = {
                                     menuExpanded = false
-                                    activeWebView?.reload()
+                                    state.requestedUrl?.let(viewModel::requestNavigation)
                                 },
                             )
                             DropdownMenuItem(
@@ -695,14 +698,15 @@ private fun DagBrowserContent(
                         onSubmit = viewModel::submitAddress,
                         onBeginEdit = viewModel::beginAddressEdit,
                         recentHistory = state.history,
+                        siteFavicons = state.siteFavicons,
                         onRecentSiteSelected = viewModel::openHistory,
                     )
                 DagView.Results ->
                     DagResultsContent(
                         results = state.results,
-                        query = state.searchQuery,
                         canLoadMore = state.canLoadMoreResults,
                         loading = state.loading,
+                        correctedQuery = state.spellingCorrection,
                         onOpen = viewModel::openResult,
                         onLoadMore = viewModel::loadMoreResults,
                         onCorrectedSearch = viewModel::search,
@@ -742,6 +746,7 @@ private fun DagBrowserContent(
                                 pendingGeolocationDecision = decision
                             }
                         },
+                        onFaviconChanged = viewModel::saveFavicon,
                         onPageBlocked = viewModel::onPageBlocked,
                         onRendererGone = viewModel::onBrowserRendererGone,
                         onWebViewChanged = { activeWebView = it },

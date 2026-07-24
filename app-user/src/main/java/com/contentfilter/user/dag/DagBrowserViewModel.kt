@@ -1,5 +1,6 @@
 package com.contentfilter.user.dag
 
+import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
+import java.util.LinkedHashMap
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
@@ -63,6 +65,12 @@ class DagBrowserViewModel
         private var approvalPollingJob: Job? = null
         private var suggestionJob: Job? = null
         private var searchJob: Job? = null
+        private val suggestionCache =
+            object : LinkedHashMap<String, DagRemoteSuggestionResponse>(MaximumSuggestionCacheEntries, 0.75f, true) {
+                override fun removeEldestEntry(
+                    eldest: MutableMap.MutableEntry<String, DagRemoteSuggestionResponse>?,
+                ): Boolean = size > MaximumSuggestionCacheEntries
+            }
         private val searchRequestTracker = DagSearchRequestTracker()
         private val reviewSubmissionsInFlight = mutableSetOf<String>()
         private var pageAnalysisStartedAtMillis = 0L
@@ -98,6 +106,11 @@ class DagBrowserViewModel
                 }
             }
             viewModelScope.launch {
+                historyStore.observeFavicons().collect { favicons ->
+                    mutableState.update { it.copy(siteFavicons = favicons) }
+                }
+            }
+            viewModelScope.launch {
                 accessRequestRepository.observeRequests().collect { requests ->
                     val reviews =
                         requests
@@ -123,22 +136,79 @@ class DagBrowserViewModel
 
         fun onAddressChanged(value: String) {
             val address = value.take(MaxAddressCharacters)
-            mutableState.update { it.copy(address = address, message = "", suggestions = emptyList()) }
+            mutableState.update {
+                it.copy(
+                    address = address,
+                    message = "",
+                    suggestions = emptyList(),
+                    spellingCorrection = null,
+                )
+            }
             suggestionJob?.cancel()
             if (address.isBlank()) return
+            val localClassification = classifier.classifyQuery(address)
+            if (localClassification.decision == DagClassification.Blocked) return
             suggestionJob =
                 viewModelScope.launch {
                     delay(SuggestionDebounceMillis)
                     val history = mutableState.value.history
+                    val cacheKey = "${address.dagLanguage()}:${address.lowercase(Locale.ROOT)}"
+                    val cached = synchronized(suggestionCache) { suggestionCache[cacheKey] }
+                    val remote =
+                        cached ?: run {
+                            val activation =
+                                withContext(Dispatchers.IO) {
+                                    activationRepository.currentActivation()
+                                }
+                            if (activation == null) {
+                                DagRemoteSuggestionResponse(emptyList(), null)
+                            } else {
+                                when (
+                                    val result =
+                                        searchRepository.suggestions(
+                                            deviceId = activation.deviceId,
+                                            query = address,
+                                            language = address.dagLanguage(),
+                                        )
+                                ) {
+                                    is RemoteResult.Success -> result.value
+                                    is RemoteResult.Failure -> DagRemoteSuggestionResponse(emptyList(), null)
+                                }
+                            }
+                        }
+                    synchronized(suggestionCache) { suggestionCache[cacheKey] = remote }
                     val suggestions =
                         withContext(Dispatchers.Default) {
-                            dagSearchSuggestionCandidates(address, history)
-                                .filter { classifier.classifyQuery(it).decision == DagClassification.Allowed }
+                            dagSearchSuggestionCandidates(address, history, remote.suggestions)
+                                .filter { classifier.classifyQuery(it).decision != DagClassification.Blocked }
                         }
+                    val correction =
+                        remote.correctedQuery
+                            ?.takeIf { !it.equals(address, ignoreCase = true) }
+                            ?.takeIf { classifier.classifyQuery(it).decision != DagClassification.Blocked }
                     if (mutableState.value.address == address) {
-                        mutableState.update { it.copy(suggestions = suggestions) }
+                        mutableState.update {
+                            it.copy(
+                                suggestions = suggestions,
+                                spellingCorrection = correction,
+                            )
+                        }
                     }
                 }
+        }
+
+        fun saveFavicon(
+            url: String,
+            bitmap: Bitmap,
+        ) {
+            if (!mutableState.value.dagEnabled || !url.startsWith("https://", ignoreCase = true)) return
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    historyStore.saveFavicon(url, bitmap)
+                } finally {
+                    bitmap.recycle()
+                }
+            }
         }
 
         fun beginAddressEdit() {
@@ -290,6 +360,7 @@ class DagBrowserViewModel
                             reviewCandidate = null,
                             pageStatus = DagPageStatus.Idle,
                             suggestions = emptyList(),
+                            spellingCorrection = it.spellingCorrection.takeIf { _ -> it.address == query },
                         )
                     }
                     val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
@@ -435,6 +506,7 @@ class DagBrowserViewModel
                         analysisProgress = 0.05f,
                         message = "",
                         suggestions = emptyList(),
+                        spellingCorrection = null,
                     ),
                 )
             if (accepted) search(suggestion)
@@ -1000,7 +1072,8 @@ class DagBrowserViewModel
             const val MaxAddressCharacters = 400
             const val ApprovalPollingIntervalMillis = 5_000L
             const val ApprovalPollingAttempts = 24
-            const val SuggestionDebounceMillis = 120L
+            const val SuggestionDebounceMillis = 250L
+            const val MaximumSuggestionCacheEntries = 40
             const val DiagnosticsLogTag = "DagSearchDiagnostics"
             const val PerformanceLogTag = "DagPerformance"
             const val PageApprovalModelVersion =
@@ -1052,6 +1125,7 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 searchPage = 0,
                 canLoadMoreResults = false,
                 suggestions = emptyList(),
+                spellingCorrection = null,
                 requestedUrl = null,
                 loading = false,
                 message = "El administrador mantiene DAG cerrado.",
@@ -1072,6 +1146,7 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 searchPage = 0,
                 canLoadMoreResults = false,
                 suggestions = emptyList(),
+                spellingCorrection = null,
                 requestedUrl = null,
                 loading = false,
                 message = "",
@@ -1091,6 +1166,7 @@ internal fun DagBrowserUiState.toDagStart(): DagBrowserUiState =
         searchPage = 0,
         canLoadMoreResults = false,
         suggestions = emptyList(),
+        spellingCorrection = null,
         requestedUrl = null,
         navigationRevision = navigationRevision + 1,
         loading = false,

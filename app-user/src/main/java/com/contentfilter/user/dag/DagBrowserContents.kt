@@ -1,5 +1,7 @@
 package com.contentfilter.user.dag
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +42,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -64,6 +67,7 @@ internal fun DagStartContent(
     onSubmit: () -> Unit,
     onBeginEdit: () -> Unit,
     recentHistory: List<DagHistoryEntry>,
+    siteFavicons: Map<String, ByteArray>,
     onRecentSiteSelected: (DagHistoryEntry) -> Unit,
 ) {
     val keyboardVisible = WindowInsets.isImeVisible
@@ -160,6 +164,12 @@ internal fun DagStartContent(
             ) {
                 items(recentSites, key = DagHistoryEntry::id) { entry ->
                     val domain = DagContentClassifier.domainFrom(entry.url.orEmpty())
+                    val favicon =
+                        remember(domain, siteFavicons[domain]) {
+                            siteFavicons[domain]
+                                ?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+                                ?.asImageBitmap()
+                        }
                     Column(
                         modifier = Modifier.width(64.dp).clickable { onRecentSiteSelected(entry) },
                         horizontalAlignment = Alignment.CenterHorizontally,
@@ -171,10 +181,18 @@ internal fun DagStartContent(
                             contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
                         ) {
                             Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    dagSiteGlyph(domain),
-                                    style = MaterialTheme.typography.titleMedium,
-                                )
+                                if (favicon != null) {
+                                    Image(
+                                        bitmap = favicon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(30.dp),
+                                    )
+                                } else {
+                                    Text(
+                                        dagSiteGlyph(domain),
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                }
                             }
                         }
                         Spacer(Modifier.height(6.dp))
@@ -232,14 +250,13 @@ internal fun DagSearchSuggestions(
 @Composable
 internal fun DagResultsContent(
     results: List<DagSearchResult>,
-    query: String,
     canLoadMore: Boolean,
     loading: Boolean,
+    correctedQuery: String?,
     onOpen: (DagSearchResult) -> Unit,
     onLoadMore: () -> Unit,
     onCorrectedSearch: (String) -> Unit,
 ) {
-    val correctedQuery = remember(query) { dagDidYouMeanSuggestion(query) }
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item(key = "results-header") {
             Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
