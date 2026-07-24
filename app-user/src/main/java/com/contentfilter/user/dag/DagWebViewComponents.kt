@@ -51,6 +51,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
+import java.io.ByteArrayInputStream
 import java.util.concurrent.atomic.AtomicLong
 
 @SuppressLint("SetJavaScriptEnabled")
@@ -68,6 +69,8 @@ internal fun DagWebContent(
     onManualCalibrationCandidate: (ByteArray, DagImageClassification) -> Unit,
     onManualBlurReviewCandidate: (ByteArray, DagImageClassification) -> Unit,
     onBlockedAction: (String) -> Unit,
+    onGeolocationPrompt: (String, (Boolean) -> Unit) -> Unit,
+    onFaviconChanged: (String, Bitmap) -> Unit,
     onPageBlocked: (String) -> Unit,
     onRendererGone: () -> Unit,
     onWebViewChanged: (WebView?) -> Unit,
@@ -83,6 +86,8 @@ internal fun DagWebContent(
     val currentManualBlurReviewCandidate by rememberUpdatedState(onManualBlurReviewCandidate)
     val currentVisualCalibrationEnabled by rememberUpdatedState(visualCalibrationEnabled)
     val currentExtraKosherEnabled by rememberUpdatedState(state.dagExtraKosherEnabled)
+    val currentGeolocationPrompt by rememberUpdatedState(onGeolocationPrompt)
+    val currentFaviconChanged by rememberUpdatedState(onFaviconChanged)
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     val imageLoader =
@@ -105,6 +110,8 @@ internal fun DagWebContent(
     var canGoForward by remember { mutableStateOf(false) }
     var inspectedUrl by remember { mutableStateOf<String?>(null) }
     var preparedUrl by remember { mutableStateOf<String?>(null) }
+    var loadedNavigationRevision by remember { mutableStateOf(-1L) }
+    var pendingFavicon by remember { mutableStateOf<Pair<String, Bitmap>?>(null) }
 
     BackHandler {
         if (webView?.canGoBack() == true) webView?.goBack() else onBackFromBrowser()
@@ -122,19 +129,42 @@ internal fun DagWebContent(
     }
     LaunchedEffect(webView, state.navigationRevision, state.requestedUrl) {
         state.requestedUrl?.let { url ->
-            if (url.startsWith("https://", ignoreCase = true) && webView?.url != url) {
-                webView?.settings?.blockNetworkImage = true
-                webView?.loadUrl(url)
+            val view = webView
+            if (
+                url.startsWith("https://", ignoreCase = true) &&
+                view != null &&
+                loadedNavigationRevision != state.navigationRevision
+            ) {
+                loadedNavigationRevision = state.navigationRevision
+                view.settings.blockNetworkImage = true
+                val performanceProbe =
+                    BuildConfig.DEBUG &&
+                        runCatching { Uri.parse(url).getQueryParameter("codexperf") != null }.getOrDefault(false)
+                view.settings.cacheMode =
+                    if (performanceProbe) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
+                if (performanceProbe) view.clearCache(true)
+                if (view.url == url) view.reload() else view.loadUrl(url)
             }
+        }
+    }
+    LaunchedEffect(state.pageStatus, state.requestedUrl, pendingFavicon) {
+        val pending = pendingFavicon ?: return@LaunchedEffect
+        val requestedDomain = DagContentClassifier.domainFrom(state.requestedUrl.orEmpty())
+        val faviconDomain = DagContentClassifier.domainFrom(pending.first)
+        if (
+            state.pageStatus == DagPageStatus.Visible &&
+            requestedDomain.isNotBlank() &&
+            requestedDomain == faviconDomain
+        ) {
+            pendingFavicon = null
+            currentFaviconChanged(pending.first, pending.second)
         }
     }
     LaunchedEffect(webView, visualCalibrationEnabled) {
         val view = webView
         if (imageLoader.setDevCalibrationRevealEnabled(visualCalibrationEnabled)) {
-            view?.url?.takeIf { it.startsWith("https://", ignoreCase = true) }?.let {
-                view.settings.blockNetworkImage = true
-                view.reload()
-            }
+            view?.setDagVisualCalibrationMode(visualCalibrationEnabled)
+            view?.setDagImageCalibrationDecisions(imageLoader.manualCalibrationDecisions())
         } else if (state.pageStatus == DagPageStatus.Visible) {
             view?.setDagVisualCalibrationMode(visualCalibrationEnabled)
         }
@@ -148,6 +178,8 @@ internal fun DagWebContent(
     }
     DisposableEffect(Unit) {
         onDispose {
+            pendingFavicon?.second?.recycle()
+            pendingFavicon = null
             webView?.stopLoading()
             webView?.destroy()
             webView = null
@@ -182,7 +214,7 @@ internal fun DagWebContent(
                                 when (action) {
                                     DagCalibrationActionBlock ->
                                         currentManualCalibrationCandidate(candidate.thumbnail, candidate.classification)
-                                    DagCalibrationActionReviewBlur ->
+                                    DagCalibrationActionAllow ->
                                         currentManualBlurReviewCandidate(
                                             candidate.thumbnail,
                                             candidate.classification,
@@ -211,7 +243,17 @@ internal fun DagWebContent(
                         setAcceptCookie(true)
                         setAcceptThirdPartyCookies(dagWebView, false)
                     }
-                    webChromeClient = DagChromeClient(onBlockedAction)
+                    webChromeClient =
+                        DagChromeClient(
+                            onBlocked = onBlockedAction,
+                            onGeolocationPrompt = { origin, decision ->
+                                currentGeolocationPrompt(origin, decision)
+                            },
+                            onFaviconChanged = { url, icon ->
+                                pendingFavicon?.second?.recycle()
+                                pendingFavicon = url to icon.copy(Bitmap.Config.ARGB_8888, false)
+                            },
+                        )
 
                     fun prepareViewport(
                         view: WebView,
@@ -344,7 +386,7 @@ private fun WebView.configureDagSettings(
                 calibrationDecision(imageUrl)?.let { view.setDagImageCalibrationDecision(imageUrl, it) }
                 return@addWebMessageListener
             }
-            if (action == DagCalibrationActionBlock || action == DagCalibrationActionReviewBlur) {
+            if (action == DagCalibrationActionBlock || action == DagCalibrationActionAllow) {
                 onManualImageReported(action, imageUrl)
             }
         }
@@ -375,6 +417,7 @@ private fun WebView.configureDagSettings(
     settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
     settings.cacheMode = WebSettings.LOAD_DEFAULT
     settings.safeBrowsingEnabled = true
+    settings.setGeolocationEnabled(true)
 }
 
 private fun WebView.setDagImageCalibrationDecision(
@@ -471,7 +514,17 @@ private val DagDocumentStartScript =
 
 private class DagChromeClient(
     private val onBlocked: (String) -> Unit,
+    private val onGeolocationPrompt: (String, (Boolean) -> Unit) -> Unit,
+    private val onFaviconChanged: (String, Bitmap) -> Unit,
 ) : WebChromeClient() {
+    override fun onReceivedIcon(
+        view: WebView?,
+        icon: Bitmap?,
+    ) {
+        val url = view?.url?.takeIf { it.startsWith("https://", ignoreCase = true) } ?: return
+        icon?.takeIf { it.width > 0 && it.height > 0 }?.let { onFaviconChanged(url, it) }
+    }
+
     override fun onPermissionRequest(request: PermissionRequest) {
         request.deny()
         onBlocked("Cámara y micrófono están bloqueados en DAG.")
@@ -481,8 +534,14 @@ private class DagChromeClient(
         origin: String?,
         callback: GeolocationPermissions.Callback?,
     ) {
-        callback?.invoke(origin, false, false)
-        onBlocked("La ubicación está bloqueada en DAG.")
+        val safeOrigin = origin?.takeIf { it.startsWith("https://", ignoreCase = true) }
+        if (safeOrigin == null || callback == null) {
+            callback?.invoke(origin, false, false)
+            return
+        }
+        onGeolocationPrompt(safeOrigin) { allowed ->
+            callback.invoke(safeOrigin, allowed, false)
+        }
     }
 
     override fun onShowFileChooser(
@@ -588,6 +647,16 @@ private class DagWebViewClient(
         request: WebResourceRequest,
     ): WebResourceResponse? {
         if (captchaSessionActive() && isDagCaptchaSessionResourceUrl(request.url.toString())) return null
+        if (dagShouldBlockAdRequest(request.url.toString(), request.isForMainFrame)) {
+            return WebResourceResponse(
+                "text/plain",
+                "utf-8",
+                204,
+                "No Content",
+                emptyMap(),
+                ByteArrayInputStream(ByteArray(0)),
+            )
+        }
         return imageLoader.intercept(request, pageUrlTracker.current())
     }
 }
@@ -713,11 +782,31 @@ private fun WebView.sanitizeAndExtractVisibleText(
             if (!image) return;
             dagBlurIntimateImage(image);
             dagApplyExtraKosherImage(image);
-            var lazy = image.getAttribute('loading') === 'lazy' ||
-              image.hasAttribute('data-src') || image.hasAttribute('data-lazy-src') ||
-              image.hasAttribute('data-srcset') || image.hasAttribute('data-lazy-srcset') ||
-              image.hasAttribute('data-dag-held-src');
-            if (lazy && window.IntersectionObserver && image.getAttribute('data-dag-image-ready') !== 'true') {
+            if (window.IntersectionObserver && image.getAttribute('data-dag-image-ready') !== 'true') {
+              var heldSource = dagHttpsImageSource(image);
+              if (!heldSource) {
+                image.style.setProperty('visibility', 'hidden', 'important');
+                image.setAttribute('data-dag-image-terminal', 'unavailable');
+                return;
+              }
+              var heldRect;
+              try { heldRect = image.getBoundingClientRect(); } catch (_) {}
+              var declaredWidth = parseFloat(image.getAttribute('width') || '0');
+              var declaredHeight = parseFloat(image.getAttribute('height') || '0');
+              if (declaredWidth > 0 && declaredHeight > 0) {
+                image.style.setProperty('aspect-ratio', declaredWidth + ' / ' + declaredHeight);
+              } else if (heldRect && heldRect.width >= 24 && heldRect.height >= 24) {
+                image.style.setProperty('aspect-ratio', heldRect.width + ' / ' + heldRect.height);
+              }
+              image.setAttribute('data-dag-held-src', heldSource);
+              image.removeAttribute('src');
+              image.removeAttribute('srcset');
+              var heldPicture = image.closest && image.closest('picture');
+              heldPicture && heldPicture.querySelectorAll('source').forEach(function(source) {
+                source.removeAttribute('srcset');
+                source.removeAttribute('data-srcset');
+                source.removeAttribute('data-lazy-srcset');
+              });
               if (!window.__dagImageObserver) {
                 var dagPrefetchMargin = Math.max(
                   (window.innerHeight || 0) * ${DagViewportReadinessPolicy.PrefetchViewportCount},
@@ -964,28 +1053,29 @@ private fun WebView.sanitizeAndExtractVisibleText(
                 }
                 return;
               }
-              var reviewBlur = decision !== 'allowed' || image.getAttribute('data-dag-kosher-blurred') === 'true';
-              var marker = document.createElement('button');
-              marker.type = 'button';
+              var marker = document.createElement('div');
               marker.setAttribute('data-dag-calibration-marker', 'true');
-              marker.setAttribute('aria-label', reviewBlur ? 'Revisar posible falso positivo' : 'Marcar foto como inapropiada');
-              marker.textContent = reviewBlur ? 'R' : '×';
-              marker.style.cssText = 'position:fixed;z-index:2147483647;width:34px;height:34px;border:2px solid white;border-radius:17px;background:' + (reviewBlur ? '#087f8c' : '#d71920') + ';color:white;font:700 ' + (reviewBlur ? '17px/29px' : '25px/27px') + ' sans-serif;padding:0;box-shadow:0 2px 7px rgba(0,0,0,.55);';
-              marker.style.left = Math.max(4, rect.right - 38) + 'px';
+              marker.style.cssText = 'position:fixed;z-index:2147483647;display:flex;gap:4px;padding:3px;border-radius:20px;background:rgba(15,23,42,.82);box-shadow:0 2px 7px rgba(0,0,0,.55);';
+              marker.style.left = Math.max(4, rect.right - 78) + 'px';
               marker.style.top = Math.max(4, rect.top + 4) + 'px';
-              marker.addEventListener('click', function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                image.setAttribute('data-dag-manually-blocked', 'true');
-                if (!reviewBlur) {
-                  image.style.setProperty('filter', 'blur(48px) saturate(0.05) brightness(0.82)', 'important');
-                  image.style.setProperty('transform', 'scale(1.14)', 'important');
-                }
-                marker.remove();
-                try {
-                  window.$DagCalibrationBridgeName.postMessage(JSON.stringify({ action: reviewBlur ? 'review_blur' : 'block', url: source }));
-                } catch (_) {}
-              }, true);
+              function addCalibrationButton(label, action, color, ariaLabel) {
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.setAttribute('aria-label', ariaLabel);
+                button.textContent = label;
+                button.style.cssText = 'width:32px;height:32px;border:2px solid white;border-radius:16px;background:' + color + ';color:white;font:700 18px/27px sans-serif;padding:0;';
+                button.addEventListener('click', function(event) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  marker.remove();
+                  try {
+                    window.$DagCalibrationBridgeName.postMessage(JSON.stringify({ action: action, url: source }));
+                  } catch (_) {}
+                }, true);
+                marker.appendChild(button);
+              }
+              addCalibrationButton('✓', 'allow', '#087f5b', 'Marcar foto como permitida para calibración');
+              addCalibrationButton('×', 'block', '#d71920', 'Marcar foto como prohibida para calibración');
               document.body.appendChild(marker);
             });
           };
@@ -1192,4 +1282,4 @@ private const val DagCaptchaSessionStart = "captcha_session_start"
 private const val DagCaptchaSessionDurationMillis = 120_000L
 private const val DagCalibrationActionProbe = "probe"
 private const val DagCalibrationActionBlock = "block"
-private const val DagCalibrationActionReviewBlur = "review_blur"
+private const val DagCalibrationActionAllow = "allow"

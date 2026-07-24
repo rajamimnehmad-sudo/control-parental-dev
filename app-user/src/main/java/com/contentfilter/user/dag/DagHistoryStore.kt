@@ -1,6 +1,7 @@
 package com.contentfilter.user.dag
 
 import android.content.Context
+import android.graphics.Bitmap
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -9,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.security.KeyStore
 import java.util.UUID
 import javax.crypto.Cipher
@@ -26,8 +28,11 @@ class DagHistoryStore
     ) {
         private val preferences = context.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
         private val mutableEntries = MutableStateFlow(loadSafely())
+        private val mutableFavicons = MutableStateFlow(loadFaviconsSafely())
 
         fun observe(): StateFlow<List<DagHistoryEntry>> = mutableEntries
+
+        fun observeFavicons(): StateFlow<Map<String, ByteArray>> = mutableFavicons
 
         @Synchronized
         fun addSearch(
@@ -71,8 +76,38 @@ class DagHistoryStore
 
         @Synchronized
         fun clear() {
-            preferences.edit().remove(EncryptedHistoryKey).commit()
+            preferences.edit().remove(EncryptedHistoryKey).remove(EncryptedFaviconsKey).commit()
             mutableEntries.value = emptyList()
+            mutableFavicons.value = emptyMap()
+        }
+
+        @Synchronized
+        fun saveFavicon(
+            url: String,
+            bitmap: Bitmap,
+        ) {
+            val domain = DagContentClassifier.domainFrom(url)
+            if (domain.isBlank() || bitmap.width <= 0 || bitmap.height <= 0) return
+            val scaled = Bitmap.createScaledBitmap(bitmap, FaviconSidePixels, FaviconSidePixels, true)
+            val bytes =
+                try {
+                    ByteArrayOutputStream().use { output ->
+                        if (!scaled.compress(Bitmap.CompressFormat.PNG, 100, output)) return
+                        output.toByteArray()
+                    }
+                } finally {
+                    if (scaled !== bitmap) scaled.recycle()
+                }
+            if (bytes.isEmpty() || bytes.size > MaximumFaviconBytes) return
+            val updated =
+                linkedMapOf(domain to bytes).apply {
+                    mutableFavicons.value
+                        .asSequence()
+                        .filterNot { it.key == domain }
+                        .take(MaximumFavicons - 1)
+                        .forEach { put(it.key, it.value) }
+                }
+            persistFavicons(updated)
         }
 
         @Synchronized
@@ -170,6 +205,26 @@ class DagHistoryStore
             }
         }
 
+        private fun loadFaviconsSafely(): Map<String, ByteArray> {
+            val encoded = preferences.getString(EncryptedFaviconsKey, null) ?: return emptyMap()
+            return runCatching { decodeFavicons(decrypt(encoded)) }
+                .getOrElse {
+                    preferences.edit().remove(EncryptedFaviconsKey).commit()
+                    emptyMap()
+                }
+        }
+
+        private fun persistFavicons(favicons: Map<String, ByteArray>) {
+            runCatching {
+                preferences.edit().putString(EncryptedFaviconsKey, encrypt(encodeFavicons(favicons))).commit()
+            }.onSuccess {
+                mutableFavicons.value = favicons
+            }.onFailure {
+                preferences.edit().remove(EncryptedFaviconsKey).commit()
+                mutableFavicons.value = emptyMap()
+            }
+        }
+
         private fun loadPageApprovals(nowEpochMillis: Long): List<DagPageApproval> {
             val encoded = preferences.getString(EncryptedPageApprovalsKey, null) ?: return emptyList()
             return runCatching {
@@ -256,6 +311,34 @@ class DagHistoryStore
                         visitedAtEpochMillis = json.getLong("visited_at"),
                     )
                 }.take(MaxEntries)
+            }
+
+            internal fun encodeFavicons(favicons: Map<String, ByteArray>): String =
+                JSONArray().apply {
+                    favicons.entries.take(MaximumFavicons).forEach { (domain, bytes) ->
+                        if (domain.isNotBlank() && bytes.size <= MaximumFaviconBytes) {
+                            put(
+                                JSONObject()
+                                    .put("domain", domain)
+                                    .put("png", java.util.Base64.getEncoder().encodeToString(bytes)),
+                            )
+                        }
+                    }
+                }.toString()
+
+            internal fun decodeFavicons(value: String): Map<String, ByteArray> {
+                val array = JSONArray(value)
+                return buildMap {
+                    for (index in 0 until minOf(array.length(), MaximumFavicons)) {
+                        val json = array.getJSONObject(index)
+                        val domain = json.optString("domain").trim()
+                        val bytes =
+                            runCatching { java.util.Base64.getDecoder().decode(json.optString("png")) }
+                                .getOrNull()
+                                ?.takeIf { it.isNotEmpty() && it.size <= MaximumFaviconBytes }
+                        if (domain.isNotBlank() && bytes != null) put(domain, bytes)
+                    }
+                }
             }
 
             internal fun encodePageApprovals(entries: List<DagPageApproval>): String =
@@ -398,6 +481,7 @@ class DagHistoryStore
             private const val EncryptedHistoryKey = "entries"
             private const val EncryptedPageApprovalsKey = "page-approvals"
             private const val EncryptedTabsKey = "tabs"
+            private const val EncryptedFaviconsKey = "favicons"
             private const val AndroidKeyStore = "AndroidKeyStore"
             private const val KeyAlias = "content-filter-dag-history-v1"
             private const val Transformation = "AES/GCM/NoPadding"
@@ -405,11 +489,14 @@ class DagHistoryStore
             private const val TagLengthBits = 128
             private const val MaxEntries = 200
             private const val MaxPageApprovals = 200
-            private const val MaxSavedTabs = 8
+            private const val MaxSavedTabs = 50
             private const val MaxSavedResults = 20
             private const val PageApprovalLifetimeMillis = 7L * 24L * 60L * 60L * 1_000L
             private const val MaxValueCharacters = 2_048
             private const val MaxTitleCharacters = 180
             private const val MaxDescriptionCharacters = 500
+            private const val MaximumFavicons = 24
+            private const val MaximumFaviconBytes = 48 * 1024
+            private const val FaviconSidePixels = 64
         }
     }

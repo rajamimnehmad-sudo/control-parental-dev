@@ -1,6 +1,7 @@
 package com.contentfilter.user.dag
 
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 
 class DagHistoryStoreTest {
@@ -48,6 +49,18 @@ class DagHistoryStoreTest {
         val decoded = DagHistoryStore.decodePageApprovals(DagHistoryStore.encodePageApprovals(expected))
 
         assertEquals(expected, decoded)
+    }
+
+    @Test
+    fun `favicon codec preserves bounded png bytes`() {
+        val expected = byteArrayOf(1, 2, 3, 4)
+
+        val decoded =
+            DagHistoryStore.decodeFavicons(
+                DagHistoryStore.encodeFavicons(mapOf("example.com" to expected)),
+            )
+
+        assertContentEquals(expected, decoded.getValue("example.com"))
     }
 
     @Test
@@ -112,5 +125,23 @@ class DagHistoryStoreTest {
         assertEquals(false, DagTabSnapshot(address = "consulta").isEmptyTab())
         assertEquals(false, DagTabSnapshot(view = DagView.History).isEmptyTab())
         assertEquals(false, DagTabSnapshot(requestedUrl = "https://example.com").isEmptyTab())
+    }
+
+    @Test
+    fun `tab session persists at most fifty suspended tabs`() {
+        val tabs =
+            (1..55).map { index ->
+                DagSavedTab(
+                    id = "tab-$index",
+                    snapshot = DagTabSnapshot(address = "consulta $index", view = DagView.Results),
+                    lastUsedAtEpochMillis = index.toLong(),
+                )
+            }
+        val decoded =
+            DagHistoryStore.decodeTabSession(
+                DagHistoryStore.encodeTabSession(DagSavedTabSession(activeTabId = "tab-1", tabs = tabs)),
+            )
+
+        assertEquals(50, decoded.tabs.size)
     }
 }

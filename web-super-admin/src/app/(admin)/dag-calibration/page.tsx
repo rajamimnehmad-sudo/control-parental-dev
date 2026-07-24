@@ -1,5 +1,9 @@
 import { BrainCircuit, ClipboardCheck, History, Images, ShieldCheck } from "lucide-react";
-import { ActivateDagCalibrationButton, ClearDagCalibrationButton, PrepareDagCalibrationButton } from "@/components/DagCalibrationActions";
+import {
+  ActivateDagCalibrationButton,
+  ClearDagCalibrationButton,
+  ManualDagCalibrationForm,
+} from "@/components/DagCalibrationActions";
 import { DagCalibrationReviewForm } from "@/components/DagCalibrationReviewForm";
 import { EmptyState } from "@/components/EmptyState";
 import { getDagCalibrationBundle } from "@/lib/data";
@@ -12,6 +16,13 @@ export default async function DagCalibrationPage() {
   const { pending, reviewed, versions, audit, models } = await getDagCalibrationBundle();
   const allowCount = reviewed.filter((item) => item.review_decision === "allow").length;
   const blockCount = reviewed.filter((item) => item.review_decision === "block").length;
+  const activeVersion = versions.find((version) => version.status === "active");
+  const availableVersion = versions.find((version) => version.status === "candidate");
+  const lastEvaluatedCount = Math.max(0, ...versions.map((version) => version.labeled_item_count));
+  const labelsUntilEvaluation = reviewed.length < 40
+    ? 40 - reviewed.length
+    : Math.max(0, 10 - (reviewed.length - lastEvaluatedCount));
+  const displayedThresholds = activeVersion?.thresholds ?? {};
   return (
     <main className="mx-auto grid max-w-7xl gap-5 px-4 py-5 lg:px-6">
       <section className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -21,7 +32,6 @@ export default async function DagCalibrationPage() {
         </div>
         <div className="flex flex-wrap gap-2">
           <ClearDagCalibrationButton disabled={pending.length + reviewed.length === 0} />
-          <PrepareDagCalibrationButton />
         </div>
       </section>
 
@@ -33,8 +43,39 @@ export default async function DagCalibrationPage() {
       </section>
 
       <section className="rounded-md border border-cyan-100 bg-cyan-50 p-4 text-sm text-cyan-950">
-        <p className="font-bold">Qué hace “Calibrar DAG”</p>
-        <p className="mt-1">Necesita al menos 12 respuestas, con 3 permitidas y 3 bloqueadas. Separa ejemplos de ajuste y validación, penaliza tres veces más un falso negativo, conserva las decisiones exactas y no cambia los teléfonos hasta que actives la versión.</p>
+        <p className="font-bold">
+          {availableVersion
+            ? `Calibración #${availableVersion.version_number} disponible`
+            : activeVersion
+              ? `Calibración activa #${activeVersion.version_number}`
+              : "Reuniendo la primera calibración"}
+        </p>
+        <p className="mt-1">
+          {availableVersion
+            ? "La propuesta ya fue evaluada y espera activación manual. Nada cambia en los teléfonos hasta que la actives."
+            : labelsUntilEvaluation > 0
+              ? `Faltan ${labelsUntilEvaluation} etiquetas para la próxima evaluación automática.`
+              : "La próxima etiqueta completará la evaluación automática."}
+        </p>
+      </section>
+
+      <section className="grid gap-3">
+        <div>
+          <h2 className="text-lg font-semibold text-ink">Umbrales actuales</h2>
+          <p className="text-sm text-slate-500">Valores activos en los teléfonos y propuesta disponible para comparación.</p>
+        </div>
+        <ThresholdGrid active={displayedThresholds} proposed={availableVersion?.thresholds} />
+      </section>
+
+      <section className="grid gap-3 rounded-md border border-line bg-white p-4 shadow-soft">
+        <div>
+          <h2 className="text-lg font-semibold text-ink">Ajuste manual avanzado</h2>
+          <p className="text-sm text-slate-500">Podés preparar otros valores dentro de límites seguros. Siempre se guardan como propuesta y requieren activación manual.</p>
+        </div>
+        <ManualDagCalibrationForm
+          modelVersion={activeVersion?.model_version ?? models.find((model) => model.status === "active")?.model_version ?? "marqo-nsfw-vit-tiny-384-2"}
+          thresholds={displayedThresholds}
+        />
       </section>
 
       <section className="grid gap-3">
@@ -58,7 +99,7 @@ export default async function DagCalibrationPage() {
                       {review.submission_source === "manual_dag_false_positive" ? <span className="rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-bold text-cyan-700">Revisar difuminado</span> : null}
                     </div>
                     <p className="text-xs text-slate-500">{review.device_name} · {formatDate(review.created_at)}</p>
-                    {review.submission_source === "manual_dag" ? <p className="mt-1 text-xs text-slate-600">La X indicó “inapropiada”. Elegí el motivo antes de incorporarla a una calibración.</p> : null}
+                    {review.submission_source === "manual_dag" ? <p className="mt-1 text-xs text-slate-600">La X indicó “prohibida”. Confirmá la etiqueta para incorporarla a una calibración.</p> : null}
                     {review.submission_source === "manual_dag_false_positive" ? <p className="mt-1 text-xs text-slate-600">La R indicó que DAG habría difuminado esta foto y podría ser un falso positivo. Decidí si debe permitirse o bloquearse y registrá el motivo.</p> : null}
                   </div>
                   <div className="rounded-md border border-cyan-100 bg-cyan-50 p-3 text-sm text-cyan-950">
@@ -99,3 +140,41 @@ export default async function DagCalibrationPage() {
 
 function Metric({ label, value, icon: Icon }: { label: string; value: number; icon: typeof Images }) { return <div className="rounded-md border border-line bg-white p-4 shadow-soft"><div className="flex items-center justify-between"><p className="text-xs font-semibold text-slate-500">{label}</p><Icon className="h-4 w-4 text-accent" /></div><p className="mt-2 text-2xl font-bold text-ink">{value}</p></div>; }
 function actionLabel(action: string) { return ({ review_labeled: "Foto etiquetada", reviews_cleared: "Fotos borradas", manual_image_reported: "Foto marcada desde DAG", calibration_created: "Calibración creada", calibration_activated: "Calibración activada", calibration_rollback: "Cambio de calibración", model_registered: "Modelo registrado" } as Record<string, string>)[action] ?? action; }
+
+const thresholdLabels: Array<[string, string]> = [
+  ["professional_block", "Contenido NSFW"],
+  ["female_face", "Contexto femenino"],
+  ["male_face", "Contexto masculino"],
+  ["male_breast_exposed", "Torso masculino"],
+  ["belly_exposed", "Abdomen expuesto"],
+  ["armpits_exposed", "Hombros"],
+  ["sleeves_above_elbow", "Mangas"],
+  ["hem_above_knee", "Largo sobre la rodilla"],
+  ["explicit_region", "Riesgo visual general"],
+];
+
+function ThresholdGrid({
+  active,
+  proposed,
+}: {
+  active: Record<string, number>;
+  proposed?: Record<string, number>;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      {thresholdLabels.map(([key, label]) => (
+        <article key={key} className="rounded-md border border-line bg-white p-4 shadow-soft">
+          <p className="text-sm font-semibold text-ink">{label}</p>
+          <div className="mt-2 flex items-end justify-between gap-3">
+            <div><p className="text-xs text-slate-500">Activo</p><p className="text-xl font-bold text-ink">{formatThreshold(active[key])}</p></div>
+            <div className="text-right"><p className="text-xs text-slate-500">Propuesto</p><p className="text-xl font-bold text-accent">{formatThreshold(proposed?.[key])}</p></div>
+          </div>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function formatThreshold(value: number | undefined) {
+  return typeof value === "number" ? value.toFixed(2) : "—";
+}

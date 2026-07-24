@@ -91,6 +91,19 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 - No cambia comportamiento, ViewModel, WebView, filtros, clasificacion, red, Brave, permisos, pestañas ni rendimiento. `ktlintCheck`, unitarios DEV y `assembleDevDebug` Usuario correctos.
 - Por pedido explicito del usuario no se incremento `versionCode`, no se uso dispositivo y no se publico APK. La version publica real continua siendo Usuario 278 y Admin 275.
 
+## Candidato local DAG Chrome y correcciones visuales - instalado, no publicado - 2026-07-23
+
+- Se completaron `DAG-SEARCH-SUGGEST-03`, `DAG-BLACK-RESOURCES-05`, `DAG-REFRESH-03`, `DAG-RECENTS-FAVICON-03` y `DAG-TAB-PREVIEW-04` sobre el lote local de experiencia DAG.
+- Las sugerencias online gratuitas pasan por una Edge Function autorizada en Supabase DEV, con debounce, cancelacion, cache acotada y clasificacion local antes de mostrarse. `frabega` devolvio autocompletado en vivo y `Tal vez quisiste decir: fravega` en el SM-A235M.
+- La respuesta neutra de imagenes ahora es transparente; Mimo dejo de mostrar los bloques negros de la captura. Home mostro favicons reales de Mimo y Cheeky desde cache cifrada local, y el selector mostro una miniatura efimera real de Fravega. `Actualizar` fuerza una nueva revision y usa `reload()` sobre la URL activa.
+- `app-user:testDevDebugUnitTest`, `app-user:ktlintCheck`, `assembleDevDebug` y `deno check` correctos. La Edge `dag-search` fue desplegada solo en DEV y la APK candidata se instalo in-place en el SM-A235M. No se incremento `versionCode`, no se publico APK, no se modifico Admin ni Production.
+
+## Candidato local DAG-IMAGE-FILTER-1 - instalado, no publicado - 2026-07-23
+
+- `Filtro 1` fue descartado y retirado el 2026-07-24. En SM-S908E agregaba MoveNet/skin a casi todas las fotos y solo evitaba la capa corporal pesada en una fraccion minima; Fravega registro 11.502 ms hasta `page_visible`.
+- Se restauro exactamente el recorrido visual anterior y el candidato corregido quedo instalado in-place en SM-S908E. Unitarios DEV, `ktlintCheck` y `assembleDevDebug` correctos; no cambio versionCode y no se publico APK.
+- Matriz fija posterior al retiro, Android 16 y cache-bust por URL: Fravega 8.761 ms, Mimo 2.190 ms y Cheeky 27.920 ms. Son una muestra operativa sensible a red/cache; Cheeky queda como regresion visible a investigar, no como exito.
+
 ## Publicacion Usuario DEV 277 - optimizacion integral DAG - 2026-07-23
 
 - Se optimizo el recorrido completo de pagina e imagenes sin permitir contenido antes de decidirlo: clasificacion monotona por dominio, URL, titulo y texto; reglas explicitas siempre prioritarias; evaluacion neuronal solo cuando puede elevar el riesgo; y preparacion unica del viewport sin sondeo artificial de fotos. Cada raster sigue interceptado, descargado por HTTPS con defensa SSRF, clasificado localmente y reemplazado por un recurso neutro ante duda, error o cancelacion.

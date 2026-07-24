@@ -162,8 +162,8 @@ internal fun DagTabSwitcher(
 ) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(
-            modifier = Modifier.fillMaxSize().padding(vertical = 24.dp),
-            shape = RoundedCornerShape(28.dp),
+            modifier = Modifier.fillMaxSize(),
+            shape = RoundedCornerShape(0.dp),
             color = MaterialTheme.colorScheme.surface,
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
@@ -272,7 +272,7 @@ internal fun DagTabSwitcher(
 
 internal const val TabPreviewWidth = 240
 internal const val TabPreviewHeight = 360
-internal const val MaximumTabs = 8
+internal const val MaximumTabs = 50
 internal const val MaxVisibleReviewRequests = 50
 internal const val TabPersistenceDebounceMillis = 500L
 

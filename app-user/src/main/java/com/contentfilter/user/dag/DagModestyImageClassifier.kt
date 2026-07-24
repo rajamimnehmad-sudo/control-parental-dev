@@ -98,7 +98,7 @@ internal fun DagModestyScores.hasFemaleContext(
     if (audienceContext == DagImageAudienceContext.FemaleSixPlus) return true
     val femaleDetected = femaleFace >= calibration.femaleFace
     val maleDominates =
-        (audienceContext == DagImageAudienceContext.Male || maleFace >= calibration.femaleFace) &&
+        (audienceContext == DagImageAudienceContext.Male || maleFace >= calibration.maleFace) &&
             maleFace >= femaleFace + GenderDominanceMargin
     return femaleDetected && !maleDominates
 }
@@ -110,7 +110,7 @@ private fun DagModestyScores.hasMaleOnlyContext(
     if (audienceContext == DagImageAudienceContext.YoungChild) return true
     if (audienceContext == DagImageAudienceContext.IntimateClothing) return false
     if (audienceContext == DagImageAudienceContext.FemaleSixPlus) return false
-    val maleDetected = audienceContext == DagImageAudienceContext.Male || maleFace >= calibration.femaleFace
+    val maleDetected = audienceContext == DagImageAudienceContext.Male || maleFace >= calibration.maleFace
     return maleDetected && (femaleFace < calibration.femaleFace || maleFace >= femaleFace + GenderDominanceMargin)
 }
 
@@ -127,7 +127,7 @@ internal fun dagAudienceAwareImageDecision(
     val measured = scores ?: return ensembleDecision
     val maleChestOnly =
         measured.hasMaleOnlyContext(calibration, audienceContext) &&
-            measured.maleBreastExposed >= MaleChestEvidenceThreshold &&
+            measured.maleBreastExposed >= calibration.maleBreastExposed &&
             !measured.hasFemaleContext(calibration, audienceContext)
     val youngChild = audienceContext == DagImageAudienceContext.YoungChild
     return if (maleChestOnly || youngChild) DagImageDecision.Allowed else ensembleDecision
@@ -254,4 +254,3 @@ internal class DagModestyImageClassifier(
 
 private const val StrongDecisionMargin = 0.15f
 private const val GenderDominanceMargin = 0.10f
-private const val MaleChestEvidenceThreshold = 0.30f

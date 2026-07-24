@@ -1,5 +1,6 @@
 package com.contentfilter.user.dag
 
+import android.graphics.Bitmap
 import android.os.SystemClock
 import android.util.Log
 import androidx.lifecycle.ViewModel
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.net.URI
+import java.util.LinkedHashMap
 import java.util.Locale
 import java.util.UUID
 import javax.inject.Inject
@@ -63,6 +65,12 @@ class DagBrowserViewModel
         private var approvalPollingJob: Job? = null
         private var suggestionJob: Job? = null
         private var searchJob: Job? = null
+        private val suggestionCache =
+            object : LinkedHashMap<String, DagRemoteSuggestionResponse>(MaximumSuggestionCacheEntries, 0.75f, true) {
+                override fun removeEldestEntry(
+                    eldest: MutableMap.MutableEntry<String, DagRemoteSuggestionResponse>?,
+                ): Boolean = size > MaximumSuggestionCacheEntries
+            }
         private val searchRequestTracker = DagSearchRequestTracker()
         private val reviewSubmissionsInFlight = mutableSetOf<String>()
         private var pageAnalysisStartedAtMillis = 0L
@@ -98,6 +106,11 @@ class DagBrowserViewModel
                 }
             }
             viewModelScope.launch {
+                historyStore.observeFavicons().collect { favicons ->
+                    mutableState.update { it.copy(siteFavicons = favicons) }
+                }
+            }
+            viewModelScope.launch {
                 accessRequestRepository.observeRequests().collect { requests ->
                     val reviews =
                         requests
@@ -123,22 +136,94 @@ class DagBrowserViewModel
 
         fun onAddressChanged(value: String) {
             val address = value.take(MaxAddressCharacters)
-            mutableState.update { it.copy(address = address, message = "", suggestions = emptyList()) }
+            mutableState.update {
+                it.copy(
+                    address = address,
+                    message = "",
+                    suggestions = emptyList(),
+                    spellingCorrection = null,
+                )
+            }
             suggestionJob?.cancel()
             if (address.isBlank()) return
+            val localClassification = classifier.classifyQuery(address)
+            if (localClassification.decision == DagClassification.Blocked) return
             suggestionJob =
                 viewModelScope.launch {
                     delay(SuggestionDebounceMillis)
                     val history = mutableState.value.history
+                    val cacheKey = "${address.dagLanguage()}:${address.lowercase(Locale.ROOT)}"
+                    val cached = synchronized(suggestionCache) { suggestionCache[cacheKey] }
+                    val remote =
+                        cached ?: run {
+                            val activation =
+                                withContext(Dispatchers.IO) {
+                                    activationRepository.currentActivation()
+                                }
+                            if (activation == null) {
+                                DagRemoteSuggestionResponse(emptyList(), null)
+                            } else {
+                                when (
+                                    val result =
+                                        searchRepository.suggestions(
+                                            deviceId = activation.deviceId,
+                                            query = address,
+                                            language = address.dagLanguage(),
+                                        )
+                                ) {
+                                    is RemoteResult.Success -> result.value
+                                    is RemoteResult.Failure -> DagRemoteSuggestionResponse(emptyList(), null)
+                                }
+                            }
+                        }
+                    synchronized(suggestionCache) { suggestionCache[cacheKey] = remote }
                     val suggestions =
                         withContext(Dispatchers.Default) {
-                            dagSearchSuggestionCandidates(address, history)
-                                .filter { classifier.classifyQuery(it).decision == DagClassification.Allowed }
+                            dagSearchSuggestionCandidates(address, history, remote.suggestions)
+                                .filter { classifier.classifyQuery(it).decision != DagClassification.Blocked }
                         }
+                    val correction =
+                        remote.correctedQuery
+                            ?.takeIf { !it.equals(address, ignoreCase = true) }
+                            ?.takeIf { classifier.classifyQuery(it).decision != DagClassification.Blocked }
                     if (mutableState.value.address == address) {
-                        mutableState.update { it.copy(suggestions = suggestions) }
+                        mutableState.update {
+                            it.copy(
+                                suggestions = suggestions,
+                                spellingCorrection = correction,
+                            )
+                        }
                     }
                 }
+        }
+
+        fun saveFavicon(
+            url: String,
+            bitmap: Bitmap,
+        ) {
+            if (!mutableState.value.dagEnabled || !url.startsWith("https://", ignoreCase = true)) return
+            viewModelScope.launch(Dispatchers.IO) {
+                try {
+                    historyStore.saveFavicon(url, bitmap)
+                } finally {
+                    bitmap.recycle()
+                }
+            }
+        }
+
+        fun beginAddressEdit() {
+            val state = mutableState.value
+            if (!state.loading && state.pageStatus != DagPageStatus.Loading) return
+            cancelActiveSearch()
+            mutableState.update {
+                it.toDagStart().copy(
+                    address = "",
+                    loading = false,
+                    analysisProgress = 0f,
+                    suggestions = emptyList(),
+                    message = "",
+                )
+            }
         }
 
         internal fun submitDagCalibrationCandidate(
@@ -158,7 +243,7 @@ class DagBrowserViewModel
             }
         }
 
-        internal fun submitDagManualCalibrationCandidate(
+        internal fun submitDagProhibitedCalibrationCandidate(
             thumbnail: ByteArray,
             classification: DagImageClassification,
         ) {
@@ -166,31 +251,34 @@ class DagBrowserViewModel
             viewModelScope.launch(Dispatchers.IO) {
                 val activation = activationRepository.currentActivation() ?: return@launch
                 runCatching {
-                    calibrationRepository.submitManualBlock(activation.deviceId, thumbnail, classification)
+                    calibrationRepository.submitBinaryLabel(
+                        activation.deviceId,
+                        thumbnail,
+                        classification,
+                        DagCalibrationLabel.Block,
+                    )
                 }.onSuccess { result ->
                     mutableState.update {
                         it.copy(
                             message =
                                 when (result) {
                                     DagCalibrationDeliveryResult.Accepted ->
-                                        "Foto marcada para revisar en Calibración DAG."
+                                        "Foto marcada como prohibida para la próxima calibración."
                                     DagCalibrationDeliveryResult.Queued ->
                                         "Foto guardada; se enviará para revisión cuando vuelva la conexión."
                                     is DagCalibrationDeliveryResult.Rejected ->
-                                        "La foto quedó difuminada, pero el servidor no la agregó a revisión."
+                                        "No se pudo guardar la etiqueta de calibración."
                                 },
                         )
                     }
                 }.onFailure {
                     Log.d("DagCalibration", "manual_report_upload_failed")
-                    mutableState.update {
-                        it.copy(message = "La foto quedó difuminada, pero no se pudo enviar para revisión.")
-                    }
+                    mutableState.update { it.copy(message = "No se pudo guardar la etiqueta de calibración.") }
                 }
             }
         }
 
-        internal fun submitDagManualBlurReviewCandidate(
+        internal fun submitDagAllowedCalibrationCandidate(
             thumbnail: ByteArray,
             classification: DagImageClassification,
         ) {
@@ -203,14 +291,19 @@ class DagBrowserViewModel
             viewModelScope.launch(Dispatchers.IO) {
                 val activation = activationRepository.currentActivation() ?: return@launch
                 runCatching {
-                    calibrationRepository.submitManualBlurReview(activation.deviceId, thumbnail, classification)
+                    calibrationRepository.submitBinaryLabel(
+                        activation.deviceId,
+                        thumbnail,
+                        classification,
+                        DagCalibrationLabel.Allow,
+                    )
                 }.onSuccess { result ->
                     mutableState.update {
                         it.copy(
                             message =
                                 when (result) {
                                     DagCalibrationDeliveryResult.Accepted ->
-                                        "Foto enviada para revisar un posible falso positivo."
+                                        "Foto marcada como permitida para la próxima calibración."
                                     DagCalibrationDeliveryResult.Queued ->
                                         "Foto guardada; se enviará para revisión cuando vuelva la conexión."
                                     is DagCalibrationDeliveryResult.Rejected ->
@@ -219,8 +312,8 @@ class DagBrowserViewModel
                         )
                     }
                 }.onFailure {
-                    Log.d("DagCalibration", "manual_blur_review_upload_failed")
-                    mutableState.update { it.copy(message = "No se pudo enviar la foto para revisión.") }
+                    Log.d("DagCalibration", "manual_allow_upload_failed")
+                    mutableState.update { it.copy(message = "No se pudo guardar la etiqueta de calibración.") }
                 }
             }
         }
@@ -275,6 +368,7 @@ class DagBrowserViewModel
                             reviewCandidate = null,
                             pageStatus = DagPageStatus.Idle,
                             suggestions = emptyList(),
+                            spellingCorrection = it.spellingCorrection.takeIf { _ -> it.address == query },
                         )
                     }
                     val activation = withContext(Dispatchers.IO) { activationRepository.currentActivation() }
@@ -420,6 +514,7 @@ class DagBrowserViewModel
                         analysisProgress = 0.05f,
                         message = "",
                         suggestions = emptyList(),
+                        spellingCorrection = null,
                     ),
                 )
             if (accepted) search(suggestion)
@@ -484,6 +579,7 @@ class DagBrowserViewModel
                             pageStatus = DagPageStatus.Loading,
                             pageAnalysisReady = false,
                             viewportImagesReady = false,
+                            viewportImageProgress = 0f,
                             analysisProgress = 0.10f,
                             requestedUrl = url,
                             navigationRevision = it.navigationRevision + 1,
@@ -542,6 +638,7 @@ class DagBrowserViewModel
                     if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return@withContext
                     when (pageDecision) {
                         DagAdaptivePageDecision.Allowed -> {
+                            logPageAnalysisReady(url)
                             mutableState.update {
                                 it.copy(
                                     address = url,
@@ -574,6 +671,7 @@ class DagBrowserViewModel
         ) {
             if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
             if (recordHistory) viewModelScope.launch(Dispatchers.IO) { historyStore.addPage(url, title) }
+            logPageAnalysisReady(url)
             mutableState.update {
                 it.copy(
                     address = url,
@@ -588,10 +686,31 @@ class DagBrowserViewModel
 
         fun onViewportImagesReady(url: String) {
             if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
-            mutableState.update {
-                it.copy(viewportImagesReady = true, analysisProgress = maxOf(it.analysisProgress, 0.95f))
+            if (!mutableState.value.viewportImagesReady) {
+                Log.d(
+                    PerformanceLogTag,
+                    "viewport_images_ready elapsed_ms=" +
+                        (SystemClock.elapsedRealtime() - pageAnalysisStartedAtMillis),
+                )
             }
-            revealPageIfReady(url)
+            mutableState.update {
+                it.copy(
+                    viewportImagesReady = true,
+                    viewportImageProgress = 1f,
+                    analysisProgress = maxOf(it.analysisProgress, 0.95f),
+                )
+            }
+        }
+
+        private fun logPageAnalysisReady(url: String) {
+            val state = mutableState.value
+            if (state.requestedUrl == url && !state.pageAnalysisReady) {
+                Log.d(
+                    PerformanceLogTag,
+                    "page_analysis_ready elapsed_ms=" +
+                        (SystemClock.elapsedRealtime() - pageAnalysisStartedAtMillis),
+                )
+            }
         }
 
         fun onViewportImageProgress(
@@ -602,18 +721,18 @@ class DagBrowserViewModel
             if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
             val ratio = if (total <= 0) 1f else (resolved.toFloat() / total).coerceIn(0f, 1f)
             val progress = (0.65f + ratio * 0.30f).coerceAtMost(0.95f)
-            mutableState.update { it.copy(analysisProgress = maxOf(it.analysisProgress, progress)) }
+            mutableState.update {
+                it.copy(
+                    viewportImageProgress = ratio,
+                    analysisProgress = maxOf(it.analysisProgress, progress),
+                )
+            }
         }
 
         private fun revealPageIfReady(url: String) {
             var revealed = false
             mutableState.update { state ->
-                if (
-                    state.requestedUrl == url &&
-                    state.pageAnalysisReady &&
-                    state.viewportImagesReady &&
-                    state.pageStatus == DagPageStatus.Loading
-                ) {
+                if (dagPageCanReveal(url, state)) {
                     revealed = true
                     state.copy(pageStatus = DagPageStatus.Visible, analysisProgress = 1f)
                 } else {
@@ -985,7 +1104,8 @@ class DagBrowserViewModel
             const val MaxAddressCharacters = 400
             const val ApprovalPollingIntervalMillis = 5_000L
             const val ApprovalPollingAttempts = 24
-            const val SuggestionDebounceMillis = 120L
+            const val SuggestionDebounceMillis = 250L
+            const val MaximumSuggestionCacheEntries = 40
             const val DiagnosticsLogTag = "DagSearchDiagnostics"
             const val PerformanceLogTag = "DagPerformance"
             const val PageApprovalModelVersion =
@@ -993,6 +1113,14 @@ class DagBrowserViewModel
                     DagProfessionalImageClassifier.ModelVersion
         }
     }
+
+internal fun dagPageCanReveal(
+    url: String,
+    state: DagBrowserUiState,
+): Boolean =
+    state.requestedUrl == url &&
+        state.pageAnalysisReady &&
+        state.pageStatus == DagPageStatus.Loading
 
 internal fun dagCanLoadMoreResults(
     page: Int,
@@ -1037,6 +1165,7 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 searchPage = 0,
                 canLoadMoreResults = false,
                 suggestions = emptyList(),
+                spellingCorrection = null,
                 requestedUrl = null,
                 loading = false,
                 message = "El administrador mantiene DAG cerrado.",
@@ -1057,6 +1186,7 @@ internal fun DagBrowserUiState.withDagAvailability(enabled: Boolean): DagBrowser
                 searchPage = 0,
                 canLoadMoreResults = false,
                 suggestions = emptyList(),
+                spellingCorrection = null,
                 requestedUrl = null,
                 loading = false,
                 message = "",
@@ -1071,11 +1201,13 @@ internal fun DagBrowserUiState.toDagStart(): DagBrowserUiState =
         pageStatus = DagPageStatus.Idle,
         pageAnalysisReady = false,
         viewportImagesReady = false,
+        viewportImageProgress = 0f,
         results = emptyList(),
         searchQuery = "",
         searchPage = 0,
         canLoadMoreResults = false,
         suggestions = emptyList(),
+        spellingCorrection = null,
         requestedUrl = null,
         navigationRevision = navigationRevision + 1,
         loading = false,
@@ -1090,6 +1222,7 @@ internal fun DagBrowserUiState.toDagResults(): DagBrowserUiState =
         pageStatus = DagPageStatus.Idle,
         pageAnalysisReady = false,
         viewportImagesReady = false,
+        viewportImageProgress = 0f,
         suggestions = emptyList(),
         requestedUrl = null,
         navigationRevision = navigationRevision + 1,

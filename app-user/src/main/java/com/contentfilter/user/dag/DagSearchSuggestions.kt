@@ -6,21 +6,11 @@ import java.util.Locale
 internal fun dagSearchSuggestionCandidates(
     input: String,
     history: List<DagHistoryEntry>,
+    remote: List<String> = emptyList(),
 ): List<String> {
     val normalizedInput = input.normalizedSuggestionText()
     if (normalizedInput.isBlank()) return emptyList()
 
-    val contextual =
-        when {
-            normalizedInput == "coca" || normalizedInput.startsWith("coca ") ->
-                listOf(
-                    "Coca-Cola gaseosa",
-                    "Precio de Coca-Cola",
-                    "Coca-Cola en supermercados",
-                    "Historia de Coca-Cola",
-                )
-            else -> emptyList()
-        }
     val localHistory =
         history
             .asSequence()
@@ -31,7 +21,7 @@ internal fun dagSearchSuggestionCandidates(
             }
             .toList()
 
-    return (contextual + localHistory)
+    return (localHistory + remote)
         .asSequence()
         .map(String::trim)
         .filter(String::isNotBlank)
@@ -47,4 +37,4 @@ private fun String.normalizedSuggestionText(): String =
         .replace("[^a-z0-9א-ת]+".toRegex(), " ")
         .trim()
 
-private const val MaximumSuggestions = 5
+private const val MaximumSuggestions = 8

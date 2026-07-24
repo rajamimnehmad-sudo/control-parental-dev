@@ -67,8 +67,6 @@ internal class DagImageClassifier(
     private val tzniutPoseClassifier = DagTzniutPoseClassifier(applicationContext)
     private val calibrationStore = DagImageCalibrationStore(applicationContext)
 
-    fun exactDecision(imageHash: String): DagImageDecision? = calibrationStore.exactDecision(imageHash)
-
     fun prepare() {
         synchronized(lock) {
             runCatching {

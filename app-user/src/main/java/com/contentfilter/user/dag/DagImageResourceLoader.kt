@@ -53,10 +53,10 @@ internal class DagImageResourceLoader(
     private val devCalibrationRevealEnabled = AtomicBoolean(false)
     private val imageSlots = Semaphore(DagImageDeliveryPolicy.MaximumConcurrentImages, true)
     private val classifierPool = ArrayBlockingQueue(classifiers.size, true, classifiers)
-    private val calibrationClassifier = classifiers.first()
     private val responseCache = LinkedHashMap<String, CachedImageResource>(16, 0.75f, true)
-    private val manualCalibrationCandidates = LinkedHashMap<String, DagManualCalibrationCandidate>(16, 0.75f, true)
+    private val manualCalibrationSources = LinkedHashMap<String, DagManualCalibrationSource>(16, 0.75f, true)
     private var responseCacheBytes = 0
+    private var manualCalibrationSourceBytes = 0
 
     fun resetPage() {
         pageGeneration.incrementAndGet()
@@ -68,7 +68,10 @@ internal class DagImageResourceLoader(
             responseCache.clear()
             responseCacheBytes = 0
         }
-        synchronized(manualCalibrationCandidates) { manualCalibrationCandidates.clear() }
+        synchronized(manualCalibrationSources) {
+            manualCalibrationSources.clear()
+            manualCalibrationSourceBytes = 0
+        }
     }
 
     fun pageSummary(): DagImagePageSummary =
@@ -84,24 +87,26 @@ internal class DagImageResourceLoader(
     }
 
     fun setDevCalibrationRevealEnabled(enabled: Boolean): Boolean {
-        if (devCalibrationRevealEnabled.getAndSet(enabled) == enabled) return false
-        resetPage()
-        return true
+        return devCalibrationRevealEnabled.getAndSet(enabled) != enabled
     }
 
     fun manualCalibrationDecision(imageUrl: String): DagImageDecision? =
-        synchronized(manualCalibrationCandidates) {
-            manualCalibrationCandidates[normalizeImageUrl(imageUrl)]?.classification?.decision
+        synchronized(manualCalibrationSources) {
+            manualCalibrationSources[normalizeImageUrl(imageUrl)]?.classification?.decision
         }
 
     fun manualCalibrationDecisions(): Map<String, DagImageDecision> =
-        synchronized(manualCalibrationCandidates) {
-            manualCalibrationCandidates.mapValues { it.value.classification.decision }
+        synchronized(manualCalibrationSources) {
+            manualCalibrationSources.mapValues { it.value.classification.decision }
         }
 
     fun takeManualCalibrationCandidate(imageUrl: String): DagManualCalibrationCandidate? =
-        synchronized(manualCalibrationCandidates) {
-            manualCalibrationCandidates.remove(normalizeImageUrl(imageUrl))
+        synchronized(manualCalibrationSources) {
+            val source = manualCalibrationSources.remove(normalizeImageUrl(imageUrl)) ?: return null
+            manualCalibrationSourceBytes -= source.bytes.size
+            dagCalibrationThumbnail(source.bytes)?.let { thumbnail ->
+                DagManualCalibrationCandidate(thumbnail, source.classification)
+            }
         }
 
     fun intercept(
@@ -177,21 +182,18 @@ internal class DagImageResourceLoader(
                     )
                 }
             val calibrationThumbnail =
-                if (shouldCreateCalibrationThumbnail(measuredClassification, devCalibrationRevealEnabled.get())) {
+                if (shouldCreateCalibrationThumbnail(measuredClassification)) {
                     dagCalibrationThumbnail(bytes)
                 } else {
                     null
                 }
-            val classification =
-                calibrationThumbnail
-                    ?.let { calibrationClassifier.exactDecision(it.dagCalibrationHash()) }
-                    ?.let { measuredClassification.copy(decision = it) }
-                    ?: measuredClassification
-            if (calibrationThumbnail != null) {
-                calibrationThumbnail.let { thumbnail ->
-                    rememberManualCalibrationCandidate(request.url.toString(), thumbnail, classification)
-                }
+            val classification = measuredClassification
+            if (classification.scores.isNotEmpty()) {
+                rememberManualCalibrationSource(request.url.toString(), bytes, classification)
                 onManualCandidateReady(request.url.toString(), classification.decision)
+            }
+            if (calibrationThumbnail != null) {
+                onCalibrationCandidate(calibrationThumbnail, classification)
             }
             when (classification.decision) {
                 DagImageDecision.Allowed -> allowedCount.incrementAndGet()
@@ -200,7 +202,7 @@ internal class DagImageResourceLoader(
             }
             if (classification.decision != DagImageDecision.Allowed) {
                 if (classification.decision == DagImageDecision.Uncertain) {
-                    calibrationThumbnail?.let { onCalibrationCandidate(it, classification) }
+                    // The uncertain sample has already been queued above.
                 }
                 if (devCalibrationRevealEnabled.get()) {
                     return cacheAndCreateResource(
@@ -274,16 +276,25 @@ internal class DagImageResourceLoader(
         }
     }
 
-    private fun rememberManualCalibrationCandidate(
+    private fun rememberManualCalibrationSource(
         imageUrl: String,
-        thumbnail: ByteArray,
+        bytes: ByteArray,
         classification: DagImageClassification,
     ) {
-        synchronized(manualCalibrationCandidates) {
-            manualCalibrationCandidates[normalizeImageUrl(imageUrl)] =
-                DagManualCalibrationCandidate(thumbnail, classification)
-            while (manualCalibrationCandidates.size > MaximumManualCalibrationCandidates) {
-                manualCalibrationCandidates.remove(manualCalibrationCandidates.entries.first().key)
+        if (bytes.size > MaximumManualCalibrationSourceBytes) return
+        synchronized(manualCalibrationSources) {
+            manualCalibrationSources.put(
+                normalizeImageUrl(imageUrl),
+                DagManualCalibrationSource(bytes, classification),
+            )?.let { manualCalibrationSourceBytes -= it.bytes.size }
+            manualCalibrationSourceBytes += bytes.size
+            while (
+                manualCalibrationSources.size > MaximumManualCalibrationCandidates ||
+                manualCalibrationSourceBytes > MaximumManualCalibrationBytes
+            ) {
+                val eldest = manualCalibrationSources.entries.iterator().next()
+                manualCalibrationSourceBytes -= eldest.value.bytes.size
+                manualCalibrationSources.remove(eldest.key)
             }
         }
     }
@@ -378,19 +389,23 @@ internal class DagImageResourceLoader(
         const val MaximumCachedImageBytes = 1024 * 1024
         const val MaximumResponseCacheBytes = 16 * 1024 * 1024
         const val MaximumManualCalibrationCandidates = 160
+        const val MaximumManualCalibrationSourceBytes = 2 * 1024 * 1024
+        const val MaximumManualCalibrationBytes = 24 * 1024 * 1024
         val ForwardedHeaders = setOf("Accept", "Accept-Language", "Referer", "User-Agent")
     }
 }
 
-internal fun shouldCreateCalibrationThumbnail(
-    classification: DagImageClassification,
-    calibrationRevealEnabled: Boolean,
-): Boolean =
+internal fun shouldCreateCalibrationThumbnail(classification: DagImageClassification): Boolean =
     classification.scores.isNotEmpty() &&
-        (classification.decision == DagImageDecision.Uncertain || calibrationRevealEnabled)
+        classification.decision == DagImageDecision.Uncertain
 
 internal data class DagManualCalibrationCandidate(
     val thumbnail: ByteArray,
+    val classification: DagImageClassification,
+)
+
+private data class DagManualCalibrationSource(
+    val bytes: ByteArray,
     val classification: DagImageClassification,
 )
 
@@ -529,7 +544,7 @@ private const val MaximumSafeSvgBytes = 64 * 1024
 
 private val NeutralPlaceholderPng by lazy(LazyThreadSafetyMode.PUBLICATION) {
     android.util.Base64.decode(
-        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
         android.util.Base64.DEFAULT,
     )
 }

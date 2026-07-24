@@ -1,5 +1,7 @@
 package com.contentfilter.user.dag
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,8 +16,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -36,7 +40,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
@@ -59,8 +65,21 @@ internal fun DagStartContent(
     onAddressChanged: (String) -> Unit,
     onSuggestionSelected: (String) -> Unit,
     onSubmit: () -> Unit,
+    onBeginEdit: () -> Unit,
+    recentHistory: List<DagHistoryEntry>,
+    siteFavicons: Map<String, ByteArray>,
+    onRecentSiteSelected: (DagHistoryEntry) -> Unit,
 ) {
     val keyboardVisible = WindowInsets.isImeVisible
+    val recentSites =
+        remember(recentHistory) {
+            recentHistory
+                .asSequence()
+                .filter { it.type == DagHistoryType.Page && !it.url.isNullOrBlank() }
+                .distinctBy { DagContentClassifier.domainFrom(it.url.orEmpty()) }
+                .take(MaximumRecentSites)
+                .toList()
+        }
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -91,9 +110,12 @@ internal fun DagStartContent(
             OutlinedTextField(
                 value = if (analyzing) "" else address,
                 onValueChange = onAddressChanged,
-                modifier = Modifier.fillMaxSize(),
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .onFocusChanged { if (it.isFocused && analyzing) onBeginEdit() },
                 placeholder = { if (analyzing) DagAnalyzingText() else Text("Buscar en Internet") },
-                readOnly = analyzing,
+                readOnly = false,
                 singleLine = true,
                 shape = RoundedCornerShape(28.dp),
                 colors =
@@ -127,6 +149,62 @@ internal fun DagStartContent(
         }
         if (suggestions.isNotEmpty() && !analyzing) {
             DagSearchSuggestions(suggestions, onSuggestionSelected)
+        }
+        if (!keyboardVisible && !analyzing && recentSites.isNotEmpty()) {
+            Spacer(Modifier.height(24.dp))
+            Text(
+                "Sitios recientes",
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.titleSmall,
+            )
+            Spacer(Modifier.height(10.dp))
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                items(recentSites, key = DagHistoryEntry::id) { entry ->
+                    val domain = DagContentClassifier.domainFrom(entry.url.orEmpty())
+                    val favicon =
+                        remember(domain, siteFavicons[domain]) {
+                            siteFavicons[domain]
+                                ?.let { bytes -> BitmapFactory.decodeByteArray(bytes, 0, bytes.size) }
+                                ?.asImageBitmap()
+                        }
+                    Column(
+                        modifier = Modifier.width(64.dp).clickable { onRecentSiteSelected(entry) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Surface(
+                            modifier = Modifier.size(48.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        ) {
+                            Box(contentAlignment = Alignment.Center) {
+                                if (favicon != null) {
+                                    Image(
+                                        bitmap = favicon,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(30.dp),
+                                    )
+                                } else {
+                                    Text(
+                                        dagSiteGlyph(domain),
+                                        style = MaterialTheme.typography.titleMedium,
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            dagSiteLabel(domain),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                    }
+                }
+            }
         }
         Spacer(Modifier.height(12.dp))
         Text(
@@ -174,8 +252,10 @@ internal fun DagResultsContent(
     results: List<DagSearchResult>,
     canLoadMore: Boolean,
     loading: Boolean,
+    correctedQuery: String?,
     onOpen: (DagSearchResult) -> Unit,
     onLoadMore: () -> Unit,
+    onCorrectedSearch: (String) -> Unit,
 ) {
     LazyColumn(modifier = Modifier.fillMaxSize()) {
         item(key = "results-header") {
@@ -189,6 +269,16 @@ internal fun DagResultsContent(
             }
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f))
         }
+        correctedQuery?.let { correction ->
+            item(key = "did-you-mean") {
+                TextButton(
+                    onClick = { onCorrectedSearch(correction) },
+                    modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                ) {
+                    Text("Tal vez quisiste decir: $correction")
+                }
+            }
+        }
         items(results, key = { it.url }) { result ->
             Column(
                 modifier =
@@ -200,11 +290,28 @@ internal fun DagResultsContent(
                         .heightIn(min = 88.dp)
                         .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
-                Text(
-                    result.domain,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Surface(
+                        modifier = Modifier.size(32.dp),
+                        shape = RoundedCornerShape(16.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Text(
+                                dagSiteGlyph(result.domain),
+                                style = MaterialTheme.typography.labelLarge,
+                            )
+                        }
+                    }
+                    Text(
+                        result.domain,
+                        modifier = Modifier.padding(start = 10.dp),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.onSurface,
+                    )
+                }
+                Spacer(Modifier.height(4.dp))
                 Text(
                     result.title,
                     style = MaterialTheme.typography.titleMedium,
@@ -243,6 +350,30 @@ internal fun DagResultsContent(
             }
         }
     }
+}
+
+private const val MaximumRecentSites = 6
+
+private fun dagSiteGlyph(domain: String): String {
+    val normalized = domain.lowercase()
+    return when {
+        normalized.endsWith("instagram.com") -> "IG"
+        normalized.endsWith("mercadolibre.com.ar") -> "ML"
+        normalized.endsWith("argentina.gob.ar") -> "AR"
+        normalized.endsWith("fravega.com") -> "F"
+        normalized.endsWith("hm.com") -> "H&M"
+        normalized.endsWith("zara.com") -> "Z"
+        else -> dagSiteLabel(normalized).firstOrNull()?.uppercaseChar()?.toString() ?: "↗"
+    }
+}
+
+private fun dagSiteLabel(domain: String): String {
+    val parts = domain.lowercase().split(".").filter(String::isNotBlank)
+    val firstUseful =
+        parts.firstOrNull { part ->
+            part != "m" && part != "mobile" && !part.matches(Regex("www\\d*"))
+        }
+    return firstUseful?.ifBlank { "Sitio" } ?: "Sitio"
 }
 
 @Composable

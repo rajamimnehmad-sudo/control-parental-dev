@@ -1,13 +1,17 @@
 package com.contentfilter.user.dag
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -31,6 +35,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -60,8 +65,10 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.Lifecycle
@@ -152,6 +159,18 @@ private fun DagBrowserContent(
     var tabs by remember { mutableStateOf(listOf(DagTab(snapshot = viewModel.captureTab()))) }
     var activeTabId by remember { mutableStateOf(tabs.first().id) }
     var tabsRestored by remember { mutableStateOf(false) }
+    var allowedGeolocationOrigins by remember { mutableStateOf(emptySet<String>()) }
+    var pendingGeolocationOrigin by remember { mutableStateOf<String?>(null) }
+    var pendingGeolocationDecision by remember { mutableStateOf<((Boolean) -> Unit)?>(null) }
+    val locationPermissionLauncher =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+            val allowed = grants.values.any { it }
+            val origin = pendingGeolocationOrigin
+            if (allowed && origin != null) allowedGeolocationOrigins = allowedGeolocationOrigins + origin
+            pendingGeolocationDecision?.invoke(allowed)
+            pendingGeolocationOrigin = null
+            pendingGeolocationDecision = null
+        }
 
     LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
         viewModel.refreshCalibration()
@@ -160,15 +179,25 @@ private fun DagBrowserContent(
     LaunchedEffect(Unit) {
         val saved = viewModel.loadTabSession()
         if (saved != null) {
-            tabs =
+            val restoredTabs =
                 saved.tabs.map {
                     DagTab(id = it.id, snapshot = it.snapshot, lastUsedAtEpochMillis = it.lastUsedAtEpochMillis)
                 }
-            activeTabId = saved.activeTabId
-            viewModel.restoreTab(saved.tabs.first { it.id == saved.activeTabId }.snapshot)
+            val reusableHome =
+                restoredTabs.maxByOrNull { if (it.snapshot.isEmptyTab()) it.lastUsedAtEpochMillis else Long.MIN_VALUE }
+                    ?.takeIf { it.snapshot.isEmptyTab() }
+            viewModel.openNewTab()
+            val homeTab = reusableHome ?: DagTab(snapshot = viewModel.captureTab())
+            tabs =
+                if (reusableHome != null) {
+                    restoredTabs
+                } else {
+                    (restoredTabs.sortedByDescending(DagTab::lastUsedAtEpochMillis).take(MaximumTabs - 1) + homeTab)
+                }
+            activeTabId = homeTab.id
             tabs =
                 tabs.map {
-                    if (it.id == activeTabId) it.copy(lastUsedAtEpochMillis = System.currentTimeMillis()) else it
+                    if (it.id == activeTabId) it.copy(snapshot = viewModel.captureTab(), lastUsedAtEpochMillis = System.currentTimeMillis()) else it
                 }
         }
         tabsRestored = true
@@ -216,6 +245,7 @@ private fun DagBrowserContent(
     }
 
     fun openTab(tab: DagTab) {
+        captureActiveTabPreview()
         persistActiveTab()
         activeTabId = tab.id
         viewModel.restoreTab(tab.snapshot)
@@ -227,6 +257,7 @@ private fun DagBrowserContent(
     }
 
     fun newTab() {
+        captureActiveTabPreview()
         persistActiveTab()
         val currentSnapshot = viewModel.captureTab()
         val reusable =
@@ -266,6 +297,7 @@ private fun DagBrowserContent(
     }
 
     fun closeTab(tab: DagTab) {
+        captureActiveTabPreview()
         persistActiveTab()
         val remaining = tabs.filterNot { it.id == tab.id }
         if (remaining.isEmpty()) {
@@ -433,7 +465,15 @@ private fun DagBrowserContent(
                                 Modifier
                                     .fillMaxSize()
                                     .onFocusChanged { focusState ->
-                                        if (focusState.isFocused && !addressFocused) viewModel.onAddressChanged("")
+                                        if (focusState.isFocused && !addressFocused) {
+                                            if (analyzing) {
+                                                viewModel.beginAddressEdit()
+                                            } else {
+                                                viewModel.onAddressChanged(
+                                                    "",
+                                                )
+                                            }
+                                        }
                                         addressFocused = focusState.isFocused
                                     },
                             value = if (analyzing) "" else state.address,
@@ -441,7 +481,7 @@ private fun DagBrowserContent(
                             placeholder = {
                                 if (analyzing) DagAnalyzingText() else Text("Buscar o escribir dirección")
                             },
-                            readOnly = analyzing,
+                            readOnly = false,
                             singleLine = true,
                             textStyle = MaterialTheme.typography.bodyMedium,
                             shape = RoundedCornerShape(26.dp),
@@ -539,7 +579,7 @@ private fun DagBrowserContent(
                                 enabled = state.view == DagView.Browser,
                                 onClick = {
                                     menuExpanded = false
-                                    activeWebView?.reload()
+                                    state.requestedUrl?.let(viewModel::requestNavigation)
                                 },
                             )
                             DropdownMenuItem(
@@ -623,6 +663,23 @@ private fun DagBrowserContent(
                         }
                     }
                 }
+                if (
+                    state.view == DagView.Browser &&
+                    state.pageStatus == DagPageStatus.Visible &&
+                    !state.viewportImagesReady
+                ) {
+                    LinearProgressIndicator(
+                        progress = { state.viewportImageProgress.coerceIn(0f, 1f) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .semantics {
+                                    stateDescription =
+                                        "${(state.viewportImageProgress * 100).toInt()} por ciento de imágenes visibles"
+                                },
+                    )
+                }
                 HorizontalDivider()
                 if (addressFocused && state.suggestions.isNotEmpty() && !analyzing) {
                     DagSearchSuggestions(state.suggestions, viewModel::selectSuggestion)
@@ -658,14 +715,20 @@ private fun DagBrowserContent(
                         onAddressChanged = viewModel::onAddressChanged,
                         onSuggestionSelected = viewModel::selectSuggestion,
                         onSubmit = viewModel::submitAddress,
+                        onBeginEdit = viewModel::beginAddressEdit,
+                        recentHistory = state.history,
+                        siteFavicons = state.siteFavicons,
+                        onRecentSiteSelected = viewModel::openHistory,
                     )
                 DagView.Results ->
                     DagResultsContent(
                         results = state.results,
                         canLoadMore = state.canLoadMoreResults,
                         loading = state.loading,
+                        correctedQuery = state.spellingCorrection,
                         onOpen = viewModel::openResult,
                         onLoadMore = viewModel::loadMoreResults,
+                        onCorrectedSearch = viewModel::search,
                     )
                 DagView.History ->
                     DagHistoryContent(
@@ -690,9 +753,19 @@ private fun DagBrowserContent(
                         onViewportImageProgress = viewModel::onViewportImageProgress,
                         onCalibrationCandidate = viewModel::submitDagCalibrationCandidate,
                         visualCalibrationEnabled = visualCalibrationEnabled,
-                        onManualCalibrationCandidate = viewModel::submitDagManualCalibrationCandidate,
-                        onManualBlurReviewCandidate = viewModel::submitDagManualBlurReviewCandidate,
+                        onManualCalibrationCandidate = viewModel::submitDagProhibitedCalibrationCandidate,
+                        onManualBlurReviewCandidate = viewModel::submitDagAllowedCalibrationCandidate,
                         onBlockedAction = viewModel::onBrowserBlockedAction,
+                        onGeolocationPrompt = { origin, decision ->
+                            if (origin in allowedGeolocationOrigins) {
+                                decision(true)
+                            } else {
+                                pendingGeolocationDecision?.invoke(false)
+                                pendingGeolocationOrigin = origin
+                                pendingGeolocationDecision = decision
+                            }
+                        },
+                        onFaviconChanged = viewModel::saveFavicon,
                         onPageBlocked = viewModel::onPageBlocked,
                         onRendererGone = viewModel::onBrowserRendererGone,
                         onWebViewChanged = { activeWebView = it },
@@ -753,7 +826,7 @@ private fun DagBrowserContent(
             title = { Text("¿Activar Calibración DEV?") },
             text = {
                 Text(
-                    "Sólo para pruebas: DAG recargará la página y mostrará todas las fotos originales sin difuminar. Usá X si una foto permitida debería bloquearse y R si una foto que DAG habría difuminado debería revisarse como posible falso positivo. Al desactivar el modo, se restaura la protección normal.",
+                    "Sólo para pruebas: marcá cada foto con ✓ Permitida o × Prohibida. La página no se recarga, la foto no cambia y la etiqueta se usa únicamente para preparar calibraciones futuras.",
                 )
             },
             confirmButton = {
@@ -766,6 +839,55 @@ private fun DagBrowserContent(
             },
             dismissButton = {
                 TextButton(onClick = { visualCalibrationDialog = false }) { Text("Cancelar") }
+            },
+        )
+    }
+
+    pendingGeolocationOrigin?.let { origin ->
+        AlertDialog(
+            onDismissRequest = {
+                pendingGeolocationDecision?.invoke(false)
+                pendingGeolocationOrigin = null
+                pendingGeolocationDecision = null
+            },
+            title = { Text("¿Permitir ubicación?") },
+            text = {
+                Text(
+                    "${runCatching { URI(origin).host }.getOrNull() ?: origin} podrá usar tu ubicación durante esta sesión de DAG.",
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val alreadyGranted =
+                            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                                PackageManager.PERMISSION_GRANTED ||
+                                ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
+                                PackageManager.PERMISSION_GRANTED
+                        if (alreadyGranted) {
+                            allowedGeolocationOrigins = allowedGeolocationOrigins + origin
+                            pendingGeolocationDecision?.invoke(true)
+                            pendingGeolocationOrigin = null
+                            pendingGeolocationDecision = null
+                        } else {
+                            locationPermissionLauncher.launch(
+                                arrayOf(
+                                    Manifest.permission.ACCESS_COARSE_LOCATION,
+                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                ),
+                            )
+                        }
+                    },
+                ) { Text("Permitir") }
+            },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        pendingGeolocationDecision?.invoke(false)
+                        pendingGeolocationOrigin = null
+                        pendingGeolocationDecision = null
+                    },
+                ) { Text("No permitir") }
             },
         )
     }
