@@ -313,7 +313,7 @@ Flujo de una entrada:
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
-| DAG-WEB-INTERACTION-03 | Estado DEV 276 restaurado en DEV 278 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
+| DAG-WEB-INTERACTION-03 | Resuelto y publicado DEV 279 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
 | DAG-PROTECTED-MODE-UX-04 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P2 | Quitar el mensaje tecnico de proteccion adicional | S | Bajo |
 | DAG-HOME-UX-01 | Resuelto DEV 234 | P2 | Home DAG con buscador central grande e identidad de Internet kosher | S | Bajo |
@@ -327,7 +327,7 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
-| DAG-LOCAL-IMAGE-PERF-03 | DEV 277 revertido; estado DEV 276 restaurado en DEV 278 | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
+| DAG-LOCAL-IMAGE-PERF-03 | Resuelto y publicado DEV 279; validado en SM-S908E | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
 | DAG-IMAGE-FILTER-1 | Candidato descartado por regresion fisica; codigo retirado | P1 | Prefiltro local liviano que libera solo imagenes confirmadas sin presencia ni rasgos humanos y deriva el resto al analisis completo | M | Alto |
 | DAG-CATEGORY-FAST-PATH-04 | DEV 277 revertido; permanece retirado como en DEV 276 | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
 | DAG-CALIBRATION-BIDIRECTIONAL-09 | Publicado DEV 259; validado en SM-A235M | P1 | Modo temporal DEV que revela originales y permite X para falsos negativos o R para posibles falsos positivos, con trazabilidad separada | M | Alto |
@@ -366,10 +366,13 @@ Flujo de una entrada:
 | DAG-TAB-PREVIEW-04 | Implementado y validado en candidato local | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
 | DAG-CALIBRATION-QUEUE-02 | Resuelto DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
-| DAG-CALIBRATION-REVIEW-03 | Publicado DEV 253; recorrido autenticado pendiente | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
-| DAG-CALIBRATION-VERSIONS-04 | Resuelto DEV 253 | P0 | Calcular, activar y revertir umbrales versionados de Calibracion DAG | L | Alto |
+| DAG-CALIBRATION-REVIEW-03 | Reemplazado por calibracion binaria DEV 279 | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
+| DAG-CALIBRATION-VERSIONS-04 | Resuelto DEV 279; candidatos automaticos y activacion manual | P0 | Calcular, activar y revertir umbrales versionados de Calibracion DAG | L | Alto |
 | DAG-CALIBRATION-MODELS-05 | Resuelto DEV 253 | P1 | Registrar modelos y separar calibracion de entrenamiento real | M | Alto |
 | DAG-CALIBRATION-IN-PAGE-08 | Resuelto y validado fisicamente DEV 256 | P1 | Marcar una foto inapropiada desde DAG con X, blur inmediato y revision posterior auditable | M | Medio |
+| DAG-PROGRESSIVE-LOAD-06 | Resuelto, publicado y validado DEV 279 en SM-S908E | P0 | Hacer util la pagina de inmediato y revelar cada imagen segura progresivamente sin relajar el filtro | L | Alto |
+| DAG-CALIBRATION-BINARY-13 | Resuelto, publicado y validado DEV 279 en SM-S908E | P0 | Calibrar con solo `✓` o `×`, sin motivo ni bloqueo permanente por hash | M | Alto |
+| SUPERWEB-DAG-THRESHOLDS-02 | Resuelto y publicado DEV 279 | P0 | Mostrar umbrales activos/propuestos, editar valores seguros y activar candidatos manualmente | L | Alto |
 | USER-GREETING-01 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Personalizar el saludo de App Usuario con el nombre definido por el administrador | S | Bajo |
 
 ### ADMIN-UX-EPIC-2026-07-19 - Reorganización integral de App Admin
