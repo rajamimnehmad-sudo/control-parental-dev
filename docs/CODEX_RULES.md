@@ -23,6 +23,7 @@ Reglas permanentes para trabajar con Codex en este proyecto.
 - Varios tickets Android relacionados, aprobados y listos deben agruparse en un solo lote y una sola publicacion por app afectada. Nunca publicar varias APK sin que el codigo exacto este antes en GitHub; el lote conserva causa, pruebas y evidencia por ticket.
 - Despues de publicar, verificar manifiestos, hashes, paquetes, version y firma; recien entonces actualizar `docs/HANDOFF_ACTUAL.md` y `docs/BACKLOG_PRODUCTO.md` de candidato a publicado.
 - Las pruebas fisicas, de laboratorio o cualquier requisito externo pendiente se documentan por separado con su bloqueo exacto. Nunca declararlos ejecutados por inferencia.
+- Todo candidato o version de DAG que cambie navegador, carga, WebView o imagenes debe ejecutar antes de entregarse la matriz fija Fravega, Mimo y Cheeky en el mismo telefono objetivo. Registrar `DagPerformance page_visible`, dispositivo, Android, fecha, variante y cualquier timeout/rotura en `docs/compatibility/results/dag-performance-history.md`; una pagina que no completa cuenta como regresion, no como dato ausente.
 - Antes de iniciar otro lote, dejar `main` sincronizada, documentacion coherente, los PR del lote fusionados y el checkout sin artefactos generados por la tarea.
 - No usar Service Role Key en Android.
 - No borrar datos sin confirmacion.

@@ -49,52 +49,6 @@ class DagImagePolicyTest {
     }
 
     @Test
-    fun `filter 1 skips full modesty only after both safe and no-human evidence`() {
-        val noHuman = DagHumanPresenceEvidence(confidentKeypoints = 0, probableSkinRatio = 0f)
-
-        assertFalse(
-            dagShouldRunModestyFilter(
-                DagImageDecision.Allowed,
-                DagImageDecision.Allowed,
-                DagImageAudienceContext.Unknown,
-                noHuman,
-            ),
-        )
-        assertTrue(
-            dagShouldRunModestyFilter(
-                DagImageDecision.Allowed,
-                DagImageDecision.Allowed,
-                DagImageAudienceContext.Unknown,
-                noHuman.copy(confidentKeypoints = 2),
-            ),
-        )
-        assertTrue(
-            dagShouldRunModestyFilter(
-                DagImageDecision.Allowed,
-                DagImageDecision.Allowed,
-                DagImageAudienceContext.Unknown,
-                noHuman.copy(probableSkinRatio = 0.01f),
-            ),
-        )
-        assertTrue(
-            dagShouldRunModestyFilter(
-                DagImageDecision.Allowed,
-                DagImageDecision.Allowed,
-                DagImageAudienceContext.FemaleSixPlus,
-                noHuman,
-            ),
-        )
-        assertTrue(
-            dagShouldRunModestyFilter(
-                DagImageDecision.Uncertain,
-                DagImageDecision.Uncertain,
-                DagImageAudienceContext.Unknown,
-                noHuman,
-            ),
-        )
-    }
-
-    @Test
     fun `active DAG calibration changes thresholds without replacing the model`() {
         val calibration =
             DagImageCalibration(

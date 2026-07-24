@@ -100,8 +100,9 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 
 ## Candidato local DAG-IMAGE-FILTER-1 - instalado, no publicado - 2026-07-23
 
-- `Filtro 1` conserva el clasificador NSFW profesional para cada raster. Si su decision es segura, el contexto no es de audiencia humana y el prefiltro MoveNet/skin confirma conservadoramente ausencia de persona, omite solo el modelo corporal ONNX pesado; cualquier persona, piel, duda o error ejecuta el recorrido completo.
-- Unitarios DEV, `ktlintCheck` y `assembleDevDebug` de App Usuario correctos. El candidato se instalo in-place en el SM-A235M sin cambiar versionCode ni publicar APK. La prueba comparativa quedo pendiente porque el telefono estaba bloqueado.
+- `Filtro 1` fue descartado y retirado el 2026-07-24. En SM-S908E agregaba MoveNet/skin a casi todas las fotos y solo evitaba la capa corporal pesada en una fraccion minima; Fravega registro 11.502 ms hasta `page_visible`.
+- Se restauro exactamente el recorrido visual anterior y el candidato corregido quedo instalado in-place en SM-S908E. Unitarios DEV, `ktlintCheck` y `assembleDevDebug` correctos; no cambio versionCode y no se publico APK.
+- Matriz fija posterior al retiro, Android 16 y cache-bust por URL: Fravega 8.761 ms, Mimo 2.190 ms y Cheeky 27.920 ms. Son una muestra operativa sensible a red/cache; Cheeky queda como regresion visible a investigar, no como exito.
 
 ## Publicacion Usuario DEV 277 - optimizacion integral DAG - 2026-07-23
 
