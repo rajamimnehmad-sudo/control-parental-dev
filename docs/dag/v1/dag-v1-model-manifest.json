@@ -1,0 +1,328 @@
+{
+  "archive_version": "1.0.0",
+  "source_commit": "486c564be62ab336cfc815b223343b9419370f14",
+  "generated_at": "2026-07-24T19:36:55Z",
+  "model_bundle_id": "dag-v1-source-486c564be62ab336cfc815b223343b9419370f14",
+  "models": [
+    {
+      "name": "DAG professional image safety",
+      "role": "professional",
+      "relative_path": "app-user/src/main/assets/dag/nsfw_marqo_vit_tiny_384.onnx",
+      "sha256": "0366969ece89f252f05fad2c730d6c7e3373000e1ff43e4cfab8425aad94405b",
+      "size_bytes": 6702582,
+      "runtime": "ONNX Runtime Android",
+      "input_shape": [1, 3, 384, 384],
+      "input_type": "float32",
+      "output_shape": [1, 2],
+      "declared_version": "marqo-nsfw-vit-tiny-384-2",
+      "classes_or_primary_signals": ["unsafe", "safe"],
+      "default_active_thresholds": {
+        "professional_safe": 0.15,
+        "professional_block": 0.65
+      },
+      "related_policy_files": [
+        "app-user/src/main/java/com/contentfilter/user/dag/DagProfessionalImageClassifier.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagImageClassifier.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagImageCalibration.kt"
+      ]
+    },
+    {
+      "name": "Yahoo OpenNSFW Android conversion",
+      "role": "legacy_fallback",
+      "relative_path": "app-user/src/main/assets/dag/nsfw_open_nsfw_quantized.tflite",
+      "sha256": "eb3b446a6a8c1a73998a76011b97cfc67bc01084c63ee195c774e71344a66442",
+      "size_bytes": 5958568,
+      "runtime": "LiteRT/TensorFlow Lite Android",
+      "input_shape": [1, 224, 224, 3],
+      "input_type": "float32",
+      "output_shape": [1, 2],
+      "declared_version": "not_available_in_repository",
+      "classes_or_primary_signals": ["safe", "unsafe"],
+      "default_active_thresholds": {
+        "professional_safe": 0.15,
+        "professional_block": 0.65
+      },
+      "related_policy_files": [
+        "app-user/src/main/java/com/contentfilter/user/dag/DagImageClassifier.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagImageCalibration.kt"
+      ]
+    },
+    {
+      "name": "DAG modesty region detector",
+      "role": "modesty",
+      "relative_path": "app-user/src/main/assets/dag/nudenet_modesty_320n_uint8.onnx",
+      "sha256": "2e5d2b1471903c5bad06596dbb57bc991a489e27d5b475a62269321db42f123b",
+      "size_bytes": 3230558,
+      "runtime": "ONNX Runtime Android",
+      "input_shape": [1, 3, 320, 320],
+      "input_type": "float32",
+      "output_shape": "not_declared_in_repository",
+      "declared_version": "not_available_in_repository",
+      "classes_or_primary_signals": [
+        "female_face",
+        "male_face",
+        "male_breast_exposed",
+        "female_breast_covered",
+        "female_genitalia_covered",
+        "buttocks_covered",
+        "armpits_exposed",
+        "belly_exposed",
+        "explicit_region"
+      ],
+      "default_active_thresholds": {
+        "female_face": 0.3,
+        "male_face": 0.3,
+        "male_breast_exposed": 0.55,
+        "female_breast_covered": 0.18,
+        "female_genitalia_covered": 0.18,
+        "buttocks_covered": 0.18,
+        "armpits_exposed": 0.2,
+        "belly_exposed": 0.2,
+        "explicit_region": 0.2,
+        "strong_decision_margin": 0.15
+      },
+      "related_policy_files": [
+        "app-user/src/main/java/com/contentfilter/user/dag/DagModestyImageClassifier.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagImageAudienceContext.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagKosherImageMetadata.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagImageCalibration.kt"
+      ]
+    },
+    {
+      "name": "MoveNet SinglePose Lightning INT8",
+      "role": "pose",
+      "relative_path": "app-user/src/main/assets/dag/movenet_singlepose_lightning_int8.tflite",
+      "sha256": "cd7cc22fa946e5d146a7b98d496853e1923e22828d3972d579973f27f91bb105",
+      "size_bytes": 2894840,
+      "runtime": "LiteRT/TensorFlow Lite Android",
+      "input_shape": [1, 192, 192, 3],
+      "input_type": "uint8",
+      "output_shape": [1, 1, 17, 3],
+      "declared_version": "not_available_in_repository",
+      "classes_or_primary_signals": [
+        "sleeves_above_elbow",
+        "hem_above_knee"
+      ],
+      "default_active_thresholds": {
+        "sleeves_above_elbow": 0.72,
+        "hem_above_knee": 0.72,
+        "minimum_keypoint_confidence": 0.48,
+        "minimum_skin_ratio": 0.58
+      },
+      "related_policy_files": [
+        "app-user/src/main/java/com/contentfilter/user/dag/DagTzniutPoseClassifier.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagModestyImageClassifier.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagImageCalibration.kt"
+      ]
+    },
+    {
+      "name": "DAG compact multilingual text intent",
+      "role": "text_fallback",
+      "relative_path": "app-user/src/main/assets/dag/dag_text_intent_v1.bin",
+      "sha256": "8ffb797ab8976f4a4cd18728c8a64ff5973392e30562a3e4291783f00cb9e612",
+      "size_bytes": 114736,
+      "runtime": "DAG Kotlin linear classifier",
+      "input_shape": "4096 hashed character/word n-gram buckets; not a tensor model",
+      "input_type": "normalized UTF-8 text",
+      "output_shape": [7],
+      "declared_version": "dag-local-text-3; binary format 1",
+      "classes_or_primary_signals": [
+        "general",
+        "sexual",
+        "dating",
+        "gambling",
+        "drugs",
+        "violence",
+        "sensitive_context"
+      ],
+      "default_active_thresholds": {
+        "semantic_block_confidence": 0.55,
+        "semantic_block_margin": 0.15,
+        "semantic_review_confidence": 0.3,
+        "semantic_review_margin": 0.05
+      },
+      "related_policy_files": [
+        "app-user/src/main/java/com/contentfilter/user/dag/DagSemanticTextClassifier.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagContentClassifier.kt",
+        "scripts/dag_text_model/train_model.py"
+      ]
+    }
+  ],
+  "external_models": [
+    {
+      "name": "DAG multilingual MiniLM text classifier",
+      "role": "text_primary_when_downloaded_in_dev",
+      "repository_path": null,
+      "repository_availability": "not_available_in_repository",
+      "runtime_path": "noBackupFilesDir/dag/models/dag-multilingual-minilm-v1.onnx",
+      "sha256": "641b05b3775dbb94ba7291c7fe607d0bfa304b844cdf6551271018fb287c3627",
+      "size_bytes": 123379433,
+      "runtime": "ONNX Runtime Android with ONNX Runtime Extensions",
+      "input_shape": [1],
+      "input_type": "string",
+      "output_shape": "not_declared_in_repository",
+      "declared_version": "dag-neural-minilm-1",
+      "classes_or_primary_signals": [
+        "general",
+        "sexual",
+        "dating",
+        "gambling",
+        "drugs",
+        "violence",
+        "sensitive_context"
+      ],
+      "default_active_thresholds": {
+        "semantic_block_confidence": 0.55,
+        "semantic_block_margin": 0.15,
+        "semantic_review_confidence": 0.3,
+        "semantic_review_margin": 0.05
+      },
+      "parts": [
+        {
+          "filename": "dag-multilingual-minilm-v1-81f961904468-part-00",
+          "size_bytes": 41943040,
+          "sha256": "24f1dd60a6145ec63891fa9cf89348a41f1d12058495020c68dfa5f0bc8c97ad"
+        },
+        {
+          "filename": "dag-multilingual-minilm-v1-81f961904468-part-01",
+          "size_bytes": 41943040,
+          "sha256": "0e8bbc09bf5b0ca08d82a66fbf97e0f21602d921f090124cf5eb4de304361d93"
+        },
+        {
+          "filename": "dag-multilingual-minilm-v1-641b05b3775d-part-02",
+          "size_bytes": 39493353,
+          "sha256": "e666a96a84c239289c523b48426eeaaba9d5a1eb81d28573881b36d504ed81e3"
+        }
+      ],
+      "related_policy_files": [
+        "app-user/src/main/java/com/contentfilter/user/dag/DagNeuralTextClassifier.kt",
+        "app-user/src/main/java/com/contentfilter/user/dag/DagContentClassifier.kt",
+        "app-user/build.gradle.kts"
+      ]
+    }
+  ],
+  "policy_files": [
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagBrowserViewModel.kt",
+      "sha256": "1d59ee6ca2bb993a34cb9fa4377b4c7f9206b8489f6d406e5f540b36fb34095c",
+      "size_bytes": 55119
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagBrowserScreen.kt",
+      "sha256": "a4c03d6afd1ee407472610424145690fcf229a286588153946ad862e13d12f6f",
+      "size_bytes": 47197
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagContentClassifier.kt",
+      "sha256": "d08e1828fa5644c15141e71b07294f509fc3d2202d4ed3492532b0bdf3134544",
+      "size_bytes": 17730
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagImageAudienceContext.kt",
+      "sha256": "aa6cb82d5c3ad8cb11c473e66f4ade63c331e6a05b2719236055948cc060685e",
+      "size_bytes": 2209
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagImageCalibration.kt",
+      "sha256": "54bd3e79d5f5677d825fd49a7b71ed330e72e0a8e589dc8d67ec640e85dca6fb",
+      "size_bytes": 4052
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagImageClassifier.kt",
+      "sha256": "18d0ff148e80bf91dbeb65413e8ea1a2a7a0bb0657522063438785000807ac8a",
+      "size_bytes": 16052
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagImageResourceLoader.kt",
+      "sha256": "123a73fb4869a7412760a7818f8b0ab108c28c64d0393c6ee025e0eeeb7f2504",
+      "size_bytes": 22897
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagKosherImageMetadata.kt",
+      "sha256": "28b2b637ffc1b88318ba0aa042f0266372ba267602354ae25d5a0ffa7c412171",
+      "size_bytes": 1262
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagModestyImageClassifier.kt",
+      "sha256": "526fccb77b3346548e38b9462948ee6e5f28ed6309ccbfe04f9643e186f669a1",
+      "size_bytes": 11171
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagNeuralTextClassifier.kt",
+      "sha256": "55f1141e353c13ccfa689cdc0d0b797d86eef8add446ee9f5374fa894497bf4b",
+      "size_bytes": 7484
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagProfessionalImageClassifier.kt",
+      "sha256": "2c520a3fe7f5a63da18d495eaab4076cdf7d75a30b8519c53cefea5fe249c072",
+      "size_bytes": 4263
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagSearchRepository.kt",
+      "sha256": "d8da1bfcca137ff37ec384d24dd2c5663bfa926a02d60481fcaf9ae9a1eb7caa",
+      "size_bytes": 5296
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagSemanticTextClassifier.kt",
+      "sha256": "4fc42d17c62a9570d80216cd4750c0ef63ec13fc2e4d0b8503f60c53b418c1b8",
+      "size_bytes": 7320
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagTzniutPoseClassifier.kt",
+      "sha256": "e733b9b64f027371647f2485226f067545d9f6ffd7cba25ed311d771894e173d",
+      "size_bytes": 9562
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagWebViewComponents.kt",
+      "sha256": "d38f3c17061c0420edbbcc2b376ebc5a94d87e15ec9fcfbb30dc1d68499c8dbf",
+      "size_bytes": 58943
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagCalibrationRepository.kt",
+      "sha256": "d4abcf7a67bdbb01c4bb763ba525a869af233642bcb2619b17ca132e8ba098dc",
+      "size_bytes": 7607
+    },
+    {
+      "relative_path": "app-user/src/main/java/com/contentfilter/user/dag/DagCalibrationOutbox.kt",
+      "sha256": "4bdf6a9f542b88881256b491881ed138b7da579c8561635b0ccb28cdf4c334c3",
+      "size_bytes": 7925
+    },
+    {
+      "relative_path": "supabase/functions/dag-search/index.ts",
+      "sha256": "68ef22e3cc8343321d9be5dcfb9a9fd5f2977538e1f2a0ebefb1dfc635df7267",
+      "size_bytes": 11222
+    },
+    {
+      "relative_path": "supabase/functions/dag-calibration/index.ts",
+      "sha256": "810d3d2aa6dbd5c2c4f54dc0d3caf32a77129a973661d631b2cb8fbacf5febdd",
+      "size_bytes": 28425
+    },
+    {
+      "relative_path": "supabase/migrations/20260724124019_dag_binary_manual_calibration.sql",
+      "sha256": "359d4371c429ef92b4b7da2bb1e1b6e1f8f5a8e7f8581f56184daad447d76f1f",
+      "size_bytes": 7114
+    },
+    {
+      "relative_path": "app-user/build.gradle.kts",
+      "sha256": "273de1826eb9a0d883c284798ad1690ead6c113adbc7e92a4bb6d6a8e4844058",
+      "size_bytes": 7734
+    }
+  ],
+  "supporting_files": [
+    {
+      "relative_path": "app-user/src/main/assets/dag/THIRD_PARTY_NOTICES.txt",
+      "sha256": "b8da6c3598096116599d6ab9469aec62a4d8ded7a70bdb0c7acf2d89b8df0c6e",
+      "size_bytes": 4156
+    },
+    {
+      "relative_path": "scripts/dag_text_model/train_model.py",
+      "sha256": "1fce8eb1309d606733b7944b83501741f009ff2627aa627fa28d8c6a4954b1ad",
+      "size_bytes": 20161
+    }
+  ],
+  "active_threshold_source": {
+    "repository_defaults": "app-user/src/main/java/com/contentfilter/user/dag/DagImageCalibration.kt",
+    "remote_override": "Supabase DEV dag_calibration_versions for model marqo-nsfw-vit-tiny-384-2",
+    "remote_active_values": "not_available_in_repository"
+  }
+}

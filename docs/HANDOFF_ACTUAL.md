@@ -79,6 +79,15 @@ Usuario 5d98a83b992042477059a7809df140b6545ded03f8e52704c883a8add0aee2cc
 Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ```
 
+## DAG-V1-ARCHIVE-V2-CONTRACT-01 - archivo y contrato, sin cambio funcional - 2026-07-24
+
+- DAG v1 queda archivado como respaldo verificable desde el commit `486c564be62ab336cfc815b223343b9419370f14`; sus modelos y archivos de política permanecen en su ubicación original y se verifican por tamaño y SHA-256 mediante `scripts/dag/verify-dag-v1-archive.sh`.
+- La documentación canónica vive en `docs/dag/v1/` y `docs/dag/v2/`. Registra comportamiento, thresholds por defecto, precedencia, infraestructura, limitaciones, rendimiento, rollback, contrato de producto, frontera arquitectónica y roadmap.
+- Decisión de producto: DAG v2 se construirá separado de DAG v1 y utilizará un único modelo visual propio, entrenado desde cero con pesos iniciales aleatorios para la política acordada. No agregará dependencias hacia las clases internas de decisión visual de v1.
+- DAG v1 no se borrará hasta que v2 esté validado, estable, haya completado modo sombra y canary, y exista una decisión manual de retiro con rollback probado.
+- Orden cerrado de v2: archivo y contrato; navegador base; calibración DEV; dataset; entrenamiento desde cero; optimización Android; modo sombra; pruebas físicas y reentrenamiento; canary; retiro de v1. Ninguna fase inicia automáticamente la siguiente.
+- Este ticket es exclusivamente documental: no cambia APK, navegador, filtro, modelo, thresholds, Calibración DEV, App Admin, `versionCode`, Supabase ni Production; no publica ni borra datos.
+
 ## Publicacion Usuario DEV 279 - carga progresiva y calibracion binaria - 2026-07-24
 
 - DAG muestra de inmediato la estructura funcional de la pagina y mantiene menus, inputs, botones y scripts disponibles mientras las imagenes siguen protegidas. Reserva el espacio visual, prioriza el viewport con concurrencia limitada, revela cada imagen segura al terminar, difiere las inferiores hasta acercarse por scroll y deja aislada cualquier imagen lenta mediante timeout; una linea fina indica el trabajo visible pendiente.
