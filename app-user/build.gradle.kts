@@ -156,6 +156,7 @@ android {
 }
 
 dependencies {
+    add("devImplementation", project(":feature-dag2"))
     implementation(project(":core-domain"))
     implementation(project(":core-data"))
     implementation(project(":core-database"))

@@ -51,6 +51,14 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### DAG-V2-BROWSER-FOUNDATION-02 - Base de navegador aislada
+
+- Estado: `Candidato DEV local; validación física SM-S908E pendiente`. Aprobado explícitamente el 2026-07-24. Tipo: navegador, seguridad y arquitectura. Prioridad: P0. Esfuerzo: XL. Riesgo: alto.
+- Alcance cerrado: módulo `:feature-dag2` y namespace independientes, entrada `DAG v2 Lab` sólo en App Usuario DEV, proceso WebView `:dag2`, búsqueda Brave existente con filtrado local previo y posterior, sesión única por documento y un router común para WebView y Service Workers.
+- Estado visual transitorio: no existe todavía el modelo v2 y todo raster termina como placeholder neutro sin píxeles del original. HTML, CSS, JavaScript, JSON, RSC, XHR, `fetch` y fuentes no atraviesan el pipeline visual.
+- Aceptación local: pruebas unitarias y de aislamiento, ktlint, Android Lint, Detekt y APK DEV correctos; el Lab está ausente de los manifiestos Beta y Production; DAG v1 verifica sin cambios. La validación física de Frávega, Mimo y Cheeky quedó pendiente porque el SM-S908E no estaba conectado.
+- No hubo incremento de versión, publicación, cambios en Supabase o Production ni borrado. Este ticket no autoriza Calibración DEV v2, dataset, entrenamiento ni el Lote 3.
+
 ### DAG-V1-ARCHIVE-V2-CONTRACT-01 - Archivo verificable y contrato DAG v2
 
 - Estado: `Implementado documentalmente en rama de entrega`. Aprobado explícitamente el 2026-07-24. Tipo: preservación, producto y arquitectura. Prioridad: P0. Esfuerzo: M. Riesgo: bajo.
@@ -319,6 +327,7 @@ Flujo de una entrada:
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | BARRIER-FACTORY-RESET-01 | Idea autorizada para backlog; no aprobada para codigo | P0 | Bloquear el restablecimiento desde Ajustes salvo autorizacion destructiva independiente | M | Critico |
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
+| DAG-V2-BROWSER-FOUNDATION-02 | Candidato DEV local; validacion fisica SM-S908E pendiente | P0 | Base de navegador v2 separada, con imagenes raster siempre neutras hasta existir el modelo propio | XL | Alto |
 | DAG-V1-ARCHIVE-V2-CONTRACT-01 | Implementado documentalmente en rama de entrega | P0 | Archivar DAG v1 y fijar contrato, frontera y roadmap de DAG v2 sin cambiar comportamiento | M | Bajo |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
@@ -1622,7 +1631,7 @@ Flujo de una entrada:
 - DAG v1 queda archivado y disponible como respaldo; no se borra hasta que v2 esté validado, estable y tenga rollback probado.
 - DAG v2 usará un único modelo visual propio, entrenado desde cero con pesos iniciales aleatorios.
 - Secuencia obligatoria: 1) archivo y contrato; 2) navegador base; 3) calibración DEV; 4) dataset; 5) entrenamiento desde cero; 6) optimización Android; 7) modo sombra; 8) pruebas físicas y reentrenamiento; 9) canary; 10) retiro de DAG v1.
-- Cada fase necesita ticket y aprobación explícita. Este registro no autoriza iniciar el navegador base ni ninguna fase posterior.
+- La fase 2 tiene un candidato DEV local aislado y todavía requiere validación física en SM-S908E. Cada fase necesita ticket y aprobación explícita; este registro no autoriza iniciar Calibración DEV v2 ni ninguna fase posterior.
 
 ### DAG-FOUNDATION-01 - Entrada, control y atajo seguro
 

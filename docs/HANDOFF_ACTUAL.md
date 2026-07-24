@@ -88,6 +88,16 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 - Orden cerrado de v2: archivo y contrato; navegador base; calibración DEV; dataset; entrenamiento desde cero; optimización Android; modo sombra; pruebas físicas y reentrenamiento; canary; retiro de v1. Ninguna fase inicia automáticamente la siguiente.
 - Este ticket es exclusivamente documental: no cambia APK, navegador, filtro, modelo, thresholds, Calibración DEV, App Admin, `versionCode`, Supabase ni Production; no publica ni borra datos.
 
+## DAG-V2-BROWSER-FOUNDATION-02 - candidato DEV local, no publicado - 2026-07-24
+
+- Se creó `:feature-dag2` bajo `com.contentfilter.user.dag2`, conectado a App Usuario exclusivamente con `devImplementation`. `DAG v2 Lab` existe sólo en el manifiesto DEV, conserva intacta la entrada activa de DAG v1 y se ejecuta en `:dag2` con directorio de datos WebView `dag2`.
+- El proceso secundario termina la inicialización de `UserApplication` antes de iniciar VPN, WorkManager, sincronizaciones, receptores, monitores o servicios propios del proceso principal. El laboratorio usa una sesión por documento y un único análisis completo; hash, `pushState`, `replaceState`, menús, botones, scroll y recursos diferidos no reinician esa sesión.
+- La búsqueda reutiliza la Edge Function existente `dag-search` mediante un adaptador neutral. Consulta, URL, dominio y resultados se filtran localmente; una consulta adulta se bloquea antes de invocar Brave y una regla Admin común de permitir no reemplaza una prohibición adulta.
+- HTML, CSS, JavaScript, JSON, XHR, `fetch`, fuentes, RSC, manifests y scripts de Service Worker siguen por WebView sin entrar al pipeline visual. WebView y Service Workers comparten el mismo router. Los raster se reemplazan siempre por un SVG neutro generado sin píxeles del original; el único SVG permitido debe superar una validación determinista cerrada.
+- Validación local: unitarios de `:feature-dag2` y App Usuario DEV, aislamiento v1/v2, ktlint, Android Lint, Detekt y `assembleDevDebug` correctos. Los manifiestos fusionados confirman que el Lab está presente en DEV y ausente en Beta y Production. El verificador del archivo de DAG v1 continúa correcto y el diff no modifica sus modelos, código visual ni calibración.
+- No se realizó la validación física condicionada: no estaba conectado el Samsung SM-S908E; ADB sólo mostró un SM-A235M, que no se utilizó. Por eso Frávega, Mimo, Cheeky, caché normal/sin caché, estabilidad de 20 segundos y métricas físicas quedan pendientes antes de considerar este candidato validado.
+- No se incrementó `versionCode`, no se publicó APK, no se modificó Supabase ni Production y no se borraron datos. Este cierre no autoriza Calibración DEV v2, dataset, entrenamiento ni ninguna fase posterior.
+
 ## Publicacion Usuario DEV 279 - carga progresiva y calibracion binaria - 2026-07-24
 
 - DAG muestra de inmediato la estructura funcional de la pagina y mantiene menus, inputs, botones y scripts disponibles mientras las imagenes siguen protegidas. Reserva el espacio visual, prioriza el viewport con concurrencia limitada, revela cada imagen segura al terminar, difiere las inferiores hasta acercarse por scroll y deja aislada cualquier imagen lenta mediante timeout; una linea fina indica el trabajo visible pendiente.
