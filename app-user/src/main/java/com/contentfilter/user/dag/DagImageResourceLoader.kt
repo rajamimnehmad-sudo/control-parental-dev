@@ -212,7 +212,7 @@ internal class DagImageResourceLoader(
                         classification.decision.name.lowercase(),
                     )
                 }
-                return blurredImageResource(request.url.toString(), bytes) ?: unavailableImageResource()
+                return neutralImageResource(request.url.toString(), bytes) ?: unavailableImageResource()
             }
 
             return cacheAndCreateResource(
@@ -223,26 +223,22 @@ internal class DagImageResourceLoader(
         }
     }
 
-    private fun blurredImageResource(
+    private fun neutralImageResource(
         cacheKey: String,
         bytes: ByteArray,
     ): WebResourceResponse? {
         val source = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return null
         return try {
-            val outputWidth = minOf(source.width, MaximumBlurredDimension)
+            val outputWidth = minOf(source.width, MaximumNeutralDimension)
             val outputHeight = maxOf(1, source.height * outputWidth / source.width)
-            val tinyWidth = minOf(BlurSampleSide, outputWidth)
-            val tinyHeight = maxOf(1, outputHeight * tinyWidth / outputWidth)
-            val tiny = Bitmap.createScaledBitmap(source, tinyWidth, tinyHeight, true)
-            val blurred = Bitmap.createScaledBitmap(tiny, outputWidth, outputHeight, true)
+            val neutral = Bitmap.createBitmap(outputWidth, outputHeight, Bitmap.Config.RGB_565)
+            neutral.eraseColor(NeutralPlaceholderColor)
             val output = ByteArrayOutputStream()
             try {
-                if (!blurred.compress(Bitmap.CompressFormat.JPEG, BlurJpegQuality, output)) return null
-                val blurredBytes = output.toByteArray()
-                cacheAndCreateResource(cacheKey, blurredBytes, "image/jpeg", "blurred")
+                if (!neutral.compress(Bitmap.CompressFormat.JPEG, NeutralJpegQuality, output)) return null
+                cacheAndCreateResource(cacheKey, output.toByteArray(), "image/jpeg", "neutral")
             } finally {
-                if (blurred !== tiny && blurred !== source) blurred.recycle()
-                if (tiny !== source) tiny.recycle()
+                neutral.recycle()
             }
         } finally {
             source.recycle()
@@ -379,9 +375,9 @@ internal class DagImageResourceLoader(
         const val RequestTimeoutSeconds = 15L
         const val InitialBufferBytes = 64 * 1024
         const val ReadBufferBytes = 16 * 1024
-        const val MaximumBlurredDimension = 480
-        const val BlurSampleSide = 4
-        const val BlurJpegQuality = 72
+        const val MaximumNeutralDimension = 480
+        const val NeutralJpegQuality = 80
+        const val NeutralPlaceholderColor = 0xFFE9EDF2.toInt()
         const val CalibrationThumbnailDimension = 512
         const val CalibrationThumbnailQuality = 65
         const val CalibrationThumbnailMaximumBytes = 128 * 1024

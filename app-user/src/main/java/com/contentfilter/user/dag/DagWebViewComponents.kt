@@ -4,14 +4,18 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
+import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.GeolocationPermissions
 import android.webkit.PermissionRequest
 import android.webkit.RenderProcessGoneDetail
 import android.webkit.SafeBrowsingResponse
+import android.webkit.ServiceWorkerClient
+import android.webkit.ServiceWorkerController
 import android.webkit.SslErrorHandler
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -86,6 +90,7 @@ internal fun DagWebContent(
     val currentManualBlurReviewCandidate by rememberUpdatedState(onManualBlurReviewCandidate)
     val currentVisualCalibrationEnabled by rememberUpdatedState(visualCalibrationEnabled)
     val currentExtraKosherEnabled by rememberUpdatedState(state.dagExtraKosherEnabled)
+    val currentRequestedUrl by rememberUpdatedState(state.requestedUrl)
     val currentGeolocationPrompt by rememberUpdatedState(onGeolocationPrompt)
     val currentFaviconChanged by rememberUpdatedState(onFaviconChanged)
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
@@ -112,6 +117,7 @@ internal fun DagWebContent(
     var preparedUrl by remember { mutableStateOf<String?>(null) }
     var loadedNavigationRevision by remember { mutableStateOf(-1L) }
     var pendingFavicon by remember { mutableStateOf<Pair<String, Bitmap>?>(null) }
+    var serviceWorkerController by remember { mutableStateOf<ServiceWorkerController?>(null) }
 
     BackHandler {
         if (webView?.canGoBack() == true) webView?.goBack() else onBackFromBrowser()
@@ -136,9 +142,8 @@ internal fun DagWebContent(
                 loadedNavigationRevision != state.navigationRevision
             ) {
                 loadedNavigationRevision = state.navigationRevision
-                view.settings.blockNetworkImage = true
                 val performanceProbe =
-                    BuildConfig.DEBUG &&
+                    BuildConfig.FLAVOR == "dev" &&
                         runCatching { Uri.parse(url).getQueryParameter("codexperf") != null }.getOrDefault(false)
                 view.settings.cacheMode =
                     if (performanceProbe) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
@@ -172,7 +177,6 @@ internal fun DagWebContent(
     LaunchedEffect(webView, state.dagExtraKosherEnabled) {
         val view = webView ?: return@LaunchedEffect
         view.url?.takeIf { it.startsWith("https://", ignoreCase = true) }?.let {
-            view.settings.blockNetworkImage = true
             view.reload()
         }
     }
@@ -184,6 +188,10 @@ internal fun DagWebContent(
             webView?.destroy()
             webView = null
             onWebViewChanged(null)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                serviceWorkerController?.setServiceWorkerClient(null)
+                serviceWorkerController = null
+            }
             imageLoader.cancel()
             imageClassifiers.forEach(DagImageClassifier::close)
         }
@@ -193,6 +201,7 @@ internal fun DagWebContent(
         AndroidView(
             modifier = Modifier.fillMaxSize().alpha(if (state.pageStatus == DagPageStatus.Visible) 1f else 0f),
             factory = {
+                if (BuildConfig.FLAVOR == "dev") WebView.setWebContentsDebuggingEnabled(true)
                 WebView(context).apply {
                     webView = this
                     onWebViewChanged(this)
@@ -238,6 +247,27 @@ internal fun DagWebContent(
                             )
                         },
                     )
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                        serviceWorkerController =
+                            ServiceWorkerController.getInstance().also { controller ->
+                                controller.setServiceWorkerClient(
+                                    object : ServiceWorkerClient() {
+                                        override fun shouldInterceptRequest(
+                                            request: WebResourceRequest,
+                                        ): WebResourceResponse? =
+                                            interceptDagResource(
+                                                request = request,
+                                                pageUrl = currentRequestedUrl,
+                                                imageLoader = imageLoader,
+                                                captchaSessionActive = {
+                                                    SystemClock.elapsedRealtime() < captchaSessionExpiresAt.get()
+                                                },
+                                                source = "service-worker",
+                                            )
+                                    },
+                                )
+                            }
+                    }
                     setBackgroundColor(android.graphics.Color.WHITE)
                     cookieManager.apply {
                         setAcceptCookie(true)
@@ -288,12 +318,52 @@ internal fun DagWebContent(
                             onPageTextReady(url, view.title.orEmpty(), text, imageLoader.pageSummary())
                         }
                     }
+
+                    fun logDomDiagnostic(
+                        view: WebView,
+                        url: String,
+                    ) {
+                        if (BuildConfig.FLAVOR != "dev") return
+                        view.evaluateJavascript(
+                            """
+                            (function() {
+                              var root = document.documentElement;
+                              var body = document.body;
+                              var next = document.getElementById('__next');
+                              var rootStyle = root && getComputedStyle(root);
+                              var bodyStyle = body && getComputedStyle(body);
+                              var nextStyle = next && getComputedStyle(next);
+                              var nextRect = next && next.getBoundingClientRect();
+                              return JSON.stringify({
+                                title: document.title,
+                                readyState: document.readyState,
+                                htmlLength: root ? root.outerHTML.length : -1,
+                                textLength: body ? body.innerText.length : -1,
+                                textSample: body ? body.innerText.substring(0,300) : '',
+                                bodyChildren: body ? body.children.length : -1,
+                                scrollHeight: root ? root.scrollHeight : -1,
+                                rootDisplay: rootStyle && rootStyle.display,
+                                rootVisibility: rootStyle && rootStyle.visibility,
+                                rootOpacity: rootStyle && rootStyle.opacity,
+                                bodyDisplay: bodyStyle && bodyStyle.display,
+                                bodyVisibility: bodyStyle && bodyStyle.visibility,
+                                bodyOpacity: bodyStyle && bodyStyle.opacity,
+                                nextDisplay: nextStyle && nextStyle.display,
+                                nextVisibility: nextStyle && nextStyle.visibility,
+                                nextOpacity: nextStyle && nextStyle.opacity,
+                                nextWidth: nextRect && nextRect.width,
+                                nextHeight: nextRect && nextRect.height
+                              });
+                            })();
+                            """.trimIndent(),
+                        ) { result -> Log.d("DagDomDiagnostic", "$url $result") }
+                    }
+
                     webViewClient =
                         DagWebViewClient(
                             onNavigate = onNavigate,
                             onStarted = { url ->
                                 closeCaptchaSession()
-                                settings.blockNetworkImage = true
                                 inspectedUrl = null
                                 preparedUrl = null
                                 imageLoader.resetPage()
@@ -307,12 +377,17 @@ internal fun DagWebContent(
                                     },
                                     PageCommitInspectionDelayMillis,
                                 )
+                                view.postDelayed(
+                                    { if (view.url == url) logDomDiagnostic(view, url) },
+                                    3_000L,
+                                )
                             },
                             onFinished = { view, url ->
                                 canGoBack = view.canGoBack()
                                 canGoForward = view.canGoForward()
                                 onNavigationStateChanged(canGoBack, canGoForward)
                                 inspectPage(view, url)
+                                logDomDiagnostic(view, url)
                                 view.setDagVisualCalibrationMode(currentVisualCalibrationEnabled)
                                 view.setDagImageCalibrationDecisions(imageLoader.manualCalibrationDecisions())
                             },
@@ -410,7 +485,7 @@ private fun WebView.configureDagSettings(
     settings.allowFileAccess = false
     settings.allowContentAccess = false
     settings.loadsImagesAutomatically = true
-    settings.blockNetworkImage = true
+    settings.blockNetworkImage = false
     settings.mediaPlaybackRequiresUserGesture = true
     settings.javaScriptCanOpenWindowsAutomatically = false
     settings.setSupportMultipleWindows(false)
@@ -476,39 +551,60 @@ private fun WebView.setDagVisualCalibrationMode(enabled: Boolean) {
 private val DagDocumentStartScript =
     """
     (function() {
-      try {
-        var dagDocumentHost = (window.location.hostname || '').toLowerCase();
-        var dagDocumentPath = window.location.pathname || '';
-        var dagCaptchaDocument =
-          ((dagDocumentHost === 'www.google.com' || dagDocumentHost === 'www.recaptcha.net') &&
-            dagDocumentPath.indexOf('/recaptcha/') === 0) ||
-          (dagDocumentHost === 'challenges.cloudflare.com' &&
-            dagDocumentPath.indexOf('/cdn-cgi/challenge-platform/') === 0) ||
-          (dagDocumentHost === 'newassets.hcaptcha.com' &&
-            dagDocumentPath.indexOf('/captcha/') === 0);
-        if (dagCaptchaDocument) return;
-        if (window.URL && window.URL.createObjectURL) {
-          Object.defineProperty(window.URL, 'createObjectURL', {
-            value: function() { throw new Error('DAG blocked blob content'); },
-            writable: false,
-            configurable: false
-          });
+      var dagSafeStyle = document.createElement('style');
+      dagSafeStyle.id = 'dag-document-safety-style';
+      dagSafeStyle.textContent =
+        'img:not([data-dag-image-resolved="true"]) { visibility:hidden !important; }' +
+        'video,audio,canvas,iframe:not([data-dag-safe-captcha="true"]) { display:none !important; }' +
+        '[style*="url(data:" i],[style*="url(blob:" i] { background-image:none !important; }';
+      function dagInstallSafetyStyle() {
+        var root = document.head || document.documentElement;
+        if (root && !document.getElementById(dagSafeStyle.id)) root.appendChild(dagSafeStyle);
+      }
+      dagInstallSafetyStyle();
+      if (!dagSafeStyle.isConnected) {
+        document.addEventListener('DOMContentLoaded', dagInstallSafetyStyle, { once:true });
+      }
+
+      function dagResolveImage(image) {
+        if (!image || !image.isConnected) return;
+        var source = image.currentSrc || image.getAttribute('src') || '';
+        try {
+          if (new URL(source, document.baseURI).protocol !== 'https:') return;
+        } catch (_) {
+          return;
         }
-        if (navigator.serviceWorker) {
-          var worker = navigator.serviceWorker;
-          Object.defineProperty(worker, 'register', {
-            value: function() { return Promise.reject(new Error('DAG blocked service workers')); },
-            writable: false,
-            configurable: false
-          });
-          if (worker.controller) {
-            window.stop();
-            worker.getRegistrations().then(function(registrations) {
-              return Promise.all(registrations.map(function(registration) { return registration.unregister(); }));
-            }).finally(function() { location.reload(); });
-          }
+        image.setAttribute('data-dag-image-resolved', 'true');
+      }
+
+      document.addEventListener('load', function(event) {
+        if (event.target && event.target.tagName === 'IMG') dagResolveImage(event.target);
+      }, true);
+      document.addEventListener('error', function(event) {
+        if (event.target && event.target.tagName === 'IMG') {
+          event.target.setAttribute('data-dag-image-terminal', 'unavailable');
         }
-      } catch (_) {}
+      }, true);
+      function dagObserveImageSources() {
+        if (!document.documentElement || window.__dagImageSourceObserver) return;
+        window.__dagImageSourceObserver = new MutationObserver(function(records) {
+          records.forEach(function(record) {
+            var image = record.target;
+            if (!image || image.tagName !== 'IMG') return;
+            image.removeAttribute('data-dag-image-resolved');
+            image.removeAttribute('data-dag-image-terminal');
+          });
+        });
+        window.__dagImageSourceObserver.observe(document.documentElement, {
+          subtree:true,
+          attributes:true,
+          attributeFilter:['src','srcset']
+        });
+      }
+      dagObserveImageSources();
+      if (!window.__dagImageSourceObserver) {
+        document.addEventListener('DOMContentLoaded', dagObserveImageSources, { once:true });
+      }
     })();
     """.trimIndent()
 
@@ -645,20 +741,38 @@ private class DagWebViewClient(
     override fun shouldInterceptRequest(
         view: WebView?,
         request: WebResourceRequest,
-    ): WebResourceResponse? {
-        if (captchaSessionActive() && isDagCaptchaSessionResourceUrl(request.url.toString())) return null
-        if (dagShouldBlockAdRequest(request.url.toString(), request.isForMainFrame)) {
-            return WebResourceResponse(
-                "text/plain",
-                "utf-8",
-                204,
-                "No Content",
-                emptyMap(),
-                ByteArrayInputStream(ByteArray(0)),
-            )
+    ): WebResourceResponse? =
+        interceptDagResource(
+            request = request,
+            pageUrl = pageUrlTracker.current(),
+            imageLoader = imageLoader,
+            captchaSessionActive = captchaSessionActive,
+            source = "web-view",
+        )
+}
+
+private fun interceptDagResource(
+    request: WebResourceRequest,
+    pageUrl: String?,
+    imageLoader: DagImageResourceLoader,
+    captchaSessionActive: () -> Boolean,
+    source: String,
+): WebResourceResponse? {
+    if (captchaSessionActive() && isDagCaptchaSessionResourceUrl(request.url.toString())) return null
+    if (dagShouldBlockAdRequest(request.url.toString(), request.isForMainFrame)) {
+        if (BuildConfig.FLAVOR == "dev") {
+            Log.d("DagRequestDiagnostic", "blocked source=$source url=${request.url}")
         }
-        return imageLoader.intercept(request, pageUrlTracker.current())
+        return WebResourceResponse(
+            "text/plain",
+            "utf-8",
+            204,
+            "No Content",
+            emptyMap(),
+            ByteArrayInputStream(ByteArray(0)),
+        )
     }
+    return imageLoader.intercept(request, pageUrl)
 }
 
 internal class DagPageUrlTracker {
@@ -759,122 +873,81 @@ private fun WebView.sanitizeAndExtractVisibleText(
             }
             return '';
           }
+          function dagHoldImage(image) {
+            if (!image) return;
+            image.setAttribute('data-dag-image-pending', 'true');
+          }
+          function dagBindImageLifecycle(image) {
+            if (!image || image.__dagImageLifecycleBound) return;
+            image.__dagImageLifecycleBound = true;
+            image.addEventListener('load', function() {
+              var source = image.currentSrc || image.getAttribute('src') || '';
+              try {
+                if (new URL(source, document.baseURI).protocol !== 'https:') return;
+              } catch (_) {
+                return;
+              }
+              image.removeAttribute('data-dag-image-pending');
+              image.removeAttribute('data-dag-image-terminal');
+              image.setAttribute('data-dag-image-resolved', 'true');
+              if (window.__dagVisualCalibrationEnabled) window.__dagRefreshCalibrationMarkers();
+            });
+            image.addEventListener('error', function() {
+              image.removeAttribute('data-dag-image-pending');
+              image.setAttribute('data-dag-image-terminal', 'unavailable');
+            });
+          }
           function dagLoadImage(image) {
             if (!image || !image.isConnected) return;
             dagBlurIntimateImage(image);
             dagApplyExtraKosherImage(image);
-            var source = dagHttpsImageSource(image);
-            if (!source) {
-              image.style.setProperty('visibility', 'hidden', 'important');
-              image.setAttribute('data-dag-image-terminal', 'unavailable');
+            dagBindImageLifecycle(image);
+            var source = image.currentSrc || image.getAttribute('src') || '';
+            try {
+              if (new URL(source, document.baseURI).protocol !== 'https:') {
+                image.removeAttribute('data-dag-image-resolved');
+                image.setAttribute('data-dag-image-terminal', 'unsupported-source');
+                return;
+              }
+            } catch (_) {
+              image.removeAttribute('data-dag-image-resolved');
+              image.setAttribute('data-dag-image-terminal', 'unsupported-source');
               return;
             }
-            image.removeAttribute('srcset');
-            image.removeAttribute('data-srcset');
-            image.removeAttribute('data-lazy-srcset');
-            image.removeAttribute('data-dag-held-src');
-            image.style.removeProperty('visibility');
-            if (image.getAttribute('src') !== source) image.src = source;
-            image.setAttribute('data-dag-image-ready', 'true');
-            if (window.__dagVisualCalibrationEnabled) window.__dagRefreshCalibrationMarkers();
+            image.removeAttribute('data-dag-image-terminal');
+            if (image.complete && image.naturalWidth > 0) {
+              image.removeAttribute('data-dag-image-pending');
+              image.setAttribute('data-dag-image-resolved', 'true');
+            } else {
+              image.removeAttribute('data-dag-image-resolved');
+              dagHoldImage(image);
+            }
           }
           function dagQueueImage(image) {
             if (!image) return;
-            dagBlurIntimateImage(image);
-            dagApplyExtraKosherImage(image);
-            if (window.IntersectionObserver && image.getAttribute('data-dag-image-ready') !== 'true') {
-              var heldSource = dagHttpsImageSource(image);
-              if (!heldSource) {
-                image.style.setProperty('visibility', 'hidden', 'important');
-                image.setAttribute('data-dag-image-terminal', 'unavailable');
-                return;
-              }
-              var heldRect;
-              try { heldRect = image.getBoundingClientRect(); } catch (_) {}
-              var declaredWidth = parseFloat(image.getAttribute('width') || '0');
-              var declaredHeight = parseFloat(image.getAttribute('height') || '0');
-              if (declaredWidth > 0 && declaredHeight > 0) {
-                image.style.setProperty('aspect-ratio', declaredWidth + ' / ' + declaredHeight);
-              } else if (heldRect && heldRect.width >= 24 && heldRect.height >= 24) {
-                image.style.setProperty('aspect-ratio', heldRect.width + ' / ' + heldRect.height);
-              }
-              image.setAttribute('data-dag-held-src', heldSource);
-              image.removeAttribute('src');
-              image.removeAttribute('srcset');
-              var heldPicture = image.closest && image.closest('picture');
-              heldPicture && heldPicture.querySelectorAll('source').forEach(function(source) {
-                source.removeAttribute('srcset');
-                source.removeAttribute('data-srcset');
-                source.removeAttribute('data-lazy-srcset');
-              });
-              if (!window.__dagImageObserver) {
-                var dagPrefetchMargin = Math.max(
-                  (window.innerHeight || 0) * ${DagViewportReadinessPolicy.PrefetchViewportCount},
-                  600
-                );
-                window.__dagImageObserver = new IntersectionObserver(function(entries) {
-                  entries.forEach(function(entry) {
-                    if (!entry.isIntersecting) return;
-                    window.__dagImageObserver.unobserve(entry.target);
-                    dagLoadImage(entry.target);
-                  });
-                }, { rootMargin: dagPrefetchMargin + 'px 0px' });
-              }
-              window.__dagImageObserver.observe(image);
-              return;
-            }
             dagLoadImage(image);
           }
           window.__dagPrepareViewportImages = function(hidePending) {
             var viewportHeight = Math.max(window.innerHeight || 0, 1);
-            var preparationLimit = viewportHeight * ${DagViewportReadinessPolicy.PreparedViewportCount};
             var total = 0;
             var pending = 0;
             document.querySelectorAll('img').forEach(function(image) {
               if (!image || !image.isConnected) return;
               var rect;
               try { rect = image.getBoundingClientRect(); } catch (_) { return; }
-              if (rect.bottom < 0 || rect.top > preparationLimit) return;
+              if (rect.bottom < 0 || rect.top > viewportHeight) return;
               var style;
               try { style = window.getComputedStyle(image); } catch (_) { return; }
               if (style.display === 'none' || rect.width < 24 || rect.height < 24) {
                 return;
               }
-              if (rect.top > preparationLimit) {
-                var heldSource = dagHttpsImageSource(image);
-                if (heldSource) {
-                  image.setAttribute('data-dag-held-src', heldSource);
-                  image.removeAttribute('src');
-                  image.removeAttribute('srcset');
-                  var picture = image.closest && image.closest('picture');
-                  picture && picture.querySelectorAll('source').forEach(function(source) {
-                    source.removeAttribute('srcset');
-                    source.removeAttribute('data-srcset');
-                    source.removeAttribute('data-lazy-srcset');
-                  });
-                  image.removeAttribute('data-dag-image-ready');
-                  dagQueueImage(image);
-                }
-                return;
-              }
-              var visibleNow = rect.top <= viewportHeight && rect.bottom >= 0;
               dagLoadImage(image);
-              if (!visibleNow) return;
               total += 1;
               if (image.hasAttribute('data-dag-image-terminal')) return;
               if (image.complete && image.naturalWidth > 0) return;
-              if (image.complete && image.naturalWidth === 0) {
-                if (!hidePending) {
-                  pending += 1;
-                  return;
-                }
-                image.style.setProperty('visibility', 'hidden', 'important');
-                image.setAttribute('data-dag-image-terminal', 'unavailable');
-                return;
-              }
               if (hidePending) {
-                image.style.setProperty('visibility', 'hidden', 'important');
                 image.setAttribute('data-dag-image-terminal', 'timeout');
+                image.removeAttribute('data-dag-image-pending');
                 return;
               }
               pending += 1;
@@ -882,28 +955,15 @@ private fun WebView.sanitizeAndExtractVisibleText(
             return JSON.stringify({ total: total, pending: pending });
           };
           function dagSecureBackground(node) {
-            if (!node || node.nodeType !== 1) return;
+            if (!node || node.nodeType !== 1 || window.__dagExtraKosherEnabled !== true) return;
             var background = '';
             try { background = window.getComputedStyle(node).backgroundImage || ''; } catch (_) {}
             if (!background || background === 'none') return;
-            if (window.__dagExtraKosherEnabled === true &&
-                !(node.closest && node.closest('header,nav,button,[role="button"],[role="navigation"]')) &&
+            if (!(node.closest && node.closest('header,nav,button,[role="button"],[role="navigation"]')) &&
                 !/\b(logo|icon|sprite|flag|payment)\b/.test(dagNormalizedText([node.className, node.id].join(' ')))) {
               node.style.setProperty('background-image', 'none', 'important');
               node.setAttribute('data-dag-extra-kosher-background', 'true');
               return;
-            }
-            var matches = background.matchAll(/url\(["']?([^"')]+)["']?\)/g);
-            for (var match of matches) {
-              try {
-                if (new URL(match[1], document.baseURI).protocol !== 'https:') {
-                  node.style.setProperty('background-image', 'none', 'important');
-                  return;
-                }
-              } catch (_) {
-                node.style.setProperty('background-image', 'none', 'important');
-                return;
-              }
             }
           }
           function dagAllowedCaptchaFrame(frame) {
@@ -958,58 +1018,31 @@ private fun WebView.sanitizeAndExtractVisibleText(
                 return;
               }
               if (dagDeferIncompleteCaptchaFrame(node)) return;
-              node.remove();
+              node.removeAttribute('data-dag-safe-captcha');
               return;
             }
             if (tag === 'video' || tag === 'audio' || tag === 'canvas') {
-              node.remove();
               return;
             }
             if (tag === 'source') {
-              var parentTag = node.parentElement && node.parentElement.tagName ? node.parentElement.tagName.toLowerCase() : '';
-              if (parentTag === 'video' || parentTag === 'audio') node.remove();
               return;
             }
             if (tag === 'img') {
               dagQueueImage(node);
             }
-            dagSecureBackground(node);
             if (includeDescendants !== true) return;
             node.querySelectorAll && node.querySelectorAll('video,audio,video source,audio source,canvas,iframe').forEach(dagSecureNode);
             node.querySelectorAll && node.querySelectorAll('img').forEach(function(image) {
               dagQueueImage(image);
             });
-            node.querySelectorAll && node.querySelectorAll('*').forEach(dagSecureBackground);
-          }
-          var dagSecurityQueue = [];
-          var dagSecurityQueued = new WeakSet();
-          var dagSecurityFlushScheduled = false;
-          function dagScheduleSecurityFlush() {
-            if (dagSecurityFlushScheduled || !dagSecurityQueue.length) return;
-            dagSecurityFlushScheduled = true;
-            window.requestAnimationFrame(function() {
-              dagSecurityFlushScheduled = false;
-              var remaining = ${DagDomSecurityBatchPolicy.MaximumNodesPerFrame};
-              while (remaining > 0 && dagSecurityQueue.length) {
-                var current = dagSecurityQueue.shift();
-                remaining -= 1;
-                if (!current || !current.isConnected) continue;
-                dagSecureNode(current, false);
-                if (!current.isConnected) continue;
-                var child = current.firstElementChild;
-                while (child) {
-                  dagQueueSecurityNode(child);
-                  child = child.nextElementSibling;
-                }
-              }
-              dagScheduleSecurityFlush();
-            });
+            if (window.__dagExtraKosherEnabled === true) {
+              dagSecureBackground(node);
+              node.querySelectorAll && node.querySelectorAll('*').forEach(dagSecureBackground);
+            }
           }
           function dagQueueSecurityNode(node) {
-            if (!node || node.nodeType !== 1 || dagSecurityQueued.has(node)) return;
-            dagSecurityQueued.add(node);
-            dagSecurityQueue.push(node);
-            dagScheduleSecurityFlush();
+            if (!node || node.nodeType !== 1) return;
+            dagSecureNode(node, true);
           }
           function dagRemoveCalibrationMarkers() {
             document.querySelectorAll('[data-dag-calibration-marker="true"]').forEach(function(marker) {
@@ -1099,7 +1132,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               if (window.__dagVisualCalibrationEnabled) window.requestAnimationFrame(window.__dagRefreshCalibrationMarkers);
             });
           }
-          dagSecureNode(document.documentElement, true);
+          dagQueueSecurityNode(document.documentElement);
           if (document.documentElement) {
             if (window.__dagExtraKosherEnabled) {
               document.documentElement.setAttribute('data-dag-extra-kosher', 'true');
@@ -1111,7 +1144,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
           if (!style) {
             style = document.createElement('style');
             style.id = 'dag-safe-style';
-            style.textContent = 'video,audio,canvas,iframe:not([data-dag-safe-captcha="true"]) { display:none !important; } img[data-dag-kosher-blurred="true"], img[data-dag-extra-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; transform: scale(1.14) !important; } html[data-dag-dev-calibration="true"] img[data-dag-kosher-blurred="true"]:not([data-dag-extra-kosher-blurred="true"]) { filter:none !important; transform:none !important; }';
+            style.textContent = 'video,audio,canvas,iframe:not([data-dag-safe-captcha="true"]) { display:none !important; } img:not([data-dag-image-resolved="true"]), img[data-dag-image-terminal] { visibility:hidden !important; } [style*="url(data:" i],[style*="url(blob:" i] { background-image:none !important; } img[data-dag-kosher-blurred="true"], img[data-dag-extra-kosher-blurred="true"] { filter: blur(48px) saturate(0.05) brightness(0.82) !important; } html[data-dag-dev-calibration="true"] img[data-dag-kosher-blurred="true"]:not([data-dag-extra-kosher-blurred="true"]) { filter:none !important; }';
             document.documentElement.appendChild(style);
           }
           if (!window.__dagSafeObserver) {
@@ -1141,7 +1174,7 @@ private fun WebView.sanitizeAndExtractVisibleText(
               attributes: true,
               attributeFilter: [
                 'src', 'srcset', 'data-src', 'data-lazy-src', 'data-srcset', 'data-lazy-srcset',
-                'style', 'class', 'alt', 'title', 'aria-label', 'loading'
+                'data-image', 'data-hi-res-src', 'data-src-large', 'data-flickity-lazyload'
               ]
             });
           }
@@ -1167,7 +1200,6 @@ private fun WebView.sanitizeAndExtractVisibleText(
 
 private fun WebView.awaitDagViewportImages(
     startedAtMillis: Long = SystemClock.elapsedRealtime(),
-    networkImagesEnabled: Boolean = false,
     onProgress: (Int, Int) -> Unit,
     callback: () -> Unit,
 ) {
@@ -1177,7 +1209,6 @@ private fun WebView.awaitDagViewportImages(
     evaluateJavascript(
         prepareViewportScript,
     ) { encoded ->
-        if (!networkImagesEnabled) settings.blockNetworkImage = false
         val status =
             encoded.decodeJavascriptString()?.let { value ->
                 runCatching { org.json.JSONObject(value) }.getOrNull()
@@ -1194,7 +1225,6 @@ private fun WebView.awaitDagViewportImages(
                         {
                             awaitDagViewportImages(
                                 startedAtMillis,
-                                networkImagesEnabled = true,
                                 onProgress,
                                 callback,
                             )
