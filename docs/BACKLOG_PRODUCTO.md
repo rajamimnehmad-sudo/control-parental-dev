@@ -359,6 +359,10 @@ Flujo de una entrada:
 | DAG-RESULTS-CLARITY-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Resultados mas claros con dominio destacado e iconos de sitio no engañosos | M | Medio |
 | DAG-ANALYSIS-SEARCH-02 | Idea autorizada para backlog; no aprobada para codigo | P1 | Permitir una nueva busqueda desde la barra mientras DAG analiza | S | Medio |
 | DAG-ADBLOCK-01 | Idea autorizada para backlog; no aprobada para codigo | P1 | Bloquear anuncios y recursos publicitarios para mejorar velocidad sin romper sitios | L | Alto |
+| DAG-BLACK-RESOURCES-05 | Reportado en candidato local; pendiente diagnostico | P1 | Evitar rectangulos negros en recursos seguros sin mostrar contenido no aprobado | M | Alto |
+| DAG-REFRESH-03 | Reportado en candidato local; pendiente diagnostico | P1 | Hacer que Actualizar recargue realmente la pestana activa con estado visible y seguro | S | Medio |
+| DAG-RECENTS-FAVICON-03 | Reportado en candidato local; pendiente implementacion | P2 | Mostrar el favicon real y seguro del sitio en los accesos recientes de Home | M | Medio |
+| DAG-TAB-PREVIEW-04 | Reportado en candidato local; pendiente implementacion | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
 | DAG-CALIBRATION-QUEUE-02 | Resuelto DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
 | DAG-CALIBRATION-REVIEW-03 | Publicado DEV 253; recorrido autenticado pendiente | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
@@ -1311,6 +1315,37 @@ Flujo de una entrada:
 - Rendimiento: comparar en el mismo Samsung primera carga, recarga, bytes/solicitudes, cantidad de imagenes enviadas al clasificador, tiempo hasta primera pantalla completa, memoria y roturas visibles. Implementar solo si mejora de forma repetible sin aumentar huecos ni falsos bloqueos.
 - Aceptacion: anuncios conocidos desaparecen antes de descargar; una muestra de tiendas, noticias, tramites y CAPTCHA sigue funcional; no salen historial ni URLs a un servicio de bloqueo; listas se actualizan de forma autenticada/versionada y pueden revertirse.
 - Validacion: codec de sesiones y compatibilidad de marca de uso, definicion estricta de vacia, tests DEV, compilacion y `ktlintCheck` de App Usuario correctos. Falta prueba visual y de restauracion fisica en Samsung SM-S908E; no hubo publicacion intermedia.
+
+#### DAG-BLACK-RESOURCES-05 - Rectangulos negros en contenido seguro
+
+- Estado: `Reportado en candidato local; pendiente diagnostico`. Evidencia: captura aportada por el usuario el 2026-07-23; la barra visible comienza con `https://www.mim...`, aunque el reporte menciona Cheeky. Tipo: compatibilidad visual y seguridad. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Problema: la pagina conserva su foto principal, pero presenta rectangulos negros grandes en cabecera, iconos y beneficios de envio/retiro. Todavia no esta demostrado si esos bloques son imagenes, fondos CSS, SVG, placeholders del filtro visual, recursos fallidos o coincidencias del bloqueo publicitario.
+- Causa raiz requerida: identificar por recurso y por capa si intervienen WebView/red, bloqueo de anuncios, sanitizacion CSS/SVG, clasificacion visual, respuesta neutra o un error propio del sitio. No crear una excepcion por dominio antes de aislar la causa comun.
+- Seguridad: una correccion no puede mostrar una imagen antes de aprobarla ni convertir el fallo en un bypass. El contenido inseguro conserva bloqueo o blur; logos, controles y recursos seguros recuperan su representacion normal.
+- Aceptacion: el sitio de la captura y una segunda tienda dinamica no muestran rectangulos negros en recursos seguros; los bloqueos intencionales son distinguibles de un recurso roto; se mantienen los filtros de imagenes; recarga y navegacion interna no reintroducen los bloques; queda una prueba general que no dependa de Cheeky/Mimo.
+
+#### DAG-REFRESH-03 - Actualizar la pestana activa
+
+- Estado: `Reportado en candidato local; pendiente diagnostico`. Evidencia: el usuario informa el 2026-07-23 que el boton `Actualizar` no actualiza. Tipo: navegacion WebView. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Problema: la accion puede no producir una recarga observable, especialmente si la pestana fue restaurada, esta suspendida o conserva un estado de analisis anterior.
+- Propuesta: recargar la pagina activa y mostrar progreso inmediato; invalidar callbacks de la generacion anterior y volver a aplicar las compuertas DAG sin crear una busqueda Brave ni otra pestana.
+- Aceptacion: funciona en una pagina visible, despues de restaurar/suspender y tras recuperacion del renderer; la pagina demuestra una solicitud nueva; no vuelve a Home, no duplica historial ni pestanas y no reutiliza una decision parcial; error/sin red queda visible y permite reintentar.
+
+#### DAG-RECENTS-FAVICON-03 - Favicon real en accesos recientes
+
+- Estado: `Reportado en candidato local; pendiente implementacion`. Evidencia: el usuario informa el 2026-07-23 que los ultimos sitios de Home no muestran el icono de la pagina. Tipo: Home e identidad visual segura. Prioridad: P2. Esfuerzo: M. Riesgo: medio.
+- Problema: el candidato local usa letras o abreviaturas de marca como reemplazo seguro; eso no satisface el acceso circular con favicon real definido en `DAG-HOME-RECENTS-02`.
+- Propuesta: obtener el icono desde la pagina ya aprobada o mediante el cargador seguro propio, validarlo y almacenarlo solo en cache local acotada. No consultar un proxy publico de favicons ni retrasar la apertura de Home.
+- Seguridad: el favicon es orientativo y nunca un sello de confianza; el dominio/nombre sigue visible, iconos fallidos o sospechosos usan inicial neutra y borrar historial elimina tambien esta cache.
+- Aceptacion: recientes de tiendas y servicios conocidos muestran el favicon correcto al volver a Home; subdominios no heredan una identidad engañosa; sin red aparece el ultimo icono seguro o el fallback; Home abre instantaneamente y tocarlo sigue revalidando la pagina.
+
+#### DAG-TAB-PREVIEW-04 - Miniatura real por pestana
+
+- Estado: `Reportado en candidato local; pendiente implementacion`. Evidencia: el usuario informa el 2026-07-23 que el selector no muestra las paginas en miniatura. Tipo: pestanas, privacidad y memoria. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Problema: el candidato local solo puede capturar de forma efimera el WebView activo y visible al abrir el selector; las demas tarjetas pueden quedar neutras o representar Home, por lo que el alcance de `DAG-TABS-UX-03` esta incompleto.
+- Propuesta: actualizar la miniatura efimera aprobada antes de suspender o cambiar de pestana y asociarla estrictamente con su identificador. Mantener un solo WebView activo y un presupuesto de memoria limitado.
+- Privacidad y seguridad: no escribir pixeles en disco; bloqueo, analisis, CAPTCHA, formularios sensibles o contenido incierto usan tarjeta neutra; una miniatura nunca evita la revalidacion al restaurar.
+- Aceptacion: con 1, 10 y 50 pestanas cada tarjeta representa su ultima pagina segura y solo muestra Home si esa pestana esta en Home; cambiar/cerrar no cruza miniaturas; `Cerrar todo` libera memoria; reiniciar no restaura capturas; el selector sigue fluido bajo el presupuesto definido.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
