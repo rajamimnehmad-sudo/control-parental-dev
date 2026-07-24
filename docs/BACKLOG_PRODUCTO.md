@@ -51,6 +51,14 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### DAG-V1-ARCHIVE-V2-CONTRACT-01 - Archivo verificable y contrato DAG v2
+
+- Estado: `Implementado documentalmente en rama de entrega`. Aprobado explícitamente el 2026-07-24. Tipo: preservación, producto y arquitectura. Prioridad: P0. Esfuerzo: M. Riesgo: bajo.
+- Alcance cerrado: archivar DAG v1 por commit, tamaños y SHA-256; documentar su comportamiento, thresholds, precedencia, infraestructura, límites y rollback; fijar contrato, frontera y roadmap de DAG v2.
+- Decisión de producto: DAG v1 permanece como respaldo y no se borra. DAG v2 se construirá separado, sin dependencias nuevas hacia la decisión visual interna de v1, con un único modelo visual propio entrenado desde cero y pesos iniciales aleatorios.
+- Orden obligatorio: archivo/contrato, navegador base, calibración DEV, dataset, entrenamiento, optimización Android, modo sombra, pruebas físicas/reentrenamiento, canary y retiro de v1. Cada fase requiere ticket y aprobación propios; ninguna comienza automáticamente.
+- Este ticket no cambia APK, comportamiento, modelos, thresholds, Calibración DEV, App Admin, `versionCode`, Supabase ni Production, y no inicia el Lote 2.
+
 ### ANDROID-FLAT-LISTS-UX-01 - Listas simples, compactas y modernas
 
 - Estado: `Validacion fisica parcial ampliada en SM-A235M DEV 270`. Aprobado explicitamente el 2026-07-21. Tipo: UX Android compartida. Prioridad: P2. Esfuerzo: M. Riesgo: bajo.
@@ -311,6 +319,7 @@ Flujo de una entrada:
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | BARRIER-FACTORY-RESET-01 | Idea autorizada para backlog; no aprobada para codigo | P0 | Bloquear el restablecimiento desde Ajustes salvo autorizacion destructiva independiente | M | Critico |
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
+| DAG-V1-ARCHIVE-V2-CONTRACT-01 | Implementado documentalmente en rama de entrega | P0 | Archivar DAG v1 y fijar contrato, frontera y roadmap de DAG v2 sin cambiar comportamiento | M | Bajo |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Resuelto y publicado DEV 279 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
@@ -1604,6 +1613,16 @@ Flujo de una entrada:
 - Decision implementada: booleano en la licencia de comunidad, separado del cupo mensual. Las comunidades existentes conservan el acceso; las nuevas comienzan sin DAG. Super Admin es la unica autoridad para cambiarlo; una licencia no activa o sin entitlement cierra DAG conservando toda la configuracion.
 
 ## Roadmap DAG, Web e IA local
+
+### DAG v2 - plan canónico separado
+
+- Contrato canónico: `docs/dag/v2/DAG_V2_PRODUCT_CONTRACT.md`.
+- Frontera: `docs/dag/v2/DAG_V2_ARCHITECTURE_BOUNDARY.md`.
+- Roadmap de fases y rollback: `docs/dag/v2/DAG_V2_ROADMAP.md`.
+- DAG v1 queda archivado y disponible como respaldo; no se borra hasta que v2 esté validado, estable y tenga rollback probado.
+- DAG v2 usará un único modelo visual propio, entrenado desde cero con pesos iniciales aleatorios.
+- Secuencia obligatoria: 1) archivo y contrato; 2) navegador base; 3) calibración DEV; 4) dataset; 5) entrenamiento desde cero; 6) optimización Android; 7) modo sombra; 8) pruebas físicas y reentrenamiento; 9) canary; 10) retiro de DAG v1.
+- Cada fase necesita ticket y aprobación explícita. Este registro no autoriza iniciar el navegador base ni ninguna fase posterior.
 
 ### DAG-FOUNDATION-01 - Entrada, control y atajo seguro
 
