@@ -243,7 +243,7 @@ class DagBrowserViewModel
             }
         }
 
-        internal fun submitDagManualCalibrationCandidate(
+        internal fun submitDagProhibitedCalibrationCandidate(
             thumbnail: ByteArray,
             classification: DagImageClassification,
         ) {
@@ -251,31 +251,34 @@ class DagBrowserViewModel
             viewModelScope.launch(Dispatchers.IO) {
                 val activation = activationRepository.currentActivation() ?: return@launch
                 runCatching {
-                    calibrationRepository.submitManualBlock(activation.deviceId, thumbnail, classification)
+                    calibrationRepository.submitBinaryLabel(
+                        activation.deviceId,
+                        thumbnail,
+                        classification,
+                        DagCalibrationLabel.Block,
+                    )
                 }.onSuccess { result ->
                     mutableState.update {
                         it.copy(
                             message =
                                 when (result) {
                                     DagCalibrationDeliveryResult.Accepted ->
-                                        "Foto marcada para revisar en Calibración DAG."
+                                        "Foto marcada como prohibida para la próxima calibración."
                                     DagCalibrationDeliveryResult.Queued ->
                                         "Foto guardada; se enviará para revisión cuando vuelva la conexión."
                                     is DagCalibrationDeliveryResult.Rejected ->
-                                        "La foto quedó difuminada, pero el servidor no la agregó a revisión."
+                                        "No se pudo guardar la etiqueta de calibración."
                                 },
                         )
                     }
                 }.onFailure {
                     Log.d("DagCalibration", "manual_report_upload_failed")
-                    mutableState.update {
-                        it.copy(message = "La foto quedó difuminada, pero no se pudo enviar para revisión.")
-                    }
+                    mutableState.update { it.copy(message = "No se pudo guardar la etiqueta de calibración.") }
                 }
             }
         }
 
-        internal fun submitDagManualBlurReviewCandidate(
+        internal fun submitDagAllowedCalibrationCandidate(
             thumbnail: ByteArray,
             classification: DagImageClassification,
         ) {
@@ -288,14 +291,19 @@ class DagBrowserViewModel
             viewModelScope.launch(Dispatchers.IO) {
                 val activation = activationRepository.currentActivation() ?: return@launch
                 runCatching {
-                    calibrationRepository.submitManualBlurReview(activation.deviceId, thumbnail, classification)
+                    calibrationRepository.submitBinaryLabel(
+                        activation.deviceId,
+                        thumbnail,
+                        classification,
+                        DagCalibrationLabel.Allow,
+                    )
                 }.onSuccess { result ->
                     mutableState.update {
                         it.copy(
                             message =
                                 when (result) {
                                     DagCalibrationDeliveryResult.Accepted ->
-                                        "Foto enviada para revisar un posible falso positivo."
+                                        "Foto marcada como permitida para la próxima calibración."
                                     DagCalibrationDeliveryResult.Queued ->
                                         "Foto guardada; se enviará para revisión cuando vuelva la conexión."
                                     is DagCalibrationDeliveryResult.Rejected ->
@@ -304,8 +312,8 @@ class DagBrowserViewModel
                         )
                     }
                 }.onFailure {
-                    Log.d("DagCalibration", "manual_blur_review_upload_failed")
-                    mutableState.update { it.copy(message = "No se pudo enviar la foto para revisión.") }
+                    Log.d("DagCalibration", "manual_allow_upload_failed")
+                    mutableState.update { it.copy(message = "No se pudo guardar la etiqueta de calibración.") }
                 }
             }
         }
@@ -571,6 +579,7 @@ class DagBrowserViewModel
                             pageStatus = DagPageStatus.Loading,
                             pageAnalysisReady = false,
                             viewportImagesReady = false,
+                            viewportImageProgress = 0f,
                             analysisProgress = 0.10f,
                             requestedUrl = url,
                             navigationRevision = it.navigationRevision + 1,
@@ -685,9 +694,12 @@ class DagBrowserViewModel
                 )
             }
             mutableState.update {
-                it.copy(viewportImagesReady = true, analysisProgress = maxOf(it.analysisProgress, 0.95f))
+                it.copy(
+                    viewportImagesReady = true,
+                    viewportImageProgress = 1f,
+                    analysisProgress = maxOf(it.analysisProgress, 0.95f),
+                )
             }
-            revealPageIfReady(url)
         }
 
         private fun logPageAnalysisReady(url: String) {
@@ -709,18 +721,18 @@ class DagBrowserViewModel
             if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
             val ratio = if (total <= 0) 1f else (resolved.toFloat() / total).coerceIn(0f, 1f)
             val progress = (0.65f + ratio * 0.30f).coerceAtMost(0.95f)
-            mutableState.update { it.copy(analysisProgress = maxOf(it.analysisProgress, progress)) }
+            mutableState.update {
+                it.copy(
+                    viewportImageProgress = ratio,
+                    analysisProgress = maxOf(it.analysisProgress, progress),
+                )
+            }
         }
 
         private fun revealPageIfReady(url: String) {
             var revealed = false
             mutableState.update { state ->
-                if (
-                    state.requestedUrl == url &&
-                    state.pageAnalysisReady &&
-                    state.viewportImagesReady &&
-                    state.pageStatus == DagPageStatus.Loading
-                ) {
+                if (dagPageCanReveal(url, state)) {
                     revealed = true
                     state.copy(pageStatus = DagPageStatus.Visible, analysisProgress = 1f)
                 } else {
@@ -1102,6 +1114,14 @@ class DagBrowserViewModel
         }
     }
 
+internal fun dagPageCanReveal(
+    url: String,
+    state: DagBrowserUiState,
+): Boolean =
+    state.requestedUrl == url &&
+        state.pageAnalysisReady &&
+        state.pageStatus == DagPageStatus.Loading
+
 internal fun dagCanLoadMoreResults(
     page: Int,
     providerHasMoreResults: Boolean,
@@ -1181,6 +1201,7 @@ internal fun DagBrowserUiState.toDagStart(): DagBrowserUiState =
         pageStatus = DagPageStatus.Idle,
         pageAnalysisReady = false,
         viewportImagesReady = false,
+        viewportImageProgress = 0f,
         results = emptyList(),
         searchQuery = "",
         searchPage = 0,
@@ -1201,6 +1222,7 @@ internal fun DagBrowserUiState.toDagResults(): DagBrowserUiState =
         pageStatus = DagPageStatus.Idle,
         pageAnalysisReady = false,
         viewportImagesReady = false,
+        viewportImageProgress = 0f,
         suggestions = emptyList(),
         requestedUrl = null,
         navigationRevision = navigationRevision + 1,

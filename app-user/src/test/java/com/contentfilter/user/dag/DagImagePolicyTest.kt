@@ -80,6 +80,8 @@ class DagImagePolicyTest {
                 version = 3,
                 professionalSafe = 0.05f,
                 professionalBlock = 0.05f,
+                maleFace = 0.01f,
+                maleBreastExposed = 0.01f,
                 femaleBreastCovered = 0.0022f,
                 sleevesAboveElbow = 0.01f,
             ).withSafeBounds()
@@ -87,6 +89,8 @@ class DagImagePolicyTest {
         assertEquals(3, calibration.version)
         assertEquals(0.05f, calibration.professionalSafe)
         assertEquals(0.35f, calibration.professionalBlock)
+        assertEquals(0.12f, calibration.maleFace)
+        assertEquals(0.25f, calibration.maleBreastExposed)
         assertEquals(0.08f, calibration.femaleBreastCovered)
         assertEquals(0.45f, calibration.sleevesAboveElbow)
     }
@@ -152,9 +156,8 @@ class DagImagePolicyTest {
             )
         val uncertain = allowed.copy(decision = DagImageDecision.Uncertain)
 
-        assertFalse(shouldCreateCalibrationThumbnail(allowed, calibrationRevealEnabled = false))
-        assertTrue(shouldCreateCalibrationThumbnail(uncertain, calibrationRevealEnabled = false))
-        assertTrue(shouldCreateCalibrationThumbnail(allowed, calibrationRevealEnabled = true))
+        assertFalse(shouldCreateCalibrationThumbnail(allowed))
+        assertTrue(shouldCreateCalibrationThumbnail(uncertain))
     }
 
     @Test
@@ -168,6 +171,20 @@ class DagImagePolicyTest {
         assertEquals(1, DagViewportReadinessPolicy.PreparedViewportCount)
         assertEquals(1, DagViewportReadinessPolicy.PrefetchViewportCount)
         assertTrue(DagViewportReadinessPolicy.VisualSettleMillis <= 300L)
+    }
+
+    @Test
+    fun `safe page becomes usable without waiting for all viewport images`() {
+        val state =
+            DagBrowserUiState(
+                requestedUrl = "https://example.com",
+                pageAnalysisReady = true,
+                viewportImagesReady = false,
+                pageStatus = DagPageStatus.Loading,
+            )
+
+        assertTrue(dagPageCanReveal("https://example.com", state))
+        assertFalse(dagPageCanReveal("https://other.example", state))
     }
 
     @Test

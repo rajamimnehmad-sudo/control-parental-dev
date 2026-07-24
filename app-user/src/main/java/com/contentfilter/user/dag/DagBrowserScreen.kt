@@ -35,6 +35,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -64,6 +65,7 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -661,6 +663,23 @@ private fun DagBrowserContent(
                         }
                     }
                 }
+                if (
+                    state.view == DagView.Browser &&
+                    state.pageStatus == DagPageStatus.Visible &&
+                    !state.viewportImagesReady
+                ) {
+                    LinearProgressIndicator(
+                        progress = { state.viewportImageProgress.coerceIn(0f, 1f) },
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .height(2.dp)
+                                .semantics {
+                                    stateDescription =
+                                        "${(state.viewportImageProgress * 100).toInt()} por ciento de imágenes visibles"
+                                },
+                    )
+                }
                 HorizontalDivider()
                 if (addressFocused && state.suggestions.isNotEmpty() && !analyzing) {
                     DagSearchSuggestions(state.suggestions, viewModel::selectSuggestion)
@@ -734,8 +753,8 @@ private fun DagBrowserContent(
                         onViewportImageProgress = viewModel::onViewportImageProgress,
                         onCalibrationCandidate = viewModel::submitDagCalibrationCandidate,
                         visualCalibrationEnabled = visualCalibrationEnabled,
-                        onManualCalibrationCandidate = viewModel::submitDagManualCalibrationCandidate,
-                        onManualBlurReviewCandidate = viewModel::submitDagManualBlurReviewCandidate,
+                        onManualCalibrationCandidate = viewModel::submitDagProhibitedCalibrationCandidate,
+                        onManualBlurReviewCandidate = viewModel::submitDagAllowedCalibrationCandidate,
                         onBlockedAction = viewModel::onBrowserBlockedAction,
                         onGeolocationPrompt = { origin, decision ->
                             if (origin in allowedGeolocationOrigins) {
@@ -807,7 +826,7 @@ private fun DagBrowserContent(
             title = { Text("¿Activar Calibración DEV?") },
             text = {
                 Text(
-                    "Sólo para pruebas: DAG recargará la página y mostrará todas las fotos originales sin difuminar. Usá X si una foto permitida debería bloquearse y R si una foto que DAG habría difuminado debería revisarse como posible falso positivo. Al desactivar el modo, se restaura la protección normal.",
+                    "Sólo para pruebas: marcá cada foto con ✓ Permitida o × Prohibida. La página no se recarga, la foto no cambia y la etiqueta se usa únicamente para preparar calibraciones futuras.",
                 )
             },
             confirmButton = {

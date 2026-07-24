@@ -34,12 +34,9 @@ class DagCalibrationRepository
                     val calibration = result.value.optJSONObject("calibration")
                     val thresholds = calibration?.optJSONObject("thresholds")
                     if (calibration != null && thresholds != null) {
-                        val decisions = result.value.optJSONObject("exact_decisions")
                         calibrationStore.save(
                             calibration.optLong("version_number", 0),
                             thresholds,
-                            decisions?.stringSet("allow").orEmpty(),
-                            decisions?.stringSet("block").orEmpty(),
                         )
                     } else {
                         calibrationStore.clear()
@@ -50,8 +47,6 @@ class DagCalibrationRepository
         }
 
         internal fun currentVersion(): Long = calibrationStore.current().version
-
-        internal fun exactDecision(imageHash: String): DagImageDecision? = calibrationStore.exactDecision(imageHash)
 
         internal suspend fun submitReview(
             deviceId: String,
@@ -78,10 +73,11 @@ class DagCalibrationRepository
             return enqueueAndDeliver(payload)
         }
 
-        internal suspend fun submitManualBlock(
+        internal suspend fun submitBinaryLabel(
             deviceId: String,
             thumbnail: ByteArray,
             classification: DagImageClassification,
+            decision: DagCalibrationLabel,
         ): DagCalibrationDeliveryResult {
             if (classification.scores.isEmpty()) return DagCalibrationDeliveryResult.Rejected("missing_scores")
             val hash = thumbnail.dagCalibrationHash()
@@ -89,35 +85,13 @@ class DagCalibrationRepository
             classification.scores.forEach { (name, score) -> scoreJson.put(name, score.toDouble()) }
             val payload =
                 JSONObject()
-                    .put("action", "submit_manual_block")
+                    .put("action", "submit_binary_label")
                     .put("device_id", deviceId)
                     .put("image_base64", Base64.encodeToString(thumbnail, Base64.NO_WRAP))
                     .put("image_hash", hash)
                     .put("model_version", DagProfessionalImageClassifier.ModelVersion)
                     .put("initial_decision", classification.decision.name.lowercase())
-                    .put("scores", scoreJson)
-                    .put("signals", classification.signals.toJsonArray())
-                    .put("calibration_version", classification.calibrationVersion)
-            return enqueueAndDeliver(payload)
-        }
-
-        internal suspend fun submitManualBlurReview(
-            deviceId: String,
-            thumbnail: ByteArray,
-            classification: DagImageClassification,
-        ): DagCalibrationDeliveryResult {
-            if (classification.scores.isEmpty()) return DagCalibrationDeliveryResult.Rejected("missing_scores")
-            val hash = thumbnail.dagCalibrationHash()
-            val scoreJson = JSONObject()
-            classification.scores.forEach { (name, score) -> scoreJson.put(name, score.toDouble()) }
-            val payload =
-                JSONObject()
-                    .put("action", "submit_manual_blur_review")
-                    .put("device_id", deviceId)
-                    .put("image_base64", Base64.encodeToString(thumbnail, Base64.NO_WRAP))
-                    .put("image_hash", hash)
-                    .put("model_version", DagProfessionalImageClassifier.ModelVersion)
-                    .put("initial_decision", classification.decision.name.lowercase())
+                    .put("review_decision", decision.remoteValue)
                     .put("scores", scoreJson)
                     .put("signals", classification.signals.toJsonArray())
                     .put("calibration_version", classification.calibrationVersion)
@@ -169,20 +143,7 @@ class DagCalibrationRepository
                 }
             }
 
-        private fun JSONObject.stringSet(name: String): Set<String> {
-            val values = optJSONArray(name) ?: return emptySet()
-            return buildSet {
-                for (index in 0 until values.length()) {
-                    values.optString(index).takeIf { it.matches(HashPattern) }?.let(::add)
-                }
-            }
-        }
-
         private fun Set<String>.toJsonArray() = org.json.JSONArray(sorted())
-
-        private companion object {
-            val HashPattern = Regex("^[0-9a-f]{64}$")
-        }
     }
 
 internal sealed interface DagCalibrationDeliveryResult {
@@ -191,6 +152,13 @@ internal sealed interface DagCalibrationDeliveryResult {
     data class Rejected(val reason: String) : DagCalibrationDeliveryResult
 
     data object Queued : DagCalibrationDeliveryResult
+}
+
+internal enum class DagCalibrationLabel(
+    val remoteValue: String,
+) {
+    Allow("allow"),
+    Block("block"),
 }
 
 internal fun dagCalibrationAcknowledgement(

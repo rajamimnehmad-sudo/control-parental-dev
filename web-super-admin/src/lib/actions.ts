@@ -66,15 +66,24 @@ const archiveSchema = z.object({ id: z.string().uuid() });
 const dagReviewSchema = z.object({
   reviewId: z.string().uuid(),
   decision: z.enum(["allow", "block"]),
-  reason: z.enum([
-    "acceptable_clothing", "product_without_person", "mannequin", "object_misclassified",
-    "false_positive", "allow_other", "pronounced_neckline", "exposed_shoulders",
-    "sleeves_above_elbow", "hem_above_knee", "tight_or_transparent", "swimwear",
-    "lingerie", "nudity", "block_other",
-  ]),
   note: z.string().trim().max(500).optional(),
 });
 const dagCalibrationIdSchema = z.object({ calibrationId: z.string().uuid() });
+const dagThresholdBounds = {
+  professional_safe: [0.05, 0.75],
+  professional_block: [0.35, 0.90],
+  female_face: [0.12, 0.65],
+  male_face: [0.12, 0.65],
+  male_breast_exposed: [0.25, 0.90],
+  female_breast_covered: [0.08, 0.65],
+  female_genitalia_covered: [0.08, 0.65],
+  buttocks_covered: [0.08, 0.65],
+  armpits_exposed: [0.08, 0.65],
+  belly_exposed: [0.08, 0.65],
+  explicit_region: [0.08, 0.65],
+  sleeves_above_elbow: [0.45, 0.95],
+  hem_above_knee: [0.45, 0.95],
+} as const;
 
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -307,7 +316,6 @@ export async function labelDagCalibrationReviewAction(_prevState: ActionState, f
   const parsed = dagReviewSchema.safeParse({
     reviewId: formValue(formData, "reviewId"),
     decision: formValue(formData, "decision"),
-    reason: formValue(formData, "reason"),
     note: formValue(formData, "note"),
   });
   if (!parsed.success) return { ok: false, message: "Completá la decisión y el motivo." };
@@ -315,7 +323,7 @@ export async function labelDagCalibrationReviewAction(_prevState: ActionState, f
   const { error } = await supabase.rpc("super_admin_label_dag_calibration_review", {
     target_review_id: parsed.data.reviewId,
     new_decision: parsed.data.decision,
-    new_reason: parsed.data.reason,
+    new_reason: null,
     new_note: parsed.data.note || null,
   });
   if (error) return errorState(error);
@@ -412,8 +420,9 @@ export async function prepareDagCalibrationAction(_prevState: ActionState): Prom
 
 type CalibrationReview = {
   review_id: string;
+  model_version: string;
   review_decision: "allow" | "block";
-  review_reason: string;
+  review_reason: string | null;
   scores: Record<string, number>;
 };
 
@@ -460,8 +469,49 @@ export async function activateDagCalibrationAction(_prevState: ActionState, form
   return { ok: true, message: "Calibración activada. Los dispositivos la recibirán en su próxima comprobación." };
 }
 
+export async function createManualDagCalibrationAction(_prevState: ActionState, formData: FormData): Promise<ActionState> {
+  void _prevState;
+  const modelVersion = formValue(formData, "modelVersion");
+  if (!modelVersion || modelVersion.length > 120) return { ok: false, message: "Modelo inválido." };
+  const thresholds: Record<string, number> = {};
+  for (const [key, [minimum, maximum]] of Object.entries(dagThresholdBounds)) {
+    const value = Number(formValue(formData, key));
+    if (!Number.isFinite(value) || value < minimum || value > maximum) {
+      return { ok: false, message: `${key} debe estar entre ${minimum} y ${maximum}.` };
+    }
+    thresholds[key] = round4(value);
+  }
+  if (thresholds.professional_safe >= thresholds.professional_block) {
+    return { ok: false, message: "El umbral permitido de NSFW debe ser menor que el umbral prohibido." };
+  }
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("super_admin_list_dag_calibration_reviews", {
+    requested_status: "reviewed",
+    max_rows: 500,
+  });
+  if (error) return errorState(error);
+  const reviews = ((data ?? []) as CalibrationReview[]).filter((review) => review.model_version === modelVersion);
+  const metrics = evaluateCalibration(reviews, thresholds);
+  const { error: createError } = await supabase.rpc("super_admin_create_dag_calibration", {
+    new_thresholds: thresholds,
+    new_metrics: {
+      reviewed: reviews.length,
+      false_positive: metrics.falsePositive,
+      false_negative: metrics.falseNegative,
+      weighted_error: metrics.weightedError,
+      manual_proposal: true,
+    },
+    calibration_model_version: modelVersion,
+    calibration_explanation:
+      "Propuesta manual creada desde Super Web. No cambia los teléfonos hasta su activación explícita.",
+  });
+  if (createError) return errorState(createError);
+  revalidatePath("/dag-calibration");
+  return { ok: true, message: "Propuesta manual guardada. Revisá las métricas antes de activarla." };
+}
+
 function bestThreshold(
-  reviews: Array<{ review_decision: "allow" | "block"; review_reason: string; scores: Record<string, number> }>,
+  reviews: Array<{ review_decision: "allow" | "block"; review_reason: string | null; scores: Record<string, number> }>,
   key: string,
   fallback: number,
   relevantBlockReasons?: string[],
@@ -470,7 +520,7 @@ function bestThreshold(
   // and other objects). A blocked example only trains the detector that matches the
   // human reason, so a neckline label cannot accidentally lower the sleeve threshold.
   const relevantReviews = relevantBlockReasons
-    ? reviews.filter((review) => review.review_decision === "allow" || relevantBlockReasons.includes(review.review_reason))
+    ? reviews.filter((review) => review.review_decision === "allow" || relevantBlockReasons.includes(review.review_reason ?? ""))
     : reviews;
   const samples = relevantReviews.flatMap((review) => {
     const score = review.scores?.[key];
@@ -486,7 +536,7 @@ function bestThreshold(
 }
 
 function boundedBestThreshold(
-  reviews: Array<{ review_decision: "allow" | "block"; review_reason: string; scores: Record<string, number> }>,
+  reviews: Array<{ review_decision: "allow" | "block"; review_reason: string | null; scores: Record<string, number> }>,
   key: string,
   fallback: number,
   minimum: number,

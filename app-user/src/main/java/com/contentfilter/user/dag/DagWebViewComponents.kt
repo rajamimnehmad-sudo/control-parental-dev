@@ -163,10 +163,8 @@ internal fun DagWebContent(
     LaunchedEffect(webView, visualCalibrationEnabled) {
         val view = webView
         if (imageLoader.setDevCalibrationRevealEnabled(visualCalibrationEnabled)) {
-            view?.url?.takeIf { it.startsWith("https://", ignoreCase = true) }?.let {
-                view.settings.blockNetworkImage = true
-                view.reload()
-            }
+            view?.setDagVisualCalibrationMode(visualCalibrationEnabled)
+            view?.setDagImageCalibrationDecisions(imageLoader.manualCalibrationDecisions())
         } else if (state.pageStatus == DagPageStatus.Visible) {
             view?.setDagVisualCalibrationMode(visualCalibrationEnabled)
         }
@@ -216,7 +214,7 @@ internal fun DagWebContent(
                                 when (action) {
                                     DagCalibrationActionBlock ->
                                         currentManualCalibrationCandidate(candidate.thumbnail, candidate.classification)
-                                    DagCalibrationActionReviewBlur ->
+                                    DagCalibrationActionAllow ->
                                         currentManualBlurReviewCandidate(
                                             candidate.thumbnail,
                                             candidate.classification,
@@ -388,7 +386,7 @@ private fun WebView.configureDagSettings(
                 calibrationDecision(imageUrl)?.let { view.setDagImageCalibrationDecision(imageUrl, it) }
                 return@addWebMessageListener
             }
-            if (action == DagCalibrationActionBlock || action == DagCalibrationActionReviewBlur) {
+            if (action == DagCalibrationActionBlock || action == DagCalibrationActionAllow) {
                 onManualImageReported(action, imageUrl)
             }
         }
@@ -784,11 +782,31 @@ private fun WebView.sanitizeAndExtractVisibleText(
             if (!image) return;
             dagBlurIntimateImage(image);
             dagApplyExtraKosherImage(image);
-            var lazy = image.getAttribute('loading') === 'lazy' ||
-              image.hasAttribute('data-src') || image.hasAttribute('data-lazy-src') ||
-              image.hasAttribute('data-srcset') || image.hasAttribute('data-lazy-srcset') ||
-              image.hasAttribute('data-dag-held-src');
-            if (lazy && window.IntersectionObserver && image.getAttribute('data-dag-image-ready') !== 'true') {
+            if (window.IntersectionObserver && image.getAttribute('data-dag-image-ready') !== 'true') {
+              var heldSource = dagHttpsImageSource(image);
+              if (!heldSource) {
+                image.style.setProperty('visibility', 'hidden', 'important');
+                image.setAttribute('data-dag-image-terminal', 'unavailable');
+                return;
+              }
+              var heldRect;
+              try { heldRect = image.getBoundingClientRect(); } catch (_) {}
+              var declaredWidth = parseFloat(image.getAttribute('width') || '0');
+              var declaredHeight = parseFloat(image.getAttribute('height') || '0');
+              if (declaredWidth > 0 && declaredHeight > 0) {
+                image.style.setProperty('aspect-ratio', declaredWidth + ' / ' + declaredHeight);
+              } else if (heldRect && heldRect.width >= 24 && heldRect.height >= 24) {
+                image.style.setProperty('aspect-ratio', heldRect.width + ' / ' + heldRect.height);
+              }
+              image.setAttribute('data-dag-held-src', heldSource);
+              image.removeAttribute('src');
+              image.removeAttribute('srcset');
+              var heldPicture = image.closest && image.closest('picture');
+              heldPicture && heldPicture.querySelectorAll('source').forEach(function(source) {
+                source.removeAttribute('srcset');
+                source.removeAttribute('data-srcset');
+                source.removeAttribute('data-lazy-srcset');
+              });
               if (!window.__dagImageObserver) {
                 var dagPrefetchMargin = Math.max(
                   (window.innerHeight || 0) * ${DagViewportReadinessPolicy.PrefetchViewportCount},
@@ -1035,28 +1053,29 @@ private fun WebView.sanitizeAndExtractVisibleText(
                 }
                 return;
               }
-              var reviewBlur = decision !== 'allowed' || image.getAttribute('data-dag-kosher-blurred') === 'true';
-              var marker = document.createElement('button');
-              marker.type = 'button';
+              var marker = document.createElement('div');
               marker.setAttribute('data-dag-calibration-marker', 'true');
-              marker.setAttribute('aria-label', reviewBlur ? 'Revisar posible falso positivo' : 'Marcar foto como inapropiada');
-              marker.textContent = reviewBlur ? 'R' : '×';
-              marker.style.cssText = 'position:fixed;z-index:2147483647;width:34px;height:34px;border:2px solid white;border-radius:17px;background:' + (reviewBlur ? '#087f8c' : '#d71920') + ';color:white;font:700 ' + (reviewBlur ? '17px/29px' : '25px/27px') + ' sans-serif;padding:0;box-shadow:0 2px 7px rgba(0,0,0,.55);';
-              marker.style.left = Math.max(4, rect.right - 38) + 'px';
+              marker.style.cssText = 'position:fixed;z-index:2147483647;display:flex;gap:4px;padding:3px;border-radius:20px;background:rgba(15,23,42,.82);box-shadow:0 2px 7px rgba(0,0,0,.55);';
+              marker.style.left = Math.max(4, rect.right - 78) + 'px';
               marker.style.top = Math.max(4, rect.top + 4) + 'px';
-              marker.addEventListener('click', function(event) {
-                event.preventDefault();
-                event.stopPropagation();
-                image.setAttribute('data-dag-manually-blocked', 'true');
-                if (!reviewBlur) {
-                  image.style.setProperty('filter', 'blur(48px) saturate(0.05) brightness(0.82)', 'important');
-                  image.style.setProperty('transform', 'scale(1.14)', 'important');
-                }
-                marker.remove();
-                try {
-                  window.$DagCalibrationBridgeName.postMessage(JSON.stringify({ action: reviewBlur ? 'review_blur' : 'block', url: source }));
-                } catch (_) {}
-              }, true);
+              function addCalibrationButton(label, action, color, ariaLabel) {
+                var button = document.createElement('button');
+                button.type = 'button';
+                button.setAttribute('aria-label', ariaLabel);
+                button.textContent = label;
+                button.style.cssText = 'width:32px;height:32px;border:2px solid white;border-radius:16px;background:' + color + ';color:white;font:700 18px/27px sans-serif;padding:0;';
+                button.addEventListener('click', function(event) {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  marker.remove();
+                  try {
+                    window.$DagCalibrationBridgeName.postMessage(JSON.stringify({ action: action, url: source }));
+                  } catch (_) {}
+                }, true);
+                marker.appendChild(button);
+              }
+              addCalibrationButton('✓', 'allow', '#087f5b', 'Marcar foto como permitida para calibración');
+              addCalibrationButton('×', 'block', '#d71920', 'Marcar foto como prohibida para calibración');
               document.body.appendChild(marker);
             });
           };
@@ -1263,4 +1282,4 @@ private const val DagCaptchaSessionStart = "captcha_session_start"
 private const val DagCaptchaSessionDurationMillis = 120_000L
 private const val DagCalibrationActionProbe = "probe"
 private const val DagCalibrationActionBlock = "block"
-private const val DagCalibrationActionReviewBlur = "review_blur"
+private const val DagCalibrationActionAllow = "allow"

@@ -2,7 +2,12 @@
 
 import { BrainCircuit, Loader2, RotateCcw, Trash2 } from "lucide-react";
 import { useActionState } from "react";
-import { activateDagCalibrationAction, clearDagCalibrationReviewsAction, prepareDagCalibrationAction } from "@/lib/actions";
+import {
+  activateDagCalibrationAction,
+  clearDagCalibrationReviewsAction,
+  createManualDagCalibrationAction,
+  prepareDagCalibrationAction,
+} from "@/lib/actions";
 import { emptyState } from "@/lib/action-state";
 
 export function PrepareDagCalibrationButton() {
@@ -48,6 +53,63 @@ export function ActivateDagCalibrationButton({ calibrationId, active }: { calibr
       <button className="button button-secondary" disabled={pending}>
         {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />} Activar
       </button>
+      {state.message ? <p className={state.ok ? "text-xs text-teal-700" : "text-xs text-danger"}>{state.message}</p> : null}
+    </form>
+  );
+}
+
+const editableThresholds = [
+  ["professional_safe", "NSFW permitido", 0.05, 0.75, 0.15],
+  ["professional_block", "NSFW prohibido", 0.35, 0.90, 0.65],
+  ["female_face", "Contexto femenino", 0.12, 0.65, 0.30],
+  ["male_face", "Contexto masculino", 0.12, 0.65, 0.30],
+  ["male_breast_exposed", "Torso masculino", 0.25, 0.90, 0.55],
+  ["female_breast_covered", "Pecho o escote", 0.08, 0.65, 0.18],
+  ["female_genitalia_covered", "Zona íntima cubierta", 0.08, 0.65, 0.18],
+  ["buttocks_covered", "Glúteos cubiertos", 0.08, 0.65, 0.18],
+  ["armpits_exposed", "Hombros expuestos", 0.08, 0.65, 0.20],
+  ["belly_exposed", "Abdomen expuesto", 0.08, 0.65, 0.20],
+  ["explicit_region", "Región explícita", 0.08, 0.65, 0.20],
+  ["sleeves_above_elbow", "Manga sobre el codo", 0.45, 0.95, 0.72],
+  ["hem_above_knee", "Largo sobre la rodilla", 0.45, 0.95, 0.72],
+] as const;
+
+export function ManualDagCalibrationForm({
+  modelVersion,
+  thresholds,
+}: {
+  modelVersion: string;
+  thresholds: Record<string, number>;
+}) {
+  const [state, action, pending] = useActionState(createManualDagCalibrationAction, emptyState);
+  return (
+    <form action={action} className="grid gap-4">
+      <input type="hidden" name="modelVersion" value={modelVersion} />
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        {editableThresholds.map(([key, label, minimum, maximum, fallback]) => (
+          <label key={key} className="grid gap-1 rounded-md border border-line bg-slate-50 p-3 text-sm font-semibold text-ink">
+            <span>{label}</span>
+            <input
+              className="input"
+              name={key}
+              type="number"
+              min={minimum}
+              max={maximum}
+              step="0.01"
+              defaultValue={thresholds[key] ?? fallback}
+              required
+            />
+            <span className="text-xs font-normal text-slate-500">Rango seguro: {minimum}–{maximum}</span>
+          </label>
+        ))}
+      </div>
+      <div className="flex flex-wrap items-center gap-3">
+        <button className="button button-secondary" disabled={pending}>
+          {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <BrainCircuit className="h-4 w-4" />}
+          {pending ? "Calculando impacto" : "Guardar propuesta manual"}
+        </button>
+        <p className="text-xs text-slate-500">Guardar no activa los valores en los teléfonos.</p>
+      </div>
       {state.message ? <p className={state.ok ? "text-xs text-teal-700" : "text-xs text-danger"}>{state.message}</p> : null}
     </form>
   );
