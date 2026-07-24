@@ -1,0 +1,2 @@
+DAG permite usar la página mientras analiza las fotos visibles y muestra cada imagen segura apenas termina, sin que una imagen lenta bloquee todo.
+Calibración DAG ahora permite marcar rápidamente cada muestra con ✓ o ×, propone ajustes automáticos por lotes y mantiene la activación manual desde Super Web.
