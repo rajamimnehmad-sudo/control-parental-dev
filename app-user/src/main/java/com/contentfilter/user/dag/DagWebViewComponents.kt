@@ -137,6 +137,12 @@ internal fun DagWebContent(
             ) {
                 loadedNavigationRevision = state.navigationRevision
                 view.settings.blockNetworkImage = true
+                val performanceProbe =
+                    BuildConfig.DEBUG &&
+                        runCatching { Uri.parse(url).getQueryParameter("codexperf") != null }.getOrDefault(false)
+                view.settings.cacheMode =
+                    if (performanceProbe) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
+                if (performanceProbe) view.clearCache(true)
                 if (view.url == url) view.reload() else view.loadUrl(url)
             }
         }

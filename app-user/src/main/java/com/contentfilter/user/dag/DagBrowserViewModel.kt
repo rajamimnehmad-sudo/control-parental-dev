@@ -629,6 +629,7 @@ class DagBrowserViewModel
                     if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return@withContext
                     when (pageDecision) {
                         DagAdaptivePageDecision.Allowed -> {
+                            logPageAnalysisReady(url)
                             mutableState.update {
                                 it.copy(
                                     address = url,
@@ -661,6 +662,7 @@ class DagBrowserViewModel
         ) {
             if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
             if (recordHistory) viewModelScope.launch(Dispatchers.IO) { historyStore.addPage(url, title) }
+            logPageAnalysisReady(url)
             mutableState.update {
                 it.copy(
                     address = url,
@@ -675,10 +677,28 @@ class DagBrowserViewModel
 
         fun onViewportImagesReady(url: String) {
             if (url != mutableState.value.requestedUrl || !mutableState.value.dagEnabled) return
+            if (!mutableState.value.viewportImagesReady) {
+                Log.d(
+                    PerformanceLogTag,
+                    "viewport_images_ready elapsed_ms=" +
+                        (SystemClock.elapsedRealtime() - pageAnalysisStartedAtMillis),
+                )
+            }
             mutableState.update {
                 it.copy(viewportImagesReady = true, analysisProgress = maxOf(it.analysisProgress, 0.95f))
             }
             revealPageIfReady(url)
+        }
+
+        private fun logPageAnalysisReady(url: String) {
+            val state = mutableState.value
+            if (state.requestedUrl == url && !state.pageAnalysisReady) {
+                Log.d(
+                    PerformanceLogTag,
+                    "page_analysis_ready elapsed_ms=" +
+                        (SystemClock.elapsedRealtime() - pageAnalysisStartedAtMillis),
+                )
+            }
         }
 
         fun onViewportImageProgress(
