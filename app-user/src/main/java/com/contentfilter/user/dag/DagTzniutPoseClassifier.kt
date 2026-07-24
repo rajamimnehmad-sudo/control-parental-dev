@@ -23,41 +23,78 @@ internal data class DagTzniutPoseScores(
     val hemAboveKnee: Float = 0f,
 )
 
+internal data class DagHumanPresenceEvidence(
+    val confidentKeypoints: Int = 0,
+    val probableSkinRatio: Float = 1f,
+) {
+    val definitelyAbsent: Boolean
+        get() = confidentKeypoints < MinimumHumanKeypoints && probableSkinRatio < MaximumAbsentSkinRatio
+
+    private companion object {
+        const val MinimumHumanKeypoints = 2
+        const val MaximumAbsentSkinRatio = 0.0025f
+    }
+}
+
+internal data class DagTzniutPoseAnalysis(
+    val scores: DagTzniutPoseScores = DagTzniutPoseScores(),
+    val humanPresence: DagHumanPresenceEvidence = DagHumanPresenceEvidence(),
+)
+
 internal class DagTzniutPoseClassifier(
     context: Context,
 ) : Closeable {
     private val applicationContext = context.applicationContext
     private var interpreter: Interpreter? = null
 
-    fun classify(bitmap: Bitmap): DagTzniutPoseScores {
+    fun analyze(bitmap: Bitmap): DagTzniutPoseAnalysis {
         val startedAt = SystemClock.elapsedRealtime()
-        val scores =
+        val analysis =
             runCatching {
                 val inputBitmap = bitmap.resizeWithPadding(InputSize)
                 try {
                     val pose = detectPose(inputBitmap)
-                    DagTzniutPoseScores(
-                        sleevesAboveElbow =
-                            maxOf(
-                                pose.armExposure(inputBitmap, true),
-                                pose.armExposure(inputBitmap, false),
+                    DagTzniutPoseAnalysis(
+                        scores =
+                            DagTzniutPoseScores(
+                                sleevesAboveElbow =
+                                    maxOf(
+                                        pose.armExposure(inputBitmap, true),
+                                        pose.armExposure(inputBitmap, false),
+                                    ),
+                                hemAboveKnee =
+                                    maxOf(
+                                        pose.legExposure(inputBitmap, true),
+                                        pose.legExposure(inputBitmap, false),
+                                    ),
                             ),
-                        hemAboveKnee =
-                            maxOf(
-                                pose.legExposure(inputBitmap, true),
-                                pose.legExposure(inputBitmap, false),
+                        humanPresence =
+                            DagHumanPresenceEvidence(
+                                confidentKeypoints =
+                                    pose.keypoints.count { keypoint ->
+                                        keypoint.score >= HumanPresenceKeypointConfidence
+                                    },
+                                probableSkinRatio = bitmap.probableSkinRatio(),
                             ),
                     )
                 } finally {
                     inputBitmap.recycle()
                 }
-            }.getOrDefault(DagTzniutPoseScores())
+            }.getOrDefault(DagTzniutPoseAnalysis())
         Log.d(
             MetricsTag,
-            "pose_elapsed_ms=${SystemClock.elapsedRealtime() - startedAt} sleeves=${scores.sleevesAboveElbow} " +
-                "hem=${scores.hemAboveKnee}",
+            "pose_elapsed_ms=${SystemClock.elapsedRealtime() - startedAt} " +
+                "keypoints=${analysis.humanPresence.confidentKeypoints} " +
+                "skin=${analysis.humanPresence.probableSkinRatio} " +
+                "sleeves=${analysis.scores.sleevesAboveElbow} hem=${analysis.scores.hemAboveKnee}",
         )
-        return scores
+        return analysis
+    }
+
+    fun classify(bitmap: Bitmap): DagTzniutPoseScores = analyze(bitmap).scores
+
+    fun prepare() {
+        model()
     }
 
     override fun close() {
@@ -164,6 +201,19 @@ internal class DagTzniutPoseClassifier(
         return if (sampled == 0) 0f else skin.toFloat() / sampled
     }
 
+    private fun Bitmap.probableSkinRatio(): Float {
+        val sampleStep = maxOf(1, sqrt((width * height) / MaximumPresenceSamples.toFloat()).toInt())
+        var skin = 0
+        var sampled = 0
+        for (y in 0 until height step sampleStep) {
+            for (x in 0 until width step sampleStep) {
+                sampled += 1
+                if (getPixel(x, y).isProbableSkin()) skin += 1
+            }
+        }
+        return if (sampled == 0) 1f else skin.toFloat() / sampled
+    }
+
     private fun Bitmap.resizeWithPadding(size: Int): Bitmap {
         val output = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val scale = minOf(size.toFloat() / width, size.toFloat() / height)
@@ -229,7 +279,9 @@ internal class DagTzniutPoseClassifier(
         const val LeftAnkle = 15
         const val RightAnkle = 16
         const val MinimumKeypointConfidence = 0.48f
+        const val HumanPresenceKeypointConfidence = 0.20f
         const val MinimumSkinRatio = 0.58f
+        const val MaximumPresenceSamples = 4_096
         const val SegmentSamples = 7
         const val MinimumSampleRadius = 2f
         const val SampleRadiusRatio = 0.08f

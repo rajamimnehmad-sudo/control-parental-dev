@@ -56,6 +56,19 @@ internal fun dagEnsembleImageDecision(
     legacy: DagImageDecision,
 ): DagImageDecision = if (professional != DagImageDecision.Uncertain) professional else legacy
 
+internal fun dagShouldRunModestyFilter(
+    ensembleDecision: DagImageDecision,
+    professionalDecision: DagImageDecision,
+    audienceContext: DagImageAudienceContext,
+    humanPresence: DagHumanPresenceEvidence?,
+): Boolean =
+    ensembleDecision != DagImageDecision.Blocked &&
+        !(
+            professionalDecision == DagImageDecision.Allowed &&
+                audienceContext == DagImageAudienceContext.Unknown &&
+                humanPresence?.definitelyAbsent == true
+        )
+
 internal class DagImageClassifier(
     context: Context,
 ) : Closeable {
@@ -74,6 +87,7 @@ internal class DagImageClassifier(
             runCatching {
                 professionalClassifier.prepare()
                 modestyClassifier.prepare()
+                tzniutPoseClassifier.prepare()
             }
         }
     }
@@ -111,8 +125,28 @@ internal class DagImageClassifier(
                         legacyScore = output[0][UnsafeOutputIndex]
                         dagEnsembleImageDecision(professional.decision, dagImageDecision(legacyScore, calibration))
                     }
+                var poseAnalysis: DagTzniutPoseAnalysis? = null
+                if (
+                    ensembleDecision != DagImageDecision.Blocked &&
+                    professional.decision == DagImageDecision.Allowed
+                ) {
+                    decodeForPose(bytes)?.let { poseBitmap ->
+                        try {
+                            poseAnalysis = tzniutPoseClassifier.analyze(poseBitmap)
+                        } finally {
+                            poseBitmap.recycle()
+                        }
+                    }
+                }
+                val runModestyFilter =
+                    dagShouldRunModestyFilter(
+                        ensembleDecision = ensembleDecision,
+                        professionalDecision = professional.decision,
+                        audienceContext = audienceContext,
+                        humanPresence = poseAnalysis?.humanPresence,
+                    )
                 var modestyScores =
-                    if (ensembleDecision != DagImageDecision.Blocked) {
+                    if (runModestyFilter) {
                         modestyClassifier.classify(
                             bitmap,
                         )
@@ -123,14 +157,26 @@ internal class DagImageClassifier(
                     modestyScores != null &&
                     modestyScores.femaleFace >= calibration.femaleFace * PoseFemaleContextRatio
                 ) {
-                    decodeForPose(bytes)?.let { poseBitmap ->
-                        try {
-                            modestyScores = modestyScores.withTzniutPose(tzniutPoseClassifier.classify(poseBitmap))
-                        } finally {
-                            poseBitmap.recycle()
-                        }
+                    val poseScores =
+                        poseAnalysis?.scores
+                            ?: decodeForPose(bytes)?.let { poseBitmap ->
+                                try {
+                                    tzniutPoseClassifier.classify(poseBitmap)
+                                } finally {
+                                    poseBitmap.recycle()
+                                }
+                            }
+                    poseScores?.let {
+                        modestyScores = modestyScores.withTzniutPose(it)
                     }
                 }
+                val filter1Status =
+                    when {
+                        ensembleDecision == DagImageDecision.Blocked -> "blocked"
+                        runModestyFilter -> "full"
+                        else -> "skip"
+                    }
+                val humanPresence = poseAnalysis?.humanPresence
                 val modestyDecision =
                     modestyScores?.let { dagModestyImageDecision(it, calibration, audienceContext) }
                         ?: DagImageDecision.Allowed
@@ -147,6 +193,8 @@ internal class DagImageClassifier(
                     "decision=${decision.name.lowercase()} elapsed_ms=" +
                         (SystemClock.elapsedRealtime() - classificationStartedAt) +
                         " fallback=${legacyScore != null} modesty=${modestyDecision.name.lowercase()} " +
+                        "filter1=$filter1Status keypoints=${humanPresence?.confidentKeypoints ?: -1} " +
+                        "skin=${humanPresence?.probableSkinRatio ?: -1f} " +
                         "audience=${audienceContext.name.lowercase()}",
                 )
                 val scores =
