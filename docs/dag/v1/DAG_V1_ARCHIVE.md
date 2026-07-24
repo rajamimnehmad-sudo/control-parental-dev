@@ -195,11 +195,15 @@ Cheeky queda limitada por la cola visual. Un prefiltro previo fue descartado por
 
 El rollback de código debe preservar datos y usar una nueva versión Android; no se debe desinstalar la app ni borrar datos.
 
+Primero hay que ubicarse en una rama que contenga este manifiesto y el verificador. El script valida directamente los objetos almacenados en el commit fuente, independientemente de que los archivos de DAG v1 existan, hayan cambiado o hayan sido retirados del working tree actual.
+
 ```bash
-git fetch origin
-git worktree add ../content-filter-dag-v1-rollback 486c564be62ab336cfc815b223343b9419370f14
-cd ../content-filter-dag-v1-rollback
+git switch codex/dag-v1-archive-v2-contract-01
+git pull --ff-only
 bash scripts/dag/verify-dag-v1-archive.sh
+
+git worktree add --detach ../content-filter-dag-v1-rollback 486c564be62ab336cfc815b223343b9419370f14
+cd ../content-filter-dag-v1-rollback
 git switch -c codex/dag-v1-rollback-486c564
 ```
 

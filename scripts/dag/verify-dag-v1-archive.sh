@@ -22,6 +22,7 @@ python3 - "$repo_root" "$manifest" <<'PY'
 import hashlib
 import json
 import pathlib
+import re
 import subprocess
 import sys
 
@@ -35,7 +36,7 @@ except (OSError, json.JSONDecodeError) as error:
     raise SystemExit(1)
 
 source_commit = manifest.get("source_commit")
-if not isinstance(source_commit, str) or len(source_commit) != 40:
+if not isinstance(source_commit, str) or re.fullmatch(r"[0-9a-f]{40}", source_commit) is None:
     print("ERROR: manifest source_commit is missing or invalid.", file=sys.stderr)
     raise SystemExit(1)
 
@@ -78,22 +79,41 @@ for section, entry in entries:
         failures.append(f"{section}: malformed manifest entry: {entry!r}")
         continue
 
-    candidate = (root / relative_path).resolve()
-    try:
-        candidate.relative_to(root)
-    except ValueError:
-        failures.append(f"{relative_path}: path escapes repository root")
-        continue
-    if not candidate.is_file():
-        failures.append(f"{relative_path}: file is missing")
+    archive_path = pathlib.PurePosixPath(relative_path)
+    if (
+        archive_path.is_absolute()
+        or archive_path.as_posix() != relative_path
+        or any(part in (".", "..") for part in archive_path.parts)
+        or "\\" in relative_path
+        or "\x00" in relative_path
+        or "\n" in relative_path
+        or "\r" in relative_path
+    ):
+        failures.append(f"{relative_path}: path is not a safe repository-relative path")
         continue
 
     digest = hashlib.sha256()
     actual_size = 0
-    with candidate.open("rb") as source:
+    process = subprocess.Popen(
+        ["git", "-C", str(root), "cat-file", "blob", f"{source_commit}:{relative_path}"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    assert process.stdout is not None
+    assert process.stderr is not None
+    with process.stdout as source:
         for block in iter(lambda: source.read(1024 * 1024), b""):
             actual_size += len(block)
             digest.update(block)
+    git_error = process.stderr.read().decode("utf-8", errors="replace").strip()
+    return_code = process.wait()
+    if return_code != 0:
+        detail = f": {git_error}" if git_error else ""
+        failures.append(
+            f"{relative_path}: file is missing or is not a blob in source commit "
+            f"{source_commit}{detail}"
+        )
+        continue
     actual_hash = digest.hexdigest()
 
     mismatch = False
@@ -118,7 +138,7 @@ if failures:
 
 external_count = len(manifest.get("external_models", []))
 print(
-    f"DAG v1 archive verified: {verified} repository files match size and SHA-256; "
+    f"DAG v1 archive verified: {verified} files stored in source commit match size and SHA-256; "
     f"source commit {source_commit} is available."
 )
 if external_count:
