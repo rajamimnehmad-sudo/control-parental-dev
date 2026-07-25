@@ -6,6 +6,7 @@ import android.net.http.SslError
 import android.os.Handler
 import android.os.Looper
 import android.webkit.ClientCertRequest
+import android.webkit.ConsoleMessage
 import android.webkit.CookieManager
 import android.webkit.HttpAuthHandler
 import android.webkit.PermissionRequest
@@ -48,6 +49,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -66,14 +68,14 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
-import org.json.JSONArray
-import org.json.JSONObject
 
 @Composable
 internal fun DagV2LabScreen(
     coordinator: DagV2BrowserCoordinator,
     metrics: DagV2Metrics,
     resourceRouter: DagV2ResourceRouter,
+    serviceWorkerRouter: DagV2ServiceWorkerRouter,
+    pageAnalyzer: DagV2PageAnalyzer,
 ) {
     val state by coordinator.state.collectAsStateWithLifecycle()
     val metricSnapshot by metrics.snapshot.collectAsStateWithLifecycle()
@@ -135,6 +137,22 @@ internal fun DagV2LabScreen(
             style = MaterialTheme.typography.bodySmall,
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
+        TextButton(
+            onClick = {
+                val enabled = !state.noCacheMode
+                val currentUrl = state.requestedUrl
+                coordinator.setNoCacheMode(enabled)
+                serviceWorkerRouter.setNoCacheMode(enabled)
+                webView?.apply {
+                    settings.cacheMode = if (enabled) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
+                    if (enabled) clearCache(true)
+                }
+                if (enabled && currentUrl != null) coordinator.navigate(currentUrl)
+            },
+            modifier = Modifier.padding(horizontal = 8.dp),
+        ) {
+            Text(if (state.noCacheMode) "Sin caché DEV: activo" else "Sin caché DEV: inactivo")
+        }
         state.blockedMessage?.let {
             Text(
                 text = it,
@@ -168,7 +186,9 @@ internal fun DagV2LabScreen(
                     DagV2WebContent(
                         state = state,
                         coordinator = coordinator,
+                        metrics = metrics,
                         resourceRouter = resourceRouter,
+                        pageAnalyzer = pageAnalyzer,
                         onWebView = { webView = it },
                     )
                 else ->
@@ -187,7 +207,9 @@ internal fun DagV2LabScreen(
 private fun DagV2WebContent(
     state: DagV2BrowserState,
     coordinator: DagV2BrowserCoordinator,
+    metrics: DagV2Metrics,
     resourceRouter: DagV2ResourceRouter,
+    pageAnalyzer: DagV2PageAnalyzer,
     onWebView: (WebView?) -> Unit,
 ) {
     val context = LocalContext.current
@@ -205,15 +227,16 @@ private fun DagV2WebContent(
             factory = {
                 WebView(context).apply {
                     onWebView(this)
-                    configureDagV2Settings()
+                    configureDagV2Settings(state.noCacheMode)
+                    if (state.noCacheMode) clearCache(true)
                     val bridge = DagV2JavaScriptBridge(mainHandler, coordinator)
                     addJavascriptInterface(bridge, "DagV2Bridge")
                     runtimeReady = installDagV2DocumentStartScript()
                     if (!runtimeReady) {
                         coordinator.onSecurityFailure("WebView no admite el script seguro de inicio requerido.")
                     }
-                    webChromeClient = DagV2ChromeClient(coordinator)
-                    webViewClient = DagV2WebViewClient(coordinator, resourceRouter)
+                    webChromeClient = DagV2ChromeClient(coordinator, metrics)
+                    webViewClient = DagV2WebViewClient(coordinator, resourceRouter, pageAnalyzer)
                     setDownloadListener { _, _, _, _, _ ->
                         coordinator.onSecurityFailure("Las descargas están bloqueadas en DAG v2 Lab.")
                     }
@@ -221,6 +244,8 @@ private fun DagV2WebContent(
                 }
             },
             update = { view ->
+                view.settings.cacheMode =
+                    if (state.noCacheMode) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
                 val requested = state.requestedUrl
                 if (requested == null) {
                     if (view.url != "about:blank") {
@@ -251,7 +276,7 @@ private fun DagV2WebContent(
 }
 
 @SuppressLint("SetJavaScriptEnabled")
-private fun WebView.configureDagV2Settings() {
+private fun WebView.configureDagV2Settings(noCacheMode: Boolean) {
     settings.javaScriptEnabled = true
     settings.domStorageEnabled = true
     settings.databaseEnabled = true
@@ -266,7 +291,7 @@ private fun WebView.configureDagV2Settings() {
     settings.setSupportMultipleWindows(false)
     settings.mediaPlaybackRequiresUserGesture = true
     settings.mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-    settings.cacheMode = WebSettings.LOAD_DEFAULT
+    settings.cacheMode = if (noCacheMode) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
     settings.safeBrowsingEnabled = true
     CookieManager.getInstance().apply {
         setAcceptCookie(true)
@@ -283,7 +308,15 @@ private fun WebView.installDagV2DocumentStartScript(): Boolean {
 
 private class DagV2ChromeClient(
     private val coordinator: DagV2BrowserCoordinator,
+    private val metrics: DagV2Metrics,
 ) : WebChromeClient() {
+    override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+        if (consoleMessage?.messageLevel() == ConsoleMessage.MessageLevel.ERROR) {
+            metrics.event(DagV2MetricNames.ConsoleError)
+        }
+        return super.onConsoleMessage(consoleMessage)
+    }
+
     override fun onPermissionRequest(request: PermissionRequest) {
         request.deny()
     }
@@ -309,6 +342,7 @@ private class DagV2ChromeClient(
 private class DagV2WebViewClient(
     private val coordinator: DagV2BrowserCoordinator,
     private val router: DagV2ResourceRouter,
+    private val pageAnalyzer: DagV2PageAnalyzer,
 ) : WebViewClient() {
     override fun shouldOverrideUrlLoading(
         view: WebView,
@@ -320,7 +354,10 @@ private class DagV2WebViewClient(
             coordinator.onSecurityFailure("DAG v2 bloqueó una navegación no HTTPS.")
             return true
         }
-        if (coordinator.isExpectedDocument(url)) return false
+        if (coordinator.isHashOnlyNavigation(url)) {
+            coordinator.onSpaUrlChanged(url)
+            return false
+        }
         coordinator.navigate(url)
         return true
     }
@@ -344,7 +381,24 @@ private class DagV2WebViewClient(
     ) {
         val session = coordinator.onDocumentCommitted(url) ?: return
         view.postDelayed(
-            { extractDocumentOnce(view, session, coordinator) },
+            {
+                pageAnalyzer.analyze(
+                    view = view,
+                    session = session,
+                    onSuccess = { evidence ->
+                        coordinator.onDocumentAnalysis(
+                            sessionId = session.sessionId,
+                            navigationToken = session.navigationToken,
+                            url = evidence.url,
+                            title = evidence.title,
+                            visibleText = evidence.visibleText,
+                        )
+                    },
+                    onFailure = {
+                        coordinator.onDocumentAnalysisFailed(session.sessionId, session.navigationToken)
+                    },
+                )
+            },
             DocumentSettleDelayMillis,
         )
     }
@@ -417,52 +471,6 @@ private class DagV2WebViewClient(
     }
 }
 
-private fun extractDocumentOnce(
-    view: WebView,
-    session: DagV2DocumentSessionState,
-    coordinator: DagV2BrowserCoordinator,
-) {
-    var completed = false
-    val timeout =
-        Runnable {
-            if (!completed) {
-                completed = true
-                coordinator.onDocumentAnalysisFailed(session.sessionId, session.navigationToken)
-            }
-        }
-    view.postDelayed(timeout, DocumentAnalysisTimeoutMillis)
-    view.evaluateJavascript(
-        """
-        (function() {
-          return JSON.stringify({
-            title: String(document.title || '').substring(0, 500),
-            text: String(document.body && document.body.innerText || '').substring(0, 24000)
-          });
-        })();
-        """.trimIndent(),
-    ) { encoded ->
-        if (completed) return@evaluateJavascript
-        completed = true
-        view.removeCallbacks(timeout)
-        val payload =
-            runCatching {
-                val decoded = JSONArray("[$encoded]").getString(0)
-                JSONObject(decoded)
-            }.getOrNull()
-        if (payload == null) {
-            coordinator.onDocumentAnalysisFailed(session.sessionId, session.navigationToken)
-        } else {
-            coordinator.onDocumentAnalysis(
-                sessionId = session.sessionId,
-                navigationToken = session.navigationToken,
-                url = session.mainDocumentUrl,
-                title = payload.optString("title"),
-                visibleText = payload.optString("text"),
-            )
-        }
-    }
-}
-
 private class DagV2JavaScriptBridge(
     private val handler: Handler,
     private val coordinator: DagV2BrowserCoordinator,
@@ -498,5 +506,4 @@ private class DagV2JavaScriptBridge(
     }
 }
 
-private const val DocumentAnalysisTimeoutMillis = 8_000L
 private const val DocumentSettleDelayMillis = 500L

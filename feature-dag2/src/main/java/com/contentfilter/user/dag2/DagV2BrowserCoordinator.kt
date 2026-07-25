@@ -2,12 +2,14 @@ package com.contentfilter.user.dag2
 
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import java.net.URI
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -49,11 +51,12 @@ data class DagV2BrowserState(
     val documentAnalyzing: Boolean = false,
     val documentVisible: Boolean = false,
     val fullPageAnalysisCount: Int = 0,
-    val statusMessage: String = "Laboratorio DEV: todos los raster se mantienen neutros.",
+    val statusMessage: String = "Laboratorio DEV: todas las imágenes se mantienen neutras.",
     val blockedMessage: String? = null,
     val canGoBack: Boolean = false,
     val canGoForward: Boolean = false,
     val rendererGone: Boolean = false,
+    val noCacheMode: Boolean = false,
 )
 
 @Singleton
@@ -68,6 +71,7 @@ class DagV2BrowserCoordinator
         private val metrics: DagV2Metrics,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        private var commandJob: Job? = null
         private val mutableState = MutableStateFlow(DagV2BrowserState())
         val state: StateFlow<DagV2BrowserState> = mutableState.asStateFlow()
 
@@ -89,45 +93,65 @@ class DagV2BrowserCoordinator
             navigate(result.url)
         }
 
+        fun setNoCacheMode(enabled: Boolean) {
+            mutableState.value =
+                mutableState.value.copy(
+                    noCacheMode = enabled,
+                    statusMessage =
+                        if (enabled) {
+                            "Modo DEV sin caché activo."
+                        } else {
+                            "Caché normal de WebView activa."
+                        },
+                )
+            if (enabled) metrics.event(DagV2MetricNames.NoCacheModeEnabled)
+        }
+
         fun navigate(url: String) {
-            scope.launch {
-                mutableState.value =
-                    mutableState.value.copy(
-                        searching = false,
-                        blockedMessage = null,
-                        statusMessage = "Validando navegación segura…",
-                    )
-                val networkDecision = networkGuard.validate(url)
-                if (networkDecision.decision == DagV2SiteDecision.Block) {
-                    block(networkDecision.reason)
-                    return@launch
+            commandJob?.cancel()
+            commandJob =
+                scope.launch {
+                    mutableState.value =
+                        mutableState.value.copy(
+                            searching = false,
+                            blockedMessage = null,
+                            statusMessage = "Validando navegación segura…",
+                        )
+                    val networkDecision = networkGuard.validate(url)
+                    if (networkDecision.decision == DagV2SiteDecision.Block) {
+                        block(networkDecision.reason)
+                        return@launch
+                    }
+                    val siteDecision = sitePolicy.evaluateNavigation(url)
+                    if (siteDecision.decision == DagV2SiteDecision.Block) {
+                        block(siteDecision.reason)
+                        return@launch
+                    }
+                    cancelActiveSession()
+                    val session = sessions.start(url)
+                    resourceRouter.onNewDocument(session)
+                    mutableState.value =
+                        mutableState.value.copy(
+                            requestedUrl = url,
+                            results = emptyList(),
+                            navigationRevision = mutableState.value.navigationRevision + 1,
+                            documentAnalyzing = true,
+                            documentVisible = false,
+                            fullPageAnalysisCount = 0,
+                            statusMessage = "Analizando el documento principal una sola vez…",
+                            blockedMessage = null,
+                            rendererGone = false,
+                        )
                 }
-                val siteDecision = sitePolicy.evaluateNavigation(url)
-                if (siteDecision.decision == DagV2SiteDecision.Block) {
-                    block(siteDecision.reason)
-                    return@launch
-                }
-                val session = sessions.start(url)
-                resourceRouter.onNewDocument(session)
-                mutableState.value =
-                    mutableState.value.copy(
-                        requestedUrl = url,
-                        results = emptyList(),
-                        navigationRevision = mutableState.value.navigationRevision + 1,
-                        documentAnalyzing = true,
-                        documentVisible = false,
-                        fullPageAnalysisCount = 0,
-                        statusMessage = "Analizando el documento principal una sola vez…",
-                        blockedMessage = null,
-                        rendererGone = false,
-                    )
-            }
         }
 
         fun onDocumentStarted(url: String) {
             val session = sessions.snapshot() ?: return
-            if (session.mainDocumentUrl != url || !sessions.isCurrent(session.sessionId, session.navigationToken)) return
-            metrics.event("document_started", session)
+            if (session.mainDocumentUrl != url || !sessions.isCurrent(session.sessionId, session.navigationToken)) {
+                metrics.staleResultDiscarded()
+                return
+            }
+            metrics.event(DagV2MetricNames.DocumentStarted, session)
         }
 
         fun isExpectedDocument(url: String): Boolean =
@@ -135,12 +159,22 @@ class DagV2BrowserCoordinator
                 it.mainDocumentUrl == url && sessions.isCurrent(it.sessionId, it.navigationToken)
             } == true
 
+        fun isHashOnlyNavigation(url: String): Boolean {
+            val currentUrl = sessions.snapshot()?.mainDocumentUrl ?: return false
+            if (currentUrl == url) return false
+            return currentUrl.withoutDagV2Fragment() == url.withoutDagV2Fragment()
+        }
+
         fun onDocumentCommitted(url: String): DagV2DocumentSessionState? {
             val session = sessions.snapshot() ?: return null
-            if (session.mainDocumentUrl != url || !sessions.isCurrent(session.sessionId, session.navigationToken)) return null
-            metrics.event("document_committed", session)
+            if (session.mainDocumentUrl != url || !sessions.isCurrent(session.sessionId, session.navigationToken)) {
+                metrics.staleResultDiscarded()
+                return null
+            }
+            metrics.event(DagV2MetricNames.DocumentCommitted, session)
             val analyzing = sessions.beginFullAnalysis(session.sessionId, session.navigationToken) ?: return null
-            metrics.event("full_page_analysis_count", analyzing, analyzing.fullPageAnalysisCount)
+            metrics.event(DagV2MetricNames.FullPageAnalysisStarted, analyzing)
+            metrics.event(DagV2MetricNames.FullPageAnalysisCount, analyzing, analyzing.fullPageAnalysisCount)
             mutableState.value =
                 mutableState.value.copy(
                     documentAnalyzing = true,
@@ -156,21 +190,24 @@ class DagV2BrowserCoordinator
             title: String,
             visibleText: String,
         ) {
-            if (!sessions.isCurrent(sessionId, navigationToken)) return
+            if (!sessions.isCurrent(sessionId, navigationToken)) {
+                metrics.staleResultDiscarded()
+                return
+            }
             val decision = sitePolicy.evaluateDocument(url, title, visibleText)
             val completed = sessions.completeFullAnalysis(sessionId, navigationToken) ?: return
-            metrics.event("document_decision_ready", completed)
+            metrics.event(DagV2MetricNames.FullPageAnalysisCompleted, completed)
             if (decision.decision == DagV2SiteDecision.Block) {
                 block(decision.reason)
                 return
             }
-            metrics.event("structure_visible", completed)
+            metrics.event(DagV2MetricNames.StructureVisible, completed)
             mutableState.value =
                 mutableState.value.copy(
                     documentAnalyzing = false,
                     documentVisible = true,
                     fullPageAnalysisCount = completed.fullPageAnalysisCount,
-                    statusMessage = "Estructura permitida; imágenes raster reemplazadas por placeholders.",
+                    statusMessage = "Estructura permitida; imágenes reemplazadas por placeholders.",
                     blockedMessage = null,
                 )
             scheduleStableMetric(completed)
@@ -180,7 +217,10 @@ class DagV2BrowserCoordinator
             sessionId: String,
             navigationToken: String,
         ) {
-            if (!sessions.isCurrent(sessionId, navigationToken)) return
+            if (!sessions.isCurrent(sessionId, navigationToken)) {
+                metrics.staleResultDiscarded()
+                return
+            }
             block("No se pudo aprobar el documento con suficiente certeza.")
         }
 
@@ -217,7 +257,8 @@ class DagV2BrowserCoordinator
 
         fun onRendererGone() {
             val session = sessions.snapshot()
-            metrics.event("renderer_gone", session)
+            metrics.event(DagV2MetricNames.RendererGone, session)
+            cancelActiveSession()
             mutableState.value =
                 mutableState.value.copy(
                     rendererGone = true,
@@ -232,37 +273,45 @@ class DagV2BrowserCoordinator
         }
 
         private fun search(query: String) {
-            scope.launch {
-                mutableState.value =
-                    mutableState.value.copy(
-                        searching = true,
-                        results = emptyList(),
-                        requestedUrl = null,
-                        documentVisible = false,
-                        blockedMessage = null,
-                        statusMessage = "Comprobando la consulta localmente…",
-                    )
-                when (val outcome = searchOrchestrator.search(query)) {
-                    is DagV2SearchOutcome.Failure -> block(outcome.message)
-                    is DagV2SearchOutcome.Success ->
-                        mutableState.value =
-                            mutableState.value.copy(
-                                searching = false,
-                                results = outcome.results,
-                                statusMessage =
-                                    if (outcome.results.isEmpty()) {
-                                        "No quedaron resultados seguros para mostrar."
-                                    } else {
-                                        "${outcome.results.size} resultados seguros."
-                                    },
-                            )
+            commandJob?.cancel()
+            commandJob =
+                scope.launch {
+                    cancelActiveSession()
+                    mutableState.value =
+                        mutableState.value.copy(
+                            searching = true,
+                            results = emptyList(),
+                            requestedUrl = null,
+                            documentVisible = false,
+                            blockedMessage = null,
+                            statusMessage = "Comprobando la consulta localmente…",
+                        )
+                    when (val outcome = searchOrchestrator.search(query)) {
+                        is DagV2SearchOutcome.Failure -> block(outcome.message)
+                        is DagV2SearchOutcome.Success ->
+                            mutableState.value =
+                                mutableState.value.copy(
+                                    searching = false,
+                                    results = outcome.results,
+                                    statusMessage =
+                                        if (outcome.results.isEmpty()) {
+                                            "No quedaron resultados seguros para mostrar."
+                                        } else {
+                                            "${outcome.results.size} resultados seguros."
+                                        },
+                                )
+                    }
                 }
-            }
+        }
+
+        fun closeSession() {
+            commandJob?.cancel()
+            commandJob = null
+            cancelActiveSession()
         }
 
         private fun block(message: String) {
-            resourceRouter.cancelVisualRequests()
-            sessions.invalidate()
+            cancelActiveSession()
             mutableState.value =
                 mutableState.value.copy(
                     searching = false,
@@ -282,12 +331,23 @@ class DagV2BrowserCoordinator
                     mutableState.value.documentVisible &&
                     !mutableState.value.rendererGone
                 ) {
-                    metrics.event("stable_20s", session)
+                    metrics.event(DagV2MetricNames.FunctionalStable20s, session)
                 }
             }
+        }
+
+        private fun cancelActiveSession() {
+            sessions.cancelActive()?.let(metrics::sessionCancelled)
+            resourceRouter.cancelVisualRequests()
         }
 
         private companion object {
             const val StableWindowMillis = 20_000L
         }
     }
+
+private fun String.withoutDagV2Fragment(): String? =
+    runCatching {
+        val uri = URI(this)
+        URI(uri.scheme, uri.authority, uri.path, uri.query, null).toString()
+    }.getOrNull()

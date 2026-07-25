@@ -14,22 +14,36 @@ class DagV2ResourceRouter
     constructor(
         private val imagePipeline: DagV2ImagePipeline,
         private val metrics: DagV2Metrics,
+        private val sessions: DagV2DocumentSession,
     ) {
         fun intercept(
             request: WebResourceRequest,
             source: DagV2ResourceSource,
-        ): WebResourceResponse? =
-            intercept(
+        ): WebResourceResponse? {
+            val session = sessions.snapshot()?.takeUnless { it.cancelled }
+            return intercept(
                 DagV2ResourceRequest(
                     url = request.url.toString(),
                     headers = request.requestHeaders.orEmpty(),
                     isForMainFrame = request.isForMainFrame,
                     source = source,
+                    sessionId = session?.sessionId,
+                    navigationToken = session?.navigationToken,
                 ),
             )
+        }
 
         fun intercept(request: DagV2ResourceRequest): WebResourceResponse? {
-            if (request.source == DagV2ResourceSource.ServiceWorker) metrics.serviceWorkerRequest()
+            if (request.source == DagV2ResourceSource.ServiceWorker) {
+                if (
+                    request.sessionId == null ||
+                    request.navigationToken == null ||
+                    !sessions.isCurrent(request.sessionId, request.navigationToken)
+                ) {
+                    return null
+                }
+                metrics.serviceWorkerRequest()
+            }
             val kind = classify(request)
             return when (route(kind, request.url)) {
                 DagV2ResourceRoute.Bypass -> {

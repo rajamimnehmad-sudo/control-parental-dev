@@ -4,14 +4,22 @@ import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotNull
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class DagV2ResourceRouterTest {
     private val sessions = DagV2DocumentSession()
     private val metrics = DagV2Metrics()
     private val neutral = DagV2NeutralImageFactory()
-    private val pipeline = DagV2ImagePipeline(HideAllPendingModel(), neutral, sessions, metrics)
-    private val router = DagV2ResourceRouter(pipeline, metrics)
+    private val pipeline =
+        DagV2ImagePipeline(
+            DagV2FailClosedImageDecisionProvider(),
+            neutral,
+            sessions,
+            metrics,
+        )
+    private val router = DagV2ResourceRouter(pipeline, metrics, sessions)
 
     @Test
     fun `html scripts json rsc fetch xhr and fonts bypass immediately`() {
@@ -54,6 +62,83 @@ class DagV2ResourceRouterTest {
             )
 
         assertEquals(DagV2ResourceKind.RasterImage, router.classify(request))
+    }
+
+    @Test
+    fun `accept image and extension fallback detect images without relying on one signal`() {
+        val acceptOnly = request("https://example.com/resource", "image/*", "")
+        val extensionOnly = request("https://example.com/photo.webp", "*/*", "")
+
+        assertEquals(DagV2ResourceKind.RasterImage, router.classify(acceptOnly))
+        assertEquals(DagV2ResourceKind.RasterImage, router.classify(extensionOnly))
+    }
+
+    @Test
+    fun `known fetch destination is not converted to image only because its url ends in jpg`() {
+        val request = request("https://example.com/api/photo.jpg", "application/json", "empty")
+
+        assertEquals(DagV2ResourceKind.NonVisual, router.classify(request))
+        assertEquals(DagV2ResourceRoute.Bypass, router.route(router.classify(request), request.url))
+    }
+
+    @Test
+    fun `url without extension is not visual without header evidence`() {
+        val request = request("https://example.com/resource", "*/*", "empty")
+
+        assertEquals(DagV2ResourceKind.NonVisual, router.classify(request))
+        assertEquals(DagV2ResourceRoute.Bypass, router.route(router.classify(request), request.url))
+    }
+
+    @Test
+    fun `service worker request without an active dag2 session bypasses the global client`() {
+        val request =
+            request("https://example.com/photo.jpg", "image/*", "image")
+                .copy(source = DagV2ResourceSource.ServiceWorker)
+
+        assertNull(router.intercept(request))
+    }
+
+    @Test
+    fun `old visual request cannot alter pending counters for a new session`() {
+        val first = sessions.start("https://example.com/first")
+        router.onNewDocument(first)
+        val oldRequest =
+            request("https://example.com/old.jpg", "image/*", "image")
+                .copy(sessionId = first.sessionId, navigationToken = first.navigationToken)
+        sessions.cancelActive()
+        val second = sessions.start("https://example.com/second")
+        router.onNewDocument(second)
+
+        router.intercept(oldRequest)
+
+        assertEquals(second.sessionId, sessions.snapshot()?.sessionId)
+        assertEquals(0, metrics.snapshot.value.visualPendingCount)
+    }
+
+    @Test
+    fun `active service worker request uses the same fail closed visual pipeline`() {
+        val session = sessions.start("https://example.com/products")
+        router.onNewDocument(session)
+        val request =
+            request("https://example.com/photo.jpg", "image/*", "image")
+                .copy(
+                    source = DagV2ResourceSource.ServiceWorker,
+                    sessionId = session.sessionId,
+                    navigationToken = session.navigationToken,
+                )
+
+        val response = router.intercept(request)
+
+        assertNotNull(response)
+        assertEquals(1, metrics.snapshot.value.serviceWorkerRequestCount)
+        assertEquals(1, metrics.snapshot.value.imagePlaceholderCount)
+    }
+
+    @Test
+    fun `fail closed provider has no approved image path`() {
+        val provider = DagV2FailClosedImageDecisionProvider()
+
+        assertEquals(DagV2ImageDecision.Hide, provider.decide())
     }
 
     @Test

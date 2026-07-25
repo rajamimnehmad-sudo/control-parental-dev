@@ -45,6 +45,8 @@ data class DagV2ResourceRequest(
     val headers: Map<String, String>,
     val isForMainFrame: Boolean,
     val source: DagV2ResourceSource,
+    val sessionId: String? = null,
+    val navigationToken: String? = null,
 )
 
 sealed interface DagV2ResourceRoute {

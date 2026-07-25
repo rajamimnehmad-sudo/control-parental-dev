@@ -16,6 +16,7 @@ class DagV2ServiceWorkerRouter
         private val resourceRouter: DagV2ResourceRouter,
     ) {
         private var installed = false
+        private var noCacheMode = false
 
         fun install() {
             if (installed || Build.VERSION.SDK_INT < Build.VERSION_CODES.N) return
@@ -26,7 +27,7 @@ class DagV2ServiceWorkerRouter
                         allowContentAccess = false
                         allowFileAccess = false
                         blockNetworkLoads = false
-                        cacheMode = WebSettings.LOAD_DEFAULT
+                        cacheMode = if (noCacheMode) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
                     }
                 }.setServiceWorkerClient(
                     object : ServiceWorkerClient() {
@@ -35,6 +36,14 @@ class DagV2ServiceWorkerRouter
                     },
                 )
             installed = true
+        }
+
+        fun setNoCacheMode(enabled: Boolean) {
+            noCacheMode = enabled
+            if (installed && Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                ServiceWorkerController.getInstance().serviceWorkerWebSettings.cacheMode =
+                    if (enabled) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
+            }
         }
 
         fun uninstall() {

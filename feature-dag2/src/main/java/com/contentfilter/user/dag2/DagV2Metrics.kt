@@ -18,6 +18,36 @@ data class DagV2MetricSnapshot(
     val visualPendingCount: Int = 0,
 )
 
+internal object DagV2MetricNames {
+    const val DocumentStarted = "document_started"
+    const val DocumentCommitted = "document_committed"
+    const val FullPageAnalysisStarted = "full_page_analysis_started"
+    const val FullPageAnalysisCompleted = "full_page_analysis_completed"
+    const val FullPageAnalysisCount = "full_page_analysis_count"
+    const val StructureVisible = "structure_visible"
+    const val VisualPlaceholderReady = "visual_placeholder_ready"
+    const val StaleResultDiscarded = "stale_result_discarded"
+    const val SessionCancelled = "session_cancelled"
+    const val FunctionalStable20s = "functional_stable_20s"
+    const val NoCacheModeEnabled = "no_cache_mode_enabled"
+    const val RendererGone = "renderer_gone"
+    const val ConsoleError = "console_error"
+
+    val RequiredFoundationEvents =
+        setOf(
+            DocumentStarted,
+            DocumentCommitted,
+            FullPageAnalysisStarted,
+            FullPageAnalysisCompleted,
+            FullPageAnalysisCount,
+            StructureVisible,
+            VisualPlaceholderReady,
+            StaleResultDiscarded,
+            SessionCancelled,
+            FunctionalStable20s,
+        )
+}
+
 @Singleton
 class DagV2Metrics
     @Inject
@@ -91,6 +121,11 @@ class DagV2Metrics
             publish()
         }
 
+        fun visualPlaceholderReady(session: DagV2DocumentSessionState?) {
+            imagePlaceholder(session)
+            event(DagV2MetricNames.VisualPlaceholderReady, session)
+        }
+
         fun imageCancelled() {
             imageCancelled.incrementAndGet()
             publish()
@@ -101,6 +136,14 @@ class DagV2Metrics
                 visualPending.updateAndGet { current -> (current - 1).coerceAtLeast(0) }
             }
             publish()
+        }
+
+        fun staleResultDiscarded() {
+            event(DagV2MetricNames.StaleResultDiscarded)
+        }
+
+        fun sessionCancelled(session: DagV2DocumentSessionState) {
+            event(DagV2MetricNames.SessionCancelled, session)
         }
 
         private fun publish() {

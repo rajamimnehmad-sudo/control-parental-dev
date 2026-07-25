@@ -7,7 +7,7 @@ internal val DagV2DocumentStartScript =
       window.__dag2RuntimeInstalled = true;
 
       function dag2InstallHeadGuards() {
-        if (!document.head) return false;
+        if (!document.head) return;
         if (!document.getElementById('__dag2_csp')) {
           var csp = document.createElement('meta');
           csp.id = '__dag2_csp';
@@ -20,27 +20,10 @@ internal val DagV2DocumentStartScript =
           safety.id = '__dag2_safety';
           safety.textContent =
             'img{visibility:visible!important;object-fit:none!important;object-position:999999px 999999px!important;background:#E9EDF2!important;color:transparent!important;}' +
+            'html *{background-image:none!important;}' +
             'video,audio,canvas,object,embed,svg{display:none!important;}' +
-            'iframe:not([data-dag2-safe-frame="true"]){display:none!important;}' +
-            '[style*="url(data:" i],[style*="url(blob:" i]{background-image:none!important;}';
+            'iframe:not([data-dag2-safe-frame="true"]){display:none!important;}';
           document.head.appendChild(safety);
-        }
-        return true;
-      }
-
-      if (!dag2InstallHeadGuards()) {
-        var headObserver = new MutationObserver(function() {
-          if (dag2InstallHeadGuards()) headObserver.disconnect();
-        });
-        headObserver.observe(document, {childList:true, subtree:true});
-      }
-
-      function dag2HttpsVisualSource(node) {
-        var source = (node && (node.currentSrc || node.getAttribute('src'))) || '';
-        try {
-          return new URL(source, document.baseURI).protocol === 'https:';
-        } catch (_) {
-          return false;
         }
       }
 
@@ -63,9 +46,7 @@ internal val DagV2DocumentStartScript =
       function dag2Protect(node) {
         if (!node || node.nodeType !== 1) return;
         var tag = (node.tagName || '').toLowerCase();
-        if (tag === 'img') {
-          dag2HttpsVisualSource(node);
-        } else if (tag === 'iframe') {
+        if (tag === 'iframe') {
           if (dag2AuthorizedFrame(node)) node.setAttribute('data-dag2-safe-frame', 'true');
           else node.removeAttribute('data-dag2-safe-frame');
         } else if (tag === 'video' || tag === 'audio') {
@@ -73,39 +54,31 @@ internal val DagV2DocumentStartScript =
         }
       }
 
-      document.addEventListener('load', function(event) {
-        if (event.target && event.target.tagName === 'IMG') dag2HttpsVisualSource(event.target);
-      }, true);
-      document.addEventListener('error', function(event) {
-        if (event.target && event.target.tagName === 'IMG') dag2HttpsVisualSource(event.target);
-      }, true);
-
-      function dag2InstallMediaObserver() {
-        if (!document.documentElement || window.__dag2MediaObserver) return;
-        window.__dag2MediaObserver = new MutationObserver(function(records) {
-          records.forEach(function(record) {
-            if (record.type === 'attributes') {
-              dag2Protect(record.target);
-              return;
-            }
-            record.addedNodes.forEach(function(node) {
-              dag2Protect(node);
-              if (node.querySelectorAll) {
-                node.querySelectorAll('img,video,audio,canvas,iframe').forEach(dag2Protect);
-              }
-            });
-          });
-        });
-        window.__dag2MediaObserver.observe(document.documentElement, {
-          subtree:true,
-          childList:true,
-          attributes:true,
-          attributeFilter:['src','srcset','poster']
-        });
-        document.querySelectorAll('img,video,audio,canvas,iframe').forEach(dag2Protect);
+      function dag2ProtectTree(root) {
+        dag2Protect(root);
+        if (root && root.querySelectorAll) {
+          root.querySelectorAll('img,picture,source,video,audio,canvas,iframe').forEach(dag2Protect);
+        }
       }
-      dag2InstallMediaObserver();
-      document.addEventListener('DOMContentLoaded', dag2InstallMediaObserver, {once:true});
+
+      var dag2Observer = new MutationObserver(function(records) {
+        dag2InstallHeadGuards();
+        records.forEach(function(record) {
+          if (record.type === 'attributes') {
+            dag2Protect(record.target);
+          } else {
+            record.addedNodes.forEach(dag2ProtectTree);
+          }
+        });
+      });
+      dag2Observer.observe(document, {
+        subtree:true,
+        childList:true,
+        attributes:true,
+        attributeFilter:['src','srcset','poster']
+      });
+      dag2InstallHeadGuards();
+      dag2ProtectTree(document.documentElement);
 
       if (window.HTMLMediaElement && window.HTMLMediaElement.prototype) {
         window.HTMLMediaElement.prototype.play = function() {
@@ -116,15 +89,11 @@ internal val DagV2DocumentStartScript =
       function dag2ReportRoute(kind) {
         try { DagV2Bridge.onSpaLocation(String(location.href), kind); } catch (_) {}
       }
-      ['pushState','replaceState'].forEach(function(method) {
-        var original = history[method];
-        if (typeof original !== 'function') return;
-        history[method] = function() {
-          var result = original.apply(this, arguments);
-          dag2ReportRoute(method);
-          return result;
-        };
-      });
+      if (window.navigation && typeof window.navigation.addEventListener === 'function') {
+        window.navigation.addEventListener('navigate', function() {
+          setTimeout(function() { dag2ReportRoute('navigation'); }, 0);
+        });
+      }
       addEventListener('hashchange', function() { dag2ReportRoute('hash'); });
       addEventListener('popstate', function() { dag2ReportRoute('popstate'); });
 

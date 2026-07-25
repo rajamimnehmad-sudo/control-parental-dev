@@ -13,7 +13,8 @@ data class DagV2DocumentSessionState(
     val fullAnalysisCompleted: Boolean,
     val fullPageAnalysisCount: Int,
     val startedAt: Long,
-    internal val fullAnalysisStarted: Boolean = false,
+    val fullAnalysisStarted: Boolean = false,
+    val cancelled: Boolean = false,
 )
 
 enum class DagV2InternalInteraction {
@@ -60,7 +61,7 @@ class DagV2DocumentSession
             navigationToken: String,
         ): Boolean =
             current?.let {
-                it.sessionId == sessionId && it.navigationToken == navigationToken
+                !it.cancelled && it.sessionId == sessionId && it.navigationToken == navigationToken
             } == true
 
         @Synchronized
@@ -95,7 +96,11 @@ class DagV2DocumentSession
         }
 
         @Synchronized
-        fun invalidate(): DagV2DocumentSessionState? = current.also { current = null }
+        fun cancelActive(): DagV2DocumentSessionState? {
+            val cancelled = current?.copy(cancelled = true)
+            current = null
+            return cancelled
+        }
     }
 
 private fun String.dagV2Origin(): String =

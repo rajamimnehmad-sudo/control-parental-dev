@@ -3,16 +3,10 @@
     <application>
         <activity
             android:name=".DagV2LabActivity"
-            android:exported="true"
+            android:exported="false"
             android:label="@string/dag_v2_lab_name"
             android:launchMode="singleTask"
             android:process=":dag2"
-            android:taskAffinity="${applicationId}.dag2">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-
-                <category android:name="android.intent.category.LAUNCHER" />
-            </intent-filter>
-        </activity>
+            android:taskAffinity="${applicationId}.dag2" />
     </application>
 </manifest>

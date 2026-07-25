@@ -22,6 +22,9 @@ class DagV2LabActivity : ComponentActivity() {
     @Inject
     lateinit var resourceRouter: DagV2ResourceRouter
 
+    @Inject
+    lateinit var pageAnalyzer: DagV2PageAnalyzer
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -32,12 +35,15 @@ class DagV2LabActivity : ComponentActivity() {
                     coordinator = coordinator,
                     metrics = metrics,
                     resourceRouter = resourceRouter,
+                    serviceWorkerRouter = serviceWorkerRouter,
+                    pageAnalyzer = pageAnalyzer,
                 )
             }
         }
     }
 
     override fun onDestroy() {
+        coordinator.closeSession()
         serviceWorkerRouter.uninstall()
         resourceRouter.close()
         super.onDestroy()
