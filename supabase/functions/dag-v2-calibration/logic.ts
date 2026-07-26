@@ -7,6 +7,15 @@ export const ValidSourceKinds = new Set([
   "webview_raster",
   "serviceworker_raster",
 ]);
+export const UploadMatchKinds = new Set([
+  "new",
+  "retry_rejected",
+  "resume_pending",
+]);
+export const DeduplicatedMatchKinds = new Set([
+  "exact_ready",
+  "perceptual",
+]);
 
 export type CalibrationFields = {
   deviceId: string;
@@ -109,6 +118,62 @@ export function sanitizeHost(value: string): string {
 
 export function isTrainingExample(decision: string): boolean {
   return decision === "show" || decision === "hide";
+}
+
+export function shouldUploadForMatchKind(matchKind: string): boolean | null {
+  if (UploadMatchKinds.has(matchKind)) return true;
+  if (DeduplicatedMatchKinds.has(matchKind)) return false;
+  return null;
+}
+
+export function isStorageAlreadyExists(
+  error: {
+    statusCode?: string | number;
+    code?: string;
+    error?: string;
+    message?: string;
+  },
+): boolean {
+  const status = String(error.statusCode ?? "");
+  const code = `${error.code ?? ""} ${error.error ?? ""}`.toLowerCase();
+  const message = (error.message ?? "").toLowerCase();
+  return status === "409" ||
+    code.includes("resourcealreadyexists") ||
+    code.includes("already_exists") ||
+    message.includes("already exists");
+}
+
+export type SampleCompletionResult =
+  | { accepted: true; deduplicated: boolean }
+  | { accepted: false; stage: "registration" | "storage" | "ready" };
+
+export async function completeRegisteredSample(
+  matchKind: string,
+  upload: () => Promise<
+    null | {
+      statusCode?: string | number;
+      code?: string;
+      error?: string;
+      message?: string;
+    }
+  >,
+  markReady: () => Promise<boolean>,
+): Promise<SampleCompletionResult> {
+  const uploadRequired = shouldUploadForMatchKind(matchKind);
+  if (uploadRequired === null) {
+    return { accepted: false, stage: "registration" };
+  }
+  if (!uploadRequired) {
+    return { accepted: true, deduplicated: true };
+  }
+  const uploadError = await upload();
+  if (uploadError && !isStorageAlreadyExists(uploadError)) {
+    return { accepted: false, stage: "storage" };
+  }
+  if (!await markReady()) {
+    return { accepted: false, stage: "ready" };
+  }
+  return { accepted: true, deduplicated: false };
 }
 
 export function containsForbiddenPayloadFields(form: FormData): boolean {

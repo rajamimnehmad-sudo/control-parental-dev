@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import {
+  completeRegisteredSample,
   containsForbiddenPayloadFields,
   jpegDimensions,
   MaximumNormalizedBytes,
@@ -128,39 +129,40 @@ Deno.serve(async (request) => {
       return json({ error: "No se pudo registrar la muestra." }, 503);
     }
     sampleId = registered.sample_id;
-    deduplicated = registered.created !== true;
-    if (registered.created === true) {
-      const { error: uploadError } = await serviceClient.storage
-        .from("dag-v2-calibration")
-        .upload(registered.canonical_storage_path, bytes, {
-          contentType: "image/jpeg",
-          upsert: false,
-        });
-      bytes.fill(0);
-      if (
-        uploadError &&
-        !uploadError.message.toLowerCase().includes("already exists")
-      ) {
-        await serviceClient.rpc("dag_v2_calibration_mark_sample", {
-          p_sample_id: sampleId,
-          p_status: "rejected",
-          p_reviewer_key: reviewerKey,
-        });
-        return json({ error: "No se pudo guardar la muestra privada." }, 503);
-      }
-      const { error: readyError } = await serviceClient.rpc(
-        "dag_v2_calibration_mark_sample",
-        {
-          p_sample_id: sampleId,
-          p_status: "ready",
-          p_reviewer_key: reviewerKey,
-        },
-      );
-      if (readyError) {
-        return json({ error: "No se pudo finalizar la muestra." }, 503);
-      }
-    } else {
-      bytes.fill(0);
+    const completion = await completeRegisteredSample(
+      String(registered.match_kind ?? ""),
+      async () => {
+        const { error } = await serviceClient.storage
+          .from("dag-v2-calibration")
+          .upload(registered.canonical_storage_path, bytes, {
+            contentType: "image/jpeg",
+            upsert: false,
+          });
+        return error;
+      },
+      async () => {
+        const { error } = await serviceClient.rpc(
+          "dag_v2_calibration_mark_sample",
+          {
+            p_sample_id: sampleId,
+            p_status: "ready",
+            p_reviewer_key: reviewerKey,
+          },
+        );
+        return !error;
+      },
+    );
+    bytes.fill(0);
+    if (!completion.accepted) {
+      const message = completion.stage === "storage"
+        ? "No se pudo guardar la muestra privada."
+        : completion.stage === "ready"
+        ? "No se pudo finalizar la muestra."
+        : "Estado de muestra inválido.";
+      return json({ error: message }, 503);
+    }
+    deduplicated = completion.deduplicated;
+    if (deduplicated) {
       const { data: existing, error } = await serviceClient
         .from("dag_v2_calibration_samples")
         .select("status")

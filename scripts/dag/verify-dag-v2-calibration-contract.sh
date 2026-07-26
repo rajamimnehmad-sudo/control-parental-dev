@@ -4,11 +4,16 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-migration="$(find supabase/migrations -maxdepth 1 -type f -name '*_dag_v2_calibration_collector.sql' -print)"
+base_migration="$(find supabase/migrations -maxdepth 1 -type f -name '*_dag_v2_calibration_collector.sql' -print)"
+reliability_migration="$(find supabase/migrations -maxdepth 1 -type f -name '*_dag_v2_calibration_reliability.sql' -print)"
 function_dir="supabase/functions/dag-v2-calibration"
 
-if [[ -z "$migration" || "$(printf '%s\n' "$migration" | wc -l | tr -d ' ')" != "1" ]]; then
+if [[ -z "$base_migration" || "$(printf '%s\n' "$base_migration" | wc -l | tr -d ' ')" != "1" ]]; then
   echo "ERROR: expected exactly one DAG v2 calibration migration" >&2
+  exit 1
+fi
+if [[ -z "$reliability_migration" || "$(printf '%s\n' "$reliability_migration" | wc -l | tr -d ' ')" != "1" ]]; then
+  echo "ERROR: expected exactly one DAG v2 calibration reliability migration" >&2
   exit 1
 fi
 
@@ -37,18 +42,35 @@ required_migration_patterns=(
 )
 
 for pattern in "${required_migration_patterns[@]}"; do
-  if ! rg -F -q "$pattern" "$migration"; then
+  if ! rg -F -q "$pattern" "$base_migration"; then
     echo "ERROR: migration contract missing: $pattern" >&2
     exit 1
   fi
 done
 
-if rg -n 'grant (select|insert|update|delete|all).*to (anon|authenticated)' "$migration"; then
+required_reliability_patterns=(
+  "'exact_ready'"
+  "'retry_rejected'"
+  "'resume_pending'"
+  "current_status = 'ready' and p_status = 'ready'"
+  "'invalid_sample_transition:%->%'"
+)
+
+for pattern in "${required_reliability_patterns[@]}"; do
+  if ! rg -F -q "$pattern" "$reliability_migration"; then
+    echo "ERROR: reliability migration contract missing: $pattern" >&2
+    exit 1
+  fi
+done
+
+if rg -n 'grant (select|insert|update|delete|all).*to (anon|authenticated)' \
+  "$base_migration" "$reliability_migration"; then
   echo "ERROR: calibration tables must not be exposed directly to Android roles" >&2
   exit 1
 fi
 
-if rg -n '\b(dag_calibration_reviews|dag_calibration_versions|dag_calibration_models|dag_calibration_audit)\b' "$migration" "$function_dir"; then
+if rg -n '\b(dag_calibration_reviews|dag_calibration_versions|dag_calibration_models|dag_calibration_audit)\b' \
+  "$base_migration" "$reliability_migration" "$function_dir"; then
   echo "ERROR: DAG v2 calibration must not write DAG v1 calibration objects" >&2
   exit 1
 fi

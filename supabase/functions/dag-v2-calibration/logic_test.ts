@@ -1,7 +1,9 @@
 import { assert, assertEquals } from "jsr:@std/assert@1.0.15";
 import {
   CollectorVersion,
+  completeRegisteredSample,
   containsForbiddenPayloadFields,
+  isStorageAlreadyExists,
   isTrainingExample,
   jpegDimensions,
   parseFields,
@@ -127,4 +129,118 @@ Deno.test("JPEG dimensions come from bytes and HTML disguise is rejected", () =>
     jpegDimensions(new TextEncoder().encode("<html>not an image</html>")),
     null,
   );
+});
+
+Deno.test("new and resumed rows upload and become ready", async () => {
+  for (const matchKind of ["new", "retry_rejected", "resume_pending"]) {
+    let uploads = 0;
+    let readyCalls = 0;
+    const result = await completeRegisteredSample(
+      matchKind,
+      () => {
+        uploads += 1;
+        return Promise.resolve(null);
+      },
+      () => {
+        readyCalls += 1;
+        return Promise.resolve(true);
+      },
+    );
+
+    assertEquals(result, { accepted: true, deduplicated: false });
+    assertEquals(uploads, 1);
+    assertEquals(readyCalls, 1);
+  }
+});
+
+Deno.test("ready exact and perceptual matches never create another object", async () => {
+  for (const matchKind of ["exact_ready", "perceptual"]) {
+    let callbacks = 0;
+    const result = await completeRegisteredSample(
+      matchKind,
+      () => {
+        callbacks += 1;
+        return Promise.resolve(null);
+      },
+      () => {
+        callbacks += 1;
+        return Promise.resolve(true);
+      },
+    );
+
+    assertEquals(result, { accepted: true, deduplicated: true });
+    assertEquals(callbacks, 0);
+  }
+});
+
+Deno.test("pending row with existing object tolerates storage conflict", async () => {
+  assert(
+    isStorageAlreadyExists({ statusCode: 409, code: "ResourceAlreadyExists" }),
+  );
+  const result = await completeRegisteredSample(
+    "resume_pending",
+    () => Promise.resolve({ statusCode: 409, code: "ResourceAlreadyExists" }),
+    () => Promise.resolve(true),
+  );
+
+  assertEquals(result, { accepted: true, deduplicated: false });
+});
+
+Deno.test("failed ready mark is repaired by the next resumed submission", async () => {
+  let readyAttempts = 0;
+  const upload = () =>
+    Promise.resolve({ statusCode: 409, code: "ResourceAlreadyExists" });
+  const first = await completeRegisteredSample(
+    "resume_pending",
+    upload,
+    () => {
+      readyAttempts += 1;
+      return Promise.resolve(false);
+    },
+  );
+  const second = await completeRegisteredSample(
+    "resume_pending",
+    upload,
+    () => {
+      readyAttempts += 1;
+      return Promise.resolve(true);
+    },
+  );
+
+  assertEquals(first, { accepted: false, stage: "ready" });
+  assertEquals(second, { accepted: true, deduplicated: false });
+  assertEquals(readyAttempts, 2);
+});
+
+Deno.test("temporary storage failure leaves registration resumable", async () => {
+  let readyCalls = 0;
+  const result = await completeRegisteredSample(
+    "resume_pending",
+    () => Promise.resolve({ statusCode: 503, code: "InternalError" }),
+    () => {
+      readyCalls += 1;
+      return Promise.resolve(true);
+    },
+  );
+
+  assertEquals(result, { accepted: false, stage: "storage" });
+  assertEquals(readyCalls, 0);
+});
+
+Deno.test("unknown match kinds fail closed without storage or activation side effects", async () => {
+  let callbacks = 0;
+  const result = await completeRegisteredSample(
+    "model_approved",
+    () => {
+      callbacks += 1;
+      return Promise.resolve(null);
+    },
+    () => {
+      callbacks += 1;
+      return Promise.resolve(true);
+    },
+  );
+
+  assertEquals(result, { accepted: false, stage: "registration" });
+  assertEquals(callbacks, 0);
 });
