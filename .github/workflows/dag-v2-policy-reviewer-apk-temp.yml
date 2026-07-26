@@ -65,9 +65,7 @@ jobs:
                   request = urllib.request.Request(
                       item["download_url"],
                       headers={
-                          "User-Agent": "Glosh-DAG-v2-reviewer-builder/04B (private reproducible build)",
-                          "Referer": item["source_page"],
-                          "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
+                          "User-Agent": "Glosh-DAG-v2-benchmark/04A (bounded research; no product inference)",
                       },
                   )
                   try:
