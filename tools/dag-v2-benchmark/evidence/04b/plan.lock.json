@@ -1,0 +1,36 @@
+{
+  "corpus_sha256": "52a6293838b5ea7d2ee5378d844d8d5f397a42bdf0362e26898e4f929910e010",
+  "created_before_human_labels": true,
+  "diagnostic_count": 60,
+  "files": {
+    "diagnostic-subset.lock.jsonl": {
+      "sha256": "fbca34ade0121b91a94ca7cf371afd8e15558537e4886cab4c08a57c87255da1",
+      "size_bytes": 12000
+    },
+    "label-schema.json": {
+      "sha256": "207aca98209e0974d07a27973da3543a3d62221ffeb23b7fad449949f0adae81",
+      "size_bytes": 680
+    },
+    "review-order.lock.jsonl": {
+      "sha256": "01f29707be7717830c35de29509e858a9d1ca84315305de764a4a0e51fba1651",
+      "size_bytes": 41853
+    },
+    "split.lock.jsonl": {
+      "sha256": "958fc8f15ad333ee2ad6686955231230f9c88ead37541a042077d60ed1c74f40",
+      "size_bytes": 52427
+    }
+  },
+  "near_duplicate_hamming_max": 5,
+  "plan_version": "dag-v2-04b-plan-1",
+  "sample_count": 203,
+  "seeds": {
+    "diagnostic": "dag-v2-04b-diagnostic-v1",
+    "order": "dag-v2-04b-blind-order-v1",
+    "split": "dag-v2-04b-split-v1"
+  },
+  "split_targets": {
+    "exploratory": 122,
+    "test": 40,
+    "validation": 41
+  }
+}

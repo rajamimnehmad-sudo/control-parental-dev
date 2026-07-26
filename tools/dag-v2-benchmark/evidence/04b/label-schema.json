@@ -1,0 +1,35 @@
+{
+  "additional_fields_allowed": false,
+  "decisions": [
+    "hide",
+    "show",
+    "unsure"
+  ],
+  "policy_version": "DAG_STRICT_MODESTY_V1",
+  "reasons": [
+    "adult_or_explicit",
+    "underwear_or_swimwear",
+    "deep_neckline_or_chest",
+    "abdomen",
+    "shoulder_or_armpit",
+    "elbow",
+    "knee",
+    "tight_clothing",
+    "transparency",
+    "age_uncertain",
+    "groups",
+    "other"
+  ],
+  "required_fields": [
+    "decision",
+    "policy_version",
+    "reasons",
+    "review_number",
+    "reviewed_at",
+    "reviewer_version",
+    "sample_id"
+  ],
+  "reviewer_version": "dag-v2-policy-reviewer-04b-1",
+  "schema_version": 1,
+  "unsure_training_role": "excluded"
+}

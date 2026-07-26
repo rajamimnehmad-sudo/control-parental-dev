@@ -44,6 +44,46 @@ IDs, p50, p95, máximos y porcentajes de cascada. `fetch-locked-corpus` descarga
 exclusivamente las URLs fijadas y falla si tamaño o SHA-256 cambiaron; nunca
 elige reemplazos silenciosamente.
 
+## Evaluación humana 04B
+
+El plan de revisión, el split y el subconjunto diagnóstico se verifican sin
+imágenes ni red:
+
+```bash
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
+```
+
+El revisor Android autónomo se construye con las 203 imágenes ya verificadas:
+
+```bash
+DAG_V2_BENCHMARK_CACHE=/tmp/dag-v2-benchmark-cache \
+  ./gradlew -p tools/dag-v2-benchmark/policy-reviewer \
+  :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
+```
+
+No tiene WebView ni permiso de Internet. Para CI, `DAG_V2_REVIEWER_FIXTURE=1`
+genera tres PNG mínimos desde texto y no descarga el corpus.
+
+Después de completar las 203 decisiones:
+
+```bash
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py \
+  validate-label-export /ruta/dag-v2-evaluation-04b.jsonl
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py \
+  --cache /tmp/dag-v2-benchmark-cache extract-signals \
+  --output /tmp/dag-v2-04b-signals.jsonl
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py \
+  select-policy --labels /ruta/dag-v2-evaluation-04b.jsonl \
+  --signals /tmp/dag-v2-04b-signals.jsonl --output /tmp/dag-v2-04b-seal.json
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py \
+  open-test --labels /ruta/dag-v2-evaluation-04b.jsonl \
+  --signals /tmp/dag-v2-04b-signals.jsonl \
+  --seal /tmp/dag-v2-04b-seal.json --output /tmp/dag-v2-04b-test.json
+```
+
+`open-test` rechaza una apertura previa al sello o una segunda apertura sobre
+el mismo destino.
+
 ## Runner Android aislado
 
 El runner no forma parte de `settings.gradle.kts` del producto, no tiene
@@ -77,5 +117,6 @@ tres modelos, manifiesto bloqueado, 72 IDs y cada imagen.
 python -m unittest discover -s tools/dag-v2-benchmark/tests -v
 python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-repository
 python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-evidence
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
 bash scripts/test_android_ci_scope.sh
 ```
