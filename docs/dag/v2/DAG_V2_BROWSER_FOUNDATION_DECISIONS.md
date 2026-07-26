@@ -94,7 +94,9 @@ El `ServiceWorkerClient` existe únicamente dentro del proceso aislado. Sin una 
 devuelve `null`; con una sesión activa exige atribución por `Origin`, `Referer`, URL/origen y
 contextos registrados. Un recurso funcional no atribuible devuelve `null` sin métricas; uno visual
 no atribuible queda neutro. Una solicitud atribuida a una generación cancelada no cambia la nueva.
-No guarda referencias a Compose, Activity o WebView y se retira al cerrar el Lab.
+No guarda referencias a Compose, Activity o WebView. Permanece instalado durante la vida del
+proceso `:dag2`: retirarlo al destruir una Activity producía una carrera con una reapertura
+inmediata del Lab, mientras que sin sesión activa ya es inerte.
 
 ## Destinos de red
 
@@ -119,10 +121,29 @@ fuera de este ticket y no se presenta como resuelto.
 
 Cada documento usa un WebView nuevo, por lo que su cliente, bridge y callbacks conservan la
 generación de origen. Al bloquear, volver a resultados, cambiar de documento o cerrar el Lab,
-Compose libera el WebView mediante `onRelease`.
+Compose libera el WebView mediante `onRelease`; además, un host propiedad de la Activity ejecuta la
+misma liberación si Android destruye la pantalla antes de que Compose alcance ese callback.
 La secuencia detiene la carga, navega a `about:blank`, retira script y puente, neutraliza clientes y
 descargas, cancela análisis pendientes y destruye el WebView. De ese modo el documento anterior no
 continúa ejecutándose ni puede alcanzar una sesión posterior.
+
+La apertura del Lab adquiere una generación de lifecycle y reinicia estado, historial y callbacks.
+Una Activity anterior que termina tarde no puede cerrar la generación nueva. Esto evita conservar
+la URL o el WebView anterior, elimina la pantalla blanca observada al cerrar y reabrir rápidamente,
+y garantiza una sola liberación aun cuando coincidan `onRelease` y `onDestroy`.
+
+## Correcciones surgidas de la validación física
+
+La primera carga física quedó detenida antes del análisis porque una navegación principal sin
+`Sec-Fetch-Dest` llevaba un `Accept` amplio que incluía formatos de imagen. El router priorizaba
+esa señal y devolvía un placeholder como documento HTML. La regla general corregida es que
+`isForMainFrame` siempre clasifica como `MainDocument`; el test de regresión cubre el `Accept`
+mixto real.
+
+La segunda corrección fue de lifecycle: cerrar y reabrir el Lab podía conservar estado o dejar una
+pantalla blanca por la destrucción tardía de la Activity anterior, y cerrar el router de recursos
+dejaba el pipeline inutilizable para la reapertura. El host explícito, el gate de generación y el
+reset completo de sesión corrigen la causa general sin condiciones por sitio.
 
 ## Corrección de Android CI
 
@@ -138,56 +159,58 @@ El run correctivo `30182570727`, job `89741575612`, completó correctamente buil
 equivalente `./gradlew testDevDebugUnitTest test ktlintCheck lintDevDebug detekt` y las tareas
 específicas de App Usuario y `:feature-dag2` también finalizaron correctamente.
 
-## Matriz Frávega A-F
+## Validación física SM-A235M
 
-La matriz física no se ejecutó porque ADB detectó sólo el SM-A235M `R58T34V31AE`, que no se instaló
-ni modificó, y no había un SM-S908E conectado. La evidencia local separa las variables sin declarar
-resultados de sitio:
+Se instaló in-place la APK DEV local en el Samsung SM-A235M `R58T34V31AE`, Android 14/API 34,
+build `UP1A.231005.007.A235MUBSAEYB1`, sin desinstalar ni borrar datos. La APK conserva
+`versionCode 279`, `versionName 1.0.1-dev` y SHA-256
+`ea6403d607b259ddde431fbad399315e6f94297b73e2156c450a24cc8d2e614a`.
 
-| Caso | Estado local | Evidencia |
-| --- | --- | --- |
-| A. WebView mínimo | Diseñado, físico pendiente | Los recursos funcionales usan WebView normal |
-| B. Runtime sin intercepción | Unitario correcto | Runtime idempotente, un observer, sin patch de history; fallback SPA único |
-| C. Runtime + router de test | Unitario correcto | HTML/CSS/JS/JSON/fuentes evitan el gateway |
-| D. Fail-closed real | Unitario correcto | No existe ruta `approved`; raster y SVG son neutros |
-| E. Service Worker | Unitario correcto | Router común; atribución inmutable y descarte tardío |
-| F. Bloqueo de anuncios | Excluido deliberadamente | No se importó la política v1 ni una excepción de sitio |
+La matriz completa ejecutó 10 aperturas normales y 10 con `Sin caché DEV` por sitio, 60 aperturas
+en total, manteniendo cada una al menos 20 segundos. Los tiempos son desde `document_started` hasta
+`structure_visible`:
 
+| Sitio | Modo | Aperturas estables | Estructura mín./prom./máx. | Placeholders aprox. | `console_error` |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Frávega | Normal | 10/10 | 3,539 / 3,886 / 4,504 s | 1.887 | 154 |
+| Frávega | Sin caché | 10/10 | 2,838 / 3,163 / 3,705 s | 844 | 795 |
+| Mimo | Normal | 10/10 | 0,288 / 0,417 / 1,363 s | 228 | 277 |
+| Mimo | Sin caché | 10/10 | 0,460 / 0,605 / 1,331 s | 232 | 275 |
+| Cheeky | Normal | 10/10 | 1,410 / 1,989 / 4,069 s | 694 | 62 |
+| Cheeky | Sin caché | 10/10 | 1,812 / 2,119 / 2,672 s | 693 | 61 |
+
+Cada grupo registró 10 `document_started`, 10 `document_committed`, 10
+`full_page_analysis_started`, 10 `full_page_analysis_completed`, 10
+`full_page_analysis_count`, 10 `structure_visible` y 10 `functional_stable_20s`.
+`stale_result_discarded` y `renderer_gone` fueron 0 en los seis grupos. El cambio entre aperturas
+produjo 10 `session_cancelled` por grupo, salvo Cheeky normal con 9 porque la primera apertura no
+tenía una sesión previa.
+
+Los contadores de consola son eventos internos sanitizados del sitio; no guardan mensaje, URL,
+consulta ni contenido. No hubo error fatal asociado, crash, ANR ni `renderer_gone`. En Frávega no
+apareció `Cannot read properties of undefined (reading 'length')`, `#__next` no colapsó y la
+estructura continuó visible después de 20 segundos. La temperatura de batería pasó de 29,0 °C a
+30,0 °C durante la secuencia prolongada conectada por USB, sin síntoma térmico.
+
+En los 60 documentos `full_page_analysis_count` fue exactamente `1`, hubo
+`functional_stable_20s` y ninguna respuesta tardía cambió una sesión nueva. Menús, categorías,
+tabs, modal, carrusel, scroll, lazy loading, enlaces, back, forward y recarga continuaron
+respondiendo. Mimo abrió y aplicó su drawer de filtros y acordeones como ruta SPA sin repetir el
+análisis. Frávega abrió y cerró el modal de ubicación, navegó categorías y conservó scripts, JSON y
+RSC; el rótulo `FILTRAR` de la categoría probada no abrió un panel al toque, mientras las demás
+interacciones y enlaces sí respondieron. Cheeky navegó inicio/categoría y back/forward; los grandes
+placeholders de la vista móvil limitaron el acceso visual a algunos controles inferiores, sin
+colapsar la estructura.
+
+Todas las superficies raster observadas permanecieron como rectángulos neutros; no apareció una
+fotografía real ni siquiera brevemente. Las imágenes lazy recibieron placeholders individuales sin
+loader o reanálisis global. WebView debugging permaneció desactivado y no existió socket devtools.
 No existe condición, allowlist ni excepción específica para Frávega, Mimo o Cheeky.
 
-## Modo sin caché y prueba física pendiente
+## Modo sin caché
 
 `Sin caché DEV` cambia WebView y Service Worker a `LOAD_NO_CACHE`, ejecuta `clearCache(true)` y crea
 una navegación nueva. El estado sólo existe en el Lab, que no se compila en Beta/Production.
-
-Con el SM-S908E conectado y autorizado:
-
-```bash
-adb -s SERIAL install -r app-user/build/outputs/apk/dev/debug/app-user-dev-debug.apk
-adb -s SERIAL shell am start -n com.contentfilter.user.dev/.dag.DagLauncherAlias
-adb -s SERIAL logcat -c
-adb -s SERIAL logcat -s DagV2Metrics:I chromium:E AndroidRuntime:E
-```
-
-Desde el menú de DAG elegir `Laboratorio DAG v2`. Para cada sitio ejecutar diez aperturas con caché
-normal y diez con `Sin caché DEV: activo`, esperar 20 segundos y recorrer menú, categoría, filtro,
-acordeón/modal, carrusel, lazy loading, back/forward y recarga. No usar `pm clear`, no desinstalar y
-no abrir la Activity interna directamente.
-
-Métricas esperadas por sesión:
-
-```text
-document_started
-document_committed
-full_page_analysis_started
-full_page_analysis_completed
-full_page_analysis_count
-structure_visible
-visual_placeholder_ready
-stale_result_discarded
-session_cancelled
-functional_stable_20s
-```
 
 ## Rollback
 
