@@ -1,7 +1,9 @@
 package com.contentfilter.user
 
 import android.app.Application
+import android.content.Context
 import android.util.Log
+import android.webkit.WebView
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
@@ -86,6 +88,13 @@ class UserApplication :
 
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        if (UserProcessIsolation.isDagV2Process(base.packageName, Application.getProcessName())) {
+            WebView.setDataDirectorySuffix(UserProcessIsolation.DagV2DataDirectorySuffix)
+        }
+    }
+
     override val workManagerConfiguration: Configuration
         get() =
             Configuration.Builder()
@@ -94,6 +103,7 @@ class UserApplication :
 
     override fun onCreate() {
         super.onCreate()
+        if (!UserProcessIsolation.shouldStartPrimaryProcessWork(packageName, Application.getProcessName())) return
         runCatching { VpnController.enableDevProtection(this) }
             .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }

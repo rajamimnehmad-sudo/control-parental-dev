@@ -5,6 +5,7 @@ import android.graphics.BitmapFactory
 import android.webkit.CookieManager
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import com.contentfilter.core.network.security.PublicNetworkDestinationGuard
 import okhttp3.Dns
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -458,23 +459,7 @@ internal data class DagImagePageSummary(
 }
 
 internal fun isPublicAddress(address: InetAddress): Boolean {
-    if (
-        address.isAnyLocalAddress ||
-        address.isLoopbackAddress ||
-        address.isLinkLocalAddress ||
-        address.isSiteLocalAddress ||
-        address.isMulticastAddress
-    ) {
-        return false
-    }
-    val bytes = address.address
-    if (bytes.size == 4) {
-        val first = bytes[0].toInt() and 0xff
-        val second = bytes[1].toInt() and 0xff
-        if (first == 100 && second in 64..127) return false
-    }
-    if (bytes.size == 16 && (bytes[0].toInt() and 0xfe) == 0xfc) return false
-    return true
+    return PublicNetworkDestinationGuard.isPublicAddress(address)
 }
 
 internal fun isProbableImageRequest(

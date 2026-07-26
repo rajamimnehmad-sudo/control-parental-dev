@@ -383,6 +383,16 @@ private fun DagBrowserContent(
                                     clearBrowsingCacheDialog = true
                                 },
                             )
+                            if (BuildConfig.DAG_V2_BROWSER_AVAILABLE) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Laboratorio DAG v2") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        context.startActivity(dagV2LabIntent(context))
+                                    },
+                                )
+                            }
                             if (BuildConfig.DAG_VISUAL_CALIBRATION_AVAILABLE) {
                                 HorizontalDivider()
                                 DropdownMenuItem(
@@ -611,6 +621,16 @@ private fun DagBrowserContent(
                                     clearBrowsingCacheDialog = true
                                 },
                             )
+                            if (BuildConfig.DAG_V2_BROWSER_AVAILABLE) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Laboratorio DAG v2") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        context.startActivity(dagV2LabIntent(context))
+                                    },
+                                )
+                            }
                             if (BuildConfig.DAG_VISUAL_CALIBRATION_AVAILABLE) {
                                 HorizontalDivider()
                                 DropdownMenuItem(
@@ -974,6 +994,9 @@ internal fun dagShareableUrl(url: String): String? =
         URI(url).takeIf { it.scheme.equals("https", ignoreCase = true) && !it.host.isNullOrBlank() }?.toString()
     }.getOrNull()
 
+internal fun dagV2LabIntent(context: Context): Intent =
+    Intent().setClassName(context.packageName, DagV2LabActivityClassName)
+
 private fun Context.findActivity(): Activity? {
     var current: Context? = this
     while (current is ContextWrapper) {
@@ -1038,3 +1061,4 @@ internal val DagNeonCyan = Color(0xFF00D8FF)
 internal val DagNeonViolet = Color(0xFF8C6CFF)
 private const val DagPreferencesName = "dag_browser_preferences"
 private const val DagThemePreferenceKey = "theme_preference"
+internal const val DagV2LabActivityClassName = "com.contentfilter.user.dag2.DagV2LabActivity"

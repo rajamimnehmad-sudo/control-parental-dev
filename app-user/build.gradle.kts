@@ -67,6 +67,7 @@ android {
                 "\"https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/dag-models/\"",
             )
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "true")
+            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "true")
         }
         create("beta") {
             dimension = "distribution"
@@ -74,11 +75,13 @@ android {
             versionNameSuffix = "-beta"
             buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
+            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
         }
         create("prod") {
             dimension = "distribution"
             buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
+            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
         }
     }
 
@@ -156,6 +159,7 @@ android {
 }
 
 dependencies {
+    add("devImplementation", project(":feature-dag2"))
     implementation(project(":core-domain"))
     implementation(project(":core-data"))
     implementation(project(":core-database"))
