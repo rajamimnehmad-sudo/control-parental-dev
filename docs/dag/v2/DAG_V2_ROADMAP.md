@@ -4,6 +4,8 @@
 
 Las fases se ejecutan estrictamente en el orden indicado. Completar una fase no inicia automáticamente la siguiente. Cada fase requiere un ticket propio, aprobación explícita y evidencia de su criterio de aceptación.
 
+La estrategia de modelo, computo, automatizacion y limites de recursos se define en `docs/dag/v2/DAG_V2_MODEL_AND_COMPUTE_STRATEGY.md`.
+
 ## 1. Archivo y contrato
 
 - Dependencia: ninguna; parte de `origin/main`.
@@ -31,30 +33,31 @@ Las fases se ejecutan estrictamente en el orden indicado. Completar una fase no 
 - Rollback: deshabilitar la función DEV y conservar las muestras sin activarlas ni borrarlas.
 - Puerta: queda prohibido iniciar automáticamente la fase 4.
 
-## 4. Dataset
+## 4. Dataset automatizado
 
 - Dependencia: calibración DEV validada y contrato de datos aprobado.
-- Riesgo: etiquetas incorrectas, duplicados, sesgo, pérdida de procedencia o material no autorizado.
-- Resultado: dataset versionado, deduplicado, trazable, balanceado y separado en entrenamiento, validación y prueba.
-- Criterio de aceptación: cada muestra tiene procedencia, política aplicable, etiqueta concluyente o estado incierto; no hay cruces entre particiones por duplicado visual.
+- Riesgo: etiquetas incorrectas, duplicados, sesgo, pérdida de procedencia, material no autorizado o fuga entre particiones.
+- Resultado: fábrica reproducible que valida licencias y procedencia, normaliza, deduplica, agrupa, preetiqueta con varios profesores, mide acuerdo y envía a revisión humana sólo incertidumbre y casos críticos. Produce un dataset versionado, trazable y separado en entrenamiento, validación y prueba.
+- Criterio de aceptación: cada muestra conserva procedencia, licencia, transformaciones, hashes, profesores, versiones, confianza y política aplicable; las etiquetas automáticas se distinguen de las humanas; `unsure` no entra como positivo o negativo; no hay cruces entre particiones por duplicado exacto o visual.
 - Rollback: retirar la versión candidata del dataset y volver a la última versión aprobada sin borrar evidencia histórica.
 - Puerta: queda prohibido iniciar automáticamente la fase 5.
 
-## 5. Entrenamiento desde cero
+## 5. Entrenamiento asistido y modelo propio
 
 - Dependencia: dataset aprobado y congelado para la corrida.
-- Riesgo: baja cobertura, sobreajuste o incorporación accidental de pesos preentrenados.
-- Resultado: modelo visual propio con pesos iniciales aleatorios que implementa las señales mínimas del contrato.
-- Criterio de aceptación: procedencia reproducible, ausencia verificada de pesos externos, métricas por señal y errores críticos dentro de límites aprobados.
+- Riesgo: baja cobertura, sobreajuste, licencia incompatible, dependencia de un proveedor, costo de GPU o aceptar pseudoetiquetas incorrectas.
+- Resultado: modelo visual propio de Glosh obtenido mediante ajuste y, cuando convenga, destilación de backbones preentrenados con licencia verificada. El entrenamiento pesado se ejecuta en GPU externa efímera con presupuesto, checkpoints, parada temprana y apagado automático.
+- Criterio de aceptación: pipeline reproducible desde el repositorio; procedencia completa de pesos y datos; licencias compatibles; métricas por señal y por subgrupo; conjunto de prueba independiente; comparación contra baselines; artefactos exportables sin dependencia del proveedor; costos y recursos registrados.
+- Regla: entrenar desde pesos aleatorios no es obligatorio. Sólo se autoriza mediante una prueba separada que demuestre una ventaja material y tenga presupuesto explícito de datos, GPU y tiempo.
 - Rollback: retirar el artefacto candidato y conservar el modelo anterior; DAG v1 continúa activo.
 - Puerta: queda prohibido iniciar automáticamente la fase 6.
 
 ## 6. Optimización Android
 
 - Dependencia: modelo candidato aprobado fuera del producto.
-- Riesgo: degradar precisión al cuantizar, aumentar memoria/temperatura o saturar el teléfono.
-- Resultado: artefacto Android reproducible y pipeline con concurrencia acotada.
-- Criterio de aceptación: paridad de seguridad dentro del margen aprobado; mediciones de latencia, PSS, CPU, temperatura y batería en Samsung SM-S908E; fallo cerrado.
+- Riesgo: degradar precisión al cuantizar, aumentar memoria/temperatura, saturar el teléfono o depender de un acelerador no disponible.
+- Resultado: artefacto Android reproducible, cuantizado cuando sea seguro, con pipeline de inferencia local y concurrencia acotada. Se compara ONNX Runtime con cualquier alternativa móvil únicamente mediante evidencia física.
+- Criterio de aceptación: paridad de seguridad dentro del margen aprobado; mediciones de latencia, PSS, CPU, temperatura y batería en Samsung SM-A235M y SM-S908E; fallo cerrado; modelo de respaldo; descarga principal firmada, hasheada, versionada y reversible.
 - Rollback: deshabilitar el artefacto optimizado y volver al candidato previo o a DAG v1.
 - Puerta: queda prohibido iniciar automáticamente la fase 7.
 
@@ -72,7 +75,7 @@ Las fases se ejecutan estrictamente en el orden indicado. Completar una fase no 
 - Dependencia: evidencia suficiente del modo sombra.
 - Riesgo: perseguir casos aislados, contaminar el conjunto de prueba o introducir regresiones al reentrenar.
 - Resultado: matriz física reproducible, errores etiquetados y nuevas versiones de dataset/modelo cuando correspondan.
-- Criterio de aceptación: pruebas sin cache en Frávega, Mimo y Cheeky sobre SM-S908E; corpus de política visual; regresión, rendimiento y temperatura documentados; conjunto de prueba permanece independiente.
+- Criterio de aceptación: pruebas sin cache en Frávega, Mimo y Cheeky sobre SM-A235M y SM-S908E; corpus de política visual; regresión, rendimiento y temperatura documentados; conjunto de prueba permanece independiente.
 - Rollback: retirar el último dataset/modelo candidato y volver a la última pareja aprobada; v1 sigue activo.
 - Puerta: queda prohibido iniciar automáticamente la fase 9.
 
