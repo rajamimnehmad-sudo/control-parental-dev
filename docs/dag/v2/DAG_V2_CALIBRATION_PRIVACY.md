@@ -24,6 +24,8 @@ Cookies y Referer pueden existir sólo en memoria durante una recuperación expl
 - AES-256-GCM con una clave no exportable de Android Keystore.
 - Archivos dentro de `noBackupFilesDir`.
 - Un archivo cifrado por pendiente.
+- Un outbox lleno rechaza la incorporación nueva de forma explícita; nunca elimina un pendiente para hacer lugar.
+- Los rechazos permanentes dejan un recibo AES-GCM separado cuyo payload conserva sólo el motivo sanitizado, sin JPEG; el nombre local y la fecha del archivo permiten administrarlo.
 - Bytes originales y previews liberados o sobrescritos cuando termina su uso.
 - Límites de cantidad, bytes y antigüedad evitan acumulación ilimitada.
 
@@ -50,5 +52,6 @@ Cualquier eliminación futura requiere un ticket administrativo destructivo sepa
 - Un host sanitizado conserva contexto de procedencia a nivel de dominio.
 - La deduplicación perceptual puede agrupar imágenes visualmente cercanas; no cambia por sí sola ninguna decisión global.
 - El outbox reintenta al abrir el Lab, no en segundo plano, para conservar el aislamiento del proceso `:dag2`.
+- La expiración local de pendientes y recibos es explícita y acotada; no borra muestras ni auditoría remotas.
 
 No existe uso de las etiquetas como preferencia personal ni transferencia a Production.

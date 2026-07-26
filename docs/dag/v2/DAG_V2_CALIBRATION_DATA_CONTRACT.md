@@ -47,6 +47,14 @@ La muestra remota registra:
 
 Estados: `pending`, `ready`, `rejected`.
 
+Semántica de recuperación exacta:
+
+- `ready`: devuelve la muestra existente con `created=false` y no vuelve a subir el objeto.
+- `rejected`: reutiliza el mismo `sample_id` y `storage_path`, vuelve a `pending` con metadatos validados y permite completar el upload.
+- `pending`: devuelve la misma identidad con `match_kind=resume_pending`; el cliente intenta el upload, tolera que el objeto ya exista y vuelve a marcar `ready`.
+
+`dag_v2_calibration_mark_sample` permite `pending → ready` y `pending → rejected`. Repetir `ready → ready` es éxito idempotente sin otra fila `sample_ready`; cualquier otra transición falla explícitamente.
+
 ## Etiqueta
 
 Valores permitidos:
@@ -95,3 +103,4 @@ La ruta de Storage se deriva del SHA-256: `samples/<prefijo>/<sha>.jpg`.
 - DAG v1 y sus tablas de calibración no reciben escrituras.
 - `unsure` se conserva, pero nunca se convierte en ejemplo binario.
 - El estado global requiere revisión futura; no existe activación automática.
+- Reanudar una muestra no crea una segunda fila ni un segundo objeto para el mismo SHA-256.

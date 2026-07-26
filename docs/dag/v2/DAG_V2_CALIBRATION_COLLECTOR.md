@@ -45,17 +45,20 @@ Cerrar o avanzar cancela trabajo pendiente, libera el bitmap y sobrescribe las r
 - Namespace completamente separado de Calibración v1.
 - Máximo 50 pendientes, 20 MiB totales y 30 días.
 - Deduplicación local por SHA-256 y decisión antes de escribir.
+- Una incorporación devuelve explícitamente `Queued`, `Duplicate`, `Full`, `TooLarge` o `PersistenceFailure`. Alcanzar un límite nunca elimina un `.enc` pendiente para aceptar una etiqueta nueva; si no se pudo guardar, el candidato y la preview permanecen disponibles para reintentar.
+- La expiración por antigüedad es una operación explícita al iniciar una sesión del Lab y no se usa implícitamente para hacer lugar a una etiqueta más nueva.
 - Envío inmediato y tres intentos acotados mientras el Lab está abierto.
 - Un éxito elimina sólo el pendiente aceptado.
-- Un fallo temporal conserva la copia cifrada.
-- Un fallo permanente se muestra con un motivo sanitizado.
+- Un fallo temporal conserva la copia cifrada y detiene la entrega ordenada para reintentar luego.
+- Un fallo permanente retira sólo ese pendiente, genera un recibo AES-GCM separado con motivo sanitizado y fecha, y permite continuar con los pendientes posteriores. La cuarentena tiene límites y retención propios; su rotación nunca borra muestras remotas ni archivos pendientes.
+- La ausencia transitoria de activación o token se clasifica como recuperable y no descarta la etiqueta.
 - Cerrar el Lab no descarta una etiqueta ya confirmada.
 
 No se usa WorkManager dentro de `:dag2`, para conservar la garantía de que ese proceso no inicia workers o sincronizaciones del proceso principal. El reintento equivalente se ejecuta al abrir el Lab.
 
 ## Backend DEV
 
-La migración `20260726041736_dag_v2_calibration_collector.sql` y la Edge Function `dag-v2-calibration` existen sólo en Supabase DEV `syeycayasyufedwoprea`.
+La migración base `20260726041736_dag_v2_calibration_collector.sql`, la migración correctiva forward-only `20260726111615_dag_v2_calibration_reliability.sql` y la Edge Function `dag-v2-calibration` existen sólo en Supabase DEV `syeycayasyufedwoprea`.
 
 La función:
 
@@ -67,6 +70,10 @@ La función:
 - conserva auditoría de creación, deduplicación, relabel y rechazo;
 - no expone lectura ni borrado;
 - no escribe tablas de DAG v1.
+
+La corrección permite reanudar una fila exacta `pending` con o sin objeto de Storage, restaura una exacta `rejected` para un nuevo upload y mantiene la deduplicación normal de una exacta `ready`. Un conflicto `already exists` durante la reanudación se acepta, el marcado `ready` es idempotente y su auditoría se inserta únicamente cuando ocurrió la transición.
+
+Antes y después de aplicar exclusivamente la migración correctiva y desplegar la versión 2 de la función en DEV se verificaron los mismos conteos: 4 muestras `ready`, 4 etiquetas `unsure` y 4 objetos privados. No se creó, modificó, borró ni reenvió ninguna de esas evidencias. Los asesores de seguridad y rendimiento no reportaron hallazgos sobre los objetos `dag_v2_calibration`; se conservó RLS sin políticas permisivas para clientes.
 
 ## Evidencia física
 
@@ -82,6 +89,8 @@ Dispositivo: Samsung SM-A235M `R58T34V31AE`, Android 14/API 34. APK DEV instalad
 - No se observó ninguna fotografía real dentro de WebView.
 
 Incidencia de validación: el primer APK del worktree se compiló sin importar el `.env` local y devolvió `config_unavailable`. Sus tres outboxes cifrados sobrevivieron y fueron entregados al instalar el APK correctamente configurado. Una comprobación adicional creó una cuarta muestra `unsure`, excediendo en una el máximo de tres solicitado. DEV contiene cuatro muestras privadas listas, cuatro etiquetas `unsure` y su auditoría. No se borró ni alteró ninguna porque este ticket prohíbe borrados; corregir esa evidencia requeriría un ticket administrativo destructivo explícito.
+
+Validación de confiabilidad posterior: Samsung SM-A235M `R58T34V31AE`, Android 14/API 34; APK instalada in-place sin cambiar `versionCode`, SHA-256 `605e969e9854ea52502a32c401b08d5bd01f4f98a2f1ee2c43f0f7066e2e9be4`. El Lab abrió desde el menú de DAG v1 con calibración apagada; Frávega conservó placeholders, activación y preview nativa no recargaron el documento, el cierre volvió a `Documento: 1`, y el log registró una sola vez `full_page_analysis_count=1`. No hubo crash, ANR ni `renderer_gone`. No se pulsó ninguna decisión y los conteos remotos permanecieron en cuatro.
 
 ## Rollback
 
