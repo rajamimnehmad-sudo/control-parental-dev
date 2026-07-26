@@ -42,32 +42,124 @@ jobs:
           python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-evidence
           python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
 
-      - name: Reconstruct locked corpus
-        id: corpus
-        continue-on-error: true
+      - name: Reconstruct locked corpus with pacing
         env:
           DAG_V2_BENCHMARK_CACHE: ${{ runner.temp }}/dag-v2-benchmark-cache
         run: |
-          set -o pipefail
-          python tools/dag-v2-benchmark/dag_v2_benchmark.py \
-            --cache "$DAG_V2_BENCHMARK_CACHE" fetch-locked-corpus \
-            2>&1 | tee "$RUNNER_TEMP/corpus-fetch.log"
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import time
+          import urllib.error
+          import urllib.request
 
-      - name: Upload corpus diagnostics on failure
-        if: steps.corpus.outcome == 'failure'
-        uses: actions/upload-artifact@v4
-        with:
-          name: dag-v2-policy-reviewer-corpus-diagnostics-${{ github.sha }}
-          path: ${{ runner.temp }}/corpus-fetch.log
-          if-no-files-found: error
-          retention-days: 1
+          root = pathlib.Path.cwd()
+          lock_path = root / "tools/dag-v2-benchmark/evidence/04a/corpus.lock.jsonl"
+          cache = pathlib.Path(os.environ["DAG_V2_BENCHMARK_CACHE"])
+          corpus = cache / "corpus"
+          corpus.mkdir(parents=True, exist_ok=True)
+          rows = [json.loads(line) for line in lock_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+          if len(rows) != 203:
+              raise SystemExit(f"expected 203 locked samples, found {len(rows)}")
 
-      - name: Stop after corpus failure
-        if: steps.corpus.outcome == 'failure'
-        run: exit 1
+          def digest(path):
+              h = hashlib.sha256()
+              size = 0
+              with path.open("rb") as source:
+                  for chunk in iter(lambda: source.read(1024 * 1024), b""):
+                      h.update(chunk)
+                      size += len(chunk)
+              return h.hexdigest(), size
+
+          runtime = []
+          for index, item in enumerate(rows, 1):
+              destination = corpus / item["relative_file"]
+              expected = (item["sha256"], int(item["size_bytes"]))
+              if not destination.exists() or digest(destination) != expected:
+                  temporary = destination.with_suffix(destination.suffix + ".partial")
+                  temporary.unlink(missing_ok=True)
+                  success = False
+                  for attempt in range(12):
+                      request = urllib.request.Request(
+                          item["download_url"],
+                          headers={
+                              "User-Agent": "Glosh-DAG-v2-reviewer-builder/04B (private reproducible build)",
+                              "Referer": item["source_page"],
+                              "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
+                          },
+                      )
+                      try:
+                          h = hashlib.sha256()
+                          size = 0
+                          with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
+                              for chunk in iter(lambda: response.read(256 * 1024), b""):
+                                  size += len(chunk)
+                                  if size > expected[1]:
+                                      raise RuntimeError("locked image exceeds expected size")
+                                  h.update(chunk)
+                                  output.write(chunk)
+                          actual = (h.hexdigest(), size)
+                          if actual != expected:
+                              raise RuntimeError(f"integrity mismatch expected={expected} actual={actual}")
+                          os.replace(temporary, destination)
+                          success = True
+                          break
+                      except urllib.error.HTTPError as error:
+                          temporary.unlink(missing_ok=True)
+                          if error.code != 429 or attempt == 11:
+                              raise
+                          retry_after = error.headers.get("Retry-After", "")
+                          delay = int(retry_after) if retry_after.isdigit() else min(120, 15 + attempt * 10)
+                          print(f"rate_limited sample={index}/203 delay={delay}s", flush=True)
+                          time.sleep(delay)
+                      except Exception:
+                          temporary.unlink(missing_ok=True)
+                          if attempt == 11:
+                              raise
+                          time.sleep(min(60, 5 + attempt * 5))
+                  if not success:
+                      raise RuntimeError(f"failed to reconstruct {item['sample_id']}")
+                  time.sleep(0.8)
+              runtime.append({
+                  "sample_id": item["sample_id"],
+                  "relative_file": item["relative_file"],
+                  "source": "Wikimedia Commons",
+                  "source_page": item["source_page"],
+                  "download_url": item["download_url"],
+                  "wikimedia_title": item["wikimedia_title"],
+                  "page_id": item["page_id"],
+                  "license": item["canonical_license"],
+                  "canonical_license": item["canonical_license"],
+                  "license_url": item["license_url"],
+                  "author": item["author"],
+                  "sha256": item["sha256"],
+                  "perceptual_hash64": item["perceptual_hash64"],
+                  "width": item["width"],
+                  "height": item["height"],
+                  "size_bytes": item["size_bytes"],
+                  "category": item["category"],
+                  "source_label": item["source_label"],
+                  "transformation": item["transformation"],
+                  "review_status": item["review_status"],
+                  "cluster_visual": item["cluster_visual"],
+              })
+              if index % 20 == 0 or index == len(rows):
+                  print(f"locked_corpus_progress={index}/203", flush=True)
+
+          manifest = corpus / "manifest.jsonl"
+          temporary_manifest = manifest.with_suffix(".partial")
+          temporary_manifest.write_text(
+              "".join(json.dumps(item, sort_keys=True) + "\n" for item in runtime),
+              encoding="utf-8",
+          )
+          os.replace(temporary_manifest, manifest)
+          print(f"locked_corpus=ok samples={len(runtime)} cache={corpus}")
+          PY
 
       - name: Build reviewer APK
-        if: steps.corpus.outcome == 'success'
         env:
           DAG_V2_BENCHMARK_CACHE: ${{ runner.temp }}/dag-v2-benchmark-cache
         run: |
@@ -77,7 +169,6 @@ jobs:
             :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
 
       - name: Stage and verify APK
-        if: steps.corpus.outcome == 'success'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/reviewer-artifact"
@@ -96,7 +187,6 @@ jobs:
             > BUILD_INFO.txt
 
       - name: Upload private APK artifact
-        if: steps.corpus.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: dag-v2-policy-reviewer-04b-${{ github.sha }}
