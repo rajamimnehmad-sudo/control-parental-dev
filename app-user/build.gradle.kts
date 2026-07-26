@@ -68,6 +68,7 @@ android {
             )
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "true")
             buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "true")
+            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "true")
         }
         create("beta") {
             dimension = "distribution"
@@ -76,12 +77,14 @@ android {
             buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
             buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
+            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "false")
         }
         create("prod") {
             dimension = "distribution"
             buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
             buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
+            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "false")
         }
     }
 
@@ -156,6 +159,22 @@ android {
             }
         }
     }
+}
+
+val verifyDagV2CalibrationPackaging by tasks.registering(Exec::class) {
+    group = "verification"
+    description = "Verifies that DAG v2 calibration is present only in the DEV merged app."
+    dependsOn(
+        "processDevDebugMainManifest",
+        "processBetaDebugMainManifest",
+        "processProdDebugMainManifest",
+    )
+    commandLine(
+        "bash",
+        rootProject.layout.projectDirectory
+            .file("scripts/dag/verify-dag-v2-calibration-packaging.sh")
+            .asFile.absolutePath,
+    )
 }
 
 dependencies {
