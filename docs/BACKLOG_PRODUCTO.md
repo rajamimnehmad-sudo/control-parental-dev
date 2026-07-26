@@ -51,6 +51,15 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### DAG-V2-CALIBRATION-COLLECTOR-03 - Colector DEV aislado
+
+- Estado: `Implementado y validado en DEV; Draft PR pendiente`. Autorizado explícitamente el 2026-07-26. Tipo: calibración, privacidad y backend DEV. Prioridad: P0. Esfuerzo: XL. Riesgo: alto.
+- Alcance cerrado: activación manual no persistente; cola de candidatos de la generación vigente; preview sólo en visor nativo; etiquetas `show`, `hide` y `unsure`; normalización JPEG; SHA-256/dHash; outbox AES-GCM; backend, bucket y tablas v2 separados.
+- Invariantes: WebView continúa con placeholders; las etiquetas no cambian página, thresholds, modelos ni DAG v1; `unsure` queda fuera de positivos/negativos; Beta y Production no contienen la superficie; no empezó dataset, entrenamiento, modo sombra ni Lote 4.
+- Validación: tests Android/backend, aislamiento, empaquetado por flavor, Gradle global y específico correctos. En SM-A235M, Frávega, Mimo y Cheeky mantuvieron `full_page_analysis_count == 1`, cero fotos reales dentro de WebView y preview únicamente tras selección explícita.
+- Incidencia: cuatro outboxes `unsure` terminaron entregados a DEV, uno por encima del máximo físico pedido de tres, después de corregir un APK local compilado sin `.env`. No se borró ni alteró evidencia; cualquier corrección requiere otro ticket destructivo explícito.
+- Rollback: deshabilitar el flag y retirar interfaz/envío sin cambiar navegador v2, DAG v1 ni evidencia remota.
+
 ### DAG-V2-BROWSER-FOUNDATION-02 - Base de navegador aislada
 
 - Estado: `Candidato DEV validado físicamente en SM-A235M; Draft PR abierto`. Autorizado explícitamente el 2026-07-24, pero no declarado aprobado. Tipo: navegador, seguridad y arquitectura. Prioridad: P0. Esfuerzo: XL. Riesgo: alto.
