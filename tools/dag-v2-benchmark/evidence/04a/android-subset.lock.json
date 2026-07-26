@@ -1,0 +1,654 @@
+{
+  "manifest_version": 1,
+  "sample_count": 72,
+  "samples": [
+    {
+      "category": "abdomen",
+      "expected_adult_score": 0.11037189902081307,
+      "expected_person_count": 1,
+      "file": "wmc-d66b7bcf8a120185f6e2.jpg",
+      "sample_id": "wmc-d66b7bcf8a120185f6e2",
+      "sha256": "d66b7bcf8a120185f6e23b9b8e3365240799358d6bbbd3e35027e777024c36fe",
+      "size_bytes": 8320
+    },
+    {
+      "category": "advertising",
+      "expected_adult_score": 0.0913970206228686,
+      "expected_person_count": 0,
+      "file": "wmc-14725584e520180d42b5.jpg",
+      "sample_id": "wmc-14725584e520180d42b5",
+      "sha256": "14725584e520180d42b5de8f151494b4283521b7d8c225d61903f78ab3faba75",
+      "size_bytes": 1430826
+    },
+    {
+      "category": "advertising_general",
+      "expected_adult_score": 0.0694290429801148,
+      "expected_person_count": 0,
+      "file": "wmc-07b1a594a2e45a70f3b3.jpg",
+      "sample_id": "wmc-07b1a594a2e45a70f3b3",
+      "sha256": "07b1a594a2e45a70f3b30aed3ef3eb9476a5f289e0c593f71bec7c317e0508de",
+      "size_bytes": 169033
+    },
+    {
+      "category": "animals",
+      "expected_adult_score": 0.0837948990010578,
+      "expected_person_count": 0,
+      "file": "wmc-97d51c12e4067e79c66e.jpg",
+      "sample_id": "wmc-97d51c12e4067e79c66e",
+      "sha256": "97d51c12e4067e79c66e4671868756517405159342ebab9acd1c6af035ac2216",
+      "size_bytes": 409390
+    },
+    {
+      "category": "books",
+      "expected_adult_score": 0.05344359686112964,
+      "expected_person_count": 0,
+      "file": "wmc-e99d6ff10834c667c6c2.jpg",
+      "sample_id": "wmc-e99d6ff10834c667c6c2",
+      "sha256": "e99d6ff10834c667c6c2f8950517bda4f1ffa707d359a3780f236c71ecb91b81",
+      "size_bytes": 427968
+    },
+    {
+      "category": "buildings",
+      "expected_adult_score": 0.057874153900606747,
+      "expected_person_count": 0,
+      "file": "wmc-cca10b9eb87d875f5403.jpg",
+      "sample_id": "wmc-cca10b9eb87d875f5403",
+      "sha256": "cca10b9eb87d875f540350cbdcb2eb3cdb71ccfa03636e92b2057826de9b9562",
+      "size_bytes": 180334
+    },
+    {
+      "category": "children_ordinary",
+      "expected_adult_score": 0.06522698174460807,
+      "expected_person_count": 1,
+      "file": "wmc-d724f3d1a25047292687.jpg",
+      "sample_id": "wmc-d724f3d1a25047292687",
+      "sha256": "d724f3d1a25047292687581d5fda2a1562933719ea4515a3a81583809bac2ebd",
+      "size_bytes": 284995
+    },
+    {
+      "category": "children_playing",
+      "expected_adult_score": 0.1886183694580129,
+      "expected_person_count": 1,
+      "file": "wmc-c22b37ee9c1219e5750e.jpg",
+      "sample_id": "wmc-c22b37ee9c1219e5750e",
+      "sha256": "c22b37ee9c1219e5750ea38beb028698112f5b57664e4cb935f719749dcd8015",
+      "size_bytes": 360079
+    },
+    {
+      "category": "cityscapes",
+      "expected_adult_score": 0.0873849510865175,
+      "expected_person_count": 0,
+      "file": "wmc-435f28b21b57ab0e6955.png",
+      "sample_id": "wmc-435f28b21b57ab0e6955",
+      "sha256": "435f28b21b57ab0e6955af94bbd6e58780c991ca41b1ef0f54a632d712806120",
+      "size_bytes": 2110870
+    },
+    {
+      "category": "clothing_products",
+      "expected_adult_score": 0.06957944221208473,
+      "expected_person_count": 0,
+      "file": "wmc-9ebc2da94a878d853191.jpg",
+      "sample_id": "wmc-9ebc2da94a878d853191",
+      "sha256": "9ebc2da94a878d85319109805a973ef3510d1e68af6f4e0d42c42f9405e2975b",
+      "size_bytes": 556904
+    },
+    {
+      "category": "computers",
+      "expected_adult_score": 0.051877553849424475,
+      "expected_person_count": 0,
+      "file": "wmc-650697b2830dbceb8241.jpg",
+      "sample_id": "wmc-650697b2830dbceb8241",
+      "sha256": "650697b2830dbceb82411f06a74a96aba59e3f2db2a1ed8a862de24e404e5695",
+      "size_bytes": 520724
+    },
+    {
+      "category": "drawings",
+      "expected_adult_score": 0.0703366619128498,
+      "expected_person_count": 0,
+      "file": "wmc-9ef751e053dbc2d5d43e.jpg",
+      "sample_id": "wmc-9ef751e053dbc2d5d43e",
+      "sha256": "9ef751e053dbc2d5d43edaba11d1a6b4cc201c1e96b5100ca75f24778063e57d",
+      "size_bytes": 1369394
+    },
+    {
+      "category": "elbows",
+      "expected_adult_score": 0.05336004210307825,
+      "expected_person_count": 1,
+      "file": "wmc-5b95788691287a68fcb8.jpg",
+      "sample_id": "wmc-5b95788691287a68fcb8",
+      "sha256": "5b95788691287a68fcb87934a6cb643265d304dc263e77fcdda755bf3eb3bc96",
+      "size_bytes": 176963
+    },
+    {
+      "category": "female_fashion_broad",
+      "expected_adult_score": 0.07932903084332504,
+      "expected_person_count": 1,
+      "file": "wmc-4b0fc59a7bb2cb65d021.jpg",
+      "sample_id": "wmc-4b0fc59a7bb2cb65d021",
+      "sha256": "4b0fc59a7bb2cb65d02150de897b3197c047197ad539a04c95d9e671882c5e7f",
+      "size_bytes": 474886
+    },
+    {
+      "category": "female_sports",
+      "expected_adult_score": 0.06893594686425006,
+      "expected_person_count": 4,
+      "file": "wmc-feaa72d9eabdf1576c51.jpg",
+      "sample_id": "wmc-feaa72d9eabdf1576c51",
+      "sha256": "feaa72d9eabdf1576c51a1b5e380fba766ac364e7c82381a0fbe28d84ad49c89",
+      "size_bytes": 328177
+    },
+    {
+      "category": "food",
+      "expected_adult_score": 0.06270616586269889,
+      "expected_person_count": 0,
+      "file": "wmc-de306ed7e7e754aa860b.jpg",
+      "sample_id": "wmc-de306ed7e7e754aa860b",
+      "sha256": "de306ed7e7e754aa860b23b5c3d16cf2e8f46859e686288a677f816336ce1d93",
+      "size_bytes": 42799
+    },
+    {
+      "category": "furniture",
+      "expected_adult_score": 0.05460330723532245,
+      "expected_person_count": 3,
+      "file": "wmc-7245779e2d37a4c67657.jpg",
+      "sample_id": "wmc-7245779e2d37a4c67657",
+      "sha256": "7245779e2d37a4c67657aab44252c031a82445bcb11bb24a0ccd0103fb6fcb3f",
+      "size_bytes": 218981
+    },
+    {
+      "category": "generated",
+      "expected_adult_score": 0.059118522693615595,
+      "expected_person_count": 4,
+      "file": "wmc-027f1ad347b7b16dc560.jpg",
+      "sample_id": "wmc-027f1ad347b7b16dc560",
+      "sha256": "027f1ad347b7b16dc560e6b3c2cdf864100a2f11be6f85cf70e87f2878440800",
+      "size_bytes": 110786
+    },
+    {
+      "category": "groups",
+      "expected_adult_score": 0.06332326184209774,
+      "expected_person_count": 4,
+      "file": "wmc-c79bfc4c0d3665187df0.jpg",
+      "sample_id": "wmc-c79bfc4c0d3665187df0",
+      "sha256": "c79bfc4c0d3665187df0fa952350d3044af4fd3d5528735fc2dc272aa24740d5",
+      "size_bytes": 410138
+    },
+    {
+      "category": "groups_general",
+      "expected_adult_score": 0.06835983419792521,
+      "expected_person_count": 1,
+      "file": "wmc-9e91473d60e0fbad7cbc.jpg",
+      "sample_id": "wmc-9e91473d60e0fbad7cbc",
+      "sha256": "9e91473d60e0fbad7cbc8159edc1326f76303dbf91faa1a9d4ccb0a7e3521f23",
+      "size_bytes": 259834
+    },
+    {
+      "category": "illustrations_general",
+      "expected_adult_score": 0.05250725829498779,
+      "expected_person_count": 1,
+      "file": "wmc-f47b11e4edb22db02dce.jpg",
+      "sample_id": "wmc-f47b11e4edb22db02dce",
+      "sha256": "f47b11e4edb22db02dce394abc365d42893ec94d0ad38a3f9e751e5ac0361e76",
+      "size_bytes": 293176
+    },
+    {
+      "category": "knees",
+      "expected_adult_score": 0.05318619867994779,
+      "expected_person_count": 1,
+      "file": "wmc-0c2622c4b609513d9d1b.jpg",
+      "sample_id": "wmc-0c2622c4b609513d9d1b",
+      "sha256": "0c2622c4b609513d9d1b4695afeabc20201f60be03eacf65bb67d8047687ad1b",
+      "size_bytes": 358879
+    },
+    {
+      "category": "landscapes",
+      "expected_adult_score": 0.05814656304746278,
+      "expected_person_count": 1,
+      "file": "wmc-a0a536f9ca794b146189.jpg",
+      "sample_id": "wmc-a0a536f9ca794b146189",
+      "sha256": "a0a536f9ca794b1461894004ec0881b0991038511ff5ab37786a001a05c5a424",
+      "size_bytes": 347120
+    },
+    {
+      "category": "men",
+      "expected_adult_score": 0.0696780308085853,
+      "expected_person_count": 1,
+      "file": "wmc-c15c75b826d2847b1828.jpg",
+      "sample_id": "wmc-c15c75b826d2847b1828",
+      "sha256": "c15c75b826d2847b1828451b39264af6f27c868e102706c3df6b2a2539adafeb",
+      "size_bytes": 44339
+    },
+    {
+      "category": "neckline",
+      "expected_adult_score": 0.08539848168206042,
+      "expected_person_count": 2,
+      "file": "wmc-1277d73912bd74921e9a.jpg",
+      "sample_id": "wmc-1277d73912bd74921e9a",
+      "sha256": "1277d73912bd74921e9a7130f84e4ff172ee4728bd2b1eac911d4c629ad7ee98",
+      "size_bytes": 42765
+    },
+    {
+      "category": "no_person",
+      "expected_adult_score": 0.0740068579413554,
+      "expected_person_count": 1,
+      "file": "wmc-df8d8d595c2eb956b179.png",
+      "sample_id": "wmc-df8d8d595c2eb956b179",
+      "sha256": "df8d8d595c2eb956b1799a25a660d0d258184f173273bf96b076f697336c174b",
+      "size_bytes": 68014
+    },
+    {
+      "category": "nudity_art",
+      "expected_adult_score": 0.7168394239027114,
+      "expected_person_count": 2,
+      "file": "wmc-2e6f4cc9886d7ff16fb5.jpg",
+      "sample_id": "wmc-2e6f4cc9886d7ff16fb5",
+      "sha256": "2e6f4cc9886d7ff16fb54050557238d621779d4fb77e4a1ab139c5f2583a8ff8",
+      "size_bytes": 252835
+    },
+    {
+      "category": "plants",
+      "expected_adult_score": 0.0596072517612787,
+      "expected_person_count": 0,
+      "file": "wmc-d111df57ede5f205ad70.jpg",
+      "sample_id": "wmc-d111df57ede5f205ad70",
+      "sha256": "d111df57ede5f205ad7034f74c15b07604c02fad6284fb33b27f8f96fc9a7423",
+      "size_bytes": 213929
+    },
+    {
+      "category": "shoulders",
+      "expected_adult_score": 0.07862087183822072,
+      "expected_person_count": 1,
+      "file": "wmc-c877459b81c29bad5ac2.jpg",
+      "sample_id": "wmc-c877459b81c29bad5ac2",
+      "sha256": "c877459b81c29bad5ac2107bfe0c5290c5c70dadf7256cf7f25d0a5548ae8b1f",
+      "size_bytes": 30536
+    },
+    {
+      "category": "small_images",
+      "expected_adult_score": 0.06119540069826225,
+      "expected_person_count": 0,
+      "file": "wmc-2eff007cd74317c9b77d.jpg",
+      "sample_id": "wmc-2eff007cd74317c9b77d",
+      "sha256": "2eff007cd74317c9b77dac926ea70be6c6c526c23676c29e9719fe49e508144c",
+      "size_bytes": 27121
+    },
+    {
+      "category": "store",
+      "expected_adult_score": 0.03567609418095164,
+      "expected_person_count": 2,
+      "file": "wmc-5ee8e58a9e35ba4512b8.jpg",
+      "sample_id": "wmc-5ee8e58a9e35ba4512b8",
+      "sha256": "5ee8e58a9e35ba4512b8ad1658fd644f72f5eebf519a82e394fa2e40c6c12110",
+      "size_bytes": 337347
+    },
+    {
+      "category": "tight",
+      "expected_adult_score": 0.9449612753149306,
+      "expected_person_count": 1,
+      "file": "wmc-925f7d883d87cc543683.jpg",
+      "sample_id": "wmc-925f7d883d87cc543683",
+      "sha256": "925f7d883d87cc5436833a6cb505641ac228172e8ed4ff521c8e6f1677ce2405",
+      "size_bytes": 73615
+    },
+    {
+      "category": "transparent",
+      "expected_adult_score": 0.059587392066890434,
+      "expected_person_count": 2,
+      "file": "wmc-e771ffe6f7ccee16d488.jpg",
+      "sample_id": "wmc-e771ffe6f7ccee16d488",
+      "sha256": "e771ffe6f7ccee16d488773c5fad4f075fa73ee24666b2374a459cef33bd1c02",
+      "size_bytes": 810839
+    },
+    {
+      "category": "underwear",
+      "expected_adult_score": 0.07238900531271866,
+      "expected_person_count": 4,
+      "file": "wmc-e9ee601989ec2c476b33.jpg",
+      "sample_id": "wmc-e9ee601989ec2c476b33",
+      "sha256": "e9ee601989ec2c476b33ba6972cc478e4f596f7d4fb78c72c4f5fd9371eb8ab3",
+      "size_bytes": 139622
+    },
+    {
+      "category": "vehicles",
+      "expected_adult_score": 0.07379833435556517,
+      "expected_person_count": 0,
+      "file": "wmc-c6ef2a81710240895799.jpg",
+      "sample_id": "wmc-c6ef2a81710240895799",
+      "sha256": "c6ef2a817102408957996bb4c98b85b56c43f1caf5bf954e800495fb88d6440a",
+      "size_bytes": 219847
+    },
+    {
+      "category": "women_dresses_broad",
+      "expected_adult_score": 0.06456388796133174,
+      "expected_person_count": 1,
+      "file": "wmc-cbe38716c34e0bc5fa44.jpg",
+      "sample_id": "wmc-cbe38716c34e0bc5fa44",
+      "sha256": "cbe38716c34e0bc5fa4451dbc0519822306ac7b0d2f52fe8bdec19fa4a11115f",
+      "size_bytes": 385755
+    },
+    {
+      "category": "women_events",
+      "expected_adult_score": 0.0767126607459511,
+      "expected_person_count": 1,
+      "file": "wmc-937bdc28eddea312bfe8.jpg",
+      "sample_id": "wmc-937bdc28eddea312bfe8",
+      "sha256": "937bdc28eddea312bfe8366ab60377ac64bfd00fca50b073c1a6adece7afab6c",
+      "size_bytes": 403908
+    },
+    {
+      "category": "women_permitted",
+      "expected_adult_score": 0.05398200383042055,
+      "expected_person_count": 1,
+      "file": "wmc-62b0b5e104ba602b611c.jpg",
+      "sample_id": "wmc-62b0b5e104ba602b611c",
+      "sha256": "62b0b5e104ba602b611cc4260d64362bc717bde3e689423c5100f780815ac263",
+      "size_bytes": 53244
+    },
+    {
+      "category": "women_portraits_broad",
+      "expected_adult_score": 0.14400648309298772,
+      "expected_person_count": 0,
+      "file": "wmc-73dce276a7648d25ff80.jpg",
+      "sample_id": "wmc-73dce276a7648d25ff80",
+      "sha256": "73dce276a7648d25ff80f969134b2172dedcb4f9e83f979ff02790612bf07ffb",
+      "size_bytes": 201780
+    },
+    {
+      "category": "women_shirts",
+      "expected_adult_score": 0.05131163195224065,
+      "expected_person_count": 1,
+      "file": "wmc-d21a3f761204d082f3f7.jpg",
+      "sample_id": "wmc-d21a3f761204d082f3f7",
+      "sha256": "d21a3f761204d082f3f7170d4abb260927ba537bb1df565a2109d68717b1a392",
+      "size_bytes": 22267
+    },
+    {
+      "category": "women_unspecified",
+      "expected_adult_score": 0.051670236319800784,
+      "expected_person_count": 1,
+      "file": "wmc-70f08463c2058a6cce3a.jpg",
+      "sample_id": "wmc-70f08463c2058a6cce3a",
+      "sha256": "70f08463c2058a6cce3a066c9d75cff8d564256cd78261e6aa2f096d86d4deab",
+      "size_bytes": 380110
+    },
+    {
+      "category": "abdomen",
+      "expected_adult_score": 0.12147779421892763,
+      "expected_person_count": 1,
+      "file": "wmc-45fb851fcf4ea7b1fd91.jpg",
+      "sample_id": "wmc-45fb851fcf4ea7b1fd91",
+      "sha256": "45fb851fcf4ea7b1fd913df79816079698e1fe381b3fb3fd1539234426259087",
+      "size_bytes": 153446
+    },
+    {
+      "category": "advertising",
+      "expected_adult_score": 0.08337304040720846,
+      "expected_person_count": 1,
+      "file": "wmc-eef155febd1992c72909.jpg",
+      "sample_id": "wmc-eef155febd1992c72909",
+      "sha256": "eef155febd1992c7290961359fd80f525e0946037974f1f1dbfd99beadf719ca",
+      "size_bytes": 454943
+    },
+    {
+      "category": "animals",
+      "expected_adult_score": 0.048704053644331384,
+      "expected_person_count": 0,
+      "file": "wmc-1c14993b87304baece09.jpg",
+      "sample_id": "wmc-1c14993b87304baece09",
+      "sha256": "1c14993b87304baece090a48c4dbedc886a28e8cd20abac113942e31345c1f17",
+      "size_bytes": 179074
+    },
+    {
+      "category": "books",
+      "expected_adult_score": 0.03641604087503095,
+      "expected_person_count": 0,
+      "file": "wmc-9b7166d3840bdfffb1fd.jpg",
+      "sample_id": "wmc-9b7166d3840bdfffb1fd",
+      "sha256": "9b7166d3840bdfffb1fd7555874bbb36c74dd9db54d7e7e563f3a4c0bc0bdebe",
+      "size_bytes": 480315
+    },
+    {
+      "category": "buildings",
+      "expected_adult_score": 0.0676383931859877,
+      "expected_person_count": 0,
+      "file": "wmc-5d1676415760aba7e6d7.jpg",
+      "sample_id": "wmc-5d1676415760aba7e6d7",
+      "sha256": "5d1676415760aba7e6d78efca230db4a333ffa06a89d22675727e7b4c5b70992",
+      "size_bytes": 267468
+    },
+    {
+      "category": "children_ordinary",
+      "expected_adult_score": 0.061814970973919525,
+      "expected_person_count": 2,
+      "file": "wmc-aa1a7cc2936c07dfadb9.jpg",
+      "sample_id": "wmc-aa1a7cc2936c07dfadb9",
+      "sha256": "aa1a7cc2936c07dfadb9061e34bbcdf492220702f57424931ece7c4e3301e755",
+      "size_bytes": 151489
+    },
+    {
+      "category": "children_playing",
+      "expected_adult_score": 0.061337993690831066,
+      "expected_person_count": 0,
+      "file": "wmc-809c18fadbfb7fbc3d34.jpg",
+      "sample_id": "wmc-809c18fadbfb7fbc3d34",
+      "sha256": "809c18fadbfb7fbc3d3403009bd26f873190fb31884757ee6f0b66c4d072e442",
+      "size_bytes": 332817
+    },
+    {
+      "category": "clothing_products",
+      "expected_adult_score": 0.059279396036284175,
+      "expected_person_count": 2,
+      "file": "wmc-f16c3b0b85fe513542f0.jpg",
+      "sample_id": "wmc-f16c3b0b85fe513542f0",
+      "sha256": "f16c3b0b85fe513542f05fad5a5eedbf6ff12baca8df0f4693844515d5224e70",
+      "size_bytes": 694504
+    },
+    {
+      "category": "computers",
+      "expected_adult_score": 0.0680707009962862,
+      "expected_person_count": 0,
+      "file": "wmc-6da4b47594ecc238c773.jpg",
+      "sample_id": "wmc-6da4b47594ecc238c773",
+      "sha256": "6da4b47594ecc238c7737748ed5c2c61a6d61faa944f7875a90a3eff8e7385e8",
+      "size_bytes": 56443
+    },
+    {
+      "category": "drawings",
+      "expected_adult_score": 0.13532750819523912,
+      "expected_person_count": 0,
+      "file": "wmc-1dfc96358da747bd47f0.jpg",
+      "sample_id": "wmc-1dfc96358da747bd47f0",
+      "sha256": "1dfc96358da747bd47f0edfb4774530aab99be036e03822bf5a778a44bc8b958",
+      "size_bytes": 257871
+    },
+    {
+      "category": "elbows",
+      "expected_adult_score": 0.061315718383525154,
+      "expected_person_count": 1,
+      "file": "wmc-10f4a5c45fc0a53c48ce.jpg",
+      "sample_id": "wmc-10f4a5c45fc0a53c48ce",
+      "sha256": "10f4a5c45fc0a53c48ce8ccc4829e294b8f359945e824af063cab4c99d70d685",
+      "size_bytes": 264503
+    },
+    {
+      "category": "female_fashion_broad",
+      "expected_adult_score": 0.08194989215754778,
+      "expected_person_count": 1,
+      "file": "wmc-31f122fd9c27f02b9243.jpg",
+      "sample_id": "wmc-31f122fd9c27f02b9243",
+      "sha256": "31f122fd9c27f02b92434cc23bdcaec6be5585261df4f7325b15fc32fbfea287",
+      "size_bytes": 633009
+    },
+    {
+      "category": "female_sports",
+      "expected_adult_score": 0.11717522569663642,
+      "expected_person_count": 1,
+      "file": "wmc-ef015296891028c3bb36.jpg",
+      "sample_id": "wmc-ef015296891028c3bb36",
+      "sha256": "ef015296891028c3bb36e8b08cf37471f75c5fa0dea0a968d2e4ca23f8ad2267",
+      "size_bytes": 230257
+    },
+    {
+      "category": "food",
+      "expected_adult_score": 0.048458605924876365,
+      "expected_person_count": 3,
+      "file": "wmc-48704a77c7047e6badf9.jpg",
+      "sample_id": "wmc-48704a77c7047e6badf9",
+      "sha256": "48704a77c7047e6badf9492cd90af79ac9e8a00b0c64ca6fe970d597f2ca9ea4",
+      "size_bytes": 189535
+    },
+    {
+      "category": "furniture",
+      "expected_adult_score": 0.06654629636929967,
+      "expected_person_count": 1,
+      "file": "wmc-76c757cc5d71f70099a6.jpg",
+      "sample_id": "wmc-76c757cc5d71f70099a6",
+      "sha256": "76c757cc5d71f70099a6a37c388129f43299cccfae156b8c7bf68392032b2bfb",
+      "size_bytes": 194366
+    },
+    {
+      "category": "groups",
+      "expected_adult_score": 0.055650737342811514,
+      "expected_person_count": 3,
+      "file": "wmc-3a3d9001478a8c067e45.jpg",
+      "sample_id": "wmc-3a3d9001478a8c067e45",
+      "sha256": "3a3d9001478a8c067e451ac0d934f4c907c93282055125a06cd6dd3fedb374ed",
+      "size_bytes": 89701
+    },
+    {
+      "category": "groups_general",
+      "expected_adult_score": 0.052021702495392605,
+      "expected_person_count": 1,
+      "file": "wmc-8e8f8d6187862661f50e.jpg",
+      "sample_id": "wmc-8e8f8d6187862661f50e",
+      "sha256": "8e8f8d6187862661f50e5f3e7799ab98cfc1c8c4d2c3b9e6cf5a33e50de0b86d",
+      "size_bytes": 544458
+    },
+    {
+      "category": "illustrations_general",
+      "expected_adult_score": 0.08573735969121292,
+      "expected_person_count": 0,
+      "file": "wmc-577114c09b3823ef2a0e.png",
+      "sample_id": "wmc-577114c09b3823ef2a0e",
+      "sha256": "577114c09b3823ef2a0e52403a258736602ec91208b763653875e8c5459da257",
+      "size_bytes": 15676
+    },
+    {
+      "category": "knees",
+      "expected_adult_score": 0.13262730062411776,
+      "expected_person_count": 4,
+      "file": "wmc-40f6966d581c3e8d98a0.jpg",
+      "sample_id": "wmc-40f6966d581c3e8d98a0",
+      "sha256": "40f6966d581c3e8d98a05b50b4ab25ce3a33e094fc63c23ab6575c78892ca58a",
+      "size_bytes": 532732
+    },
+    {
+      "category": "landscapes",
+      "expected_adult_score": 0.053677202940014795,
+      "expected_person_count": 0,
+      "file": "wmc-555f0a2cbe7f71bf9944.jpg",
+      "sample_id": "wmc-555f0a2cbe7f71bf9944",
+      "sha256": "555f0a2cbe7f71bf9944520d94eb024ea74a8d3fe281541e653efd0bb7583142",
+      "size_bytes": 298859
+    },
+    {
+      "category": "men",
+      "expected_adult_score": 0.05000388670771951,
+      "expected_person_count": 1,
+      "file": "wmc-272e13993ec3f90fd378.jpg",
+      "sample_id": "wmc-272e13993ec3f90fd378",
+      "sha256": "272e13993ec3f90fd3783c3c94991f568380bd41f980fad8aeef8e9d9300316d",
+      "size_bytes": 96960
+    },
+    {
+      "category": "neckline",
+      "expected_adult_score": 0.6532417935882444,
+      "expected_person_count": 1,
+      "file": "wmc-94c1b043bc39418e65be.jpg",
+      "sample_id": "wmc-94c1b043bc39418e65be",
+      "sha256": "94c1b043bc39418e65beec7e8d6aaafeba2b40b1e0d1a1aaf134cdf960d4ba64",
+      "size_bytes": 494106
+    },
+    {
+      "category": "no_person",
+      "expected_adult_score": 0.15148471609385408,
+      "expected_person_count": 0,
+      "file": "wmc-6717cd419af2a2cc46e1.jpg",
+      "sample_id": "wmc-6717cd419af2a2cc46e1",
+      "sha256": "6717cd419af2a2cc46e1db193e6e8294574ca252b9b76e926761f92a1c56058d",
+      "size_bytes": 94761
+    },
+    {
+      "category": "nudity_art",
+      "expected_adult_score": 0.06510661740443441,
+      "expected_person_count": 0,
+      "file": "wmc-f046a0c5cf1f12dc932f.jpg",
+      "sample_id": "wmc-f046a0c5cf1f12dc932f",
+      "sha256": "f046a0c5cf1f12dc932f801321c6064f17645a2fc84b66c6b74bcb6911f747ee",
+      "size_bytes": 295488
+    },
+    {
+      "category": "plants",
+      "expected_adult_score": 0.06748073063547179,
+      "expected_person_count": 0,
+      "file": "wmc-bedc48a51c6d9bac8aea.jpg",
+      "sample_id": "wmc-bedc48a51c6d9bac8aea",
+      "sha256": "bedc48a51c6d9bac8aeaac623b6a61b7116a7f03bc0f8aa4d9372d7647861503",
+      "size_bytes": 206625
+    },
+    {
+      "category": "shoulders",
+      "expected_adult_score": 0.04498054283492488,
+      "expected_person_count": 1,
+      "file": "wmc-0fcaf057167fa04bd339.jpg",
+      "sample_id": "wmc-0fcaf057167fa04bd339",
+      "sha256": "0fcaf057167fa04bd339003a1e0dd66914f2cd6a2ad48118703f156488359a26",
+      "size_bytes": 75097
+    },
+    {
+      "category": "small_images",
+      "expected_adult_score": 0.05782717947584035,
+      "expected_person_count": 0,
+      "file": "wmc-e465a221c4008aa77d90.jpg",
+      "sample_id": "wmc-e465a221c4008aa77d90",
+      "sha256": "e465a221c4008aa77d903599be1e0d173eab402913b0ba5df33f114ec437c1ab",
+      "size_bytes": 23404
+    },
+    {
+      "category": "store",
+      "expected_adult_score": 0.034331292688075284,
+      "expected_person_count": 3,
+      "file": "wmc-e7ad990cbd6c777f8ec0.jpg",
+      "sample_id": "wmc-e7ad990cbd6c777f8ec0",
+      "sha256": "e7ad990cbd6c777f8ec08ba8a4f0d98cd50759dfe58e9e0585ad865e19018cd4",
+      "size_bytes": 427496
+    },
+    {
+      "category": "tight",
+      "expected_adult_score": 0.04676656149929497,
+      "expected_person_count": 0,
+      "file": "wmc-8be89c15880f91325f86.jpg",
+      "sample_id": "wmc-8be89c15880f91325f86",
+      "sha256": "8be89c15880f91325f86fad56cb62fb8e8b7cc98594bf212984ce2d0b163a4a1",
+      "size_bytes": 167806
+    },
+    {
+      "category": "transparent",
+      "expected_adult_score": 0.06287750560211366,
+      "expected_person_count": 0,
+      "file": "wmc-d9b869c5d0df111128b9.jpg",
+      "sample_id": "wmc-d9b869c5d0df111128b9",
+      "sha256": "d9b869c5d0df111128b998643e2ba27b6af058f42dbfe19af54c664f0f0e9bce",
+      "size_bytes": 118243
+    },
+    {
+      "category": "underwear",
+      "expected_adult_score": 0.5689366381485119,
+      "expected_person_count": 1,
+      "file": "wmc-937dbec4d83de0c77d79.jpg",
+      "sample_id": "wmc-937dbec4d83de0c77d79",
+      "sha256": "937dbec4d83de0c77d79c26094d7f71d269f916307d9d0f9deca35cbde0679bc",
+      "size_bytes": 133689
+    }
+  ]
+}

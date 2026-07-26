@@ -1,0 +1,30 @@
+{
+  "files": {
+    "tools/dag-v2-benchmark/evidence/04a/android-subset.lock.json": {
+      "sha256": "b4fbd2d6cc9777f882620df26a53378ae2c7ca45732914043ab09f47cdd6235d",
+      "size_bytes": 24125
+    },
+    "tools/dag-v2-benchmark/evidence/04a/corpus.lock.jsonl": {
+      "sha256": "52a6293838b5ea7d2ee5378d844d8d5f397a42bdf0362e26898e4f929910e010",
+      "size_bytes": 201686
+    },
+    "tools/dag-v2-benchmark/evidence/04a/evidence.jsonl": {
+      "sha256": "5d043a03e317a75b73bae15022d8ea964cf3d8e699968f0ba5c972e5ef3a24f3",
+      "size_bytes": 157049
+    },
+    "tools/dag-v2-benchmark/evidence/04a/run.json": {
+      "sha256": "61f360890fbcef14ed5c15369c0c7782be0db77906b264253986feaa3d84e45d",
+      "size_bytes": 547
+    },
+    "tools/dag-v2-benchmark/evidence/04a/summary.json": {
+      "sha256": "8f73ba7d2d8af1d9f7703853569cfeaae7e742b18a56ae48650ed8f42a35b919",
+      "size_bytes": 3543
+    },
+    "tools/dag-v2-benchmark/models.lock.json": {
+      "sha256": "81496fb1c513e53e5b4e2f5ec32564a0f20b45ab5097a353d580420999f8a0c5",
+      "size_bytes": 3276
+    }
+  },
+  "sample_count": 203,
+  "schema_version": 1
+}

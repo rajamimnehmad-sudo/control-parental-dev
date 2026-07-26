@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+android-runner/.gradle/
+android-runner/app/build/
+android-runner/local.properties

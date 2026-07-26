@@ -82,14 +82,26 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ## DAG-V1-ARCHIVE-V2-CONTRACT-01 - archivo y contrato, sin cambio funcional - 2026-07-24
 
 - DAG v1 queda archivado como respaldo verificable desde el commit `486c564be62ab336cfc815b223343b9419370f14`; sus modelos y archivos de política permanecen en su ubicación original y se verifican por tamaño y SHA-256 mediante `scripts/dag/verify-dag-v1-archive.sh`.
+- Lote 1 fue fusionado en PR #67 mediante
+  `72151326c902cf93fa2b1a4996262d683fde6170`.
 - La documentación canónica vive en `docs/dag/v1/` y `docs/dag/v2/`. Registra comportamiento, thresholds por defecto, precedencia, infraestructura, limitaciones, rendimiento, rollback, contrato de producto, frontera arquitectónica y roadmap.
-- Decisión de producto: DAG v2 se construirá separado de DAG v1 y utilizará un único modelo visual propio, entrenado desde cero con pesos iniciales aleatorios para la política acordada. No agregará dependencias hacia las clases internas de decisión visual de v1.
+- Decisión vigente actualizada en PR #70
+  (`b4f1b6600d16f5dde2a30799c3df060ef72c872c`): DAG v2 se
+  construirá separado de DAG v1 y utilizará un modelo visual propio para la
+  política acordada. Puede ajustar o destilar pesos preentrenados con licencia
+  verificada; entrenar desde pesos aleatorios dejó de ser obligatorio. No
+  agregará dependencias hacia las clases internas de decisión visual de v1.
 - DAG v1 no se borrará hasta que v2 esté validado, estable, haya completado modo sombra y canary, y exista una decisión manual de retiro con rollback probado.
-- Orden cerrado de v2: archivo y contrato; navegador base; calibración DEV; dataset; entrenamiento desde cero; optimización Android; modo sombra; pruebas físicas y reentrenamiento; canary; retiro de v1. Ninguna fase inicia automáticamente la siguiente.
+- Orden cerrado de v2: archivo y contrato; navegador base; calibración DEV;
+  baseline 04A; dataset; entrenamiento asistido/modelo propio; optimización
+  Android; modo sombra; pruebas físicas y reentrenamiento; canary; retiro de
+  v1. Ninguna fase inicia automáticamente la siguiente.
 - Este ticket es exclusivamente documental: no cambia APK, navegador, filtro, modelo, thresholds, Calibración DEV, App Admin, `versionCode`, Supabase ni Production; no publica ni borra datos.
 
 ## DAG-V2-BROWSER-FOUNDATION-02 - candidato DEV validado físicamente en SM-A235M - 2026-07-26
 
+- Lote 2 fue fusionado en PR #68 mediante
+  `45ab039e798f18fc3012bd36690a761d878ccc7a`.
 - `:feature-dag2` vive bajo `com.contentfilter.user.dag2` y App Usuario lo incorpora exclusivamente con `devImplementation`. La Activity es interna (`exported=false`), sin `intent-filter`, y sólo se abre desde `Laboratorio DAG v2` en el menú DAG cuando `DAG_V2_BROWSER_AVAILABLE=true`; Beta y Production usan `false`.
 - El Lab se ejecuta en `:dag2`, configura el directorio WebView `dag2` antes de crear WebView y corta la inicialización propia del proceso principal antes de VPN, WorkManager, sincronizaciones, receptores, monitores o servicios. DAG v1 sigue siendo el navegador predeterminado; sus modelos, assets, thresholds, calibración y decisión visual no cambiaron. Su cargador reutiliza ahora el mismo guard neutral compartido de destinos públicos en lugar de mantener una implementación parcial separada.
 - Cada documento crea un `DagV2DocumentRequestContext` inmutable con `sessionId`, `navigationToken`, URL, origen y fecha. WebView, análisis, bridge, router y callbacks quedan ligados a esa generación: una navegación B invalida A y ningún recurso o callback tardío de A puede modificar métricas, visibilidad, URL, contador o estado de B. Una solicitud visual sin atribución segura falla a placeholder; una funcional no atribuible conserva el bypass sin contaminar otra sesión.
@@ -107,6 +119,8 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 
 ## DAG-V2-CALIBRATION-COLLECTOR-03 - colector DEV validado en SM-A235M - 2026-07-26
 
+- Lote 3 fue fusionado en PR #69 mediante
+  `e8232968dc3b4feb52663c800505101bdd5e657c`.
 - Calibración DAG v2 está separada de v1 y disponible sólo con `DAG_V2_CALIBRATION_AVAILABLE=true` en App Usuario DEV. Comienza apagada cada sesión, requiere confirmación y no recarga, no crea otra sesión ni cambia `fullPageAnalysisCount`.
 - La cola acepta sólo raster de la generación vigente. El recurso real se descarga tras selección explícita, valida HTTPS/redirects/destino público, se normaliza a JPEG sRGB sin EXIF de hasta 768 px/512 KiB y se muestra exclusivamente en un visor Compose nativo. WebView conserva siempre placeholders.
 - La identidad usa SHA-256 de bytes normalizados y dHash64 con distancia máxima 5. El outbox independiente usa AES-GCM/Android Keystore en `noBackupFilesDir`, conserva fallos temporales y elimina sólo la entrega aceptada.
@@ -117,6 +131,40 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 - Incidencia: el primer APK físico se compiló desde un worktree sin cargar el `.env` local y dejó tres outboxes con `config_unavailable`. Al instalar la APK correctamente configurada, esos tres pendientes y una comprobación adicional se entregaron: DEV contiene cuatro muestras privadas `ready`, cuatro etiquetas `unsure` y auditoría, una muestra por encima del máximo solicitado. No se borró ni alteró ningún dato porque hacerlo requiere otro ticket destructivo.
 - Validación posterior de confiabilidad en el mismo SM-A235M: APK SHA-256 `605e969e9854ea52502a32c401b08d5bd01f4f98a2f1ee2c43f0f7066e2e9be4`, instalada in-place sin cambiar `versionCode`. El Lab abrió desde DAG v1 con calibración apagada, Frávega mantuvo placeholders, la preview se abrió y cerró fuera de WebView, `full_page_analysis_count` quedó en 1 y no hubo crash, ANR ni `renderer_gone`. No se pulsó ninguna etiqueta; antes y después siguieron exactamente 4 muestras `ready`, 4 etiquetas `unsure` y 4 objetos privados.
 - No hubo incremento de versión, publicación de APK, Production, App Admin ni borrado. DAG v1 continúa predeterminado e intacto. No se inició dataset, entrenamiento, modo sombra ni Lote 4.
+
+## DAG-V2-NO-GPU-BASELINE-BENCHMARK-04A - benchmark independiente - 2026-07-26
+
+- PR #70, fusionado mediante
+  `b4f1b6600d16f5dde2a30799c3df060ef72c872c`, fijó la estrategia
+  vigente de modelos preentrenados con licencia, ajuste/destilación, recursos
+  acotados y gates pequeños antes de escalar.
+- 04A crea sólo tooling y documentación fuera del producto. Compara una
+  referencia Marqo NSFW archivada, MediaPipe Pose Lite y MediaPipe Selfie
+  Multiclass por CPU, con artefactos hasheados en caché externa y un corpus
+  público trazable de Wikimedia Commons.
+- La corrida final procesó 203 imágenes en Mac M2/CPU. p50: 36,79 ms NSFW,
+  19,77 ms Pose y 129,12 ms segmentación; pico RSS 771.751.936 bytes. La
+  simulación adaptativa alcanzó pose en 98,52% y segmentación en 68,47%.
+- El runner Android autónomo, no incluido en el producto y sin variante
+  Release, midió 72 imágenes en SM-A235M: p50 CPU 245,01 ms NSFW, 139,13 ms
+  Pose y 784,79 ms segmentación. NNAPI empeoró NSFW a 1.199,78 ms; GPU
+  MediaPipe no estuvo disponible. Sin crash ni ANR; paridad adulta MAE 0,008715
+  y conteo pose 71/72.
+- Decisión: `NO-GO`. No hay etiquetas humanas de política ni señales
+  suficientes de apariencia femenina, edad, ajuste o transparencia; no se
+  selecciona modelo ni se inicia cache/04B. Próxima propuesta no autorizada:
+  `DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B`.
+- Corrección de trazabilidad en PR #71: las 203 muestras quedaron bloqueadas
+  con URL pública, `page_id`, licencia canónica, hashes y metadatos; evidencia,
+  corrida, resumen, subconjunto Android y checksums son versionados y
+  recalculables sin red. La auditoría estricta aceptó 203/203 y no cambió
+  corpus ni métricas. CI especializado verifica el bundle sin descargar
+  modelos/imágenes, mientras el scope Android devuelve `none` para cambios
+  exclusivos del benchmark.
+- No cambió Android de producto, DAG v1, Calibración DEV, Supabase, App Admin,
+  `versionCode` ni Production. El APK debug fue sólo el runner aislado local;
+  no se publicó. El provider visible v2 sigue devolviendo sólo `Hide`; no se
+  inició dataset, entrenamiento, modo sombra ni 04B.
 
 ## Publicacion Usuario DEV 279 - carga progresiva y calibracion binaria - 2026-07-24
 

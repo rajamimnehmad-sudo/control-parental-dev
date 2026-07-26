@@ -35,12 +35,30 @@ La estrategia de modelo, computo, automatizacion y limites de recursos se define
 
 ## 4. Dataset automatizado
 
-- Dependencia: calibración DEV validada y contrato de datos aprobado.
+- Dependencia: calibración DEV validada, contrato de datos aprobado y baseline
+  visual 04A cerrado con licencias, hashes, costo y limitaciones verificables.
 - Riesgo: etiquetas incorrectas, duplicados, sesgo, pérdida de procedencia, material no autorizado o fuga entre particiones.
 - Resultado: fábrica reproducible que valida licencias y procedencia, normaliza, deduplica, agrupa, preetiqueta con varios profesores, mide acuerdo y envía a revisión humana sólo incertidumbre y casos críticos. Produce un dataset versionado, trazable y separado en entrenamiento, validación y prueba.
 - Criterio de aceptación: cada muestra conserva procedencia, licencia, transformaciones, hashes, profesores, versiones, confianza y política aplicable; las etiquetas automáticas se distinguen de las humanas; `unsure` no entra como positivo o negativo; no hay cruces entre particiones por duplicado exacto o visual.
 - Rollback: retirar la versión candidata del dataset y volver a la última versión aprobada sin borrar evidencia histórica.
 - Puerta: queda prohibido iniciar automáticamente la fase 5.
+
+### Puerta 04A — baseline visual sin GPU paga
+
+- Estado: cerrado como `NO-GO`; no integra modelos al navegador ni autoriza
+  04B.
+- Dependencia: fases 1–3 fusionadas.
+- Riesgo: confundir señales de modelos generales con cumplimiento de la
+  política, seleccionar pesos sin licencia o extrapolar Mac a Android.
+- Resultado: lock reproducible, corpus acotado y trazable, métricas por etapa y
+  simulación de cascadas.
+- Criterio de aceptación: ninguna imagen/modelo grande en Git, provider visible
+  sigue en `Hide`, licencias verificadas, gate pequeño antes de escalar,
+  resultados sin afirmar precisión donde no hay etiqueta humana y decisión
+  explícita `GO`, `GO CONDICIONAL` o `NO-GO`.
+- Rollback: retirar herramienta e informes. El runner debug local está aislado
+  del producto y no hay backend ni decisión activa que revertir.
+- Puerta: el cierre de 04A no inicia dataset, entrenamiento ni 04B.
 
 ## 5. Entrenamiento asistido y modelo propio
 

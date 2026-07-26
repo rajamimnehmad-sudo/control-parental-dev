@@ -1,0 +1,5 @@
+mediapipe==0.10.21
+numpy==1.26.4
+onnxruntime==1.19.2
+Pillow==11.3.0
+psutil==7.0.0

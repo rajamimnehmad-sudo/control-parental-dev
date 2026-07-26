@@ -94,11 +94,16 @@ La política no depende de que el contenido se describa con una categoría concr
 
 DAG v2 utilizará un único modelo visual propio:
 
-- entrenado desde cero;
-- con pesos iniciales aleatorios;
 - diseñado específicamente para esta política;
-- sin depender de pesos preentrenados de DAG v1 ni de modelos visuales externos;
+- obtenido mediante una estrategia reproducible que puede ajustar o destilar
+  backbones preentrenados con licencia y procedencia verificadas;
+- sin dependencia runtime hacia clases, thresholds, calibración ni estados
+  visuales internos de DAG v1;
 - separado de la implementación y de los estados internos de decisión visual de DAG v1.
+
+Entrenar desde pesos aleatorios no es obligatorio. Sólo puede evaluarse mediante
+un ticket separado que demuestre una ventaja material y declare presupuesto de
+datos, cómputo, tiempo y costo.
 
 Este ticket no define todavía la arquitectura de red, el pipeline de entrenamiento, el formato final, los hiperparámetros ni el código del modelo.
 

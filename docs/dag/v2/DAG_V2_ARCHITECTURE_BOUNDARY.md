@@ -86,7 +86,8 @@ La activación final de v2 requiere:
 2. navegador base funcional sin regresiones;
 3. calibración DEV controlada;
 4. dataset trazable;
-5. modelo entrenado desde cero;
+5. modelo propio ajustado o destilado desde pesos con licencia verificada, o
+   entrenado desde cero sólo si un benchmark separado justifica esa excepción;
 6. optimización comprobada en Android objetivo;
 7. modo sombra satisfactorio;
 8. pruebas físicas y reentrenamiento cerrados;
