@@ -57,6 +57,7 @@ class DagV2ResourceRouter
         }
 
         fun classify(request: DagV2ResourceRequest): DagV2ResourceKind {
+            if (request.isForMainFrame) return DagV2ResourceKind.MainDocument
             val destination = request.header("Sec-Fetch-Dest").lowercase(Locale.ROOT)
             val accept = request.header("Accept").lowercase(Locale.ROOT)
             val extension =

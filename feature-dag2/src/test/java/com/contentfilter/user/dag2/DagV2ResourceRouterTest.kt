@@ -50,6 +50,20 @@ class DagV2ResourceRouterTest {
     }
 
     @Test
+    fun `main document wins over broad image accept when fetch destination is absent`() {
+        val document =
+            request(
+                url = "https://example.com/",
+                accept = "text/html,image/avif,image/webp,image/apng,*/*",
+                destination = "",
+                mainFrame = true,
+            )
+
+        assertEquals(DagV2ResourceKind.MainDocument, router.classify(document))
+        assertEquals(DagV2ResourceRoute.Bypass, router.route(router.classify(document), document.url))
+    }
+
+    @Test
     fun `webview and service worker images share the visual route`() {
         val webView = request("https://example.com/photo?id=1", "image/avif,image/webp,*/*", "image")
         val worker = webView.copy(source = DagV2ResourceSource.ServiceWorker)
