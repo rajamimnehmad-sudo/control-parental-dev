@@ -10,9 +10,120 @@ permissions:
   contents: read
 
 jobs:
-  build-reviewer-apk:
+  download-corpus-shards:
+    name: Download corpus shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download and verify shard
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARD_COUNT: 11
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import time
+          import urllib.error
+          import urllib.request
+
+          root = pathlib.Path.cwd()
+          lock_path = root / "tools/dag-v2-benchmark/evidence/04a/corpus.lock.jsonl"
+          output = pathlib.Path(os.environ["RUNNER_TEMP"]) / "corpus-shard"
+          output.mkdir(parents=True, exist_ok=True)
+          shard = int(os.environ["SHARD"])
+          shard_count = int(os.environ["SHARD_COUNT"])
+          rows = [json.loads(line) for line in lock_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+          selected = [(index, item) for index, item in enumerate(rows) if index % shard_count == shard]
+          if not selected:
+              raise SystemExit("empty shard")
+
+          for position, item in selected:
+              destination = output / item["relative_file"]
+              expected_sha = item["sha256"]
+              expected_size = int(item["size_bytes"])
+              temporary = destination.with_suffix(destination.suffix + ".partial")
+              success = False
+              for attempt in range(8):
+                  request = urllib.request.Request(
+                      item["download_url"],
+                      headers={
+                          "User-Agent": "Glosh-DAG-v2-reviewer-builder/04B (private reproducible build)",
+                          "Referer": item["source_page"],
+                          "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
+                      },
+                  )
+                  try:
+                      digest = hashlib.sha256()
+                      size = 0
+                      with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as target:
+                          for chunk in iter(lambda: response.read(256 * 1024), b""):
+                              size += len(chunk)
+                              if size > expected_size:
+                                  raise RuntimeError("locked image exceeds expected size")
+                              digest.update(chunk)
+                              target.write(chunk)
+                      if size != expected_size or digest.hexdigest() != expected_sha:
+                          raise RuntimeError("locked image integrity mismatch")
+                      os.replace(temporary, destination)
+                      success = True
+                      break
+                  except urllib.error.HTTPError as error:
+                      temporary.unlink(missing_ok=True)
+                      if error.code != 429 or attempt == 7:
+                          raise
+                      retry_after = error.headers.get("Retry-After", "")
+                      delay = int(retry_after) if retry_after.isdigit() else min(60, 8 + attempt * 8)
+                      time.sleep(delay)
+                  except Exception:
+                      temporary.unlink(missing_ok=True)
+                      if attempt == 7:
+                          raise
+                      time.sleep(min(45, 4 + attempt * 5))
+              if not success:
+                  raise RuntimeError(f"failed {item['sample_id']}")
+              time.sleep(0.25)
+
+          manifest = {
+              "shard": shard,
+              "sample_count": len(selected),
+              "sample_ids": [item["sample_id"] for _, item in selected],
+          }
+          (output / f"shard-{shard}.json").write_text(json.dumps(manifest, sort_keys=True) + "\n", encoding="utf-8")
+          print(f"corpus_shard=ok shard={shard} samples={len(selected)}")
+          PY
+
+      - name: Upload verified shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: dag-v2-policy-reviewer-corpus-shard-${{ matrix.shard }}
+          path: ${{ runner.temp }}/corpus-shard/*
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+
+  build-reviewer-apk:
+    name: Build reviewer APK
+    needs: download-corpus-shards
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -42,7 +153,14 @@ jobs:
           python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-evidence
           python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
 
-      - name: Reconstruct locked corpus with pacing
+      - name: Download all verified corpus shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: dag-v2-policy-reviewer-corpus-shard-*
+          path: ${{ runner.temp }}/dag-v2-benchmark-cache/corpus
+          merge-multiple: true
+
+      - name: Verify merged locked corpus
         env:
           DAG_V2_BENCHMARK_CACHE: ${{ runner.temp }}/dag-v2-benchmark-cache
         run: |
@@ -52,77 +170,23 @@ jobs:
           import json
           import os
           import pathlib
-          import time
-          import urllib.error
-          import urllib.request
 
           root = pathlib.Path.cwd()
           lock_path = root / "tools/dag-v2-benchmark/evidence/04a/corpus.lock.jsonl"
-          cache = pathlib.Path(os.environ["DAG_V2_BENCHMARK_CACHE"])
-          corpus = cache / "corpus"
-          corpus.mkdir(parents=True, exist_ok=True)
+          corpus = pathlib.Path(os.environ["DAG_V2_BENCHMARK_CACHE"]) / "corpus"
           rows = [json.loads(line) for line in lock_path.read_text(encoding="utf-8").splitlines() if line.strip()]
           if len(rows) != 203:
-              raise SystemExit(f"expected 203 locked samples, found {len(rows)}")
-
-          def digest(path):
-              h = hashlib.sha256()
-              size = 0
-              with path.open("rb") as source:
-                  for chunk in iter(lambda: source.read(1024 * 1024), b""):
-                      h.update(chunk)
-                      size += len(chunk)
-              return h.hexdigest(), size
+              raise SystemExit(f"expected 203 locked rows, found {len(rows)}")
 
           runtime = []
-          for index, item in enumerate(rows, 1):
-              destination = corpus / item["relative_file"]
-              expected = (item["sha256"], int(item["size_bytes"]))
-              if not destination.exists() or digest(destination) != expected:
-                  temporary = destination.with_suffix(destination.suffix + ".partial")
-                  temporary.unlink(missing_ok=True)
-                  success = False
-                  for attempt in range(12):
-                      request = urllib.request.Request(
-                          item["download_url"],
-                          headers={
-                              "User-Agent": "Glosh-DAG-v2-reviewer-builder/04B (private reproducible build)",
-                              "Referer": item["source_page"],
-                              "Accept": "image/avif,image/webp,image/png,image/jpeg,*/*;q=0.8",
-                          },
-                      )
-                      try:
-                          h = hashlib.sha256()
-                          size = 0
-                          with urllib.request.urlopen(request, timeout=60) as response, temporary.open("wb") as output:
-                              for chunk in iter(lambda: response.read(256 * 1024), b""):
-                                  size += len(chunk)
-                                  if size > expected[1]:
-                                      raise RuntimeError("locked image exceeds expected size")
-                                  h.update(chunk)
-                                  output.write(chunk)
-                          actual = (h.hexdigest(), size)
-                          if actual != expected:
-                              raise RuntimeError(f"integrity mismatch expected={expected} actual={actual}")
-                          os.replace(temporary, destination)
-                          success = True
-                          break
-                      except urllib.error.HTTPError as error:
-                          temporary.unlink(missing_ok=True)
-                          if error.code != 429 or attempt == 11:
-                              raise
-                          retry_after = error.headers.get("Retry-After", "")
-                          delay = int(retry_after) if retry_after.isdigit() else min(120, 15 + attempt * 10)
-                          print(f"rate_limited sample={index}/203 delay={delay}s", flush=True)
-                          time.sleep(delay)
-                      except Exception:
-                          temporary.unlink(missing_ok=True)
-                          if attempt == 11:
-                              raise
-                          time.sleep(min(60, 5 + attempt * 5))
-                  if not success:
-                      raise RuntimeError(f"failed to reconstruct {item['sample_id']}")
-                  time.sleep(0.8)
+          for item in rows:
+              path = corpus / item["relative_file"]
+              if not path.is_file():
+                  raise SystemExit(f"missing locked file {item['sample_id']}")
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              size = path.stat().st_size
+              if digest != item["sha256"] or size != int(item["size_bytes"]):
+                  raise SystemExit(f"integrity mismatch {item['sample_id']}")
               runtime.append({
                   "sample_id": item["sample_id"],
                   "relative_file": item["relative_file"],
@@ -146,17 +210,14 @@ jobs:
                   "review_status": item["review_status"],
                   "cluster_visual": item["cluster_visual"],
               })
-              if index % 20 == 0 or index == len(rows):
-                  print(f"locked_corpus_progress={index}/203", flush=True)
 
+          expected_files = {item["relative_file"] for item in rows}
+          unexpected = [p.name for p in corpus.iterdir() if p.is_file() and not p.name.startswith("shard-") and p.name not in expected_files]
+          if unexpected:
+              raise SystemExit(f"unexpected corpus files: {unexpected[:5]}")
           manifest = corpus / "manifest.jsonl"
-          temporary_manifest = manifest.with_suffix(".partial")
-          temporary_manifest.write_text(
-              "".join(json.dumps(item, sort_keys=True) + "\n" for item in runtime),
-              encoding="utf-8",
-          )
-          os.replace(temporary_manifest, manifest)
-          print(f"locked_corpus=ok samples={len(runtime)} cache={corpus}")
+          manifest.write_text("".join(json.dumps(item, sort_keys=True) + "\n" for item in runtime), encoding="utf-8")
+          print(f"locked_corpus=ok samples={len(runtime)}")
           PY
 
       - name: Build reviewer APK
