@@ -19,6 +19,10 @@ assert_scope() {
 assert_scope none "benchmark tooling" \
     "tools/dag-v2-benchmark/dag_v2_benchmark.py" \
     "tools/dag-v2-benchmark/evidence/04a/summary.json"
+assert_scope none "isolated benchmark reviewer" \
+    "tools/dag-v2-benchmark/policy-reviewer/app/src/main/AndroidManifest.xml" \
+    "tools/dag-v2-benchmark/dag_v2_policy_eval.py" \
+    "tools/dag-v2-benchmark/evidence/04b/split.lock.jsonl"
 assert_scope none "benchmark documentation" \
     "docs/dag/v2/DAG_V2_NO_GPU_BENCHMARK_RESULTS.md"
 assert_scope none "benchmark workflow" \
