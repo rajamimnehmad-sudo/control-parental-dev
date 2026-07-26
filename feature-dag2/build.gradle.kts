@@ -41,6 +41,7 @@ dependencies {
     implementation(libs.okhttp)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
+    testImplementation("org.json:json:20240303")
 }
 
 val dagV2ManifestFile = layout.projectDirectory.file("src/main/AndroidManifest.xml").asFile

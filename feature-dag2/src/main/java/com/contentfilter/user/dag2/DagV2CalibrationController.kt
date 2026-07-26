@@ -37,6 +37,7 @@ class DagV2CalibrationController
             releasePreview()
             queue.resetLabSession()
             outbox.clearTemporaryFiles()
+            outbox.expirePending()
             mutableState.value = DagV2CalibrationReviewState()
             scope.launch { flushOutbox() }
         }
@@ -209,17 +210,24 @@ class DagV2CalibrationController
                     sourceUrlHash = candidate.resourceUrl.dagV2Sha256(),
                     decision = decision,
                 )
-            val queued = outbox.enqueue(submission)
+            val enqueueResult = outbox.enqueue(submission)
             submission.jpegBytes?.fill(0)
-            if (queued) {
-                localDeduplicator.remember(imageFingerprint)
-                metrics.event(
-                    when (decision) {
-                        DagV2CalibrationDecision.Show -> DagV2MetricNames.LabelShow
-                        DagV2CalibrationDecision.Hide -> DagV2MetricNames.LabelHide
-                        DagV2CalibrationDecision.Unsure -> DagV2MetricNames.LabelUnsure
-                    },
-                )
+            if (
+                enqueueResult != DagV2CalibrationEnqueueResult.Queued &&
+                enqueueResult != DagV2CalibrationEnqueueResult.Duplicate
+            ) {
+                mutableState.value = mutableState.value.withEnqueueFailure(enqueueResult)
+                return
+            }
+            localDeduplicator.remember(imageFingerprint)
+            metrics.event(
+                when (decision) {
+                    DagV2CalibrationDecision.Show -> DagV2MetricNames.LabelShow
+                    DagV2CalibrationDecision.Hide -> DagV2MetricNames.LabelHide
+                    DagV2CalibrationDecision.Unsure -> DagV2MetricNames.LabelUnsure
+                },
+            )
+            if (enqueueResult == DagV2CalibrationEnqueueResult.Queued) {
                 metrics.event(DagV2MetricNames.LabelQueued)
             }
             queue.remove(candidate.candidateId)
@@ -231,10 +239,15 @@ class DagV2CalibrationController
                     previewCandidate = null,
                     preview = null,
                     previewFingerprint = null,
-                    sending = queued,
-                    statusMessage = if (queued) "Etiqueta cifrada y pendiente de entrega." else "Etiqueta ya pendiente.",
+                    sending = true,
+                    statusMessage =
+                        if (enqueueResult == DagV2CalibrationEnqueueResult.Queued) {
+                            "Etiqueta cifrada y pendiente de entrega."
+                        } else {
+                            "La misma etiqueta ya estaba pendiente; se reintentará su entrega."
+                        },
                 )
-            if (queued) scope.launch { flushOutbox() }
+            scope.launch { flushOutbox() }
         }
 
         fun closeLab() {

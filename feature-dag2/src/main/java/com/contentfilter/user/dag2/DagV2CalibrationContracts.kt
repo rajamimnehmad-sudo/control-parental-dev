@@ -10,6 +10,7 @@ import javax.inject.Singleton
 internal const val DagV2CalibrationPolicyVersion = "DAG_STRICT_MODESTY_V1"
 internal const val DagV2CalibrationCollectorVersion = "dag-v2-calibration-collector-1"
 internal const val DagV2CalibrationOutboxNamespace = "dag-v2-calibration-outbox-v1"
+internal const val DagV2CalibrationRejectionNamespace = "dag-v2-calibration-rejections-v1"
 
 enum class DagV2CalibrationDecision(
     val wireValue: String,
@@ -148,6 +149,18 @@ sealed interface DagV2CalibrationDeliveryResult {
     ) : DagV2CalibrationDeliveryResult
 }
 
+sealed interface DagV2CalibrationEnqueueResult {
+    data object Queued : DagV2CalibrationEnqueueResult
+
+    data object Duplicate : DagV2CalibrationEnqueueResult
+
+    data object Full : DagV2CalibrationEnqueueResult
+
+    data object TooLarge : DagV2CalibrationEnqueueResult
+
+    data object PersistenceFailure : DagV2CalibrationEnqueueResult
+}
+
 data class DagV2CalibrationReviewState(
     val enabled: Boolean = false,
     val candidates: List<DagV2CalibrationCandidate> = emptyList(),
@@ -162,6 +175,25 @@ data class DagV2CalibrationReviewState(
     val candidateCount: Int
         get() = candidates.size
 }
+
+internal fun DagV2CalibrationReviewState.withEnqueueFailure(
+    result: DagV2CalibrationEnqueueResult,
+): DagV2CalibrationReviewState =
+    copy(
+        sending = false,
+        statusMessage =
+            when (result) {
+                DagV2CalibrationEnqueueResult.Full ->
+                    "Outbox lleno: la etiqueta no fue almacenada. Entregá pendientes y reintentá."
+                DagV2CalibrationEnqueueResult.TooLarge ->
+                    "La etiqueta no fue almacenada porque la evidencia excede el límite local."
+                DagV2CalibrationEnqueueResult.PersistenceFailure ->
+                    "La etiqueta no fue almacenada por un fallo local. Podés reintentar."
+                DagV2CalibrationEnqueueResult.Queued,
+                DagV2CalibrationEnqueueResult.Duplicate,
+                -> error("enqueue_result_is_not_a_failure")
+            },
+    )
 
 internal fun String.dagV2Sha256(): String =
     MessageDigest

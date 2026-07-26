@@ -3,12 +3,12 @@ package com.contentfilter.user.dag2
 import android.content.Context
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
-import android.util.Base64
 import dagger.hilt.android.qualifiers.ApplicationContext
 import org.json.JSONObject
 import java.io.File
 import java.security.KeyStore
 import java.time.Instant
+import java.util.Base64
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.SecretKey
@@ -71,142 +71,281 @@ internal class DagV2AndroidKeystoreCipher
         }
     }
 
+internal data class DagV2CalibrationOutboxLimits(
+    val maxItems: Int = 50,
+    val maxTotalBytes: Long = 20L * 1024L * 1024L,
+    val maxEncryptedItemBytes: Int = 720 * 1024,
+    val maxAgeMillis: Long = 30L * 24L * 60L * 60L * 1_000L,
+    val maxRejectionReceipts: Int = 100,
+    val maxEncryptedReceiptBytes: Int = 16 * 1024,
+    val rejectionRetentionMillis: Long = 30L * 24L * 60L * 60L * 1_000L,
+)
+
+internal data class DagV2CalibrationRejectionReceipt(
+    val submissionId: String,
+    val reason: String,
+    val rejectedAt: String,
+)
+
 @Singleton
-class DagV2CalibrationOutboxStore
+class DagV2CalibrationOutboxStore private constructor(
+    private val directory: File,
+    private val rejectionDirectory: File,
+    private val cipher: DagV2CalibrationCipher,
+    private val limits: DagV2CalibrationOutboxLimits,
+    private val nowMillis: () -> Long,
+) {
     @Inject
     internal constructor(
         @ApplicationContext context: Context,
-        private val cipher: DagV2AndroidKeystoreCipher,
-    ) {
-        private val directory = File(context.noBackupFilesDir, DagV2CalibrationOutboxNamespace)
+        cipher: DagV2AndroidKeystoreCipher,
+    ) : this(
+        directory = File(context.noBackupFilesDir, DagV2CalibrationOutboxNamespace),
+        rejectionDirectory = File(context.noBackupFilesDir, DagV2CalibrationRejectionNamespace),
+        cipher = cipher,
+        limits = DagV2CalibrationOutboxLimits(),
+        nowMillis = System::currentTimeMillis,
+    )
 
-        @Synchronized
-        fun enqueue(submission: DagV2CalibrationSubmission): Boolean {
-            directory.mkdirs()
-            purgeExpired()
-            val existing = pending()
-            val duplicate =
-                existing.any {
-                    it.contentSha256 == submission.contentSha256 &&
-                        it.decision == submission.decision
-                }
-            existing.forEach { it.jpegBytes?.fill(0) }
-            if (duplicate) {
-                return false
+    internal constructor(
+        rootDirectory: File,
+        cipher: DagV2CalibrationCipher,
+        limits: DagV2CalibrationOutboxLimits = DagV2CalibrationOutboxLimits(),
+        nowMillis: () -> Long = System::currentTimeMillis,
+    ) : this(
+        directory = File(rootDirectory, DagV2CalibrationOutboxNamespace),
+        rejectionDirectory = File(rootDirectory, DagV2CalibrationRejectionNamespace),
+        cipher = cipher,
+        limits = limits,
+        nowMillis = nowMillis,
+    )
+
+    @Synchronized
+    fun enqueue(submission: DagV2CalibrationSubmission): DagV2CalibrationEnqueueResult {
+        if (!ensureDirectory(directory)) return DagV2CalibrationEnqueueResult.PersistenceFailure
+        val existing = pending()
+        val duplicate =
+            existing.any {
+                it.contentSha256 == submission.contentSha256 &&
+                    it.decision == submission.decision
             }
-            val plain = submission.toJson().toString().encodeToByteArray()
-            val encrypted =
-                try {
-                    cipher.encrypt(plain)
-                } finally {
-                    plain.fill(0)
-                }
+        existing.forEach { it.jpegBytes?.fill(0) }
+        if (duplicate) return DagV2CalibrationEnqueueResult.Duplicate
+
+        val plain = submission.toJson().toString().encodeToByteArray()
+        val encrypted =
             try {
-                if (encrypted.size > MaxEncryptedItemBytes) return false
-                pruneFor(encrypted.size)
-                val temporary = File(directory, "${submission.submissionId}.pending")
-                val target = File(directory, "${submission.submissionId}.enc")
-                temporary.outputStream().use { it.write(encrypted) }
-                check(temporary.renameTo(target)) { "outbox_commit_failed" }
-                return true
-            } finally {
-                encrypted.fill(0)
-            }
-        }
-
-        @Synchronized
-        fun pending(): List<DagV2CalibrationSubmission> {
-            if (!directory.exists()) return emptyList()
-            return directory
-                .listFiles { file -> file.isFile && file.extension == "enc" }
-                .orEmpty()
-                .sortedBy(File::lastModified)
-                .mapNotNull(::read)
-        }
-
-        @Synchronized
-        fun removeAccepted(submissionId: String) {
-            safeFile(submissionId)?.delete()
-        }
-
-        @Synchronized
-        fun clearTemporaryFiles() {
-            directory
-                .listFiles { file -> file.isFile && file.extension == "pending" }
-                .orEmpty()
-                .forEach(File::delete)
-        }
-
-        private fun read(file: File): DagV2CalibrationSubmission? {
-            val encrypted = runCatching { file.readBytes() }.getOrNull() ?: return null
-            val plain =
-                try {
-                    cipher.decrypt(encrypted)
-                } catch (_: Exception) {
-                    file.delete()
-                    return null
-                } finally {
-                    encrypted.fill(0)
-                }
-            return try {
-                JSONObject(plain.decodeToString()).toSubmission()
+                cipher.encrypt(plain)
             } catch (_: Exception) {
-                file.delete()
-                null
+                return DagV2CalibrationEnqueueResult.PersistenceFailure
             } finally {
                 plain.fill(0)
             }
-        }
-
-        private fun safeFile(submissionId: String): File? {
-            if (!submissionId.matches(IdentifierPattern)) return null
-            val file = File(directory, "$submissionId.enc")
-            return file.takeIf { it.parentFile?.canonicalFile == directory.canonicalFile }
-        }
-
-        private fun purgeExpired() {
-            val cutoff = System.currentTimeMillis() - MaxAgeMillis
-            directory
-                .listFiles()
-                .orEmpty()
-                .filter { it.lastModified() < cutoff || it.extension == "pending" }
-                .forEach(File::delete)
-        }
-
-        private fun pruneFor(nextBytes: Int) {
-            val files =
-                directory
-                    .listFiles { file -> file.extension == "enc" }
-                    .orEmpty()
-                    .sortedBy(File::lastModified)
-                    .toMutableList()
-            var total = files.sumOf(File::length)
-            while (files.size >= MaxItems || total + nextBytes > MaxTotalBytes) {
-                val oldest = files.removeFirstOrNull() ?: break
-                total -= oldest.length()
-                oldest.delete()
+        return try {
+            when {
+                encrypted.size > limits.maxEncryptedItemBytes ->
+                    DagV2CalibrationEnqueueResult.TooLarge
+                !hasCapacityFor(encrypted.size) ->
+                    DagV2CalibrationEnqueueResult.Full
+                writeEncrypted(
+                    parent = directory,
+                    temporaryName = "${submission.submissionId}.pending",
+                    targetName = "${submission.submissionId}.enc",
+                    encrypted = encrypted,
+                ) -> DagV2CalibrationEnqueueResult.Queued
+                else -> DagV2CalibrationEnqueueResult.PersistenceFailure
             }
+        } finally {
+            encrypted.fill(0)
+        }
+    }
+
+    @Synchronized
+    fun pending(): List<DagV2CalibrationSubmission> {
+        if (!directory.exists()) return emptyList()
+        return directory
+            .listFiles { file -> file.isFile && file.extension == "enc" }
+            .orEmpty()
+            .mapNotNull(::readSubmission)
+            .sortedBy { submission ->
+                runCatching { Instant.parse(submission.createdAt) }.getOrDefault(Instant.EPOCH)
+            }
+    }
+
+    @Synchronized
+    fun removeAccepted(submissionId: String): Boolean = safePendingFile(submissionId)?.delete() == true
+
+    @Synchronized
+    fun quarantinePermanent(
+        submissionId: String,
+        reason: String,
+    ): Boolean {
+        val sanitizedReason = reason.sanitizedDagV2RejectionReason()
+        if (!ensureDirectory(rejectionDirectory)) return false
+        expireRejectionReceipts()
+        val receipts =
+            rejectionDirectory
+                .listFiles { file -> file.isFile && file.name.endsWith(".rejected.enc") }
+                .orEmpty()
+                .sortedBy(File::lastModified)
+        val excessReceiptCount = receipts.size - limits.maxRejectionReceipts + 1
+        if (excessReceiptCount > 0 && !receipts.take(excessReceiptCount).all(File::delete)) return false
+        val plain =
+            JSONObject()
+                .put("reason", sanitizedReason)
+                .toString()
+                .encodeToByteArray()
+        val encrypted =
+            try {
+                cipher.encrypt(plain)
+            } catch (_: Exception) {
+                return false
+            } finally {
+                plain.fill(0)
+            }
+        return try {
+            encrypted.size <= limits.maxEncryptedReceiptBytes &&
+                writeEncrypted(
+                    parent = rejectionDirectory,
+                    temporaryName = "$submissionId.rejected.pending",
+                    targetName = "$submissionId.rejected.enc",
+                    encrypted = encrypted,
+                )
+        } finally {
+            encrypted.fill(0)
+        }
+    }
+
+    @Synchronized
+    fun removePermanentlyRejected(submissionId: String): Boolean = safePendingFile(submissionId)?.delete() == true
+
+    @Synchronized
+    fun expirePending(): Int {
+        val cutoff = nowMillis() - limits.maxAgeMillis
+        return directory
+            .listFiles { file -> file.isFile && file.extension == "enc" && file.lastModified() < cutoff }
+            .orEmpty()
+            .count(File::delete)
+    }
+
+    @Synchronized
+    fun clearTemporaryFiles() {
+        sequenceOf(directory, rejectionDirectory)
+            .flatMap { parent ->
+                parent
+                    .listFiles { file -> file.isFile && file.extension == "pending" }
+                    .orEmpty()
+                    .asSequence()
+            }.forEach(File::delete)
+    }
+
+    internal fun rejectionReceipts(): List<DagV2CalibrationRejectionReceipt> =
+        rejectionDirectory
+            .listFiles { file -> file.isFile && file.name.endsWith(".rejected.enc") }
+            .orEmpty()
+            .sortedBy(File::lastModified)
+            .mapNotNull(::readReceipt)
+
+    private fun hasCapacityFor(nextBytes: Int): Boolean {
+        val files =
+            directory
+                .listFiles { file -> file.isFile && file.extension == "enc" }
+                .orEmpty()
+        return files.size < limits.maxItems &&
+            files.sumOf(File::length) + nextBytes <= limits.maxTotalBytes
+    }
+
+    private fun expireRejectionReceipts(): Int {
+        val cutoff = nowMillis() - limits.rejectionRetentionMillis
+        return rejectionDirectory
+            .listFiles {
+                    file ->
+                file.isFile &&
+                    file.name.endsWith(".rejected.enc") &&
+                    file.lastModified() < cutoff
+            }.orEmpty()
+            .count(File::delete)
+    }
+
+    private fun readSubmission(file: File): DagV2CalibrationSubmission? = readEncryptedJson(file)?.toSubmissionOrNull()
+
+    private fun readReceipt(file: File): DagV2CalibrationRejectionReceipt? =
+        readEncryptedJson(file)?.let {
+            runCatching {
+                DagV2CalibrationRejectionReceipt(
+                    submissionId = file.name.removeSuffix(".rejected.enc"),
+                    reason = it.getString("reason"),
+                    rejectedAt = Instant.ofEpochMilli(file.lastModified()).toString(),
+                )
+            }.getOrNull()
         }
 
-        private fun DagV2CalibrationSubmission.toJson(): JSONObject =
-            JSONObject()
-                .put("submission_id", submissionId)
-                .put("content_sha256", contentSha256)
-                .put("perceptual_hash", perceptualHash)
-                .put("jpeg", jpegBytes?.let { Base64.encodeToString(it, Base64.NO_WRAP) })
-                .put("existing_content_sha256", existingContentSha256)
-                .put("width", width)
-                .put("height", height)
-                .put("source_kind", sourceKind)
-                .put("source_host", sourceHost)
-                .put("document_host", documentHost)
-                .put("source_url_hash", sourceUrlHash)
-                .put("decision", decision.wireValue)
-                .put("policy_version", policyVersion)
-                .put("collector_version", collectorVersion)
-                .put("created_at", createdAt)
+    private fun readEncryptedJson(file: File): JSONObject? {
+        val encrypted = runCatching { file.readBytes() }.getOrNull() ?: return null
+        val plain =
+            try {
+                cipher.decrypt(encrypted)
+            } catch (_: Exception) {
+                return null
+            } finally {
+                encrypted.fill(0)
+            }
+        return try {
+            JSONObject(plain.decodeToString())
+        } catch (_: Exception) {
+            null
+        } finally {
+            plain.fill(0)
+        }
+    }
 
-        private fun JSONObject.toSubmission(): DagV2CalibrationSubmission =
+    private fun safePendingFile(submissionId: String): File? {
+        if (!submissionId.matches(IdentifierPattern)) return null
+        val file = File(directory, "$submissionId.enc")
+        return file.takeIf { it.parentFile?.canonicalFile == directory.canonicalFile }
+    }
+
+    private fun writeEncrypted(
+        parent: File,
+        temporaryName: String,
+        targetName: String,
+        encrypted: ByteArray,
+    ): Boolean {
+        val temporary = File(parent, temporaryName)
+        val target = File(parent, targetName)
+        return runCatching {
+            check(!target.exists()) { "encrypted_target_exists" }
+            temporary.outputStream().use { it.write(encrypted) }
+            check(temporary.renameTo(target)) { "encrypted_commit_failed" }
+            true
+        }.getOrElse {
+            temporary.delete()
+            false
+        }
+    }
+
+    private fun ensureDirectory(target: File): Boolean = target.exists() || target.mkdirs()
+
+    private fun DagV2CalibrationSubmission.toJson(): JSONObject =
+        JSONObject()
+            .put("submission_id", submissionId)
+            .put("content_sha256", contentSha256)
+            .put("perceptual_hash", perceptualHash)
+            .put("jpeg", jpegBytes?.let { Base64.getEncoder().encodeToString(it) })
+            .put("existing_content_sha256", existingContentSha256)
+            .put("width", width)
+            .put("height", height)
+            .put("source_kind", sourceKind)
+            .put("source_host", sourceHost)
+            .put("document_host", documentHost)
+            .put("source_url_hash", sourceUrlHash)
+            .put("decision", decision.wireValue)
+            .put("policy_version", policyVersion)
+            .put("collector_version", collectorVersion)
+            .put("created_at", createdAt)
+
+    private fun JSONObject.toSubmissionOrNull(): DagV2CalibrationSubmission? =
+        runCatching {
             DagV2CalibrationSubmission(
                 submissionId = getString("submission_id"),
                 contentSha256 = getString("content_sha256"),
@@ -214,7 +353,7 @@ class DagV2CalibrationOutboxStore
                 jpegBytes =
                     optString("jpeg")
                         .takeIf(String::isNotBlank)
-                        ?.let { Base64.decode(it, Base64.NO_WRAP) },
+                        ?.let { Base64.getDecoder().decode(it) },
                 existingContentSha256 = optString("existing_content_sha256").takeIf(String::isNotBlank),
                 width = getInt("width"),
                 height = getInt("height"),
@@ -227,14 +366,15 @@ class DagV2CalibrationOutboxStore
                 collectorVersion = getString("collector_version"),
                 createdAt = optString("created_at", Instant.EPOCH.toString()),
             )
+        }.getOrNull()
 
-        private companion object {
-            const val MaxItems = 50
-            const val MaxTotalBytes = 20L * 1024L * 1024L
-
-            // JSON + Base64 expands a valid 512 KiB JPEG by roughly one third.
-            const val MaxEncryptedItemBytes = 720 * 1024
-            const val MaxAgeMillis = 30L * 24L * 60L * 60L * 1_000L
-            val IdentifierPattern = Regex("[0-9a-fA-F-]{36}")
-        }
+    private companion object {
+        val IdentifierPattern = Regex("[0-9a-fA-F-]{36}")
     }
+}
+
+private fun String.sanitizedDagV2RejectionReason(): String =
+    lowercase()
+        .replace(Regex("[^a-z0-9_-]"), "_")
+        .take(80)
+        .ifBlank { "submission_rejected" }

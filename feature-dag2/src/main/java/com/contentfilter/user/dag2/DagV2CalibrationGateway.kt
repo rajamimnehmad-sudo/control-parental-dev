@@ -44,11 +44,11 @@ class SupabaseDagV2CalibrationGateway
                         ?: return@withContext temporary("config_unavailable")
                 val activation =
                     activationRepository.currentActivation()
-                        ?: return@withContext permanent("device_not_activated")
+                        ?: return@withContext temporary("activation_unavailable")
                 val authToken = authTokenProvider.currentToken()
                 val deviceToken =
                     deviceTokenProvider.currentDeviceToken()
-                        ?: return@withContext permanent("device_token_missing")
+                        ?: return@withContext temporary("device_token_unavailable")
                 val multipart =
                     MultipartBody
                         .Builder()
@@ -141,51 +141,62 @@ internal fun Throwable.dagV2CalibrationTransportReason(): String =
     }
 
 @Singleton
-class DagV2CalibrationOutboxFlusher
+class DagV2CalibrationOutboxFlusher internal constructor(
+    private val store: DagV2CalibrationOutboxStore,
+    private val gateway: DagV2CalibrationGateway,
+    private val metrics: DagV2Metrics,
+    private val maxAttempts: Int = 3,
+    private val retryDelayMillis: Long = 5_000L,
+) {
     @Inject
-    constructor(
-        private val store: DagV2CalibrationOutboxStore,
-        private val gateway: SupabaseDagV2CalibrationGateway,
-        private val metrics: DagV2Metrics,
-    ) {
-        private val mutex = kotlinx.coroutines.sync.Mutex()
+    internal constructor(
+        store: DagV2CalibrationOutboxStore,
+        gateway: SupabaseDagV2CalibrationGateway,
+        metrics: DagV2Metrics,
+    ) : this(
+        store = store,
+        gateway = gateway as DagV2CalibrationGateway,
+        metrics = metrics,
+    )
 
-        suspend fun flush(): DagV2CalibrationDeliveryResult? =
-            mutex.withLock {
-                var last: DagV2CalibrationDeliveryResult? = null
-                val pending = store.pending()
-                for (submission in pending) {
-                    var result: DagV2CalibrationDeliveryResult = gateway.deliver(submission)
-                    for (attempt in 1 until MaxAttempts) {
-                        if (result !is DagV2CalibrationDeliveryResult.TemporaryFailure) break
-                        delay(RetryDelayMillis * attempt)
-                        result = gateway.deliver(submission)
+    private val mutex = kotlinx.coroutines.sync.Mutex()
+
+    suspend fun flush(): DagV2CalibrationDeliveryResult? =
+        mutex.withLock {
+            var last: DagV2CalibrationDeliveryResult? = null
+            var firstPermanentFailure: DagV2CalibrationDeliveryResult.PermanentFailure? = null
+            val pending = store.pending()
+            for (submission in pending) {
+                var result: DagV2CalibrationDeliveryResult = gateway.deliver(submission)
+                for (attempt in 1 until maxAttempts) {
+                    if (result !is DagV2CalibrationDeliveryResult.TemporaryFailure) break
+                    delay(retryDelayMillis * attempt)
+                    result = gateway.deliver(submission)
+                }
+                last = result
+                when (result) {
+                    is DagV2CalibrationDeliveryResult.Accepted -> {
+                        store.removeAccepted(submission.submissionId)
+                        submission.jpegBytes?.fill(0)
+                        metrics.event(DagV2MetricNames.LabelDelivered)
                     }
-                    last = result
-                    when (result) {
-                        is DagV2CalibrationDeliveryResult.Accepted -> {
-                            store.removeAccepted(submission.submissionId)
-                            submission.jpegBytes?.fill(0)
-                            metrics.event(DagV2MetricNames.LabelDelivered)
+                    is DagV2CalibrationDeliveryResult.PermanentFailure -> {
+                        val quarantined = store.quarantinePermanent(submission.submissionId, result.reason)
+                        if (quarantined) {
+                            store.removePermanentlyRejected(submission.submissionId)
                         }
-                        is DagV2CalibrationDeliveryResult.PermanentFailure -> {
-                            pending.forEach { it.jpegBytes?.fill(0) }
-                            metrics.event(DagV2MetricNames.LabelRejected)
-                            return@withLock result
-                        }
-                        is DagV2CalibrationDeliveryResult.TemporaryFailure -> {
-                            pending.forEach { it.jpegBytes?.fill(0) }
-                            return@withLock result
-                        }
+                        submission.jpegBytes?.fill(0)
+                        if (firstPermanentFailure == null) firstPermanentFailure = result
+                        metrics.event(DagV2MetricNames.LabelRejected)
+                    }
+                    is DagV2CalibrationDeliveryResult.TemporaryFailure -> {
+                        pending.forEach { it.jpegBytes?.fill(0) }
+                        return@withLock result
                     }
                 }
-                pending.forEach { it.jpegBytes?.fill(0) }
-                if (last != null) metrics.event(DagV2MetricNames.OutboxFlushed)
-                last
             }
-
-        private companion object {
-            const val MaxAttempts = 3
-            const val RetryDelayMillis = 5_000L
+            pending.forEach { it.jpegBytes?.fill(0) }
+            if (last != null) metrics.event(DagV2MetricNames.OutboxFlushed)
+            firstPermanentFailure ?: last
         }
-    }
+}
