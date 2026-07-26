@@ -1,9 +1,7 @@
 name: Temporary DAG v2 Policy Reviewer APK
 
 on:
-  push:
-    branches:
-      - codex/dag-v2-targeted-signal-labeled-policy-04b
+  pull_request:
     paths:
       - .github/workflows/dag-v2-policy-reviewer-apk-temp.yml
   workflow_dispatch:
