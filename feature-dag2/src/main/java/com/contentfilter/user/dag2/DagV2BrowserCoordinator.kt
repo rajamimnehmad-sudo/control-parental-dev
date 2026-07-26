@@ -85,6 +85,11 @@ internal class DagV2NavigationHistory {
     fun canGoBack(): Boolean = index > 0
 
     fun canGoForward(): Boolean = index >= 0 && index < entries.lastIndex
+
+    fun clear() {
+        entries.clear()
+        index = -1
+    }
 }
 
 data class DagV2BrowserState(
@@ -425,6 +430,8 @@ class DagV2BrowserCoordinator
             commandJob = null
             cancelActiveSession()
             callbackGate.clear()
+            navigationHistory.clear()
+            mutableState.value = DagV2BrowserState()
         }
 
         private fun block(message: String) {

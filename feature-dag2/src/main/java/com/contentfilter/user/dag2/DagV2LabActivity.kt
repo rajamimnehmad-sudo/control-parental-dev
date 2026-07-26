@@ -10,6 +10,8 @@ import javax.inject.Inject
 
 @AndroidEntryPoint
 class DagV2LabActivity : ComponentActivity() {
+    private val webViewHost = DagV2WebViewHost<android.webkit.WebView>()
+
     @Inject
     lateinit var coordinator: DagV2BrowserCoordinator
 
@@ -20,9 +22,6 @@ class DagV2LabActivity : ComponentActivity() {
     lateinit var serviceWorkerRouter: DagV2ServiceWorkerRouter
 
     @Inject
-    lateinit var resourceRouter: DagV2ResourceRouter
-
-    @Inject
     lateinit var resourceInterceptor: DagV2ResourceInterceptor
 
     @Inject
@@ -31,8 +30,16 @@ class DagV2LabActivity : ComponentActivity() {
     @Inject
     lateinit var webViewLifecycle: DagV2WebViewLifecycle
 
+    @Inject
+    lateinit var lifecycleGate: DagV2LabLifecycleGate
+
+    private var lifecycleGeneration = 0L
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lifecycleGeneration = lifecycleGate.acquire()
+        coordinator.closeSession()
+        serviceWorkerRouter.setNoCacheMode(false)
         enableEdgeToEdge()
         serviceWorkerRouter.install()
         setContent {
@@ -44,15 +51,17 @@ class DagV2LabActivity : ComponentActivity() {
                     serviceWorkerRouter = serviceWorkerRouter,
                     pageAnalyzer = pageAnalyzer,
                     webViewLifecycle = webViewLifecycle,
+                    webViewHost = webViewHost,
                 )
             }
         }
     }
 
     override fun onDestroy() {
-        coordinator.closeSession()
-        serviceWorkerRouter.uninstall()
-        resourceRouter.close()
+        webViewHost.close()
+        if (lifecycleGate.release(lifecycleGeneration)) {
+            coordinator.closeSession()
+        }
         super.onDestroy()
     }
 }

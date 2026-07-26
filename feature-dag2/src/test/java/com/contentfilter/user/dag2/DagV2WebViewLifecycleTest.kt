@@ -26,4 +26,42 @@ class DagV2WebViewLifecycleTest {
 
         assertEquals(listOf("stop", "blank", "bridge", "clients", "callbacks", "destroy"), calls)
     }
+
+    @Test
+    fun `host close releases the active webview exactly once`() {
+        val host = DagV2WebViewHost<Any>()
+        val view = Any()
+        var releases = 0
+
+        host.attach(view) { releases += 1 }
+        host.close()
+        host.close()
+        host.detach(view)
+
+        assertEquals(1, releases)
+    }
+
+    @Test
+    fun `host replacement releases the previous webview`() {
+        val host = DagV2WebViewHost<Any>()
+        val first = Any()
+        val second = Any()
+        val released = mutableListOf<String>()
+
+        host.attach(first) { released += "first" }
+        host.attach(second) { released += "second" }
+        host.close()
+
+        assertEquals(listOf("first", "second"), released)
+    }
+
+    @Test
+    fun `old activity release cannot close a newer lab generation`() {
+        val gate = DagV2LabLifecycleGate()
+        val old = gate.acquire()
+        val current = gate.acquire()
+
+        assertEquals(false, gate.release(old))
+        assertEquals(true, gate.release(current))
+    }
 }

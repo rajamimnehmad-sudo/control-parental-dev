@@ -33,6 +33,58 @@ internal object DagV2WebViewReleaseSequence {
     }
 }
 
+internal class DagV2WebViewHost<T : Any> {
+    private var activeView: T? = null
+    private var activeRelease: (() -> Unit)? = null
+
+    fun attach(
+        view: T,
+        release: () -> Unit,
+    ) {
+        if (activeView === view) return
+        close()
+        activeView = view
+        activeRelease = release
+    }
+
+    fun detach(view: T) {
+        if (activeView !== view) return
+        val release = activeRelease
+        activeView = null
+        activeRelease = null
+        release?.invoke()
+    }
+
+    fun close() {
+        val release = activeRelease
+        activeView = null
+        activeRelease = null
+        release?.invoke()
+    }
+}
+
+@Singleton
+class DagV2LabLifecycleGate
+    @Inject
+    constructor() {
+        private var generation = 0L
+        private var activeGeneration: Long? = null
+
+        @Synchronized
+        fun acquire(): Long {
+            generation += 1
+            activeGeneration = generation
+            return generation
+        }
+
+        @Synchronized
+        fun release(candidate: Long): Boolean {
+            if (activeGeneration != candidate) return false
+            activeGeneration = null
+            return true
+        }
+    }
+
 @Singleton
 class DagV2WebViewLifecycle
     @Inject

@@ -78,6 +78,7 @@ internal fun DagV2LabScreen(
     serviceWorkerRouter: DagV2ServiceWorkerRouter,
     pageAnalyzer: DagV2PageAnalyzer,
     webViewLifecycle: DagV2WebViewLifecycle,
+    webViewHost: DagV2WebViewHost<WebView>,
 ) {
     val state by coordinator.state.collectAsStateWithLifecycle()
     val metricSnapshot by metrics.snapshot.collectAsStateWithLifecycle()
@@ -202,6 +203,7 @@ internal fun DagV2LabScreen(
                         resourceInterceptor = resourceInterceptor,
                         pageAnalyzer = pageAnalyzer,
                         webViewLifecycle = webViewLifecycle,
+                        webViewHost = webViewHost,
                         onWebViewCreated = { webView = it },
                         onWebViewReleased = { released ->
                             if (webView === released) webView = null
@@ -227,6 +229,7 @@ private fun DagV2WebContent(
     resourceInterceptor: DagV2ResourceInterceptor,
     pageAnalyzer: DagV2PageAnalyzer,
     webViewLifecycle: DagV2WebViewLifecycle,
+    webViewHost: DagV2WebViewHost<WebView>,
     onWebViewCreated: (WebView) -> Unit,
     onWebViewReleased: (WebView) -> Unit,
 ) {
@@ -242,6 +245,9 @@ private fun DagV2WebContent(
                 factory = {
                     WebView(context).apply {
                         onWebViewCreated(this)
+                        webViewHost.attach(this) {
+                            webViewLifecycle.release(this, runtimeScripts::clear)
+                        }
                         configureDagV2Settings(state.noCacheMode)
                         if (state.noCacheMode) clearCache(true)
                         val runtimeReady =
@@ -283,7 +289,7 @@ private fun DagV2WebContent(
                         if (state.noCacheMode) WebSettings.LOAD_NO_CACHE else WebSettings.LOAD_DEFAULT
                 },
                 onRelease = { view ->
-                    webViewLifecycle.release(view, runtimeScripts::clear)
+                    webViewHost.detach(view)
                     onWebViewReleased(view)
                 },
             )
