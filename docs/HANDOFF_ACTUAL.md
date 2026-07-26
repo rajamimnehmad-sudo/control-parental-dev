@@ -152,8 +152,8 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
   y conteo pose 71/72.
 - Decisión: `NO-GO`. No hay etiquetas humanas de política ni señales
   suficientes de apariencia femenina, edad, ajuste o transparencia; no se
-  selecciona modelo ni se inicia cache/04B. Próxima propuesta no autorizada:
-  `DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B`.
+  seleccionó modelo ni caché. 04B fue autorizado después y permanece detenido
+  en su gate humano.
 - Corrección de trazabilidad en PR #71: las 203 muestras quedaron bloqueadas
   con URL pública, `page_id`, licencia canónica, hashes y metadatos; evidencia,
   corrida, resumen, subconjunto Android y checksums son versionados y
@@ -164,7 +164,29 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 - No cambió Android de producto, DAG v1, Calibración DEV, Supabase, App Admin,
   `versionCode` ni Production. El APK debug fue sólo el runner aislado local;
   no se publicó. El provider visible v2 sigue devolviendo sólo `Hide`; no se
-  inició dataset, entrenamiento, modo sombra ni 04B.
+  inició dataset, entrenamiento ni modo sombra.
+
+## DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B - gate humano - 2026-07-26
+
+- Rama `codex/dag-v2-targeted-signal-labeled-policy-04b`. 04A verifica intacto
+  y sus 203 imágenes se reconstruyeron sólo mediante `fetch-locked-corpus`.
+- Antes de etiquetas se fijaron orden ciego, 60 muestras diagnósticas
+  equilibradas y split 122 exploratoria / 41 validación / 40 prueba, sin fuga
+  por SHA-256 ni dHash64 a distancia menor o igual a cinco.
+- El APK debug autónomo del revisor no forma parte del producto, no tiene
+  WebView ni permiso de Internet. Se instaló in-place en SM-A235M
+  `R58T34V31AE`, Android 14/API 34. SHA-256
+  `c8d577a2fda2e8a80174d39a19b856a38f4319b5ed53efb69f7d9df9dd231f67`,
+  70.229.187 bytes, con 203 imágenes/70.142.418 bytes verificadas.
+- Apertura y reapertura correctas: botones `Mostrar`, `Ocultar`, `No estoy
+  seguro`, Atrás y Deshacer; exportación deshabilitada; estado privado con
+  cero decisiones, cero revisiones y cero auditoría. No hubo crash ni ANR.
+- Gate vigente: `203 decisiones humanas pendientes`. Codex no debe etiquetar,
+  abrir el test, elegir parámetros ni ejecutar la evaluación final hasta que
+  el usuario complete y exporte la revisión.
+- Provider visible DAG v2 sigue sólo en `Hide`. No hubo integración, caché
+  activa, red visual nueva, entrenamiento, GPU, Supabase, Production,
+  publicación, cambio de `versionCode` de las apps ni inicio de 04C.
 
 ## Publicacion Usuario DEV 279 - carga progresiva y calibracion binaria - 2026-07-24
 
