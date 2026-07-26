@@ -43,14 +43,31 @@ jobs:
           python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
 
       - name: Reconstruct locked corpus
+        id: corpus
+        continue-on-error: true
         env:
           DAG_V2_BENCHMARK_CACHE: ${{ runner.temp }}/dag-v2-benchmark-cache
         run: |
-          set -euo pipefail
+          set -o pipefail
           python tools/dag-v2-benchmark/dag_v2_benchmark.py \
-            --cache "$DAG_V2_BENCHMARK_CACHE" fetch-locked-corpus
+            --cache "$DAG_V2_BENCHMARK_CACHE" fetch-locked-corpus \
+            2>&1 | tee "$RUNNER_TEMP/corpus-fetch.log"
+
+      - name: Upload corpus diagnostics on failure
+        if: steps.corpus.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: dag-v2-policy-reviewer-corpus-diagnostics-${{ github.sha }}
+          path: ${{ runner.temp }}/corpus-fetch.log
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Stop after corpus failure
+        if: steps.corpus.outcome == 'failure'
+        run: exit 1
 
       - name: Build reviewer APK
+        if: steps.corpus.outcome == 'success'
         env:
           DAG_V2_BENCHMARK_CACHE: ${{ runner.temp }}/dag-v2-benchmark-cache
         run: |
@@ -60,6 +77,7 @@ jobs:
             :app:testDebugUnitTest :app:assembleDebug :app:lintDebug
 
       - name: Stage and verify APK
+        if: steps.corpus.outcome == 'success'
         run: |
           set -euo pipefail
           mkdir -p "$RUNNER_TEMP/reviewer-artifact"
@@ -78,6 +96,7 @@ jobs:
             > BUILD_INFO.txt
 
       - name: Upload private APK artifact
+        if: steps.corpus.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: dag-v2-policy-reviewer-04b-${{ github.sha }}
