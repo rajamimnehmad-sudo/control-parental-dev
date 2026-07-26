@@ -27,6 +27,23 @@ Después del gate pequeño, `build-corpus --limit 240` y `run` completan el corp
 `build-corpus --group-id <id>` permite reintentar sólo una fuente sin recorrer
 las demás.
 
+## Evidencia publicada de 04A
+
+La corrida publicada no vuelve a seleccionar imágenes. El bundle textual
+`evidence/04a/` fija las 203 muestras, sus fuentes públicas, bytes esperados,
+evidencia neutral, métricas y checksums:
+
+```bash
+python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-evidence
+python tools/dag-v2-benchmark/dag_v2_benchmark.py \
+  --cache /tmp/dag-v2-benchmark-cache fetch-locked-corpus
+```
+
+`verify-evidence` no usa red ni descarga modelos o imágenes. Recalcula hashes,
+IDs, p50, p95, máximos y porcentajes de cascada. `fetch-locked-corpus` descarga
+exclusivamente las URLs fijadas y falla si tamaño o SHA-256 cambiaron; nunca
+elige reemplazos silenciosamente.
+
 ## Runner Android aislado
 
 El runner no forma parte de `settings.gradle.kts` del producto, no tiene
@@ -41,6 +58,8 @@ DAG_V2_BENCHMARK_CACHE=/tmp/dag-v2-benchmark-cache \
 `DAG_V2_BENCHMARK_CACHE` es obligatorio para incorporar modelos y corpus. El
 APK generado es un benchmark debug local; no se publica ni se integra a DAG.
 `parity-signature` calcula las firmas de escritorio del mismo subconjunto.
+Antes de copiar assets, `verify-android-assets` valida tamaño y SHA-256 de los
+tres modelos, manifiesto bloqueado, 72 IDs y cada imagen.
 
 ## Controles
 
@@ -57,4 +76,6 @@ APK generado es un benchmark debug local; no se publica ni se integra a DAG.
 ```bash
 python -m unittest discover -s tools/dag-v2-benchmark/tests -v
 python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-repository
+python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-evidence
+bash scripts/test_android_ci_scope.sh
 ```

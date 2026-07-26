@@ -7,33 +7,16 @@ val benchmarkCache =
         providers.systemProperty("user.home").map { "$it/.cache/dag-v2-benchmark" },
     )
 val generatedAssets = layout.buildDirectory.dir("generated/benchmarkAssets")
+val benchmarkTool = rootProject.projectDir.parentFile.resolve("dag_v2_benchmark.py")
 
-val validateBenchmarkCache by tasks.registering {
-    doLast {
-        val cache = file(benchmarkCache.get())
-        val modelFiles =
-            fileTree(cache.resolve("models"))
-                .matching {
-                    include(
-                        "nsfw_marqo_vit_tiny_384.onnx",
-                        "pose_landmarker_lite.task",
-                        "selfie_multiclass_256x256.tflite",
-                    )
-                }.files
-        val corpusFiles =
-            fileTree(cache.resolve("android-subset"))
-                .matching { exclude("manifest.json") }
-                .files
-        check(modelFiles.size == 3) {
-            "Set DAG_V2_BENCHMARK_CACHE to a cache containing three verified models"
-        }
-        check(corpusFiles.size in 50..100) {
-            "Export an Android subset of 50 to 100 images before building"
-        }
-        check(cache.resolve("android-subset/manifest.json").isFile) {
-            "Android subset manifest is missing"
-        }
-    }
+val validateBenchmarkCache by tasks.registering(Exec::class) {
+    commandLine(
+        "python3",
+        benchmarkTool.absolutePath,
+        "--cache",
+        benchmarkCache.get(),
+        "verify-android-assets",
+    )
 }
 
 val prepareBenchmarkAssets by tasks.registering(Sync::class) {

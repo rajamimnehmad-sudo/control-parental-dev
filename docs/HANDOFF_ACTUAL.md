@@ -154,6 +154,13 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
   suficientes de apariencia femenina, edad, ajuste o transparencia; no se
   selecciona modelo ni se inicia cache/04B. Próxima propuesta no autorizada:
   `DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B`.
+- Corrección de trazabilidad en PR #71: las 203 muestras quedaron bloqueadas
+  con URL pública, `page_id`, licencia canónica, hashes y metadatos; evidencia,
+  corrida, resumen, subconjunto Android y checksums son versionados y
+  recalculables sin red. La auditoría estricta aceptó 203/203 y no cambió
+  corpus ni métricas. CI especializado verifica el bundle sin descargar
+  modelos/imágenes, mientras el scope Android devuelve `none` para cambios
+  exclusivos del benchmark.
 - No cambió Android de producto, DAG v1, Calibración DEV, Supabase, App Admin,
   `versionCode` ni Production. El APK debug fue sólo el runner aislado local;
   no se publicó. El provider visible v2 sigue devolviendo sólo `Hide`; no se

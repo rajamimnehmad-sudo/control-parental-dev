@@ -67,6 +67,10 @@ Flujo de una entrada:
   simulada aún envía 98,52% a pose y 68,47% a segmentación. Sin etiquetas
   humanas ni señales de sexo/edad/ajuste/transparencia, no se selecciona
   ganador ni se inicia 04B.
+- Trazabilidad: selección/evidencia/checksums versionados; licencias por mapa
+  canónico cerrado; runner valida hashes de modelos, manifiesto e imágenes;
+  CI ligero propio evita compilar aplicaciones ante cambios sólo de 04A. La
+  auditoría conservó 203/203 y todas las cifras.
 - Próxima propuesta, no autorizada:
   `DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B`.
 

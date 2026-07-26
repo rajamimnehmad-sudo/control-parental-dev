@@ -59,6 +59,20 @@ comerciales ni se baja un dataset completo. Cada imagen:
 - se deduplica por SHA-256;
 - queda sólo en la caché externa.
 
+La selección exacta publicada está bloqueada en
+`tools/dag-v2-benchmark/evidence/04a/corpus.lock.jsonl`. Incluye título,
+`page_id`, página fuente, URL pública exacta de descarga, licencia canónica,
+autor, hashes, dimensiones y transformación. `fetch-locked-corpus` reconstruye
+exclusivamente esa selección y falla ante cualquier byte distinto; no consulta
+categorías ni elige reemplazos. `build-corpus` queda sólo para candidatos
+futuros.
+
+Las licencias se aceptan mediante un mapa canónico cerrado, nunca por
+substring. Sólo admite CC0, dominio público/PD Mark y versiones explícitas de
+CC BY o CC BY-SA, incluidas las cuatro variantes jurisdiccionales presentes y
+auditadas (`DE`, `FR`, `IT`). NC, NC-SA, ND, fair use, copyright, vacío o
+nombres desconocidos fallan.
+
 Las categorías de Commons son evidencia de procedencia, no verdad de la
 política. `review_status=source_category_unreviewed`; por eso el ticket no
 declara precisión, falsos permisos ni falsos bloqueos definitivos. No se
@@ -129,6 +143,19 @@ paridad pixel a pixel.
 El APK se instaló en el SM-A235M autorizado mediante actualización in-place.
 No se desinstaló, no se borraron datos y no se modificó `app-user` ni
 `:feature-dag2`.
+
+Antes de copiar assets, Gradle ejecuta `verify-android-assets`: compara tamaño
+y SHA-256 de los tres modelos con `models.lock.json`, exige coincidencia
+byte-a-byte del manifiesto bloqueado del subconjunto y verifica los 72
+`sample_id`, nombres, tamaños y hashes de imagen.
+
+## CI económico
+
+El workflow `DAG v2 Benchmark Evidence` ejecuta unitarios, verificación del
+repositorio, evidencia y scope sin descargar corpus/modelos ni configurar
+Android. `android_ci_scope.sh` clasifica cambios exclusivos de
+`tools/dag-v2-benchmark/**` y de su documentación como `none`; cambios reales
+en App Usuario, Admin o módulos compartidos conservan sus builds Android.
 
 ## Rollback
 

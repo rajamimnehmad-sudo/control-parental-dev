@@ -2,14 +2,7 @@
   "spec_version": 1,
   "source": "Wikimedia Commons MediaWiki API",
   "api": "https://commons.wikimedia.org/w/api.php",
-  "license_allowlist": [
-    "cc0",
-    "public domain",
-    "cc by",
-    "cc-by",
-    "cc by-sa",
-    "cc-by-sa"
-  ],
+  "license_policy": "canonical-closed-v1",
   "per_file_max_bytes": 8388608,
   "total_max_bytes": 1073741824,
   "queries": [

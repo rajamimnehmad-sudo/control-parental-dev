@@ -14,7 +14,7 @@ while IFS= read -r path; do
         app-admin/*)
             admin_changed=true
             ;;
-        .github/*|docs/*|release-notes/*|scripts/*|*.md)
+        .github/*|docs/*|release-notes/*|scripts/*|tools/dag-v2-benchmark/*|*.md)
             ;;
         *)
             shared_changed=true

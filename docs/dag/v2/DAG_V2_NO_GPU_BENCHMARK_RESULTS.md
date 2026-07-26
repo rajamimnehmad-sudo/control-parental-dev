@@ -18,15 +18,20 @@ falsos bloqueos ni superioridad frente a DAG v1.
 ## Corpus y reproducibilidad
 
 - 203 imágenes únicas de Wikimedia Commons, 70.142.418 bytes.
-- Licencias admitidas: CC0, dominio público, CC BY y CC BY-SA.
-- Manifiesto externo:
-  `$DAG_V2_BENCHMARK_CACHE/corpus/manifest.jsonl`.
-- SHA-256 del manifiesto:
-  `4b20c3418c2ae2e9ec84781e4013dc2dc8ce4909bffb78df36e50b42715e505f`.
+- Licencias admitidas por comparación exacta: CC0, dominio público/PD Mark,
+  CC BY y CC BY-SA con versiones reconocidas.
+- Manifiesto bloqueado versionado:
+  `tools/dag-v2-benchmark/evidence/04a/corpus.lock.jsonl`.
+- SHA-256 del manifiesto bloqueado:
+  `52a6293838b5ea7d2ee5378d844d8d5f397a42bdf0362e26898e4f929910e010`.
 - Evidencia JSONL SHA-256:
   `5d043a03e317a75b73bae15022d8ea964cf3d8e699968f0ba5c972e5ef3a24f3`.
+- Corrida JSON SHA-256:
+  `61f360890fbcef14ed5c15369c0c7782be0db77906b264253986feaa3d84e45d`.
 - Resumen JSON SHA-256:
   `8f73ba7d2d8af1d9f7703853569cfeaae7e742b18a56ae48650ed8f42a35b919`.
+- Subconjunto Android bloqueado SHA-256:
+  `b4fbd2d6cc9777f882620df26a53378ae2c7ca45732914043ab09f47cdd6235d`.
 
 El corpus cubre 40 categorías fuente, incluidas personas, grupos, vestimenta,
 arte, tiendas, controles sin persona y dos fuentes pequeñas. Intentó obtener
@@ -34,6 +39,18 @@ casos borrosos, pero Wikimedia no incorporó ninguno que superara todas las
 validaciones. `review_status=source_category_unreviewed`: las categorías
 describen procedencia y no son etiquetas humanas de `Show`/`Hide`. No se usaron
 imágenes privadas ni las cuatro muestras remotas.
+
+Auditoría estricta: 203/203 muestras aceptadas; no se retiró ni reemplazó
+ninguna imagen y las métricas permanecen idénticas. Distribución:
+
+- Public Domain: 73; CC0: 7;
+- CC BY: 45;
+- CC BY-SA genérica: 73;
+- CC BY-SA jurisdiccional validada: 5 (`DE`: 3, `FR`: 1, `IT`: 1).
+
+El validador rechaza CC BY-NC, CC BY-NC-SA, CC BY-ND, fair use, copyright,
+vacío, versiones desconocidas y nombres que sólo contengan parcialmente una
+licencia aceptada.
 
 ## Mac Apple M2, 8 GB
 
@@ -60,6 +77,9 @@ independiente, sin Internet, sin WebView, no incluido en el Gradle del producto
 y con variante Release deshabilitada.
 
 - Subconjunto: 72 imágenes, round-robin por categoría.
+- Los 72 `sample_id` y hashes de imagen son los mismos de la prueba física. Sólo
+  se agregó integridad explícita al manifiesto; no cambió ninguna muestra ni
+  modelo y no fue necesario repetir inferencia física.
 - APK local: 170.878.133 bytes.
 - APK SHA-256:
   `3608258117ce7a4198a4988e260ca721b4a488971c9220f2ef7be36b60321e53`.

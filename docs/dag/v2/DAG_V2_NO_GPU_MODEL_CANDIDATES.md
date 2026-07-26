@@ -8,6 +8,12 @@ La fuente ejecutable está fijada en
 `tools/dag-v2-benchmark/models.lock.json`. El descargador rechaza cualquier
 tamaño o SHA-256 diferente y conserva la caché fuera de Git.
 
+El corpus asociado usa una política de licencia canónica cerrada. La aceptación
+se realiza por nombre completo normalizado, nunca por substring: una variante
+NC, NC-SA, ND, ambigua, vacía o desconocida no puede entrar aunque contenga
+`CC BY`. Las cuatro variantes jurisdiccionales existentes se enumeran
+explícitamente y fueron auditadas sin cambiar ninguna de las 203 muestras.
+
 ## Candidatos medidos
 
 ### Marqo NSFW ViT-Tiny 384 — referencia adulta
