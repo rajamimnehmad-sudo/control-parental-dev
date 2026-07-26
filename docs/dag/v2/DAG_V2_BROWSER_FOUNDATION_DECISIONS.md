@@ -133,11 +133,16 @@ global `test` también ejecuta Beta Debug, Beta Compatibility y Beta Release, do
 manifiestos. La comprobación común de aislamiento continúa verificando que Beta y Production no
 incluyen el Lab.
 
+El run correctivo `30182570727`, job `89741575612`, completó correctamente build DEV y
+`Calidad compartida` en el head `1714235431961d4f093a3f64cdc6f2c446e19e51`. El comando local
+equivalente `./gradlew testDevDebugUnitTest test ktlintCheck lintDevDebug detekt` y las tareas
+específicas de App Usuario y `:feature-dag2` también finalizaron correctamente.
+
 ## Matriz Frávega A-F
 
-La matriz física no se ejecutó porque ADB detectó sólo un SM-A235M, que no se instaló ni modificó,
-y no había un SM-S908E conectado. La evidencia local separa las variables sin declarar resultados
-de sitio:
+La matriz física no se ejecutó porque ADB detectó sólo el SM-A235M `R58T34V31AE`, que no se instaló
+ni modificó, y no había un SM-S908E conectado. La evidencia local separa las variables sin declarar
+resultados de sitio:
 
 | Caso | Estado local | Evidencia |
 | --- | --- | --- |
