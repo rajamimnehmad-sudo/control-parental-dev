@@ -1,6 +1,7 @@
 package com.contentfilter.user.dag2
 
 import android.annotation.SuppressLint
+import android.graphics.BitmapFactory
 import android.net.Uri
 import android.net.http.SslError
 import android.webkit.ClientCertRequest
@@ -19,6 +20,7 @@ import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -39,6 +41,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -46,9 +50,11 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -58,10 +64,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.webkit.JavaScriptReplyProxy
 import androidx.webkit.ScriptHandler
@@ -79,10 +87,13 @@ internal fun DagV2LabScreen(
     pageAnalyzer: DagV2PageAnalyzer,
     webViewLifecycle: DagV2WebViewLifecycle,
     webViewHost: DagV2WebViewHost<WebView>,
+    calibrationController: DagV2CalibrationController,
 ) {
     val state by coordinator.state.collectAsStateWithLifecycle()
     val metricSnapshot by metrics.snapshot.collectAsStateWithLifecycle()
+    val calibrationState by calibrationController.state.collectAsStateWithLifecycle()
     var webView by remember { mutableStateOf<WebView?>(null) }
+    var showCalibrationConfirmation by remember { mutableStateOf(false) }
 
     Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
         Spacer(Modifier.height(24.dp))
@@ -166,6 +177,41 @@ internal fun DagV2LabScreen(
         ) {
             Text(if (state.noCacheMode) "Sin caché DEV: activo" else "Sin caché DEV: inactivo")
         }
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.fillMaxWidth(0.8f)) {
+                Text("Calibración DAG v2", style = MaterialTheme.typography.bodyMedium)
+                Text(
+                    "Las páginas conservan placeholders neutros.",
+                    style = MaterialTheme.typography.labelSmall,
+                )
+            }
+            Switch(
+                checked = calibrationState.enabled,
+                onCheckedChange = { enabled ->
+                    if (enabled) showCalibrationConfirmation = true else calibrationController.setEnabled(false)
+                },
+            )
+        }
+        if (calibrationState.enabled) {
+            TextButton(
+                onClick = calibrationController::openReview,
+                enabled = calibrationState.candidateCount > 0,
+                modifier = Modifier.padding(horizontal = 8.dp),
+            ) {
+                Text("Revisar imágenes (${calibrationState.candidateCount})")
+            }
+            calibrationState.statusMessage?.let {
+                Text(
+                    text = it,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 2.dp),
+                )
+            }
+        }
         state.blockedMessage?.let {
             Text(
                 text = it,
@@ -215,6 +261,145 @@ internal fun DagV2LabScreen(
                         modifier = Modifier.align(Alignment.Center).padding(24.dp),
                         style = MaterialTheme.typography.bodyLarge,
                     )
+            }
+        }
+    }
+    if (showCalibrationConfirmation) {
+        AlertDialog(
+            onDismissRequest = { showCalibrationConfirmation = false },
+            title = { Text("Activar Calibración DAG v2") },
+            text = {
+                Text(
+                    "Las imágenes seguirán ocultas en las páginas.\n\n" +
+                        "Sólo se mostrarán dentro del visor de revisión cuando las abras expresamente.\n\n" +
+                        "Las etiquetas se enviarán al conjunto de evidencia global de DAG v2.\n\n" +
+                        "No cambiarán el filtro actual.",
+                )
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        showCalibrationConfirmation = false
+                        calibrationController.setEnabled(true)
+                    },
+                ) {
+                    Text("Activar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCalibrationConfirmation = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+    if (calibrationState.reviewOpen) {
+        DagV2CalibrationReviewDialog(
+            state = calibrationState,
+            onOpenCandidate = calibrationController::openCandidate,
+            onLabel = calibrationController::label,
+            onClose = calibrationController::closeReview,
+        )
+    }
+}
+
+@Composable
+private fun DagV2CalibrationReviewDialog(
+    state: DagV2CalibrationReviewState,
+    onOpenCandidate: (String) -> Unit,
+    onLabel: (DagV2CalibrationDecision) -> Unit,
+    onClose: () -> Unit,
+) {
+    Dialog(onDismissRequest = onClose) {
+        Surface(
+            shape = MaterialTheme.shapes.large,
+            tonalElevation = 6.dp,
+            modifier = Modifier.fillMaxWidth().padding(12.dp),
+        ) {
+            Column(Modifier.padding(16.dp)) {
+                Text("Revisión aislada", style = MaterialTheme.typography.titleLarge)
+                Text(
+                    "La imagen se muestra sólo en este visor nativo.",
+                    style = MaterialTheme.typography.bodySmall,
+                )
+                when {
+                    state.loadingCandidateId != null -> {
+                        CircularProgressIndicator(Modifier.align(Alignment.CenterHorizontally).padding(24.dp))
+                        Text("Validando y normalizando…", Modifier.align(Alignment.CenterHorizontally))
+                    }
+                    state.preview != null && state.previewCandidate != null -> {
+                        val bytes = state.preview.jpegBytes
+                        val bitmap =
+                            remember(bytes) {
+                                BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+                            }
+                        DisposableEffect(bitmap) {
+                            onDispose { bitmap?.takeUnless(android.graphics.Bitmap::isRecycled)?.recycle() }
+                        }
+                        bitmap?.let {
+                            Image(
+                                bitmap = it.asImageBitmap(),
+                                contentDescription = "Preview de calibración",
+                                modifier = Modifier.fillMaxWidth().height(360.dp).padding(vertical = 12.dp),
+                            )
+                        }
+                        Text(
+                            "Origen: ${state.previewCandidate.sanitizedResourceHost}",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Text(
+                            "Posición: 1 de ${state.candidateCount.coerceAtLeast(1)}",
+                            style = MaterialTheme.typography.labelSmall,
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
+                        ) {
+                            Button(onClick = { onLabel(DagV2CalibrationDecision.Show) }) {
+                                Text("✓ Mostrar")
+                            }
+                            Button(onClick = { onLabel(DagV2CalibrationDecision.Hide) }) {
+                                Text("× Ocultar")
+                            }
+                        }
+                        Button(
+                            onClick = { onLabel(DagV2CalibrationDecision.Unsure) },
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                        ) {
+                            Text("? No estoy seguro")
+                        }
+                    }
+                    else -> {
+                        Text(
+                            "Elegí expresamente una imagen para descargar su preview.",
+                            modifier = Modifier.padding(vertical = 10.dp),
+                        )
+                        LazyColumn(Modifier.height(360.dp)) {
+                            items(state.candidates, key = DagV2CalibrationCandidate::candidateId) { candidate ->
+                                Column(
+                                    modifier =
+                                        Modifier
+                                            .fillMaxWidth()
+                                            .clickable { onOpenCandidate(candidate.candidateId) }
+                                            .padding(vertical = 12.dp),
+                                ) {
+                                    Text(candidate.sanitizedResourceHost)
+                                    Text(
+                                        "Candidato raster · ${candidate.observedAt}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                    )
+                                }
+                                HorizontalDivider()
+                            }
+                        }
+                    }
+                }
+                state.statusMessage?.let {
+                    Text(it, style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(top = 8.dp))
+                }
+                TextButton(onClick = onClose, modifier = Modifier.align(Alignment.End)) {
+                    Text("Cerrar")
+                }
             }
         }
     }

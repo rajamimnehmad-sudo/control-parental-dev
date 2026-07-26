@@ -32,6 +32,22 @@ internal object DagV2MetricNames {
     const val NoCacheModeEnabled = "no_cache_mode_enabled"
     const val RendererGone = "renderer_gone"
     const val ConsoleError = "console_error"
+    const val CalibrationEnabled = "calibration_enabled"
+    const val CalibrationDisabled = "calibration_disabled"
+    const val CandidateQueued = "candidate_queued"
+    const val CandidateDeduplicated = "candidate_deduplicated"
+    const val ReviewOpened = "review_opened"
+    const val PreviewDownloadStarted = "preview_download_started"
+    const val PreviewReady = "preview_ready"
+    const val PreviewRejected = "preview_rejected"
+    const val LabelShow = "label_show"
+    const val LabelHide = "label_hide"
+    const val LabelUnsure = "label_unsure"
+    const val LabelQueued = "label_queued"
+    const val LabelDelivered = "label_delivered"
+    const val LabelRejected = "label_rejected"
+    const val OutboxFlushed = "outbox_flushed"
+    const val StaleCandidateDiscarded = "stale_candidate_discarded"
 
     val RequiredFoundationEvents =
         setOf(

@@ -38,6 +38,7 @@ dependencies {
     implementation(libs.androidx.webkit)
     implementation(libs.hilt.android)
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.okhttp)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
 }
@@ -104,6 +105,12 @@ val verifyDagV2Isolation by tasks.registering {
         }
         check(appBuild.split("""DAG_V2_BROWSER_AVAILABLE", "false"""").size - 1 == 2) {
             "DAG v2 must be disabled in Beta and Production."
+        }
+        check(appBuild.split("""DAG_V2_CALIBRATION_AVAILABLE", "true"""").size - 1 == 1) {
+            "DAG v2 calibration must be enabled only in DEV."
+        }
+        check(appBuild.split("""DAG_V2_CALIBRATION_AVAILABLE", "false"""").size - 1 == 2) {
+            "DAG v2 calibration must be disabled in Beta and Production."
         }
     }
 }

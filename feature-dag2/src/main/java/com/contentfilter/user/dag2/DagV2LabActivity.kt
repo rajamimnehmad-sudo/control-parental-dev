@@ -33,12 +33,16 @@ class DagV2LabActivity : ComponentActivity() {
     @Inject
     lateinit var lifecycleGate: DagV2LabLifecycleGate
 
+    @Inject
+    lateinit var calibrationController: DagV2CalibrationController
+
     private var lifecycleGeneration = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lifecycleGeneration = lifecycleGate.acquire()
         coordinator.closeSession()
+        calibrationController.resetLabSession()
         serviceWorkerRouter.setNoCacheMode(false)
         enableEdgeToEdge()
         serviceWorkerRouter.install()
@@ -52,12 +56,14 @@ class DagV2LabActivity : ComponentActivity() {
                     pageAnalyzer = pageAnalyzer,
                     webViewLifecycle = webViewLifecycle,
                     webViewHost = webViewHost,
+                    calibrationController = calibrationController,
                 )
             }
         }
     }
 
     override fun onDestroy() {
+        calibrationController.closeLab()
         webViewHost.close()
         if (lifecycleGate.release(lifecycleGeneration)) {
             coordinator.closeSession()

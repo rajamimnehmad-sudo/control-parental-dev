@@ -17,6 +17,7 @@ class DagV2ResourceRouter
         private val imagePipeline: DagV2ImagePipeline,
         private val metrics: DagV2Metrics,
         private val destinationGuard: PublicNetworkDestinationGuard,
+        private val calibration: DagV2CalibrationController? = null,
     ) {
         fun intercept(request: DagV2ResourceRequest): WebResourceResponse? {
             val kind = classify(request)
@@ -46,6 +47,7 @@ class DagV2ResourceRouter
         fun onNewDocument(session: DagV2DocumentSessionState) {
             metrics.beginDocument(session)
             imagePipeline.cancelBefore(session.navigationToken)
+            calibration?.onNewDocument(session)
         }
 
         fun close() {

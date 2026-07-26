@@ -64,6 +64,7 @@ class DagV2ImagePipeline
         private val neutralImageFactory: DagV2NeutralImageFactory,
         private val sessions: DagV2DocumentSession,
         private val metrics: DagV2Metrics,
+        private val calibration: DagV2CalibrationController? = null,
     ) {
         fun intercept(
             request: DagV2ResourceRequest,
@@ -84,6 +85,7 @@ class DagV2ImagePipeline
 
             check(kind == DagV2ResourceKind.RasterImage || kind == DagV2ResourceKind.SvgImage)
             check(decisionProvider.decide() == DagV2ImageDecision.Hide)
+            calibration?.observeCandidate(request, kind, session)
 
             if (!sessions.isCurrent(session.sessionId, session.navigationToken)) {
                 return neutralImageFactory.create()
