@@ -16,6 +16,18 @@ Reglas permanentes para trabajar con Codex en este proyecto.
 - No agregar features fuera del ticket.
 - Modificar la menor cantidad posible de archivos.
 - Prioridad permanente: ahorrar tokens, reducir contexto, evitar cambios innecesarios, hacer fixes faciles de revisar y mantener el repo limpio y escalable.
+- Antes de elegir una arquitectura, libreria, modelo, servicio o flujo operativo, buscar y contrastar las mejores practicas vigentes en documentacion oficial y fuentes primarias. No confiar solamente en memoria, ejemplos antiguos o una unica herramienta.
+- Comparar alternativas relevantes por seguridad, privacidad, mantenibilidad, compatibilidad, licencia, costo, consumo de tokens, CPU, RAM, disco, red y tiempo de ejecucion. Documentar la opcion elegida y por que es mejor para este proyecto.
+- Informar al usuario cuando exista una alternativa materialmente mas segura, rapida, economica o confiable, incluso si el ticket original propone otra solucion. No cambiar el alcance sin autorizacion, pero dejar la recomendacion concreta y sus tradeoffs.
+- No implementar ciegamente una practica conocida como inferior. Si una restriccion obliga a desviarse de la mejor practica, documentar el motivo, el riesgo residual, el rollback y el ticket de seguimiento.
+- Verificar licencia, procedencia, mantenimiento, seguridad y compatibilidad comercial de modelos, pesos, datasets y dependencias antes de incorporarlos. No asumir que un artefacto publicado en Hugging Face, GitHub u otro catalogo permite uso comercial.
+- Antes de una operacion costosa o larga, ejecutar una prueba pequena y medible. Escalar solamente si pasa criterios definidos. Fijar limites de costo, tokens, reintentos, tiempo, almacenamiento y concurrencia; nunca dejar procesos sin limite.
+- Reutilizar scripts, caches y artefactos verificables. Evitar repetir investigaciones, builds globales o recorridos completos cuando una prueba dirigida aporta evidencia suficiente.
+- La Mac de desarrollo M2 con 8 GB de RAM sirve para programacion, preparacion por lotes, metadatos, deduplicacion, pruebas pequenas, exportacion y validacion. No cargar datasets completos en RAM, no ejecutar varios procesos pesados simultaneos y no planificar entrenamiento visual grande localmente.
+- Codex local o cloud coordina, programa, ejecuta pruebas y analiza resultados, pero no se considera una GPU de entrenamiento ni se presupone hardware acelerado no documentado.
+- Supabase se usa para Postgres, Storage privado, auditoria, colas livianas, metadatos, registro y distribucion de artefactos. No ejecutar entrenamiento pesado dentro de Edge Functions ni asumir GPU incluida en la suscripcion.
+- GitHub Actions estandar se usa para CI, validaciones y orquestacion. No asumir GPU; cualquier runner GPU requiere disponibilidad, plan y presupuesto verificados por un ticket separado.
+- El entrenamiento pesado de modelos se ejecutara en una GPU externa efimera y alquilada por tiempo solamente cuando un ticket aprobado lo requiera. Codex debe preparar un pipeline reproducible, reanudable y con apagado automatico para evitar gasto accidental.
 - Si cambia Android: validar cada ticket con build/tests proporcionales. Incrementar y publicar solo el `versionCode` de cada app afectada; Usuario y Admin versionan de forma independiente. Coordinar ambas solo si el cambio entra en las dos APK. Hacer commit, push y publicacion DEV al cierre del lote aprobado.
 - Si solo cambian docs: no compilar, no incrementar `versionCode`, no publicar APK, no tocar Android y no tocar Supabase.
 - Si solo cambian docs/scripts/SQL: no APK.
