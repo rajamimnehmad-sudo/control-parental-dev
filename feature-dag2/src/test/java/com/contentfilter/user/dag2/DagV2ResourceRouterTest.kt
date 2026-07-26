@@ -1,5 +1,6 @@
 package com.contentfilter.user.dag2
 
+import com.contentfilter.core.network.security.PublicNetworkDestinationGuard
 import kotlin.test.Test
 import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
@@ -10,6 +11,7 @@ import kotlin.test.assertTrue
 
 class DagV2ResourceRouterTest {
     private val sessions = DagV2DocumentSession()
+    private val contexts = DagV2DocumentContextRegistry()
     private val metrics = DagV2Metrics()
     private val neutral = DagV2NeutralImageFactory()
     private val pipeline =
@@ -19,17 +21,26 @@ class DagV2ResourceRouterTest {
             sessions,
             metrics,
         )
-    private val router = DagV2ResourceRouter(pipeline, metrics, sessions)
+    private val router =
+        DagV2ResourceRouter(
+            pipeline,
+            metrics,
+            PublicNetworkDestinationGuard(),
+        )
+    private val interceptor = DagV2ResourceInterceptor(router, contexts)
 
     @Test
     fun `html scripts json rsc fetch xhr and fonts bypass immediately`() {
         val cases =
             listOf(
                 request("https://example.com/", "text/html", "document", mainFrame = true),
+                request("https://example.com/site.css", "text/css", "style"),
                 request("https://example.com/app.js", "application/javascript", "script"),
                 request("https://example.com/api", "application/json", "empty"),
                 request("https://example.com/rsc", "text/x-component", "empty"),
                 request("https://example.com/font.woff2", "font/woff2", "font"),
+                request("https://example.com/site.webmanifest", "application/manifest+json", "manifest"),
+                request("https://example.com/sw.js", "application/javascript", "serviceworker"),
             )
 
         cases.forEach {
@@ -82,52 +93,140 @@ class DagV2ResourceRouterTest {
     }
 
     @Test
-    fun `url without extension is not visual without header evidence`() {
-        val request = request("https://example.com/resource", "*/*", "empty")
+    fun `sec fetch destination takes precedence over conflicting accept and extension hints`() {
+        val script = request("https://example.com/app.jpg", "image/*", "script")
+        val image = request("https://example.com/image-endpoint", "application/octet-stream", "image")
 
-        assertEquals(DagV2ResourceKind.NonVisual, router.classify(request))
-        assertEquals(DagV2ResourceRoute.Bypass, router.route(router.classify(request), request.url))
+        assertEquals(DagV2ResourceKind.NonVisual, router.classify(script))
+        assertEquals(DagV2ResourceKind.RasterImage, router.classify(image))
     }
 
     @Test
-    fun `service worker request without an active dag2 session bypasses the global client`() {
-        val request =
-            request("https://example.com/photo.jpg", "image/*", "image")
-                .copy(source = DagV2ResourceSource.ServiceWorker)
+    fun `service worker without active dag2 document is left untouched`() {
+        val visual = evidence("https://example.com/photo.jpg", "image/*", "image")
+        val functional = evidence("https://example.com/app.js", "application/javascript", "script")
 
-        assertNull(router.intercept(request))
+        assertNull(interceptor.interceptServiceWorker(visual))
+        assertNull(interceptor.interceptServiceWorker(functional))
+        assertEquals(DagV2MetricSnapshot(), metrics.snapshot.value)
     }
 
     @Test
-    fun `old visual request cannot alter pending counters for a new session`() {
-        val first = sessions.start("https://example.com/first")
-        router.onNewDocument(first)
-        val oldRequest =
-            request("https://example.com/old.jpg", "image/*", "image")
-                .copy(sessionId = first.sessionId, navigationToken = first.navigationToken)
-        sessions.cancelActive()
-        val second = sessions.start("https://example.com/second")
-        router.onNewDocument(second)
+    fun `unattributed functional resource bypasses without changing current metrics`() {
+        start("https://current.example/products")
+        val before = metrics.snapshot.value
 
-        router.intercept(oldRequest)
+        val response =
+            interceptor.intercept(
+                evidence(
+                    url = "https://unrelated.example.com/app.js",
+                    accept = "application/javascript",
+                    destination = "script",
+                ),
+            )
 
+        assertNull(response)
+        assertEquals(before, metrics.snapshot.value)
+    }
+
+    @Test
+    fun `unattributed visual resource fails closed without changing current metrics`() {
+        start("https://current.example/products")
+        val before = metrics.snapshot.value
+
+        val response =
+            interceptor.intercept(
+                evidence(
+                    url = "https://unrelated.example.com/photo.jpg",
+                    accept = "image/*",
+                    destination = "image",
+                ),
+            )
+
+        assertNotNull(response)
+        assertEquals(before, metrics.snapshot.value)
+    }
+
+    @Test
+    fun `production interceptor rejects old webview work after a new document starts`() {
+        val first = start("https://example.com/a")
+        val oldEvidence =
+            evidence(
+                url = "https://example.com/old.jpg",
+                accept = "image/*",
+                destination = "image",
+                referer = first.documentUrl,
+            )
+        cancel(first)
+        val second = start("https://example.com/b")
+        val before = metrics.snapshot.value
+
+        val response = interceptor.interceptBound(oldEvidence, first)
+
+        assertNotNull(response)
         assertEquals(second.sessionId, sessions.snapshot()?.sessionId)
-        assertEquals(0, metrics.snapshot.value.visualPendingCount)
+        assertEquals(before, metrics.snapshot.value)
+    }
+
+    @Test
+    fun `old service worker request cannot mutate the new document`() {
+        val first = start("https://example.com/a")
+        val oldEvidence =
+            evidence(
+                url = "https://example.com/old.jpg",
+                accept = "image/*",
+                destination = "image",
+                source = DagV2ResourceSource.ServiceWorker,
+                referer = first.documentUrl,
+                origin = first.documentOrigin,
+            )
+        cancel(first)
+        val second = start("https://example.com/b")
+        val before = metrics.snapshot.value
+
+        val response = interceptor.interceptServiceWorker(oldEvidence)
+
+        assertNotNull(response)
+        assertEquals(second.sessionId, sessions.snapshot()?.sessionId)
+        assertEquals(before, metrics.snapshot.value)
+    }
+
+    @Test
+    fun `old functional service worker request bypasses without attribution to new document`() {
+        val first = start("https://example.com/a")
+        val oldEvidence =
+            evidence(
+                url = "https://example.com/old.js",
+                accept = "application/javascript",
+                destination = "script",
+                source = DagV2ResourceSource.ServiceWorker,
+                referer = first.documentUrl,
+                origin = first.documentOrigin,
+            )
+        cancel(first)
+        val second = start("https://example.com/b")
+        val before = metrics.snapshot.value
+
+        assertNull(interceptor.interceptServiceWorker(oldEvidence))
+        assertEquals(second.sessionId, sessions.snapshot()?.sessionId)
+        assertEquals(before, metrics.snapshot.value)
     }
 
     @Test
     fun `active service worker request uses the same fail closed visual pipeline`() {
-        val session = sessions.start("https://example.com/products")
-        router.onNewDocument(session)
-        val request =
-            request("https://example.com/photo.jpg", "image/*", "image")
-                .copy(
-                    source = DagV2ResourceSource.ServiceWorker,
-                    sessionId = session.sessionId,
-                    navigationToken = session.navigationToken,
-                )
+        val context = start("https://example.com/products")
 
-        val response = router.intercept(request)
+        val response =
+            interceptor.interceptServiceWorker(
+                evidence(
+                    url = "https://example.com/photo.jpg",
+                    accept = "image/*",
+                    destination = "image",
+                    source = DagV2ResourceSource.ServiceWorker,
+                    referer = context.documentUrl,
+                    origin = context.documentOrigin,
+                ),
+            )
 
         assertNotNull(response)
         assertEquals(1, metrics.snapshot.value.serviceWorkerRequestCount)
@@ -135,10 +234,38 @@ class DagV2ResourceRouterTest {
     }
 
     @Test
-    fun `fail closed provider has no approved image path`() {
-        val provider = DagV2FailClosedImageDecisionProvider()
+    fun `private and reserved literals are blocked for webview and service worker resources`() {
+        val context = start("https://example.com/products")
+        val literals =
+            listOf(
+                "127.0.0.1",
+                "127.1",
+                "10.0.0.1",
+                "192.0.2.1",
+                "[2001:db8::1]",
+                "localhost",
+                "device.local",
+            )
 
-        assertEquals(DagV2ImageDecision.Hide, provider.decide())
+        literals.forEach { host ->
+            val headers = mapOf("Referer" to context.documentUrl, "Origin" to context.documentOrigin)
+            val webView =
+                evidence(
+                    url = "https://$host/private.js",
+                    accept = "application/javascript",
+                    destination = "script",
+                    headers = headers,
+                )
+            val worker = webView.copy(source = DagV2ResourceSource.ServiceWorker)
+
+            assertNotNull(interceptor.intercept(webView), host)
+            assertNotNull(interceptor.interceptServiceWorker(worker), host)
+        }
+    }
+
+    @Test
+    fun `fail closed provider has no approved image path`() {
+        assertEquals(DagV2ImageDecision.Hide, DagV2FailClosedImageDecisionProvider().decide())
     }
 
     @Test
@@ -151,6 +278,40 @@ class DagV2ResourceRouterTest {
         assertFalse(first.decodeToString().contains(sourceMarker.decodeToString()))
         assertTrue(first.decodeToString().contains("#E9EDF2"))
     }
+
+    private fun start(url: String): DagV2DocumentRequestContext {
+        val session = sessions.start(url)
+        contexts.register(session.requestContext)
+        router.onNewDocument(session)
+        return session.requestContext
+    }
+
+    private fun cancel(context: DagV2DocumentRequestContext) {
+        sessions.cancelActive()
+        contexts.cancel(context)
+    }
+
+    private fun evidence(
+        url: String,
+        accept: String,
+        destination: String,
+        source: DagV2ResourceSource = DagV2ResourceSource.WebView,
+        referer: String? = null,
+        origin: String? = null,
+        headers: Map<String, String> = emptyMap(),
+    ) = DagV2ResourceEvidence(
+        url = url,
+        headers =
+            buildMap {
+                put("Accept", accept)
+                put("Sec-Fetch-Dest", destination)
+                referer?.let { put("Referer", it) }
+                origin?.let { put("Origin", it) }
+                putAll(headers)
+            },
+        isForMainFrame = destination == "document",
+        source = source,
+    )
 
     private fun request(
         url: String,

@@ -10,7 +10,6 @@ import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.feature.vpn.domainlist.DynamicDomainBlocklist
 import com.contentfilter.feature.vpn.domainlist.WebDomainList
 import java.net.URI
-import java.text.Normalizer
 import java.time.ZonedDateTime
 import java.util.Locale
 import javax.inject.Inject
@@ -22,19 +21,35 @@ class DagV2SitePolicy
     constructor(
         private val policyRepository: PolicyRepository,
         private val domainBlocklist: DynamicDomainBlocklist,
+        private val canonicalTextPolicy: DagV2CanonicalTextPolicy,
     ) : DagV2SearchPolicy {
         override fun evaluateQuery(query: String): DagV2PolicyResult =
             when {
                 query.isBlank() -> blocked("La consulta está vacía.")
-                containsAdultSignal(query) -> blocked("La consulta fue bloqueada por la política adulta.")
-                else -> allowed("Consulta local permitida.")
+                canonicalTextPolicy.classifyQuery(query).decision != DagV2CanonicalTextDecision.Allowed ->
+                    blocked("La consulta no fue aprobada por la política textual canónica.")
+                else -> allowed("La política textual canónica permite buscar y filtrar resultados.")
             }
 
         suspend fun evaluateNavigation(url: String): DagV2PolicyResult {
             val parsed = parseHttps(url) ?: return blocked("Sólo se permiten direcciones HTTPS válidas.")
             val domain = parsed.host.normalizedDomain()
-            if (isNonNegotiableAdult(domain, url)) {
-                return blocked("El dominio o la dirección están prohibidos por la política adulta.")
+            val category =
+                runCatching { domainBlocklist.categoryFor(domain) }
+                    .getOrElse { return blocked("No se pudo comprobar la lista local de dominios.") }
+            if (category == WebDomainList.CategoryAdult || category == WebDomainList.CategoryMixedAdult) {
+                return blocked("El dominio está prohibido por la lista adulta no reemplazable.")
+            }
+            val canonicalNavigation = canonicalTextPolicy.classifyNavigation(url)
+            val canonicalDecisionComesFromDomainList =
+                category != null &&
+                    canonicalNavigation.decision == DagV2CanonicalTextDecision.Blocked &&
+                    canonicalNavigation.category == category
+            if (
+                canonicalNavigation.decision != DagV2CanonicalTextDecision.Allowed &&
+                !canonicalDecisionComesFromDomainList
+            ) {
+                return blocked("La dirección no fue aprobada por la política textual canónica.")
             }
             val snapshot =
                 runCatching { policyRepository.getActivePolicy() }
@@ -50,21 +65,18 @@ class DagV2SitePolicy
                     RuleAction.RequestAuthorization -> blocked("La regla administrativa requiere autorización.")
                 }
             }
-            val category =
-                runCatching { domainBlocklist.categoryFor(domain) }
-                    .getOrElse { return blocked("No se pudo comprobar la lista local de dominios.") }
             if (category != null) return blocked("Dominio bloqueado por la lista local: $category.")
-            if (containsAdultSignal(parsed.path.orEmpty()) || containsAdultSignal(parsed.query.orEmpty())) {
-                return blocked("La ruta fue bloqueada por la política adulta.")
-            }
             return allowed("Navegación permitida.")
         }
 
         override suspend fun evaluateResult(result: DagV2SearchResult): DagV2PolicyResult {
             val navigation = evaluateNavigation(result.url)
             if (navigation.decision == DagV2SiteDecision.Block) return navigation
-            return if (containsAdultSignal("${result.title} ${result.description}")) {
-                blocked("El resultado fue bloqueado por su texto.")
+            return if (
+                canonicalTextPolicy.classifyResult(result).decision !=
+                DagV2CanonicalTextDecision.Allowed
+            ) {
+                blocked("El resultado no fue aprobado por la política textual canónica.")
             } else {
                 allowed("Resultado permitido.")
             }
@@ -75,39 +87,32 @@ class DagV2SitePolicy
             title: String,
             visibleText: String,
         ): DagV2PolicyResult {
-            val evidence = "$title ${visibleText.take(MaxDocumentCharacters)}".trim()
-            return if (evidence.isBlank()) {
-                blocked("El documento no aportó texto suficiente para aprobarlo.")
-            } else if (containsAdultSignal("$url $evidence")) {
-                blocked("La página contiene señales adultas inequívocas.")
+            if (title.isBlank() && visibleText.isBlank()) {
+                return blocked("El documento no aportó texto suficiente para aprobarlo.")
+            }
+            val result =
+                canonicalTextPolicy.classifyPage(
+                    url = url,
+                    title = title,
+                    visibleText = visibleText.take(MaxDocumentCharacters),
+                )
+            return if (result.decision == DagV2CanonicalTextDecision.Allowed) {
+                allowed("Documento permitido por la política textual canónica.")
             } else {
-                allowed("Documento permitido.")
+                blocked("El documento no alcanzó una aprobación textual canónica.")
             }
         }
 
         fun evaluateSpaRoute(url: String): DagV2PolicyResult {
-            val parsed = parseHttps(url) ?: return blocked("La ruta SPA dejó de ser HTTPS.")
-            val domain = parsed.host.normalizedDomain()
+            if (parseHttps(url) == null) return blocked("La ruta SPA dejó de ser HTTPS.")
             return if (
-                isNonNegotiableAdult(domain, url) ||
-                containsAdultSignal(parsed.path.orEmpty()) ||
-                containsAdultSignal(parsed.query.orEmpty())
+                canonicalTextPolicy.classifyNavigation(url).decision ==
+                DagV2CanonicalTextDecision.Allowed
             ) {
-                blocked("La ruta SPA fue bloqueada por la política adulta.")
-            } else {
                 allowed("Ruta SPA permitida sin repetir el análisis completo.")
+            } else {
+                blocked("La ruta SPA fue bloqueada por la política textual canónica.")
             }
-        }
-
-        private fun isNonNegotiableAdult(
-            domain: String,
-            rawUrl: String,
-        ): Boolean {
-            if (domain == ControlledAdultFixtureDomain) return true
-            if (AdultDomainLabels.any { label -> domain == label || domain.endsWith(".$label") }) return true
-            val category = runCatching { domainBlocklist.categoryFor(domain) }.getOrNull()
-            if (category == WebDomainList.CategoryAdult || category == WebDomainList.CategoryMixedAdult) return true
-            return containsAdultSignal(rawUrl)
         }
 
         private fun explicitDomainRule(
@@ -136,54 +141,7 @@ class DagV2SitePolicy
         }
 
         companion object {
-            const val ControlledAdultFixtureDomain = "adult.test"
             private const val MaxDocumentCharacters = 24_000
-            private val AdultDomainLabels =
-                setOf(
-                    "pornhub.com",
-                    "xvideos.com",
-                    "xnxx.com",
-                    "redtube.com",
-                    "youporn.com",
-                    "imgsrc.ru",
-                )
-            private val AdultPhrases =
-                setOf(
-                    "porn",
-                    "porno",
-                    "pornografia",
-                    "pornography",
-                    "xxx",
-                    "nude",
-                    "nudes",
-                    "nudity",
-                    "desnudo",
-                    "desnuda",
-                    "desnudez",
-                    "sexo explicito",
-                    "explicit sex",
-                    "adult video",
-                    "videos adultos",
-                    "escort sexual",
-                    "prostitucion",
-                    "hookup sexual",
-                    "פורנו",
-                    "פורנוגרפיה",
-                    "עירום",
-                )
-
-            fun containsAdultSignal(value: String): Boolean {
-                val normalized =
-                    Normalizer
-                        .normalize(value, Normalizer.Form.NFD)
-                        .replace(Regex("\\p{M}+"), "")
-                        .lowercase(Locale.ROOT)
-                        .replace(Regex("[^\\p{L}\\p{N}]+"), " ")
-                        .trim()
-                if (normalized.isBlank()) return false
-                val padded = " $normalized "
-                return AdultPhrases.any { phrase -> padded.contains(" $phrase ") }
-            }
 
             private fun parseHttps(url: String): URI? =
                 runCatching { URI(url) }

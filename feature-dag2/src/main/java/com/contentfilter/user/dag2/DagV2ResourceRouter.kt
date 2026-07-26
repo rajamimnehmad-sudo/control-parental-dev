@@ -2,6 +2,8 @@ package com.contentfilter.user.dag2
 
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
+import com.contentfilter.core.network.security.PublicDestinationDecision
+import com.contentfilter.core.network.security.PublicNetworkDestinationGuard
 import java.io.ByteArrayInputStream
 import java.net.URI
 import java.util.Locale
@@ -14,37 +16,23 @@ class DagV2ResourceRouter
     constructor(
         private val imagePipeline: DagV2ImagePipeline,
         private val metrics: DagV2Metrics,
-        private val sessions: DagV2DocumentSession,
+        private val destinationGuard: PublicNetworkDestinationGuard,
     ) {
-        fun intercept(
-            request: WebResourceRequest,
-            source: DagV2ResourceSource,
-        ): WebResourceResponse? {
-            val session = sessions.snapshot()?.takeUnless { it.cancelled }
-            return intercept(
-                DagV2ResourceRequest(
-                    url = request.url.toString(),
-                    headers = request.requestHeaders.orEmpty(),
-                    isForMainFrame = request.isForMainFrame,
-                    source = source,
-                    sessionId = session?.sessionId,
-                    navigationToken = session?.navigationToken,
-                ),
-            )
-        }
-
         fun intercept(request: DagV2ResourceRequest): WebResourceResponse? {
-            if (request.source == DagV2ResourceSource.ServiceWorker) {
-                if (
-                    request.sessionId == null ||
-                    request.navigationToken == null ||
-                    !sessions.isCurrent(request.sessionId, request.navigationToken)
-                ) {
-                    return null
-                }
+            val kind = classify(request)
+            val destination = destinationGuard.validateImmediate(request.url)
+            if (destination.decision == PublicDestinationDecision.Block) {
+                return if (kind.isVisual()) imagePipeline.intercept(request, kind) else blockedResponse()
+            }
+            val current =
+                request.attribution == DagV2RequestAttribution.Current &&
+                    request.documentContext != null
+            if (request.source == DagV2ResourceSource.ServiceWorker && current) {
                 metrics.serviceWorkerRequest()
             }
-            val kind = classify(request)
+            if (request.attribution != DagV2RequestAttribution.Current) {
+                return if (kind.isVisual()) imagePipeline.intercept(request, kind) else null
+            }
             return when (route(kind, request.url)) {
                 DagV2ResourceRoute.Bypass -> {
                     metrics.nonImageBypass()
@@ -75,19 +63,18 @@ class DagV2ResourceRouter
                 runCatching { URI(request.url).path.orEmpty().substringAfterLast('.', "").lowercase() }
                     .getOrDefault("")
 
-            if (destination == "image" || accept.contains("image/")) {
+            kindFromDestination(destination, request.isForMainFrame, extension)?.let { return it }
+            if (accept.contains("image/")) {
                 return if (extension == "svg") {
                     DagV2ResourceKind.SvgImage
                 } else {
                     DagV2ResourceKind.RasterImage
                 }
             }
-            if (destination in setOf("video", "audio") || accept.startsWith("video/") || accept.startsWith("audio/")) {
+            if (accept.startsWith("video/") || accept.startsWith("audio/")) {
                 return DagV2ResourceKind.Media
             }
-            if (destination in setOf("iframe", "frame")) return DagV2ResourceKind.Subframe
             if (
-                destination in NonVisualDestinations ||
                 NonVisualAcceptTypes.any(accept::contains) ||
                 extension in NonVisualExtensions
             ) {
@@ -99,6 +86,22 @@ class DagV2ResourceRouter
             if (request.isForMainFrame) return DagV2ResourceKind.MainDocument
             return DagV2ResourceKind.Unknown
         }
+
+        private fun kindFromDestination(
+            destination: String,
+            isForMainFrame: Boolean,
+            extension: String,
+        ): DagV2ResourceKind? =
+            when {
+                destination == "image" ->
+                    if (extension == "svg") DagV2ResourceKind.SvgImage else DagV2ResourceKind.RasterImage
+                destination == "video" || destination == "audio" -> DagV2ResourceKind.Media
+                destination == "iframe" || destination == "frame" -> DagV2ResourceKind.Subframe
+                destination == "document" -> DagV2ResourceKind.MainDocument
+                destination in NonVisualDestinations ->
+                    if (isForMainFrame) DagV2ResourceKind.MainDocument else DagV2ResourceKind.NonVisual
+                else -> null
+            }
 
         fun route(
             kind: DagV2ResourceKind,
@@ -119,6 +122,9 @@ class DagV2ResourceRouter
 
         private fun DagV2ResourceRequest.header(name: String): String =
             headers.entries.firstOrNull { it.key.equals(name, true) }?.value.orEmpty()
+
+        private fun DagV2ResourceKind.isVisual(): Boolean =
+            this == DagV2ResourceKind.RasterImage || this == DagV2ResourceKind.SvgImage
 
         private fun isAuthorizedCaptchaFrame(url: String): Boolean {
             val uri = runCatching { URI(url) }.getOrNull() ?: return false
@@ -144,7 +150,7 @@ class DagV2ResourceRouter
 
         private companion object {
             val NonVisualDestinations =
-                setOf("document", "style", "script", "font", "manifest", "worker", "sharedworker", "serviceworker", "empty")
+                setOf("style", "script", "font", "manifest", "worker", "sharedworker", "serviceworker", "empty")
             val NonVisualAcceptTypes =
                 setOf(
                     "text/html",
@@ -179,4 +185,67 @@ class DagV2ResourceRouter
                 setOf("jpg", "jpeg", "png", "webp", "gif", "bmp", "avif", "heic", "heif", "ico")
             val MediaExtensions = setOf("mp4", "webm", "m3u8", "mp3", "wav", "ogg", "mov", "m4a")
         }
+    }
+
+@Singleton
+class DagV2ResourceInterceptor
+    @Inject
+    constructor(
+        private val router: DagV2ResourceRouter,
+        private val contexts: DagV2DocumentContextRegistry,
+    ) {
+        fun intercept(
+            request: WebResourceRequest,
+            source: DagV2ResourceSource,
+            context: DagV2DocumentRequestContext,
+        ): WebResourceResponse? = interceptBound(evidence(request, source), context)
+
+        internal fun interceptBound(
+            evidence: DagV2ResourceEvidence,
+            context: DagV2DocumentRequestContext,
+        ): WebResourceResponse? {
+            val attributed = contexts.resolveBound(context, evidence)
+            return router.intercept(attributed.toRequest())
+        }
+
+        fun attribute(
+            request: WebResourceRequest,
+            source: DagV2ResourceSource,
+            context: DagV2DocumentRequestContext,
+        ): DagV2AttributedResource = contexts.resolveBound(context, evidence(request, source))
+
+        fun interceptServiceWorker(request: WebResourceRequest): WebResourceResponse? {
+            if (!contexts.hasActiveContext()) return null
+            return intercept(evidence(request, DagV2ResourceSource.ServiceWorker))
+        }
+
+        internal fun interceptServiceWorker(evidence: DagV2ResourceEvidence): WebResourceResponse? {
+            if (!contexts.hasActiveContext()) return null
+            return intercept(evidence.copy(source = DagV2ResourceSource.ServiceWorker))
+        }
+
+        internal fun intercept(evidence: DagV2ResourceEvidence): WebResourceResponse? {
+            val attributed = contexts.resolve(evidence)
+            return router.intercept(attributed.toRequest())
+        }
+
+        private fun evidence(
+            request: WebResourceRequest,
+            source: DagV2ResourceSource,
+        ) = DagV2ResourceEvidence(
+            url = request.url.toString(),
+            headers = request.requestHeaders.orEmpty(),
+            isForMainFrame = request.isForMainFrame,
+            source = source,
+        )
+
+        private fun DagV2AttributedResource.toRequest() =
+            DagV2ResourceRequest(
+                url = evidence.url,
+                headers = evidence.headers,
+                isForMainFrame = evidence.isForMainFrame,
+                source = evidence.source,
+                documentContext = context,
+                attribution = attribution,
+            )
     }

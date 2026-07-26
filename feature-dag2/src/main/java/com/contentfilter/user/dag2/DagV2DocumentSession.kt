@@ -1,6 +1,5 @@
 package com.contentfilter.user.dag2
 
-import java.net.URI
 import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -15,6 +14,7 @@ data class DagV2DocumentSessionState(
     val startedAt: Long,
     val fullAnalysisStarted: Boolean = false,
     val cancelled: Boolean = false,
+    val requestContext: DagV2DocumentRequestContext,
 )
 
 enum class DagV2InternalInteraction {
@@ -40,15 +40,27 @@ class DagV2DocumentSession
 
         @Synchronized
         fun start(mainDocumentUrl: String): DagV2DocumentSessionState {
+            val sessionId = UUID.randomUUID().toString()
+            val navigationToken = UUID.randomUUID().toString()
+            val startedAt = System.nanoTime() / 1_000_000L
+            val origin = mainDocumentUrl.dagV2Origin()
             val created =
                 DagV2DocumentSessionState(
-                    sessionId = UUID.randomUUID().toString(),
-                    navigationToken = UUID.randomUUID().toString(),
+                    sessionId = sessionId,
+                    navigationToken = navigationToken,
                     mainDocumentUrl = mainDocumentUrl,
-                    origin = mainDocumentUrl.dagV2Origin(),
+                    origin = origin,
                     fullAnalysisCompleted = false,
                     fullPageAnalysisCount = 0,
-                    startedAt = System.nanoTime() / 1_000_000L,
+                    startedAt = startedAt,
+                    requestContext =
+                        DagV2DocumentRequestContext(
+                            sessionId = sessionId,
+                            navigationToken = navigationToken,
+                            documentUrl = mainDocumentUrl,
+                            documentOrigin = origin,
+                            createdAt = startedAt,
+                        ),
                 )
             current = created
             return created
@@ -102,9 +114,3 @@ class DagV2DocumentSession
             return cancelled
         }
     }
-
-private fun String.dagV2Origin(): String =
-    runCatching {
-        val uri = URI(this)
-        "${uri.scheme.lowercase()}://${uri.host.lowercase()}${uri.port.takeIf { it >= 0 }?.let { ":$it" }.orEmpty()}"
-    }.getOrDefault("")

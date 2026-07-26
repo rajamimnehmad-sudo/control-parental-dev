@@ -23,7 +23,13 @@ class DagV2LabActivity : ComponentActivity() {
     lateinit var resourceRouter: DagV2ResourceRouter
 
     @Inject
+    lateinit var resourceInterceptor: DagV2ResourceInterceptor
+
+    @Inject
     lateinit var pageAnalyzer: DagV2PageAnalyzer
+
+    @Inject
+    lateinit var webViewLifecycle: DagV2WebViewLifecycle
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -34,9 +40,10 @@ class DagV2LabActivity : ComponentActivity() {
                 DagV2LabScreen(
                     coordinator = coordinator,
                     metrics = metrics,
-                    resourceRouter = resourceRouter,
+                    resourceInterceptor = resourceInterceptor,
                     serviceWorkerRouter = serviceWorkerRouter,
                     pageAnalyzer = pageAnalyzer,
+                    webViewLifecycle = webViewLifecycle,
                 )
             }
         }

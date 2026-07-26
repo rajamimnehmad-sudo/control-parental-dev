@@ -42,6 +42,51 @@ class DagV2SearchOrchestrator
         }
     }
 
+internal data class DagV2HistoryTarget(
+    val index: Int,
+    val url: String,
+)
+
+internal class DagV2NavigationHistory {
+    private val entries = mutableListOf<String>()
+    private var index = -1
+
+    fun push(url: String) {
+        if (index >= 0 && entries[index] == url) return
+        while (entries.lastIndex > index) entries.removeAt(entries.lastIndex)
+        entries += url
+        index = entries.lastIndex
+    }
+
+    fun backTarget(): DagV2HistoryTarget? =
+        (index - 1)
+            .takeIf { it >= 0 }
+            ?.let { DagV2HistoryTarget(it, entries[it]) }
+
+    fun forwardTarget(): DagV2HistoryTarget? =
+        (index + 1)
+            .takeIf { it <= entries.lastIndex }
+            ?.let { DagV2HistoryTarget(it, entries[it]) }
+
+    fun currentTarget(): DagV2HistoryTarget? =
+        index
+            .takeIf { it in entries.indices }
+            ?.let { DagV2HistoryTarget(it, entries[it]) }
+
+    fun commit(target: DagV2HistoryTarget) {
+        require(entries.getOrNull(target.index) == target.url)
+        index = target.index
+    }
+
+    fun replaceCurrent(url: String) {
+        if (index in entries.indices) entries[index] = url
+    }
+
+    fun canGoBack(): Boolean = index > 0
+
+    fun canGoForward(): Boolean = index >= 0 && index < entries.lastIndex
+}
+
 data class DagV2BrowserState(
     val input: String = "",
     val searching: Boolean = false,
@@ -57,6 +102,7 @@ data class DagV2BrowserState(
     val canGoForward: Boolean = false,
     val rendererGone: Boolean = false,
     val noCacheMode: Boolean = false,
+    val requestContext: DagV2DocumentRequestContext? = null,
 )
 
 @Singleton
@@ -67,10 +113,12 @@ class DagV2BrowserCoordinator
         private val sitePolicy: DagV2SitePolicy,
         private val networkGuard: DagV2NetworkGuard,
         private val sessions: DagV2DocumentSession,
+        private val callbackGate: DagV2DocumentCallbackGate,
         private val resourceRouter: DagV2ResourceRouter,
         private val metrics: DagV2Metrics,
     ) {
         private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+        private val navigationHistory = DagV2NavigationHistory()
         private var commandJob: Job? = null
         private val mutableState = MutableStateFlow(DagV2BrowserState())
         val state: StateFlow<DagV2BrowserState> = mutableState.asStateFlow()
@@ -93,6 +141,18 @@ class DagV2BrowserCoordinator
             navigate(result.url)
         }
 
+        fun goBack() {
+            navigationHistory.backTarget()?.let { navigate(it.url, it) }
+        }
+
+        fun goForward() {
+            navigationHistory.forwardTarget()?.let { navigate(it.url, it) }
+        }
+
+        fun refresh() {
+            navigationHistory.currentTarget()?.let { navigate(it.url, it) }
+        }
+
         fun setNoCacheMode(enabled: Boolean) {
             mutableState.value =
                 mutableState.value.copy(
@@ -108,6 +168,13 @@ class DagV2BrowserCoordinator
         }
 
         fun navigate(url: String) {
+            navigate(url, historyTarget = null)
+        }
+
+        private fun navigate(
+            url: String,
+            historyTarget: DagV2HistoryTarget?,
+        ) {
             commandJob?.cancel()
             commandJob =
                 scope.launch {
@@ -128,7 +195,13 @@ class DagV2BrowserCoordinator
                         return@launch
                     }
                     cancelActiveSession()
+                    if (historyTarget == null) {
+                        navigationHistory.push(url)
+                    } else {
+                        navigationHistory.commit(historyTarget)
+                    }
                     val session = sessions.start(url)
+                    callbackGate.register(session.requestContext)
                     resourceRouter.onNewDocument(session)
                     mutableState.value =
                         mutableState.value.copy(
@@ -141,36 +214,54 @@ class DagV2BrowserCoordinator
                             statusMessage = "Analizando el documento principal una sola vez…",
                             blockedMessage = null,
                             rendererGone = false,
+                            requestContext = session.requestContext,
+                            canGoBack = navigationHistory.canGoBack(),
+                            canGoForward = navigationHistory.canGoForward(),
                         )
                 }
         }
 
-        fun onDocumentStarted(url: String) {
+        fun onDocumentStarted(context: DagV2DocumentRequestContext) {
             val session = sessions.snapshot() ?: return
-            if (session.mainDocumentUrl != url || !sessions.isCurrent(session.sessionId, session.navigationToken)) {
-                metrics.staleResultDiscarded()
-                return
-            }
+            if (!accepts(context) || session.mainDocumentUrl != context.documentUrl) return
             metrics.event(DagV2MetricNames.DocumentStarted, session)
         }
 
-        fun isExpectedDocument(url: String): Boolean =
-            sessions.snapshot()?.let {
-                it.mainDocumentUrl == url && sessions.isCurrent(it.sessionId, it.navigationToken)
-            } == true
-
-        fun isHashOnlyNavigation(url: String): Boolean {
-            val currentUrl = sessions.snapshot()?.mainDocumentUrl ?: return false
-            if (currentUrl == url) return false
-            return currentUrl.withoutDagV2Fragment() == url.withoutDagV2Fragment()
+        fun isHashOnlyNavigation(
+            context: DagV2DocumentRequestContext,
+            url: String,
+        ): Boolean {
+            if (!accepts(context) || context.documentUrl == url) return false
+            return context.documentUrl.withoutDagV2Fragment() == url.withoutDagV2Fragment()
         }
 
-        fun onDocumentCommitted(url: String): DagV2DocumentSessionState? {
-            val session = sessions.snapshot() ?: return null
-            if (session.mainDocumentUrl != url || !sessions.isCurrent(session.sessionId, session.navigationToken)) {
-                metrics.staleResultDiscarded()
-                return null
+        /**
+         * Returns true only when this location still belongs to the WebView's
+         * immutable document generation. Redirects are stopped and re-enter the
+         * normal async navigation guards as a new generation.
+         */
+        fun onMainFrameStarted(
+            context: DagV2DocumentRequestContext,
+            url: String,
+        ): Boolean {
+            if (!accepts(context)) return false
+            if (!url.isHttpsDagV2Url()) {
+                block("DAG v2 bloqueó una navegación no HTTPS.")
+                return false
             }
+            if (
+                context.documentUrl == url ||
+                context.documentUrl.withoutDagV2Fragment() == url.withoutDagV2Fragment()
+            ) {
+                return true
+            }
+            navigate(url)
+            return false
+        }
+
+        fun onDocumentCommitted(context: DagV2DocumentRequestContext): DagV2DocumentSessionState? {
+            val session = sessions.snapshot() ?: return null
+            if (!accepts(context) || session.mainDocumentUrl != context.documentUrl) return null
             metrics.event(DagV2MetricNames.DocumentCommitted, session)
             val analyzing = sessions.beginFullAnalysis(session.sessionId, session.navigationToken) ?: return null
             metrics.event(DagV2MetricNames.FullPageAnalysisStarted, analyzing)
@@ -184,18 +275,17 @@ class DagV2BrowserCoordinator
         }
 
         fun onDocumentAnalysis(
-            sessionId: String,
-            navigationToken: String,
+            context: DagV2DocumentRequestContext,
             url: String,
             title: String,
             visibleText: String,
         ) {
-            if (!sessions.isCurrent(sessionId, navigationToken)) {
-                metrics.staleResultDiscarded()
-                return
-            }
+            if (!accepts(context)) return
             val decision = sitePolicy.evaluateDocument(url, title, visibleText)
-            val completed = sessions.completeFullAnalysis(sessionId, navigationToken) ?: return
+            if (!accepts(context)) return
+            val completed =
+                sessions.completeFullAnalysis(context.sessionId, context.navigationToken)
+                    ?: return
             metrics.event(DagV2MetricNames.FullPageAnalysisCompleted, completed)
             if (decision.decision == DagV2SiteDecision.Block) {
                 block(decision.reason)
@@ -213,29 +303,23 @@ class DagV2BrowserCoordinator
             scheduleStableMetric(completed)
         }
 
-        fun onDocumentAnalysisFailed(
-            sessionId: String,
-            navigationToken: String,
-        ) {
-            if (!sessions.isCurrent(sessionId, navigationToken)) {
-                metrics.staleResultDiscarded()
-                return
-            }
+        fun onDocumentAnalysisFailed(context: DagV2DocumentRequestContext) {
+            if (!accepts(context)) return
             block("No se pudo aprobar el documento con suficiente certeza.")
         }
 
-        fun onCurrentDocumentFailure(message: String) {
-            if (sessions.snapshot() == null) return
-            block(message)
-        }
-
-        fun onSpaUrlChanged(url: String) {
+        fun onSpaUrlChanged(
+            context: DagV2DocumentRequestContext,
+            url: String,
+        ) {
+            if (!accepts(context) || !callbackGate.registerSpaLocation(context, url)) return
             val session = sessions.snapshot() ?: return
             if (!sessions.isCurrent(session.sessionId, session.navigationToken)) return
             val decision = sitePolicy.evaluateSpaRoute(url)
             if (decision.decision == DagV2SiteDecision.Block) {
                 block(decision.reason)
             } else {
+                navigationHistory.replaceCurrent(url)
                 mutableState.value =
                     mutableState.value.copy(
                         input = url,
@@ -244,23 +328,36 @@ class DagV2BrowserCoordinator
             }
         }
 
-        fun onInternalInteraction(interaction: DagV2InternalInteraction) {
-            sessions.recordInternalInteraction(interaction)
-        }
-
-        fun onNavigationState(
+        fun onWebViewHistoryChanged(
+            context: DagV2DocumentRequestContext,
             canGoBack: Boolean,
             canGoForward: Boolean,
         ) {
-            mutableState.value = mutableState.value.copy(canGoBack = canGoBack, canGoForward = canGoForward)
+            if (!accepts(context)) return
+            mutableState.value =
+                mutableState.value.copy(
+                    canGoBack = canGoBack || navigationHistory.canGoBack(),
+                    canGoForward = canGoForward || navigationHistory.canGoForward(),
+                )
         }
 
-        fun onRendererGone() {
+        fun onInternalInteraction(
+            context: DagV2DocumentRequestContext,
+            interaction: DagV2InternalInteraction,
+        ) {
+            if (!accepts(context)) return
+            sessions.recordInternalInteraction(interaction)
+        }
+
+        fun onRendererGone(context: DagV2DocumentRequestContext) {
+            if (!accepts(context)) return
             val session = sessions.snapshot()
             metrics.event(DagV2MetricNames.RendererGone, session)
             cancelActiveSession()
             mutableState.value =
                 mutableState.value.copy(
+                    requestedUrl = null,
+                    requestContext = null,
                     rendererGone = true,
                     documentVisible = false,
                     documentAnalyzing = false,
@@ -268,9 +365,27 @@ class DagV2BrowserCoordinator
                 )
         }
 
-        fun onSecurityFailure(message: String) {
-            block(message)
+        fun onSecurityFailure(
+            context: DagV2DocumentRequestContext,
+            message: String,
+        ) {
+            if (accepts(context)) block(message)
         }
+
+        fun authorizeBridgeMessage(
+            sessionId: String,
+            navigationToken: String,
+            sourceOrigin: String,
+            isMainFrame: Boolean,
+        ): DagV2DocumentRequestContext? =
+            callbackGate.authorizeBridgeMessage(
+                sessionId = sessionId,
+                navigationToken = navigationToken,
+                sourceOrigin = sourceOrigin,
+                isMainFrame = isMainFrame,
+            )
+
+        fun onRejectedDocumentCallback() = Unit
 
         private fun search(query: String) {
             commandJob?.cancel()
@@ -282,6 +397,7 @@ class DagV2BrowserCoordinator
                             searching = true,
                             results = emptyList(),
                             requestedUrl = null,
+                            requestContext = null,
                             documentVisible = false,
                             blockedMessage = null,
                             statusMessage = "Comprobando la consulta localmente…",
@@ -308,6 +424,7 @@ class DagV2BrowserCoordinator
             commandJob?.cancel()
             commandJob = null
             cancelActiveSession()
+            callbackGate.clear()
         }
 
         private fun block(message: String) {
@@ -320,6 +437,7 @@ class DagV2BrowserCoordinator
                     documentVisible = false,
                     blockedMessage = message,
                     statusMessage = "Página o búsqueda bloqueada.",
+                    requestContext = null,
                 )
         }
 
@@ -337,9 +455,14 @@ class DagV2BrowserCoordinator
         }
 
         private fun cancelActiveSession() {
-            sessions.cancelActive()?.let(metrics::sessionCancelled)
+            sessions.cancelActive()?.let { cancelled ->
+                callbackGate.cancel(cancelled.requestContext)
+                metrics.sessionCancelled(cancelled)
+            }
             resourceRouter.cancelVisualRequests()
         }
+
+        internal fun accepts(context: DagV2DocumentRequestContext): Boolean = callbackGate.accepts(context)
 
         private companion object {
             const val StableWindowMillis = 20_000L

@@ -69,24 +69,24 @@ class DagV2ImagePipeline
             request: DagV2ResourceRequest,
             kind: DagV2ResourceKind,
         ): WebResourceResponse {
+            val context = request.documentContext
             val session =
                 sessions.snapshot()?.takeIf {
-                    request.sessionId == it.sessionId &&
-                        request.navigationToken == it.navigationToken &&
+                    request.attribution == DagV2RequestAttribution.Current &&
+                        context?.sessionId == it.sessionId &&
+                        context.navigationToken == it.navigationToken &&
                         sessions.isCurrent(it.sessionId, it.navigationToken)
                 }
-            metrics.imageRequest(request.source, session)
             if (session == null) {
-                metrics.staleResultDiscarded()
-                return neutralPlaceholder(null)
+                return neutralImageFactory.create()
             }
+            metrics.imageRequest(request.source, session)
 
             check(kind == DagV2ResourceKind.RasterImage || kind == DagV2ResourceKind.SvgImage)
             check(decisionProvider.decide() == DagV2ImageDecision.Hide)
 
             if (!sessions.isCurrent(session.sessionId, session.navigationToken)) {
-                metrics.staleResultDiscarded()
-                return neutralPlaceholder(null)
+                return neutralImageFactory.create()
             }
             return neutralPlaceholder(session)
         }

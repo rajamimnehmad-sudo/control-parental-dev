@@ -13,7 +13,7 @@ import javax.inject.Singleton
 class DagV2ServiceWorkerRouter
     @Inject
     constructor(
-        private val resourceRouter: DagV2ResourceRouter,
+        private val resourceInterceptor: DagV2ResourceInterceptor,
     ) {
         private var installed = false
         private var noCacheMode = false
@@ -32,7 +32,7 @@ class DagV2ServiceWorkerRouter
                 }.setServiceWorkerClient(
                     object : ServiceWorkerClient() {
                         override fun shouldInterceptRequest(request: WebResourceRequest): WebResourceResponse? =
-                            resourceRouter.intercept(request, DagV2ResourceSource.ServiceWorker)
+                            resourceInterceptor.interceptServiceWorker(request)
                     },
                 )
             installed = true

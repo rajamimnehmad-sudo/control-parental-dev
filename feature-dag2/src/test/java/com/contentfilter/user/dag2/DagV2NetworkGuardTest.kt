@@ -1,25 +1,35 @@
 package com.contentfilter.user.dag2
 
-import java.net.InetAddress
+import com.contentfilter.core.network.security.PublicNetworkDestinationGuard
+import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
+import kotlin.test.assertEquals
 
 class DagV2NetworkGuardTest {
-    @Test
-    fun `private loopback link local cgnat and documentation ranges are rejected`() {
-        val blocked = listOf("127.0.0.1", "10.1.2.3", "169.254.1.2", "100.64.1.2", "192.0.2.1", "fc00::1")
+    private val guard = DagV2NetworkGuard(PublicNetworkDestinationGuard())
 
-        blocked.forEach { literal ->
-            val address = InetAddress.getByName(literal)
-            assertFalse(with(DagV2NetworkGuard.Companion) { address.isPublicDagV2Address() }, literal)
+    @Test
+    fun `private loopback link local cgnat and documentation literals are rejected`() =
+        runBlocking {
+            val blocked =
+                listOf(
+                    "https://127.0.0.1/",
+                    "https://10.1.2.3/",
+                    "https://169.254.1.2/",
+                    "https://100.64.1.2/",
+                    "https://192.0.2.1/",
+                    "https://[2001:db8::1]/",
+                    "https://[fc00::1]/",
+                )
+
+            blocked.forEach { url ->
+                assertEquals(DagV2SiteDecision.Block, guard.validate(url).decision, url)
+            }
         }
-    }
 
     @Test
-    fun `known public addresses pass the local range guard`() {
-        val address = InetAddress.getByName("8.8.8.8")
-
-        assertTrue(with(DagV2NetworkGuard.Companion) { address.isPublicDagV2Address() })
-    }
+    fun `known public literal passes the canonical range guard`() =
+        runBlocking {
+            assertEquals(DagV2SiteDecision.Allow, guard.validate("https://8.8.8.8/").decision)
+        }
 }

@@ -51,14 +51,14 @@ class DagV2SearchOrchestratorTest {
 
     private object AdultBlockingPolicy : DagV2SearchPolicy {
         override fun evaluateQuery(query: String): DagV2PolicyResult =
-            if (DagV2SitePolicy.containsAdultSignal(query)) {
+            if (query.contains("porno", ignoreCase = true)) {
                 DagV2PolicyResult(DagV2SiteDecision.Block, "blocked")
             } else {
                 DagV2PolicyResult(DagV2SiteDecision.Allow, "allowed")
             }
 
         override suspend fun evaluateResult(result: DagV2SearchResult): DagV2PolicyResult =
-            if (result.url.contains(DagV2SitePolicy.ControlledAdultFixtureDomain)) {
+            if (result.url.contains("adult.test")) {
                 DagV2PolicyResult(DagV2SiteDecision.Block, "blocked")
             } else {
                 DagV2PolicyResult(DagV2SiteDecision.Allow, "allowed")
