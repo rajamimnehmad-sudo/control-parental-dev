@@ -28,6 +28,18 @@ class MediaBarrierContractTest {
     }
 
     @Test
+    fun `image responses remain withheld during bounded native inspection`() {
+        val background = extensionRoot.resolve("background.js").readText()
+
+        assertContains(background, "filterResponseData")
+        assertContains(background, "MAX_CAPTURE_BYTES = 256 * 1024")
+        assertContains(background, "NATIVE_DECISION_TIMEOUT_MS = 2_500")
+        assertContains(background, "\"media-bytes\"")
+        assertContains(background, "closeWithPlaceholder")
+        assertContains(background, "response?.action === \"block\"")
+    }
+
+    @Test
     fun `document barrier covers static dynamic and painted media`() {
         val css = extensionRoot.resolve("barrier.css").readText()
         val script = extensionRoot.resolve("barrier.js").readText()

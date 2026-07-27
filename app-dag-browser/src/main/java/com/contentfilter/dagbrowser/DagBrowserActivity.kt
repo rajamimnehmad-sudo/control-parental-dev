@@ -4,6 +4,8 @@ import android.app.Activity
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.view.View
 import android.view.inputmethod.EditorInfo
@@ -18,6 +20,10 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoView
 import org.mozilla.geckoview.WebExtension
+import java.util.concurrent.ArrayBlockingQueue
+import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
 
 class DagBrowserActivity : Activity() {
     private lateinit var geckoView: GeckoView
@@ -31,6 +37,15 @@ class DagBrowserActivity : Activity() {
 
     private val session = GeckoSession()
     private val handler = Handler(Looper.getMainLooper())
+    private val mediaAnalysisExecutor =
+        ThreadPoolExecutor(
+            MediaAnalysisThreads,
+            MediaAnalysisThreads,
+            0L,
+            TimeUnit.MILLISECONDS,
+            ArrayBlockingQueue(MediaAnalysisQueueCapacity),
+        )
+    private var protectionExtension: WebExtension? = null
     private var sessionOpened = false
     private var extensionReady = false
     private var canGoBack = false
@@ -52,24 +67,34 @@ class DagBrowserActivity : Activity() {
                 sender: WebExtension.MessageSender,
             ): GeckoResult<Any>? {
                 val payload = message as? JSONObject ?: return null
-                val trustedSender =
+                val correctExtension =
                     nativeApp == NativeApp &&
-                        sender.session === session &&
-                        sender.environmentType == WebExtension.MessageSender.ENV_TYPE_CONTENT_SCRIPT
-                if (!trustedSender || payload.optInt("version") != ProtectionProtocolVersion) {
+                        sender.webExtension.id == ExtensionId
+                if (!correctExtension || payload.optInt("version") != ProtectionProtocolVersion) {
                     return null
                 }
 
                 return when (payload.optString("type")) {
                     BarrierReadyMessage -> {
-                        if (sender.isTopLevel && waitingForBarrier) {
+                        if (isTrustedContentSender(sender) && sender.isTopLevel && waitingForBarrier) {
                             waitingForBarrier = false
                             handler.removeCallbacks(barrierTimeout)
                             revealProtectedPage()
                         }
                         null
                     }
-                    MediaCandidateMessage -> GeckoResult.fromValue(mediaDecisionPayload(payload))
+                    MediaCandidateMessage ->
+                        if (isTrustedContentSender(sender)) {
+                            GeckoResult.fromValue(metadataDecisionPayload(payload))
+                        } else {
+                            null
+                        }
+                    MediaBytesMessage ->
+                        if (isTrustedExtensionSender(sender)) {
+                            mediaBytesDecisionAsync(payload)
+                        } else {
+                            null
+                        }
                     else -> null
                 }
             }
@@ -209,6 +234,8 @@ class DagBrowserActivity : Activity() {
                             isFinishing || isDestroyed -> Unit
                             extension == null -> showExtensionFailure()
                             else -> {
+                                protectionExtension = extension
+                                extension.setMessageDelegate(messageDelegate, NativeApp)
                                 session.webExtensionController.setMessageDelegate(extension, messageDelegate, NativeApp)
                                 session.open(runtime)
                                 sessionOpened = true
@@ -275,7 +302,15 @@ class DagBrowserActivity : Activity() {
         safetyOverlay.visibility = View.GONE
     }
 
-    private fun mediaDecisionPayload(payload: JSONObject): JSONObject {
+    private fun isTrustedContentSender(sender: WebExtension.MessageSender): Boolean =
+        sender.session === session &&
+            sender.environmentType == WebExtension.MessageSender.ENV_TYPE_CONTENT_SCRIPT
+
+    private fun isTrustedExtensionSender(sender: WebExtension.MessageSender): Boolean =
+        sender.session == null &&
+            sender.environmentType == WebExtension.MessageSender.ENV_TYPE_EXTENSION
+
+    private fun metadataDecisionPayload(payload: JSONObject): JSONObject {
         val candidate =
             DagMediaCandidate(
                 candidateId = payload.optString("candidateId"),
@@ -286,6 +321,59 @@ class DagBrowserActivity : Activity() {
                 height = payload.optInt("height", -1),
             )
         val decision = DagMediaAnalysisPolicy.decide(candidate)
+        return decisionPayload(decision)
+    }
+
+    private fun mediaBytesDecisionAsync(payload: JSONObject): GeckoResult<Any> {
+        val result = GeckoResult<Any>(handler)
+        try {
+            mediaAnalysisExecutor.execute {
+                val decision =
+                    runCatching { mediaBytesDecision(payload) }
+                        .getOrElse {
+                            DagMediaDecision(
+                                candidateId = payload.optString("candidateId").take(MaxMediaCandidateIdLength),
+                                action = DagMediaAction.Block,
+                                reason = DagMediaBytesPolicy.InvalidPayloadReason,
+                            )
+                        }
+                result.complete(decisionPayload(decision))
+            }
+        } catch (_: RejectedExecutionException) {
+            result.complete(
+                decisionPayload(
+                    DagMediaDecision(
+                        candidateId = payload.optString("candidateId").take(MaxMediaCandidateIdLength),
+                        action = DagMediaAction.Block,
+                        reason = DagMediaBytesPolicy.AnalyzerBusyReason,
+                    ),
+                ),
+            )
+        }
+        return result
+    }
+
+    private fun mediaBytesDecision(payload: JSONObject): DagMediaDecision {
+        val startedAt = SystemClock.elapsedRealtime()
+        val bytesPayload =
+            DagMediaBytesPayload(
+                candidateId = payload.optString("candidateId"),
+                sourceUrl = payload.optString("sourceUrl"),
+                declaredByteLength = payload.optInt("byteLength", -1),
+                bytesBase64 = payload.optString("bytesBase64"),
+            )
+        val decision = DagMediaBytesPolicy.decide(bytesPayload)
+        if (packageName.endsWith(".dev")) {
+            Log.i(
+                MediaTransportLogTag,
+                "bytes=${bytesPayload.declaredByteLength} reason=${decision.reason} " +
+                    "elapsed_ms=${SystemClock.elapsedRealtime() - startedAt}",
+            )
+        }
+        return decision
+    }
+
+    private fun decisionPayload(decision: DagMediaDecision): JSONObject {
         return JSONObject()
             .put("type", MediaDecisionMessage)
             .put("version", ProtectionProtocolVersion)
@@ -337,6 +425,12 @@ class DagBrowserActivity : Activity() {
 
     override fun onDestroy() {
         handler.removeCallbacks(barrierTimeout)
+        protectionExtension?.let { extension ->
+            extension.setMessageDelegate(null, NativeApp)
+            session.webExtensionController.setMessageDelegate(extension, null, NativeApp)
+        }
+        protectionExtension = null
+        mediaAnalysisExecutor.shutdownNow()
         if (sessionOpened) {
             geckoView.releaseSession()
             session.close()
@@ -350,8 +444,13 @@ class DagBrowserActivity : Activity() {
         const val NativeApp = "glosh.dag.protection"
         const val BarrierReadyMessage = "barrier-ready"
         const val MediaCandidateMessage = "media-candidate"
+        const val MediaBytesMessage = "media-bytes"
         const val MediaDecisionMessage = "media-decision"
         const val ProtectionProtocolVersion = 1
+        const val MaxMediaCandidateIdLength = 80
+        const val MediaAnalysisThreads = 2
+        const val MediaAnalysisQueueCapacity = 8
+        const val MediaTransportLogTag = "DagMediaTransport"
         const val BarrierTimeoutMillis = 12_000L
         const val InitialBlankPage = "about:blank"
     }
