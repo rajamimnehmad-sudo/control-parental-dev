@@ -101,6 +101,11 @@ Open Images declara CC BY 4.0 para anotaciones y lista imagenes como CC BY 2.0, 
 verifique cada licencia. Fashionpedia publica anotaciones/ontologia bajo CC BY 4.0, pero no posee el
 copyright de sus imagenes. Openverse y Wikimedia tambien dejan la verificacion final al reutilizador.
 
+Un sondeo de metadatos del 2026-07-27 encontro entre 11 y 240 candidatos por consulta en ocho
+busquedas de vestimenta, pero tambien duplicados y ruido semantico: por ejemplo, buscar ropa
+transparente devolvio recursos con fondo PNG transparente. Openverse queda como descubrimiento
+acotado, nunca como etiqueta ni licencia aprobada.
+
 ## Manifiesto minimo por muestra
 
 El dataset se almacena como objetos inmutables y manifiestos JSONL. Cada fila conserva:
@@ -122,6 +127,10 @@ dispositivo Glosh.
 El validador local de este contrato vive en `scripts/dag_v3_model/manifest_validator.py`. Rechaza
 antes del entrenamiento licencias incompletas, fuentes no aprobadas, hashes duplicados, etiquetas
 fuera del contrato y grupos repartidos entre splits.
+
+`scripts/dag_v3_model/openverse_inventory.py` puede reunir solamente metadatos candidatos con
+limites de consultas/paginas y licencias potencialmente compatibles. No descarga imagenes y marca
+todo como `needs_review`.
 
 ## Deduplicacion y splits
 
