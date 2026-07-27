@@ -1,9 +1,7 @@
 package com.contentfilter.user
 
 import android.app.Application
-import android.content.Context
 import android.util.Log
-import android.webkit.WebView
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
@@ -18,7 +16,6 @@ import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
 import com.contentfilter.user.dag.DagLauncherController
-import com.contentfilter.user.dag.DagNeuralTextClassifier
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.protection.ProtectionHealthMonitor
 import com.contentfilter.user.protection.UserLauncherController
@@ -32,6 +29,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import java.io.File
 import javax.inject.Inject
 
 @HiltAndroidApp
@@ -83,17 +81,7 @@ class UserApplication :
     @Inject
     lateinit var userLauncherController: UserLauncherController
 
-    @Inject
-    lateinit var dagNeuralTextClassifier: DagNeuralTextClassifier
-
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-
-    override fun attachBaseContext(base: Context) {
-        super.attachBaseContext(base)
-        if (UserProcessIsolation.isDagV2Process(base.packageName, Application.getProcessName())) {
-            WebView.setDataDirectorySuffix(UserProcessIsolation.DagV2DataDirectorySuffix)
-        }
-    }
 
     override val workManagerConfiguration: Configuration
         get() =
@@ -103,7 +91,7 @@ class UserApplication :
 
     override fun onCreate() {
         super.onCreate()
-        if (!UserProcessIsolation.shouldStartPrimaryProcessWork(packageName, Application.getProcessName())) return
+        removeRetiredDagNeuralModel()
         runCatching { VpnController.enableDevProtection(this) }
             .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }
@@ -115,10 +103,6 @@ class UserApplication :
         appScope.launch {
             runCatching { userLauncherController.monitorVisibility() }
                 .logFailure("user-launcher-monitor")
-        }
-        appScope.launch {
-            runCatching { dagNeuralTextClassifier.prepare() }
-                .logFailure("dag-neural-model-prepare")
         }
         appScope.launch {
             runCatching { webDomainListUpdater.refreshIfDue() }
@@ -227,6 +211,14 @@ class UserApplication :
         onFailure { error ->
             Log.w(LogTag, "Startup step=$step failed type=${error.javaClass.simpleName}")
         }
+
+    private fun removeRetiredDagNeuralModel() {
+        val modelDirectory = File(noBackupFilesDir, "dag/models")
+        File(modelDirectory, "dag-multilingual-minilm-v1.onnx").delete()
+        File(modelDirectory, "dag-multilingual-minilm-v1.onnx.download").delete()
+        modelDirectory.delete()
+        File(noBackupFilesDir, "dag").delete()
+    }
 
     private companion object {
         const val LogTag = "UserApplication"

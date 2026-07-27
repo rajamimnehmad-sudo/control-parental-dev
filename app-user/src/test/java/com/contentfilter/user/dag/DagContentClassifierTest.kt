@@ -46,7 +46,7 @@ class DagContentClassifierTest {
                 category = "drugs",
                 confidence = 0.304f,
                 margin = 0.008f,
-                modelVersion = DagNeuralTextClassifier.ModelVersion,
+                modelVersion = "test-model",
             )
 
         assertEquals(DagClassification.Allowed, dagSemanticDecision(prediction))
@@ -59,7 +59,7 @@ class DagContentClassifierTest {
                 category = "drugs",
                 confidence = 0.40f,
                 margin = 0.10f,
-                modelVersion = DagNeuralTextClassifier.ModelVersion,
+                modelVersion = "test-model",
             )
 
         assertEquals(DagClassification.Uncertain, dagSemanticDecision(prediction))
@@ -73,7 +73,7 @@ class DagContentClassifierTest {
     }
 
     @Test
-    fun `intimate retail page stays open for selective image filtering`() {
+    fun `intimate retail page stays open while explicit searches remain blocked`() {
         assertEquals(
             DagClassification.Allowed,
             classifier.classifyResult(

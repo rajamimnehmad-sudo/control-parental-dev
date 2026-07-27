@@ -92,6 +92,10 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 - Se retiraron 4 modelos visuales y el módulo `:feature-dag2`; los archivos de
   archivo y evidencia histórica permanecen fuera del runtime para auditoría y
   rollback. No se borraron muestras ni datos remotos.
+- También se retiraron el clasificador textual ONNX, sus librerías nativas y la
+  descarga de 123 MB. El APK DEV quedó en 4,8 MB y elimina al iniciar cualquier
+  copia local obsoleta de ese modelo; continúa usando la política textual local
+  liviana.
 - Candidato local: tests, ktlint, Android Lint, Detekt y builds DEV de Usuario y
   Admin correctos; TypeScript, ESLint y build de Super Admin correctos. No se
   publicó APK, no se desplegó Super Admin y no se tocó Production.

@@ -12,9 +12,6 @@ class DagContentClassifier
         private val domainBlocklist: DynamicDomainBlocklist,
         private val semanticClassifier: DagSemanticTextClassifier,
     ) {
-        @Inject
-        lateinit var neuralClassifier: DagNeuralTextClassifier
-
         fun classifyQuery(text: String): DagClassificationResult =
             if (text.isClearlySafeCocaColaQuery() || text.isClearlySafeYeshurunQuery()) {
                 allowed()
@@ -115,9 +112,7 @@ class DagContentClassifier
         }
 
         private fun classifySemantically(rawText: String): DagClassificationResult {
-            val semantic =
-                neuralClassifierOrNull()?.classify(rawText.take(MaxNeuralCharacters))
-                    ?: semanticClassifier.classify(rawText.take(MaxSemanticCharacters))
+            val semantic = semanticClassifier.classify(rawText.take(MaxSemanticCharacters))
             return when (dagSemanticDecision(semantic)) {
                 DagClassification.Blocked ->
                     blocked(
@@ -134,9 +129,6 @@ class DagContentClassifier
                 DagClassification.Allowed -> allowed(semantic?.modelVersion ?: ModelVersion)
             }
         }
-
-        private fun neuralClassifierOrNull(): DagNeuralTextClassifier? =
-            if (::neuralClassifier.isInitialized) neuralClassifier else null
 
         private fun String.isSearchPortal(): Boolean =
             runCatching {
@@ -175,7 +167,6 @@ class DagContentClassifier
             const val ModelVersion = "dag-local-text-7"
             const val MaxPageCharacters = 24_000
             private const val MaxSemanticCharacters = 4_000
-            private const val MaxNeuralCharacters = 2_000
             val NonOverridableCategories = setOf("unsafe_visual_platform", "search_portal")
             private val NonOverridableVisualDomains = setOf("imgsrc.ru")
             private val SearchPortalDomains =

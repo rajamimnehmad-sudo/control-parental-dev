@@ -61,21 +61,14 @@ android {
             applicationIdSuffix = ".dev"
             versionCode = 280
             versionNameSuffix = "-dev"
-            buildConfigField(
-                "String",
-                "DAG_NEURAL_MODEL_URL",
-                "\"https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/dag-models/\"",
-            )
         }
         create("beta") {
             dimension = "distribution"
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
-            buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
         }
         create("prod") {
             dimension = "distribution"
-            buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
         }
     }
 
@@ -110,23 +103,6 @@ android {
         buildConfig = true
     }
 
-    androidResources {
-    }
-
-    packaging {
-        jniLibs {
-            // The neural text runtime is ARM64-only; ARM32 devices safely
-            // retain the compact local text classifier.
-            excludes +=
-                setOf(
-                    "lib/armeabi-v7a/libonnxruntime.so",
-                    "lib/armeabi-v7a/libonnxruntime4j_jni.so",
-                    "lib/armeabi-v7a/libonnxruntime_extensions4j_jni.so",
-                    "lib/armeabi-v7a/libortextensions.so",
-                )
-        }
-    }
-
     testOptions {
         managedDevices {
             devices {
@@ -148,22 +124,6 @@ android {
             }
         }
     }
-}
-
-val verifyDagV2CalibrationPackaging by tasks.registering(Exec::class) {
-    group = "verification"
-    description = "Verifies that DAG v2 calibration is present only in the DEV merged app."
-    dependsOn(
-        "processDevDebugMainManifest",
-        "processBetaDebugMainManifest",
-        "processProdDebugMainManifest",
-    )
-    commandLine(
-        "bash",
-        rootProject.layout.projectDirectory
-            .file("scripts/dag/verify-dag-v2-calibration-packaging.sh")
-            .asFile.absolutePath,
-    )
 }
 
 dependencies {
@@ -196,8 +156,6 @@ dependencies {
     implementation(libs.firebase.messaging)
     implementation(libs.hilt.android)
     implementation(libs.okhttp)
-    implementation(libs.onnxruntime.android)
-    implementation(libs.onnxruntime.extensions.android)
     ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)

@@ -58,7 +58,8 @@ Flujo de una entrada:
   navegador directo, rápido y compatible.
 - Eliminados del runtime: modelos visuales, clasificación por imagen,
   interceptores, calibración v1/v2, laboratorio v2, placeholders y configuración
-  `Extra Kosher`; Super Admin deja de exponer Calibración DAG.
+  `Extra Kosher`; también el modelo textual ONNX y su descarga de 123 MB. Super
+  Admin deja de exponer Calibración DAG.
 - Se mantienen búsqueda Brave y protecciones de consulta, resultado, dominio,
   HTTPS, certificados, Safe Browsing y permisos sensibles.
 - Los tickets de modelo visual, dataset, entrenamiento, caché visual y 04C
