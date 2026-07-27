@@ -1,0 +1,3 @@
+DAG carga la estructura de las páginas más rápido y mantiene menús, botones y sitios dinámicos funcionando mientras cada foto continúa su análisis protegido por separado.
+
+La navegación atrás, adelante, recarga, scroll y carga diferida ya no repiten el análisis completo del documento. No cambian los modelos, los umbrales ni las decisiones del filtro de imágenes.

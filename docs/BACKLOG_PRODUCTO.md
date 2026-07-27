@@ -1694,6 +1694,14 @@ Flujo de una entrada:
 
 ## Roadmap DAG, Web e IA local
 
+### DAG-V1-BROWSER-FAST-06 - Navegacion liviana sin cambiar el filtro visual
+
+- Estado: `Candidato DEV 280 validado fisicamente` el 2026-07-27 en Samsung SM-A235M con Android 14.
+- Causa raiz: cada documento ejecutaba dos extracciones completas y el runtime recorria el DOM general, inspeccionaba estilos calculados, retiraba/restauraba fuentes visuales globalmente y desregistraba Service Workers. Ese trabajo duplicado retrasaba la estructura y podia interferir con React, Next.js y componentes del sitio.
+- Cambio: una generacion inmutable por documento ejecuta una sola extraccion de texto; interacciones internas no reinician el analisis; el observador queda dirigido a imagenes y medios; HTML, CSS, JavaScript, JSON, XHR, fuentes y Service Workers funcionales evitan el pipeline visual; las solicitudes visuales antiguas se cancelan y no contaminan la pagina nueva.
+- Invariantes: no cambian modelos, assets, thresholds, precedencia ni decisiones de imagen de DAG v1. La estructura se muestra al aprobar la pagina y cada foto conserva clasificacion individual fail-closed.
+- Evidencia sin cache real: Fravega `2.434 / 11.134 / 2.434 ms`, Mimo `964 / 4.342 / 965 ms` y Cheeky `463 / 8.694 / 463 ms` para pagina / fotos visibles / estructura visible. Scroll, atras, adelante y recarga funcionaron; no hubo crash, ANR ni `renderer gone`.
+
 ### DAG v2 - plan canónico separado
 
 - Contrato canónico: `docs/dag/v2/DAG_V2_PRODUCT_CONTRACT.md`.

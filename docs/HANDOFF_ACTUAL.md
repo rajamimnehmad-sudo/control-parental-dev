@@ -198,6 +198,13 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
   activa, red visual nueva, entrenamiento, GPU, Supabase, Production,
   publicación, cambio de `versionCode` de las apps ni inicio de 04C.
 
+## Candidato Usuario DEV 280 - navegador DAG v1 liviano - 2026-07-27
+
+- Se corrigio la base de navegacion sin cambiar el filtro de fotos: cada documento usa una generacion propia, extrae texto una sola vez y cancela recursos visuales viejos al navegar. Menus, botones, hash, scroll y recursos nuevos no repiten el analisis completo.
+- El runtime dejo de recorrer clases y estilos generales, quitar/restaurar globalmente `src`/`srcset` y desregistrar Service Workers. El observador queda limitado a imagenes y medios; recursos funcionales no compiten con el clasificador visual.
+- Prueba fisica sin cache en SM-A235M, Android 14: estructura visible en Fravega 2.434 ms, Mimo 965 ms y Cheeky 463 ms. Las fotos visibles terminaron en 11.134, 4.342 y 8.694 ms respectivamente, de manera progresiva. Atras, adelante, recarga y scroll correctos; sin crash, ANR ni `renderer gone`.
+- Los modelos, assets, thresholds, calibracion y decisiones de DAG v1 no cambiaron. App Admin, DAG v2, Supabase y Production quedaron fuera de alcance.
+
 ## Publicacion Usuario DEV 279 - carga progresiva y calibracion binaria - 2026-07-24
 
 - DAG muestra de inmediato la estructura funcional de la pagina y mantiene menus, inputs, botones y scripts disponibles mientras las imagenes siguen protegidas. Reserva el espacio visual, prioriza el viewport con concurrencia limitada, revela cada imagen segura al terminar, difiere las inferiores hasta acercarse por scroll y deja aislada cualquier imagen lenta mediante timeout; una linea fina indica el trabajo visible pendiente.

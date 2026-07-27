@@ -59,7 +59,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 279
+            versionCode = 280
             versionNameSuffix = "-dev"
             buildConfigField(
                 "String",

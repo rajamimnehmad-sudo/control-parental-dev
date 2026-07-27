@@ -168,8 +168,6 @@ class DagImagePolicyTest {
             DagViewportReadinessAction.HidePending,
             dagViewportReadinessAction(2, DagViewportReadinessPolicy.MaximumWaitMillis),
         )
-        assertEquals(1, DagViewportReadinessPolicy.PreparedViewportCount)
-        assertEquals(1, DagViewportReadinessPolicy.PrefetchViewportCount)
         assertTrue(DagViewportReadinessPolicy.VisualSettleMillis <= 300L)
     }
 

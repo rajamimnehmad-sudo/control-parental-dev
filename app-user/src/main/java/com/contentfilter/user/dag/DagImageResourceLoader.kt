@@ -61,6 +61,7 @@ internal class DagImageResourceLoader(
 
     fun resetPage() {
         pageGeneration.incrementAndGet()
+        client.dispatcher.cancelAll()
         imageCount.set(0)
         allowedCount.set(0)
         blockedCount.set(0)
@@ -138,10 +139,14 @@ internal class DagImageResourceLoader(
         }
         return try {
             if (closed.get() || generation != pageGeneration.get()) return unavailableImageResource()
-            runCatching { loadClassifiedImage(request, pageUrl) }.getOrElse {
+            loadClassifiedImage(request, pageUrl, generation)
+        } catch (_: StaleDagImageRequestException) {
+            unavailableImageResource()
+        } catch (_: Exception) {
+            if (generation == pageGeneration.get()) {
                 uncertainCount.incrementAndGet()
-                unavailableImageResource()
             }
+            unavailableImageResource()
         } finally {
             imageSlots.release()
         }
@@ -150,6 +155,7 @@ internal class DagImageResourceLoader(
     private fun loadClassifiedImage(
         request: WebResourceRequest,
         pageUrl: String?,
+        generation: Int,
     ): WebResourceResponse {
         val requestBuilder = Request.Builder().url(request.url.toString()).get()
         ForwardedHeaders.forEach { name ->
@@ -165,12 +171,15 @@ internal class DagImageResourceLoader(
         }
 
         client.newCall(requestBuilder.build()).execute().use { response ->
+            requireCurrentGeneration(generation)
             if (!response.isSuccessful || response.request.url.scheme != "https") return unavailableImageResource()
             val body = response.body ?: return unavailableImageResource()
             if (body.contentLength() > DagImageClassifier.MaximumImageBytes) return unavailableImageResource()
             val bytes = body.byteStream().readLimited(DagImageClassifier.MaximumImageBytes)
+            requireCurrentGeneration(generation)
             val mimeType = body.contentType()?.toString()
             if (isSafeStaticSvg(bytes, mimeType)) {
+                requireCurrentGeneration(generation)
                 allowedCount.incrementAndGet()
                 return cacheAndCreateResource(request.url.toString(), bytes, "image/svg+xml", "safe-icon")
             }
@@ -182,6 +191,7 @@ internal class DagImageResourceLoader(
                         dagImageAudienceContext(request.url.toString(), pageUrl),
                     )
                 }
+            requireCurrentGeneration(generation)
             val calibrationThumbnail =
                 if (shouldCreateCalibrationThumbnail(measuredClassification)) {
                     dagCalibrationThumbnail(bytes)
@@ -221,6 +231,12 @@ internal class DagImageResourceLoader(
                 bytes,
                 classification.mimeType ?: return unavailableImageResource(),
             )
+        }
+    }
+
+    private fun requireCurrentGeneration(generation: Int) {
+        if (closed.get() || generation != pageGeneration.get()) {
+            throw StaleDagImageRequestException()
         }
     }
 
@@ -418,6 +434,8 @@ private data class CachedImageResource(
     val decision: String?,
 )
 
+private class StaleDagImageRequestException : IOException()
+
 internal fun isSafeStaticSvg(
     bytes: ByteArray,
     mimeType: String?,
@@ -489,6 +507,8 @@ private fun Map<String, String>.headerValue(name: String): String =
 private fun blockedResource(): WebResourceResponse =
     WebResourceResponse("text/plain", "utf-8", 204, "Blocked", emptyMap(), ByteArrayInputStream(ByteArray(0)))
 
+internal fun dagBlockedResource(): WebResourceResponse = blockedResource()
+
 private fun unavailableImageResource(): WebResourceResponse =
     WebResourceResponse(
         "image/png",
@@ -504,6 +524,8 @@ private fun unavailableImageResource(): WebResourceResponse =
         ),
         ByteArrayInputStream(NeutralPlaceholderPng),
     )
+
+internal fun dagUnavailableImageResource(): WebResourceResponse = unavailableImageResource()
 
 private val ImageExtensions =
     setOf(
