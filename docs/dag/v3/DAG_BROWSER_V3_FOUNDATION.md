@@ -82,10 +82,14 @@ Estado del primer corte, 2026-07-27:
 - recarga observada en ocho capturas consecutivas sin destello visual;
 - sin conexion queda cerrado y, al recuperar la red, recarga correctamente;
 - background/foreground y reinicio del proceso correctos;
-- queda pendiente una prueba dirigida de `target=_blank` y repetir sobre la APK firmada candidata.
+- `target=_blank` correcto dentro de la misma sesion protegida;
+- queda pendiente repetir sobre la APK firmada candidata.
 
 Evidencia:
 `docs/compatibility/results/dag-browser-v3-foundation-sm-a235m-2026-07-27.md`.
+
+Puente controlado:
+`docs/dag/v3/DAG_BROWSER_V3_GLOSH_BRIDGE.md`.
 
 ## Publicacion e instalacion
 

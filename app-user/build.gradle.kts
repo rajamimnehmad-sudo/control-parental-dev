@@ -59,7 +59,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 280
+            versionCode = 281
             versionNameSuffix = "-dev"
             buildConfigField(
                 "String",
@@ -69,6 +69,11 @@ android {
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "true")
             buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "true")
             buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "true")
+            buildConfigField(
+                "boolean",
+                "DAG_BROWSER_V3_BRIDGE_AVAILABLE",
+                (envValue("DAG_BROWSER_V3_BRIDGE_AVAILABLE").equals("true", ignoreCase = true)).toString(),
+            )
         }
         create("beta") {
             dimension = "distribution"
@@ -78,6 +83,7 @@ android {
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
             buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
             buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "false")
+            buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "false")
         }
         create("prod") {
             dimension = "distribution"
@@ -85,6 +91,7 @@ android {
             buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
             buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
             buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "false")
+            buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "false")
         }
     }
 

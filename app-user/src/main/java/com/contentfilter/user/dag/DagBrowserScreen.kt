@@ -393,6 +393,16 @@ private fun DagBrowserContent(
                                     },
                                 )
                             }
+                            if (BuildConfig.DAG_BROWSER_V3_BRIDGE_AVAILABLE) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Probar navegador DAG nuevo") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        runCatching { context.startActivity(dagBrowserV3Intent()) }
+                                    },
+                                )
+                            }
                             if (BuildConfig.DAG_VISUAL_CALIBRATION_AVAILABLE) {
                                 HorizontalDivider()
                                 DropdownMenuItem(
@@ -628,6 +638,16 @@ private fun DagBrowserContent(
                                     onClick = {
                                         menuExpanded = false
                                         context.startActivity(dagV2LabIntent(context))
+                                    },
+                                )
+                            }
+                            if (BuildConfig.DAG_BROWSER_V3_BRIDGE_AVAILABLE) {
+                                HorizontalDivider()
+                                DropdownMenuItem(
+                                    text = { Text("Probar navegador DAG nuevo") },
+                                    onClick = {
+                                        menuExpanded = false
+                                        runCatching { context.startActivity(dagBrowserV3Intent()) }
                                     },
                                 )
                             }
@@ -997,6 +1017,9 @@ internal fun dagShareableUrl(url: String): String? =
 internal fun dagV2LabIntent(context: Context): Intent =
     Intent().setClassName(context.packageName, DagV2LabActivityClassName)
 
+internal fun dagBrowserV3Intent(): Intent =
+    Intent().setClassName(DagBrowserV3Target.packageName, DagBrowserV3Target.activityClassName)
+
 private fun Context.findActivity(): Activity? {
     var current: Context? = this
     while (current is ContextWrapper) {
@@ -1062,3 +1085,8 @@ internal val DagNeonViolet = Color(0xFF8C6CFF)
 private const val DagPreferencesName = "dag_browser_preferences"
 private const val DagThemePreferenceKey = "theme_preference"
 internal const val DagV2LabActivityClassName = "com.contentfilter.user.dag2.DagV2LabActivity"
+
+internal object DagBrowserV3Target {
+    const val packageName = "com.contentfilter.dagbrowser.dev"
+    const val activityClassName = "com.contentfilter.dagbrowser.DagBrowserActivity"
+}

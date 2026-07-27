@@ -121,23 +121,41 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     request: GeckoSession.NavigationDelegate.LoadRequest,
                 ): GeckoResult<AllowOrDeny> {
-                    val safeUrl = DagNavigationPolicy.sanitizeTopLevel(request.uri)
-                    if (safeUrl == null) {
-                        showBlockedNavigation()
-                        return GeckoResult.fromValue(AllowOrDeny.DENY)
+                    return when (
+                        val decision =
+                            DagNavigationPolicy.decideLoad(
+                                url = request.uri,
+                                opensNewWindow =
+                                    request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW,
+                            )
+                    ) {
+                        DagLoadDecision.Allow -> GeckoResult.fromValue(AllowOrDeny.ALLOW)
+                        DagLoadDecision.Block -> {
+                            showBlockedNavigation()
+                            GeckoResult.fromValue(AllowOrDeny.DENY)
+                        }
+                        is DagLoadDecision.Redirect -> {
+                            beginProtectedLoad()
+                            session.loadUri(decision.url)
+                            GeckoResult.fromValue(AllowOrDeny.DENY)
+                        }
                     }
-                    if (safeUrl != request.uri || request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW) {
-                        beginProtectedLoad()
-                        session.loadUri(safeUrl)
-                        return GeckoResult.fromValue(AllowOrDeny.DENY)
-                    }
-                    return GeckoResult.fromValue(AllowOrDeny.ALLOW)
                 }
 
                 override fun onNewSession(
                     session: GeckoSession,
                     uri: String,
-                ): GeckoResult<GeckoSession>? = null
+                ): GeckoResult<GeckoSession>? {
+                    when (val decision = DagNavigationPolicy.decideLoad(uri, opensNewWindow = true)) {
+                        DagLoadDecision.Allow -> Unit
+                        DagLoadDecision.Block -> showBlockedNavigation()
+                        is DagLoadDecision.Redirect -> {
+                            beginProtectedLoad()
+                            handler.post { session.loadUri(decision.url) }
+                        }
+                    }
+                    return null
+                }
             }
         session.progressDelegate =
             object : GeckoSession.ProgressDelegate {

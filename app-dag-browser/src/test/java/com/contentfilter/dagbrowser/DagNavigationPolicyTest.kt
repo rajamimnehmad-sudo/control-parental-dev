@@ -2,6 +2,7 @@ package com.contentfilter.dagbrowser
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -68,5 +69,27 @@ class DagNavigationPolicyTest {
     fun `ordinary HTTPS page is preserved`() {
         val url = "https://cheeky.com.ar/coleccion"
         assertTrue(DagNavigationPolicy.sanitizeTopLevel(url) === url)
+    }
+
+    @Test
+    fun `new window is redirected into the protected session`() {
+        assertEquals(
+            DagLoadDecision.Redirect("https://example.com/new"),
+            DagNavigationPolicy.decideLoad("https://example.com/new", opensNewWindow = true),
+        )
+    }
+
+    @Test
+    fun `unsafe new window is blocked`() {
+        assertIs<DagLoadDecision.Block>(
+            DagNavigationPolicy.decideLoad("intent://external-app", opensNewWindow = true),
+        )
+    }
+
+    @Test
+    fun `ordinary same-window request is allowed`() {
+        assertIs<DagLoadDecision.Allow>(
+            DagNavigationPolicy.decideLoad("https://example.com", opensNewWindow = false),
+        )
     }
 }

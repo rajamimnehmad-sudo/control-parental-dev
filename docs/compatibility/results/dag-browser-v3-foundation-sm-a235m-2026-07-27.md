@@ -56,3 +56,21 @@ objetivo. Antes de conectar Glosh siguen pendientes:
   comprimir y el flujo cloud historico solo contempla App Usuario y App Admin.
 
 No se modifico ni se retiro el DAG vigente.
+
+## Seguimiento del mismo dia
+
+La prueba dirigida de `target=_blank` se completo sobre
+`https://the-internet.herokuapp.com/windows`: el enlace `Click Here` cargo `New Window` dentro de
+la misma actividad y tarea protegida, habilito Atrás y no abrio otra aplicacion.
+
+El puente opcional con Glosh compila y pasa sus tests con la bandera apagada por defecto. La prueba
+fisica integrada queda pendiente de la firma DEV historica y del tercer target de distribucion.
+
+Artefactos locales del segundo corte:
+
+- Browser V3 `versionCode 2`: `102567158` bytes, SHA-256
+  `487d025ac745c920efed03b9ba562b1ccbc8681ea469230850dae8536ed47890`;
+- App Usuario `versionCode 281`, puente encendido: `52104382` bytes, SHA-256
+  `eee5d2cb3e872c2381d1c813080f6283551378012321ed349961687317674699`;
+- ambos son builds locales con firma debug y no se deben distribuir ni instalar como actualización
+  de las APK DEV históricas.

@@ -42,6 +42,17 @@ internal object DagNavigationPolicy {
         return "$withoutQuery?$strictQuery$fragment"
     }
 
+    fun decideLoad(
+        url: String,
+        opensNewWindow: Boolean,
+    ): DagLoadDecision {
+        val safeUrl = sanitizeTopLevel(url) ?: return DagLoadDecision.Block
+        return when {
+            opensNewWindow || safeUrl != url -> DagLoadDecision.Redirect(safeUrl)
+            else -> DagLoadDecision.Allow
+        }
+    }
+
     private fun looksLikeHost(value: String): Boolean =
         !value.any(Char::isWhitespace) &&
             value.substringBefore("/").contains(".") &&
@@ -65,4 +76,14 @@ internal object DagNavigationPolicy {
             } == true
 
     private fun encode(value: String): String = URLEncoder.encode(value, StandardCharsets.UTF_8.toString())
+}
+
+internal sealed interface DagLoadDecision {
+    data object Allow : DagLoadDecision
+
+    data object Block : DagLoadDecision
+
+    data class Redirect(
+        val url: String,
+    ) : DagLoadDecision
 }
