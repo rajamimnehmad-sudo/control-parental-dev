@@ -33,25 +33,6 @@ class DagHistoryStoreTest {
     }
 
     @Test
-    fun `page approval codec preserves exact scope and invalidation metadata`() {
-        val expected =
-            listOf(
-                DagPageApproval(
-                    url = "https://example.com/product?id=1",
-                    fingerprint = "abc123",
-                    policyVersion = 42L,
-                    modelVersion = "model-v1",
-                    approvedAtEpochMillis = 100L,
-                    expiresAtEpochMillis = 200L,
-                ),
-            )
-
-        val decoded = DagHistoryStore.decodePageApprovals(DagHistoryStore.encodePageApprovals(expected))
-
-        assertEquals(expected, decoded)
-    }
-
-    @Test
     fun `favicon codec preserves bounded png bytes`() {
         val expected = byteArrayOf(1, 2, 3, 4)
 

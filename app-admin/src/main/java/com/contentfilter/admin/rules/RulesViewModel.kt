@@ -18,7 +18,6 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.WebProtectionSemantics
 import com.contentfilter.core.domain.model.dagEnabled
-import com.contentfilter.core.domain.model.dagExtraKosherEnabled
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.InstalledAppRepository
@@ -169,9 +168,6 @@ class RulesViewModel
                     safeSearchEnabled =
                         formState.pendingSafeSearchEnabled ?: selectedPolicy.rules.safeSearchEnabledForWeb(),
                     dagEnabled = health.dagEntitled && (formState.pendingDagEnabled ?: selectedPolicy.rules.dagEnabled()),
-                    dagExtraKosherEnabled =
-                        health.dagEntitled &&
-                            (formState.pendingDagExtraKosherEnabled ?: selectedPolicy.rules.dagExtraKosherEnabled()),
                     dagEntitled = health.dagEntitled,
                     appControls =
                         if (selectedDeviceId == null) {
@@ -848,24 +844,6 @@ class RulesViewModel
                 requestedState = enabled,
                 previousState = uiState.value.dagEnabled,
                 successMessage = if (enabled) "DAG abierto." else "DAG cerrado.",
-            )
-        }
-
-        fun setDagExtraKosherEnabled(enabled: Boolean) {
-            if (!uiState.value.dagEntitled) {
-                form.update { it.copy(message = "DAG no está incluido en la licencia de esta comunidad.") }
-                return
-            }
-            if (enabled && !uiState.value.dagEnabled) {
-                form.update { it.copy(message = "Abrí DAG antes de activar el modo Extra Kosher.") }
-                return
-            }
-            setWebOption(
-                preference = WebPolicyPreference.DagExtraKosherEnabled,
-                action = "dag-extra-kosher",
-                requestedState = enabled,
-                previousState = uiState.value.dagExtraKosherEnabled,
-                successMessage = if (enabled) "Modo Extra Kosher activado." else "Modo Extra Kosher desactivado.",
             )
         }
 

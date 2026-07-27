@@ -37,15 +37,6 @@ data class DagHistoryEntry(
     val visitedAtEpochMillis: Long,
 )
 
-internal data class DagPageApproval(
-    val url: String,
-    val fingerprint: String,
-    val policyVersion: Long,
-    val modelVersion: String,
-    val approvedAtEpochMillis: Long,
-    val expiresAtEpochMillis: Long,
-)
-
 data class DagReviewCandidate(
     val url: String,
     val domain: String,
@@ -73,13 +64,9 @@ enum class DagPageStatus {
 data class DagBrowserUiState(
     val dagAvailabilityKnown: Boolean = false,
     val dagEnabled: Boolean = false,
-    val dagExtraKosherEnabled: Boolean = false,
     val address: String = "",
     val view: DagView = DagView.Start,
     val pageStatus: DagPageStatus = DagPageStatus.Idle,
-    val pageAnalysisReady: Boolean = false,
-    val viewportImagesReady: Boolean = false,
-    val viewportImageProgress: Float = 0f,
     val analysisProgress: Float = 0f,
     val results: List<DagSearchResult> = emptyList(),
     val searchQuery: String = "",
@@ -95,7 +82,6 @@ data class DagBrowserUiState(
     val loading: Boolean = false,
     val message: String = "",
     val reviewCandidate: DagReviewCandidate? = null,
-    val calibrationVersion: Long = 0,
 )
 
 data class DagTabSnapshot(

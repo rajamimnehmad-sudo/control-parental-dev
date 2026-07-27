@@ -35,7 +35,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -65,19 +64,15 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
-import androidx.lifecycle.compose.LifecycleEventEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ProductLargeFeatureCard
 import com.contentfilter.core.ui.ProductViolet
 import com.contentfilter.core.ui.ProductVisualPage
-import com.contentfilter.user.BuildConfig
 import kotlinx.coroutines.delay
 import java.net.URI
 import java.util.UUID
@@ -150,8 +145,6 @@ private fun DagBrowserContent(
     var menuExpanded by remember { mutableStateOf(false) }
     var tabsExpanded by remember { mutableStateOf(false) }
     var clearBrowsingCacheDialog by remember { mutableStateOf(false) }
-    var visualCalibrationDialog by remember { mutableStateOf(false) }
-    var visualCalibrationEnabled by remember { mutableStateOf(false) }
     var addressFocused by remember { mutableStateOf(false) }
     var activeWebView by remember { mutableStateOf<WebView?>(null) }
     var browserCanGoBack by remember { mutableStateOf(false) }
@@ -171,10 +164,6 @@ private fun DagBrowserContent(
             pendingGeolocationOrigin = null
             pendingGeolocationDecision = null
         }
-
-    LifecycleEventEffect(Lifecycle.Event.ON_RESUME) {
-        viewModel.refreshCalibration()
-    }
 
     LaunchedEffect(Unit) {
         val saved = viewModel.loadTabSession()
@@ -383,51 +372,6 @@ private fun DagBrowserContent(
                                     clearBrowsingCacheDialog = true
                                 },
                             )
-                            if (BuildConfig.DAG_V2_BROWSER_AVAILABLE) {
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text("Laboratorio DAG v2") },
-                                    onClick = {
-                                        menuExpanded = false
-                                        context.startActivity(dagV2LabIntent(context))
-                                    },
-                                )
-                            }
-                            if (BuildConfig.DAG_VISUAL_CALIBRATION_AVAILABLE) {
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (state.calibrationVersion > 0) {
-                                                "Calibración aplicada: #${state.calibrationVersion}"
-                                            } else {
-                                                "Calibración aplicada: base"
-                                            },
-                                        )
-                                    },
-                                    enabled = false,
-                                    onClick = {},
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (visualCalibrationEnabled) {
-                                                "✓ Calibración DEV"
-                                            } else {
-                                                "Calibración DEV"
-                                            },
-                                        )
-                                    },
-                                    onClick = {
-                                        menuExpanded = false
-                                        if (visualCalibrationEnabled) {
-                                            visualCalibrationEnabled = false
-                                        } else {
-                                            visualCalibrationDialog = true
-                                        }
-                                    },
-                                )
-                            }
                             HorizontalDivider()
                             DagThemePreference.entries.forEach { preference ->
                                 DropdownMenuItem(
@@ -621,51 +565,6 @@ private fun DagBrowserContent(
                                     clearBrowsingCacheDialog = true
                                 },
                             )
-                            if (BuildConfig.DAG_V2_BROWSER_AVAILABLE) {
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = { Text("Laboratorio DAG v2") },
-                                    onClick = {
-                                        menuExpanded = false
-                                        context.startActivity(dagV2LabIntent(context))
-                                    },
-                                )
-                            }
-                            if (BuildConfig.DAG_VISUAL_CALIBRATION_AVAILABLE) {
-                                HorizontalDivider()
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (state.calibrationVersion > 0) {
-                                                "Calibración aplicada: #${state.calibrationVersion}"
-                                            } else {
-                                                "Calibración aplicada: base"
-                                            },
-                                        )
-                                    },
-                                    enabled = false,
-                                    onClick = {},
-                                )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            if (visualCalibrationEnabled) {
-                                                "✓ Calibración DEV"
-                                            } else {
-                                                "Calibración DEV"
-                                            },
-                                        )
-                                    },
-                                    onClick = {
-                                        menuExpanded = false
-                                        if (visualCalibrationEnabled) {
-                                            visualCalibrationEnabled = false
-                                        } else {
-                                            visualCalibrationDialog = true
-                                        }
-                                    },
-                                )
-                            }
                             HorizontalDivider()
                             DagThemePreference.entries.forEach { preference ->
                                 DropdownMenuItem(
@@ -682,23 +581,6 @@ private fun DagBrowserContent(
                             }
                         }
                     }
-                }
-                if (
-                    state.view == DagView.Browser &&
-                    state.pageStatus == DagPageStatus.Visible &&
-                    !state.viewportImagesReady
-                ) {
-                    LinearProgressIndicator(
-                        progress = { state.viewportImageProgress.coerceIn(0f, 1f) },
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .height(2.dp)
-                                .semantics {
-                                    stateDescription =
-                                        "${(state.viewportImageProgress * 100).toInt()} por ciento de imágenes visibles"
-                                },
-                    )
                 }
                 HorizontalDivider()
                 if (addressFocused && state.suggestions.isNotEmpty() && !analyzing) {
@@ -768,13 +650,7 @@ private fun DagBrowserContent(
                         onBackFromBrowser = viewModel::backFromBrowser,
                         onNavigate = viewModel::requestNavigation,
                         onPageStarted = viewModel::onPageStarted,
-                        onPageTextReady = viewModel::onPageTextReady,
-                        onViewportImagesReady = viewModel::onViewportImagesReady,
-                        onViewportImageProgress = viewModel::onViewportImageProgress,
-                        onCalibrationCandidate = viewModel::submitDagCalibrationCandidate,
-                        visualCalibrationEnabled = visualCalibrationEnabled,
-                        onManualCalibrationCandidate = viewModel::submitDagProhibitedCalibrationCandidate,
-                        onManualBlurReviewCandidate = viewModel::submitDagAllowedCalibrationCandidate,
+                        onPageReady = viewModel::onPageReady,
                         onBlockedAction = viewModel::onBrowserBlockedAction,
                         onGeolocationPrompt = { origin, decision ->
                             if (origin in allowedGeolocationOrigins) {
@@ -822,43 +698,19 @@ private fun DagBrowserContent(
             title = { Text("¿Borrar caché de navegación?") },
             text = {
                 Text(
-                    "DAG volverá a analizar por completo las páginas. El historial, los inicios de sesión y las pestañas no se borrarán.",
+                    "Los recursos web se descargarán nuevamente. El historial, los inicios de sesión y las pestañas no se borrarán.",
                 )
             },
             confirmButton = {
                 TextButton(
                     onClick = {
                         activeWebView?.clearCache(true)
-                        viewModel.clearPageApprovals()
                         clearBrowsingCacheDialog = false
                     },
                 ) { Text("Borrar") }
             },
             dismissButton = {
                 TextButton(onClick = { clearBrowsingCacheDialog = false }) { Text("Cancelar") }
-            },
-        )
-    }
-
-    if (visualCalibrationDialog) {
-        AlertDialog(
-            onDismissRequest = { visualCalibrationDialog = false },
-            title = { Text("¿Activar Calibración DEV?") },
-            text = {
-                Text(
-                    "Sólo para pruebas: marcá cada foto con ✓ Permitida o × Prohibida. La página no se recarga, la foto no cambia y la etiqueta se usa únicamente para preparar calibraciones futuras.",
-                )
-            },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        visualCalibrationEnabled = true
-                        visualCalibrationDialog = false
-                    },
-                ) { Text("Activar") }
-            },
-            dismissButton = {
-                TextButton(onClick = { visualCalibrationDialog = false }) { Text("Cancelar") }
             },
         )
     }
@@ -994,9 +846,6 @@ internal fun dagShareableUrl(url: String): String? =
         URI(url).takeIf { it.scheme.equals("https", ignoreCase = true) && !it.host.isNullOrBlank() }?.toString()
     }.getOrNull()
 
-internal fun dagV2LabIntent(context: Context): Intent =
-    Intent().setClassName(context.packageName, DagV2LabActivityClassName)
-
 private fun Context.findActivity(): Activity? {
     var current: Context? = this
     while (current is ContextWrapper) {
@@ -1061,4 +910,3 @@ internal val DagNeonCyan = Color(0xFF00D8FF)
 internal val DagNeonViolet = Color(0xFF8C6CFF)
 private const val DagPreferencesName = "dag_browser_preferences"
 private const val DagThemePreferenceKey = "theme_preference"
-internal const val DagV2LabActivityClassName = "com.contentfilter.user.dag2.DagV2LabActivity"

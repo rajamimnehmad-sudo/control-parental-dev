@@ -171,13 +171,10 @@ internal fun WebNavigationPanel(
     dagEnabled: Boolean,
     dagEntitled: Boolean,
     dagSaving: Boolean,
-    dagExtraKosherEnabled: Boolean,
-    dagExtraKosherSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
     onDagEnabledChanged: (Boolean) -> Unit,
-    onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Acceso a Internet", style = MaterialTheme.typography.titleLarge)
@@ -237,15 +234,6 @@ internal fun WebNavigationPanel(
             enabled = dagEntitled && !dagSaving,
             saving = dagSaving,
             onCheckedChange = onDagEnabledChanged,
-        )
-        WebSwitchRow(
-            icon = ProductIcon.ShieldCheck,
-            title = "Modo Extra Kosher",
-            description = "Difumina fotos de contenido y mantiene los videos bloqueados.",
-            checked = dagExtraKosherEnabled,
-            enabled = dagEnabled && dagEntitled && !dagExtraKosherSaving,
-            saving = dagExtraKosherSaving,
-            onCheckedChange = onDagExtraKosherEnabledChanged,
         )
         if (blocked && !protectionActive) {
             FeedbackBanner(

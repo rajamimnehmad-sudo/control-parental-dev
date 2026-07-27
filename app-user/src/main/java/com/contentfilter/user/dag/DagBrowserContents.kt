@@ -88,7 +88,7 @@ internal fun DagStartContent(
         Spacer(Modifier.height(if (keyboardVisible) 48.dp else 88.dp))
         Text("DAG", style = MaterialTheme.typography.displaySmall)
         Text(
-            "Internet kosher con protección local",
+            "Búsqueda rápida y navegación directa",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -102,7 +102,7 @@ internal fun DagStartContent(
                     .height(56.dp)
                     .semantics {
                         if (analyzing) {
-                            stateDescription = "${(analysisProgress * 100).roundToInt()} por ciento analizado"
+                            stateDescription = "${(analysisProgress * 100).roundToInt()} por ciento cargado"
                         }
                     },
             cornerRadius = 28.dp,
@@ -208,7 +208,7 @@ internal fun DagStartContent(
         }
         Spacer(Modifier.height(12.dp))
         Text(
-            "Las páginas y sus imágenes se analizan antes de mostrarse.",
+            "Las páginas y sus imágenes cargan directamente.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -330,7 +330,7 @@ internal fun DagResultsContent(
                 }
                 if (result.classification.decision == DagClassification.Uncertain) {
                     Text(
-                        "DAG analizará la página antes de mostrarla",
+                        "DAG comprobará el sitio antes de abrirlo",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

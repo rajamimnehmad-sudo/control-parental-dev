@@ -66,31 +66,6 @@ class DagContentClassifier
             )
         }
 
-        internal fun classifyPage(
-            url: String,
-            title: String,
-            text: String,
-            images: DagImagePageSummary = DagImagePageSummary(0, 0, 0),
-        ): DagClassificationResult {
-            val domain = domainFrom(url)
-            blockedVisualPlatform(domain)?.let { return it }
-            domainBlocklist.categoryFor(domain)?.let { category ->
-                return DagClassificationResult(
-                    decision = DagClassification.Blocked,
-                    category = category,
-                    confidence = 1f,
-                    modelVersion = ModelVersion,
-                )
-            }
-            val textResult =
-                classify(
-                    "$domain $title ${text.take(MaxPageCharacters)}".withoutIntimateApparelTerms(),
-                    directUrl = false,
-                    reviewSingleAmbiguousTerm = false,
-                )
-            return textResult
-        }
-
         fun classifyDirectUrl(url: String): DagClassificationResult {
             if (url.isSearchPortal()) return blocked("search_portal", confidence = 1f)
             val domain = domainFrom(url)
@@ -361,23 +336,3 @@ class DagContentClassifier
             }
         }
     }
-
-internal enum class DagAdaptivePageDecision {
-    Allowed,
-    Protected,
-    Blocked,
-}
-
-internal fun dagAdaptivePageDecision(result: DagClassificationResult): DagAdaptivePageDecision =
-    when (result.decision) {
-        DagClassification.Allowed -> DagAdaptivePageDecision.Allowed
-        DagClassification.Uncertain -> DagAdaptivePageDecision.Protected
-        DagClassification.Blocked ->
-            if (result.category.startsWith("semantic_") && result.confidence < AdaptiveSemanticPageBlockThreshold) {
-                DagAdaptivePageDecision.Protected
-            } else {
-                DagAdaptivePageDecision.Blocked
-            }
-    }
-
-private const val AdaptiveSemanticPageBlockThreshold = 0.82f

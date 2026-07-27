@@ -66,26 +66,6 @@ class DagContentClassifierTest {
     }
 
     @Test
-    fun `uncertain pages open with additional protection instead of requiring admin review`() {
-        val uncertain = DagClassificationResult(DagClassification.Uncertain, "sensitive_context", 0.64f, "test")
-        val weakSemanticBlock = DagClassificationResult(DagClassification.Blocked, "semantic_sexual", 0.70f, "test")
-
-        assertEquals(DagAdaptivePageDecision.Protected, dagAdaptivePageDecision(uncertain))
-        assertEquals(DagAdaptivePageDecision.Protected, dagAdaptivePageDecision(weakSemanticBlock))
-    }
-
-    @Test
-    fun `explicit policy and strong unsafe evidence still block pages`() {
-        val explicit = DagClassificationResult(DagClassification.Blocked, "sexual", 0.97f, "test")
-        val strongSemantic = DagClassificationResult(DagClassification.Blocked, "semantic_sexual", 0.91f, "test")
-        val safe = DagClassificationResult(DagClassification.Allowed, "general", 0.82f, "test")
-
-        assertEquals(DagAdaptivePageDecision.Blocked, dagAdaptivePageDecision(explicit))
-        assertEquals(DagAdaptivePageDecision.Blocked, dagAdaptivePageDecision(strongSemantic))
-        assertEquals(DagAdaptivePageDecision.Allowed, dagAdaptivePageDecision(safe))
-    }
-
-    @Test
     fun `explicit unsafe intent is blocked in all initial languages`() {
         assertEquals(DagClassification.Blocked, classifier.classifyQuery("video porno").decision)
         assertEquals(DagClassification.Blocked, classifier.classifyQuery("online casino").decision)
@@ -100,14 +80,6 @@ class DagContentClassifierTest {
                 title = "Calvin Klein Underwear",
                 description = "Catálogo de lencería y ropa íntima para mujer",
                 url = "https://www.calvinklein.example/women/underwear",
-            ).decision,
-        )
-        assertEquals(
-            DagClassification.Allowed,
-            classifier.classifyPage(
-                url = "https://shop.example/intimates",
-                title = "Nueva colección",
-                text = "Catálogo de lencería y ropa íntima para mujer",
             ).decision,
         )
         assertEquals(DagClassification.Blocked, classifier.classifyQuery("lencería con videos porno").decision)
@@ -236,58 +208,6 @@ class DagContentClassifierTest {
     @Test
     fun `ordinary retail domain remains allowed`() {
         assertEquals(DagClassification.Allowed, classifier.classifyDirectUrl("https://easy.com.ar").decision)
-    }
-
-    @Test
-    fun `unsafe images are isolated without closing an otherwise safe store`() {
-        val result =
-            classifier.classifyPage(
-                url = "https://images.example",
-                title = "Galería",
-                text = "Contenido general",
-                images = DagImagePageSummary(allowed = 1, blocked = 4, uncertain = 0),
-            )
-
-        assertEquals(DagClassification.Allowed, result.decision)
-    }
-
-    @Test
-    fun `page image signal does not penalize a mostly safe page`() {
-        val result =
-            classifier.classifyPage(
-                url = "https://shop.example",
-                title = "Tienda",
-                text = "Productos para el hogar",
-                images = DagImagePageSummary(allowed = 8, blocked = 1, uncertain = 1),
-            )
-
-        assertEquals(DagClassification.Allowed, result.decision)
-    }
-
-    @Test
-    fun `single incidental ambiguous term does not force review of an otherwise ordinary page`() {
-        val result =
-            classifier.classifyPage(
-                url = "https://shop.example",
-                title = "Tienda para el hogar",
-                text = "Ofertas para vos y tu pareja. Envíos, muebles y electrodomésticos.",
-            )
-
-        assertEquals(DagClassification.Allowed, result.decision)
-        assertEquals(DagClassification.Uncertain, classifier.classifyQuery("consejos de pareja").decision)
-    }
-
-    @Test
-    fun `unreadable images stay hidden without blocking otherwise safe page text`() {
-        val result =
-            classifier.classifyPage(
-                url = "https://shop.example",
-                title = "Tienda",
-                text = "Productos y ofertas del supermercado",
-                images = DagImagePageSummary(allowed = 0, blocked = 0, uncertain = 8),
-            )
-
-        assertEquals(DagClassification.Allowed, result.decision)
     }
 
     private fun modelBytes(): ByteArray {

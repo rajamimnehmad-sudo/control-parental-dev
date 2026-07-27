@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-22
+Ultima sincronizacion: 2026-07-27
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -50,6 +50,22 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-BROWSER-DIRECT-BASELINE
+
+- Estado: `Implementado como candidato local`. Decisión de producto del
+  2026-07-27: retirar el filtrado visual de DAG y priorizar un buscador y
+  navegador directo, rápido y compatible.
+- Eliminados del runtime: modelos visuales, clasificación por imagen,
+  interceptores, calibración v1/v2, laboratorio v2, placeholders y configuración
+  `Extra Kosher`; Super Admin deja de exponer Calibración DAG.
+- Se mantienen búsqueda Brave y protecciones de consulta, resultado, dominio,
+  HTTPS, certificados, Safe Browsing y permisos sensibles.
+- Los tickets de modelo visual, dataset, entrenamiento, caché visual y 04C
+  quedan `Archivados`; no iniciar su implementación salvo una nueva decisión
+  explícita.
+- La evidencia histórica permanece versionada sólo para auditoría/rollback. No
+  se borraron datos remotos ni se tocó Production.
 
 ### DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B
 

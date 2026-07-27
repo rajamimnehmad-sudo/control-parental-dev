@@ -30,6 +30,10 @@ class DagHistoryStore
         private val mutableEntries = MutableStateFlow(loadSafely())
         private val mutableFavicons = MutableStateFlow(loadFaviconsSafely())
 
+        init {
+            preferences.edit().remove(RetiredPageApprovalsKey).apply()
+        }
+
         fun observe(): StateFlow<List<DagHistoryEntry>> = mutableEntries
 
         fun observeFavicons(): StateFlow<Map<String, ByteArray>> = mutableFavicons
@@ -111,49 +115,6 @@ class DagHistoryStore
         }
 
         @Synchronized
-        fun hasFreshPageApproval(
-            url: String,
-            fingerprint: String,
-            policyVersion: Long,
-            modelVersion: String,
-            nowEpochMillis: Long = System.currentTimeMillis(),
-        ): Boolean =
-            loadPageApprovals(nowEpochMillis).any {
-                it.url == url &&
-                    it.fingerprint == fingerprint &&
-                    it.policyVersion == policyVersion &&
-                    it.modelVersion == modelVersion
-            }
-
-        @Synchronized
-        fun savePageApproval(
-            url: String,
-            fingerprint: String,
-            policyVersion: Long,
-            modelVersion: String,
-            nowEpochMillis: Long = System.currentTimeMillis(),
-        ) {
-            val entry =
-                DagPageApproval(
-                    url = url.take(MaxValueCharacters),
-                    fingerprint = fingerprint,
-                    policyVersion = policyVersion,
-                    modelVersion = modelVersion,
-                    approvedAtEpochMillis = nowEpochMillis,
-                    expiresAtEpochMillis = nowEpochMillis + PageApprovalLifetimeMillis,
-                )
-            val retained =
-                loadPageApprovals(nowEpochMillis)
-                    .filterNot { it.url == entry.url }
-            persistPageApprovals((listOf(entry) + retained).take(MaxPageApprovals))
-        }
-
-        @Synchronized
-        fun clearPageApprovals() {
-            preferences.edit().remove(EncryptedPageApprovalsKey).commit()
-        }
-
-        @Synchronized
         internal fun loadTabSession(): DagSavedTabSession? {
             val encoded = preferences.getString(EncryptedTabsKey, null) ?: return null
             return runCatching { decodeTabSession(decrypt(encoded)) }
@@ -222,29 +183,6 @@ class DagHistoryStore
             }.onFailure {
                 preferences.edit().remove(EncryptedFaviconsKey).commit()
                 mutableFavicons.value = emptyMap()
-            }
-        }
-
-        private fun loadPageApprovals(nowEpochMillis: Long): List<DagPageApproval> {
-            val encoded = preferences.getString(EncryptedPageApprovalsKey, null) ?: return emptyList()
-            return runCatching {
-                decodePageApprovals(decrypt(encoded)).filter {
-                    nowEpochMillis >= it.approvedAtEpochMillis && it.expiresAtEpochMillis > nowEpochMillis
-                }
-            }.getOrElse {
-                preferences.edit().remove(EncryptedPageApprovalsKey).commit()
-                emptyList()
-            }
-        }
-
-        private fun persistPageApprovals(entries: List<DagPageApproval>) {
-            runCatching {
-                preferences
-                    .edit()
-                    .putString(EncryptedPageApprovalsKey, encrypt(encodePageApprovals(entries)))
-                    .commit()
-            }.onFailure {
-                preferences.edit().remove(EncryptedPageApprovalsKey).commit()
             }
         }
 
@@ -339,36 +277,6 @@ class DagHistoryStore
                         if (domain.isNotBlank() && bytes != null) put(domain, bytes)
                     }
                 }
-            }
-
-            internal fun encodePageApprovals(entries: List<DagPageApproval>): String =
-                JSONArray().apply {
-                    entries.forEach { entry ->
-                        put(
-                            JSONObject()
-                                .put("url", entry.url)
-                                .put("fingerprint", entry.fingerprint)
-                                .put("policy_version", entry.policyVersion)
-                                .put("model_version", entry.modelVersion)
-                                .put("approved_at", entry.approvedAtEpochMillis)
-                                .put("expires_at", entry.expiresAtEpochMillis),
-                        )
-                    }
-                }.toString()
-
-            internal fun decodePageApprovals(value: String): List<DagPageApproval> {
-                val array = JSONArray(value)
-                return (0 until array.length()).map { index ->
-                    val json = array.getJSONObject(index)
-                    DagPageApproval(
-                        url = json.getString("url"),
-                        fingerprint = json.getString("fingerprint"),
-                        policyVersion = json.getLong("policy_version"),
-                        modelVersion = json.getString("model_version"),
-                        approvedAtEpochMillis = json.getLong("approved_at"),
-                        expiresAtEpochMillis = json.getLong("expires_at"),
-                    )
-                }.take(MaxPageApprovals)
             }
 
             internal fun encodeTabSession(session: DagSavedTabSession): String =
@@ -479,7 +387,7 @@ class DagHistoryStore
 
             private const val PreferencesName = "dag-history"
             private const val EncryptedHistoryKey = "entries"
-            private const val EncryptedPageApprovalsKey = "page-approvals"
+            private const val RetiredPageApprovalsKey = "page-approvals"
             private const val EncryptedTabsKey = "tabs"
             private const val EncryptedFaviconsKey = "favicons"
             private const val AndroidKeyStore = "AndroidKeyStore"
@@ -488,10 +396,8 @@ class DagHistoryStore
             private const val IvLength = 12
             private const val TagLengthBits = 128
             private const val MaxEntries = 200
-            private const val MaxPageApprovals = 200
             private const val MaxSavedTabs = 50
             private const val MaxSavedResults = 20
-            private const val PageApprovalLifetimeMillis = 7L * 24L * 60L * 60L * 1_000L
             private const val MaxValueCharacters = 2_048
             private const val MaxTitleCharacters = 180
             private const val MaxDescriptionCharacters = 500

@@ -50,7 +50,7 @@ class DagSearchSuggestionsTest {
                 DagHistoryEntry(
                     id = "1",
                     type = DagHistoryType.Search,
-                    value = "Frávega electrodomésticos",
+                    value = "Tienda electrodomésticos",
                     url = null,
                     title = null,
                     visitedAtEpochMillis = 1L,
@@ -59,11 +59,11 @@ class DagSearchSuggestionsTest {
 
         val suggestions =
             dagSearchSuggestionCandidates(
-                "frav",
+                "tienda",
                 history,
-                listOf("Frávega electrodomésticos", "Frávega ofertas"),
+                listOf("Tienda electrodomésticos", "Tienda ofertas"),
             )
 
-        assertEquals(listOf("Frávega electrodomésticos", "Frávega ofertas"), suggestions)
+        assertEquals(listOf("Tienda electrodomésticos", "Tienda ofertas"), suggestions)
     }
 }

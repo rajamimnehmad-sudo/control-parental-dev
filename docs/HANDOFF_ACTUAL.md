@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-26
+Fecha de corte: 2026-07-27
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -78,6 +78,23 @@ SHA-256 publicados:
 Usuario 5d98a83b992042477059a7809df140b6545ded03f8e52704c883a8add0aee2cc
 Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ```
+
+## Candidato DAG navegador directo - 2026-07-27
+
+- Decisión vigente: DAG queda como buscador y navegador rápido; se retiró del
+  producto el filtrado visual de fotografías, sus modelos, thresholds,
+  interceptores, placeholders, calibración y el laboratorio DAG v2.
+- WebView carga HTML, scripts, datos, fuentes e imágenes directamente. Conserva
+  búsqueda Brave, clasificación de consulta/resultado/dominio, HTTPS,
+  certificados, Android Safe Browsing y bloqueo de permisos sensibles.
+- App Admin ya no ofrece `Modo Extra Kosher`. Super Admin ya no contiene la
+  ruta, menú, acciones ni tipos de Calibración DAG.
+- Se retiraron 4 modelos visuales y el módulo `:feature-dag2`; los archivos de
+  archivo y evidencia histórica permanecen fuera del runtime para auditoría y
+  rollback. No se borraron muestras ni datos remotos.
+- Candidato local: tests, ktlint, Android Lint, Detekt y builds DEV de Usuario y
+  Admin correctos; TypeScript, ESLint y build de Super Admin correctos. No se
+  publicó APK, no se desplegó Super Admin y no se tocó Production.
 
 ## DAG-V1-ARCHIVE-V2-CONTRACT-01 - archivo y contrato, sin cambio funcional - 2026-07-24
 

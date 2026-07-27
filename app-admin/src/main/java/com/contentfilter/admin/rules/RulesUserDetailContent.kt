@@ -97,7 +97,6 @@ internal fun UserDetailContent(
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
     onDagEnabledChanged: (Boolean) -> Unit,
-    onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
     onProtectionArmedChanged: (String, Boolean) -> Unit,
     onAuthorizeRemoval: (String) -> Unit,
     onGenerateRecoveryCode: (String) -> Unit,
@@ -332,13 +331,10 @@ internal fun UserDetailContent(
                             dagEnabled = state.dagEnabled,
                             dagEntitled = state.dagEntitled,
                             dagSaving = state.pendingDagEnabled != null,
-                            dagExtraKosherEnabled = state.dagExtraKosherEnabled,
-                            dagExtraKosherSaving = state.pendingDagExtraKosherEnabled != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
                             onBlockedChanged = onWebNavigationBlockedChanged,
                             onOnlyResultsChanged = onOnlyResultsChanged,
                             onDagEnabledChanged = onDagEnabledChanged,
-                            onDagExtraKosherEnabledChanged = onDagExtraKosherEnabledChanged,
                         )
                     }
                     item {

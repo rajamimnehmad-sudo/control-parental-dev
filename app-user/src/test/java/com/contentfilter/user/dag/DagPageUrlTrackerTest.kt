@@ -21,22 +21,4 @@ class DagPageUrlTrackerTest {
         assertFalse(first.matches(latest.url))
         assertTrue(latest.matches("https://example.com/latest#section"))
     }
-
-    @Test
-    fun `document is inspected once and old callback cannot affect same url reload`() {
-        val tracker = DagPageUrlTracker()
-        val gate = DagPageInspectionGate()
-        val first = tracker.begin("https://example.com/products")
-        gate.begin(first)
-
-        assertTrue(gate.claim(first))
-        assertFalse(gate.claim(first))
-
-        val reload = tracker.begin("https://example.com/products")
-        gate.begin(reload)
-
-        assertFalse(gate.accepts(first, reload.url))
-        assertTrue(gate.claim(reload))
-        assertTrue(gate.accepts(reload, reload.url))
-    }
 }

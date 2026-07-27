@@ -66,25 +66,16 @@ android {
                 "DAG_NEURAL_MODEL_URL",
                 "\"https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/dag-models/\"",
             )
-            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "true")
-            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "true")
-            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "true")
         }
         create("beta") {
             dimension = "distribution"
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
             buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
-            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
-            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
-            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "false")
         }
         create("prod") {
             dimension = "distribution"
             buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
-            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
-            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
-            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "false")
         }
     }
 
@@ -120,14 +111,12 @@ android {
     }
 
     androidResources {
-        noCompress += "tflite"
     }
 
     packaging {
         jniLibs {
-            // Keep the app and the existing TFLite image model compatible with
-            // ARM32. The much larger neural text runtime is ARM64-only; ARM32
-            // devices safely retain the compact local text classifier.
+            // The neural text runtime is ARM64-only; ARM32 devices safely
+            // retain the compact local text classifier.
             excludes +=
                 setOf(
                     "lib/armeabi-v7a/libonnxruntime.so",
@@ -178,7 +167,6 @@ val verifyDagV2CalibrationPackaging by tasks.registering(Exec::class) {
 }
 
 dependencies {
-    add("devImplementation", project(":feature-dag2"))
     implementation(project(":core-domain"))
     implementation(project(":core-data"))
     implementation(project(":core-database"))
@@ -203,7 +191,6 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.hilt.work)
-    implementation(libs.androidx.webkit)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
@@ -211,7 +198,6 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.onnxruntime.android)
     implementation(libs.onnxruntime.extensions.android)
-    implementation(libs.tflite)
     ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)
