@@ -44,22 +44,16 @@ internal object AndroidImageBoundsReader : DagImageBoundsReader {
  */
 internal object DagMediaBytesPolicy {
     private val candidateIdPattern = Regex("^[A-Za-z0-9_-]{1,80}$")
-    private val supportedMimeTypes =
-        setOf(
-            "image/gif",
-            "image/jpeg",
-            "image/png",
-            "image/webp",
-        )
 
     fun decide(
         payload: DagMediaBytesPayload,
         boundsReader: DagImageBoundsReader = AndroidImageBoundsReader,
+        preprocessor: DagImagePreprocessor = AndroidDagImagePreprocessor,
     ): DagMediaDecision {
         val reason =
             when {
                 !validEnvelope(payload) -> InvalidPayloadReason
-                else -> inspectImage(payload, boundsReader)
+                else -> inspectImage(payload, boundsReader, preprocessor)
             }
         return DagMediaDecision(
             candidateId = payload.candidateId.take(MaxCandidateIdLength),
@@ -78,6 +72,7 @@ internal object DagMediaBytesPolicy {
     private fun inspectImage(
         payload: DagMediaBytesPayload,
         boundsReader: DagImageBoundsReader,
+        preprocessor: DagImagePreprocessor,
     ): String {
         val bytes =
             runCatching { Base64.getDecoder().decode(payload.bytesBase64) }
@@ -86,15 +81,30 @@ internal object DagMediaBytesPolicy {
             return InvalidPayloadReason
         }
         val bounds = boundsReader.read(bytes) ?: return UnsupportedImageReason
-        if (bounds.mimeType !in supportedMimeTypes) return UnsupportedImageReason
-        if (
-            bounds.width !in 1..MaxDimension ||
-            bounds.height !in 1..MaxDimension ||
-            bounds.width.toLong() * bounds.height.toLong() > MaxPixels
-        ) {
+        if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) return UnsupportedImageReason
+        if (!DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height)) {
             return UnsafeDimensionsReason
         }
-        return DagMediaAnalysisPolicy.AnalyzerUnavailableReason
+        return when (
+            val result =
+                runCatching { preprocessor.prepare(bytes) }
+                    .getOrElse {
+                        DagImagePreprocessResult.Rejected(
+                            AndroidDagImagePreprocessor.DecodeFailedReason,
+                        )
+                    }
+        ) {
+            is DagImagePreprocessResult.Ready -> {
+                val valid = DagImageDecodeContract.isValid(result.image)
+                result.image.rgb888.fill(0)
+                if (valid) {
+                    DagMediaAnalysisPolicy.AnalyzerUnavailableReason
+                } else {
+                    AndroidDagImagePreprocessor.DecodeFailedReason
+                }
+            }
+            is DagImagePreprocessResult.Rejected -> result.reason
+        }
     }
 
     private fun isAllowedUrl(value: String): Boolean {
@@ -106,8 +116,6 @@ internal object DagMediaBytesPolicy {
     private const val MaxUrlLength = 4_096
     const val MaxCaptureBytes = 256 * 1024
     private const val MaxBase64Length = ((MaxCaptureBytes + 2) / 3) * 4
-    private const val MaxDimension = 4_096
-    private const val MaxPixels = 16_777_216L
     const val InvalidPayloadReason = "invalid_payload"
     const val UnsupportedImageReason = "unsupported_image"
     const val UnsafeDimensionsReason = "unsafe_dimensions"

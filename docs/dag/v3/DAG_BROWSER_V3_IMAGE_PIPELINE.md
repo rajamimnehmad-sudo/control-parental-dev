@@ -31,12 +31,14 @@ codigo empaquetado de esa dependencia.
 5. La extension envia bytes Base64 al Android local mediante el canal de fondo privilegiado.
 6. Android valida remitente, version, URL, longitud Base64, formato y dimensiones sin decodificar
    el bitmap completo.
-7. El trabajo se limita a dos hilos y ocho elementos en espera.
-8. Como maximo hay 16 respuestas de imagen activas y 10 pedidos nativos simultaneos.
-9. Capturar una respuesta puede demorar como maximo 5 segundos y la decision nativa 2,5 segundos.
-10. Limite, cola llena o timeout significan bloqueo.
-11. En esta etapa Android solo puede responder `block`.
-12. La extension reemplaza siempre la respuesta por un GIF transparente de 1x1.
+7. Android reduce el lado mayor a 224 px durante la decodificacion, conserva la imagen completa con
+   relleno neutro y produce RGB888 acotado.
+8. El trabajo se limita a dos hilos y ocho elementos en espera.
+9. Como maximo hay 16 respuestas de imagen activas y 10 pedidos nativos simultaneos.
+10. Capturar una respuesta puede demorar como maximo 5 segundos y la decision nativa 2,5 segundos.
+11. Limite, cola llena o timeout significan bloqueo.
+12. En esta etapa Android solo puede responder `block`.
+13. La extension reemplaza siempre la respuesta por un GIF transparente de 1x1.
 
 Ningun byte se guarda en disco, se registra en logs o se envia a Supabase.
 
@@ -71,9 +73,12 @@ archivos.
 
 1. Transporte fisico con formatos pequenos, grandes, corruptos y lentos: completo.
 2. Latencia y memoria sin habilitar fotos: completo.
-3. Agregar reduccion local a la entrada exacta del modelo.
+3. Agregar reduccion local a la entrada exacta del modelo: implementado, falta evidencia fisica.
 4. Comparar los modelos candidatos con el mismo conjunto de evaluacion.
 5. Habilitar `allow` y luego `blur` solamente tras cerrar precision y fugas.
 
 Evidencia de los dos primeros gates:
 `docs/compatibility/results/dag-browser-v3-image-transport-sm-a235m-2026-07-27.md`.
+
+Contrato del tercer gate:
+`docs/dag/v3/DAG_BROWSER_V3_IMAGE_PREPROCESSOR.md`.
