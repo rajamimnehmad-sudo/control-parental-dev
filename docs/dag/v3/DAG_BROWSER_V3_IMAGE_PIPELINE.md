@@ -32,15 +32,20 @@ codigo empaquetado de esa dependencia.
 6. Android valida remitente, version, URL, longitud Base64, formato y dimensiones sin decodificar
    el bitmap completo.
 7. El trabajo se limita a dos hilos y ocho elementos en espera.
-8. El timeout es 2,5 segundos; cola llena o timeout significan bloqueo.
-9. En esta etapa Android solo puede responder `block`.
-10. La extension reemplaza siempre la respuesta por un GIF transparente de 1x1.
+8. Como maximo hay 16 respuestas de imagen activas y 10 pedidos nativos simultaneos.
+9. Capturar una respuesta puede demorar como maximo 5 segundos y la decision nativa 2,5 segundos.
+10. Limite, cola llena o timeout significan bloqueo.
+11. En esta etapa Android solo puede responder `block`.
+12. La extension reemplaza siempre la respuesta por un GIF transparente de 1x1.
 
 Ningun byte se guarda en disco, se registra en logs o se envia a Supabase.
 
 ## Limites contra imagenes maliciosas
 
 - cuerpo capturado: maximo 256 KiB;
+- respuestas de imagen simultaneas: maximo 16;
+- mensajes simultaneos hacia el analizador: maximo 10;
+- respuesta lenta: maximo 5 segundos antes de bloquear;
 - URL: maximo 4096 caracteres y esquema HTTP(S);
 - formatos: JPEG, PNG, WebP y GIF;
 - ancho y alto: maximo 4096;

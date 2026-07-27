@@ -33,6 +33,10 @@ class MediaBarrierContractTest {
 
         assertContains(background, "filterResponseData")
         assertContains(background, "MAX_CAPTURE_BYTES = 256 * 1024")
+        assertContains(background, "MAX_SOURCE_URL_LENGTH = 4_096")
+        assertContains(background, "MAX_ACTIVE_IMAGE_FILTERS = 16")
+        assertContains(background, "MAX_NATIVE_IN_FLIGHT = 10")
+        assertContains(background, "RESPONSE_CAPTURE_TIMEOUT_MS = 5_000")
         assertContains(background, "NATIVE_DECISION_TIMEOUT_MS = 2_500")
         assertContains(background, "\"media-bytes\"")
         assertContains(background, "closeWithPlaceholder")

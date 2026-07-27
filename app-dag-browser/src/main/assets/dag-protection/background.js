@@ -3,6 +3,10 @@
 const INTERCEPTED_RESOURCE_TYPES = new Set(["image", "imageset"]);
 const BLOCKED_RESOURCE_TYPES = new Set(["media", "object"]);
 const MAX_CAPTURE_BYTES = 256 * 1024;
+const MAX_SOURCE_URL_LENGTH = 4_096;
+const MAX_ACTIVE_IMAGE_FILTERS = 16;
+const MAX_NATIVE_IN_FLIGHT = 10;
+const RESPONSE_CAPTURE_TIMEOUT_MS = 5_000;
 const NATIVE_DECISION_TIMEOUT_MS = 2_500;
 const NATIVE_APP = "glosh.dag.protection";
 const PROTOCOL_VERSION = 1;
@@ -11,6 +15,8 @@ const TRANSPARENT_GIF = Uint8Array.from(
   (character) => character.charCodeAt(0),
 );
 let requestSequence = 0;
+let activeImageFilters = 0;
+let nativeRequestsInFlight = 0;
 
 const nextCandidateId = () => {
   requestSequence += 1;
@@ -72,6 +78,14 @@ const interceptImageResponse = (details) => {
   if (typeof browser.webRequest.filterResponseData !== "function") {
     return { cancel: true };
   }
+  if (
+    typeof details.url !== "string" ||
+    details.url.length === 0 ||
+    details.url.length > MAX_SOURCE_URL_LENGTH ||
+    activeImageFilters >= MAX_ACTIVE_IMAGE_FILTERS
+  ) {
+    return { cancel: true };
+  }
 
   let filter;
   try {
@@ -79,22 +93,32 @@ const interceptImageResponse = (details) => {
   } catch {
     return { cancel: true };
   }
+  activeImageFilters += 1;
 
   const chunks = [];
   let totalBytes = 0;
   let overflow = false;
   let finalized = false;
+  let ownsActiveSlot = true;
+  let captureTimeout = null;
 
   const finalize = () => {
     if (finalized) {
       return;
     }
     finalized = true;
+    if (captureTimeout !== null) {
+      clearTimeout(captureTimeout);
+    }
+    if (ownsActiveSlot) {
+      ownsActiveSlot = false;
+      activeImageFilters = Math.max(0, activeImageFilters - 1);
+    }
     closeWithPlaceholder(filter);
   };
 
   filter.ondata = (event) => {
-    if (overflow) {
+    if (finalized || overflow) {
       return;
     }
     const chunk = new Uint8Array(event.data);
@@ -102,6 +126,7 @@ const interceptImageResponse = (details) => {
       overflow = true;
       chunks.length = 0;
       totalBytes = 0;
+      finalize();
       return;
     }
     chunks.push(chunk);
@@ -113,20 +138,31 @@ const interceptImageResponse = (details) => {
     if (finalized) {
       return;
     }
+    if (captureTimeout !== null) {
+      clearTimeout(captureTimeout);
+      captureTimeout = null;
+    }
     if (overflow || totalBytes === 0) {
       finalize();
       return;
     }
+    if (nativeRequestsInFlight >= MAX_NATIVE_IN_FLIGHT) {
+      finalize();
+      return;
+    }
 
+    nativeRequestsInFlight += 1;
     const timeout = setTimeout(finalize, NATIVE_DECISION_TIMEOUT_MS);
     const bytes = combineChunks(chunks, totalBytes);
     requestNativeBlockDecision(details, bytes)
       .catch(() => false)
       .finally(() => {
+        nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
         clearTimeout(timeout);
         finalize();
       });
   };
+  captureTimeout = setTimeout(finalize, RESPONSE_CAPTURE_TIMEOUT_MS);
 
   return {};
 };
