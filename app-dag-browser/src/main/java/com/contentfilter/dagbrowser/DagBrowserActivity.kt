@@ -52,19 +52,26 @@ class DagBrowserActivity : Activity() {
                 sender: WebExtension.MessageSender,
             ): GeckoResult<Any>? {
                 val payload = message as? JSONObject ?: return null
-                val valid =
+                val trustedSender =
                     nativeApp == NativeApp &&
                         sender.session === session &&
-                        sender.isTopLevel &&
-                        sender.environmentType == WebExtension.MessageSender.ENV_TYPE_CONTENT_SCRIPT &&
-                        payload.optString("type") == BarrierReadyMessage &&
-                        payload.optInt("version") == BarrierProtocolVersion
-                if (valid && waitingForBarrier) {
-                    waitingForBarrier = false
-                    handler.removeCallbacks(barrierTimeout)
-                    revealProtectedPage()
+                        sender.environmentType == WebExtension.MessageSender.ENV_TYPE_CONTENT_SCRIPT
+                if (!trustedSender || payload.optInt("version") != ProtectionProtocolVersion) {
+                    return null
                 }
-                return null
+
+                return when (payload.optString("type")) {
+                    BarrierReadyMessage -> {
+                        if (sender.isTopLevel && waitingForBarrier) {
+                            waitingForBarrier = false
+                            handler.removeCallbacks(barrierTimeout)
+                            revealProtectedPage()
+                        }
+                        null
+                    }
+                    MediaCandidateMessage -> GeckoResult.fromValue(mediaDecisionPayload(payload))
+                    else -> null
+                }
             }
         }
 
@@ -268,6 +275,25 @@ class DagBrowserActivity : Activity() {
         safetyOverlay.visibility = View.GONE
     }
 
+    private fun mediaDecisionPayload(payload: JSONObject): JSONObject {
+        val candidate =
+            DagMediaCandidate(
+                candidateId = payload.optString("candidateId"),
+                sourceUrl = payload.optString("sourceUrl"),
+                documentUrl = payload.optString("documentUrl"),
+                altText = payload.optString("altText"),
+                width = payload.optInt("width", -1),
+                height = payload.optInt("height", -1),
+            )
+        val decision = DagMediaAnalysisPolicy.decide(candidate)
+        return JSONObject()
+            .put("type", MediaDecisionMessage)
+            .put("version", ProtectionProtocolVersion)
+            .put("candidateId", decision.candidateId)
+            .put("action", decision.action.wireValue)
+            .put("reason", decision.reason)
+    }
+
     private fun showClosedPage() {
         geckoView.visibility = View.INVISIBLE
         showOverlay(
@@ -323,7 +349,9 @@ class DagBrowserActivity : Activity() {
         const val ExtensionId = "dag-protection@glosh.local"
         const val NativeApp = "glosh.dag.protection"
         const val BarrierReadyMessage = "barrier-ready"
-        const val BarrierProtocolVersion = 1
+        const val MediaCandidateMessage = "media-candidate"
+        const val MediaDecisionMessage = "media-decision"
+        const val ProtectionProtocolVersion = 1
         const val BarrierTimeoutMillis = 12_000L
         const val InitialBlankPage = "about:blank"
     }
