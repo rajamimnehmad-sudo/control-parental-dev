@@ -6,6 +6,7 @@ on:
       - ".github/workflows/dag-v2-benchmark-ci.yml"
       - "tools/dag-v2-benchmark/**"
       - "docs/dag/v2/DAG_V2_NO_GPU_*"
+      - "docs/dag/v2/DAG_V2_TARGETED_SIGNAL_*"
       - "scripts/android_ci_scope.sh"
       - "scripts/test_android_ci_scope.sh"
   push:
@@ -15,6 +16,7 @@ on:
       - ".github/workflows/dag-v2-benchmark-ci.yml"
       - "tools/dag-v2-benchmark/**"
       - "docs/dag/v2/DAG_V2_NO_GPU_*"
+      - "docs/dag/v2/DAG_V2_TARGETED_SIGNAL_*"
       - "scripts/android_ci_scope.sh"
       - "scripts/test_android_ci_scope.sh"
 
@@ -45,6 +47,63 @@ jobs:
           python -m unittest discover -s tools/dag-v2-benchmark/tests -v
           python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-repository
           python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-evidence
+          python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
+          python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-results
 
       - name: Verify Android CI scope
         run: bash scripts/test_android_ci_scope.sh
+
+  reviewer:
+    name: Build isolated 04B reviewer fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Detect reviewer changes
+        id: scope
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            base="${{ github.event.pull_request.base.sha }}"
+          else
+            base="${{ github.event.before }}"
+          fi
+          if git diff --name-only "$base" "$GITHUB_SHA" |
+            grep -Eq '^(tools/dag-v2-benchmark/policy-reviewer/|tools/dag-v2-benchmark/dag_v2_policy_eval.py|tools/dag-v2-benchmark/evidence/04b/)'; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up JDK
+        if: steps.scope.outputs.changed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        if: steps.scope.outputs.changed == 'true'
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        if: steps.scope.outputs.changed == 'true'
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build, test and lint reviewer with fixtures
+        if: steps.scope.outputs.changed == 'true'
+        env:
+          DAG_V2_REVIEWER_FIXTURE: "1"
+        run: |
+          ./gradlew -p tools/dag-v2-benchmark/policy-reviewer \
+            :app:testDebugUnitTest \
+            :app:assembleDebug \
+            :app:lintDebug
+
+      - name: No reviewer changes
+        if: steps.scope.outputs.changed != 'true'
+        run: echo "No reviewer build required."

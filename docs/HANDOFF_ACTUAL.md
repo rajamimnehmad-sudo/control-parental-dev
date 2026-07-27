@@ -152,8 +152,8 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
   y conteo pose 71/72.
 - Decisión: `NO-GO`. No hay etiquetas humanas de política ni señales
   suficientes de apariencia femenina, edad, ajuste o transparencia; no se
-  selecciona modelo ni se inicia cache/04B. Próxima propuesta no autorizada:
-  `DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B`.
+  seleccionó modelo ni caché. 04B fue autorizado después y permanece detenido
+  en su gate humano.
 - Corrección de trazabilidad en PR #71: las 203 muestras quedaron bloqueadas
   con URL pública, `page_id`, licencia canónica, hashes y metadatos; evidencia,
   corrida, resumen, subconjunto Android y checksums son versionados y
@@ -164,7 +164,39 @@ Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 - No cambió Android de producto, DAG v1, Calibración DEV, Supabase, App Admin,
   `versionCode` ni Production. El APK debug fue sólo el runner aislado local;
   no se publicó. El provider visible v2 sigue devolviendo sólo `Hide`; no se
-  inició dataset, entrenamiento, modo sombra ni 04B.
+  inició dataset, entrenamiento ni modo sombra.
+
+## DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B - NO-GO - 2026-07-26
+
+- Rama `codex/dag-v2-targeted-signal-labeled-policy-04b`. 04A verifica intacto
+  y sus 203 imágenes se reconstruyeron sólo mediante `fetch-locked-corpus`.
+- Antes de etiquetas se fijaron orden ciego, 60 muestras diagnósticas
+  equilibradas y split 122 exploratoria / 41 validación / 40 prueba, sin fuga
+  por SHA-256 ni dHash64 a distancia menor o igual a cinco.
+- El APK debug autónomo del revisor no forma parte del producto, no tiene
+  WebView ni permiso de Internet. Se instaló in-place en SM-A235M
+  `R58T34V31AE`, Android 14/API 34. SHA-256
+  `c8d577a2fda2e8a80174d39a19b856a38f4319b5ed53efb69f7d9df9dd231f67`,
+  70.229.187 bytes, con 203 imágenes/70.142.418 bytes verificadas.
+- Exportación humana validada: SHA-256
+  `a672cbf5436e492732f7df645551472e6f738760d4959bba2d3d4fef11d68174`,
+  203 IDs únicos, 117 Show, 76 Hide y 10 Unsure. Un defecto del exportador
+  serializaba motivos como texto cerrado; se preservó el original, se
+  normalizó sin ambigüedad y se corrigió el exportador.
+- Se extrajeron señales CPU, se compararon cuatro políticas interpretables
+  usando sólo exploración/validación y se sellaron reglas deterministas antes
+  de abrir el test una sola vez. Test concluyente: 39 muestras, cero falsos
+  permisos, recall Hide 62,5%, cobertura 33,33%, incertidumbre 66,67% y
+  ninguna predicción Show.
+- SM-A235M, 72 muestras: adulto+pose paralelo 309,44/472,24 ms p50/p95, PSS
+  183.520 KiB, estado térmico 0 y cero fallos. El runner aisló el bitmap de pose
+  después de detectar y corregir un reciclado prematuro en su primer intento.
+- Decisión: `NO-GO`. El rendimiento cumple la puerta experimental, la calidad
+  no. No iniciar 04C; el próximo ticket recomendado queda sólo propuesto para
+  datos públicos equilibrados y un modelo visual dirigido pequeño.
+- Provider visible DAG v2 sigue sólo en `Hide`. No hubo integración, caché
+  activa, red visual nueva, entrenamiento, GPU, Supabase, Production,
+  publicación, cambio de `versionCode` de las apps ni inicio de 04C.
 
 ## Publicacion Usuario DEV 279 - carga progresiva y calibracion binaria - 2026-07-24
 

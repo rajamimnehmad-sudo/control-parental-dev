@@ -51,6 +51,34 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B
+
+- Estado: `Evaluación cerrada en Draft: NO-GO`. Autorizado
+  explícitamente el 2026-07-26. Tipo: evaluación humana reproducible y señales
+  CPU. Prioridad: P0. Esfuerzo: XL. Riesgo: medio.
+- Plan congelado antes de etiquetas: orden ciego de 203, subconjunto
+  diagnóstico de 60 (cinco por motivo) y split sin fuga 122/41/40 por
+  SHA-256/dHash/cluster.
+- Revisor Android autónomo sin WebView ni Internet instalado in-place en
+  SM-A235M. Valida cada imagen, no preselecciona, persiste, reanuda, permite
+  Atrás/Deshacer y exporta sólo el contrato sanitizado.
+- Tooling preparado: señales locales YCbCr/HSV/Lab, pose/torso/calidad,
+  comparación docente limitada a 20 imágenes, políticas interpretables y
+  apertura única del test después de sellar parámetros.
+- Resultado humano: 203/203 decisiones verificadas (117 Show, 76 Hide y 10
+  Unsure). El test se abrió una sola vez después de sellar reglas
+  deterministas con exploración/validación.
+- Resultado congelado: cero falsos permisos críticos, pero recall Hide 62,5%,
+  cobertura 33,33%, incertidumbre/segmentación requerida 66,67% y ninguna
+  predicción Show. La ruta paralela sí cumple rendimiento en SM-A235M
+  (309,44/472,24 ms p50/p95), por lo que el bloqueo es de calidad de señales.
+- Decisión: `NO-GO`; no corresponde iniciar 04C. Próximo ticket sólo propuesto:
+  `DAG-V2-DIRECTED-VISUAL-MODEL-DATASET-05`, para ampliar datos públicos
+  equilibrados y evaluar un modelo visual dirigido pequeño.
+- No se integró modelo, no se creó caché activa, no hubo entrenamiento, GPU,
+  Supabase, Production, publicación ni inicio de 04C. Provider v2 sigue en
+  `Hide`.
+
 ### DAG-V2-NO-GPU-BASELINE-BENCHMARK-04A - comparación visual independiente
 
 - Estado: `Candidato cerrado en Draft PR, decisión NO-GO`. Autorizado
@@ -65,14 +93,14 @@ Flujo de una entrada:
 - Resultado: 203 imágenes públicas, 3 modelos/28.852.165 bytes, Mac M2 y
   SM-A235M medidos. En Android, segmentación alcanzó 784,79 ms p50; la cascada
   simulada aún envía 98,52% a pose y 68,47% a segmentación. Sin etiquetas
-  humanas ni señales de sexo/edad/ajuste/transparencia, no se selecciona
-  ganador ni se inicia 04B.
+  humanas ni señales de sexo/edad/ajuste/transparencia, 04A no seleccionó
+  ganador; 04B abrió después sólo su revisión humana.
 - Trazabilidad: selección/evidencia/checksums versionados; licencias por mapa
   canónico cerrado; runner valida hashes de modelos, manifiesto e imágenes;
   CI ligero propio evita compilar aplicaciones ante cambios sólo de 04A. La
   auditoría conservó 203/203 y todas las cifras.
-- Próxima propuesta, no autorizada:
-  `DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B`.
+- Continuación autorizada: 04B abrió exclusivamente el gate humano; no inició
+  integración, caché ni entrenamiento.
 
 ### DAG-V2-CALIBRATION-COLLECTOR-03 - Colector DEV aislado
 

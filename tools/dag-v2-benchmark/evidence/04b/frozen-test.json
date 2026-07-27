@@ -1,0 +1,797 @@
+{
+  "gate": {
+    "heavy_segmentation_at_most_10": false,
+    "hide_recall_at_least_95": false,
+    "show_precision_at_least_95": false,
+    "uncertainty_at_most_40": false,
+    "zero_critical_false_allows": true
+  },
+  "opened_at": "2026-07-27T00:46:50.338265+00:00",
+  "opened_once": true,
+  "parameters_sha256": "887bdcf3046dbed9ae99eaa064d4ce5b93f80bb18ba3fbd73af9cf39ec6be3ff",
+  "production_claim": false,
+  "selected_policy": "deterministic_rules",
+  "test": {
+    "by_category": {
+      "abdomen": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.7934506856227626,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "animals": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "books": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 1,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "buildings": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "children_ordinary": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "children_playing": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "cityscapes": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "clothing_products": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "computers": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "drawings": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "elbows": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "female_fashion_broad": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "food": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "furniture": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "generated": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 1,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "groups": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.7934506856227626,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "groups_general": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.7934506856227626,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "illustrations_general": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "knees": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "landscapes": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "men": {
+        "coverage": 0.5,
+        "critical_false_allows": 0,
+        "false_blocks": 1,
+        "heavy_segmentation_needed_percent": 50.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 2,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 50.0
+      },
+      "neckline": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "no_person": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 2,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "nudity_art": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.6576197724933469,
+          "low": 0.0
+        },
+        "sample_count": 2,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "plants": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "shoulders": {
+        "coverage": 0.5,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 50.0,
+        "hide_recall": 0.5,
+        "hide_recall_95ci": {
+          "high": 0.9054687942657693,
+          "low": 0.09453120573423074
+        },
+        "sample_count": 2,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 50.0
+      },
+      "small_images": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "tight": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "transparent": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "underwear": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "vehicles": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "women_permitted": {
+        "coverage": 0.5,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 50.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 2,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 50.0
+      },
+      "women_portraits_broad": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "women_unspecified": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      }
+    },
+    "by_reason": {
+      "abdomen": {
+        "coverage": 0.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 100.0,
+        "hide_recall": 0.0,
+        "hide_recall_95ci": {
+          "high": 0.7934506856227626,
+          "low": 0.0
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 100.0
+      },
+      "adult_or_explicit": {
+        "coverage": 0.5,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 50.0,
+        "hide_recall": 0.5,
+        "hide_recall_95ci": {
+          "high": 0.8499610108478506,
+          "low": 0.15003898915214947
+        },
+        "sample_count": 4,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 50.0
+      },
+      "deep_neckline_or_chest": {
+        "coverage": 0.5714285714285714,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 42.857142857142854,
+        "hide_recall": 0.5714285714285714,
+        "hide_recall_95ci": {
+          "high": 0.8417801447485302,
+          "low": 0.2504583645276572
+        },
+        "sample_count": 7,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 42.857142857142854
+      },
+      "elbow": {
+        "coverage": 0.8333333333333334,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 16.666666666666668,
+        "hide_recall": 0.8333333333333334,
+        "hide_recall_95ci": {
+          "high": 0.9699466302516935,
+          "low": 0.43649717781352987
+        },
+        "sample_count": 6,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 16.666666666666668
+      },
+      "knee": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.20654931437723745
+        },
+        "sample_count": 1,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "shoulder_or_armpit": {
+        "coverage": 0.6666666666666666,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 33.333333333333336,
+        "hide_recall": 0.6666666666666666,
+        "hide_recall_95ci": {
+          "high": 0.9385080552796037,
+          "low": 0.2076596008020477
+        },
+        "sample_count": 3,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 33.333333333333336
+      },
+      "tight_clothing": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.34238022750665303
+        },
+        "sample_count": 2,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      },
+      "underwear_or_swimwear": {
+        "coverage": 1.0,
+        "critical_false_allows": 0,
+        "false_blocks": 0,
+        "heavy_segmentation_needed_percent": 0.0,
+        "hide_recall": 1.0,
+        "hide_recall_95ci": {
+          "high": 1.0,
+          "low": 0.34238022750665303
+        },
+        "sample_count": 2,
+        "show_precision": 0.0,
+        "show_precision_95ci": {
+          "high": 0.0,
+          "low": 0.0
+        },
+        "uncertainty_percent": 0.0
+      }
+    },
+    "cluster_stability": {
+      "comparable_cluster_count": 0,
+      "stable_cluster_count": 0,
+      "stable_fraction": null
+    },
+    "coverage": 0.3333333333333333,
+    "critical_false_allows": 0,
+    "false_blocks": 3,
+    "heavy_segmentation_needed_percent": 66.66666666666667,
+    "hide_recall": 0.625,
+    "hide_recall_95ci": {
+      "high": 0.8151876744113636,
+      "low": 0.38641040545502714
+    },
+    "sample_count": 39,
+    "show_precision": 0.0,
+    "show_precision_95ci": {
+      "high": 0.0,
+      "low": 0.0
+    },
+    "uncertainty_percent": 66.66666666666667
+  }
+}

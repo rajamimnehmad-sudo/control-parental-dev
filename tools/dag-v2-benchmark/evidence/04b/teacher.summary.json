@@ -1,0 +1,12 @@
+{
+  "absolute_difference_mean": 0.21547523261929066,
+  "corpus_percent": 9.852216748768473,
+  "role": "offline_teacher_comparison_only",
+  "runtime_candidate": false,
+  "sample_count": 20,
+  "teacher_latency": {
+    "max_ms": 144.70620800000012,
+    "p50_ms": 128.22945800000008,
+    "p95_ms": 138.82375000000002
+  }
+}
