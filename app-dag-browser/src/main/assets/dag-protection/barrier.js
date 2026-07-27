@@ -34,6 +34,8 @@
   const MAX_ALT_TEXT_LENGTH = 256;
   const analyzedSources = new WeakMap();
   let candidateCount = 0;
+  const performanceDocumentToken =
+    `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
 
   const sourceFor = (element) => {
     let rawSource = "";
@@ -143,6 +145,23 @@
   });
 
   if (window.top === window) {
+    const reportDocumentState = (type) => {
+      browser.runtime
+        .sendMessage({
+          type,
+          version: 1,
+          documentToken: performanceDocumentToken,
+        })
+        .catch(() => {
+          // Missing performance evidence never weakens the media barrier.
+        });
+    };
+    reportDocumentState("document-started");
+    window.addEventListener(
+      "load",
+      () => reportDocumentState("document-loaded"),
+      { once: true },
+    );
     browser.runtime
       .sendNativeMessage("glosh.dag.protection", {
         type: "barrier-ready",
