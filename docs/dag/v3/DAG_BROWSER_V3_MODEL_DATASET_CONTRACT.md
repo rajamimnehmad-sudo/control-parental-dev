@@ -108,7 +108,8 @@ acotado, nunca como etiqueta ni licencia aprobada.
 
 ## Manifiesto minimo por muestra
 
-El dataset se almacena como objetos inmutables y manifiestos JSONL. Cada fila conserva:
+El dataset se almacena como objetos inmutables y manifiestos JSONL con
+`manifest_schema_version: dag-v3-dataset-manifest-v1`. Cada fila conserva:
 
 - `sample_id`, SHA-256 de contenido, hash perceptual, dimensiones y MIME;
 - URL de pagina original, URL del archivo y fecha de recuperacion;
@@ -118,7 +119,8 @@ El dataset se almacena como objetos inmutables y manifiestos JSONL. Cada fila co
 - estado conocido de derechos de imagen o consentimiento cuando corresponda;
 - origen `owned`, `commissioned`, `commons`, `openverse`, `openimages` u otro aprobado;
 - prelabels con profesor/version/score separados de las etiquetas humanas;
-- etiquetas, revisores seudonimos, adjudicacion y guia usada;
+- etiqueta final y las 21 decisiones originales de cada revisor seudonimo;
+- timestamps, guia usada y decision de un tercer adjudicador para cada desacuerdo;
 - `split_group_id`, version de dataset y motivo de exclusion si no se usa.
 
 El manifiesto nunca contiene cookies, credenciales, historial privado ni identificadores de un
@@ -126,7 +128,10 @@ dispositivo Glosh.
 
 El validador local de este contrato vive en `scripts/dag_v3_model/manifest_validator.py`. Rechaza
 antes del entrenamiento licencias incompletas, fuentes no aprobadas, hashes duplicados, etiquetas
-fuera del contrato y grupos repartidos entre splits.
+fuera del contrato, resumenes de revision sin decisiones independientes, adjudicaciones
+inconsistentes y grupos repartidos entre splits. Validacion y test exigen exactamente dos revisores
+independientes; un desacuerdo exige un tercer adjudicador distinto y la etiqueta final debe coincidir
+con esa resolucion.
 
 `scripts/dag_v3_model/openverse_inventory.py` puede reunir solamente metadatos candidatos con
 limites de consultas/paginas y licencias potencialmente compatibles. No descarga imagenes y marca

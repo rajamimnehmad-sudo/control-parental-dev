@@ -19,6 +19,7 @@ HEX_64 = re.compile(r"^[0-9a-f]{64}$")
 HEX_16 = re.compile(r"^[0-9a-f]{16}$")
 SAFE_ID = re.compile(r"^[A-Za-z0-9._:-]{1,160}$")
 GLOSH_URN = re.compile(r"^urn:glosh:[A-Za-z0-9][A-Za-z0-9._:-]{0,240}$")
+MANIFEST_SCHEMA_VERSION = "dag-v3-dataset-manifest-v1"
 ALLOWED_SOURCE_KINDS = {
     "owned",
     "commissioned",
@@ -242,52 +243,320 @@ def _validate_rights(
         _error(errors, line, "rights.evidence_url", "must be HTTPS or an approved Glosh URN")
 
 
-def _validate_labels(
+def _validate_label_map(
+    value: Any,
+    contract: SignalContract,
+    errors: list[str],
+    line: int,
+    field: str,
+    *,
+    allow_unreviewed: bool,
+) -> dict[str, str] | None:
+    if not isinstance(value, dict):
+        _error(errors, line, field, "must be an object")
+        return None
+    expected = set(contract.labels)
+    actual = set(value)
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing:
+        _error(errors, line, field, f"missing labels: {', '.join(missing)}")
+    if extra:
+        _error(errors, line, field, f"unknown labels: {', '.join(extra)}")
+    valid = not missing and not extra
+    for name, state in value.items():
+        if name in expected and state not in contract.annotation_states:
+            _error(errors, line, f"{field}.{name}", "has an invalid annotation state")
+            valid = False
+        elif name in expected and not allow_unreviewed and state == "unreviewed":
+            _error(errors, line, f"{field}.{name}", "completed reviews cannot be unreviewed")
+            valid = False
+    if not valid:
+        return None
+    return {name: value[name] for name in contract.labels}
+
+
+def _validate_review(
     record: dict[str, Any],
+    labels: dict[str, str] | None,
     contract: SignalContract,
     split: str | None,
     errors: list[str],
     line: int,
 ) -> None:
-    labels = _required_object(record, "labels", errors, line)
-    if labels is None:
-        return
-    expected = set(contract.labels)
-    actual = set(labels)
-    missing = sorted(expected - actual)
-    extra = sorted(actual - expected)
-    if missing:
-        _error(errors, line, "labels", f"missing labels: {', '.join(missing)}")
-    if extra:
-        _error(errors, line, "labels", f"unknown labels: {', '.join(extra)}")
-    for name, state in labels.items():
-        if name in expected and state not in contract.annotation_states:
-            _error(errors, line, f"labels.{name}", "has an invalid annotation state")
-
-    reviewed_values = [state for state in labels.values() if state != "unreviewed"]
-    unreviewed_values = [state for state in labels.values() if state == "unreviewed"]
     review = _required_object(record, "review", errors, line)
     if review is None:
         return
-    reviewers = review.get("reviewer_keys")
-    if not isinstance(reviewers, list) or any(
-        not isinstance(value, str) or not SAFE_ID.fullmatch(value) for value in reviewers
-    ):
-        _error(errors, line, "review.reviewer_keys", "must be a list of non-empty pseudonymous keys")
-        reviewers = []
-    adjudicator = review.get("adjudicator_key")
-    if adjudicator is not None and (
-        not isinstance(adjudicator, str) or not SAFE_ID.fullmatch(adjudicator)
-    ):
-        _error(errors, line, "review.adjudicator_key", "must be null or a pseudonymous key")
-    if reviewed_values:
-        _required_string(review, "guide_version", errors, line, "review.")
-        if not reviewers:
-            _error(errors, line, "review.reviewer_keys", "requires a reviewer for reviewed labels")
+
+    allowed_review_fields = {"guide_version", "annotations", "adjudication"}
+    extra_review_fields = sorted(set(review) - allowed_review_fields)
+    if extra_review_fields:
+        _error(
+            errors,
+            line,
+            "review",
+            f"contains unsupported fields: {', '.join(extra_review_fields)}",
+        )
+
+    raw_annotations = review.get("annotations")
+    if not isinstance(raw_annotations, list):
+        _error(errors, line, "review.annotations", "must be a list")
+        raw_annotations = []
+    elif len(raw_annotations) > 2:
+        _error(errors, line, "review.annotations", "supports at most two independent reviews")
+
+    annotations: list[tuple[str, dict[str, str]]] = []
+    reviewer_keys: list[str] = []
+    for index, raw_annotation in enumerate(raw_annotations):
+        field = f"review.annotations[{index}]"
+        if not isinstance(raw_annotation, dict):
+            _error(errors, line, field, "must be an object")
+            continue
+        extra_fields = sorted(
+            set(raw_annotation) - {"reviewer_key", "reviewed_at", "labels"}
+        )
+        if extra_fields:
+            _error(
+                errors,
+                line,
+                field,
+                f"contains unsupported fields: {', '.join(extra_fields)}",
+            )
+        reviewer_key = raw_annotation.get("reviewer_key")
+        if not isinstance(reviewer_key, str) or not SAFE_ID.fullmatch(reviewer_key):
+            _error(
+                errors,
+                line,
+                f"{field}.reviewer_key",
+                "must be a pseudonymous key",
+            )
+            reviewer_key = ""
+        reviewed_at = raw_annotation.get("reviewed_at")
+        if not isinstance(reviewed_at, str) or not _valid_time(reviewed_at):
+            _error(
+                errors,
+                line,
+                f"{field}.reviewed_at",
+                "must be an ISO-8601 UTC timestamp",
+            )
+        annotation_labels = _validate_label_map(
+            raw_annotation.get("labels"),
+            contract,
+            errors,
+            line,
+            f"{field}.labels",
+            allow_unreviewed=False,
+        )
+        if reviewer_key:
+            reviewer_keys.append(reviewer_key)
+        if reviewer_key and annotation_labels is not None:
+            annotations.append((reviewer_key, annotation_labels))
+
+    if len(set(reviewer_keys)) != len(reviewer_keys):
+        _error(errors, line, "review.annotations", "reviewer keys must be distinct")
+
+    reviewed_values = (
+        [state for state in labels.values() if state != "unreviewed"]
+        if labels is not None
+        else []
+    )
+    unreviewed_values = (
+        [state for state in labels.values() if state == "unreviewed"]
+        if labels is not None
+        else []
+    )
+    guide_version = review.get("guide_version")
+    if raw_annotations or reviewed_values:
+        if not isinstance(guide_version, str) or not SAFE_ID.fullmatch(guide_version):
+            _error(
+                errors,
+                line,
+                "review.guide_version",
+                "must be a versioned guide identifier for reviewed labels",
+            )
+        if not raw_annotations:
+            _error(
+                errors,
+                line,
+                "review.annotations",
+                "reviewed labels require an independent annotation",
+            )
+    elif not isinstance(guide_version, str):
+        _error(errors, line, "review.guide_version", "must be a string")
+
     if split in ASSIGNED_SPLITS and unreviewed_values:
         _error(errors, line, "labels", "assigned splits cannot contain unreviewed labels")
-    if split in {"validation", "test"} and len(set(reviewers)) < 2:
-        _error(errors, line, "review.reviewer_keys", "validation and test require two reviewers")
+    if split in {"validation", "test"} and len(raw_annotations) != 2:
+        _error(
+            errors,
+            line,
+            "review.annotations",
+            "validation and test require exactly two independent reviews",
+        )
+
+    raw_adjudication = review.get("adjudication")
+    if len(annotations) == 1:
+        if raw_adjudication is not None:
+            _error(
+                errors,
+                line,
+                "review.adjudication",
+                "must be null when there is only one independent review",
+            )
+        if labels is not None:
+            for name in contract.labels:
+                if labels[name] != annotations[0][1][name]:
+                    _error(
+                        errors,
+                        line,
+                        f"labels.{name}",
+                        "does not match the independent review",
+                    )
+    elif len(annotations) == 2:
+        disagreements = [
+            name
+            for name in contract.labels
+            if annotations[0][1][name] != annotations[1][1][name]
+        ]
+        if not disagreements:
+            if raw_adjudication is not None:
+                _error(
+                    errors,
+                    line,
+                    "review.adjudication",
+                    "must be null when independent reviews agree",
+                )
+            if labels is not None:
+                for name in contract.labels:
+                    if labels[name] != annotations[0][1][name]:
+                        _error(
+                            errors,
+                            line,
+                            f"labels.{name}",
+                            "does not match the agreeing independent reviews",
+                        )
+        else:
+            _validate_adjudication(
+                raw_adjudication,
+                disagreements,
+                annotations,
+                labels,
+                contract,
+                errors,
+                line,
+            )
+    elif raw_adjudication is not None:
+        _error(
+            errors,
+            line,
+            "review.adjudication",
+            "requires two valid independent reviews",
+        )
+
+
+def _validate_adjudication(
+    raw_adjudication: Any,
+    disagreements: list[str],
+    annotations: list[tuple[str, dict[str, str]]],
+    final_labels: dict[str, str] | None,
+    contract: SignalContract,
+    errors: list[str],
+    line: int,
+) -> None:
+    if not isinstance(raw_adjudication, dict):
+        _error(
+            errors,
+            line,
+            "review.adjudication",
+            f"is required for disagreements: {', '.join(disagreements)}",
+        )
+        return
+    extra_fields = sorted(
+        set(raw_adjudication) - {"adjudicator_key", "adjudicated_at", "labels"}
+    )
+    if extra_fields:
+        _error(
+            errors,
+            line,
+            "review.adjudication",
+            f"contains unsupported fields: {', '.join(extra_fields)}",
+        )
+
+    adjudicator_key = raw_adjudication.get("adjudicator_key")
+    if not isinstance(adjudicator_key, str) or not SAFE_ID.fullmatch(adjudicator_key):
+        _error(
+            errors,
+            line,
+            "review.adjudication.adjudicator_key",
+            "must be a pseudonymous key",
+        )
+    elif adjudicator_key in {annotation[0] for annotation in annotations}:
+        _error(
+            errors,
+            line,
+            "review.adjudication.adjudicator_key",
+            "must be independent from both reviewers",
+        )
+    adjudicated_at = raw_adjudication.get("adjudicated_at")
+    if not isinstance(adjudicated_at, str) or not _valid_time(adjudicated_at):
+        _error(
+            errors,
+            line,
+            "review.adjudication.adjudicated_at",
+            "must be an ISO-8601 UTC timestamp",
+        )
+
+    raw_labels = raw_adjudication.get("labels")
+    if not isinstance(raw_labels, dict):
+        _error(errors, line, "review.adjudication.labels", "must be an object")
+        return
+    expected = set(disagreements)
+    actual = set(raw_labels)
+    missing = sorted(expected - actual)
+    extra = sorted(actual - expected)
+    if missing:
+        _error(
+            errors,
+            line,
+            "review.adjudication.labels",
+            f"missing disagreements: {', '.join(missing)}",
+        )
+    if extra:
+        _error(
+            errors,
+            line,
+            "review.adjudication.labels",
+            f"contains labels without disagreement: {', '.join(extra)}",
+        )
+    valid_labels: dict[str, str] = {}
+    for name, state in raw_labels.items():
+        if name in expected and (
+            state not in contract.annotation_states or state == "unreviewed"
+        ):
+            _error(
+                errors,
+                line,
+                f"review.adjudication.labels.{name}",
+                "must be a reviewed annotation state other than unreviewed",
+            )
+        elif name in expected:
+            valid_labels[name] = state
+
+    if final_labels is None or missing or extra or len(valid_labels) != len(disagreements):
+        return
+    for name in contract.labels:
+        resolved = (
+            valid_labels[name]
+            if name in valid_labels
+            else annotations[0][1][name]
+        )
+        if final_labels[name] != resolved:
+            _error(
+                errors,
+                line,
+                f"labels.{name}",
+                "does not match the adjudicated independent reviews",
+            )
 
 
 def _validate_prelabels(
@@ -330,6 +599,13 @@ def validate_manifest(manifest_path: Path, contract: SignalContract) -> Validati
     source_clusters: dict[str, tuple[str, int]] = {}
 
     for line, record in records:
+        if record.get("manifest_schema_version") != MANIFEST_SCHEMA_VERSION:
+            _error(
+                errors,
+                line,
+                "manifest_schema_version",
+                f"must be {MANIFEST_SCHEMA_VERSION}",
+            )
         sample_id = _required_string(record, "sample_id", errors, line)
         if sample_id is not None:
             if not SAFE_ID.fullmatch(sample_id):
@@ -391,7 +667,15 @@ def validate_manifest(manifest_path: Path, contract: SignalContract) -> Validati
         source = _validate_source(record, errors, line)
         _validate_license(record, eligible, errors, line)
         _validate_rights(record, eligible, errors, line)
-        _validate_labels(record, contract, split, errors, line)
+        labels = _validate_label_map(
+            record.get("labels"),
+            contract,
+            errors,
+            line,
+            "labels",
+            allow_unreviewed=True,
+        )
+        _validate_review(record, labels, contract, split, errors, line)
         _validate_prelabels(record, contract, errors, line)
 
         if perceptual_hash and split_group:

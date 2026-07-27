@@ -17,12 +17,15 @@ El proceso imprime un resumen JSON, escribe errores con numero de linea en stder
 
 Comprueba:
 
+- esquema `dag-v3-dataset-manifest-v1`;
 - contrato de 21 senales y estados de anotacion;
 - fuente y referencias HTTPS/URN aprobadas;
 - licencia comercial, derivados, revision ML y derechos;
 - hashes, dimensiones, MIME, IDs y timestamps;
 - prelabels separados de etiquetas humanas;
-- doble revision para validacion y test;
+- decisiones completas e independientes de cada revisor;
+- doble revision para validacion/test y adjudicador tercero ante desacuerdos;
+- coincidencia exacta entre revisiones, adjudicacion y etiqueta final;
 - ausencia de contenido sin revisar en splits asignados;
 - hashes duplicados y grupos/clusters cruzados entre splits.
 
