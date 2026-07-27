@@ -111,6 +111,9 @@ hasta completar el benchmark en el Samsung objetivo y cerrar las pruebas contra 
 Plan de seleccion y calibracion:
 `docs/dag/v3/DAG_BROWSER_V3_MODEL_BENCHMARK.md`.
 
+Transporte de imagenes:
+`docs/dag/v3/DAG_BROWSER_V3_IMAGE_PIPELINE.md`.
+
 ## Publicacion e instalacion
 
 La publicación DEV usa dos caminos separados:

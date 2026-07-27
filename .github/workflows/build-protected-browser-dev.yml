@@ -96,7 +96,7 @@ jobs:
       - name: Guardar instalador
         uses: actions/upload-artifact@v4
         with:
-          name: navegador-protegido-dev-v2
+          name: navegador-protegido-dev-v3
           path: |
             app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk
             app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk.sha256
