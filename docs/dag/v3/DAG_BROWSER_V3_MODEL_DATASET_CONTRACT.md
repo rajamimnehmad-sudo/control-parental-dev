@@ -43,16 +43,18 @@ al menos una persona dentro de su alcance la cumple.
 
 ## Estados de anotacion
 
-Cada etiqueta usa uno de cuatro valores:
+Cada etiqueta usa uno de cinco valores:
 
 - `positive`: la senal esta presente;
 - `negative`: se reviso y la senal no esta presente;
 - `unknown`: la evidencia visual no alcanza o los revisores no pueden decidir;
-- `not_applicable`: la senal no corresponde al contenido.
+- `not_applicable`: la senal no corresponde al contenido;
+- `unreviewed`: todavia no hubo juicio humano.
 
-`unknown` y `not_applicable` enmascaran la perdida; nunca se convierten silenciosamente en negativos.
-Las etiquetas producidas por modelos profesores son `prelabels`, conservan modelo, version y score,
-y no sustituyen la verdad humana.
+`unknown`, `not_applicable` y `unreviewed` enmascaran la perdida; nunca se convierten silenciosamente
+en negativos. `unknown` significa duda despues de revisar y no puede usarse como sinonimo de
+`unreviewed`. Las etiquetas producidas por modelos profesores son `prelabels`, conservan modelo,
+version y score, y no sustituyen la verdad humana.
 
 La guia de anotacion debe incluir ejemplos de borde para edad visual, grupos, escote, transparencia,
 ropa ajustada, ilustraciones realistas, personas pequenas y cada tema. Dos revisores independientes
@@ -116,6 +118,10 @@ El dataset se almacena como objetos inmutables y manifiestos JSONL. Cada fila co
 
 El manifiesto nunca contiene cookies, credenciales, historial privado ni identificadores de un
 dispositivo Glosh.
+
+El validador local de este contrato vive en `scripts/dag_v3_model/manifest_validator.py`. Rechaza
+antes del entrenamiento licencias incompletas, fuentes no aprobadas, hashes duplicados, etiquetas
+fuera del contrato y grupos repartidos entre splits.
 
 ## Deduplicacion y splits
 

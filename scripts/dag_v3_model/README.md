@@ -1,0 +1,36 @@
+# DAG V3 model tools
+
+Herramientas locales, reproducibles y sin red para preparar el futuro dataset visual. No forman
+parte del APK y no activan decisiones del navegador.
+
+## Validar un manifiesto
+
+```bash
+python3 scripts/dag_v3_model/manifest_validator.py ruta/al/manifiesto.jsonl
+```
+
+El proceso imprime un resumen JSON, escribe errores con numero de linea en stderr y termina con:
+
+- `0`: manifiesto valido;
+- `1`: muestras invalidas;
+- `2`: archivo o contrato ilegible.
+
+Comprueba:
+
+- contrato de 21 senales y estados de anotacion;
+- fuente y referencias HTTPS/URN aprobadas;
+- licencia comercial, derivados, revision ML y derechos;
+- hashes, dimensiones, MIME, IDs y timestamps;
+- prelabels separados de etiquetas humanas;
+- doble revision para validacion y test;
+- ausencia de contenido sin revisar en splits asignados;
+- hashes duplicados y grupos/clusters cruzados entre splits.
+
+No descarga imagenes ni verifica remotamente que una licencia siga publicada. Esa evidencia debe
+capturarse durante la importacion autorizada y queda registrada en el manifiesto.
+
+## Tests
+
+```bash
+python3 -m unittest discover -s scripts/dag_v3_model/tests -p 'test_*.py'
+```
