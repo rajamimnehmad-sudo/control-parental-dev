@@ -67,10 +67,13 @@ aprobados hasta agregar la segunda defensa de pagina completa. Este limite debe 
 en las pruebas y en el producto; no se puede resolver honestamente solo con un clasificador de
 archivos.
 
-## Proximos gates
+## Estado de gates
 
-1. Probar el transporte en el Samsung con formatos pequenos, grandes, corruptos y lentos.
-2. Medir latencia y memoria sin habilitar fotos.
+1. Transporte fisico con formatos pequenos, grandes, corruptos y lentos: completo.
+2. Latencia y memoria sin habilitar fotos: completo.
 3. Agregar reduccion local a la entrada exacta del modelo.
 4. Comparar los modelos candidatos con el mismo conjunto de evaluacion.
 5. Habilitar `allow` y luego `blur` solamente tras cerrar precision y fugas.
+
+Evidencia de los dos primeros gates:
+`docs/compatibility/results/dag-browser-v3-image-transport-sm-a235m-2026-07-27.md`.
