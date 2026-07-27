@@ -51,6 +51,15 @@ Indice tecnico por areas para que cada ticket pueda empezar con `Area: ...` y ev
 - Uso dominios: `feature-vpn/src/main/java/com/contentfilter/feature/vpn/policy/DomainDnsUsageTracker.kt`
 - Tests: `feature-vpn/src/test/kotlin/com/contentfilter/feature/vpn/policy/VpnDomainPolicyEvaluatorTest.kt`, `feature-vpn/src/test/kotlin/com/contentfilter/feature/vpn/dns/DnsPacketParserTest.kt`
 
+## DAG Browser V3 aislado
+
+- Aplicacion: `app-dag-browser/`
+- Actividad: `app-dag-browser/src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt`
+- Politica de navegacion: `app-dag-browser/src/main/java/com/contentfilter/dagbrowser/DagNavigationPolicy.kt`
+- Barrera incorporada: `app-dag-browser/src/main/assets/dag-protection/`
+- Contrato y gates: `docs/dag/v3/DAG_BROWSER_V3_FOUNDATION.md`
+- No tocar por defecto: `app-user/src/main/java/com/contentfilter/user/dag/`, `feature-dag2/`, Supabase, VPN, Accessibility, Admin ni publicadores.
+
 ## Accessibility / Bloqueo Apps
 
 - Servicio: `feature-accessibility/src/main/java/com/contentfilter/feature/accessibility/service/ProtectorAccessibilityService.kt`

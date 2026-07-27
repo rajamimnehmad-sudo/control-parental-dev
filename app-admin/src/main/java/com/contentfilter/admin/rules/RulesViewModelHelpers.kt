@@ -15,8 +15,6 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.WebNavigationPolicy
-import com.contentfilter.core.domain.model.dagEnabled
-import com.contentfilter.core.domain.model.dagExtraKosherEnabled
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
@@ -148,8 +146,6 @@ internal fun List<PolicyRule>.webPolicyPreferences(): WebPolicyPreferences =
         webNavigationBlocked = webNavigationBlocked(),
         externalSearchResultsAllowed = externalSearchResultsAllowed(),
         safeSearchEnabled = safeSearchEnabled(),
-        dagEnabled = dagEnabled(),
-        dagExtraKosherEnabled = dagExtraKosherEnabled(),
     )
 
 internal fun List<PolicyRule>.webPolicyChanges(
@@ -211,19 +207,6 @@ internal fun List<PolicyRule>.webPolicyChanges(
         enabled = true,
         priority = WebNavigationBlockPriority + 20,
     )
-    planCanonical(
-        target = WebNavigationPolicy.DagEnabledTarget,
-        action = RuleAction.Allow,
-        enabled = desired.dagEnabled,
-        priority = WebNavigationBlockPriority + 30,
-    )
-    planCanonical(
-        target = WebNavigationPolicy.DagExtraKosherTarget,
-        action = RuleAction.Allow,
-        enabled = desired.dagExtraKosherEnabled,
-        priority = WebNavigationBlockPriority + 40,
-    )
-
     working
         .filter { rule ->
             rule.enabled &&
@@ -241,9 +224,7 @@ internal fun List<PolicyRule>.webPolicyChanges(
 private fun PolicyRule.isCanonicalWebPreference(): Boolean =
     (target == WebNavigationPolicy.RuleTarget && action == RuleAction.Block) ||
         (target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget && action == RuleAction.Allow) ||
-        (target == WebNavigationPolicy.SafeSearchTarget && action == RuleAction.Allow) ||
-        (target == WebNavigationPolicy.DagEnabledTarget && action == RuleAction.Allow) ||
-        (target == WebNavigationPolicy.DagExtraKosherTarget && action == RuleAction.Allow)
+        (target == WebNavigationPolicy.SafeSearchTarget && action == RuleAction.Allow)
 
 internal fun webRuleId(
     deviceId: String,
@@ -255,16 +236,12 @@ internal data class WebPolicyPreferences(
     val webNavigationBlocked: Boolean,
     val externalSearchResultsAllowed: Boolean,
     val safeSearchEnabled: Boolean,
-    val dagEnabled: Boolean,
-    val dagExtraKosherEnabled: Boolean,
 )
 
 internal enum class WebPolicyPreference {
     NavigationBlocked,
     ExternalSearchResultsAllowed,
     SafeSearchEnabled,
-    DagEnabled,
-    DagExtraKosherEnabled,
 }
 
 internal fun WebPolicyPreferences.withPreference(
@@ -275,8 +252,6 @@ internal fun WebPolicyPreferences.withPreference(
         WebPolicyPreference.NavigationBlocked -> copy(webNavigationBlocked = enabled)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(externalSearchResultsAllowed = enabled)
         WebPolicyPreference.SafeSearchEnabled -> copy(safeSearchEnabled = true)
-        WebPolicyPreference.DagEnabled -> copy(dagEnabled = enabled)
-        WebPolicyPreference.DagExtraKosherEnabled -> copy(dagExtraKosherEnabled = enabled)
     }
 
 internal fun WebPolicyPreferences.matchesPreference(
@@ -287,8 +262,6 @@ internal fun WebPolicyPreferences.matchesPreference(
         WebPolicyPreference.NavigationBlocked -> webNavigationBlocked == enabled
         WebPolicyPreference.ExternalSearchResultsAllowed -> externalSearchResultsAllowed == enabled
         WebPolicyPreference.SafeSearchEnabled -> safeSearchEnabled == enabled
-        WebPolicyPreference.DagEnabled -> dagEnabled == enabled
-        WebPolicyPreference.DagExtraKosherEnabled -> dagExtraKosherEnabled == enabled
     }
 
 internal fun List<PolicyRule>.webPolicyPreferenceChanges(
@@ -316,10 +289,6 @@ internal fun RulesUiState.withPendingWebPreference(
             )
         WebPolicyPreference.SafeSearchEnabled ->
             copy(pendingSafeSearchEnabledByDevice = pendingSafeSearchEnabledByDevice + (deviceId to enabled))
-        WebPolicyPreference.DagEnabled ->
-            copy(pendingDagEnabledByDevice = pendingDagEnabledByDevice + (deviceId to enabled))
-        WebPolicyPreference.DagExtraKosherEnabled ->
-            copy(pendingDagExtraKosherEnabledByDevice = pendingDagExtraKosherEnabledByDevice + (deviceId to enabled))
     }
 
 internal fun RulesUiState.clearPendingWebPreference(
@@ -335,10 +304,6 @@ internal fun RulesUiState.clearPendingWebPreference(
             )
         WebPolicyPreference.SafeSearchEnabled ->
             copy(pendingSafeSearchEnabledByDevice = pendingSafeSearchEnabledByDevice - deviceId)
-        WebPolicyPreference.DagEnabled ->
-            copy(pendingDagEnabledByDevice = pendingDagEnabledByDevice - deviceId)
-        WebPolicyPreference.DagExtraKosherEnabled ->
-            copy(pendingDagExtraKosherEnabledByDevice = pendingDagExtraKosherEnabledByDevice - deviceId)
     }
 
 internal fun RulesUiState.withPendingAppAllowed(
@@ -614,7 +579,6 @@ internal val LegacyWebGeneratedTargets =
             WebNavigationPolicy.ExternalSearchResultsAllowedTarget,
             WebNavigationPolicy.LegacyGoogleResultsAllowedTarget,
             WebNavigationPolicy.SafeSearchTarget,
-            WebNavigationPolicy.DagEnabledTarget,
         )
 internal val LegacyWebAuxiliaryBlockTargets = LegacyWebGeneratedTargets
 internal val YouTubeWebDomains =

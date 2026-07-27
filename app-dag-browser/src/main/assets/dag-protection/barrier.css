@@ -1,0 +1,31 @@
+/*
+ * This stylesheet is injected at document_start. The first foundation has no
+ * classifier, so every visual resource remains hidden by design.
+ */
+img,
+picture,
+video,
+audio,
+canvas,
+svg,
+image,
+input[type="image"],
+object,
+embed {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  background: #dce7ee !important;
+}
+
+*,
+*::before,
+*::after {
+  background-image: none !important;
+  border-image-source: none !important;
+  list-style-image: none !important;
+}
+
+*::before,
+*::after {
+  content: none !important;
+}

@@ -1,0 +1,19 @@
+<resources>
+    <string name="app_name">DAG Browser DEV</string>
+    <string name="address_hint">Buscar o escribir dirección</string>
+    <string name="go">Ir</string>
+    <string name="back">Atrás</string>
+    <string name="back_symbol">‹</string>
+    <string name="reload">Recargar</string>
+    <string name="reload_symbol">↻</string>
+    <string name="preparing_protection">Preparando protección visual…</string>
+    <string name="ready">DAG Browser está listo</string>
+    <string name="ready_detail">Las imágenes permanecerán ocultas en esta primera prueba.</string>
+    <string name="loading_protected_page">Abriendo página protegida…</string>
+    <string name="barrier_not_confirmed">La página quedó cerrada</string>
+    <string name="barrier_not_confirmed_detail">No se pudo confirmar la barrera visual. Probá recargar.</string>
+    <string name="extension_failed">No se pudo iniciar la protección</string>
+    <string name="extension_failed_detail">DAG no abrirá páginas hasta recuperar la barrera visual.</string>
+    <string name="navigation_blocked">Dirección bloqueada</string>
+    <string name="navigation_blocked_detail">Esta prueba permite solamente páginas HTTPS.</string>
+</resources>

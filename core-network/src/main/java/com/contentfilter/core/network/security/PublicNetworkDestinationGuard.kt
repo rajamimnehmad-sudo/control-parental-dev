@@ -23,7 +23,7 @@ data class PublicDestinationResult(
 )
 
 /**
- * Canonical, visual-engine-neutral destination guard shared by DAG v1 and v2.
+ * Canonical, visual-engine-neutral destination guard for protected network access.
  *
  * Literal hosts are decided synchronously. Hostname DNS is resolved only from
  * suspendable navigation/network setup paths, never from WebView interception.

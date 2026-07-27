@@ -80,7 +80,7 @@ object AppHelpAssistant {
                 "vuelve la conexion",
             ) ->
                 recoveryAnswer(context)
-            normalized.hasAny("vpn", "proteccion web", "internet", "reglas funcionan", "dag") ->
+            normalized.hasAny("vpn", "proteccion web", "internet", "reglas funcionan") ->
                 HelpAnswer(
                     title = "Protección web",
                     body =
@@ -154,7 +154,7 @@ object AppHelpAssistant {
                 listOf(
                     "¿Qué pasa si la VPN está apagada?",
                     "¿Las reglas funcionan sin Internet?",
-                    "¿Qué es DAG?",
+                    "¿Cómo funciona la navegación protegida?",
                 )
             HelpAction.Apps ->
                 listOf(
@@ -221,7 +221,7 @@ object AppHelpAssistant {
         HelpAnswer(
             title = "Sólo puedo ayudar con Content Filter",
             body =
-                "Preguntame sobre Apps, Web, DAG, protección, solicitudes, actualizaciones, instalación, reenlace o recuperación offline.",
+                "Preguntame sobre Apps, Web, protección, solicitudes, actualizaciones, instalación, reenlace o recuperación offline.",
         )
 
     private fun String.normalized(): String =

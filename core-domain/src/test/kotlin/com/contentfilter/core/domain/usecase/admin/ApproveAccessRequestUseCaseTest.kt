@@ -11,7 +11,6 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
-import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.repository.AccessRequestRepository
 import com.contentfilter.core.domain.repository.DailyLimitRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
@@ -20,7 +19,6 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.runBlocking
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
@@ -89,7 +87,7 @@ class ApproveAccessRequestUseCaseTest {
     fun `domain approval does not delete app limits`() =
         runBlocking {
             val requestRepository = FakeAccessRequestRepository()
-            val policyRepository = FakePolicyRepository(dagPolicy())
+            val policyRepository = FakePolicyRepository(emptyPolicy())
             val limitRepository =
                 FakeDailyLimitRepository(
                     listOf(
@@ -107,11 +105,6 @@ class ApproveAccessRequestUseCaseTest {
             useCase(domainAccessRequest())
 
             assertEquals(emptyList(), limitRepository.deletedIds)
-            assertTrue(
-                policyRepository.savedRules.any {
-                    it.target == WebNavigationPolicy.DagEnabledTarget && it.enabled
-                },
-            )
             assertTrue(
                 policyRepository.savedRules.any {
                     it.scope == RuleScope.Domain && it.target == "airbnb.com" && it.action == RuleAction.Allow && it.enabled
@@ -136,7 +129,7 @@ class ApproveAccessRequestUseCaseTest {
                 )
             val policyRepository =
                 FakePolicyRepository(
-                    dagPolicy().copy(rules = dagPolicy().rules + existingRule),
+                    emptyPolicy().copy(rules = listOf(existingRule)),
                 )
             val useCase =
                 ApproveAccessRequestUseCase(requestRepository, policyRepository, FakeDailyLimitRepository(emptyList()))
@@ -147,25 +140,6 @@ class ApproveAccessRequestUseCaseTest {
             assertEquals("existing-domain-allow", savedAllow.id)
             assertTrue(savedAllow.enabled)
             assertEquals(1_000, savedAllow.priority)
-            assertTrue(
-                policyRepository.savedRules.any {
-                    it.target == WebNavigationPolicy.DagEnabledTarget && it.enabled
-                },
-            )
-        }
-
-    @Test
-    fun `domain approval refuses to replace an incomplete policy`() =
-        runBlocking {
-            val requestRepository = FakeAccessRequestRepository()
-            val policyRepository = FakePolicyRepository(emptyPolicy())
-            val useCase =
-                ApproveAccessRequestUseCase(requestRepository, policyRepository, FakeDailyLimitRepository(emptyList()))
-
-            assertFailsWith<IllegalArgumentException> { useCase(domainAccessRequest()) }
-
-            assertTrue(policyRepository.savedRules.isEmpty())
-            assertEquals(null, requestRepository.updatedStatus)
         }
 
     private fun appAccessRequest(): AccessRequest =
@@ -206,22 +180,6 @@ class ApproveAccessRequestUseCaseTest {
             deviceId = "device-1",
             version = 1L,
             rules = emptyList(),
-        )
-
-    private fun dagPolicy(): PolicySnapshot =
-        emptyPolicy().copy(
-            rules =
-                listOf(
-                    PolicyRule(
-                        id = "dag-enabled",
-                        level = PolicyLevel.Account,
-                        scope = RuleScope.Domain,
-                        target = WebNavigationPolicy.DagEnabledTarget,
-                        action = RuleAction.Allow,
-                        priority = WebNavigationPolicy.RulePriority,
-                        enabled = true,
-                    ),
-                ),
         )
 
     private class FakeAccessRequestRepository : AccessRequestRepository {

@@ -5,8 +5,6 @@ import { AdminTokenForm } from "@/components/AdminTokenForm";
 import { DeleteCommunityButton } from "@/components/DeleteCommunityButton";
 import { DeleteAdminButton } from "@/components/DeleteAdminButton";
 import { DeleteProtectedUserButton } from "@/components/DeleteProtectedUserButton";
-import { DagEntitlementForm } from "@/components/DagEntitlementForm";
-import { DeviceDagForm } from "@/components/DeviceDagForm";
 import { DeviceRelinkButton } from "@/components/DeviceRelinkButton";
 import { EmptyState } from "@/components/EmptyState";
 import { LicenseBadge, ProtectedUserBadge } from "@/components/Badge";
@@ -72,7 +70,7 @@ export default async function CommunityDetailPage({ params }: Props) {
         ) : (
           <div className="grid gap-3">
             {protectedUsers.map((user) => (
-              <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} dagEntitled={detail.dag_entitled} device={devices.find((item) => item.device_id === user.device_id)} versions={devVersions} />
+              <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} device={devices.find((item) => item.device_id === user.device_id)} versions={devVersions} />
             ))}
           </div>
         )}
@@ -121,7 +119,6 @@ export default async function CommunityDetailPage({ params }: Props) {
           </summary>
           <div className="border-t border-line p-4">
             <div className="grid gap-4">
-              <DagEntitlementForm detail={detail} />
               <LicenseForm detail={detail} compact />
             </div>
           </div>
@@ -214,7 +211,7 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
   );
 }
 
-function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }: { user: ProtectedUser; communityId: string; dagEntitled: boolean; device?: CommunityDevice; versions: DevAppVersions }) {
+function ProtectedUserCard({ user, communityId, device, versions }: { user: ProtectedUser; communityId: string; device?: CommunityDevice; versions: DevAppVersions }) {
   const lastSeen = user.last_seen_at ? new Date(user.last_seen_at).getTime() : null;
   const offline = lastSeen !== null && Date.now() - lastSeen >= 24 * 60 * 60 * 1000;
   return (
@@ -238,7 +235,6 @@ function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }:
         <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(user.last_seen_at)}`} />
         {offline ? <InfoLine icon={WifiOff} label="Sin comunicación desde hace más de 24 horas" /> : null}
       </div>
-      <DeviceDagForm communityId={communityId} deviceId={user.device_id} enabled={user.dag_enabled} entitled={dagEntitled} />
       {user.device_id ? <div className="mt-3"><DeviceRelinkButton communityId={communityId} deviceId={user.device_id} /></div> : null}
       {device ? <div className="mt-3"><DeviceUpdateCard device={device} versions={versions} /></div> : null}
     </article>

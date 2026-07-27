@@ -5,8 +5,6 @@ object WebNavigationPolicy {
     const val ExternalSearchResultsAllowedTarget = "__web_external_search_results_allowed__"
     const val LegacyGoogleResultsAllowedTarget = "__web_google_results_allowed__"
     const val SafeSearchTarget = "__web_safe_search_enabled__"
-    const val DagEnabledTarget = "__dag_enabled__"
-    const val DagExtraKosherTarget = "__dag_extra_kosher__"
     const val RulePriority = 5_000
 
     val GoogleSearchDomains: Set<String> =
@@ -128,19 +126,3 @@ object WebProtectionSemantics {
 
 /** SafeSearch is a mandatory local protection. Legacy policy values are ignored. */
 fun Iterable<PolicyRule>.safeSearchEnabled(): Boolean = true
-
-fun Iterable<PolicyRule>.dagEnabled(): Boolean =
-    any {
-        it.enabled &&
-            it.scope == RuleScope.Domain &&
-            it.action == RuleAction.Allow &&
-            it.target == WebNavigationPolicy.DagEnabledTarget
-    }
-
-fun Iterable<PolicyRule>.dagExtraKosherEnabled(): Boolean =
-    any {
-        it.enabled &&
-            it.scope == RuleScope.Domain &&
-            it.action == RuleAction.Allow &&
-            it.target == WebNavigationPolicy.DagExtraKosherTarget
-    }

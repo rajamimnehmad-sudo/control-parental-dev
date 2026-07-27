@@ -168,16 +168,9 @@ internal fun WebNavigationPanel(
     presentation: WebPanelPresentation,
     navigationSaving: Boolean,
     onlyResultsSaving: Boolean,
-    dagEnabled: Boolean,
-    dagEntitled: Boolean,
-    dagSaving: Boolean,
-    dagExtraKosherEnabled: Boolean,
-    dagExtraKosherSaving: Boolean,
     protectionActive: Boolean,
     onBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
-    onDagEnabledChanged: (Boolean) -> Unit,
-    onDagExtraKosherEnabledChanged: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Acceso a Internet", style = MaterialTheme.typography.titleLarge)
@@ -224,29 +217,6 @@ internal fun WebNavigationPanel(
                 )
             }
         }
-        WebSwitchRow(
-            icon = ProductIcon.Web,
-            title = "Buscador DAG",
-            description =
-                if (dagEntitled) {
-                    "Habilita el buscador protegido en App Usuario."
-                } else {
-                    "DAG no está incluido en la licencia de esta comunidad."
-                },
-            checked = dagEnabled,
-            enabled = dagEntitled && !dagSaving,
-            saving = dagSaving,
-            onCheckedChange = onDagEnabledChanged,
-        )
-        WebSwitchRow(
-            icon = ProductIcon.ShieldCheck,
-            title = "Modo Extra Kosher",
-            description = "Difumina fotos de contenido y mantiene los videos bloqueados.",
-            checked = dagExtraKosherEnabled,
-            enabled = dagEnabled && dagEntitled && !dagExtraKosherSaving,
-            saving = dagExtraKosherSaving,
-            onCheckedChange = onDagExtraKosherEnabledChanged,
-        )
         if (blocked && !protectionActive) {
             FeedbackBanner(
                 "Protección web no activa: revisá VPN y Accesibilidad en el dispositivo.",

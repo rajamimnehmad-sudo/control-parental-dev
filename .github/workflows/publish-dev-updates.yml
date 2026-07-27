@@ -154,6 +154,7 @@ jobs:
         shell: bash
         env:
           SUPABASE_PROJECT_REF: syeycayasyufedwoprea
+          DAG_BROWSER_V3_BRIDGE_AVAILABLE: "true"
           ANDROID_DEV_KEYSTORE_PATH: ${{ runner.temp }}/dev-update.jks
           ANDROID_DEV_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_DEV_KEYSTORE_PASSWORD }}
           ANDROID_DEV_KEY_ALIAS: ${{ secrets.ANDROID_DEV_KEY_ALIAS }}

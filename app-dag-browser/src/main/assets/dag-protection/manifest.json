@@ -1,0 +1,40 @@
+{
+  "manifest_version": 2,
+  "name": "Glosh DAG Protection",
+  "version": "1.0.0",
+  "description": "Fail-closed media barrier bundled with DAG Browser.",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "dag-protection@glosh.local"
+    }
+  },
+  "background": {
+    "scripts": [
+      "background.js"
+    ]
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "<all_urls>"
+      ],
+      "all_frames": true,
+      "match_about_blank": true,
+      "run_at": "document_start",
+      "css": [
+        "barrier.css"
+      ],
+      "js": [
+        "barrier.js"
+      ]
+    }
+  ],
+  "permissions": [
+    "<all_urls>",
+    "webRequest",
+    "webRequestBlocking",
+    "nativeMessaging",
+    "nativeMessagingFromContent",
+    "geckoViewAddons"
+  ]
+}

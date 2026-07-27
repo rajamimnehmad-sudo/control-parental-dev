@@ -59,32 +59,23 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 280
+            versionCode = 281
             versionNameSuffix = "-dev"
             buildConfigField(
-                "String",
-                "DAG_NEURAL_MODEL_URL",
-                "\"https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates/dag-models/\"",
+                "boolean",
+                "DAG_BROWSER_V3_BRIDGE_AVAILABLE",
+                (envValue("DAG_BROWSER_V3_BRIDGE_AVAILABLE").equals("true", ignoreCase = true)).toString(),
             )
-            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "true")
-            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "true")
-            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "true")
         }
         create("beta") {
             dimension = "distribution"
             applicationIdSuffix = ".beta"
             versionNameSuffix = "-beta"
-            buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
-            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
-            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
-            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "false")
+            buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "false")
         }
         create("prod") {
             dimension = "distribution"
-            buildConfigField("String", "DAG_NEURAL_MODEL_URL", "\"\"")
-            buildConfigField("boolean", "DAG_VISUAL_CALIBRATION_AVAILABLE", "false")
-            buildConfigField("boolean", "DAG_V2_BROWSER_AVAILABLE", "false")
-            buildConfigField("boolean", "DAG_V2_CALIBRATION_AVAILABLE", "false")
+            buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "false")
         }
     }
 
@@ -161,24 +152,7 @@ android {
     }
 }
 
-val verifyDagV2CalibrationPackaging by tasks.registering(Exec::class) {
-    group = "verification"
-    description = "Verifies that DAG v2 calibration is present only in the DEV merged app."
-    dependsOn(
-        "processDevDebugMainManifest",
-        "processBetaDebugMainManifest",
-        "processProdDebugMainManifest",
-    )
-    commandLine(
-        "bash",
-        rootProject.layout.projectDirectory
-            .file("scripts/dag/verify-dag-v2-calibration-packaging.sh")
-            .asFile.absolutePath,
-    )
-}
-
 dependencies {
-    add("devImplementation", project(":feature-dag2"))
     implementation(project(":core-domain"))
     implementation(project(":core-data"))
     implementation(project(":core-database"))
@@ -203,15 +177,11 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.core)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.androidx.hilt.work)
-    implementation(libs.androidx.webkit)
     implementation(libs.androidx.work.runtime.ktx)
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     implementation(libs.hilt.android)
     implementation(libs.okhttp)
-    implementation(libs.onnxruntime.android)
-    implementation(libs.onnxruntime.extensions.android)
-    implementation(libs.tflite)
     ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)
     testImplementation(libs.kotlin.test)

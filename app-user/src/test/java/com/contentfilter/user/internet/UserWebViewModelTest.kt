@@ -10,20 +10,8 @@ import java.time.ZoneId
 import java.time.ZonedDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertTrue
 
 class UserWebViewModelTest {
-    @Test
-    fun `DAG is closed in the initial state and appears only when enabled`() {
-        val closed = UserWebUiState()
-        val open = closed.copy(dagEnabled = true)
-
-        assertFalse(closed.dagEnabled)
-        assertFalse("DAG" in closed.activeLayers)
-        assertTrue("DAG" in open.activeLayers)
-    }
-
     @Test
     fun `global web schedule reports the current closing time`() {
         val state = resolveWebScheduleStatus(listOf(schedule(8 * 60, 12 * 60)), instant(2026, 7, 20, 10, 30))

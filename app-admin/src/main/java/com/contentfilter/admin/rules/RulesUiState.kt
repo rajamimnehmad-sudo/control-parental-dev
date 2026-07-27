@@ -21,15 +21,10 @@ data class RulesUiState(
     val internetBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = true,
     val safeSearchEnabled: Boolean = true,
-    val dagEnabled: Boolean = false,
-    val dagExtraKosherEnabled: Boolean = false,
-    val dagEntitled: Boolean = false,
     val internetSavingDeviceIds: Set<String> = emptySet(),
     val pendingInternetBlockedByDevice: Map<String, Boolean> = emptyMap(),
     val pendingExternalSearchResultsAllowedByDevice: Map<String, Boolean> = emptyMap(),
     val pendingSafeSearchEnabledByDevice: Map<String, Boolean> = emptyMap(),
-    val pendingDagEnabledByDevice: Map<String, Boolean> = emptyMap(),
-    val pendingDagExtraKosherEnabledByDevice: Map<String, Boolean> = emptyMap(),
     val limitPackageName: String = "",
     val limitMinutes: String = "",
     val appSearchQuery: String = "",
@@ -81,12 +76,6 @@ data class RulesUiState(
     val pendingSafeSearchEnabled: Boolean?
         get() = selectedDeviceId?.let(pendingSafeSearchEnabledByDevice::get)
 
-    val pendingDagEnabled: Boolean?
-        get() = selectedDeviceId?.let(pendingDagEnabledByDevice::get)
-
-    val pendingDagExtraKosherEnabled: Boolean?
-        get() = selectedDeviceId?.let(pendingDagExtraKosherEnabledByDevice::get)
-
     val pendingAppAllowed: Map<String, Boolean>
         get() = selectedDeviceId?.let(pendingAppAllowedByDevice::get).orEmpty()
 
@@ -135,8 +124,6 @@ internal fun RulesUiState.webPanelPresentation(): WebPanelPresentation {
         buildList {
             if (safeSearchEnabled) add("SafeSearch")
             if (onlyResultsEnabled) add("Solo resultados")
-            if (dagEnabled) add("DAG")
-            if (dagExtraKosherEnabled) add("Extra Kosher")
         }
     return WebPanelPresentation(
         headline = if (layers.isEmpty()) "Internet totalmente abierto" else "Internet abierto con protecciones",
