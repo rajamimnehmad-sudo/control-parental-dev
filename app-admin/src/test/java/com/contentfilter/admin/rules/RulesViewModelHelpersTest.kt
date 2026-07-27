@@ -129,7 +129,7 @@ class RulesViewModelHelpersTest {
 
     @Test
     fun `every Web mutation changes only its selected preference`() {
-        (0 until 16).map(::preferencesFromBits).forEach { initial ->
+        (0 until 4).map(::preferencesFromBits).forEach { initial ->
             val initialRules =
                 emptyList<PolicyRule>()
                     .webPolicyChanges(initial, DeviceId)
@@ -138,7 +138,6 @@ class RulesViewModelHelpersTest {
             listOf(
                 WebPolicyPreference.NavigationBlocked,
                 WebPolicyPreference.ExternalSearchResultsAllowed,
-                WebPolicyPreference.DagEnabled,
             ).forEach { preference ->
                 listOf(false, true).forEach { enabled ->
                     val result =
@@ -232,7 +231,6 @@ class RulesViewModelHelpersTest {
                 pending.pendingExternalSearchResultsAllowed == true,
             )
             assertEquals(preference == WebPolicyPreference.SafeSearchEnabled, pending.pendingSafeSearchEnabled == true)
-            assertEquals(preference == WebPolicyPreference.DagEnabled, pending.pendingDagEnabled == true)
             assertEquals(
                 RulesUiState(selectedDeviceId = DeviceId),
                 pending.clearPendingWebPreference(DeviceId, preference),
@@ -478,8 +476,6 @@ class RulesViewModelHelpersTest {
                         webBlocked = false,
                         externalResultsAllowed = false,
                         safeSearch = true,
-                        dagEnabled = true,
-                        dagExtraKosherEnabled = true,
                     ),
                     DeviceId,
                 ).applyTo(emptyList())
@@ -491,8 +487,6 @@ class RulesViewModelHelpersTest {
         assertTrue(rules.webNavigationBlocked())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
-        assertTrue(rules.webPolicyPreferences().dagEnabled)
-        assertTrue(rules.webPolicyPreferences().dagExtraKosherEnabled)
 
         rules =
             rules
@@ -501,8 +495,6 @@ class RulesViewModelHelpersTest {
         assertTrue(rules.webNavigationOpenWithoutAuxiliaryBlocks())
         assertFalse(rules.externalSearchResultsAllowedForWeb())
         assertTrue(rules.safeSearchEnabledForWeb())
-        assertTrue(rules.webPolicyPreferences().dagEnabled)
-        assertTrue(rules.webPolicyPreferences().dagExtraKosherEnabled)
     }
 
     @Test
@@ -677,18 +669,6 @@ class RulesViewModelHelpersTest {
         assertEquals(DeviceProtectionAlert.PossibleUninstall, user.protectionAlert)
     }
 
-    @Test
-    fun `web preference matching reconciles an already applied DAG change`() {
-        assertTrue(
-            preferences(webBlocked = false, dagEnabled = true)
-                .matchesPreference(WebPolicyPreference.DagEnabled, true),
-        )
-        assertFalse(
-            preferences(webBlocked = false, dagEnabled = false)
-                .matchesPreference(WebPolicyPreference.DagEnabled, true),
-        )
-    }
-
     private fun healthyDevice(lastSeenAtEpochMillis: Long) =
         Device(
             id = DeviceId,
@@ -729,15 +709,11 @@ class RulesViewModelHelpersTest {
         webBlocked: Boolean,
         externalResultsAllowed: Boolean = false,
         safeSearch: Boolean = true,
-        dagEnabled: Boolean = false,
-        dagExtraKosherEnabled: Boolean = false,
     ): WebPolicyPreferences =
         WebPolicyPreferences(
             webNavigationBlocked = webBlocked,
             externalSearchResultsAllowed = externalResultsAllowed,
             safeSearchEnabled = true,
-            dagEnabled = dagEnabled,
-            dagExtraKosherEnabled = dagExtraKosherEnabled,
         )
 
     private fun preferencesFromBits(bits: Int): WebPolicyPreferences =
@@ -745,8 +721,6 @@ class RulesViewModelHelpersTest {
             webBlocked = bits and 1 != 0,
             externalResultsAllowed = bits and 2 != 0,
             safeSearch = true,
-            dagEnabled = bits and 4 != 0,
-            dagExtraKosherEnabled = bits and 8 != 0,
         )
 
     private fun appRule(

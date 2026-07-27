@@ -55,26 +55,6 @@ class WebNavigationPolicyTest {
         )
     }
 
-    @Test
-    fun `DAG is closed by default and opens only with its enabled allow rule`() {
-        assertFalse(emptyList<PolicyRule>().dagEnabled())
-        assertFalse(listOf(rule(WebNavigationPolicy.DagEnabledTarget, enabled = false)).dagEnabled())
-        assertFalse(
-            listOf(
-                rule(WebNavigationPolicy.DagEnabledTarget, enabled = true).copy(action = RuleAction.Block),
-            ).dagEnabled(),
-        )
-        assertTrue(listOf(rule(WebNavigationPolicy.DagEnabledTarget, enabled = true)).dagEnabled())
-    }
-
-    @Test
-    fun `Extra Kosher is explicit and independent from the DAG entitlement rule`() {
-        assertFalse(emptyList<PolicyRule>().dagExtraKosherEnabled())
-        assertFalse(listOf(rule(WebNavigationPolicy.DagEnabledTarget, enabled = true)).dagExtraKosherEnabled())
-        assertFalse(listOf(rule(WebNavigationPolicy.DagExtraKosherTarget, enabled = false)).dagExtraKosherEnabled())
-        assertTrue(listOf(rule(WebNavigationPolicy.DagExtraKosherTarget, enabled = true)).dagExtraKosherEnabled())
-    }
-
     private fun rule(
         target: String,
         enabled: Boolean,

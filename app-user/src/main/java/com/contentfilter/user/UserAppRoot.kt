@@ -44,8 +44,7 @@ import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.announcements.UserAnnouncementsRoute
 import com.contentfilter.user.apps.MyAppsRoute
-import com.contentfilter.user.dag.DagActivity
-import com.contentfilter.user.dag.DagBrowserRoute
+import com.contentfilter.user.browser.ProtectedBrowserLauncher
 import com.contentfilter.user.protection.BatteryOptimizationController
 import com.contentfilter.user.protection.ProtectionViewModel
 import com.contentfilter.user.push.UserPushViewModel
@@ -57,9 +56,7 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun UserAppRoot(
     modifier: Modifier = Modifier,
-    dagLaunchRequest: Int = 0,
     announcementOpenRequest: Int = 0,
-    onDagLaunchConsumed: () -> Unit = {},
     onAnnouncementOpenConsumed: () -> Unit = {},
 ) {
     var destination by rememberSaveable { mutableStateOf(UserDestination.Home) }
@@ -108,13 +105,6 @@ internal fun UserAppRoot(
     }
     LaunchedEffect(Unit) {
         updatesViewModel.autoCheckAndDownload()
-    }
-    LaunchedEffect(dagLaunchRequest) {
-        if (dagLaunchRequest > 0) {
-            backStack = listOf(UserDestination.Web)
-            destination = UserDestination.Dag
-            onDagLaunchConsumed()
-        }
     }
     LaunchedEffect(announcementOpenRequest) {
         if (announcementOpenRequest > 0) {
@@ -238,7 +228,10 @@ internal fun UserAppRoot(
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
                     UserWebTab(
                         onBack = null,
-                        onOpenDag = { DagActivity.open(context) },
+                        onOpenProtectedBrowser = {
+                            ProtectedBrowserLauncher.open(context)
+                        },
+                        protectedBrowserAvailable = BuildConfig.DAG_BROWSER_V3_BRIDGE_AVAILABLE,
                         vpnActive = statusState.isVpnActive,
                         onActivateWebProtection = {
                             val permissionIntent = VpnController.prepareIntent(context)
@@ -250,7 +243,6 @@ internal fun UserAppRoot(
                         },
                     )
                 }
-                UserDestination.Dag -> DagBrowserRoute(onBack = ::goBack)
                 UserDestination.Updates -> {
                     val statusViewModel: SystemStatusViewModel = hiltViewModel()
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
@@ -436,7 +428,6 @@ private enum class UserDestination(
     Home("Inicio", ProductIcon.Home),
     MyApps("Mis apps", ProductIcon.Apps),
     Web("Internet", ProductIcon.Web),
-    Dag("DAG", ProductIcon.Search, showInNav = false),
     Requests("Solicitudes", ProductIcon.Requests, showInNav = false),
     Announcements("Avisos", ProductIcon.Bell, showInNav = false),
     Updates("Ajustes", ProductIcon.Settings),

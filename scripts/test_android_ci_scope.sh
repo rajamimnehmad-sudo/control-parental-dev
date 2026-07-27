@@ -16,17 +16,9 @@ assert_scope() {
     fi
 }
 
-assert_scope none "benchmark tooling" \
-    "tools/dag-v2-benchmark/dag_v2_benchmark.py" \
-    "tools/dag-v2-benchmark/evidence/04a/summary.json"
-assert_scope none "isolated benchmark reviewer" \
-    "tools/dag-v2-benchmark/policy-reviewer/app/src/main/AndroidManifest.xml" \
-    "tools/dag-v2-benchmark/dag_v2_policy_eval.py" \
-    "tools/dag-v2-benchmark/evidence/04b/split.lock.jsonl"
-assert_scope none "benchmark documentation" \
-    "docs/dag/v2/DAG_V2_NO_GPU_BENCHMARK_RESULTS.md"
-assert_scope none "benchmark workflow" \
-    ".github/workflows/dag-v2-benchmark-ci.yml" \
+assert_scope none "tooling and documentation" \
+    "tools/diagnostics/result.json" \
+    "docs/compatibility/DEVICE_MATRIX.md" \
     "scripts/test_android_ci_scope.sh"
 assert_scope user "user application" \
     "app-user/src/main/java/com/contentfilter/user/MainActivity.kt"
@@ -37,8 +29,8 @@ assert_scope both "shared Android module" \
 assert_scope both "both applications" \
     "app-user/build.gradle.kts" \
     "app-admin/build.gradle.kts"
-assert_scope user "benchmark plus user" \
-    "tools/dag-v2-benchmark/README.md" \
+assert_scope user "tooling plus user" \
+    "tools/diagnostics/README.md" \
     "app-user/src/main/AndroidManifest.xml"
 
 echo "android_ci_scope_tests=ok"

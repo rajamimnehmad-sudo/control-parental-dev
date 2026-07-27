@@ -16,7 +16,6 @@ import androidx.lifecycle.lifecycleScope
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import com.contentfilter.core.ui.ContentFilterTheme
-import com.contentfilter.user.dag.DagShortcutController
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.push.OpenAnnouncementsAction
 import dagger.hilt.android.AndroidEntryPoint
@@ -26,7 +25,6 @@ import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-    private val dagLaunchRequests = MutableStateFlow(0)
     private val announcementOpenRequests = MutableStateFlow(0)
 
     @javax.inject.Inject
@@ -42,18 +40,14 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge(statusBarStyle = SystemBarStyle.dark(UserHomeHeaderTop.toArgb()))
         if (shouldHandleInitialUserIntent(savedInstanceState != null)) {
-            recordDagLaunch(intent)
             recordAnnouncementLaunch(intent)
         }
         setContent {
             ContentFilterTheme {
-                val dagLaunchRequest by dagLaunchRequests.collectAsStateWithLifecycle()
                 val announcementOpenRequest by announcementOpenRequests.collectAsStateWithLifecycle()
                 UserAppRoot(
                     modifier = Modifier.fillMaxSize(),
-                    dagLaunchRequest = dagLaunchRequest,
                     announcementOpenRequest = announcementOpenRequest,
-                    onDagLaunchConsumed = { dagLaunchRequests.value = 0 },
                     onAnnouncementOpenConsumed = { announcementOpenRequests.value = 0 },
                 )
             }
@@ -63,7 +57,6 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        recordDagLaunch(intent)
         recordAnnouncementLaunch(intent)
     }
 
@@ -76,12 +69,6 @@ class MainActivity : ComponentActivity() {
                 reason = "foreground",
             )
             protectionControlCoordinator.refresh()
-        }
-    }
-
-    private fun recordDagLaunch(intent: Intent?) {
-        if (intent?.action == DagShortcutController.OpenDagAction) {
-            dagLaunchRequests.value += 1
         }
     }
 

@@ -12,15 +12,15 @@ Este corte agrega un puente unidireccional y opt-in desde App Usuario DEV hacia 
 
 ## Interruptor
 
-El boton `Probar navegador DAG nuevo` solo se compila cuando
+El botón `Navegador protegido` solo se compila cuando
 `DAG_BROWSER_V3_BRIDGE_AVAILABLE=true`.
 
 - DEV: apagado por defecto y activable solo al construir explicitamente el candidato.
 - Beta: forzado a apagado.
 - Production: forzado a apagado.
 
-Si la APK nueva no esta instalada, el intento queda contenido y Glosh no falla. El DAG vigente
-permanece disponible y sin cambios.
+Si la APK nueva no está instalada, el intento queda contenido y Glosh no falla. DAG 1 y DAG 2 no
+se usan como fallback.
 
 ## Identidad y firma
 
@@ -45,6 +45,6 @@ usa la firma debug de Android y sirve solamente para pruebas locales.
 7. conservar Device Admin, Accessibility y VPN;
 8. no publicar ni habilitar nada en Production.
 
-El flujo cloud actual no contempla un tercer artefacto y no debe reutilizarse de forma improvisada.
-Se requiere agregar un target DEV separado y verificar el limite de tamaño antes de subir la APK de
-aproximadamente 98 MB.
+El navegador tiene un workflow DEV propio. La APK firmada se guarda como artefacto privado de
+GitHub Actions junto con su SHA-256; no se sube al bucket de actualizaciones de Glosh y no comparte
+su manifiesto.

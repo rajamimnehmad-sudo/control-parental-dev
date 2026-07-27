@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,7 +40,8 @@ import com.contentfilter.user.internet.UserWebViewModel
 @Composable
 internal fun UserWebTab(
     onBack: (() -> Unit)?,
-    onOpenDag: () -> Unit,
+    onOpenProtectedBrowser: () -> Unit,
+    protectedBrowserAvailable: Boolean,
     vpnActive: Boolean,
     onActivateWebProtection: () -> Unit,
     viewModel: UserWebViewModel = hiltViewModel(),
@@ -74,9 +74,9 @@ internal fun UserWebTab(
                 InternetProtectionList(
                     state = state,
                     vpnActive = vpnActive,
-                    onOpenDag = onOpenDag,
+                    onOpenProtectedBrowser = onOpenProtectedBrowser,
+                    protectedBrowserAvailable = protectedBrowserAvailable,
                     onActivateWebProtection = onActivateWebProtection,
-                    onKeepSeparateDagLauncherChange = viewModel::setKeepSeparateDagLauncher,
                 )
             }
         }
@@ -160,9 +160,9 @@ private fun UserInternetHero(
 private fun InternetProtectionList(
     state: com.contentfilter.user.internet.UserWebUiState,
     vpnActive: Boolean,
-    onOpenDag: () -> Unit,
+    onOpenProtectedBrowser: () -> Unit,
+    protectedBrowserAvailable: Boolean,
     onActivateWebProtection: () -> Unit,
-    onKeepSeparateDagLauncherChange: (Boolean) -> Unit,
 ) {
     ProductListSurface {
         InternetProtectionRow(
@@ -189,38 +189,15 @@ private fun InternetProtectionList(
             value = if (state.onlyResultsEnabled) "Activo" else "Navegación autorizada",
             active = true,
         )
-        InternetProtectionRow(
-            icon = ProductIcon.Search,
-            label = "Buscador DAG",
-            value =
-                when {
-                    state.dagEnabled -> "Activo"
-                    !state.dagEntitled -> "No incluido en la licencia"
-                    else -> "Cerrado por el administrador"
-                },
-            active = state.dagEnabled,
-            onClick = onOpenDag.takeIf { state.dagEnabled },
-            showDivider = state.dagEnabled || state.schedule != null,
-            navigation = state.dagEnabled,
-        )
-        if (state.dagEnabled) {
-            ProductListRow(
-                leading = {
-                    ProductGlyph(
-                        icon = ProductIcon.Search,
-                        color = InternetAccent,
-                        modifier = Modifier.size(24.dp),
-                    )
-                },
-                headline = { Text("DAG como app separada", style = MaterialTheme.typography.titleMedium) },
-                supporting = { Text("Mantener un acceso propio en el inicio del teléfono") },
-                trailing = {
-                    Switch(
-                        checked = state.keepSeparateDagLauncher,
-                        onCheckedChange = onKeepSeparateDagLauncherChange,
-                    )
-                },
+        if (protectedBrowserAvailable) {
+            InternetProtectionRow(
+                icon = ProductIcon.Search,
+                label = "Navegador protegido",
+                value = "Prueba DEV independiente",
+                active = true,
+                onClick = onOpenProtectedBrowser,
                 showDivider = state.schedule != null,
+                navigation = true,
             )
         }
         state.schedule?.let { schedule ->
@@ -273,7 +250,6 @@ private val com.contentfilter.user.internet.UserWebUiState.compactProtectionSumm
         buildList {
             if (safeSearchEnabled) add("SafeSearch")
             if (onlyResultsEnabled) add("Solo resultados")
-            if (dagEnabled) add("DAG activo")
         }.joinToString(" · ").ifBlank { "Protección Web configurada" }
 
 private enum class InternetVisualStatus(

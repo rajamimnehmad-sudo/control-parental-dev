@@ -4,23 +4,22 @@
 
 Construir y validar las etapas 0 a 2 del navegador nuevo:
 
-1. preservar el DAG vigente;
-2. crear una APK de navegador separada solo para DEV;
-3. demostrar una barrera visual fail-closed antes de integrar IA o Glosh.
+1. crear una APK de navegador separada solo para DEV;
+2. demostrar una barrera visual fail-closed antes de integrar IA;
+3. retirar el runtime de DAG 1 y DAG 2 antes de habilitar el puente con Glosh.
 
 ## Baseline y aislamiento
 
 - Base oficial: `origin/main` en `105c93c`.
 - Rama: `codex/dag-browser-v3-foundation-01`.
 - Worktree limpio y persistente: `/Users/yejielnehmad/Developer/content-filter-dag-browser-v3`.
-- El DAG vigente, `feature-dag2`, sus tablas, Edge Functions, modelos y calibraciones no se
-  modifican ni se importan.
+- El navegador nuevo no importa código, modelos, tablas ni Edge Functions de DAG 1 o DAG 2.
 - La aplicacion nueva es tambien un build Gradle independiente: no fuerza a Glosh a cambiar AGP,
   Kotlin, AndroidX o GeckoView.
 - No depende de ningun modulo del proyecto. Solo usa AndroidX Core y una version fijada de
   GeckoView.
-- No se modifica App Usuario, App Admin, VPN, Accessibility, Device Owner, Supabase, licencias,
-  reglas, actualizaciones ni publicacion.
+- La integración posterior sólo modifica el acceso desde App Usuario. No cambia VPN,
+  Accessibility, Device Owner ni Production.
 
 ## Contrato del primer prototipo
 
@@ -42,7 +41,7 @@ Construir y validar las etapas 0 a 2 del navegador nuevo:
 
 ### Gate 0 - aislamiento
 
-- `git diff` no contiene cambios en el DAG vigente ni en Glosh.
+- `app-dag-browser` no contiene dependencias ni imports del runtime retirado.
 - `app-dag-browser` no tiene dependencias `project(...)`.
 - No hay claves, URL de Supabase ni funciones remotas en la APK.
 
@@ -93,6 +92,12 @@ Puente controlado:
 
 ## Publicacion e instalacion
 
-Este corte no autoriza una publicacion cloud automatica. El flujo actual solo conoce App Usuario y
-App Admin. Cuando el build local y los gates automaticos queden correctos, se debe informar al
-usuario antes de agregar el tercer manifiesto, almacenamiento y target de publicacion DEV.
+La publicación DEV usa dos caminos separados:
+
+- App Usuario sigue usando su publicador DEV habitual, con el puente habilitado sólo en el
+  candidato autorizado.
+- El navegador protegido se compila y firma en un workflow separado y se entrega como artefacto
+  privado de GitHub Actions. No reutiliza el manifiesto de App Usuario ni toca Production.
+
+La limpieza completa está documentada en
+`docs/dag/v3/DAG_BROWSER_V3_LEGACY_REMOVAL.md`.
