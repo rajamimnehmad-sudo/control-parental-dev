@@ -67,4 +67,22 @@ class MediaBarrierContractTest {
         assertContains(script, "Any native or protocol failure leaves the media hidden")
         assertContains(script, "MAX_CANDIDATES_PER_DOCUMENT")
     }
+
+    @Test
+    fun `performance evidence waits for document load and response quiescence`() {
+        val background = extensionRoot.resolve("background.js").readText()
+        val script = extensionRoot.resolve("barrier.js").readText()
+
+        assertContains(script, "\"document-started\"")
+        assertContains(script, "\"document-loaded\"")
+        assertContains(script, "window.addEventListener")
+        assertContains(background, "VIEWPORT_SETTLE_MS = 250")
+        assertContains(background, "activeImageFilters !== 0")
+        assertContains(background, "nativeRequestsInFlight !== 0")
+        assertContains(background, "\"viewport-images-ready\"")
+        assertContains(
+            background,
+            "Performance evidence is DEV-only and never changes the fail-closed barrier",
+        )
+    }
 }

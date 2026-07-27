@@ -8,8 +8,10 @@ const MAX_ACTIVE_IMAGE_FILTERS = 16;
 const MAX_NATIVE_IN_FLIGHT = 10;
 const RESPONSE_CAPTURE_TIMEOUT_MS = 5_000;
 const NATIVE_DECISION_TIMEOUT_MS = 2_500;
+const VIEWPORT_SETTLE_MS = 250;
 const NATIVE_APP = "glosh.dag.protection";
 const PROTOCOL_VERSION = 1;
+const DOCUMENT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 const TRANSPARENT_GIF = Uint8Array.from(
   atob("R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="),
   (character) => character.charCodeAt(0),
@@ -17,6 +19,80 @@ const TRANSPARENT_GIF = Uint8Array.from(
 let requestSequence = 0;
 let activeImageFilters = 0;
 let nativeRequestsInFlight = 0;
+let trackedDocumentToken = null;
+let trackedDocumentLoaded = false;
+let viewportReadyReported = false;
+let viewportSettleTimeout = null;
+
+const clearViewportSettleTimeout = () => {
+  if (viewportSettleTimeout !== null) {
+    clearTimeout(viewportSettleTimeout);
+    viewportSettleTimeout = null;
+  }
+};
+
+const scheduleViewportReady = () => {
+  clearViewportSettleTimeout();
+  if (
+    trackedDocumentToken === null ||
+    !trackedDocumentLoaded ||
+    viewportReadyReported ||
+    activeImageFilters !== 0 ||
+    nativeRequestsInFlight !== 0
+  ) {
+    return;
+  }
+  viewportSettleTimeout = setTimeout(() => {
+    viewportSettleTimeout = null;
+    if (
+      trackedDocumentToken === null ||
+      !trackedDocumentLoaded ||
+      viewportReadyReported ||
+      activeImageFilters !== 0 ||
+      nativeRequestsInFlight !== 0
+    ) {
+      return;
+    }
+    viewportReadyReported = true;
+    browser.runtime
+      .sendNativeMessage(NATIVE_APP, {
+        type: "viewport-images-ready",
+        version: PROTOCOL_VERSION,
+        documentToken: trackedDocumentToken,
+      })
+      .catch(() => {
+        // Performance evidence is DEV-only and never changes the fail-closed barrier.
+      });
+  }, VIEWPORT_SETTLE_MS);
+};
+
+const resetViewportTracking = (documentToken) => {
+  clearViewportSettleTimeout();
+  trackedDocumentToken = documentToken;
+  trackedDocumentLoaded = false;
+  viewportReadyReported = false;
+};
+
+browser.runtime.onMessage.addListener((message, sender) => {
+  if (
+    sender.frameId !== 0 ||
+    message?.version !== PROTOCOL_VERSION ||
+    !DOCUMENT_TOKEN_PATTERN.test(message?.documentToken || "")
+  ) {
+    return;
+  }
+  if (message.type === "document-started") {
+    resetViewportTracking(message.documentToken);
+    return;
+  }
+  if (
+    message.type === "document-loaded" &&
+    message.documentToken === trackedDocumentToken
+  ) {
+    trackedDocumentLoaded = true;
+    scheduleViewportReady();
+  }
+});
 
 const nextCandidateId = () => {
   requestSequence += 1;
@@ -94,6 +170,7 @@ const interceptImageResponse = (details) => {
     return { cancel: true };
   }
   activeImageFilters += 1;
+  scheduleViewportReady();
 
   const chunks = [];
   let totalBytes = 0;
@@ -115,6 +192,7 @@ const interceptImageResponse = (details) => {
       activeImageFilters = Math.max(0, activeImageFilters - 1);
     }
     closeWithPlaceholder(filter);
+    scheduleViewportReady();
   };
 
   filter.ondata = (event) => {
@@ -152,6 +230,7 @@ const interceptImageResponse = (details) => {
     }
 
     nativeRequestsInFlight += 1;
+    scheduleViewportReady();
     const timeout = setTimeout(finalize, NATIVE_DECISION_TIMEOUT_MS);
     const bytes = combineChunks(chunks, totalBytes);
     requestNativeBlockDecision(details, bytes)
@@ -160,6 +239,7 @@ const interceptImageResponse = (details) => {
         nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
         clearTimeout(timeout);
         finalize();
+        scheduleViewportReady();
       });
   };
   captureTimeout = setTimeout(finalize, RESPONSE_CAPTURE_TIMEOUT_MS);

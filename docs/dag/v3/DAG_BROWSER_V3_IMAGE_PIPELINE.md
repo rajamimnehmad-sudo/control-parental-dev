@@ -82,3 +82,6 @@ Evidencia de los dos primeros gates:
 
 Contrato del tercer gate:
 `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PREPROCESSOR.md`.
+
+Las tres marcas comparables de la matriz fisica se definen en
+`docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.

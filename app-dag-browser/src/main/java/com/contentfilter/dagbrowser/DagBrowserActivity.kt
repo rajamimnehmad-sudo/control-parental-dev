@@ -37,6 +37,7 @@ class DagBrowserActivity : Activity() {
 
     private val session = GeckoSession()
     private val handler = Handler(Looper.getMainLooper())
+    private val performanceTracker = DagPerformanceTracker(SystemClock::elapsedRealtime)
     private val mediaAnalysisExecutor =
         ThreadPoolExecutor(
             MediaAnalysisThreads,
@@ -95,6 +96,12 @@ class DagBrowserActivity : Activity() {
                         } else {
                             null
                         }
+                    ViewportImagesReadyMessage -> {
+                        if (isTrustedExtensionSender(sender)) {
+                            recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)
+                        }
+                        null
+                    }
                     else -> null
                 }
             }
@@ -209,6 +216,10 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     success: Boolean,
                 ) {
+                    recordPerformanceMetric(
+                        metric = DagPerformanceMetric.PageAnalysisReady,
+                        detail = "success=$success",
+                    )
                     if (!success && waitingForBarrier) {
                         waitingForBarrier = false
                         handler.removeCallbacks(barrierTimeout)
@@ -281,11 +292,14 @@ class DagBrowserActivity : Activity() {
             showBlockedNavigation()
             return
         }
-        beginProtectedLoad()
+        beginProtectedLoad(startNewPerformanceNavigation = true)
         session.loadUri(safeUrl)
     }
 
-    private fun beginProtectedLoad() {
+    private fun beginProtectedLoad(startNewPerformanceNavigation: Boolean = false) {
+        if (startNewPerformanceNavigation || !waitingForBarrier) {
+            recordPerformanceEvent(performanceTracker.begin())
+        }
         waitingForBarrier = true
         geckoView.visibility = View.INVISIBLE
         showOverlay(
@@ -300,6 +314,27 @@ class DagBrowserActivity : Activity() {
     private fun revealProtectedPage() {
         geckoView.visibility = View.VISIBLE
         safetyOverlay.visibility = View.GONE
+        recordPerformanceMetric(DagPerformanceMetric.PageVisible)
+    }
+
+    private fun recordPerformanceMetric(
+        metric: DagPerformanceMetric,
+        detail: String = "",
+    ) {
+        performanceTracker.mark(metric)?.let { recordPerformanceEvent(it, detail) }
+    }
+
+    private fun recordPerformanceEvent(
+        event: DagPerformanceEvent,
+        detail: String = "",
+    ) {
+        if (!packageName.endsWith(".dev")) return
+        val detailSuffix = if (detail.isBlank()) "" else " $detail"
+        Log.i(
+            PerformanceLogTag,
+            "navigation=${event.navigationId} metric=${event.metric.wireValue} " +
+                "elapsed_ms=${event.elapsedMillis}$detailSuffix",
+        )
     }
 
     private fun isTrustedContentSender(sender: WebExtension.MessageSender): Boolean =
@@ -446,11 +481,13 @@ class DagBrowserActivity : Activity() {
         const val MediaCandidateMessage = "media-candidate"
         const val MediaBytesMessage = "media-bytes"
         const val MediaDecisionMessage = "media-decision"
+        const val ViewportImagesReadyMessage = "viewport-images-ready"
         const val ProtectionProtocolVersion = 1
         const val MaxMediaCandidateIdLength = 80
         const val MediaAnalysisThreads = 2
         const val MediaAnalysisQueueCapacity = 8
         const val MediaTransportLogTag = "DagMediaTransport"
+        const val PerformanceLogTag = "DagPerformance"
         const val BarrierTimeoutMillis = 12_000L
         const val InitialBlankPage = "about:blank"
     }

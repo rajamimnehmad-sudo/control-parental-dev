@@ -28,7 +28,7 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 4
+        versionCode = 5
         versionName = "0.3.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
