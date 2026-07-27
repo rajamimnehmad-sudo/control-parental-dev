@@ -24,6 +24,7 @@ class ManifestValidatorTest(unittest.TestCase):
 
     def sample(self, suffix: str = "1") -> dict:
         return {
+            "manifest_schema_version": "dag-v3-dataset-manifest-v1",
             "sample_id": f"sample-{suffix}",
             "content_sha256": suffix[-1] * 64,
             "perceptual_hash": suffix[-1] * 16,
@@ -65,8 +66,8 @@ class ManifestValidatorTest(unittest.TestCase):
             "labels": {name: "unreviewed" for name in self.contract.labels},
             "review": {
                 "guide_version": "",
-                "reviewer_keys": [],
-                "adjudicator_key": None,
+                "annotations": [],
+                "adjudication": None,
             },
         }
 
@@ -82,14 +83,29 @@ class ManifestValidatorTest(unittest.TestCase):
         record["labels"] = {name: "negative" for name in self.contract.labels}
         record["review"] = {
             "guide_version": "glosh-visual-annotation-v1",
-            "reviewer_keys": reviewers,
-            "adjudicator_key": None,
+            "annotations": [
+                {
+                    "reviewer_key": reviewer,
+                    "reviewed_at": f"2026-07-27T20:0{index}:00Z",
+                    "labels": copy.deepcopy(record["labels"]),
+                }
+                for index, reviewer in enumerate(reviewers)
+            ],
+            "adjudication": None,
         }
 
     def test_accepts_eligible_unassigned_unreviewed_sample(self) -> None:
         report = self.validate([self.sample()])
         self.assertTrue(report.ok, report.errors)
         self.assertEqual(1, report.records)
+
+    def test_requires_versioned_manifest_schema(self) -> None:
+        sample = self.sample()
+        del sample["manifest_schema_version"]
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(any("manifest_schema_version" in error for error in report.errors))
 
     def test_rejects_eligible_sample_without_commercial_license(self) -> None:
         sample = self.sample()
@@ -144,16 +160,103 @@ class ManifestValidatorTest(unittest.TestCase):
         report = self.validate([sample])
         self.assertFalse(report.ok)
         self.assertTrue(any("source.asset_url" in error for error in report.errors))
-        self.assertTrue(any("review.reviewer_keys" in error for error in report.errors))
+        self.assertTrue(any("reviewer_key" in error for error in report.errors))
 
     def test_assigned_test_requires_complete_double_review(self) -> None:
         sample = self.sample()
         sample["split"] = "test"
-        sample["review"]["reviewer_keys"] = ["reviewer-a"]
+        sample["labels"] = {name: "negative" for name in self.contract.labels}
+        sample["review"] = {
+            "guide_version": "glosh-visual-annotation-v1",
+            "annotations": [
+                {
+                    "reviewer_key": "reviewer-a",
+                    "reviewed_at": "2026-07-27T20:00:00Z",
+                    "labels": copy.deepcopy(sample["labels"]),
+                }
+            ],
+            "adjudication": None,
+        }
         report = self.validate([sample])
         self.assertFalse(report.ok)
-        self.assertTrue(any("unreviewed labels" in error for error in report.errors))
-        self.assertTrue(any("require two reviewers" in error for error in report.errors))
+        self.assertTrue(
+            any("exactly two independent reviews" in error for error in report.errors)
+        )
+
+    def test_disagreement_requires_independent_adjudication(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "test", ["reviewer-a", "reviewer-b"])
+        label = self.contract.labels[4]
+        sample["review"]["annotations"][1]["labels"][label] = "positive"
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(any("is required for disagreements" in error for error in report.errors))
+
+        sample["labels"][label] = "positive"
+        sample["review"]["adjudication"] = {
+            "adjudicator_key": "reviewer-c",
+            "adjudicated_at": "2026-07-27T21:00:00Z",
+            "labels": {label: "positive"},
+        }
+        report = self.validate([sample])
+        self.assertTrue(report.ok, report.errors)
+
+    def test_rejects_final_label_that_does_not_match_review(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "train", ["reviewer-a"])
+        sample["labels"][self.contract.labels[4]] = "positive"
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(
+            any("does not match the independent review" in error for error in report.errors)
+        )
+
+    def test_completed_review_cannot_hide_unreviewed_labels(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "train", ["reviewer-a"])
+        sample["review"]["annotations"][0]["labels"][self.contract.labels[4]] = (
+            "unreviewed"
+        )
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(
+            any("completed reviews cannot be unreviewed" in error for error in report.errors)
+        )
+
+    def test_adjudicator_must_be_third_reviewer(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "validation", ["reviewer-a", "reviewer-b"])
+        label = self.contract.labels[4]
+        sample["review"]["annotations"][1]["labels"][label] = "positive"
+        sample["labels"][label] = "positive"
+        sample["review"]["adjudication"] = {
+            "adjudicator_key": "reviewer-a",
+            "adjudicated_at": "2026-07-27T21:00:00Z",
+            "labels": {label: "positive"},
+        }
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(
+            any("independent from both reviewers" in error for error in report.errors)
+        )
+
+    def test_rejects_legacy_reviewer_summary_without_independent_labels(self) -> None:
+        sample = self.sample()
+        sample["labels"] = {name: "negative" for name in self.contract.labels}
+        sample["review"] = {
+            "guide_version": "glosh-visual-annotation-v1",
+            "reviewer_keys": ["reviewer-a", "reviewer-b"],
+            "adjudicator_key": None,
+        }
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(any("unsupported fields" in error for error in report.errors))
+        self.assertTrue(any("reviewed labels require" in error for error in report.errors))
 
     def test_excluded_sample_requires_reason_and_excluded_split(self) -> None:
         sample = copy.deepcopy(self.sample())
