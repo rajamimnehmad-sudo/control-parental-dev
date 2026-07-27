@@ -1,0 +1,143 @@
+{
+  "contractVersion": "glosh-visual-signals-v1",
+  "input": {
+    "shape": [1, 224, 224, 3],
+    "colorOrder": "RGB",
+    "logicalEncoding": "uint8 0..255",
+    "geometry": "fit-complete-image-with-neutral-gray-letterbox"
+  },
+  "logicalOutput": {
+    "type": "probabilities-after-dequantization",
+    "range": [0.0, 1.0],
+    "containsPolicyAction": false
+  },
+  "annotationStates": ["positive", "negative", "unknown", "not_applicable"],
+  "labels": [
+    {
+      "index": 0,
+      "name": "person_present",
+      "group": "context",
+      "description": "Hay al menos una persona fotografiada o una representacion humana realista."
+    },
+    {
+      "index": 1,
+      "name": "female_presentation_present",
+      "group": "context",
+      "description": "Hay presentacion visual femenina observable; no afirma identidad de genero."
+    },
+    {
+      "index": 2,
+      "name": "female_10plus_or_age_uncertain_present",
+      "group": "context",
+      "description": "Hay presentacion femenina de 10 anos o mas, o cuya edad visual es incierta."
+    },
+    {
+      "index": 3,
+      "name": "only_clearly_young_female_children_present",
+      "group": "context",
+      "description": "Toda presentacion femenina visible corresponde claramente a menores de 10 anos."
+    },
+    {
+      "index": 4,
+      "name": "adult_or_explicit",
+      "group": "critical",
+      "description": "Hay desnudez sexual, genitales, acto sexual o contenido explicitamente sexual."
+    },
+    {
+      "index": 5,
+      "name": "female_underwear_or_swimwear",
+      "group": "critical",
+      "description": "Alguna persona de presentacion femenina usa ropa interior, lenceria o traje de bano."
+    },
+    {
+      "index": 6,
+      "name": "female_transparent_clothing",
+      "group": "critical",
+      "description": "Alguna persona de presentacion femenina usa ropa transparente que revela el cuerpo."
+    },
+    {
+      "index": 7,
+      "name": "female_10plus_or_uncertain_deep_neckline",
+      "group": "modesty",
+      "description": "En una presentacion femenina de 10 anos o mas o edad incierta hay escote profundo."
+    },
+    {
+      "index": 8,
+      "name": "female_10plus_or_uncertain_chest_exposed",
+      "group": "modesty",
+      "description": "En una presentacion femenina de 10 anos o mas o edad incierta hay pecho expuesto."
+    },
+    {
+      "index": 9,
+      "name": "female_10plus_or_uncertain_abdomen_exposed",
+      "group": "modesty",
+      "description": "En una presentacion femenina de 10 anos o mas o edad incierta hay abdomen expuesto."
+    },
+    {
+      "index": 10,
+      "name": "female_10plus_or_uncertain_shoulder_or_armpit_exposed",
+      "group": "modesty",
+      "description": "En una presentacion femenina de 10 anos o mas o edad incierta hay hombro o axila expuestos."
+    },
+    {
+      "index": 11,
+      "name": "female_10plus_or_uncertain_elbow_uncovered",
+      "group": "modesty",
+      "description": "En una presentacion femenina de 10 anos o mas o edad incierta hay codo descubierto."
+    },
+    {
+      "index": 12,
+      "name": "female_10plus_or_uncertain_knee_uncovered",
+      "group": "modesty",
+      "description": "En una presentacion femenina de 10 anos o mas o edad incierta hay rodilla descubierta."
+    },
+    {
+      "index": 13,
+      "name": "female_10plus_or_uncertain_tight_clothing",
+      "group": "modesty",
+      "description": "En una presentacion femenina de 10 anos o mas o edad incierta la ropa marca claramente la silueta."
+    },
+    {
+      "index": 14,
+      "name": "sexualized_pose_or_framing",
+      "group": "critical",
+      "description": "La pose, el encuadre o el foco visual sexualizan a una persona."
+    },
+    {
+      "index": 15,
+      "name": "graphic_violence_or_gore",
+      "group": "theme",
+      "description": "Hay violencia grafica, heridas severas, sangre explicita o gore."
+    },
+    {
+      "index": 16,
+      "name": "horror_or_disturbing",
+      "group": "theme",
+      "description": "Hay contenido de terror o perturbador definido por la guia de anotacion."
+    },
+    {
+      "index": 17,
+      "name": "drug_use_or_paraphernalia",
+      "group": "theme",
+      "description": "Hay consumo de drogas o parafernalia de drogas en contexto de uso."
+    },
+    {
+      "index": 18,
+      "name": "gambling",
+      "group": "theme",
+      "description": "Hay apuestas, casino o juego de azar en contexto promocional o de uso."
+    },
+    {
+      "index": 19,
+      "name": "weapon_threat",
+      "group": "theme",
+      "description": "Hay un arma presentada como amenaza o violencia, no una herramienta cotidiana aislada."
+    },
+    {
+      "index": 20,
+      "name": "relevant_subject_too_small_or_obscured",
+      "group": "uncertainty",
+      "description": "Existe una persona relevante, pero es demasiado pequena u oculta para evaluar la politica."
+    }
+  ]
+}
