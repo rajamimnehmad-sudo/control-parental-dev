@@ -37,14 +37,18 @@ como regresion. El registro de rendimiento nunca habilita una foto ni cambia `bl
 DAG V3 usa GeckoView, no WebView; por eso `LOAD_NO_CACHE` no existe en este modulo. El recorrido
 fisico equivalente es:
 
-1. `pm clear --cache-only com.contentfilter.dagbrowser.dev`;
-2. detener el proceso;
-3. abrirlo en frio;
-4. agregar `codexperf` unico a la URL superior;
-5. registrar las tres metricas, decisiones visuales, memoria, temperatura y cualquier error.
+1. detener el proceso;
+2. ejecutar `pm clear --cache-only com.contentfilter.dagbrowser.dev`;
+3. si ese comando no termina, interrumpirlo y ejecutar
+   `pm clear com.contentfilter.dagbrowser.dev`, solamente sobre el paquete DEV;
+4. abrirlo en frio;
+5. agregar `codexperf` unico a la URL superior;
+6. registrar las tres metricas, decisiones visuales, memoria, temperatura y cualquier error.
 
-La limpieza de cache conserva datos y firma de la aplicacion. El parametro unico evita reutilizar
-el documento superior; los subrecursos quedan cubiertos por la limpieza del cache de la app.
+La limpieza de cache conserva datos y firma de la aplicacion. El fallback borra el perfil local de
+la aplicacion DEV, conserva APK y firma, y debe quedar explicitamente registrado en la evidencia.
+El parametro unico evita reutilizar el documento superior; los subrecursos quedan cubiertos por la
+limpieza del cache o del perfil.
 
 ## Matriz fija
 

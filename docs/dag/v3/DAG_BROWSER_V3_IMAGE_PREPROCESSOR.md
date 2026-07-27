@@ -2,8 +2,8 @@
 
 ## Estado
 
-Implementado para DEV. Su salida todavia no puede producir `allow` ni `blur`: una imagen preparada
-correctamente termina en `block / analyzer_unavailable`.
+Implementado y validado fisicamente en el Samsung SM-A235M. Su salida todavia no puede producir
+`allow` ni `blur`: una imagen preparada correctamente termina en `block / analyzer_unavailable`.
 
 ## Objetivo
 
@@ -42,7 +42,8 @@ Por analisis, los buffers propios mas grandes despues de validar el encabezado s
 
 Se suman los bytes comprimidos, su sobre de mensajeria y memoria interna del decodificador. La
 concurrencia nativa sigue limitada a dos trabajos, con cola acotada. La memoria real, latencia y
-temperatura se validan en el Samsung SM-A235M; estos calculos no reemplazan la medicion fisica.
+temperatura quedaron medidas en el Samsung SM-A235M; estos calculos siguen siendo el limite de
+diseno y no reemplazan los gates fisicos de cada candidato.
 
 ## Motivos de cierre
 
@@ -56,10 +57,13 @@ Todas estas salidas son `block`.
 
 ## Decisiones pendientes
 
-- medir JPEG, PNG, WebP, GIF estatico, GIF/WebP animado, transparencia, EXIF y datos truncados;
-- medir p50/p95 y memoria con scroll rapido;
+- ampliar el corpus de formatos con PNG transparente, WebP animado, EXIF y datos truncados;
 - conectar un runtime solo cuando exista una candidata de modelo versionada y licenciada;
 - mantener bloqueado cualquier resultado dudoso o error.
+
+La prueba fisica ya cubrio JPEG, PNG, WebP, GIF estatico, GIF animado, contenido corrupto, arranque
+frio y scroll rapido, con p50/p95, memoria y temperatura. Evidencia:
+`docs/compatibility/results/dag-browser-v3-image-preprocessor-sm-a235m-2026-07-27.md`.
 
 ## Fuentes primarias
 

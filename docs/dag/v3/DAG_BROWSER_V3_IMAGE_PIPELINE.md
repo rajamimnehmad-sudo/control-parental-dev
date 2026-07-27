@@ -73,7 +73,7 @@ archivos.
 
 1. Transporte fisico con formatos pequenos, grandes, corruptos y lentos: completo.
 2. Latencia y memoria sin habilitar fotos: completo.
-3. Agregar reduccion local a la entrada exacta del modelo: implementado, falta evidencia fisica.
+3. Agregar reduccion local a la entrada exacta del modelo: completo, incluida evidencia fisica.
 4. Comparar los modelos candidatos con el mismo conjunto de evaluacion.
 5. Habilitar `allow` y luego `blur` solamente tras cerrar precision y fugas.
 
@@ -82,6 +82,9 @@ Evidencia de los dos primeros gates:
 
 Contrato del tercer gate:
 `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PREPROCESSOR.md`.
+
+Evidencia fisica del tercer gate y de la matriz fija instrumentada:
+`docs/compatibility/results/dag-browser-v3-image-preprocessor-sm-a235m-2026-07-27.md`.
 
 Las tres marcas comparables de la matriz fisica se definen en
 `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
