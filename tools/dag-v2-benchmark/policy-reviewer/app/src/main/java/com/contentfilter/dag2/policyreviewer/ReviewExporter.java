@@ -9,6 +9,7 @@ import java.security.MessageDigest;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -45,7 +46,7 @@ final class ReviewExporter {
                 JSONObject line = new JSONObject();
                 line.put("sample_id", record.sampleId);
                 line.put("decision", record.decision);
-                line.put("reasons", record.reasons);
+                line.put("reasons", new JSONArray(record.reasons));
                 line.put("review_number", record.reviewNumber);
                 line.put("reviewed_at", record.reviewedAt);
                 line.put("policy_version", POLICY_VERSION);

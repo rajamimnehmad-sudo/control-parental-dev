@@ -31,6 +31,17 @@ SPLIT_LOCK = EVIDENCE_04B / "split.lock.jsonl"
 DIAGNOSTIC_LOCK = EVIDENCE_04B / "diagnostic-subset.lock.jsonl"
 LABEL_SCHEMA = EVIDENCE_04B / "label-schema.json"
 PLAN_LOCK = EVIDENCE_04B / "plan.lock.json"
+RESULT_CHECKSUMS = EVIDENCE_04B / "results.checksums.json"
+RAW_LABELS = EVIDENCE_04B / "human-labels.raw.jsonl"
+NORMALIZED_LABELS = EVIDENCE_04B / "human-labels.normalized.jsonl"
+MAC_SIGNALS = EVIDENCE_04B / "signals.mac.jsonl"
+MAC_SIGNAL_SUMMARY = EVIDENCE_04B / "signals.mac.summary.json"
+TEACHER_EVIDENCE = EVIDENCE_04B / "teacher.jsonl"
+TEACHER_SUMMARY = EVIDENCE_04B / "teacher.summary.json"
+POLICY_SEAL = EVIDENCE_04B / "policy-seal.json"
+FROZEN_TEST = EVIDENCE_04B / "frozen-test.json"
+ANDROID_EVIDENCE = EVIDENCE_04B / "android-sm-a235m.json"
+RESULT_SUMMARY = EVIDENCE_04B / "result-summary.json"
 POLICY_VERSION = "DAG_STRICT_MODESTY_V1"
 REVIEWER_VERSION = "dag-v2-policy-reviewer-04b-1"
 PLAN_VERSION = "dag-v2-04b-plan-1"
@@ -486,11 +497,32 @@ def prepare_reviewer_assets(cache: Path, output: Path, fixture: bool = False) ->
     print(f"reviewer_assets=ok samples={len(samples)} fixture={str(fixture).lower()} output={output}")
 
 
+def _normalize_export_reasons(value: Any) -> tuple[list[str], bool]:
+    if isinstance(value, list):
+        reasons = value
+        legacy = False
+    elif isinstance(value, str) and value.startswith("[") and value.endswith("]"):
+        content = value[1:-1].strip()
+        reasons = [] if not content else [item.strip() for item in content.split(",")]
+        legacy = True
+    else:
+        raise ValueError("invalid reasons")
+    if (
+        any(not isinstance(reason, str) or reason not in REASONS for reason in reasons)
+        or len(set(reasons)) != len(reasons)
+    ):
+        raise ValueError("invalid reasons")
+    return reasons, legacy
+
+
 def validate_label_export(path: Path, require_complete: bool = True) -> list[dict[str, Any]]:
-    labels = read_jsonl(path)
+    raw_labels = read_jsonl(path)
+    labels: list[dict[str, Any]] = []
     current: dict[str, dict[str, Any]] = {}
     expected_ids = {item["sample_id"] for item in read_jsonl(REVIEW_ORDER_LOCK)}
-    for item in labels:
+    legacy_reason_strings = 0
+    for raw_item in raw_labels:
+        item = dict(raw_item)
         unexpected = set(item) - EXPORT_ALLOWED_KEYS
         missing = EXPORT_ALLOWED_KEYS - set(item)
         if unexpected or missing:
@@ -499,12 +531,8 @@ def validate_label_export(path: Path, require_complete: bool = True) -> list[dic
             raise ValueError("unknown sample_id in label export")
         if item["decision"] not in DECISIONS:
             raise ValueError("invalid human decision")
-        if (
-            not isinstance(item["reasons"], list)
-            or any(reason not in REASONS for reason in item["reasons"])
-            or len(set(item["reasons"])) != len(item["reasons"])
-        ):
-            raise ValueError("invalid reasons")
+        item["reasons"], legacy = _normalize_export_reasons(item["reasons"])
+        legacy_reason_strings += int(legacy)
         if not isinstance(item["review_number"], int) or item["review_number"] < 1:
             raise ValueError("invalid review number")
         if item["policy_version"] != POLICY_VERSION or item["reviewer_version"] != REVIEWER_VERSION:
@@ -512,6 +540,7 @@ def validate_label_export(path: Path, require_complete: bool = True) -> list[dic
         if item["sample_id"] in current:
             raise ValueError("export contains more than one current label per sample")
         current[item["sample_id"]] = item
+        labels.append(item)
     if require_complete and set(current) != expected_ids:
         raise ValueError(f"human review incomplete: {len(expected_ids) - len(current)} decisions pending")
     if any(item["decision"] == "unsure" and item.get("training_target") for item in labels):
@@ -519,9 +548,172 @@ def validate_label_export(path: Path, require_complete: bool = True) -> list[dic
     digest, size = sha256_file(path)
     print(
         f"label_export=ok labels={len(labels)} complete={set(current) == expected_ids} "
-        f"sha256={digest} size={size}"
+        f"sha256={digest} size={size} legacy_reason_strings={legacy_reason_strings}"
     )
     return labels
+
+
+def normalize_label_export(source: Path, output: Path) -> None:
+    if output.exists():
+        raise ValueError("normalized label export already exists")
+    labels = validate_label_export(source)
+    write_jsonl(output, labels)
+    digest, size = sha256_file(output)
+    print(
+        f"label_export_normalized=ok labels={len(labels)} sha256={digest} size={size} "
+        f"source_sha256={sha256_file(source)[0]}"
+    )
+
+
+def _selected_scorer(selected: dict[str, Any]) -> Any:
+    model = selected["model"]
+    if selected["name"] == "deterministic_rules":
+        return lambda values: max(values[0], values[3], values[6], values[9], values[12])
+    if selected["name"] == "logistic_regression":
+        return lambda values: _logistic_score(model, values)
+    if selected["name"] == "small_tree_depth_3":
+        return lambda values: _tree_score(model, values)
+    if selected["name"] == "bounded_stump_boost":
+        return lambda values: _boost_score(model, values)
+    raise ValueError("unknown selected policy")
+
+
+def _frozen_test_rows(
+    labels: list[dict[str, Any]],
+    signals: dict[str, dict[str, Any]],
+    splits: dict[str, dict[str, Any]],
+) -> list[dict[str, Any]]:
+    rows = []
+    for label in labels:
+        if label["decision"] == "unsure" or splits[label["sample_id"]]["split"] != "test":
+            continue
+        rows.append(
+            {
+                **signals[label["sample_id"]],
+                "decision": label["decision"],
+                "reasons": label["reasons"],
+                "category": splits[label["sample_id"]]["source_category"],
+                "cluster_id": splits[label["sample_id"]]["cluster_id"],
+            }
+        )
+    return rows
+
+
+def verify_04b_results() -> None:
+    checksums = read_json(RESULT_CHECKSUMS)
+    if checksums["bundle_version"] != "dag-v2-04b-results-1":
+        raise ValueError("unsupported 04B results bundle")
+    expected_names = set(checksums["files"])
+    actual_names = {
+        path.name
+        for path in EVIDENCE_04B.iterdir()
+        if path.is_file() and path.name not in {
+            "diagnostic-subset.lock.jsonl",
+            "label-schema.json",
+            "plan.lock.json",
+            "review-order.lock.jsonl",
+            "split.lock.jsonl",
+            RESULT_CHECKSUMS.name,
+        }
+    }
+    if actual_names != expected_names:
+        raise ValueError(
+            f"04B result file set mismatch: missing={sorted(expected_names - actual_names)} "
+            f"additional={sorted(actual_names - expected_names)}"
+        )
+    for name, expected in checksums["files"].items():
+        actual_hash, actual_size = sha256_file(EVIDENCE_04B / name)
+        if actual_hash != expected["sha256"] or actual_size != expected["size_bytes"]:
+            raise ValueError(f"{name}: result integrity mismatch")
+
+    raw = validate_label_export(RAW_LABELS)
+    normalized = validate_label_export(NORMALIZED_LABELS)
+    if raw != normalized:
+        raise ValueError("normalized labels do not preserve the human export")
+    ids = {item["sample_id"] for item in normalized}
+    if len(ids) != 203:
+        raise ValueError("04B result labels must contain 203 unique samples")
+    signals_list = read_jsonl(MAC_SIGNALS)
+    if len(signals_list) != 203 or {item["sample_id"] for item in signals_list} != ids:
+        raise ValueError("04B signal sample set does not match human labels")
+    signal_summary = read_json(MAC_SIGNAL_SUMMARY)
+    if signal_summary["sample_count"] != 203:
+        raise ValueError("unexpected Mac signal count")
+    for stage in (
+        "adult",
+        "pose",
+        "local_signals",
+        "policy",
+        "sequential",
+        "adult_pose_parallel",
+    ):
+        if signal_stage_stats(signals_list, stage) != signal_summary["stages"][stage]:
+            raise ValueError(f"{stage}: Mac latency summary mismatch")
+
+    seal = read_json(POLICY_SEAL)
+    if (
+        seal["labels_sha256"] != sha256_file(NORMALIZED_LABELS)[0]
+        or seal["signals_sha256"] != sha256_file(MAC_SIGNALS)[0]
+        or seal["split_sha256"] != sha256_file(SPLIT_LOCK)[0]
+    ):
+        raise ValueError("sealed policy inputs do not match result bundle")
+    selected = seal["selected"]
+    frozen = read_json(FROZEN_TEST)
+    expected_parameters = hashlib.sha256(
+        json.dumps(selected, sort_keys=True).encode("utf-8")
+    ).hexdigest()
+    if frozen["parameters_sha256"] != expected_parameters or not frozen["opened_once"]:
+        raise ValueError("frozen test does not match sealed parameters")
+    signals = {item["sample_id"]: item for item in signals_list}
+    splits = {item["sample_id"]: item for item in read_jsonl(SPLIT_LOCK)}
+    test_rows = _frozen_test_rows(normalized, signals, splits)
+    thresholds = selected["thresholds"]
+    recomputed = _metrics(
+        test_rows,
+        _selected_scorer(selected),
+        thresholds["show_max"],
+        thresholds["hide_min"],
+    )
+    if recomputed != frozen["test"]:
+        raise ValueError("frozen test metrics are not reproducible")
+
+    result = read_json(RESULT_SUMMARY)
+    counts = Counter(item["decision"] for item in normalized)
+    reasons = Counter(reason for item in normalized for reason in item["reasons"])
+    if result["human_labels"]["counts"] != dict(sorted(counts.items())):
+        raise ValueError("human decision counts mismatch")
+    if result["human_labels"]["reason_counts"] != dict(sorted(reasons.items())):
+        raise ValueError("human reason counts mismatch")
+    if result["decision"] != "NO-GO":
+        raise ValueError("04B result must remain NO-GO")
+    expected_test_summary = {
+        key: frozen["test"][key]
+        for key in (
+            "sample_count",
+            "show_precision",
+            "hide_recall",
+            "hide_recall_95ci",
+            "critical_false_allows",
+            "false_blocks",
+            "coverage",
+            "uncertainty_percent",
+            "heavy_segmentation_needed_percent",
+        )
+    }
+    if result["frozen_test"] != expected_test_summary:
+        raise ValueError("result summary does not match frozen test")
+    android = read_json(ANDROID_EVIDENCE)
+    parallel = android["stages"]["adult_pose_parallel"]
+    performance_pass = parallel["p50_ms"] <= 350.0 and parallel["p95_ms"] <= 600.0
+    if performance_pass != android["performance_gate_passed"]:
+        raise ValueError("Android performance gate calculation mismatch")
+    if android["samples"] != 72 or android["failures"] != 0:
+        raise ValueError("unexpected Android physical result")
+    print(
+        "04b_results=ok samples=203 decisions="
+        f"{dict(sorted(counts.items()))} test_opened_once=true decision=NO-GO "
+        f"files={len(expected_names)}"
+    )
 
 
 def percentile(values: list[float], fraction: float) -> float:
@@ -1283,28 +1475,8 @@ def open_frozen_test(
     ):
         raise ValueError("policy seal does not match frozen inputs")
     selected = seal["selected"]
-    model = selected["model"]
-    if selected["name"] == "deterministic_rules":
-        scorer = lambda values: max(values[0], values[3], values[6], values[9], values[12])
-    elif selected["name"] == "logistic_regression":
-        scorer = lambda values: _logistic_score(model, values)
-    elif selected["name"] == "small_tree_depth_3":
-        scorer = lambda values: _tree_score(model, values)
-    else:
-        scorer = lambda values: _boost_score(model, values)
-    rows = []
-    for label in labels:
-        if label["decision"] == "unsure" or splits[label["sample_id"]]["split"] != "test":
-            continue
-        rows.append(
-            {
-                **signals[label["sample_id"]],
-                "decision": label["decision"],
-                "reasons": label["reasons"],
-                "category": splits[label["sample_id"]]["source_category"],
-                "cluster_id": splits[label["sample_id"]]["cluster_id"],
-            }
-        )
+    scorer = _selected_scorer(selected)
+    rows = _frozen_test_rows(labels, signals, splits)
     thresholds = selected["thresholds"]
     metrics = _metrics(rows, scorer, thresholds["show_max"], thresholds["hide_min"])
     result = {
@@ -1338,12 +1510,16 @@ def parse_args() -> argparse.Namespace:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("create-review-plan")
     subparsers.add_parser("verify-review-plan")
+    subparsers.add_parser("verify-results")
     assets = subparsers.add_parser("prepare-reviewer-assets")
     assets.add_argument("--output", type=Path, required=True)
     assets.add_argument("--fixture", action="store_true")
     labels = subparsers.add_parser("validate-label-export")
     labels.add_argument("path", type=Path)
     labels.add_argument("--allow-incomplete", action="store_true")
+    normalize = subparsers.add_parser("normalize-label-export")
+    normalize.add_argument("--source", type=Path, required=True)
+    normalize.add_argument("--output", type=Path, required=True)
     signals = subparsers.add_parser("extract-signals")
     signals.add_argument("--output", type=Path, required=True)
     signals.add_argument("--limit", type=int)
@@ -1369,10 +1545,14 @@ def main() -> None:
         create_review_plan()
     elif args.command == "verify-review-plan":
         verify_review_plan()
+    elif args.command == "verify-results":
+        verify_04b_results()
     elif args.command == "prepare-reviewer-assets":
         prepare_reviewer_assets(args.cache, args.output, args.fixture)
     elif args.command == "validate-label-export":
         validate_label_export(args.path, not args.allow_incomplete)
+    elif args.command == "normalize-label-export":
+        normalize_label_export(args.source, args.output)
     elif args.command == "extract-signals":
         extract_targeted_signals(args.cache, args.output, args.limit)
     elif args.command == "compare-teacher":

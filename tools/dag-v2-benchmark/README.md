@@ -51,6 +51,7 @@ imágenes ni red:
 
 ```bash
 python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-results
 ```
 
 El revisor Android autónomo se construye con las 203 imágenes ya verificadas:
@@ -82,7 +83,10 @@ python tools/dag-v2-benchmark/dag_v2_policy_eval.py \
 ```
 
 `open-test` rechaza una apertura previa al sello o una segunda apertura sobre
-el mismo destino.
+el mismo destino. El bundle final versionado bajo `evidence/04b/` conserva la
+exportación humana original, su normalización, señales, sello, apertura única,
+medición Android y checksums. `verify-results` recalcula hashes, IDs, conteos,
+latencias y métricas del test sin descargar imágenes ni modelos.
 
 ## Runner Android aislado
 
@@ -118,5 +122,6 @@ python -m unittest discover -s tools/dag-v2-benchmark/tests -v
 python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-repository
 python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-evidence
 python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-results
 bash scripts/test_android_ci_scope.sh
 ```

@@ -53,7 +53,7 @@ Flujo de una entrada:
 
 ### DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B
 
-- Estado: `Gate humano abierto: 203 decisiones pendientes`. Autorizado
+- Estado: `Evaluación cerrada en Draft: NO-GO`. Autorizado
   explícitamente el 2026-07-26. Tipo: evaluación humana reproducible y señales
   CPU. Prioridad: P0. Esfuerzo: XL. Riesgo: medio.
 - Plan congelado antes de etiquetas: orden ciego de 203, subconjunto
@@ -65,8 +65,16 @@ Flujo de una entrada:
 - Tooling preparado: señales locales YCbCr/HSV/Lab, pose/torso/calidad,
   comparación docente limitada a 20 imágenes, políticas interpretables y
   apertura única del test después de sellar parámetros.
-- Pendiente real: el usuario debe completar 203 decisiones. Codex no etiqueta
-  por el usuario ni abre el test antes del cierre humano.
+- Resultado humano: 203/203 decisiones verificadas (117 Show, 76 Hide y 10
+  Unsure). El test se abrió una sola vez después de sellar reglas
+  deterministas con exploración/validación.
+- Resultado congelado: cero falsos permisos críticos, pero recall Hide 62,5%,
+  cobertura 33,33%, incertidumbre/segmentación requerida 66,67% y ninguna
+  predicción Show. La ruta paralela sí cumple rendimiento en SM-A235M
+  (309,44/472,24 ms p50/p95), por lo que el bloqueo es de calidad de señales.
+- Decisión: `NO-GO`; no corresponde iniciar 04C. Próximo ticket sólo propuesto:
+  `DAG-V2-DIRECTED-VISUAL-MODEL-DATASET-05`, para ampliar datos públicos
+  equilibrados y evaluar un modelo visual dirigido pequeño.
 - No se integró modelo, no se creó caché activa, no hubo entrenamiento, GPU,
   Supabase, Production, publicación ni inicio de 04C. Provider v2 sigue en
   `Hide`.

@@ -1,8 +1,8 @@
 # Evaluación dirigida y etiquetada DAG v2 04B
 
-Estado: gate humano abierto. El revisor local está instalado y conserva
-`203 decisiones humanas pendientes`. No se abrió el conjunto de prueba, no se
-eligió política y no comenzó 04C.
+Estado: evaluación cerrada en **NO-GO**. Las 203 decisiones humanas fueron
+validadas, la política se selló con exploración/validación y el conjunto de
+prueba congelado se abrió una sola vez. No comenzó 04C.
 
 ## Invariantes
 
@@ -73,6 +73,29 @@ El contrato permite únicamente:
 
 No contiene imagen, URL, categoría, modelo, score, cookies ni identidad.
 
+La exportación recibida tiene SHA-256
+`a672cbf5436e492732f7df645551472e6f738760d4959bba2d3d4fef11d68174`,
+47.884 bytes, 203 IDs únicos y una decisión vigente por ID. Se detectó que la
+versión instalada serializaba `reasons` como una cadena cerrada (`"[knee]"`)
+en vez de un array JSON. Las decisiones no estaban afectadas: el vocabulario
+cerrado permitió normalizar las 203 filas sin ambigüedad. Se conserva el
+archivo original y la versión normalizada, cuyo SHA-256 es
+`b85d5d7780fe94a6c7b1502aca1b06edf7d7b726e13d2352985ac90a66ffd74c`.
+El exportador quedó corregido y testeado para producir arrays reales.
+
+Conteos humanos:
+
+| Decisión | Cantidad |
+| --- | ---: |
+| Mostrar | 117 |
+| Ocultar | 76 |
+| No estoy seguro | 10 |
+
+Los diez `unsure` fueron excluidos de entrenamiento, validación y prueba
+concluyente. Los motivos registrados fueron: escote/pecho 32, adulto/explícito
+20, ropa ajustada 11, ropa interior/traje de baño 10, codo 10, hombro/axila 8,
+rodilla 8, transparencia 5, abdomen 2, grupos 1 y otro 1.
+
 ## Split congelado
 
 `split.lock.jsonl` se creó antes de cualquier etiqueta:
@@ -114,7 +137,7 @@ y guarda evidencia sanitizada privada. No ejecuta segmentación universal.
 
 ## Políticas pequeñas y test sellado
 
-Después del gate humano se compararán:
+Después del gate humano se compararon:
 
 - reglas deterministas;
 - regresión logística regularizada;
@@ -127,7 +150,41 @@ una vez precisión de Show, recall de Hide, falsos permisos críticos, falsos
 bloqueos, cobertura, incertidumbre, Wilson 95%, motivos, categorías y
 estabilidad de clusters.
 
-Las puertas son experimentales, no afirmaciones de producción.
+En validación se seleccionaron reglas deterministas
+`max(adult, shoulder, elbow, knee, torso)` con `show_max=0,05` y
+`hide_min=0,55`. No hubo falsos permisos en validación, pero la incertidumbre
+fue 55,26%. El sello se creó antes de consultar el test; fija SHA-256 de
+etiquetas, señales y split, y registra `test_opened=false`.
+
+## Apertura única y resultado
+
+El test congelado se abrió una sola vez después del sello. De sus 40 muestras,
+39 tenían etiqueta concluyente:
+
+| Métrica de prueba | Resultado | Puerta |
+| --- | ---: | --- |
+| Falsos permisos críticos | 0 | cumple |
+| Precisión de Show | 0% (sin predicciones Show) | no cumple |
+| Recall de Hide | 62,5% | no cumple |
+| IC 95% de recall Hide | 38,64%–81,52% | informativo |
+| Falsos bloqueos | 3 | informativo |
+| Cobertura concluyente | 33,33% | no cumple |
+| Incertidumbre | 66,67% | no cumple |
+| Segmentación pesada requerida | 66,67% | no cumple |
+
+La ausencia de falsos permisos se obtuvo a costa de no aprobar ninguna imagen
+en el test. Por eso `show_precision=0` no representa una tasa observada de
+aciertos de Show sino ausencia de cobertura Show.
+
+**Decisión: NO-GO.** Las señales baratas no distinguen con fiabilidad
+apariencia femenina, edad, ajuste, transparencia y semántica de prendas. No
+corresponde iniciar la caché 04C. El siguiente ticket recomendado —sólo
+propuesto— es `DAG-V2-DIRECTED-VISUAL-MODEL-DATASET-05`: ampliar y equilibrar
+un corpus público con etiquetas humanas y entrenar/evaluar un único modelo
+visual dirigido y pequeño. Este ticket no lo inicia.
+
+Las puertas son experimentales y no constituyen una afirmación de precisión de
+producción; el test concluyente tiene sólo 39 muestras.
 
 ## Evidencia física del gate
 
@@ -144,17 +201,50 @@ Las puertas son experimentales, no afirmaciones de producción.
   deshabilitada hasta completar.
 - No hubo crash ni ANR durante apertura y reanudación.
 
-## Reanudación después del gate
+## Rendimiento final
 
-1. El revisor humano completa las 203 decisiones en el teléfono.
-2. Pulsa `Exportar evaluación 04B`.
-3. Codex recupera el JSONL sin borrar datos y verifica esquema y SHA-256.
-4. Se extraen señales; no se consultan métricas de prueba.
-5. Se selecciona y sella la política con exploratoria/validación.
-6. Se abre una sola vez la prueba congelada.
-7. Se miden Mac y SM-A235M y se declara `GO`, `GO CONDICIONAL` o `NO-GO`.
+En Mac, sobre las 203 imágenes y CPU: adulto 51,96/63,56 ms p50/p95, pose
+19,99/42,66 ms, señales locales 93,32/221,75 ms, política
+0,006/0,008 ms y ruta paralela 157,34/280,05 ms. PSS pico: 815.841.280 bytes.
 
-Ningún resultado inicia automáticamente 04C.
+En SM-A235M `R58T34V31AE`, Android 14/API 34, se instalaron in-place el runner
+autónomo y sus 72 muestras bloqueadas. El APK local no versionado tiene
+SHA-256 `15ce4cbbad039baf2f6b9f4811388f1b4cf1535de3ac1b72d993eafa8c655b36`.
+Resultados CPU:
+
+| Etapa | p50 | p95 | máximo |
+| --- | ---: | ---: | ---: |
+| Adulto | 248,57 ms | 316,34 ms | 347,32 ms |
+| Pose | 141,14 ms | 333,72 ms | 351,44 ms |
+| Señales locales | 3,59 ms | 18,58 ms | 30,56 ms |
+| Política | 0,012 ms | 0,018 ms | 0,022 ms |
+| Secuencial | 406,26 ms | 606,50 ms | 637,14 ms |
+| Adulto + pose paralelo | 309,44 ms | 472,24 ms | 483,32 ms |
+
+La ruta paralela cumple la puerta experimental de 350/600 ms. PSS fue 183.520
+KiB, CPU 21.619 ms, estado térmico 0, batería 25,6→25,8 °C, 72/72 muestras y
+cero fallos. No hubo crash ni ANR. No se usó NNAPI, GPU paga ni segmentación
+universal.
+
+El primer intento del runner reveló un defecto general: cerrar `MPImage`
+reciclaba el bitmap que todavía necesitaban las señales locales. El runner
+ahora entrega a pose una copia aislada y libera sólo esa copia. La repetición
+completa produjo las cifras anteriores.
+
+## Evidencia reproducible
+
+`tools/dag-v2-benchmark/evidence/04b/` versiona sólo JSON/JSONL sanitizado:
+exportación original y normalizada, señales Mac, comparación docente limitada
+a 20 muestras, sello, resultado de apertura única, medición Android, resumen y
+checksums. No contiene imágenes, modelos, APK, URLs ni datos privados.
+
+```bash
+python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-results
+```
+
+El comando recalcula hashes, conjunto de 203 IDs, conteos, p50/p95/máximos,
+inputs del sello y todas las métricas del test. El CI especializado lo ejecuta
+sin red.
 
 ## Rollback
 

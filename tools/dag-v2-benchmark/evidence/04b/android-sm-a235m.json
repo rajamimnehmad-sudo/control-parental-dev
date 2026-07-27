@@ -1,0 +1,55 @@
+{
+  "android_api": 34,
+  "android_version": "14",
+  "apk": {
+    "sha256": "15ce4cbbad039baf2f6b9f4811388f1b4cf1535de3ac1b72d993eafa8c655b36",
+    "size_bytes": 170878601,
+    "tracked": false
+  },
+  "battery_temperature_after_tenths_c": 258,
+  "battery_temperature_before_tenths_c": 256,
+  "cpu_ms": 21619,
+  "device_model": "SM-A235M",
+  "device_serial": "R58T34V31AE",
+  "failures": 0,
+  "in_place_install": true,
+  "nnapi": false,
+  "paid_gpu": false,
+  "performance_gate_passed": true,
+  "pss_kb": 183520,
+  "runtime": "CPU",
+  "samples": 72,
+  "stages": {
+    "adult": {
+      "max_ms": 347.32,
+      "p50_ms": 248.574,
+      "p95_ms": 316.336
+    },
+    "adult_pose_parallel": {
+      "max_ms": 483.322,
+      "p50_ms": 309.442,
+      "p95_ms": 472.243
+    },
+    "local_signals": {
+      "max_ms": 30.555,
+      "p50_ms": 3.592,
+      "p95_ms": 18.584
+    },
+    "policy_upper_bound": {
+      "max_ms": 0.022,
+      "p50_ms": 0.012,
+      "p95_ms": 0.018
+    },
+    "pose": {
+      "max_ms": 351.444,
+      "p50_ms": 141.143,
+      "p95_ms": 333.719
+    },
+    "sequential": {
+      "max_ms": 637.141,
+      "p50_ms": 406.258,
+      "p95_ms": 606.502
+    }
+  },
+  "thermal_status": 0
+}

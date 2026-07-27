@@ -81,6 +81,52 @@ class PolicyEvaluationContractTest(unittest.TestCase):
                 with self.assertRaises(ValueError):
                     POLICY.validate_label_export(path, require_complete=False)
 
+    def test_legacy_reasons_are_normalized_without_ambiguity(self):
+        order = POLICY.read_jsonl(POLICY.REVIEW_ORDER_LOCK)
+        legacy = {
+            "sample_id": order[0]["sample_id"],
+            "decision": "hide",
+            "reasons": "[abdomen, knee]",
+            "review_number": 1,
+            "reviewed_at": "2026-07-26T12:00:00Z",
+            "policy_version": POLICY.POLICY_VERSION,
+            "reviewer_version": POLICY.REVIEWER_VERSION,
+        }
+        with tempfile.TemporaryDirectory() as temporary:
+            root = pathlib.Path(temporary)
+            source = root / "legacy.jsonl"
+            output = root / "normalized.jsonl"
+            source.write_text(json.dumps(legacy) + "\n", encoding="utf-8")
+            labels = POLICY.validate_label_export(source, require_complete=False)
+            self.assertEqual(["abdomen", "knee"], labels[0]["reasons"])
+            with self.assertRaises(ValueError):
+                POLICY.normalize_label_export(source, output)
+
+            remaining = []
+            for item in order[1:]:
+                remaining.append(
+                    {
+                        **legacy,
+                        "sample_id": item["sample_id"],
+                        "decision": "show",
+                        "reasons": "[]",
+                    }
+                )
+            POLICY.write_jsonl(source, [legacy, *remaining])
+            POLICY.normalize_label_export(source, output)
+            normalized = POLICY.read_jsonl(output)
+            self.assertEqual(["abdomen", "knee"], normalized[0]["reasons"])
+            self.assertEqual([], normalized[1]["reasons"])
+            self.assertNotEqual(POLICY.sha256_file(source)[0], POLICY.sha256_file(output)[0])
+
+    def test_legacy_reasons_reject_unknown_or_ambiguous_values(self):
+        for value in ("abdomen", "[abdomen,,knee]", "[unknown_reason]", "[abdomen, abdomen]"):
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                POLICY._normalize_export_reasons(value)
+
+    def test_versioned_results_bundle_recomputes(self):
+        POLICY.verify_04b_results()
+
     def test_heavy_teacher_is_hard_limited_below_ten_percent(self):
         with self.assertRaises(ValueError):
             POLICY.compare_segmentation_teacher(

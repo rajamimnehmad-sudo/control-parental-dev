@@ -89,6 +89,11 @@ public final class ReviewExporterTest {
             assertFalse(line.contains("cookie"));
             assertFalse(line.contains("author"));
         }
+        JSONObject first = new JSONObject(lines.get(0));
+        JSONObject second = new JSONObject(lines.get(1));
+        assertEquals(0, first.getJSONArray("reasons").length());
+        assertEquals(1, second.getJSONArray("reasons").length());
+        assertEquals("knee", second.getJSONArray("reasons").getString(0));
         assertEquals(result.sha256, ReviewExporter.sha256(result.file));
         assertTrue(result.sizeBytes > 0);
         assertFalse(new File(directory, "dag-v2-evaluation-04b.jsonl.tmp").exists());

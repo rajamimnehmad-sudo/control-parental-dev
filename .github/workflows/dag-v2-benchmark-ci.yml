@@ -48,6 +48,7 @@ jobs:
           python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-repository
           python tools/dag-v2-benchmark/dag_v2_benchmark.py verify-evidence
           python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-review-plan
+          python tools/dag-v2-benchmark/dag_v2_policy_eval.py verify-results
 
       - name: Verify Android CI scope
         run: bash scripts/test_android_ci_scope.sh

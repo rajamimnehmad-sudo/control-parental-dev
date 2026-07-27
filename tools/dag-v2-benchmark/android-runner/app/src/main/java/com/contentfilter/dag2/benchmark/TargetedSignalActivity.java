@@ -208,11 +208,18 @@ public final class TargetedSignalActivity extends Activity {
     }
 
     private PoseLandmarkerResult detect(PoseLandmarker pose, Bitmap bitmap) {
-        MPImage image = new BitmapImageBuilder(bitmap).build();
+        Bitmap poseInput = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+        if (poseInput == null) {
+            throw new IllegalStateException("pose_bitmap_copy_failed");
+        }
+        MPImage image = new BitmapImageBuilder(poseInput).build();
         try {
             return pose.detect(image);
         } finally {
             image.close();
+            if (!poseInput.isRecycled()) {
+                poseInput.recycle();
+            }
         }
     }
 
