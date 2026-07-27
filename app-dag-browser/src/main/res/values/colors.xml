@@ -1,0 +1,8 @@
+<resources>
+    <color name="dag_navy">#102A43</color>
+    <color name="dag_blue">#1F6F8B</color>
+    <color name="dag_background">#F3F7FA</color>
+    <color name="dag_surface">#FFFFFF</color>
+    <color name="dag_text">#102A43</color>
+    <color name="dag_muted">#52677A</color>
+</resources>
