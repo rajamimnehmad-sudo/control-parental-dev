@@ -46,6 +46,58 @@ Cada resultado queda como `needs_review`. Openverse no garantiza que sus datos d
 correctos: antes de convertir un candidato en muestra elegible hay que verificar pagina original,
 atribucion, permiso comercial/derivados, derechos de imagen y relevancia visual.
 
+## Evaluar predicciones y cuantizacion
+
+```bash
+python3 scripts/dag_v3_model/evaluation_harness.py \
+  predicciones.jsonl politica-piloto-no-aprobada.json \
+  --reference-variant float \
+  --candidate-variant int8 \
+  --slice-key source \
+  --slice-key media_type \
+  --pretty > reporte.json
+```
+
+Cada fila de predicciones usa `dag-v3-prediction-v1`, conserva `sample_id`, las 21 etiquetas humanas
+y un vector ordenado de 21 probabilidades por variante. Los nombres y el orden salen de
+`glosh-visual-signals-v1.json`; una probabilidad faltante, fuera de rango o una variante desigual
+entre filas invalida la corrida completa.
+
+La politica de evaluacion usa `dag-v3-evaluation-policy-v1`. Debe declarar las 21 senales, dos
+umbrales por senal y si esa senal bloquea o solo se observa:
+
+```json
+{
+  "schema_version": "dag-v3-evaluation-policy-v1",
+  "signal_contract_version": "glosh-visual-signals-v1",
+  "policy_version": "pilot-unapproved-1",
+  "labels": {
+    "adult_or_explicit": {
+      "uncertain_threshold": 0.2,
+      "positive_threshold": 0.8,
+      "policy_action": "block"
+    }
+  }
+}
+```
+
+El fragmento muestra la forma, pero el archivo real debe incluir exactamente las 21 senales. Los
+umbrales del ejemplo no estan aprobados ni habilitan el navegador.
+
+El reporte calcula por senal precision, recall, falsos negativos, PR-AUC, Brier, calibracion,
+intervalos Wilson, curva precision/recall y cuantos positivos quedan debajo del umbral de
+incertidumbre. Tambien calcula la politica completa, separa `block`, `uncertain` y `allow`, lista
+hasta 50 IDs de falsos permisos y compara cruces de umbral y regresiones entre float e INT8.
+
+Solo `positive` y `negative` entran en las metricas de una senal. `unknown`, `not_applicable` y
+`unreviewed` quedan visibles como enmascarados. Para la verdad de politica, un positivo basta para
+`block`; sin positivos, `unknown` o `unreviewed` dejan el caso sin resolver y `not_applicable` no
+crea por si solo una senal de riesgo.
+
+La herramienta no abre imagenes, no usa red, no entrena y no decide si un modelo esta aprobado.
+Limita archivo, filas, variantes, campos de corte y cantidad de valores por corte para que un
+reporte accidentalmente enorme falle de manera controlada.
+
 ## Tests
 
 ```bash

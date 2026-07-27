@@ -190,6 +190,11 @@ Por etiqueta y por politica se registran:
 - p50/p95/maximo, PSS adicional, bateria y temperatura en SM-A235M;
 - matriz Fravega, Mimo y Cheeky sin destello.
 
+`scripts/dag_v3_model/evaluation_harness.py` fija el primer formato reproducible para estas
+mediciones. Enmascara estados no concluyentes, calcula intervalos Wilson, conserva la banda
+`uncertain`, admite cortes acotados y compara una referencia float contra una candidata INT8. Sus
+resultados son evidencia para calibrar: no aprueban umbrales ni habilitan acciones del navegador.
+
 Los objetivos numericos finales y umbrales necesitan una revision Ultra separada cuando exista la
 distribucion del piloto. Hasta entonces, ningun resultado puede generar `allow` o `blur`.
 
