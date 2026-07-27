@@ -1,9 +1,8 @@
 name: Temporary DAG v2 Policy Reviewer APK
 
 on:
-  pull_request:
-    paths:
-      - .github/workflows/dag-v2-policy-reviewer-apk-temp.yml
+  # The human review gate is closed. Keep this artifact builder manual so
+  # normal 04B evidence changes never download the corpus in CI.
   workflow_dispatch:
 
 permissions:
