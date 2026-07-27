@@ -90,6 +90,27 @@ Evidencia:
 Puente controlado:
 `docs/dag/v3/DAG_BROWSER_V3_GLOSH_BRIDGE.md`.
 
+## Etapa 3 - contrato de analisis visual
+
+La extension ya puede registrar una imagen candidata y consultar al componente Android mediante
+un protocolo local versionado. El mensaje contiene identificador, URL, pagina, texto alternativo y
+dimensiones; no sube la foto ni usa Supabase.
+
+El contrato inicial es deliberadamente cerrado:
+
+- el unico resultado aceptado es `block`;
+- una respuesta ausente, invalida, alterada o de otra version no cambia el estado oculto;
+- una URL local, metadatos excesivos o dimensiones invalidas tambien se bloquean;
+- se limita la cantidad de candidatas por documento para evitar abuso;
+- la barrera de red sigue cancelando los recursos visuales.
+
+Esta etapa no afirma que exista un clasificador. Su objetivo es preparar y probar el limite seguro
+antes de transportar pixeles o incorporar un modelo. Las acciones `allow` y `blur` no se habilitan
+hasta completar el benchmark en el Samsung objetivo y cerrar las pruebas contra fugas visuales.
+
+Plan de seleccion y calibracion:
+`docs/dag/v3/DAG_BROWSER_V3_MODEL_BENCHMARK.md`.
+
 ## Publicacion e instalacion
 
 La publicación DEV usa dos caminos separados:

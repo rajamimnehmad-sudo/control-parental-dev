@@ -1,6 +1,6 @@
 /*
- * This stylesheet is injected at document_start. The first foundation has no
- * classifier, so every visual resource remains hidden by design.
+ * This stylesheet is injected at document_start. Media remains hidden while
+ * it is pending, blocked, invalid, or cannot reach the native analyzer.
  */
 img,
 picture,

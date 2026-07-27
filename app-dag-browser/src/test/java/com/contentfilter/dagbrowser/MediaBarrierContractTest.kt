@@ -40,4 +40,15 @@ class MediaBarrierContractTest {
         assertContains(script, "barrier-ready")
         assertContains(script, "window.top === window")
     }
+
+    @Test
+    fun `media analysis protocol is native and fail closed`() {
+        val script = extensionRoot.resolve("barrier.js").readText()
+
+        assertContains(script, "\"media-candidate\"")
+        assertContains(script, "\"media-decision\"")
+        assertContains(script, "SAFE_NATIVE_ACTIONS = new Set([\"block\"])")
+        assertContains(script, "Any native or protocol failure leaves the media hidden")
+        assertContains(script, "MAX_CANDIDATES_PER_DOCUMENT")
+    }
 }
