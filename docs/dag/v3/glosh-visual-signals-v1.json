@@ -11,7 +11,7 @@
     "range": [0.0, 1.0],
     "containsPolicyAction": false
   },
-  "annotationStates": ["positive", "negative", "unknown", "not_applicable"],
+  "annotationStates": ["positive", "negative", "unknown", "not_applicable", "unreviewed"],
   "labels": [
     {
       "index": 0,
