@@ -25,33 +25,31 @@ otras reglas de tzniut. Solo se admite un segundo modelo especializado si una ab
 que reduce falsos permisos de manera material y conserva los presupuestos de latencia y memoria.
 
 La linea base del runtime sera LiteRT empaquetado y versionado dentro de DAG, CPU primero. Eso
-mantiene funcionamiento offline y una version reproducible. Google Play Services, GPU, NNAPI u otro
-runtime solo se agregan como candidatas medidas; una aceleracion no se presume.
+mantiene funcionamiento offline y una version reproducible. La investigacion del 2026-07-27 encontro
+`2.1.5` como release oficial mas reciente; se vuelve a verificar al implementar. Google Play
+Services, GPU, NNAPI u otro runtime solo se agregan como candidatas medidas; una aceleracion no se
+presume.
 
 ## Etiquetas iniciales
 
-- persona;
-- apariencia femenina observable, sin afirmar identidad real;
-- brazos o hombros expuestos;
-- escote o pecho;
-- vientre;
-- muslo o rodilla;
-- desnudez explicita;
-- vestimenta ajustada o sugestiva;
-- ropa transparente, traje de bano o ropa interior;
-- segura;
-- dudosa.
+El contrato versionado esta en `docs/dag/v3/glosh-visual-signals-v1.json` y su semantica completa en
+`docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`.
 
-Las etiquetas son senales del modelo. La accion visible pertenece a la politica de Glosh y puede
-calibrarse sin reentrenar.
+Las etiquetas son hechos visuales multietiqueta: contexto de personas y edad incierta, senales de
+modestia, desnudez/sexualizacion, temas configurables y evidencia demasiado pequena u oculta.
+`safe` y `uncertain` son resultados derivados por calibracion y politica, no clases del modelo. La
+accion visible pertenece a Glosh y puede cambiarse sin reentrenar.
 
 ## Conjunto de evaluacion
 
+- Procedencia, licencia comercial, permiso de derivados y atribucion verificadas por imagen.
 - Separacion por sitio y origen para evitar que fotos casi identicas aparezcan en entrenamiento y
   prueba.
+- Agrupacion por creador, sesion/producto/campana y cluster perceptual antes de asignar el split.
 - Casos de busqueda, tiendas, noticias, anuncios, dibujos, fotos pequenas y grupos de personas.
 - Revision humana doble para los casos dudosos.
 - Sin carga automatica de imagenes privadas desde el telefono.
+- Prelabels automaticos separados de la verdad humana.
 - Registro por categoria de falsos negativos, falsos positivos y desacuerdo humano.
 
 ## Metricas obligatorias
@@ -85,9 +83,10 @@ Ademas se registra por separado:
 1. El transporte de pixeles tiene limites de tamano, tiempo y concurrencia.
 2. Un error de descarga, decodificacion, runtime o modelo devuelve `block`.
 3. La prueba automatica demuestra que una respuesta web no puede falsificar `allow`.
-4. El benchmark fisico cumple los presupuestos acordados.
-5. Una revision de razonamiento muy alto/Ultra aprueba categorias, dataset, metricas y umbrales.
-6. Solo entonces se agregan `allow` y `blur` al protocolo nativo.
+4. Dataset, pesos y runtime tienen procedencia, licencia y hashes aprobados.
+5. El benchmark fisico cumple los presupuestos acordados.
+6. Una revision de razonamiento muy alto/Ultra aprueba categorias, dataset, metricas y umbrales.
+7. Solo entonces se agregan `allow` y `blur` al protocolo nativo.
 
 ## Candidatas y fuentes primarias
 
