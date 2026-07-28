@@ -7,6 +7,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -19,6 +21,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -41,8 +45,10 @@ fun UpdatesRoute(
     onRecoveryCodeChanged: (String) -> Unit = {},
     onSubmitRecoveryCode: () -> Unit = {},
     viewModel: UpdatesViewModel = hiltViewModel(),
+    feedbackViewModel: UserFeedbackViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val feedbackState by feedbackViewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         if (state.status == UpdatesStatus.Idle) {
             viewModel.checkForUpdates()
@@ -63,6 +69,8 @@ fun UpdatesRoute(
         protectionMessage = protectionMessage,
         onRecoveryCodeChanged = onRecoveryCodeChanged,
         onSubmitRecoveryCode = onSubmitRecoveryCode,
+        feedbackState = feedbackState,
+        onSubmitFeedback = feedbackViewModel::submit,
     )
 }
 
@@ -82,8 +90,12 @@ private fun UpdatesScreen(
     protectionMessage: String,
     onRecoveryCodeChanged: (String) -> Unit,
     onSubmitRecoveryCode: () -> Unit,
+    feedbackState: FeedbackUiState,
+    onSubmitFeedback: (Int, String) -> Unit,
 ) {
     var showReleaseNotes by rememberSaveable { mutableStateOf(false) }
+    var rating by rememberSaveable { mutableStateOf(0) }
+    var ratingComment by rememberSaveable { mutableStateOf("") }
     ProductVisualPage(
         title = "Ajustes",
         subtitle = "Versión, actualización y acceso de emergencia",
@@ -118,6 +130,43 @@ private fun UpdatesScreen(
                 supporting = { Text(activationState.ifBlank { "Revisando…" }) },
                 showDivider = false,
             )
+        }
+        ProductCard {
+            Text("Valorar App Usuario", style = MaterialTheme.typography.titleMedium)
+            Text("Tu calificación ayuda a mejorar la aplicación.", style = MaterialTheme.typography.bodyMedium)
+            Row {
+                (1..5).forEach { value ->
+                    IconButton(onClick = { rating = value }) {
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = "$value estrellas",
+                            tint =
+                                if (value <= rating) {
+                                    MaterialTheme.colorScheme.tertiary
+                                } else {
+                                    MaterialTheme.colorScheme.outlineVariant
+                                },
+                        )
+                    }
+                }
+            }
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = ratingComment,
+                onValueChange = { if (it.length <= 1000) ratingComment = it },
+                label = { Text("Comentario opcional") },
+                minLines = 3,
+            )
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = rating > 0 && !feedbackState.saving,
+                onClick = { onSubmitFeedback(rating, ratingComment) },
+            ) {
+                Text(if (feedbackState.saving) "Enviando…" else "Enviar valoración")
+            }
+            if (feedbackState.message.isNotBlank()) {
+                Text(feedbackState.message, style = MaterialTheme.typography.bodyMedium)
+            }
         }
         ProductCard {
             Text("Código de emergencia", style = MaterialTheme.typography.titleMedium)

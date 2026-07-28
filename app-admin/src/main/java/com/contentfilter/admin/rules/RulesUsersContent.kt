@@ -1,9 +1,12 @@
 package com.contentfilter.admin.rules
 
+import android.content.Intent
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -42,6 +45,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
@@ -283,6 +287,7 @@ private fun NewUserDialog(
     onCopyToken: () -> Unit,
 ) {
     val hasToken = state.pairingCode.isNotBlank()
+    val context = LocalContext.current
     val focusRequester = remember { FocusRequester() }
     LaunchedEffect(hasToken) {
         if (!hasToken) focusRequester.requestFocus()
@@ -307,6 +312,28 @@ private fun NewUserDialog(
                         expiresAt = state.pairingExpiresAt,
                         onCopy = onCopyToken,
                     )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End,
+                    ) {
+                        Button(
+                            modifier =
+                                Modifier
+                                    .size(52.dp)
+                                    .semantics { contentDescription = "Compartir token por WhatsApp" },
+                            shape = CircleShape,
+                            contentPadding = PaddingValues(0.dp),
+                            onClick = {
+                                val message =
+                                    "Código para activar Glosh Usuario:\n${state.pairingCode}\n" +
+                                        "Usalo antes de ${state.pairingExpiresAt}."
+                                val uri = Uri.parse("https://wa.me/?text=${Uri.encode(message)}")
+                                context.startActivity(Intent(Intent.ACTION_VIEW, uri))
+                            },
+                        ) {
+                            Text("WA")
+                        }
+                    }
                 } else {
                     OutlinedTextField(
                         modifier = Modifier.fillMaxWidth().focusRequester(focusRequester),
