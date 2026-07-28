@@ -1,0 +1,209 @@
+#!/usr/bin/env python3
+"""Download a small, bounded Openverse pilot from a reviewed metadata inventory."""
+
+from __future__ import annotations
+
+import argparse
+import hashlib
+import ipaddress
+import json
+import socket
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, BinaryIO
+from urllib.parse import urlparse
+from urllib.request import Request, urlopen
+
+
+DOWNLOAD_VERSION = "dag-v3-openverse-pilot-download-1"
+MAX_ITEMS = 100
+DEFAULT_ITEMS = 20
+MAX_FILE_BYTES = 8 * 1024 * 1024
+MAX_TOTAL_BYTES = 100 * 1024 * 1024
+REQUEST_TIMEOUT_SECONDS = 15
+USER_AGENT = "Glosh-DAG-V3-pilot-downloader/1.0"
+ALLOWED_LICENSES = {"by", "by-sa", "cc0", "pdm"}
+
+
+def _public_https_url(value: Any) -> str:
+    if not isinstance(value, str) or not value or len(value) > 2048:
+        raise ValueError("asset URL is missing or too long")
+    parsed = urlparse(value)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        raise ValueError("asset URL must be public HTTPS without credentials")
+    try:
+        addresses = {
+            address[4][0]
+            for address in socket.getaddrinfo(parsed.hostname, parsed.port or 443)
+        }
+    except socket.gaierror as error:
+        raise ValueError("asset hostname cannot be resolved") from error
+    if not addresses:
+        raise ValueError("asset hostname has no addresses")
+    for address in addresses:
+        ip = ipaddress.ip_address(address)
+        if not ip.is_global:
+            raise ValueError("asset hostname resolves to a non-public address")
+    return value
+
+
+def _detect_image_type(header: bytes) -> tuple[str, str] | None:
+    if header.startswith(b"\xff\xd8\xff"):
+        return "jpg", "image/jpeg"
+    if header.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "png", "image/png"
+    if header.startswith((b"GIF87a", b"GIF89a")):
+        return "gif", "image/gif"
+    if len(header) >= 12 and header[:4] == b"RIFF" and header[8:12] == b"WEBP":
+        return "webp", "image/webp"
+    return None
+
+
+def _download_body(response: BinaryIO, remaining_total: int) -> bytes:
+    allowed = min(MAX_FILE_BYTES, remaining_total)
+    body = response.read(allowed + 1)
+    if len(body) > allowed:
+        raise ValueError("image exceeds the configured size limit")
+    if not body:
+        raise ValueError("image response is empty")
+    return body
+
+
+def _candidate_rows(path: Path) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    with path.open("r", encoding="utf-8") as source:
+        for line_number, line in enumerate(source, 1):
+            if not line.strip():
+                continue
+            try:
+                row = json.loads(line)
+            except json.JSONDecodeError as error:
+                raise ValueError(f"invalid JSON on inventory line {line_number}") from error
+            if not isinstance(row, dict):
+                raise ValueError(f"inventory line {line_number} is not an object")
+            rows.append(row)
+    return rows
+
+
+def download_pilot(
+    inventory_path: Path,
+    output_dir: Path,
+    limit: int = DEFAULT_ITEMS,
+) -> dict[str, int]:
+    if not 1 <= limit <= MAX_ITEMS:
+        raise ValueError(f"limit must be between 1 and {MAX_ITEMS}")
+
+    rows = _candidate_rows(inventory_path)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    images_dir = output_dir / "images"
+    images_dir.mkdir(exist_ok=True)
+    manifest_path = output_dir / "downloads.jsonl"
+
+    downloaded = 0
+    failed = 0
+    duplicates = 0
+    total_bytes = 0
+    seen_hashes: set[str] = set()
+    records: list[dict[str, Any]] = []
+
+    for row in rows[:limit]:
+        identifier = row.get("openverse_id")
+        record: dict[str, Any] = {
+            "download_version": DOWNLOAD_VERSION,
+            "openverse_id": identifier,
+            "query": row.get("query"),
+            "source": row.get("source"),
+            "landing_url": row.get("landing_url"),
+            "asset_url": row.get("asset_url"),
+            "license_id": row.get("license_id"),
+            "license_url": row.get("license_url"),
+            "attribution": row.get("attribution"),
+            "review_status": "needs_license_and_visual_review",
+        }
+        try:
+            if not isinstance(identifier, str) or not identifier:
+                raise ValueError("candidate has no Openverse ID")
+            if row.get("license_id") not in ALLOWED_LICENSES:
+                raise ValueError("candidate license is not allowed for this pilot")
+            asset_url = _public_https_url(row.get("asset_url"))
+            remaining_total = MAX_TOTAL_BYTES - total_bytes
+            if remaining_total <= 0:
+                raise ValueError("pilot reached the total download size limit")
+            request = Request(
+                asset_url,
+                headers={
+                    "Accept": "image/jpeg,image/png,image/webp,image/gif",
+                    "User-Agent": USER_AGENT,
+                },
+            )
+            with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+                final_url = _public_https_url(response.geturl())
+                body = _download_body(response, remaining_total)
+            detected = _detect_image_type(body[:16])
+            if detected is None:
+                raise ValueError("response is not a supported raster image")
+            extension, mime = detected
+            digest = hashlib.sha256(body).hexdigest()
+            if digest in seen_hashes:
+                duplicates += 1
+                record.update({"status": "duplicate", "sha256": digest})
+            else:
+                filename = f"{downloaded + 1:03d}-{digest[:16]}.{extension}"
+                (images_dir / filename).write_bytes(body)
+                seen_hashes.add(digest)
+                downloaded += 1
+                total_bytes += len(body)
+                record.update(
+                    {
+                        "status": "downloaded",
+                        "retrieved_at": datetime.now(timezone.utc)
+                        .isoformat()
+                        .replace("+00:00", "Z"),
+                        "final_asset_url": final_url,
+                        "local_path": f"images/{filename}",
+                        "sha256": digest,
+                        "bytes": len(body),
+                        "mime": mime,
+                    }
+                )
+        except (OSError, ValueError) as error:
+            failed += 1
+            record.update({"status": "failed", "error": str(error)})
+        records.append(record)
+
+    with manifest_path.open("w", encoding="utf-8") as manifest:
+        for record in records:
+            manifest.write(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n")
+
+    return {
+        "requested": min(limit, len(rows)),
+        "downloaded": downloaded,
+        "failed": failed,
+        "duplicates": duplicates,
+        "bytes": total_bytes,
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("inventory", type=Path)
+    parser.add_argument("output_dir", type=Path)
+    parser.add_argument("--limit", type=int, default=DEFAULT_ITEMS)
+    args = parser.parse_args(argv)
+    try:
+        summary = download_pilot(args.inventory, args.output_dir, args.limit)
+    except (OSError, ValueError) as error:
+        print(f"fatal: {error}", file=sys.stderr)
+        return 2
+    print(json.dumps(summary, sort_keys=True))
+    return 0 if summary["downloaded"] else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

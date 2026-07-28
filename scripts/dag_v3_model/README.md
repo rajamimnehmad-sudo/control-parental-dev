@@ -69,6 +69,25 @@ Cada resultado queda como `needs_review`. Openverse no garantiza que sus datos d
 correctos: antes de convertir un candidato en muestra elegible hay que verificar pagina original,
 atribucion, permiso comercial/derivados, derechos de imagen y relevancia visual.
 
+## Descarga piloto acotada
+
+Solo despues de autorizar explicitamente una prueba, un inventario puede convertirse en una carpeta
+local de candidatos:
+
+```bash
+python3 scripts/dag_v3_model/openverse_pilot_downloader.py \
+  candidatos.jsonl .codex-tmp/dag-v3-pilot/downloaded --limit 20
+```
+
+El descargador acepta como maximo 100 candidatos, 8 MiB por archivo y 100 MiB totales. Rechaza
+HTTP, destinos de red no publicos, licencias fuera del sondeo, respuestas vacias, formatos que no
+sean JPEG/PNG/GIF/WebP y duplicados exactos. Guarda los pixeles fuera de Git junto con
+`downloads.jsonl`, hashes y procedencia.
+
+Una descarga exitosa sigue marcada como `needs_license_and_visual_review`: no integra la imagen al
+dataset, no la etiqueta y no autoriza entrenamiento. Openverse agrega metadatos de terceros y exige
+verificar por separado los derechos y terminos de cada obra.
+
 ## Evaluar predicciones y cuantizacion
 
 ```bash
