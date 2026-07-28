@@ -60,6 +60,11 @@ La guia de anotacion debe incluir ejemplos de borde para edad visual, grupos, es
 ropa ajustada, ilustraciones realistas, personas pequenas y cada tema. Dos revisores independientes
 etiquetan el conjunto de evaluacion; un tercero adjudica los desacuerdos criticos.
 
+El primer borrador versionado vive en
+`docs/dag/v3/DAG_BROWSER_V3_ANNOTATION_GUIDE_V1_DRAFT.md`. Fija principios observables y protocolo,
+pero enumera los bordes que aun necesitan ejemplos y aprobacion Ultra; no autoriza empezar el corpus
+final.
+
 ## Politica y perfiles
 
 Los umbrales son independientes por etiqueta. Un perfil de Glosh puede activar o desactivar temas,

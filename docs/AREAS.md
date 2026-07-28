@@ -58,6 +58,9 @@ Indice tecnico por areas para que cada ticket pueda empezar con `Area: ...` y ev
 - Politica de navegacion: `app-dag-browser/src/main/java/com/contentfilter/dagbrowser/DagNavigationPolicy.kt`
 - Barrera incorporada: `app-dag-browser/src/main/assets/dag-protection/`
 - Contrato y gates: `docs/dag/v3/DAG_BROWSER_V3_FOUNDATION.md`
+- Modelo/datos: `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`
+- Guia visual borrador: `docs/dag/v3/DAG_BROWSER_V3_ANNOTATION_GUIDE_V1_DRAFT.md`
+- Herramientas de corpus/evaluacion: `scripts/dag_v3_model/`
 - No tocar por defecto: `app-user/src/main/java/com/contentfilter/user/dag/`, `feature-dag2/`, Supabase, VPN, Accessibility, Admin ni publicadores.
 
 ## Accessibility / Bloqueo Apps
