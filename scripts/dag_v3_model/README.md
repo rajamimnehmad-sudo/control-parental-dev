@@ -77,7 +77,8 @@ local de candidatos:
 ```bash
 python3 scripts/dag_v3_model/openverse_pilot_downloader.py \
   candidatos.jsonl .codex-tmp/dag-v3-pilot/downloaded --limit 20 \
-  --known-downloads lote-anterior/downloads.jsonl
+  --known-downloads lote-anterior/downloads.jsonl \
+  --delay-seconds 1
 ```
 
 El descargador acepta como maximo 100 candidatos, 8 MiB por archivo y 100 MiB totales. Rechaza
@@ -86,10 +87,31 @@ sean JPEG/PNG/GIF/WebP y duplicados exactos. Guarda los pixeles fuera de Git jun
 `downloads.jsonl`, hashes y procedencia. La carpeta de salida debe estar vacia para no mezclar dos
 pilotos accidentalmente. `--known-downloads` puede repetirse para evitar duplicados exactos contra
 lotes anteriores.
+Para Wikimedia se usa una demora de un segundo, solicitudes en serie y un `User-Agent` identificable
+con el repositorio como contacto; un `429` se respeta como fallo y nunca se evade.
 
 Una descarga exitosa sigue marcada como `needs_license_and_visual_review`: no integra la imagen al
 dataset, no la etiqueta y no autoriza entrenamiento. Openverse agrega metadatos de terceros y exige
 verificar por separado los derechos y terminos de cada obra.
+
+## Inventario acotado de Wikimedia Commons
+
+```bash
+python3 scripts/dag_v3_model/wikimedia_inventory.py \
+  --query 'crop top' \
+  --query 'sleeveless dress' \
+  > candidatos-wikimedia.jsonl
+```
+
+Consulta la API oficial de Commons con un maximo de 20 resultados por pagina y tres paginas por
+consulta. Recupera una miniatura de hasta 1024 px junto con pagina de descripcion, autor, licencia,
+SHA-1 de origen y restricciones publicadas. Solo conserva raster y licencias potencialmente
+comerciales/modificables (`CC BY`, `CC BY-SA`, `CC0` o dominio publico).
+
+El inventario sigue siendo descubrimiento: Commons exige comprobar la pagina de cada archivo,
+atribucion, licencia y restricciones no relacionadas con copyright, incluidos derechos de imagen.
+Los candidatos compatibles se descargan con el mismo `openverse_pilot_downloader.py`, que acepta el
+contrato generico `candidate_id` aunque conserva su nombre historico.
 
 ## Evaluar predicciones y cuantizacion
 
