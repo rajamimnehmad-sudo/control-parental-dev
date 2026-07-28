@@ -10,7 +10,7 @@ export function DomainTestSamples({ domains }: { domains: Record<string, string[
     () => Object.entries(domains).flatMap(([category, values]) => values.map((domain) => ({ domain, category }))),
     [domains],
   );
-  const [selected, setSelected] = useState(() => shuffled(all).slice(0, 3));
+  const [selected, setSelected] = useState(() => all.slice(0, 3));
 
   if (all.length === 0) {
     return <section className="panel"><h2 className="section-title">Páginas de prueba</h2><p className="muted">La próxima actualización de la base preparará ejemplos verificables.</p></section>;
