@@ -10,22 +10,22 @@ export async function generateMetadata(): Promise<Metadata> {
   const imageUrl = new URL("/og.png", origin).toString();
 
   return {
-    title: "Super Admin | Content Filter",
-    description: "Panel Super Admin para comunidades, licencias y dispositivos.",
+    title: "Glosh Control Center",
+    description: "Administración central de comunidades, protección y dispositivos Glosh.",
     robots: {
       index: false,
       follow: false,
       nocache: true,
     },
     openGraph: {
-      title: "Super Admin | Content Filter",
-      description: "Administración segura de comunidades y dispositivos.",
-      images: [{ url: imageUrl, width: 1731, height: 908, alt: "Content Filter Super Admin" }],
+      title: "Glosh Control Center",
+      description: "Protección clara. Control responsable.",
+      images: [{ url: imageUrl, width: 1729, height: 910, alt: "Glosh Control Center · Protección clara. Control responsable." }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Super Admin | Content Filter",
-      description: "Administración segura de comunidades y dispositivos.",
+      title: "Glosh Control Center",
+      description: "Protección clara. Control responsable.",
       images: [imageUrl],
     },
   };
