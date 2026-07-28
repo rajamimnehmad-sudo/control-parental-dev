@@ -82,7 +82,8 @@ python3 scripts/dag_v3_model/openverse_pilot_downloader.py \
 El descargador acepta como maximo 100 candidatos, 8 MiB por archivo y 100 MiB totales. Rechaza
 HTTP, destinos de red no publicos, licencias fuera del sondeo, respuestas vacias, formatos que no
 sean JPEG/PNG/GIF/WebP y duplicados exactos. Guarda los pixeles fuera de Git junto con
-`downloads.jsonl`, hashes y procedencia.
+`downloads.jsonl`, hashes y procedencia. La carpeta de salida debe estar vacia para no mezclar dos
+pilotos accidentalmente.
 
 Una descarga exitosa sigue marcada como `needs_license_and_visual_review`: no integra la imagen al
 dataset, no la etiqueta y no autoriza entrenamiento. Openverse agrega metadatos de terceros y exige

@@ -100,10 +100,12 @@ def download_pilot(
         raise ValueError(f"limit must be between 1 and {MAX_ITEMS}")
 
     rows = _candidate_rows(inventory_path)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    images_dir = output_dir / "images"
-    images_dir.mkdir(exist_ok=True)
     manifest_path = output_dir / "downloads.jsonl"
+    images_dir = output_dir / "images"
+    if manifest_path.exists() or (images_dir.exists() and any(images_dir.iterdir())):
+        raise ValueError("output directory already contains a pilot download")
+    output_dir.mkdir(parents=True, exist_ok=True)
+    images_dir.mkdir(exist_ok=True)
 
     downloaded = 0
     failed = 0
@@ -129,6 +131,10 @@ def download_pilot(
         try:
             if not isinstance(identifier, str) or not identifier:
                 raise ValueError("candidate has no Openverse ID")
+            if row.get("review_status") not in (None, "needs_review"):
+                raise ValueError("candidate is not in the expected review state")
+            if row.get("mature") is True:
+                raise ValueError("candidate is marked as mature")
             if row.get("license_id") not in ALLOWED_LICENSES:
                 raise ValueError("candidate license is not allowed for this pilot")
             asset_url = _public_https_url(row.get("asset_url"))

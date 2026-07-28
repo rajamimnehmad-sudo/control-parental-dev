@@ -138,6 +138,16 @@ class OpenversePilotDownloaderTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 downloader.download_pilot(inventory, root / "output", limit=101)
 
+    def test_refuses_to_mix_with_an_existing_download(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            inventory = self._write_inventory(root, [candidate()])
+            output = root / "output"
+            output.mkdir()
+            (output / "downloads.jsonl").write_text("{}\n", encoding="utf-8")
+            with self.assertRaisesRegex(ValueError, "already contains"):
+                downloader.download_pilot(inventory, output)
+
 
 if __name__ == "__main__":
     unittest.main()
