@@ -133,6 +133,10 @@ inconsistentes y grupos repartidos entre splits. Validacion y test exigen exacta
 independientes; un desacuerdo exige un tercer adjudicador distinto y la etiqueta final debe coincidir
 con esa resolucion.
 
+`scripts/dag_v3_model/annotation_agreement.py` mide acuerdo exacto, kappa, desacuerdos binarios,
+casos con incertidumbre y arbitrajes por senal, split y version de guia. El reporte conserva los
+casos discrepantes mediante IDs seudonimos y no abre las imagenes.
+
 `scripts/dag_v3_model/openverse_inventory.py` puede reunir solamente metadatos candidatos con
 limites de consultas/paginas y licencias potencialmente compatibles. No descarga imagenes y marca
 todo como `needs_review`.
