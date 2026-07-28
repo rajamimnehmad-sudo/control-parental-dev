@@ -47,7 +47,7 @@ export default async function CommunityDetailPage({ params }: Props) {
         <MiniMetric label="Admins" value={`${compactNumber(detail.admin_count)} / ${detail.max_admins ?? "-"}`} icon={UsersRound} />
         <MiniMetric label="Usuarios activos" value={`${compactNumber(activatedUsers)} / ${detail.max_user_devices ?? "-"}`} icon={MonitorSmartphone} />
         <MiniMetric label="Pendientes" value={compactNumber(pendingUsers)} icon={KeyRound} />
-        <MiniMetric label="Vence" value={detail.expires_at ? new Date(detail.expires_at).toLocaleDateString("es-AR") : "Sin fecha"} icon={CalendarClock} />
+        <MiniMetric label="Vence" value={detail.expires_at ? new Date(detail.expires_at).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "Sin fecha"} icon={CalendarClock} />
       </section>
 
       <section className="grid gap-3">

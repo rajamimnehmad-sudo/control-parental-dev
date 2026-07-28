@@ -1,5 +1,6 @@
 import { AlertTriangle, CheckCircle2, Database, ShieldAlert } from "lucide-react";
 import { DomainListActions } from "@/components/DomainListActions";
+import { DomainLookup } from "@/components/DomainLookup";
 import { getDomainListStatus, protectionState } from "@/lib/domain-list";
 import { compactNumber, formatDate } from "@/lib/utils";
 
@@ -31,6 +32,7 @@ export default async function DomainListPage() {
         <Metric label="Excepciones educativas" value={data ? compactNumber(data.educationalExceptionCount) : "-"} /><Metric label="Prueba interna" value={data?.canaryIncluded ? "Correcta" : "Falló"} />
       </div>
     </details>
+    <DomainLookup />
     <section className="flex flex-col gap-4 border-t border-line pt-6"><div className="flex items-center gap-2"><Database className="h-5 w-5 text-accent" /><h2 className="text-lg font-semibold text-ink">Actualizar la base</h2></div><p className="text-sm text-slate-600">Usá estas acciones sólo si querés buscar o publicar una versión nueva. La protección actual sigue funcionando mientras tanto.</p><DomainListActions /><p className="text-sm text-slate-600">Último error: {status.operational?.lastError ?? data?.lastError ?? "Ninguno"}</p></section>
   </main>;
 }
