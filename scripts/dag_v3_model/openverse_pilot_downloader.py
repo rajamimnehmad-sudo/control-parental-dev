@@ -11,7 +11,7 @@ import socket
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, BinaryIO
+from typing import Any, BinaryIO, Iterable
 from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
@@ -91,10 +91,26 @@ def _candidate_rows(path: Path) -> list[dict[str, Any]]:
     return rows
 
 
+def _previous_hashes(manifests: Iterable[Path]) -> set[str]:
+    hashes: set[str] = set()
+    for manifest in manifests:
+        for row in _candidate_rows(manifest):
+            digest = row.get("sha256")
+            if (
+                row.get("status") in ("downloaded", "duplicate")
+                and isinstance(digest, str)
+                and len(digest) == 64
+                and all(character in "0123456789abcdef" for character in digest)
+            ):
+                hashes.add(digest)
+    return hashes
+
+
 def download_pilot(
     inventory_path: Path,
     output_dir: Path,
     limit: int = DEFAULT_ITEMS,
+    known_manifests: Iterable[Path] = (),
 ) -> dict[str, int]:
     if not 1 <= limit <= MAX_ITEMS:
         raise ValueError(f"limit must be between 1 and {MAX_ITEMS}")
@@ -111,7 +127,7 @@ def download_pilot(
     failed = 0
     duplicates = 0
     total_bytes = 0
-    seen_hashes: set[str] = set()
+    seen_hashes = _previous_hashes(known_manifests)
     records: list[dict[str, Any]] = []
 
     for row in rows[:limit]:
@@ -201,9 +217,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("inventory", type=Path)
     parser.add_argument("output_dir", type=Path)
     parser.add_argument("--limit", type=int, default=DEFAULT_ITEMS)
+    parser.add_argument(
+        "--known-downloads",
+        action="append",
+        default=[],
+        type=Path,
+        help="downloads.jsonl from an earlier batch; repeat for multiple batches",
+    )
     args = parser.parse_args(argv)
     try:
-        summary = download_pilot(args.inventory, args.output_dir, args.limit)
+        summary = download_pilot(
+            args.inventory,
+            args.output_dir,
+            args.limit,
+            args.known_downloads,
+        )
     except (OSError, ValueError) as error:
         print(f"fatal: {error}", file=sys.stderr)
         return 2

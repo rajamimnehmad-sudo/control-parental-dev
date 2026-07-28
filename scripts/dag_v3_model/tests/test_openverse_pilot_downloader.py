@@ -131,6 +131,30 @@ class OpenversePilotDownloaderTest(unittest.TestCase):
             self.assertEqual(1, summary["downloaded"])
             self.assertEqual(1, summary["duplicates"])
 
+    def test_deduplicates_against_previous_batch_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            inventory = self._write_inventory(root, [candidate()])
+            jpeg = b"\xff\xd8\xff" + b"previous-image"
+            digest = downloader.hashlib.sha256(jpeg).hexdigest()
+            previous = root / "previous.jsonl"
+            previous.write_text(
+                json.dumps({"status": "downloaded", "sha256": digest}) + "\n",
+                encoding="utf-8",
+            )
+            with (
+                patch.object(downloader.socket, "getaddrinfo", return_value=PUBLIC_ADDRESS),
+                patch.object(downloader, "urlopen", return_value=FakeResponse(jpeg)),
+            ):
+                summary = downloader.download_pilot(
+                    inventory,
+                    root / "output",
+                    known_manifests=[previous],
+                )
+            self.assertEqual(0, summary["downloaded"])
+            self.assertEqual(1, summary["duplicates"])
+            self.assertEqual([], list((root / "output/images").iterdir()))
+
     def test_enforces_item_limit(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
