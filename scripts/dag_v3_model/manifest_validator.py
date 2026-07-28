@@ -37,10 +37,30 @@ ASSIGNED_SPLITS = {"train", "validation", "test"}
 
 
 @dataclass(frozen=True)
+class AnnotationRule:
+    trigger_label: str
+    trigger_state: str
+    required_label: str
+    required_state: str
+
+
+@dataclass(frozen=True)
+class AnnotationCountRule:
+    trigger_label: str
+    trigger_state: str
+    choice_labels: tuple[str, ...]
+    choice_state: str
+    required_count: int
+
+
+@dataclass(frozen=True)
 class SignalContract:
     version: str
     labels: tuple[str, ...]
     annotation_states: frozenset[str]
+    annotation_consistency_version: str
+    annotation_rules: tuple[AnnotationRule, ...]
+    annotation_count_rules: tuple[AnnotationCountRule, ...]
 
 
 @dataclass
@@ -86,7 +106,133 @@ def load_signal_contract(path: Path) -> SignalContract:
         raise ValueError("signal contract label names must be unique")
     if any(not isinstance(state, str) or not state for state in states):
         raise ValueError("annotation states must be non-empty strings")
-    return SignalContract(version, tuple(names), frozenset(states))
+
+    raw_consistency = payload.get("annotationConsistency")
+    if not isinstance(raw_consistency, dict):
+        raise ValueError("signal contract requires annotationConsistency")
+    consistency_version = raw_consistency.get("version")
+    if not isinstance(consistency_version, str) or not consistency_version:
+        raise ValueError("annotationConsistency requires a version")
+    rule_definitions = {
+        "positiveRequiresPositive": ("positive", "positive"),
+        "positiveRequiresNegative": ("positive", "negative"),
+        "negativeRequiresNegative": ("negative", "negative"),
+    }
+    count_rule_group = "positiveRequiresExactlyOnePositive"
+    if set(raw_consistency) != {"version", count_rule_group, *rule_definitions}:
+        raise ValueError("annotationConsistency contains unsupported rule groups")
+
+    label_names = set(names)
+    rules: list[AnnotationRule] = []
+    seen_requirements: dict[tuple[str, str, str], str] = {}
+    for group_name, (trigger_state, required_state) in rule_definitions.items():
+        raw_group = raw_consistency.get(group_name)
+        if not isinstance(raw_group, dict):
+            raise ValueError(f"annotationConsistency.{group_name} must be an object")
+        for trigger_label, required_labels in raw_group.items():
+            if trigger_label not in label_names:
+                raise ValueError(f"annotation rule has unknown trigger label: {trigger_label}")
+            if (
+                not isinstance(required_labels, list)
+                or not required_labels
+                or any(label not in label_names for label in required_labels)
+                or len(set(required_labels)) != len(required_labels)
+            ):
+                raise ValueError(
+                    f"annotation rule has invalid required labels: {trigger_label}"
+                )
+            if trigger_label in required_labels:
+                raise ValueError(f"annotation rule cannot require itself: {trigger_label}")
+            for required_label in required_labels:
+                key = (trigger_label, trigger_state, required_label)
+                previous = seen_requirements.get(key)
+                if previous is not None and previous != required_state:
+                    raise ValueError(
+                        f"annotation rule has conflicting requirements: {trigger_label}"
+                    )
+                seen_requirements[key] = required_state
+                rules.append(
+                    AnnotationRule(
+                        trigger_label=trigger_label,
+                        trigger_state=trigger_state,
+                        required_label=required_label,
+                        required_state=required_state,
+                    )
+                )
+
+    raw_count_rules = raw_consistency.get(count_rule_group)
+    if not isinstance(raw_count_rules, dict):
+        raise ValueError(f"annotationConsistency.{count_rule_group} must be an object")
+    count_rules: list[AnnotationCountRule] = []
+    for trigger_label, choice_labels in raw_count_rules.items():
+        if trigger_label not in label_names:
+            raise ValueError(f"annotation count rule has unknown trigger: {trigger_label}")
+        if (
+            not isinstance(choice_labels, list)
+            or len(choice_labels) < 2
+            or any(label not in label_names for label in choice_labels)
+            or len(set(choice_labels)) != len(choice_labels)
+            or trigger_label in choice_labels
+        ):
+            raise ValueError(
+                f"annotation count rule has invalid choices: {trigger_label}"
+            )
+        count_rules.append(
+            AnnotationCountRule(
+                trigger_label=trigger_label,
+                trigger_state="positive",
+                choice_labels=tuple(choice_labels),
+                choice_state="positive",
+                required_count=1,
+            )
+        )
+    return SignalContract(
+        version,
+        tuple(names),
+        frozenset(states),
+        consistency_version,
+        tuple(rules),
+        tuple(count_rules),
+    )
+
+
+def annotation_semantic_errors(
+    labels: dict[str, str],
+    contract: SignalContract,
+) -> list[tuple[str, str]]:
+    errors: list[tuple[str, str]] = []
+    for rule in contract.annotation_rules:
+        if (
+            labels[rule.trigger_label] == rule.trigger_state
+            and labels[rule.required_label] != rule.required_state
+        ):
+            errors.append(
+                (
+                    rule.required_label,
+                    (
+                        f"must be {rule.required_state} when "
+                        f"{rule.trigger_label} is {rule.trigger_state}"
+                    ),
+                )
+            )
+    for rule in contract.annotation_count_rules:
+        if labels[rule.trigger_label] != rule.trigger_state:
+            continue
+        actual_count = sum(
+            labels[label] == rule.choice_state for label in rule.choice_labels
+        )
+        if actual_count != rule.required_count:
+            errors.append(
+                (
+                    rule.trigger_label,
+                    (
+                        f"requires exactly {rule.required_count} {rule.choice_state} among "
+                        f"{', '.join(rule.choice_labels)} when "
+                        f"{rule.trigger_label} is {rule.trigger_state}"
+                    ),
+                )
+            )
+    return errors
 
 
 def load_jsonl(path: Path) -> tuple[list[tuple[int, dict[str, Any]]], list[str]]:
@@ -273,7 +419,16 @@ def _validate_label_map(
             valid = False
     if not valid:
         return None
-    return {name: value[name] for name in contract.labels}
+    ordered = {name: value[name] for name in contract.labels}
+    for required_label, message in annotation_semantic_errors(ordered, contract):
+        trigger_message = message.replace(" when ", f" when {field}.", 1)
+        _error(
+            errors,
+            line,
+            f"{field}.{required_label}",
+            trigger_message,
+        )
+    return ordered
 
 
 def _validate_review(

@@ -66,6 +66,7 @@ class EvaluationHarnessTest(unittest.TestCase):
         slice_value: str = "owned",
     ) -> dict:
         labels = {name: "negative" for name in self.contract.labels}
+        labels["person_present"] = "positive"
         labels[self.risk_label] = truth
         if masked_label is not None:
             labels[masked_label] = "unknown"
@@ -97,7 +98,7 @@ class EvaluationHarnessTest(unittest.TestCase):
             )
 
     def test_perfect_predictions_and_masked_states(self) -> None:
-        masked = "female_underwear_or_swimwear"
+        masked = "gambling"
         predictions = self.load_predictions(
             [
                 self.record("positive", "positive", 0.95, masked_label=masked),
@@ -223,6 +224,14 @@ class EvaluationHarnessTest(unittest.TestCase):
         with self.assertRaises(evaluation_harness.EvaluationInputError) as raised:
             self.load_predictions([first, second])
         self.assertIn("duplicates an earlier record", str(raised.exception))
+
+    def test_rejects_semantically_inconsistent_truth(self) -> None:
+        record = self.record("inconsistent", "positive", 0.9)
+        record["labels"]["person_present"] = "negative"
+
+        with self.assertRaises(evaluation_harness.EvaluationInputError) as raised:
+            self.load_predictions([record])
+        self.assertIn("person_present is negative", str(raised.exception))
 
     def test_rejects_incomplete_policy_and_inverted_thresholds(self) -> None:
         payload = self.policy_payload()

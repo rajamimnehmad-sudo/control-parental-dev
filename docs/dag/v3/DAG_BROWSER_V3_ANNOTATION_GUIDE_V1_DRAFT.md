@@ -237,7 +237,8 @@ Ademas:
   `female_10plus_or_age_uncertain_present` no pueden ser positivas juntas.
 - Una senal puede quedar `unknown` aunque su contexto sea positivo.
 - Una senal de tema no depende de presentacion femenina.
-- Las dependencias se validaran automaticamente antes de entrenar; no sustituyen la revision humana.
+- Las dependencias se validan automaticamente desde `glosh-visual-signals-v1.json` antes de
+  entrenar; no sustituyen la revision humana.
 
 ## Protocolo de revision
 

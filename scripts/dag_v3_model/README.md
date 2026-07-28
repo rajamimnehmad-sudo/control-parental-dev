@@ -26,6 +26,7 @@ Comprueba:
 - decisiones completas e independientes de cada revisor;
 - doble revision para validacion/test y adjudicador tercero ante desacuerdos;
 - coincidencia exacta entre revisiones, adjudicacion y etiqueta final;
+- dependencias semanticas versionadas entre persona, presentacion, edad y senales derivadas;
 - ausencia de contenido sin revisar en splits asignados;
 - hashes duplicados y grupos/clusters cruzados entre splits.
 

@@ -12,6 +12,95 @@
     "containsPolicyAction": false
   },
   "annotationStates": ["positive", "negative", "unknown", "not_applicable", "unreviewed"],
+  "annotationConsistency": {
+    "version": "glosh-visual-annotation-consistency-v1",
+    "positiveRequiresPositive": {
+      "female_presentation_present": ["person_present"],
+      "female_10plus_or_age_uncertain_present": ["female_presentation_present"],
+      "only_clearly_young_female_children_present": ["female_presentation_present"],
+      "adult_or_explicit": ["person_present"],
+      "female_underwear_or_swimwear": ["female_presentation_present"],
+      "female_transparent_clothing": ["female_presentation_present"],
+      "female_10plus_or_uncertain_deep_neckline": [
+        "female_10plus_or_age_uncertain_present"
+      ],
+      "female_10plus_or_uncertain_chest_exposed": [
+        "female_10plus_or_age_uncertain_present"
+      ],
+      "female_10plus_or_uncertain_abdomen_exposed": [
+        "female_10plus_or_age_uncertain_present"
+      ],
+      "female_10plus_or_uncertain_shoulder_or_armpit_exposed": [
+        "female_10plus_or_age_uncertain_present"
+      ],
+      "female_10plus_or_uncertain_elbow_uncovered": [
+        "female_10plus_or_age_uncertain_present"
+      ],
+      "female_10plus_or_uncertain_knee_uncovered": [
+        "female_10plus_or_age_uncertain_present"
+      ],
+      "female_10plus_or_uncertain_tight_clothing": [
+        "female_10plus_or_age_uncertain_present"
+      ],
+      "sexualized_pose_or_framing": ["person_present"],
+      "relevant_subject_too_small_or_obscured": ["person_present"]
+    },
+    "positiveRequiresNegative": {
+      "female_10plus_or_age_uncertain_present": [
+        "only_clearly_young_female_children_present"
+      ],
+      "only_clearly_young_female_children_present": [
+        "female_10plus_or_age_uncertain_present"
+      ]
+    },
+    "positiveRequiresExactlyOnePositive": {
+      "female_presentation_present": [
+        "female_10plus_or_age_uncertain_present",
+        "only_clearly_young_female_children_present"
+      ]
+    },
+    "negativeRequiresNegative": {
+      "person_present": [
+        "female_presentation_present",
+        "female_10plus_or_age_uncertain_present",
+        "only_clearly_young_female_children_present",
+        "adult_or_explicit",
+        "female_underwear_or_swimwear",
+        "female_transparent_clothing",
+        "female_10plus_or_uncertain_deep_neckline",
+        "female_10plus_or_uncertain_chest_exposed",
+        "female_10plus_or_uncertain_abdomen_exposed",
+        "female_10plus_or_uncertain_shoulder_or_armpit_exposed",
+        "female_10plus_or_uncertain_elbow_uncovered",
+        "female_10plus_or_uncertain_knee_uncovered",
+        "female_10plus_or_uncertain_tight_clothing",
+        "sexualized_pose_or_framing",
+        "relevant_subject_too_small_or_obscured"
+      ],
+      "female_presentation_present": [
+        "female_10plus_or_age_uncertain_present",
+        "only_clearly_young_female_children_present",
+        "female_underwear_or_swimwear",
+        "female_transparent_clothing",
+        "female_10plus_or_uncertain_deep_neckline",
+        "female_10plus_or_uncertain_chest_exposed",
+        "female_10plus_or_uncertain_abdomen_exposed",
+        "female_10plus_or_uncertain_shoulder_or_armpit_exposed",
+        "female_10plus_or_uncertain_elbow_uncovered",
+        "female_10plus_or_uncertain_knee_uncovered",
+        "female_10plus_or_uncertain_tight_clothing"
+      ],
+      "female_10plus_or_age_uncertain_present": [
+        "female_10plus_or_uncertain_deep_neckline",
+        "female_10plus_or_uncertain_chest_exposed",
+        "female_10plus_or_uncertain_abdomen_exposed",
+        "female_10plus_or_uncertain_shoulder_or_armpit_exposed",
+        "female_10plus_or_uncertain_elbow_uncovered",
+        "female_10plus_or_uncertain_knee_uncovered",
+        "female_10plus_or_uncertain_tight_clothing"
+      ]
+    }
+  },
   "labels": [
     {
       "index": 0,

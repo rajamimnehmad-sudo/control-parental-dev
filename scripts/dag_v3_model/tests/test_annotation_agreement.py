@@ -37,6 +37,7 @@ class AnnotationAgreementTest(unittest.TestCase):
         adjudicated_state: str | None = None,
     ) -> dict:
         first_labels = {name: "negative" for name in self.contract.labels}
+        first_labels["person_present"] = "positive"
         second_labels = copy.deepcopy(first_labels)
         first_labels[self.risk_label] = first_state
         second_labels[self.risk_label] = second_state
