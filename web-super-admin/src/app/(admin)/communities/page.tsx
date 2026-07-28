@@ -88,7 +88,7 @@ function CommunityCard({ community }: { community: CommunitySummary }) {
       <div className="mt-4 grid grid-cols-3 gap-2">
         <CardMetric label="Admins" value={`${compactNumber(community.admin_count)} / ${community.max_admins ?? "-"}`} />
         <CardMetric label="Usuarios" value={`${compactNumber(community.user_device_count)} / ${community.max_user_devices ?? "-"}`} />
-        <CardMetric label="Vence" value={community.expires_at ? new Date(community.expires_at).toLocaleDateString("es-AR") : "Sin fecha"} />
+        <CardMetric label="Vence" value={community.expires_at ? new Date(community.expires_at).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "Sin fecha"} />
       </div>
       <div className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-500">
         <CalendarClock className="h-4 w-4" />

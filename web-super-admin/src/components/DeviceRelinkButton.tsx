@@ -42,7 +42,7 @@ export function DeviceRelinkButton({ communityId, deviceId }: { communityId: str
           </button>
         </div>
         <p className="text-xs text-slate-600">
-          El teléfono anterior conserva acceso hasta que el nuevo complete su primera sincronización. Vence: {new Date(expiresAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" })}.
+          El teléfono anterior conserva acceso hasta que el nuevo complete su primera sincronización. Vence: {new Date(expiresAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Argentina/Buenos_Aires" })}.
         </p>
         <button className="text-left text-xs font-bold text-accent" type="button" onClick={() => setCode("")}>Ocultar token</button>
       </div>

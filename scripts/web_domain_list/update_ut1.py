@@ -99,13 +99,25 @@ def build_from_sources(canary_included: bool) -> dict:
             supplemental_input_count += count
             source_dates.append(source_date)
 
+        manual_entries = fetch_json(f"{PUBLIC_BASE}/manual-domains.json?ts={time.time_ns()}", required=False) or []
+        manual_files = {}
+        for category in UT1_CATEGORIES:
+            manual_path = root / f"manual-{category}.normalized"
+            domains = sorted({
+                normalize_domain(entry.get("domain", ""))
+                for entry in manual_entries
+                if isinstance(entry, dict) and entry.get("category") == category
+            } - {None})
+            manual_path.write_text("".join(f"{domain}\n" for domain in domains), encoding="ascii")
+            manual_files[category] = manual_path
+
         raw_categories = {
-            "adult": merge_sorted_files((ut1_files["adult"], supplemental_files["adult"]), root / "adult.combined"),
-            "mixed_adult": ut1_files["mixed_adult"],
-            "gambling": merge_sorted_files((ut1_files["gambling"], supplemental_files["gambling"]), root / "gambling.combined"),
-            "drugs": merge_sorted_files((ut1_files["drugs"], supplemental_files["drugs"]), root / "drugs.combined"),
+            "adult": merge_sorted_files((ut1_files["adult"], supplemental_files["adult"], manual_files["adult"]), root / "adult.combined"),
+            "mixed_adult": merge_sorted_files((ut1_files["mixed_adult"], manual_files["mixed_adult"]), root / "mixed-adult.combined"),
+            "gambling": merge_sorted_files((ut1_files["gambling"], supplemental_files["gambling"], manual_files["gambling"]), root / "gambling.combined"),
+            "drugs": merge_sorted_files((ut1_files["drugs"], supplemental_files["drugs"], manual_files["drugs"]), root / "drugs.combined"),
             "piracy_torrents": merge_sorted_files(
-                (ut1_files["piracy_torrents"], supplemental_files["piracy"], supplemental_files["torrent"]),
+                (ut1_files["piracy_torrents"], supplemental_files["piracy"], supplemental_files["torrent"], manual_files["piracy_torrents"]),
                 root / "piracy-torrents.combined",
             ),
         }

@@ -108,7 +108,7 @@ function TokenBanner({ token, onClear }: { token: TokenResult; onClear: () => vo
             <code className="mt-2 block rounded-md bg-teal-950 px-4 py-3 text-center text-3xl font-black tracking-widest text-white">
               {token.activationCode}
             </code>
-            <p className="mt-2 text-sm font-semibold text-slate-700">Vence: {new Date(token.expiresAt).toLocaleString("es-AR")}</p>
+            <p className="mt-2 text-sm font-semibold text-slate-700">Vence: {new Date(token.expiresAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
@@ -141,7 +141,7 @@ function TokenPanel({ token, onClear }: { token: TokenResult; onClear: () => voi
         <p>Copiá este token ahora. Solo se mantiene en memoria en esta pestaña y no vuelve a mostrarse al recargar.</p>
       </div>
       <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <p className="text-sm font-semibold text-teal-950">Vence: {new Date(token.expiresAt).toLocaleString("es-AR")}</p>
+        <p className="text-sm font-semibold text-teal-950">Vence: {new Date(token.expiresAt).toLocaleString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" })}</p>
         <button className="button button-secondary" type="button" onClick={onClear}>
           Ocultar token
         </button>
