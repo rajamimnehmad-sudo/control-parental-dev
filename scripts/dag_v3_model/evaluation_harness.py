@@ -13,7 +13,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable, Sequence
 
-from manifest_validator import SignalContract, load_signal_contract
+from manifest_validator import (
+    SignalContract,
+    annotation_semantic_errors,
+    load_signal_contract,
+)
 
 
 REPORT_SCHEMA_VERSION = "dag-v3-evaluation-report-v1"
@@ -222,7 +226,17 @@ def _validate_record(
         if not missing and not extra and all(
             raw_labels.get(name) in contract.annotation_states for name in contract.labels
         ):
-            labels = tuple(raw_labels[name] for name in contract.labels)
+            ordered_labels = {name: raw_labels[name] for name in contract.labels}
+            for required_label, message in annotation_semantic_errors(
+                ordered_labels, contract
+            ):
+                _record_error(
+                    errors,
+                    line_number,
+                    f"labels.{required_label}",
+                    message,
+                )
+            labels = tuple(ordered_labels[name] for name in contract.labels)
 
     raw_predictions = payload.get("predictions")
     predictions: dict[str, tuple[float, ...]] = {}
@@ -885,6 +899,7 @@ def build_evaluation_report(
         "ok": True,
         "schema_version": REPORT_SCHEMA_VERSION,
         "signal_contract_version": contract.version,
+        "annotation_consistency_version": contract.annotation_consistency_version,
         "policy_version": policy.version,
         "records": len(prediction_set.records),
         "variants": list(prediction_set.variants),

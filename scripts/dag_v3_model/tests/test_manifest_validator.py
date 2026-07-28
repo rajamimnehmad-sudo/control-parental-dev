@@ -107,6 +107,19 @@ class ManifestValidatorTest(unittest.TestCase):
         self.assertFalse(report.ok)
         self.assertTrue(any("manifest_schema_version" in error for error in report.errors))
 
+    def test_signal_contract_rejects_unknown_semantic_rule_labels(self) -> None:
+        payload = json.loads(CONTRACT_PATH.read_text(encoding="utf-8"))
+        payload["annotationConsistency"]["positiveRequiresPositive"][
+            "invented_label"
+        ] = ["person_present"]
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", suffix=".json"
+        ) as handle:
+            json.dump(payload, handle)
+            handle.flush()
+            with self.assertRaisesRegex(ValueError, "unknown trigger label"):
+                load_signal_contract(Path(handle.name))
+
     def test_rejects_eligible_sample_without_commercial_license(self) -> None:
         sample = self.sample()
         sample["license"]["commercial_use_allowed"] = False
@@ -187,6 +200,9 @@ class ManifestValidatorTest(unittest.TestCase):
         sample = self.sample()
         self.mark_reviewed(sample, "test", ["reviewer-a", "reviewer-b"])
         label = self.contract.labels[4]
+        sample["labels"]["person_present"] = "positive"
+        for annotation in sample["review"]["annotations"]:
+            annotation["labels"]["person_present"] = "positive"
         sample["review"]["annotations"][1]["labels"][label] = "positive"
 
         report = self.validate([sample])
@@ -224,6 +240,87 @@ class ManifestValidatorTest(unittest.TestCase):
         self.assertFalse(report.ok)
         self.assertTrue(
             any("completed reviews cannot be unreviewed" in error for error in report.errors)
+        )
+
+    def test_rejects_positive_signal_without_required_context(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "train", ["reviewer-a"])
+        label = "female_10plus_or_uncertain_knee_uncovered"
+        sample["labels"][label] = "positive"
+        sample["review"]["annotations"][0]["labels"][label] = "positive"
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(
+            any(
+                "female_10plus_or_age_uncertain_present" in error
+                and "must be positive" in error
+                for error in report.errors
+            )
+        )
+
+    def test_accepts_positive_signal_with_complete_context_chain(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "train", ["reviewer-a"])
+        positives = {
+            "person_present",
+            "female_presentation_present",
+            "female_10plus_or_age_uncertain_present",
+            "female_10plus_or_uncertain_knee_uncovered",
+        }
+        for label in positives:
+            sample["labels"][label] = "positive"
+            sample["review"]["annotations"][0]["labels"][label] = "positive"
+
+        report = self.validate([sample])
+        self.assertTrue(report.ok, report.errors)
+
+    def test_age_contexts_cannot_both_be_positive(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "train", ["reviewer-a"])
+        positives = {
+            "person_present",
+            "female_presentation_present",
+            "female_10plus_or_age_uncertain_present",
+            "only_clearly_young_female_children_present",
+        }
+        for label in positives:
+            sample["labels"][label] = "positive"
+            sample["review"]["annotations"][0]["labels"][label] = "positive"
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(
+            any(
+                "only_clearly_young_female_children_present is positive" in error
+                for error in report.errors
+            )
+        )
+
+    def test_female_presentation_requires_exactly_one_age_branch(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "train", ["reviewer-a"])
+        for label in {"person_present", "female_presentation_present"}:
+            sample["labels"][label] = "positive"
+            sample["review"]["annotations"][0]["labels"][label] = "positive"
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(
+            any("requires exactly 1 positive" in error for error in report.errors)
+        )
+
+    def test_negative_context_requires_negative_dependent_signals(self) -> None:
+        sample = self.sample()
+        self.mark_reviewed(sample, "train", ["reviewer-a"])
+        label = "relevant_subject_too_small_or_obscured"
+        sample["labels"][label] = "unknown"
+        sample["review"]["annotations"][0]["labels"][label] = "unknown"
+
+        report = self.validate([sample])
+        self.assertFalse(report.ok)
+        self.assertTrue(
+            any("person_present is negative" in error for error in report.errors)
         )
 
     def test_adjudicator_must_be_third_reviewer(self) -> None:

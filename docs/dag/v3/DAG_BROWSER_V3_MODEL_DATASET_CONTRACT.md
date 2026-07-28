@@ -56,6 +56,11 @@ en negativos. `unknown` significa duda despues de revisar y no puede usarse como
 `unreviewed`. Las etiquetas producidas por modelos profesores son `prelabels`, conservan modelo,
 version y score, y no sustituyen la verdad humana.
 
+Las dependencias logicas entre contexto y senales viven en `annotationConsistency` dentro del
+contrato JSON. El validador las aplica tanto a la etiqueta final como a cada revision independiente;
+por ejemplo, una senal femenina positiva exige presentacion femenina/persona coherentes y las dos
+ramas de edad no pueden ser positivas simultaneamente.
+
 La guia de anotacion debe incluir ejemplos de borde para edad visual, grupos, escote, transparencia,
 ropa ajustada, ilustraciones realistas, personas pequenas y cada tema. Dos revisores independientes
 etiquetan el conjunto de evaluacion; un tercero adjudica los desacuerdos criticos.

@@ -247,6 +247,7 @@ def build_agreement_report(
         "schema_version": REPORT_SCHEMA_VERSION,
         "manifest_schema_version": MANIFEST_SCHEMA_VERSION,
         "signal_contract_version": contract.version,
+        "annotation_consistency_version": contract.annotation_consistency_version,
         "records": dataset.records,
         "review_counts": {
             "zero": dataset.review_counts.get(0, 0),
