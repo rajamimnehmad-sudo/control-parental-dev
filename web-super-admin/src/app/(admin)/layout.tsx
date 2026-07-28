@@ -26,7 +26,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </div>
           </Link>
           <div className="flex items-center gap-2">
-            <AdminNavigation />
+            <div className="md:hidden">
+              <AdminNavigation />
+            </div>
             <span className="hidden max-w-48 truncate text-sm text-slate-500 lg:block">{email}</span>
             <form action={signOutAction}>
               <button className="button button-secondary" type="submit" aria-label="Cerrar sesion">
