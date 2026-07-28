@@ -32,6 +32,25 @@ Comprueba:
 No descarga imagenes ni verifica remotamente que una licencia siga publicada. Esa evidencia debe
 capturarse durante la importacion autorizada y queda registrada en el manifiesto.
 
+## Medir acuerdo entre revisores
+
+```bash
+python3 scripts/dag_v3_model/annotation_agreement.py \
+  manifiesto.jsonl --pretty > acuerdo.json
+```
+
+Primero valida el manifiesto completo. Despues compara solamente las muestras que conservan dos
+revisiones independientes y reporta, por senal:
+
+- acuerdo exacto entre los cuatro estados revisados;
+- kappa de Cohen, sin ocultar el acuerdo bruto cuando kappa no esta definido;
+- acuerdo binario donde ambos eligieron `positive` o `negative`;
+- desacuerdos positivo/negativo, desacuerdos con incertidumbre y arbitrajes;
+- hasta 50 IDs seudonimos para revisar los casos concretos.
+
+El mismo calculo queda separado por split y version de la guia. La herramienta no abre imagenes, no
+usa red y no fija por si sola un objetivo de acuerdo: ese gate necesita el piloto y revision Ultra.
+
 ## Inventario acotado de Openverse
 
 ```bash
