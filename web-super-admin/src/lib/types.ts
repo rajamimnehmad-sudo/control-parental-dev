@@ -34,6 +34,7 @@ export type CommunityAdmin = {
   activated_at: string | null;
   last_seen_at: string | null;
   pending_token_expires_at: string | null;
+  phone_e164?: string | null;
 };
 
 export type CommunityDevice = {
@@ -46,6 +47,26 @@ export type CommunityDevice = {
   community_admin_name: string | null;
   activated_at: string;
   last_seen_at: string | null;
+  updated_at: string;
+  manufacturer?: string | null;
+  model?: string | null;
+  android_version?: string | null;
+  android_sdk?: number | null;
+};
+
+export type AppRating = {
+  rating_id: string;
+  community_id: string | null;
+  community_name: string | null;
+  device_id: string;
+  device_name: string;
+  app_role: "user" | "admin";
+  stars: number;
+  comment: string | null;
+  app_version_code: number;
+  manufacturer: string | null;
+  model: string | null;
+  android_version: string | null;
   updated_at: string;
 };
 
