@@ -15,6 +15,7 @@ import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteProtectionAlertRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.SupabaseProtectionControlRepository
+import com.contentfilter.core.network.remote.SupabaseAppFeedbackRepository
 import com.contentfilter.core.network.remote.SupabasePushNotificationRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteAccountRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteDeviceRepository
@@ -24,6 +25,7 @@ import com.contentfilter.core.network.remote.SupabaseRemoteLimitRepository
 import com.contentfilter.core.network.remote.SupabaseRemotePolicyRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteProtectionAlertRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteRequestRepository
+import com.contentfilter.core.domain.repository.AppFeedbackRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -35,6 +37,9 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class NetworkModule {
+    @Binds
+    abstract fun bindAppFeedbackRepository(repository: SupabaseAppFeedbackRepository): AppFeedbackRepository
+
     @Binds
     abstract fun bindSupabaseConfigProvider(provider: BuildConfigSupabaseConfigProvider): SupabaseConfigProvider
 

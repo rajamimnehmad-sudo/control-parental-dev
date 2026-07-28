@@ -12,11 +12,20 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Button
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -28,6 +37,7 @@ import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
 import com.contentfilter.core.ui.ProductListSurface
+import com.contentfilter.core.ui.ProductCard
 
 @Composable
 internal fun SettingsTab(
@@ -36,7 +46,12 @@ internal fun SettingsTab(
     onHelp: () -> Unit,
 ) {
     val dashboardViewModel: DashboardViewModel = hiltViewModel()
+    val feedbackViewModel: AdminFeedbackViewModel = hiltViewModel()
     val state by dashboardViewModel.uiState.collectAsStateWithLifecycle()
+    val feedbackState by feedbackViewModel.state.collectAsStateWithLifecycle()
+    var rating by rememberSaveable { mutableIntStateOf(0) }
+    var comment by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
     Column(
         modifier =
             Modifier
@@ -75,6 +90,55 @@ internal fun SettingsTab(
                         ),
                     showDivider = false,
                 )
+            }
+            Text("Contacto adulto", style = MaterialTheme.typography.titleSmall, color = MutedInk)
+            ProductCard {
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = phone,
+                    onValueChange = { phone = it.take(18) },
+                    label = { Text("WhatsApp, por ejemplo +549…") },
+                    singleLine = true,
+                )
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = !feedbackState.saving,
+                    onClick = { feedbackViewModel.savePhone(phone) },
+                ) {
+                    Text("Guardar contacto")
+                }
+            }
+            Text("Tu opinión", style = MaterialTheme.typography.titleSmall, color = MutedInk)
+            ProductCard {
+                Text("Valorar App Administrador", style = MaterialTheme.typography.titleMedium)
+                Row {
+                    (1..5).forEach { value ->
+                        IconButton(onClick = { rating = value }) {
+                            Icon(
+                                imageVector = Icons.Filled.Star,
+                                contentDescription = "$value estrellas",
+                                tint = if (value <= rating) MaterialTheme.colorScheme.tertiary else MaterialTheme.colorScheme.outlineVariant,
+                            )
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    value = comment,
+                    onValueChange = { if (it.length <= 1000) comment = it },
+                    label = { Text("Comentario opcional") },
+                    minLines = 3,
+                )
+                Button(
+                    modifier = Modifier.fillMaxWidth(),
+                    enabled = rating > 0 && !feedbackState.saving,
+                    onClick = { feedbackViewModel.submitRating(rating, comment) },
+                ) {
+                    Text(if (feedbackState.saving) "Guardando…" else "Enviar valoración")
+                }
+                if (feedbackState.message.isNotBlank()) {
+                    Text(feedbackState.message, style = MaterialTheme.typography.bodyMedium)
+                }
             }
             Text("Más", style = MaterialTheme.typography.titleSmall, color = MutedInk)
             ProductListSurface {

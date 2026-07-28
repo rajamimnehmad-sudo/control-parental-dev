@@ -2,11 +2,13 @@ package com.contentfilter.user
 
 import android.app.Application
 import android.content.Context
+import android.os.Build
 import android.util.Log
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.InstallApprovalStore
+import com.contentfilter.core.domain.repository.AppFeedbackRepository
 import com.contentfilter.core.network.remote.RemoteDeviceRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.sync.SyncScheduler
@@ -77,6 +79,8 @@ class UserApplication :
     @Inject
     lateinit var userLauncherController: UserLauncherController
 
+    @Inject
+    lateinit var appFeedbackRepository: AppFeedbackRepository
     private val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     override fun attachBaseContext(base: Context) {
@@ -95,6 +99,17 @@ class UserApplication :
             .logFailure("vpn-enable")
         runCatching { syncScheduler.schedulePeriodicSync() }
             .logFailure("periodic-sync-schedule")
+        appScope.launch {
+            deviceActivationRepository.currentActivation()?.let { activation ->
+                appFeedbackRepository.reportDeviceMetadata(
+                    deviceId = activation.deviceId,
+                    manufacturer = Build.MANUFACTURER,
+                    model = Build.MODEL,
+                    androidVersion = Build.VERSION.RELEASE,
+                    androidSdk = Build.VERSION.SDK_INT,
+                )
+            }
+        }
         appScope.launch {
             runCatching { userLauncherController.monitorVisibility() }
                 .logFailure("user-launcher-monitor")
