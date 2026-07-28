@@ -144,6 +144,8 @@ def _candidate(query: str, raw: dict[str, Any], retrieved_at: str) -> dict[str, 
 
     return {
         "inventory_version": INVENTORY_VERSION,
+        "catalog": "openverse",
+        "candidate_id": f"openverse:{identifier}",
         "retrieved_at": retrieved_at,
         "query": query,
         "openverse_id": identifier,

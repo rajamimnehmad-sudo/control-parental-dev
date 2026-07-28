@@ -161,6 +161,12 @@ class OpenversePilotDownloaderTest(unittest.TestCase):
             inventory = self._write_inventory(root, [candidate()])
             with self.assertRaises(ValueError):
                 downloader.download_pilot(inventory, root / "output", limit=101)
+            with self.assertRaises(ValueError):
+                downloader.download_pilot(
+                    inventory,
+                    root / "output-delay",
+                    delay_seconds=5.1,
+                )
 
     def test_refuses_to_mix_with_an_existing_download(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

@@ -9,6 +9,7 @@ import ipaddress
 import json
 import socket
 import sys
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, BinaryIO, Iterable
@@ -22,7 +23,10 @@ DEFAULT_ITEMS = 20
 MAX_FILE_BYTES = 8 * 1024 * 1024
 MAX_TOTAL_BYTES = 100 * 1024 * 1024
 REQUEST_TIMEOUT_SECONDS = 15
-USER_AGENT = "Glosh-DAG-V3-pilot-downloader/1.0"
+USER_AGENT = (
+    "GloshDAGBot/1.0 "
+    "(https://github.com/rajamimnehmad-sudo/control-parental-dev) Python-urllib/3"
+)
 ALLOWED_LICENSES = {"by", "by-sa", "cc0", "pdm"}
 
 
@@ -111,9 +115,12 @@ def download_pilot(
     output_dir: Path,
     limit: int = DEFAULT_ITEMS,
     known_manifests: Iterable[Path] = (),
+    delay_seconds: float = 0.0,
 ) -> dict[str, int]:
     if not 1 <= limit <= MAX_ITEMS:
         raise ValueError(f"limit must be between 1 and {MAX_ITEMS}")
+    if not 0.0 <= delay_seconds <= 5.0:
+        raise ValueError("delay_seconds must be between 0 and 5")
 
     rows = _candidate_rows(inventory_path)
     manifest_path = output_dir / "downloads.jsonl"
@@ -131,15 +138,22 @@ def download_pilot(
     records: list[dict[str, Any]] = []
 
     for row in rows[:limit]:
-        identifier = row.get("openverse_id")
+        identifier = row.get("candidate_id") or row.get("openverse_id")
         record: dict[str, Any] = {
             "download_version": DOWNLOAD_VERSION,
-            "openverse_id": identifier,
+            "catalog": row.get("catalog") or "openverse",
+            "candidate_id": identifier,
+            "openverse_id": row.get("openverse_id"),
+            "wikimedia_page_id": row.get("wikimedia_page_id"),
             "query": row.get("query"),
+            "title": row.get("title"),
+            "creator": row.get("creator"),
             "source": row.get("source"),
             "landing_url": row.get("landing_url"),
             "asset_url": row.get("asset_url"),
             "license_id": row.get("license_id"),
+            "license_name": row.get("license_name"),
+            "license_version": row.get("license_version"),
             "license_url": row.get("license_url"),
             "attribution": row.get("attribution"),
             "review_status": "needs_license_and_visual_review",
@@ -198,6 +212,8 @@ def download_pilot(
             failed += 1
             record.update({"status": "failed", "error": str(error)})
         records.append(record)
+        if delay_seconds:
+            time.sleep(delay_seconds)
 
     with manifest_path.open("w", encoding="utf-8") as manifest:
         for record in records:
@@ -224,6 +240,12 @@ def main(argv: list[str] | None = None) -> int:
         type=Path,
         help="downloads.jsonl from an earlier batch; repeat for multiple batches",
     )
+    parser.add_argument(
+        "--delay-seconds",
+        type=float,
+        default=0.0,
+        help="polite delay after each asset request; Wikimedia pilots should use 1",
+    )
     args = parser.parse_args(argv)
     try:
         summary = download_pilot(
@@ -231,6 +253,7 @@ def main(argv: list[str] | None = None) -> int:
             args.output_dir,
             args.limit,
             args.known_downloads,
+            args.delay_seconds,
         )
     except (OSError, ValueError) as error:
         print(f"fatal: {error}", file=sys.stderr)
