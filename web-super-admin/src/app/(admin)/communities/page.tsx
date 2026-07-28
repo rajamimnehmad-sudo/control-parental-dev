@@ -9,7 +9,7 @@ import type { CommunitySummary } from "@/lib/types";
 import { compactNumber, formatDate } from "@/lib/utils";
 
 export default async function CommunitiesPage() {
-  const communities = await listCommunities();
+  const communities = (await listCommunities()).sort((left, right) => communityPriority(left) - communityPriority(right) || left.name.localeCompare(right.name, "es"));
   const protectedUsers = communities.reduce((sum, community) => sum + Number(community.user_device_count), 0);
   const admins = communities.reduce((sum, community) => sum + Number(community.admin_count), 0);
 
@@ -54,6 +54,12 @@ export default async function CommunitiesPage() {
       </section>
     </main>
   );
+}
+
+function communityPriority(community: CommunitySummary) {
+  if (community.license_status === "expired" || community.license_status === "suspended") return 0;
+  if (community.max_user_devices && community.user_device_count >= community.max_user_devices) return 1;
+  return 2;
 }
 
 function MiniStat({ label, value, icon: Icon }: { label: string; value: number; icon: LucideIcon }) {

@@ -25,6 +25,7 @@ export default async function CommunityDetailPage({ params }: Props) {
   const { detail, admins, protectedUsers, devices, devVersions } = await getCommunityBundle(communityId);
   const pendingUsers = protectedUsers.filter((user) => user.status === "pending").length;
   const activatedUsers = protectedUsers.filter((user) => user.status === "activated").length;
+  const orderedUsers = [...protectedUsers].sort((left, right) => userPriority(left) - userPriority(right) || left.display_name.localeCompare(right.display_name, "es"));
 
   return (
     <main className="community-detail mx-auto grid max-w-4xl gap-5 px-4 py-5 lg:px-6">
@@ -71,7 +72,7 @@ export default async function CommunityDetailPage({ params }: Props) {
           <EmptyState title="Sin usuarios protegidos" body="Aparecerán cuando un administrador genere tokens de App Usuario o cuando esos celulares se activen." />
         ) : (
           <div className="grid gap-3">
-            {protectedUsers.map((user) => (
+            {orderedUsers.map((user) => (
               <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} dagEntitled={detail.dag_entitled} device={devices.find((item) => item.device_id === user.device_id)} versions={devVersions} />
             ))}
           </div>
@@ -142,6 +143,13 @@ export default async function CommunityDetailPage({ params }: Props) {
   );
 }
 
+function userPriority(user: ProtectedUser) {
+  if (user.status === "pending") return 0;
+  if (user.last_seen_at && Date.now() - new Date(user.last_seen_at).getTime() >= 24 * 60 * 60 * 1000) return 1;
+  if (user.status === "activated") return 2;
+  return 3;
+}
+
 function DeviceUpdateCard({ device, versions }: { device: CommunityDevice; versions: DevAppVersions }) {
   const latest = device.app_role === "admin" ? versions.admin : versions.user;
   const current = device.app_version_code;
@@ -160,6 +168,12 @@ function DeviceUpdateCard({ device, versions }: { device: CommunityDevice; versi
         </span>
       </div>
       <p className="mt-3 text-xs text-slate-500">Última conexión: {formatDate(device.last_seen_at)}</p>
+      <p className="mt-1 text-xs text-slate-500">
+        {device.manufacturer || device.model
+          ? `${device.manufacturer ?? ""} ${device.model ?? ""}`.trim()
+          : "Modelo pendiente de sincronización"}
+        {device.android_version ? ` · Android ${device.android_version}` : ""}
+      </p>
     </div>
   );
 }
@@ -202,6 +216,7 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
       </div>
       <div className="mt-4 grid gap-2 text-sm text-slate-600">
         <InfoLine icon={Mail} label={admin.email ?? "Sin email todavía"} />
+        <InfoLine icon={Smartphone} label={admin.phone_e164 ?? "Sin WhatsApp informado"} />
         <InfoLine icon={Smartphone} label={admin.activated_device_name ?? "Sin dispositivo activado"} />
         <InfoLine icon={CalendarClock} label={`Última conexión: ${formatDate(admin.last_seen_at)}`} />
         {!active ? <InfoLine icon={KeyRound} label={`Token pendiente: ${formatDate(admin.pending_token_expires_at)}`} /> : null}

@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 import pathlib
+import random
 import struct
 import subprocess
 import tarfile
@@ -133,10 +134,12 @@ def build_from_sources(canary_included: bool) -> dict:
 
         categories = {}
         category_counts = {}
+        test_domains = {}
         for category, source_file in unique_categories.items():
             bits, exact, count, bit_count = build_category_file(category, source_file)
             categories[category] = {"bits": bits, "exact": exact, "count": count, "bit_count": bit_count}
             category_counts[category] = count
+            test_domains[category] = sample_domains(source_file, category, max(source_dates), 20)
         exceptions, _, education_date = exact_category("sexual_education", root)
         source_dates.append(education_date)
         ut1_all = merge_sorted_files(tuple(ut1_files.values()), root / "ut1-all.normalized")
@@ -180,6 +183,7 @@ def build_from_sources(canary_included: bool) -> dict:
         "educational_exceptions": exceptions,
         "source_date": max(source_dates),
         "canary_included": canary_included,
+        "test_domains": test_domains,
     }
 
 
@@ -216,6 +220,21 @@ def build_category_file(category: str, normalized: pathlib.Path) -> tuple[bytear
 def line_count(path: pathlib.Path) -> int:
     with path.open("r", encoding="ascii") as lines:
         return sum(1 for _ in lines)
+
+
+def sample_domains(path: pathlib.Path, category: str, source_date: str, count: int) -> list[str]:
+    generator = random.Random(f"{category}:{source_date}")
+    sample: list[str] = []
+    with path.open("r", encoding="ascii") as domains:
+        for index, line in enumerate(domains):
+            domain = line.rstrip("\n")
+            if index < count:
+                sample.append(domain)
+            else:
+                replacement = generator.randint(0, index)
+                if replacement < count:
+                    sample[replacement] = domain
+    return sorted(sample)
 
 
 def exact_category(category: str, root: pathlib.Path) -> tuple[list[str], int, str]:
@@ -390,6 +409,7 @@ def read_existing_bundle(manifest: dict) -> dict:
         "sources": manifest.get("sources", []),
         "educational_exceptions": exceptions,
         "source_date": manifest["sourceDate"], "canary_included": False,
+        "test_domains": manifest.get("testDomains", {}),
     }
 
 
@@ -418,6 +438,7 @@ def publish(source: dict) -> dict:
             "lastError": None, "devCanary": CANARY, "canaryIncluded": source["canary_included"],
             "canarySource": "internal-dev-canary", "environment": ENVIRONMENT, "dataUrl": data_url,
             "dataSignature": data_signature, "nextScheduledAt": next_run_iso(),
+            "testDomains": source.get("test_domains", {}),
         }
         payload_bytes = json.dumps(payload, separators=(",", ":"), ensure_ascii=True).encode("ascii")
         payload_file = root / "payload.json"; payload_file.write_bytes(payload_bytes)

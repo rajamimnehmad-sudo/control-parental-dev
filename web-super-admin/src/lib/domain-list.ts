@@ -10,6 +10,7 @@ export type DomainListPayload = {
   lastSuccessfulRun: string; lastError: string | null; devCanary: string; canaryIncluded: boolean;
   environment: "DEV"; nextScheduledAt: string;
   dataUrl?: string;
+  testDomains?: Record<string, string[]>;
 };
 
 export type DomainListStatus = {

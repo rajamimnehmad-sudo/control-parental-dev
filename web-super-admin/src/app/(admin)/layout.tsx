@@ -26,6 +26,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
             </div>
           </Link>
           <div className="flex items-center gap-2">
+            <AdminNavigation />
             <span className="hidden max-w-48 truncate text-sm text-slate-500 lg:block">{email}</span>
             <form action={signOutAction}>
               <button className="button button-secondary" type="submit" aria-label="Cerrar sesion">
@@ -35,12 +36,9 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
         </div>
       </header>
-      <div className="hidden border-b border-line/70 bg-white md:block">
-        <div className="mx-auto max-w-7xl px-4 lg:px-6"><AdminNavigation /></div>
-      </div>
-      <div className="pb-24 md:pb-0">{children}</div>
-      <div className="fixed inset-x-0 bottom-0 z-50 border-t border-line/80 bg-white/95 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl md:hidden">
-        <AdminNavigation />
+      <div className="mx-auto grid max-w-[1500px] md:grid-cols-[250px_minmax(0,1fr)]">
+        <div className="hidden min-h-[calc(100vh-73px)] border-r border-line bg-white p-4 md:block"><AdminNavigation /></div>
+        <div className="min-w-0">{children}</div>
       </div>
     </div>
   );

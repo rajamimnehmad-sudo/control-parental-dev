@@ -14,6 +14,7 @@ import type {
   DagCalibrationReview,
   DagCalibrationVersion,
   DagCalibrationModel,
+  AppRating,
 } from "@/lib/types";
 
 const devUpdateBase = "https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates";
@@ -55,13 +56,22 @@ export async function listCommunities() {
   return (data ?? []) as CommunitySummary[];
 }
 
+export async function listAppRatings() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("super_admin_list_app_ratings", { max_rows: 500 });
+  if (error) raise(error);
+  return (data ?? []) as AppRating[];
+}
+
 export async function getCommunityBundle(communityId: string) {
   const supabase = await createClient();
-  const [detailResult, adminsResult, protectedUsersResult, devicesResult, dagEntitlementResult, dagDevicesResult, userVersion, adminVersion] = await Promise.all([
+  const [detailResult, adminsResult, contactsResult, protectedUsersResult, devicesResult, metadataResult, dagEntitlementResult, dagDevicesResult, userVersion, adminVersion] = await Promise.all([
     supabase.rpc("super_admin_get_community_detail", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_community_admins", { target_community_id: communityId }),
+    supabase.rpc("super_admin_list_admin_contacts", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_protected_users", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_community_devices", { target_community_id: communityId }),
+    supabase.rpc("super_admin_list_device_metadata", { target_community_id: communityId }),
     supabase.rpc("super_admin_get_dag_entitlement", { target_community_id: communityId }),
     supabase.rpc("super_admin_list_community_dag_devices", { target_community_id: communityId }),
     readDevVersion("user"),
@@ -70,8 +80,10 @@ export async function getCommunityBundle(communityId: string) {
 
   if (detailResult.error) raise(detailResult.error);
   if (adminsResult.error) raise(adminsResult.error);
+  if (contactsResult.error) raise(contactsResult.error);
   if (protectedUsersResult.error) raise(protectedUsersResult.error);
   if (devicesResult.error) raise(devicesResult.error);
+  if (metadataResult.error) raise(metadataResult.error);
   if (dagEntitlementResult.error) raise(dagEntitlementResult.error);
   if (dagDevicesResult.error) raise(dagDevicesResult.error);
 
@@ -85,14 +97,21 @@ export async function getCommunityBundle(communityId: string) {
     ((dagDevicesResult.data ?? []) as Array<{ device_id: string; dag_enabled: boolean }>).map((row) => [row.device_id, row.dag_enabled]),
   );
 
+  const metadataByDevice = new Map(
+    ((metadataResult.data ?? []) as Array<{ device_id: string; manufacturer: string | null; model: string | null; android_version: string | null; android_sdk: number | null }>)
+      .map((row) => [row.device_id, row]),
+  );
+  const phoneByAdmin = new Map(
+    ((contactsResult.data ?? []) as Array<{ admin_id: string; phone_e164: string | null }>).map((row) => [row.admin_id, row.phone_e164]),
+  );
   return {
     detail,
-    admins: (adminsResult.data ?? []) as CommunityAdmin[],
+    admins: ((adminsResult.data ?? []) as CommunityAdmin[]).map((admin) => ({ ...admin, phone_e164: phoneByAdmin.get(admin.admin_id) ?? null })),
     protectedUsers: ((protectedUsersResult.data ?? []) as Omit<ProtectedUser, "dag_enabled">[]).map((user) => ({
       ...user,
       dag_enabled: user.device_id ? (dagByDevice.get(user.device_id) ?? false) : false,
     })),
-    devices: (devicesResult.data ?? []) as CommunityDevice[],
+    devices: ((devicesResult.data ?? []) as CommunityDevice[]).map((device) => ({ ...device, ...metadataByDevice.get(device.device_id) })),
     devVersions: { user: userVersion, admin: adminVersion },
   };
 }

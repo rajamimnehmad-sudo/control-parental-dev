@@ -52,6 +52,16 @@ class DomainListPublisherTest(unittest.TestCase):
 
         self.assertEqual((42, 3, 7, 2, 0, 0), (version, format_version, hashes, categories, exceptions, canaries))
 
+    def test_test_domains_are_bounded_and_deterministic(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = pathlib.Path(temporary) / "domains"
+            path.write_text("".join(f"domain-{index}.example\n" for index in range(100)), encoding="ascii")
+            first = update_ut1.sample_domains(path, "adult", "2026-07-28", 20)
+            second = update_ut1.sample_domains(path, "adult", "2026-07-28", 20)
+            self.assertEqual(first, second)
+            self.assertEqual(20, len(first))
+            self.assertEqual(20, len(set(first)))
+
     @staticmethod
     def _write(path: pathlib.Path, content: str) -> pathlib.Path:
         path.write_text(content, encoding="ascii")
