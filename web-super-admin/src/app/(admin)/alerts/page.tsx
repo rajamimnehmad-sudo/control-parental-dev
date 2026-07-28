@@ -17,11 +17,10 @@ export default async function AlertsPage() {
   const groups = Array.from(grouped, ([deviceId, events]) => ({ deviceId, events }));
 
   return (
-    <main className="mx-auto grid max-w-5xl gap-5 px-4 py-5 lg:px-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-ink">Alertas de protección</h1>
-        <p className="mt-1 text-sm text-muted">Intentos bloqueados y desactivaciones confirmadas, sin historial de navegación.</p>
-      </div>
+    <main className="page-shell">
+      <section className="page-heading">
+        <div><p className="eyebrow">Seguridad</p><h1>Alertas de protección</h1><p>Intentos bloqueados y desactivaciones confirmadas, sin registrar historial de navegación.</p></div>
+      </section>
       <section className="grid gap-3 sm:grid-cols-2">
         <AlertMetric label="Intentos bloqueados" value={blockedAttempts} icon={ShieldAlert} />
         <AlertMetric label="Incidentes confirmados" value={confirmed} icon={AlertTriangle} />
@@ -34,7 +33,7 @@ export default async function AlertsPage() {
             const latest = events[0];
             const attempts = events.filter((event) => event.alert_type === "tamper_attempt").length;
             const degraded = events.some((event) => !["tamper_attempt", "maintenance_requested"].includes(event.alert_type));
-            return <article key={deviceId} className={`rounded-2xl border bg-white p-4 shadow-soft ${degraded ? "border-red-200" : "border-line"}`}>
+            return <article key={deviceId} className={`rounded-2xl border bg-white p-5 shadow-panel ${degraded ? "border-red-200" : "border-line"}`}>
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <p className="font-bold text-ink">{latest.device_name}</p>
@@ -60,7 +59,7 @@ export default async function AlertsPage() {
 
 function AlertMetric({ label, value, icon: Icon }: { label: string; value: number; icon: typeof CheckCircle2 }) {
   return (
-    <div className="rounded-md border border-line bg-white p-4 shadow-soft">
+    <div className="metric-card">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-muted">{label}</p>
         <Icon className="h-5 w-5 text-accent" />

@@ -24,10 +24,10 @@ export default async function DagCalibrationPage() {
     : Math.max(0, 10 - (reviewed.length - lastEvaluatedCount));
   const displayedThresholds = activeVersion?.thresholds ?? {};
   return (
-    <main className="mx-auto grid max-w-7xl gap-5 px-4 py-5 lg:px-6">
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <main className="page-shell">
+      <section className="page-heading">
         <div>
-          <div className="flex items-center gap-2"><BrainCircuit className="h-6 w-6 text-accent" /><h1 className="text-2xl font-semibold text-ink">Calibración DAG</h1></div>
+          <div className="flex items-center gap-2"><BrainCircuit className="h-6 w-6 text-accent" /><h1>Calibración DAG</h1></div>
           <p className="mt-1 max-w-3xl text-sm text-slate-500">Revisá casos dudosos, registrá tu criterio y creá calibraciones medibles y reversibles. Calibrar ajusta umbrales; entrenar un modelo nuevo será una etapa separada.</p>
         </div>
         <div className="flex flex-wrap gap-2">

@@ -10,22 +10,22 @@ export async function generateMetadata(): Promise<Metadata> {
   const imageUrl = new URL("/og.png", origin).toString();
 
   return {
-    title: "Super Admin | Content Filter",
-    description: "Panel Super Admin para comunidades, licencias, dispositivos y consumo DAG.",
+    title: "Glosh Control Center",
+    description: "Administración central de comunidades, protección y dispositivos Glosh.",
     robots: {
       index: false,
       follow: false,
       nocache: true,
     },
     openGraph: {
-      title: "Consumo DAG | Content Filter",
-      description: "Control mensual seguro del buscador protegido DAG.",
-      images: [{ url: imageUrl, width: 1731, height: 908, alt: "Consumo DAG · Control mensual seguro" }],
+      title: "Glosh Control Center",
+      description: "Protección clara. Control responsable.",
+      images: [{ url: imageUrl, width: 1729, height: 910, alt: "Glosh Control Center · Protección clara. Control responsable." }],
     },
     twitter: {
       card: "summary_large_image",
-      title: "Consumo DAG | Content Filter",
-      description: "Control mensual seguro del buscador protegido DAG.",
+      title: "Glosh Control Center",
+      description: "Protección clara. Control responsable.",
       images: [imageUrl],
     },
   };

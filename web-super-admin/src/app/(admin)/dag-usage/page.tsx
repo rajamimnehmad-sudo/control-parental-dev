@@ -31,12 +31,12 @@ export default async function DagUsagePage() {
   const usagePercent = percent(totalRequests, totalCapacity);
 
   return (
-    <main className="mx-auto grid max-w-7xl gap-5 px-4 py-5 lg:px-6">
-      <section className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+    <main className="page-shell">
+      <section className="page-heading">
         <div>
           <div className="flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-accent" />
-            <h1 className="text-2xl font-semibold text-ink">Consumo mensual DAG</h1>
+            <h1>Consumo mensual DAG</h1>
           </div>
           <p className="mt-1 text-sm text-slate-500">
             {monthLabel()} · conteo sin consultas, URLs, resultados ni historial.

@@ -28,8 +28,8 @@ export default async function CommunityDetailPage({ params }: Props) {
   const orderedUsers = [...protectedUsers].sort((left, right) => userPriority(left) - userPriority(right) || left.display_name.localeCompare(right.display_name, "es"));
 
   return (
-    <main className="community-detail mx-auto grid max-w-4xl gap-5 px-4 py-5 lg:px-6">
-      <div className="sticky top-0 z-30 -mx-4 flex flex-col gap-4 border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur lg:-mx-6 lg:px-6">
+    <main className="community-detail page-shell">
+      <div className="sticky top-[72px] z-20 -mx-4 flex flex-col gap-4 border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 xl:-mx-8 xl:px-8">
         <Link className="inline-flex items-center gap-2 text-sm font-semibold text-accent" href="/communities">
           <ArrowLeft className="h-4 w-4" />
           Volver
@@ -58,7 +58,7 @@ export default async function CommunityDetailPage({ params }: Props) {
         {admins.length === 0 ? (
           <EmptyState title="Sin administradores" body="Crea un administrador y comparte el token para activar App Admin." />
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-3 xl:grid-cols-2">
             {admins.map((admin) => (
               <AdminCard key={admin.admin_id} admin={admin} communityId={communityId} />
             ))}
@@ -71,7 +71,7 @@ export default async function CommunityDetailPage({ params }: Props) {
         {protectedUsers.length === 0 ? (
           <EmptyState title="Sin usuarios protegidos" body="Aparecerán cuando un administrador genere tokens de App Usuario o cuando esos celulares se activen." />
         ) : (
-          <div className="grid gap-3">
+          <div className="grid gap-3 xl:grid-cols-2">
             {orderedUsers.map((user) => (
               <ProtectedUserCard key={user.protected_user_id} user={user} communityId={communityId} dagEntitled={detail.dag_entitled} device={devices.find((item) => item.device_id === user.device_id)} versions={devVersions} />
             ))}
@@ -87,7 +87,7 @@ export default async function CommunityDetailPage({ params }: Props) {
         {devices.filter((device) => device.app_role === "admin").length === 0 ? (
           <EmptyState title="Sin administradores activos" body="El estado aparecerá cuando una App Admin complete su activación." />
         ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {devices.filter((device) => device.app_role === "admin").map((device) => (
               <DeviceUpdateCard key={device.device_id} device={device} versions={devVersions} />
             ))}
@@ -156,7 +156,7 @@ function DeviceUpdateCard({ device, versions }: { device: CommunityDevice; versi
   const needsUpdate = latest !== null && current < latest;
   const badgeStyle = latest === null ? "bg-slate-100 text-slate-600" : needsUpdate ? "bg-amber-100 text-amber-800" : "bg-emerald-100 text-emerald-800";
   return (
-    <div className="rounded-md border border-line bg-white p-4 shadow-soft">
+    <div className="rounded-2xl border border-line bg-white p-4 shadow-panel">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="truncate text-sm font-bold text-ink">{device.display_name}</p>
@@ -203,7 +203,7 @@ function AdminCard({ admin, communityId }: { admin: CommunityAdmin; communityId:
   const active = Boolean(admin.activated_device_id);
 
   return (
-    <article className="rounded-md border border-line bg-white p-4 shadow-soft">
+    <article className="rounded-2xl border border-line bg-white p-5 shadow-panel">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
@@ -233,7 +233,7 @@ function ProtectedUserCard({ user, communityId, dagEntitled, device, versions }:
   const lastSeen = user.last_seen_at ? new Date(user.last_seen_at).getTime() : null;
   const offline = lastSeen !== null && Date.now() - lastSeen >= 24 * 60 * 60 * 1000;
   return (
-    <article className="rounded-md border border-line bg-white p-4 shadow-soft">
+    <article className="rounded-2xl border border-line bg-white p-5 shadow-panel">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">

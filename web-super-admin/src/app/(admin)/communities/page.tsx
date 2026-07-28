@@ -1,114 +1,41 @@
-import Link from "next/link";
-import { ArrowRight, Building2, CalendarClock, MonitorSmartphone, Plus, UsersRound } from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Building2, MonitorSmartphone, Plus, UsersRound } from "lucide-react";
+import { CommunityDirectory } from "@/components/CommunityDirectory";
 import { CreateCommunityForm } from "@/components/CreateCommunityForm";
-import { EmptyState } from "@/components/EmptyState";
-import { LicenseBadge } from "@/components/Badge";
 import { listCommunities } from "@/lib/data";
-import type { CommunitySummary } from "@/lib/types";
-import { compactNumber, formatDate } from "@/lib/utils";
+import { compactNumber } from "@/lib/utils";
 
 export default async function CommunitiesPage() {
-  const communities = (await listCommunities()).sort((left, right) => communityPriority(left) - communityPriority(right) || left.name.localeCompare(right.name, "es"));
-  const protectedUsers = communities.reduce((sum, community) => sum + Number(community.user_device_count), 0);
-  const admins = communities.reduce((sum, community) => sum + Number(community.admin_count), 0);
+  const communities = (await listCommunities()).sort((left, right) => priority(left.license_status) - priority(right.license_status) || left.name.localeCompare(right.name, "es"));
+  const users = communities.reduce((sum, item) => sum + Number(item.user_device_count), 0);
+  const admins = communities.reduce((sum, item) => sum + Number(item.admin_count), 0);
+  const active = communities.filter((item) => item.license_status === "active").length;
 
   return (
-    <main className="mx-auto grid max-w-4xl gap-5 px-4 py-5 lg:px-6">
-      <section className="flex items-start justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold text-ink">Comunidades</h1>
-          <p className="mt-1 text-sm text-slate-500">Elegí una comunidad para administrar licencias, admins y usuarios.</p>
-        </div>
-        <div className="rounded-md border border-line bg-white px-3 py-2 text-right shadow-soft">
-          <p className="text-xl font-bold text-ink">{compactNumber(communities.length)}</p>
-          <p className="text-xs font-semibold text-slate-500">total</p>
-        </div>
+    <main className="page-shell">
+      <section className="page-heading">
+        <div><p className="eyebrow">Organizaciones</p><h1>Comunidades</h1><p>Administrá licencias, responsables y dispositivos desde un único lugar.</p></div>
+        <details className="group relative">
+          <summary className="button button-primary cursor-pointer list-none"><Plus className="h-4 w-4" />Nueva comunidad</summary>
+          <div className="absolute right-0 z-20 mt-2 w-[min(92vw,480px)] rounded-2xl border border-line bg-white p-5 shadow-2xl"><CreateCommunityForm compact /></div>
+        </details>
       </section>
 
-      <section className="grid grid-cols-2 gap-3">
-        <MiniStat label="Admins" value={admins} icon={UsersRound} />
-        <MiniStat label="Usuarios" value={protectedUsers} icon={MonitorSmartphone} />
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Summary label="Total" value={compactNumber(communities.length)} icon={Building2} />
+        <Summary label="Activas" value={compactNumber(active)} icon={Building2} />
+        <Summary label="Usuarios" value={compactNumber(users)} icon={MonitorSmartphone} />
+        <Summary label="Administradores" value={compactNumber(admins)} icon={UsersRound} />
       </section>
 
-      <details className="group rounded-md border border-line bg-white shadow-soft">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-4">
-          <div className="flex items-center gap-2">
-            <Plus className="h-5 w-5 text-accent" />
-            <h2 className="text-base font-semibold text-ink">Crear comunidad</h2>
-          </div>
-          <span className="text-sm font-semibold text-accent group-open:hidden">Abrir</span>
-          <span className="hidden text-sm font-semibold text-accent group-open:inline">Cerrar</span>
-        </summary>
-        <div className="border-t border-line p-4">
-          <CreateCommunityForm compact />
-        </div>
-      </details>
-
-      <section className="grid gap-3">
-        {communities.length === 0 ? (
-          <EmptyState title="Sin comunidades" body="Crea la primera comunidad para emitir admins y licencias." />
-        ) : (
-          communities.map((community) => <CommunityCard key={community.community_id} community={community} />)
-        )}
-      </section>
+      <CommunityDirectory communities={communities} />
     </main>
   );
 }
 
-function communityPriority(community: CommunitySummary) {
-  if (community.license_status === "expired" || community.license_status === "suspended") return 0;
-  if (community.max_user_devices && community.user_device_count >= community.max_user_devices) return 1;
-  return 2;
+function priority(status: string) {
+  return status === "expired" || status === "suspended" ? 0 : status === "scheduled" ? 1 : 2;
 }
 
-function MiniStat({ label, value, icon: Icon }: { label: string; value: number; icon: LucideIcon }) {
-  return (
-    <div className="rounded-md border border-line bg-white p-3 shadow-soft">
-      <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-slate-500">{label}</p>
-        <Icon className="h-4 w-4 text-accent" />
-      </div>
-      <p className="mt-2 text-xl font-bold text-ink">{compactNumber(value)}</p>
-    </div>
-  );
-}
-
-function CommunityCard({ community }: { community: CommunitySummary }) {
-  return (
-    <Link className="block rounded-md border border-line bg-white p-4 shadow-soft transition hover:border-teal-200 hover:bg-teal-50/40" href={`/communities/${community.community_id}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-5 w-5 shrink-0 text-accent" />
-            <h2 className="truncate text-lg font-semibold text-ink">{community.name}</h2>
-          </div>
-          <p className="mt-1 text-sm text-slate-500">{community.guide_label}</p>
-        </div>
-        <ArrowRight className="mt-1 h-5 w-5 shrink-0 text-slate-400" />
-      </div>
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <LicenseBadge status={community.license_status} />
-        <span className="text-sm font-medium text-slate-600">{community.plan_name}</span>
-      </div>
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <CardMetric label="Admins" value={`${compactNumber(community.admin_count)} / ${community.max_admins ?? "-"}`} />
-        <CardMetric label="Usuarios" value={`${compactNumber(community.user_device_count)} / ${community.max_user_devices ?? "-"}`} />
-        <CardMetric label="Vence" value={community.expires_at ? new Date(community.expires_at).toLocaleDateString("es-AR", { timeZone: "America/Argentina/Buenos_Aires" }) : "Sin fecha"} />
-      </div>
-      <div className="mt-3 flex items-center gap-2 text-xs font-medium text-slate-500">
-        <CalendarClock className="h-4 w-4" />
-        Actualizada {formatDate(community.updated_at)}
-      </div>
-    </Link>
-  );
-}
-
-function CardMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-md bg-slate-50 px-2 py-2">
-      <p className="text-[11px] font-semibold uppercase text-slate-500">{label}</p>
-      <p className="mt-1 text-sm font-bold text-ink">{value}</p>
-    </div>
-  );
+function Summary({ label, value, icon: Icon }: { label: string; value: string; icon: typeof Building2 }) {
+  return <article className="metric-card p-4"><div className="flex items-center justify-between gap-2"><p className="metric-label">{label}</p><Icon className="h-4 w-4 text-slate-400" /></div><p className="mt-2 text-2xl font-bold tracking-tight text-ink">{value}</p></article>;
 }
