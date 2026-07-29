@@ -146,9 +146,9 @@ Flujo de una entrada:
 
 #### DAG-V3-DIRECTED-DATASET-PILOT-05B - Corpus público piloto
 
-- Estado: `Listo para ejecutar; infraestructura fusionada en PR #90–#92`.
-  Tipo: adquisición reproducible y calidad de datos. Prioridad: P0. Esfuerzo:
-  L. Riesgo: alto.
+- Estado: `En progreso; gate de metadatos completo, descarga bloqueada por
+  derechos y diversidad de fuentes`. Tipo: adquisición reproducible y calidad
+  de datos. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
 - Alcance propuesto: adquirir sólo el piloto autorizado, validar licencias y
   checksums, normalizar sin cargar el corpus completo en RAM, deduplicar por
   SHA-256/dHash/cluster y producir manifiestos reproducibles sin mezclar el
@@ -159,8 +159,18 @@ Flujo de una entrada:
   conocidos entre splits potenciales; hashes y procedencia auditables; reporte
   de descarte; prueba pequeña antes de escalar; ausencia de cambios Android,
   Supabase y Production.
-- Decisiones pendientes: tamaño exacto por categoría, resolución mínima,
-  política de imágenes ambiguas y umbral de duplicación.
+- Evidencia 2026-07-29: sondeo sin píxeles de 10 consultas produjo 100
+  candidatos Openverse y 92 Wikimedia. Hay 39 BY-SA excluidos, 16 sin creador,
+  39 sin URL de licencia y diez con restricciones adicionales; todos requieren
+  revisión de licencia, pertinencia y derechos de imagen. Wikimedia/Flickr
+  concentran más del 40 % y no hubo `landing_url` exacta repetida entre
+  catálogos.
+- Corrección preventiva: el descargador ya no acepta BY-SA y falla antes de
+  solicitar la URL; el inventario puede conservarlo sólo como descubrimiento.
+- Bloqueo: falta material propio/encargado o una fuente adicional con derechos
+  verificables, además de una decisión legal para cualquier persona
+  identificable. No se descargó ninguna imagen y 05C no comienza.
+- Informe: `docs/dag/v3/DAG_BROWSER_V3_DATASET_PILOT_05B.md`.
 
 #### DAG-V3-DIRECTED-LABELING-SPLIT-05C - Etiquetado y test sellado
 

@@ -120,6 +120,12 @@ bloques se conservan debajo como historia de decisiones.
   infraestructura está fusionada, pero la adquisición real debe conservar
   revisión individual, deduplicación, procedencia y los límites cerrados en
   `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`.
+- Primer gate 05B, 2026-07-29: un inventario sin píxeles reunió 192 candidatos
+  públicos y detuvo la descarga. Treinta y nueve son BY-SA, todos requieren
+  revisión individual y las fuentes Wikimedia/Flickr superan el máximo de
+  diversidad; tampoco existe evidencia suficiente de derechos de imagen para
+  personas identificables. El descargador fue cerrado a CC BY, CC0 y dominio
+  público. No se descargaron imágenes ni se inició 05C.
 
 ## DAG-V1-ARCHIVE-V2-CONTRACT-01 - archivo y contrato, sin cambio funcional - 2026-07-24
 

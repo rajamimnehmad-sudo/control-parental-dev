@@ -68,6 +68,8 @@ como maduros, deduplica IDs/paginas y nunca solicita la URL del archivo, thumbna
 Cada resultado queda como `needs_review`. Openverse no garantiza que sus datos de licencia sean
 correctos: antes de convertir un candidato en muestra elegible hay que verificar pagina original,
 atribucion, permiso comercial/derivados, derechos de imagen y relevancia visual.
+El inventario puede descubrir CC BY-SA para una eventual revision legal, pero el descargador piloto
+lo rechaza: 05A solo permite descargar CC BY, CC0 o dominio publico verificados.
 
 ## Descarga piloto acotada
 
