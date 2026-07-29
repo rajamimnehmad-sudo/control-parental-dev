@@ -27,7 +27,7 @@ export default async function CommunityDetailPage({ params }: Props) {
 
   return (
     <main className="community-detail page-shell">
-      <div className="sticky top-[72px] z-20 -mx-4 flex flex-col gap-4 border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 xl:-mx-8 xl:px-8">
+      <div className="sticky top-[64px] z-20 -mx-4 flex flex-col gap-4 border-b border-line bg-canvas/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:top-[72px] sm:px-6 xl:-mx-8 xl:px-8">
         <Link className="inline-flex items-center gap-2 text-sm font-semibold text-accent" href="/communities">
           <ArrowLeft className="h-4 w-4" />
           Volver

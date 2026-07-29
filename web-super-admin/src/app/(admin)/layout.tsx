@@ -23,6 +23,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
         <header className="app-topbar">
           <div className="flex min-w-0 items-center gap-3">
             <div className="lg:hidden"><AdminNavigation /></div>
+            <span className="text-sm font-bold tracking-tight text-ink sm:hidden">Glosh Control</span>
             <div className="hidden min-w-0 sm:block">
               <p className="truncate text-sm font-semibold text-ink">{email}</p>
               <p className="text-xs text-slate-500">{buildLabel}</p>
@@ -30,7 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
           </div>
           <div className="flex items-center gap-2">
             <span className="system-status"><span className="status-dot" />Sistema operativo</span>
-            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+            <span className="hidden h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-600 sm:flex">
               <UserRound className="h-4 w-4" />
             </span>
             <form action={signOutAction}>
