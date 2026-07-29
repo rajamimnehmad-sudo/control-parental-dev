@@ -137,7 +137,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         val now = clock.nowEpochMillis()
         if (handleSettingsProtection(event, packageName, event.className?.toString(), elapsed, now)) return
         if (event.eventType == AccessibilityEvent.TYPE_VIEW_CLICKED) return
-        if (packageName.isAlwaysAllowedPackage()) {
+        if (AccessibilityForegroundAllowlist.contains(packageName)) {
             handleAlwaysAllowedForeground(packageName, elapsed, now)
             return
         }
@@ -870,43 +870,6 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val GoogleSearchPackage = "com.google.android.googlequicksearchbox"
         const val LogTag = "ProtectorAccessibility"
         val ExplicitSearchPackages = setOf("com.android.chrome", GoogleSearchPackage)
-        val ExactAllowedPackageNames =
-            setOf(
-                "android",
-                "com.android.contacts",
-                "com.android.dialer",
-                "com.android.packageinstaller",
-                "com.android.permissioncontroller",
-                "com.android.phone",
-                "com.android.providers.downloads",
-                "com.android.settings",
-                "com.contentfilter.admin",
-                "com.contentfilter.admin.dev",
-                "com.contentfilter.admin.beta",
-                "com.contentfilter.user",
-                "com.contentfilter.user.dev",
-                "com.contentfilter.user.beta",
-                "com.google.android.contacts",
-                "com.google.android.dialer",
-                "com.google.android.gms",
-                "com.google.android.gsf",
-                "com.google.android.packageinstaller",
-                "com.google.android.permissioncontroller",
-                "com.google.android.setupwizard",
-                "com.android.vending",
-            )
-        val AllowedPackagePrefixes =
-            listOf(
-                "com.android.launcher",
-                "com.google.android.apps.nexuslauncher",
-                "com.google.android.inputmethod",
-                "com.google.android.webview",
-            )
-
-        fun String.isAlwaysAllowedPackage(): Boolean =
-            this in ExactAllowedPackageNames ||
-                AllowedPackagePrefixes.any { startsWith(it) } ||
-                endsWith(".launcher")
 
         fun Long.toObservedMinutes(): Int =
             if (this <= 0L) {

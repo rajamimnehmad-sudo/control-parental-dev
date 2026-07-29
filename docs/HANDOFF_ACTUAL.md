@@ -53,7 +53,7 @@ documentado arriba.
 - V20 endurece el bloqueo de audio/video, mantiene Atrás dentro de DAG, evita
   saltos a apps externas, corrige indicadores visuales vencidos y oculta
   contenedores publicitarios explícitos. Build y unitarios locales aprobados;
-  instalación y matriz física pendientes porque el teléfono fue desconectado.
+  instalación y matriz física ejecutadas en SM-A235M.
 - El modelo y su umbral `0.4` no cambiaron: el ajuste siguiente debe incorporar
   ejemplos actuales de falsos permisos y falsos filtros, no bajar el umbral a
   ciegas.
@@ -244,6 +244,29 @@ El lote integrado se desarrolló y validó en:
 - La Superweb legacy sigue siendo necesaria y no debe eliminarse sin ticket
   específico.
 
+## Gate físico SM-A235M del candidato actual
+
+- Instalación in-place verificada: Usuario `295`, Admin `284` y DAG `20`, sin
+  pérdida de datos ni publicación remota.
+- DAG quedó como navegador predeterminado y Accessibility habilitada y
+  vinculada.
+- Se corrigió una doble evaluación de Accessibility: DAG era reconocido como
+  `protected-browser`, pero luego podía entrar al flujo genérico de aprobación
+  y ser expulsado a Inicio. Las variantes `release`, `dev` y `beta` de DAG
+  pertenecen ahora a una allowlist única y probada.
+- Después de la corrección DAG permaneció en primer plano. Google, H&M,
+  Cheeky, Instagram y YouTube abrieron dentro del navegador; Inicio y Atrás no
+  expulsaron la aplicación; el selector de ocho pestañas permitió seleccionar,
+  crear y cerrar tarjetas.
+- Google Imágenes mostró contenido en menos de un segundo en la corrida con
+  caché. H&M mostró la página en `1.056 s` y completó análisis en `7.533 s`;
+  Cheeky mostró la página en `2.167 s` y completó análisis en `8.307 s`.
+- H&M conservó un hero promocional difuminado y Cheeky registró algunos
+  recursos diminutos/no raster como `unsupported_image`; son observaciones de
+  calibración/compatibilidad, no fallas de navegación.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v20-sm-a235m-2026-07-29.md`.
+
 ## Límites vigentes
 
 - Sin Device Owner no existe garantía absoluta contra modo seguro, ADB
@@ -256,6 +279,6 @@ El lote integrado se desarrolló y validó en:
 
 ## Próximo trabajo autorizado
 
-No hay implementación nueva autorizada por el solo hecho de figurar en el
-backlog. El siguiente paso es elegir y aprobar un ticket pequeño del lote
-UX/seguridad de DAG y App Admin.
+El gate actual quedó cerrado. El próximo lote recomendado es ampliar la
+calibración con ejemplos actuales, priorizando el hero de H&M y falsos filtros
+de ropa masculina, sin reducir el umbral global a ciegas.
