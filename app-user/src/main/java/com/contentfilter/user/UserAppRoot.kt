@@ -1,14 +1,13 @@
 package com.contentfilter.user
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
-import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -182,6 +181,7 @@ internal fun UserAppRoot(
     }
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor =
             if (destination == UserDestination.Home) {
                 UserHomeHeaderTop
@@ -220,7 +220,7 @@ internal fun UserAppRoot(
                         },
                         onActivateAccessibility = {
                             accessibilityReminderDeferred = true
-                            context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                            AccessibilityController.openSettings(context)
                         },
                         onActivateDeviceAdmin = {
                             deviceAdminLauncher.launch(DeviceAdminController.activationIntent(context))
@@ -351,7 +351,7 @@ internal fun UserAppRoot(
             title = { Text("Accesibilidad apagada") },
             text = {
                 Text(
-                    "El bloqueo de apps necesita el servicio de accesibilidad activo. Android puede desactivarlo después de una actualización.",
+                    "El bloqueo de apps necesita el servicio de accesibilidad activo. En la pantalla siguiente, activá “Usar Content Filter” o “Usar servicio”.",
                 )
             },
             confirmButton = {
@@ -359,7 +359,7 @@ internal fun UserAppRoot(
                     onClick = {
                         accessibilityReminderDeferred = true
                         showAccessibilityDialog = false
-                        context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                        AccessibilityController.openSettings(context)
                     },
                 ) {
                     Text("Activar")

@@ -18,6 +18,7 @@ fun RulesRoute(
     onBack: (() -> Unit)? = null,
     initialDeviceId: String? = null,
     onInitialDeviceConsumed: () -> Unit = {},
+    showUserListRequestKey: Int = 0,
     createUserRequestKey: Int = 0,
     onCreateUserRequestConsumed: () -> Unit = {},
     viewModel: RulesViewModel = hiltViewModel(),
@@ -30,6 +31,11 @@ fun RulesRoute(
                 refreshApps = entryMode != RulesEntryMode.Web,
             )
             onInitialDeviceConsumed()
+        }
+    }
+    LaunchedEffect(showUserListRequestKey) {
+        if (showUserListRequestKey > 0 && initialDeviceId == null) {
+            viewModel.clearDeviceSelection()
         }
     }
     RulesScreen(

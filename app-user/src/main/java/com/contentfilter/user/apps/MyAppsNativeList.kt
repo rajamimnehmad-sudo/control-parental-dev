@@ -21,6 +21,7 @@ import android.widget.ListView
 import android.widget.TextView
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.viewinterop.AndroidView
 import java.util.concurrent.Executors
 
@@ -32,7 +33,7 @@ internal fun MyAppsNativeList(
     modifier: Modifier = Modifier,
 ) {
     AndroidView(
-        modifier = modifier,
+        modifier = modifier.clipToBounds(),
         factory = { context ->
             ListView(context).apply {
                 clipToPadding = false

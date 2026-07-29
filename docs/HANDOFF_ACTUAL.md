@@ -25,6 +25,9 @@ Trabajar únicamente en:
 - No borrar datos sin confirmación específica.
 - No incluir secretos ni Service Role Key en Android o Git.
 - App Usuario y App Admin versionan y publican de forma independiente.
+- El flujo vigente es local: cada lote terminado se integra y confirma en
+  `main`; no hacer push, PR ni publicación remota sin el `OK` explícito del
+  usuario.
 
 ## Estado publicado de Glosh
 
@@ -140,8 +143,8 @@ El lote integrado se desarrolló y validó en:
   disponible`; espera y error siguen sin revelar píxeles.
 - Solicitudes Admin presentan icono grande, nombre confiable, packageName, tipo
   y estado.
-- Candidatos independientes instalados in-place en SM-S908E: Usuario `292`,
-  Admin `283`, DAG `18`. Compilación, tests, Lint, apertura fría, inferencia
+- Candidatos independientes instalados in-place en SM-S908E: Usuario `293`,
+  Admin `284`, DAG `18`. Compilación, tests, Lint, apertura fría, inferencia
   ONNX, rol predeterminado y `ACTION_VIEW` HTTPS fueron correctos.
 - Supabase DEV confirmó licencia efectiva activa hasta el 03/08/2026. Admin
   refresca la licencia al abrir y muestra `Licencia por vencer · 5 días
@@ -155,6 +158,38 @@ El lote integrado se desarrolló y validó en:
   franja blanca superior observada en el candidato anterior quedó corregida.
 - Los candidatos todavía no están publicados en DEV; instalación física no
   equivale a distribución.
+
+## Cierre del lote local recuperado
+
+- Se auditó el commit local suelto `cd4ab38` y se recuperaron selectivamente
+  sus mejoras vigentes sobre el `main` actual. No se restauraron versiones,
+  runtimes DAG ni ajustes de barras de sistema que ya estaban reemplazados por
+  una solución posterior.
+- Usuario abre la configuración de Accessibility con intento directo al
+  servicio y fallback seguro; el texto de recuperación explica qué control
+  activar. La navegación física desde Ajustes vuelve a Inicio.
+- Admin restablece correctamente la lista de usuarios al tocar la pestaña,
+  ofrece encabezado y regreso coherentes en Solicitudes y usa selector de hora
+  de 24 horas con detección de franjas superpuestas, incluso nocturnas.
+- La fecha operativa, consumos y horarios usan explícitamente
+  `America/Argentina/Buenos_Aires`.
+- Accessibility detecta una app de terceros desconocida al verla en primer
+  plano, la deja pendiente y solicita aprobación mediante el flujo local
+  existente. Mis apps recorta correctamente su lista nativa.
+- Validación local: `ktlintFormat`; tests de `core-domain`,
+  `feature-accessibility`, `feature-vpn`, Usuario y Admin; y ambos
+  `assembleDevDebug`, todos correctos. Se añadieron pruebas de solapamiento
+  normal y nocturno.
+- Gate físico SM-S908E: Usuario `293`, Admin `284` y DAG `18` instalados;
+  Accessibility habilitada y vinculada; DAG conserva el rol de navegador.
+  Usuario volvió desde Ajustes a Inicio y Admin mostró el nuevo encabezado de
+  Solicitudes con regreso por usuario.
+- APK Usuario: 4.726.793 bytes, SHA-256
+  `4ff20a6228b9ea3785f312a11bd1dee9107aad92155618fae4342aa25f78c2e2`.
+  APK Admin: 28.685.724 bytes, SHA-256
+  `2431ef8e730a7101d2cc92f27507c15bff4d86a9212a6d4c441e0323a7f43b0a`.
+- No se hizo push ni publicación DEV; GitHub continúa como respaldo anterior
+  hasta que el usuario autorice un hito remoto.
 
 ## Estado funcional de Glosh
 

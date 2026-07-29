@@ -1,8 +1,8 @@
 package com.contentfilter.feature.accessibility.policy
 
+import com.contentfilter.core.domain.time.GloshTime
 import java.time.LocalDateTime
 import java.time.LocalTime
-import java.time.ZoneId
 import javax.inject.Inject
 
 interface LocalDayProvider {
@@ -13,7 +13,7 @@ class SystemLocalDayProvider
     @Inject
     constructor() : LocalDayProvider {
         override fun currentDay(): LocalDay {
-            val zone = ZoneId.systemDefault()
+            val zone = GloshTime.ArgentinaZone
             val now = LocalDateTime.now(zone)
             val today = now.toLocalDate()
             val resetTime = LocalTime.NOON

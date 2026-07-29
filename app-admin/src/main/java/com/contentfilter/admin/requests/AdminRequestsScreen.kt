@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -46,6 +47,7 @@ import com.contentfilter.core.ui.ProductCard
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
+import com.contentfilter.core.ui.ProductPageHeader
 import com.contentfilter.core.ui.ProductSectionHeader
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
@@ -54,6 +56,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun AdminRequestsRoute(
     refreshKey: Int = 0,
+    onBack: (() -> Unit)? = null,
     viewModel: AdminRequestsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -65,9 +68,19 @@ fun AdminRequestsRoute(
             Modifier
                 .fillMaxSize()
                 .background(Color.White)
+                .statusBarsPadding()
                 .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        val selectedUser = state.users.firstOrNull { it.deviceId == state.selectedDeviceId }
+        ProductPageHeader(
+            title = selectedUser?.name ?: "Solicitudes",
+            subtitle =
+                selectedUser?.let {
+                    "${state.requests.size} pendientes · ${state.resolvedRequests.size} en historial"
+                } ?: "${state.users.sumOf { it.pendingCount }} pendientes",
+            onBack = if (selectedUser != null) viewModel::clearUserSelection else onBack,
+        )
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -96,7 +109,6 @@ fun AdminRequestsRoute(
                 )
             }
         }
-        val selectedUser = state.users.firstOrNull { it.deviceId == state.selectedDeviceId }
         if (selectedUser == null) {
             ProductSectionHeader("Usuarios", count = state.users.size)
             if (state.users.isEmpty()) {
@@ -112,22 +124,6 @@ fun AdminRequestsRoute(
             }
         } else {
             var showingHistory by remember(selectedUser.deviceId) { mutableStateOf(false) }
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Column {
-                    Text(selectedUser.name, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        "${state.requests.size} pendientes · ${state.resolvedRequests.size} en historial",
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                }
-                OutlinedButton(onClick = viewModel::clearUserSelection) {
-                    Text("Volver")
-                }
-            }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (showingHistory) {
                     OutlinedButton(modifier = Modifier.weight(1f), onClick = { showingHistory = false }) {

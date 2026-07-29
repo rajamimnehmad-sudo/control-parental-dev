@@ -12,4 +12,9 @@ interface InstallApprovalStore {
     fun markApproved(packageName: String)
 
     fun remove(packageName: String)
+
+    companion object {
+        const val ACTION_UNKNOWN_APP_DETECTED =
+            "com.contentfilter.action.UNKNOWN_APP_DETECTED"
+    }
 }

@@ -13,16 +13,19 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TimePicker
+import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -150,6 +153,7 @@ internal fun AllowedScheduleEditor(
             },
         )
     }
+    val hasOverlap = remember(drafts) { scheduleDraftsOverlap(drafts) }
     ProductCard {
         Text(title, style = MaterialTheme.typography.titleMedium)
         Text(
@@ -179,6 +183,13 @@ internal fun AllowedScheduleEditor(
                 onRemove = { drafts = drafts.toMutableList().also { it.removeAt(index) } },
             )
         }
+        if (hasOverlap) {
+            Text(
+                "Hay franjas superpuestas en uno o más días. Ajustalas antes de guardar.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             enabled = !saving,
@@ -188,7 +199,7 @@ internal fun AllowedScheduleEditor(
         }
         Button(
             modifier = Modifier.fillMaxWidth(),
-            enabled = !saving && drafts.all(ScheduleWindowDraft::isValid),
+            enabled = !saving && !hasOverlap && drafts.all(ScheduleWindowDraft::isValid),
             onClick = { onSave(drafts.map(ScheduleWindowDraft::toInput)) },
         ) {
             Text(
@@ -209,6 +220,8 @@ private fun ScheduleWindowRow(
     onChanged: (ScheduleWindowDraft) -> Unit,
     onRemove: () -> Unit,
 ) {
+    val startMinute = parseScheduleMinute(draft.start)
+    val endMinute = parseScheduleMinute(draft.end)
     Column(
         modifier =
             Modifier
@@ -227,23 +240,28 @@ private fun ScheduleWindowRow(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            OutlinedTextField(
+            ScheduleTimeButton(
                 modifier = Modifier.weight(1f),
+                label = "Desde",
                 value = draft.start,
-                onValueChange = { onChanged(draft.copy(start = it.take(MaxTimeLength))) },
-                label = { Text("Desde") },
-                supportingText = { Text("HH:mm") },
-                singleLine = true,
-                isError = parseScheduleMinute(draft.start) == null,
+                onSelected = { onChanged(draft.copy(start = it.toScheduleTime())) },
             )
-            OutlinedTextField(
+            ScheduleTimeButton(
                 modifier = Modifier.weight(1f),
+                label = "Hasta",
                 value = draft.end,
-                onValueChange = { onChanged(draft.copy(end = it.take(MaxTimeLength))) },
-                label = { Text("Hasta") },
-                supportingText = { Text("HH:mm · bloquea desde esa hora") },
-                singleLine = true,
-                isError = parseScheduleMinute(draft.end) == null,
+                onSelected = { onChanged(draft.copy(end = it.toScheduleTime())) },
+            )
+        }
+        if (startMinute != null && endMinute != null) {
+            Text(
+                if (endMinute <= startMinute) {
+                    "${draft.start}–${draft.end} del día siguiente"
+                } else {
+                    "${draft.start}–${draft.end}"
+                },
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Row(
@@ -265,6 +283,55 @@ private fun ScheduleWindowRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ScheduleTimeButton(
+    label: String,
+    value: String,
+    onSelected: (Int) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var pickerVisible by rememberSaveable { mutableStateOf(false) }
+    val current = parseScheduleMinute(value) ?: 0
+    OutlinedButton(
+        modifier = modifier,
+        onClick = { pickerVisible = true },
+    ) {
+        Column {
+            Text(label, style = MaterialTheme.typography.labelSmall)
+            Text(value, style = MaterialTheme.typography.titleMedium)
+        }
+    }
+    if (pickerVisible) {
+        val pickerState =
+            rememberTimePickerState(
+                initialHour = current / MinutesPerHour,
+                initialMinute = current % MinutesPerHour,
+                is24Hour = true,
+            )
+        AlertDialog(
+            onDismissRequest = { pickerVisible = false },
+            title = { Text("Elegir hora") },
+            text = { TimePicker(state = pickerState) },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onSelected(pickerState.hour * MinutesPerHour + pickerState.minute)
+                        pickerVisible = false
+                    },
+                ) {
+                    Text("Aceptar")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { pickerVisible = false }) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+}
+
 internal fun parseScheduleMinute(value: String): Int? {
     val match = ScheduleTimeRegex.matchEntire(value.trim()) ?: return null
     val hour = match.groupValues[1].toInt()
@@ -275,6 +342,25 @@ internal fun parseScheduleMinute(value: String): Int? {
 private fun Int?.toScheduleTime(): String {
     val value = this ?: return ""
     return "%02d:%02d".format(value / MinutesPerHour, value % MinutesPerHour)
+}
+
+internal fun scheduleDraftsOverlap(drafts: List<ScheduleWindowDraft>): Boolean {
+    val occupied = BooleanArray(Weekdays.size * MinutesPerDay)
+    for (draft in drafts) {
+        val start = parseScheduleMinute(draft.start) ?: continue
+        val end = parseScheduleMinute(draft.end) ?: continue
+        for (day in Weekdays) {
+            if (draft.activeDaysMask and PolicyWeekdays.bit(day.isoDayOfWeek) == 0) continue
+            val dayStart = (day.isoDayOfWeek - 1) * MinutesPerDay
+            val duration = if (end > start) end - start else MinutesPerDay - start + end
+            repeat(duration) { offset ->
+                val minute = (dayStart + start + offset) % occupied.size
+                if (occupied[minute]) return true
+                occupied[minute] = true
+            }
+        }
+    }
+    return false
 }
 
 internal data class ScheduleWindowDraft(
@@ -343,4 +429,4 @@ private val Weekdays =
 
 private val ScheduleTimeRegex = Regex("([01]\\d|2[0-3]):([0-5]\\d)")
 private const val MinutesPerHour = 60
-private const val MaxTimeLength = 5
+private const val MinutesPerDay = 24 * MinutesPerHour

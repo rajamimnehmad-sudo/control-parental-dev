@@ -21,6 +21,7 @@ import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
 import com.contentfilter.core.domain.repository.PolicyRepository
 import com.contentfilter.core.domain.repository.UsageSessionRepository
+import com.contentfilter.core.domain.time.GloshTime
 import com.contentfilter.core.network.dto.RemoteAccessRequestDto
 import com.contentfilter.core.network.remote.RemoteRequestRepository
 import com.contentfilter.core.network.remote.RemoteResult
@@ -41,7 +42,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
 import java.util.UUID
 import javax.inject.Inject
 
@@ -355,7 +355,7 @@ class MyAppsViewModel
         }
 
         private fun currentDay(): LocalDay {
-            val zone = ZoneId.systemDefault()
+            val zone = GloshTime.ArgentinaZone
             val now = java.time.LocalDateTime.now(zone)
             val today = LocalDate.now(zone)
             val startDate = if (now.toLocalTime().isBefore(java.time.LocalTime.NOON)) today.minusDays(1) else today

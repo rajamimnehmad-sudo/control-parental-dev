@@ -6,6 +6,7 @@ import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.repository.AccountRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.SystemStatusRepository
+import com.contentfilter.core.domain.time.GloshTime
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -16,7 +17,6 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import javax.inject.Inject
 
@@ -80,5 +80,5 @@ class DashboardViewModel
 
 private fun Long.toDisplayDate(): String =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-        .withZone(ZoneId.systemDefault())
+        .withZone(GloshTime.ArgentinaZone)
         .format(Instant.ofEpochMilli(this))

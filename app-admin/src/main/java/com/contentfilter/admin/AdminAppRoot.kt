@@ -7,6 +7,7 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -60,6 +61,7 @@ internal fun AdminAppRoot(
     var section by rememberSaveable { mutableStateOf<AdminSection?>(null) }
     var requestedUserId by rememberSaveable { mutableStateOf<String?>(null) }
     var createUserRequestKey by rememberSaveable { mutableStateOf(0) }
+    var showUserListRequestKey by rememberSaveable { mutableStateOf(0) }
     var requestsRefreshKey by rememberSaveable { mutableStateOf(0) }
     val context = LocalContext.current
     val rootViewModel: AdminRootViewModel = hiltViewModel()
@@ -132,6 +134,7 @@ internal fun AdminAppRoot(
     }
     Scaffold(
         modifier = modifier,
+        contentWindowInsets = WindowInsets(0, 0, 0, 0),
         containerColor =
             if (tab == AdminTab.Home && section == null) {
                 AdminHomeStatusBarColor
@@ -144,6 +147,10 @@ internal fun AdminAppRoot(
                     NavigationBarItem(
                         selected = tab == item && section == null,
                         onClick = {
+                            if (item == AdminTab.Users) {
+                                requestedUserId = null
+                                showUserListRequestKey += 1
+                            }
                             tab = item
                             section = null
                         },
@@ -172,13 +179,10 @@ internal fun AdminAppRoot(
                         onBack = { section = null },
                     )
                 AdminSection.Requests ->
-                    SectionContainer(
-                        title = "Solicitudes",
-                        subtitle = "Permisos y tiempo extra pendientes",
+                    AdminRequestsRoute(
+                        refreshKey = requestsRefreshKey,
                         onBack = { section = null },
-                    ) {
-                        AdminRequestsRoute(refreshKey = requestsRefreshKey)
-                    }
+                    )
                 AdminSection.Alerts ->
                     SectionContainer(
                         title = "Alertas de seguridad",
@@ -239,6 +243,8 @@ internal fun AdminAppRoot(
                         AdminTab.Home ->
                             HomeTab(
                                 onCreateUser = {
+                                    requestedUserId = null
+                                    showUserListRequestKey += 1
                                     createUserRequestKey += 1
                                     tab = AdminTab.Users
                                 },
@@ -254,16 +260,12 @@ internal fun AdminAppRoot(
                                 entryMode = RulesEntryMode.ManageUsers,
                                 initialDeviceId = requestedUserId,
                                 onInitialDeviceConsumed = { requestedUserId = null },
+                                showUserListRequestKey = showUserListRequestKey,
                                 createUserRequestKey = createUserRequestKey,
                                 onCreateUserRequestConsumed = { createUserRequestKey = 0 },
                             )
                         AdminTab.Requests ->
-                            SectionContainer(
-                                title = "Solicitudes",
-                                subtitle = "Permisos y tiempo extra pendientes",
-                            ) {
-                                AdminRequestsRoute(refreshKey = requestsRefreshKey)
-                            }
+                            AdminRequestsRoute(refreshKey = requestsRefreshKey)
                         AdminTab.Account ->
                             SettingsTab(
                                 onPanel = { section = AdminSection.Panel },

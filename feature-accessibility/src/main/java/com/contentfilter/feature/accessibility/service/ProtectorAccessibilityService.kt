@@ -2,7 +2,10 @@ package com.contentfilter.feature.accessibility.service
 
 import android.accessibilityservice.AccessibilityService
 import android.content.Intent
+import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
@@ -563,6 +566,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         packageName: String,
         elapsedRealtimeMillis: Long,
     ): Boolean {
+        detectUnknownApp(packageName)
         val state = snapshotProvider.current()
         if (installApprovalStore.isPending(packageName)) {
             if (hasExplicitAppApproval(packageName, state.snapshot.rules)) {
@@ -618,6 +622,39 @@ class ProtectorAccessibilityService : AccessibilityService() {
             is PolicyDecision.GrantExtraTime -> scheduleExtraTimeExpiry(packageName, decision.validUntilEpochMillis)
         }
         return false
+    }
+
+    private fun detectUnknownApp(packageName: String) {
+        if (installApprovalStore.isKnown(packageName)) return
+        val applicationInfo =
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    packageManager.getApplicationInfo(
+                        packageName,
+                        PackageManager.ApplicationInfoFlags.of(0),
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageManager.getApplicationInfo(packageName, 0)
+                }
+            }.getOrNull() ?: return
+        val isSystemApp =
+            applicationInfo.flags and
+                (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+        if (
+            isSystemApp ||
+            packageName == this.packageName ||
+            packageName.startsWith("com.contentfilter.admin")
+        ) {
+            return
+        }
+        installApprovalStore.markPending(packageName)
+        Log.i(LogTag, "Unknown foreground app detected package=$packageName")
+        sendBroadcast(
+            Intent(InstallApprovalStore.ACTION_UNKNOWN_APP_DETECTED)
+                .setPackage(this.packageName)
+                .setData(Uri.parse("package:$packageName")),
+        )
     }
 
     private fun recordForegroundDecisionIfChanged(

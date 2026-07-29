@@ -41,13 +41,13 @@ import com.contentfilter.core.domain.model.AccessRequest
 import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.ExtraTimeGrant
 import com.contentfilter.core.domain.model.RequestStatus
+import com.contentfilter.core.domain.time.GloshTime
 import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
 import com.contentfilter.core.ui.ProductPageHeader
 import kotlinx.coroutines.delay
 import java.time.Instant
-import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
 @Composable
@@ -238,7 +238,7 @@ private fun RequestStatus.displayName(): String =
 
 private fun Long.toDisplayDate(): String =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
-        .withZone(ZoneId.systemDefault())
+        .withZone(GloshTime.ArgentinaZone)
         .format(Instant.ofEpochMilli(this))
 
 @Composable

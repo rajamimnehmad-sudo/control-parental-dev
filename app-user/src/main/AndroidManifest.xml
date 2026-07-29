@@ -110,6 +110,7 @@
             <intent-filter>
                 <action android:name="android.intent.action.PACKAGE_ADDED" />
                 <action android:name="android.intent.action.PACKAGE_REMOVED" />
+                <action android:name="com.contentfilter.action.UNKNOWN_APP_DETECTED" />
 
                 <data android:scheme="package" />
             </intent-filter>

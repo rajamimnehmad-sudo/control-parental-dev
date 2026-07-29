@@ -1,7 +1,7 @@
 package com.contentfilter.feature.usage
 
+import com.contentfilter.core.domain.time.GloshTime
 import java.time.LocalDate
-import java.time.ZoneId
 
 data class UsageDay(
     val localDate: String,
@@ -10,7 +10,7 @@ data class UsageDay(
 ) {
     companion object {
         fun today(): UsageDay {
-            val zone = ZoneId.systemDefault()
+            val zone = GloshTime.ArgentinaZone
             val today = LocalDate.now(zone)
             return UsageDay(
                 localDate = today.toString(),

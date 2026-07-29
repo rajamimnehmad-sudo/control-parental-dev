@@ -24,3 +24,11 @@ Para planificacion, captura de ideas o seleccion de tickets:
 - Se permite modificar Android, ejecutar tests/builds, incrementar el `versionCode` de cada app afectada, hacer commit/push y publicar esas APKs solo en DEV. Usuario y Admin versionan de forma independiente; coordinar ambos solo cuando el cambio entra en las dos apps.
 - Para alertas remotas se permite usar exclusivamente Supabase DEV `syeycayasyufedwoprea`.
 - No tocar Production, no borrar datos y no incluir Service Role Key en Android.
+
+## Flujo local vigente
+
+- Trabajar, validar, versionar, hacer commits y fusionar los lotes terminados en `main` local.
+- No hacer push, abrir PR, ejecutar una publicacion remota ni actualizar GitHub sin un `OK` explicito del usuario.
+- Proponer un respaldo remoto al cerrar un hito estable de aproximadamente 5 a 10 tickets relacionados, o antes si existe riesgo concreto de perdida. El usuario decide si se sube.
+- Antes de modificar codigo, hacer solo un control Git liviano (`status`, rama, worktrees y commits recientes). Buscar ramas o commits sueltos en profundidad unicamente si aparece una inconsistencia.
+- Los APK locales deben generarse desde el `main` local ya integrado. No instalar como entrega final un APK construido desde un worktree o rama temporal.

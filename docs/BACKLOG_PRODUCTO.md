@@ -266,6 +266,26 @@ Flujo de una entrada:
   reinicio, actualización, ahorro de batería e instalación de navegadores
   nuevos.
 
+### ANDROID-LOCAL-RECOVERY-07 - Recuperación selectiva del lote suelto
+
+- Estado: `Resuelto localmente; sin push ni publicación`. Aprobado
+  explícitamente por el usuario el 2026-07-29. Tipo: recuperación, UX Android,
+  horarios y seguridad. Prioridad: P0. Esfuerzo: L. Riesgo: medio.
+- Causa raíz: el commit local `cd4ab38` quedó fuera de `main`; el APK instalado
+  coincidía con `main`, pero ese `main` no contenía varias correcciones
+  previamente realizadas.
+- Resultado: las mejoras vigentes se adaptaron al código actual sin restaurar
+  DAG 1/2, versiones viejas ni la implementación anterior de barras del
+  sistema. Usuario `293` y Admin `284` quedaron compilados, instalados y
+  recorridos en SM-S908E; DAG permanece en `18`.
+- Alcance recuperado: guía de Accessibility, navegación de Usuario/Admin,
+  encabezados de Solicitudes, selector y validación de horarios, horario de
+  Argentina, detección inmediata de apps desconocidas y recorte de la lista
+  nativa.
+- Cierre: pruebas y builds locales correctos, Accessibility vinculada y DAG
+  predeterminado. El lote permanece solamente local hasta autorización
+  explícita de respaldo en GitHub.
+
 ### ANDROID-FLAT-LISTS-UX-01 - Listas simples, compactas y modernas
 
 - Estado: `Validacion fisica parcial ampliada en SM-A235M DEV 270`. Aprobado explicitamente el 2026-07-21. Tipo: UX Android compartida. Prioridad: P2. Esfuerzo: M. Riesgo: bajo.

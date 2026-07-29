@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import com.contentfilter.core.domain.model.AccessRequest
 import com.contentfilter.core.domain.model.AccessRequestType
 import com.contentfilter.core.domain.model.PolicyTargetType
@@ -50,18 +51,22 @@ class PackageChangeReceiver : BroadcastReceiver() {
             installApprovalStore.remove(packageName)
             return
         }
-        if (intent.action != Intent.ACTION_PACKAGE_ADDED) return
+        val detectedByAccessibility =
+            intent.action == InstallApprovalStore.ACTION_UNKNOWN_APP_DETECTED
+        if (intent.action != Intent.ACTION_PACKAGE_ADDED && !detectedByAccessibility) return
         val applicationInfo = context.packageManager.applicationInfo(packageName) ?: return
         if (
             !shouldRequireInstallApproval(
                 packageName = packageName,
                 isSystemApp = applicationInfo.isSystemApp(),
-                isKnown = installApprovalStore.isKnown(packageName),
+                isKnown = installApprovalStore.isKnown(packageName) && !detectedByAccessibility,
                 ownPackageName = context.packageName,
             )
         ) {
             return
         }
+        installApprovalStore.markPending(packageName)
+        Log.i(LogTag, "New app pending approval package=$packageName source=${intent.action}")
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
@@ -93,7 +98,6 @@ class PackageChangeReceiver : BroadcastReceiver() {
             installApprovalStore.markApproved(packageName)
             return
         }
-        installApprovalStore.markPending(packageName)
         val duplicate =
             requestRepository.observePendingRequests().first().any {
                 it.requestType == AccessRequestType.APP_ACCESS && it.targetPackageName == packageName
@@ -132,6 +136,10 @@ class PackageChangeReceiver : BroadcastReceiver() {
 
     private fun ApplicationInfo.isSystemApp(): Boolean =
         flags and (ApplicationInfo.FLAG_SYSTEM or ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
+
+    private companion object {
+        const val LogTag = "PackageChangeReceiver"
+    }
 }
 
 internal fun shouldRequireInstallApproval(

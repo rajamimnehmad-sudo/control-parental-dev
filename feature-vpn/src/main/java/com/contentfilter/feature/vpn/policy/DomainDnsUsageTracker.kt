@@ -1,7 +1,7 @@
 package com.contentfilter.feature.vpn.policy
 
+import com.contentfilter.core.domain.time.GloshTime
 import java.time.Instant
-import java.time.ZoneId
 
 class DomainDnsUsageTracker {
     private val minutesByTarget = mutableMapOf<String, MutableSet<Int>>()
@@ -14,7 +14,7 @@ class DomainDnsUsageTracker {
     ): Int {
         val date =
             Instant.ofEpochMilli(epochMillis)
-                .atZone(ZoneId.systemDefault())
+                .atZone(GloshTime.ArgentinaZone)
                 .toLocalDate()
                 .toString()
         if (localDate != date) {
