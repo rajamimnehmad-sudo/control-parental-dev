@@ -16,7 +16,7 @@ import {
   Star,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 const groups = [
   {
@@ -46,22 +46,28 @@ export function AdminNavigation() {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
   return (
     <>
-      <button className="mobile-menu-button lg:hidden" type="button" aria-expanded={open} onClick={() => setOpen(true)}>
+      <button className="mobile-menu-button lg:hidden" type="button" aria-label="Abrir menú" aria-expanded={open} onClick={() => setOpen(true)}>
         <Menu className="h-5 w-5" />
-        <span className="sr-only">Abrir menú</span>
       </button>
-      {open ? (
-        <button
-          className="fixed inset-0 z-40 bg-slate-950/55 backdrop-blur-sm lg:hidden"
-          aria-label="Cerrar menú"
-          onClick={() => setOpen(false)}
-        />
-      ) : null}
       <aside className={`admin-sidebar ${open ? "admin-sidebar-open" : ""}`}>
         <div className="flex h-full flex-col">
-          <div className="flex items-center justify-between px-1 pb-8">
+          <div className="flex items-center justify-between border-b border-white/10 px-1 pb-5 lg:border-0 lg:pb-8">
             <Link href="/dashboard" className="flex items-center gap-3" onClick={() => setOpen(false)}>
               <span className="brand-mark"><ShieldCheck className="h-5 w-5" /></span>
               <span>
@@ -69,12 +75,12 @@ export function AdminNavigation() {
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-400">Control Center</span>
               </span>
             </Link>
-            <button className="icon-button text-slate-300 hover:bg-white/10 hover:text-white lg:hidden" onClick={() => setOpen(false)} aria-label="Cerrar menú">
+            <button className="icon-button border border-white/10 bg-white/[0.06] text-slate-200 hover:bg-white/10 hover:text-white lg:hidden" onClick={() => setOpen(false)} aria-label="Cerrar menú">
               <X className="h-5 w-5" />
             </button>
           </div>
 
-          <nav aria-label="Navegación principal" className="grid gap-6">
+          <nav aria-label="Navegación principal" className="grid gap-7 overflow-y-auto py-6 lg:py-0">
             {groups.map((group) => (
               <div key={group.label}>
                 <p className="nav-group-label">{group.label}</p>
