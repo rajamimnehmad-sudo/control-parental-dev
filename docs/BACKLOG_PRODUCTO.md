@@ -49,51 +49,21 @@ Flujo de una entrada:
 - Estado DAG posterior: App Usuario 281 y DAG Browser V3 aislado hasta
   `versionCode 5` fueron candidatos físicos; el navegador se distribuye como
   artefacto DEV separado y no comparte el manifiesto público de Glosh.
-- DAG 1 y DAG 2 fueron retirados del código y backend DEV en PR #74/#76, con
-  respaldo previo de datos; el navegador actual es DAG Browser V3 fail-closed.
+- El navegador actual es DAG Browser V3 fail-closed y no conserva fallbacks,
+  módulos ni documentación operativa de runtimes retirados.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
 
-### DAG-V2-TARGETED-SIGNAL-AND-LABELED-POLICY-EVALUATION-04B
-
-- Estado: `Evaluación cerrada en Draft: NO-GO`. Autorizado
-  explícitamente el 2026-07-26. Tipo: evaluación humana reproducible y señales
-  CPU. Prioridad: P0. Esfuerzo: XL. Riesgo: medio.
-- Plan congelado antes de etiquetas: orden ciego de 203, subconjunto
-  diagnóstico de 60 (cinco por motivo) y split sin fuga 122/41/40 por
-  SHA-256/dHash/cluster.
-- Revisor Android autónomo sin WebView ni Internet instalado in-place en
-  SM-A235M. Valida cada imagen, no preselecciona, persiste, reanuda, permite
-  Atrás/Deshacer y exporta sólo el contrato sanitizado.
-- Tooling preparado: señales locales YCbCr/HSV/Lab, pose/torso/calidad,
-  comparación docente limitada a 20 imágenes, políticas interpretables y
-  apertura única del test después de sellar parámetros.
-- Resultado humano: 203/203 decisiones verificadas (117 Show, 76 Hide y 10
-  Unsure). El test se abrió una sola vez después de sellar reglas
-  deterministas con exploración/validación.
-- Resultado congelado: cero falsos permisos críticos, pero recall Hide 62,5%,
-  cobertura 33,33%, incertidumbre/segmentación requerida 66,67% y ninguna
-  predicción Show. La ruta paralela sí cumple rendimiento en SM-A235M
-  (309,44/472,24 ms p50/p95), por lo que el bloqueo es de calidad de señales.
-- Decisión histórica: `NO-GO`; no corresponde iniciar 04C. En ese cierre se
-  propuso `DAG-V2-DIRECTED-VISUAL-MODEL-DATASET-05`. Luego DAG 1/2 fueron
-  retirados y la continuación se normalizó como el lote DAG Browser V3 que
-  figura a continuación.
-- No se integró modelo, no se creó caché activa, no hubo entrenamiento, GPU,
-  Supabase, Production, publicación ni inicio de 04C. Provider v2 sigue en
-  `Hide`.
-
 ### LOTE-DAG-V3-DIRECTED-VISUAL-MODEL-DATASET-05 - Datos dirigidos y candidato visual pequeño
 
-- Estado: `En progreso; 05A cerrado documentalmente el 2026-07-29`. Autorizado
-  por el usuario el 2026-07-29. Tipo: lote de investigación, datos, licencias y
-  evaluación visual reproducible. Prioridad: P0. Evidencia: la evaluación 04B
-  de DAG v2 cerró en NO-GO por cobertura/calidad y el repositorio reemplazó DAG
-  1/2 por DAG Browser V3 aislado; PR #82–#92 prepararon el contrato y tooling
-  inicial sin habilitar imágenes. Esfuerzo total estimado: XL. Riesgo: alto.
+- Estado: `Pausado por decisión del usuario; no continuar sin nueva aprobación
+  explícita`. Tipo: lote de investigación, datos, licencias y evaluación visual
+  reproducible. Prioridad: P3 mientras permanezca pausado. Evidencia: PR #82–#94
+  prepararon contrato, tooling y un sondeo de metadatos sin habilitar imágenes.
+  Esfuerzo total estimado: XL. Riesgo: alto.
 - Objetivo: determinar, con datos públicos equilibrados y una prueba pequeña
   de costo acotado, si un modelo visual dirigido puede separar `Show`, `Hide`
   y evidencia insuficiente mejor que la política CPU descartada, sin integrar
@@ -105,13 +75,11 @@ Flujo de una entrada:
 - Fuera de alcance del lote: habilitar `allow` o `blur`, cambiar el cierre
   `block / analyzer_unavailable`, integrar un runtime antes del gate, activar
   caché, entrenar en Supabase o GitHub Actions estándar,
-  publicar APK, cambiar `versionCode`, usar Production, borrar evidencia de
-  04A/04B o iniciar optimización Android, modo sombra, canary o retiro de DAG
-  1/2.
-- Dependencias generales: contrato y preprocesador de DAG Browser V3, evidencia
-  congelada de 04A/04B, guía de anotación, presupuesto explícito antes de
-  cualquier GPU externa, licencias compatibles con uso comercial y límites de
-  la Mac M2 de 8 GB.
+  publicar APK, cambiar `versionCode`, usar Production o iniciar optimización
+  Android, modo sombra o canary.
+- Dependencias generales: contrato y preprocesador de DAG Browser V3, guía de
+  anotación, presupuesto explícito antes de cualquier GPU externa, licencias
+  compatibles con uso comercial y límites de la Mac M2 de 8 GB.
 - Aceptación del lote: termina con artefactos trazables y una decisión
   reproducible; no con una integración automática. Un GO sólo habilita
   proponer el lote siguiente y un NO-GO conserva DAG Browser V3 cerrado en
@@ -146,13 +114,12 @@ Flujo de una entrada:
 
 #### DAG-V3-DIRECTED-DATASET-PILOT-05B - Corpus público piloto
 
-- Estado: `En progreso; gate de metadatos completo, descarga bloqueada por
-  derechos y diversidad de fuentes`. Tipo: adquisición reproducible y calidad
-  de datos. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
+- Estado: `Pausado por decisión del usuario; no descargar ni continuar`. Tipo:
+  adquisición reproducible y calidad de datos. Prioridad: P3. Esfuerzo: L.
+  Riesgo: alto.
 - Alcance propuesto: adquirir sólo el piloto autorizado, validar licencias y
   checksums, normalizar sin cargar el corpus completo en RAM, deduplicar por
-  SHA-256/dHash/cluster y producir manifiestos reproducibles sin mezclar el
-  test congelado de 04B.
+  SHA-256/dHash/cluster y producir manifiestos reproducibles.
 - Dependencias: aprobación y aceptación de 05A, límites de costo/almacenamiento
   y herramientas externas al producto.
 - Criterios de aceptación: inventario exacto por fuente/clase; cero duplicados
@@ -176,9 +143,9 @@ Flujo de una entrada:
 
 - Estado: `Propuesto; bloqueado por 05B y no aprobado para código`. Tipo:
   evaluación humana reproducible. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
-- Alcance propuesto: adaptar el revisor autónomo de 04B al contrato 05A,
-  ejecutar piloto ciego con `Show`, `Hide` y `Unsure`, medir desacuerdo y sellar
-  entrenamiento, validación y test por identidad/cluster antes de experimentar.
+- Alcance propuesto: usar el contrato 05A para ejecutar un piloto ciego con
+  `Show`, `Hide` y `Unsure`, medir desacuerdo y sellar entrenamiento, validación
+  y test por identidad/cluster antes de experimentar.
 - Dependencias: corpus 05B, guía de anotación versionada y revisor sin WebView
   ni Internet.
 - Criterios de aceptación: cada decisión es explícita y reversible durante la
@@ -224,64 +191,81 @@ Flujo de una entrada:
 - Decisiones pendientes: límites exactos de falsos permisos, recall/cobertura,
   incertidumbre, p50/p95, tamaño del artefacto y criterio de nuevo dataset.
 
-### DAG-V2-NO-GPU-BASELINE-BENCHMARK-04A - comparación visual independiente
+### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
-- Estado: `Candidato cerrado en Draft PR, decisión NO-GO`. Autorizado
-  explícitamente el 2026-07-26. Tipo: investigación reproducible, licencias y rendimiento.
-  Prioridad: P0. Esfuerzo: L. Riesgo: medio.
-- Alcance cerrado: comparar Marqo NSFW archivado como artefacto upstream,
-  MediaPipe Pose Lite y Selfie Multiclass mediante tooling externo al producto,
-  corpus público acotado y cascadas simuladas. El provider de DAG v2 continúa
-  exclusivamente en `Hide`.
-- Fuera de alcance: dataset definitivo, entrenamiento, caché activa, integración
-  WebView, Supabase, Production, versión o publicación.
-- Resultado: 203 imágenes públicas, 3 modelos/28.852.165 bytes, Mac M2 y
-  SM-A235M medidos. En Android, segmentación alcanzó 784,79 ms p50; la cascada
-  simulada aún envía 98,52% a pose y 68,47% a segmentación. Sin etiquetas
-  humanas ni señales de sexo/edad/ajuste/transparencia, 04A no seleccionó
-  ganador; 04B abrió después sólo su revisión humana.
-- Trazabilidad: selección/evidencia/checksums versionados; licencias por mapa
-  canónico cerrado; runner valida hashes de modelos, manifiesto e imágenes;
-  CI ligero propio evita compilar aplicaciones ante cambios sólo de 04A. La
-  auditoría conservó 203/203 y todas las cifras.
-- Continuación autorizada: 04B abrió exclusivamente el gate humano; no inició
-  integración, caché ni entrenamiento.
+- Estado: `Propuesto; registrado por pedido del usuario; no aprobado para
+  código`. Tipo: UX, App Admin, navegador y seguridad Android. Prioridad: P1.
+  Esfuerzo total: XL. Riesgo: alto.
+- Decisión de plataforma: conservar instalación y configuración remota en
+  teléfonos personales. No usar Device Owner, MDM, Knox ni restablecimiento.
+- Orden sugerido: estados visuales de imágenes; solicitudes reconocibles;
+  activación guiada; navegador predeterminado; cierre de navegadores
+  alternativos; pruebas de evasión. Cada ticket requiere aprobación propia.
 
-### DAG-V2-CALIBRATION-COLLECTOR-03 - Colector DEV aislado
+#### DAG-IMAGE-STATE-UX-05 - Diferenciar imagen cargando de imagen bloqueada
 
-- Estado: `Fusionado en PR #69 mediante e8232968dc3b4feb52663c800505101bdd5e657c`. Autorizado explícitamente el 2026-07-26. Tipo: calibración, privacidad y backend DEV. Prioridad: P0. Esfuerzo: XL. Riesgo: alto.
-- Alcance cerrado: activación manual no persistente; cola de candidatos de la generación vigente; preview sólo en visor nativo; etiquetas `show`, `hide` y `unsure`; normalización JPEG; SHA-256/dHash; outbox AES-GCM; backend, bucket y tablas v2 separados.
-- Invariantes: WebView continúa con placeholders; las etiquetas no cambian página, thresholds, modelos ni DAG v1; `unsure` queda fuera de positivos/negativos; Beta y Production no contienen la superficie; no empezó dataset, entrenamiento, modo sombra ni Lote 4.
-- Corrección de confiabilidad: un outbox lleno rechaza la etiqueta nueva sin eliminar pendientes; un rechazo permanente pasa a recibo cifrado y no bloquea entregas posteriores; la migración forward-only `20260726111615` y Edge Function v2 reanudan muestras exactas `pending` con o sin objeto y hacen idempotente `ready`.
-- Validación: tests Android/backend, aislamiento, empaquetado por flavor, Gradle global y específico correctos. La corrección se instaló in-place en SM-A235M y confirmó Lab inicialmente apagado, placeholders, preview aislada, cierre sin recarga y `full_page_analysis_count == 1`, sin crear otra etiqueta. Supabase DEV permaneció en 4 muestras `ready`, 4 etiquetas `unsure` y 4 objetos privados.
-- Incidencia: cuatro outboxes `unsure` terminaron entregados a DEV, uno por encima del máximo físico pedido de tres, después de corregir un APK local compilado sin `.env`. No se borró ni alteró evidencia; cualquier corrección requiere otro ticket destructivo explícito.
-- Rollback: deshabilitar el flag y retirar interfaz/envío sin cambiar navegador v2, DAG v1 ni evidencia remota.
+- Estado: `Propuesto; no aprobado para código`. Prioridad: P1. Esfuerzo: M.
+  Riesgo: medio.
+- Mientras una imagen se descarga o analiza, mostrar superficie neutra con
+  pulso suave sin revelar píxeles. Al bloquear, detener la animación y dejar
+  blur estable con una marca discreta de escudo. Un error usa un tercer estado.
+- El estado se deriva de la clasificación real, no de un temporizador.
+- Aceptación: carga, bloqueo y error se distinguen en tema claro/oscuro y con
+  TalkBack; no hay destellos, parpadeos ni trabajo continuo de UI.
 
-### DAG-V2-BROWSER-FOUNDATION-02 - Base de navegador aislada
+#### ADMIN-REQUESTS-APP-IDENTITY-02 - Solicitudes de aplicaciones reconocibles
 
-- Estado: `Fusionado en PR #68 mediante 45ab039e798f18fc3012bd36690a761d878ccc7a`. Autorizado explícitamente el 2026-07-24. Tipo: navegador, seguridad y arquitectura. Prioridad: P0. Esfuerzo: XL. Riesgo: alto.
-- Alcance cerrado: módulo `:feature-dag2` y namespace independientes; Activity interna no exportada; entrada discreta en el menú DAG sólo con flag DEV; proceso WebView `:dag2`; búsqueda Brave existente con filtrado local previo y posterior; sesión y token por documento; un router común para WebView y Service Workers.
-- Estado visual transitorio: no existe todavía el modelo v2 ni una ruta aprobada. Raster y SVG terminan como placeholder constante sin leer ni conservar píxeles del original; `data:`, `blob:`, backgrounds y otros medios permanecen neutralizados. HTML, CSS, JavaScript, JSON, RSC, XHR, `fetch`, módulos y fuentes evitan inmediatamente el pipeline visual.
-- Corrección de aislamiento: cada WebView, análisis, bridge, recurso y callback conserva el contexto inmutable del documento que lo originó; Service Worker exige evidencia de generación/origen y el trabajo antiguo o no atribuible no contamina la sesión nueva. El fallback SPA consulta sólo `location.href`, sin modificar History; el WebView se destruye al salir o bloquear y se retiró la anulación global de backgrounds.
-- Política compartida: el Lab adapta la clasificación textual canónica sin importar clasificadores visuales v1. Un guard neutral común cubre navegación, WebView, imágenes y Service Worker para esquemas, IP literales y destinos especiales; la navegación resuelve DNS fuera de la intercepción síncrona. Sigue explícito el riesgo residual de DNS rebinding en subrecursos funcionales resueltos internamente por WebView.
-- Aceptación: el comando exacto de Android CI, unitarios, aislamiento v1/v2, ktlint, Android Lint, Detekt y APK DEV correctos. En el SM-A235M `R58T34V31AE`, Android 14/API 34, se completaron 60/60 aperturas de Frávega, Mimo y Cheeky: diez normales y diez sin caché por sitio, todas estables durante 20 segundos, con `full_page_analysis_count == 1`, placeholders neutros y cero fotografías reales observadas. No hubo crash, ANR ni `renderer_gone`; WebView debugging siguió desactivado.
-- Correcciones físicas generales: la navegación principal ahora prevalece sobre un `Accept` mixto para no tratar HTML como imagen; el Lab resetea sesión e historial y libera WebView exactamente una vez con una generación de lifecycle que impide que una Activity vieja cierre la nueva. No se agregó ninguna condición por sitio.
-- Limitaciones observadas: el rótulo de filtro de la categoría probada de Frávega no abrió un panel, aunque tabs, modal, enlaces, scroll, back, forward y recarga funcionaron; en Cheeky, placeholders móviles muy altos dificultaron alcanzar algunos controles inferiores. El SM-S908E no formó parte de esta matriz.
-- Rollback: mientras el Draft PR siga abierto, volver a `origin/main`; cualquier reversión tras una eventual fusión requiere otro ticket aprobado. No hubo incremento de versión, publicación, cambios en App Admin, Supabase o Production ni borrado. No se inició Calibración DEV v2, dataset, entrenamiento ni Lote 3.
+- Estado: `Propuesto; no aprobado para código`. Prioridad: P2. Esfuerzo: S.
+  Riesgo: bajo.
+- Cada solicitud muestra icono real, nombre visible, usuario, dispositivo,
+  origen y estado. El packageName permanece como identidad confiable y detalle
+  secundario.
+- Si no existe icono válido, usar placeholder estable; nunca descargar o
+  reutilizar un icono no verificado.
+- Aceptación: apps con nombres parecidos no se confunden y el historial conserva
+  la misma identidad visual.
 
-### DAG-V1-ARCHIVE-V2-CONTRACT-01 - Archivo verificable y contrato DAG v2
+#### ADMIN-DAG-ACTIVATION-GUIDE-01 - Activación guiada y navegadores incompatibles
 
-- Estado: `Fusionado en PR #67 mediante 72151326c902cf93fa2b1a4996262d683fde6170`. Aprobado explícitamente el 2026-07-24. Tipo: preservación, producto y arquitectura. Prioridad: P0. Esfuerzo: M. Riesgo: bajo.
-- Alcance cerrado: archivar DAG v1 por commit, tamaños y SHA-256; documentar su comportamiento, thresholds, precedencia, infraestructura, límites y rollback; fijar contrato, frontera y roadmap de DAG v2.
-- Decisión vigente desde PR #70
-  (`b4f1b6600d16f5dde2a30799c3df060ef72c872c`): DAG v1 permanece
-  como respaldo y no se borra. DAG v2 se construirá separado, sin dependencias
-  nuevas hacia la decisión visual interna de v1. El modelo propio puede
-  ajustarse o destilarse desde pesos preentrenados con licencia verificada;
-  pesos aleatorios sólo se consideran si otra prueba demuestra ventaja y
-  presupuesto explícito.
-- Orden obligatorio: archivo/contrato, navegador base, calibración DEV, dataset, entrenamiento, optimización Android, modo sombra, pruebas físicas/reentrenamiento, canary y retiro de v1. Cada fase requiere ticket y aprobación propios; ninguna comienza automáticamente.
-- Este ticket no cambia APK, comportamiento, modelos, thresholds, Calibración DEV, App Admin, `versionCode`, Supabase ni Production, y no inicia el Lote 2.
+- Estado: `Propuesto; no aprobado para código`. Prioridad: P1. Esfuerzo: L.
+  Riesgo: medio.
+- Reemplazar el interruptor aislado por un asistente que explique DAG/Glosh,
+  muestre navegadores reales detectados con icono y estado recomendado, confirme
+  la política remota y envíe al Usuario únicamente los pasos que Android exige
+  confirmar localmente.
+- Separar `DAG habilitado por Admin` de `DAG correctamente configurado`.
+- Estados finales: `Protegido`, `Configuración incompleta` y `Requiere atención`,
+  basados en Accessibility, rol de navegador, apps alternativas y última
+  sincronización.
+- No bloquear Android System WebView, componentes de autenticación o Custom
+  Tabs esenciales por una detección visual genérica.
+
+#### DAG-DEFAULT-BROWSER-01 - DAG como navegador predeterminado
+
+- Estado: `Propuesto; no aprobado para código`. Prioridad: P1. Esfuerzo: M.
+  Riesgo: medio.
+- DAG debe calificar para el rol oficial de navegador y solicitarlo con
+  consentimiento del Usuario. Una app común no puede asignárselo en silencio.
+- Verificar el rol real durante activación y reparación, sin prompts repetidos.
+- Ser predeterminado no equivale a bloquear otro navegador.
+
+#### GLOSH-BROWSER-ENFORCEMENT-01 - Cerrar navegadores no protegidos
+
+- Estado: `Propuesto; no aprobado para código`. Prioridad: P0. Esfuerzo: L.
+  Riesgo: alto.
+- Glosh detecta navegadores por packageName e inventario instalado, bloquea o
+  expulsa su apertura mediante Accessibility y mantiene navegadores nuevos en
+  cuarentena hasta decisión Admin.
+- La cobertura es best-effort en Android personal y depende de Accessibility,
+  fabricante y versión. No prometer garantía de sistema.
+- Una excepción de mantenimiento debe ser exacta, temporal, visible, revocable
+  y auditable.
+- Glosh no intentará inyectar el clasificador dentro de Chrome ni interceptar
+  TLS; el blur individual permanece dentro de DAG Browser.
+- Aceptación: cubrir icono, enlaces, notificaciones, intents y navegadores
+  internos detectables; evitar destellos; alertar si Accessibility cae; probar
+  reinicio, actualización, ahorro de batería e instalación de navegadores
+  nuevos.
 
 ### ANDROID-FLAT-LISTS-UX-01 - Listas simples, compactas y modernas
 
@@ -543,8 +527,6 @@ Flujo de una entrada:
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | BARRIER-FACTORY-RESET-01 | Idea autorizada para backlog; no aprobada para codigo | P0 | Bloquear el restablecimiento desde Ajustes salvo autorizacion destructiva independiente | M | Critico |
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
-| DAG-V2-BROWSER-FOUNDATION-02 | Candidato DEV validado fisicamente en SM-A235M; Draft PR abierto | P0 | Base de navegador v2 separada, con todas las imagenes siempre neutras hasta existir el modelo propio | XL | Alto |
-| DAG-V1-ARCHIVE-V2-CONTRACT-01 | Implementado documentalmente en rama de entrega | P0 | Archivar DAG v1 y fijar contrato, frontera y roadmap de DAG v2 sin cambiar comportamiento | M | Bajo |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Resuelto y publicado DEV 279 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
@@ -1838,31 +1820,6 @@ Flujo de una entrada:
 - Decision implementada: booleano en la licencia de comunidad, separado del cupo mensual. Las comunidades existentes conservan el acceso; las nuevas comienzan sin DAG. Super Admin es la unica autoridad para cambiarlo; una licencia no activa o sin entitlement cierra DAG conservando toda la configuracion.
 
 ## Roadmap DAG, Web e IA local
-
-### DAG-V1-BROWSER-FAST-06 - Navegacion liviana sin cambiar el filtro visual
-
-- Estado: `Candidato DEV 280 validado fisicamente` el 2026-07-27 en Samsung SM-A235M con Android 14.
-- Causa raiz: cada documento ejecutaba dos extracciones completas y el runtime recorria el DOM general, inspeccionaba estilos calculados, retiraba/restauraba fuentes visuales globalmente y desregistraba Service Workers. Ese trabajo duplicado retrasaba la estructura y podia interferir con React, Next.js y componentes del sitio.
-- Cambio: una generacion inmutable por documento ejecuta una sola extraccion de texto; interacciones internas no reinician el analisis; el observador queda dirigido a imagenes y medios; HTML, CSS, JavaScript, JSON, XHR, fuentes y Service Workers funcionales evitan el pipeline visual; las solicitudes visuales antiguas se cancelan y no contaminan la pagina nueva.
-- Invariantes: no cambian modelos, assets, thresholds, precedencia ni decisiones de imagen de DAG v1. La estructura se muestra al aprobar la pagina y cada foto conserva clasificacion individual fail-closed.
-- Evidencia sin cache real: Fravega `2.434 / 11.134 / 2.434 ms`, Mimo `964 / 4.342 / 965 ms` y Cheeky `463 / 8.694 / 463 ms` para pagina / fotos visibles / estructura visible. Scroll, atras, adelante y recarga funcionaron; no hubo crash, ANR ni `renderer gone`.
-
-### DAG v2 - plan canónico separado
-
-- Contrato canónico: `docs/dag/v2/DAG_V2_PRODUCT_CONTRACT.md`.
-- Frontera: `docs/dag/v2/DAG_V2_ARCHITECTURE_BOUNDARY.md`.
-- Roadmap de fases y rollback: `docs/dag/v2/DAG_V2_ROADMAP.md`.
-- DAG v1 queda archivado y disponible como respaldo; no se borra hasta que v2 esté validado, estable y tenga rollback probado.
-- DAG v2 usará un modelo visual propio ajustado o destilado desde pesos
-  preentrenados con licencia verificada. Pesos aleatorios requieren evidencia y
-  presupuesto de otro ticket.
-- Secuencia obligatoria: 1) archivo y contrato; 2) navegador base; 3)
-  calibración DEV; puerta 04A de baseline; 4) dataset; 5) entrenamiento
-  asistido/modelo propio; 6) optimización Android; 7) modo sombra; 8) pruebas
-  físicas y reentrenamiento; 9) canary; 10) retiro de DAG v1.
-- Las fases 1–3 y la estrategia de PR #70 están fusionadas. Cada fase necesita
-  ticket y aprobación explícita; este registro no autoriza dataset,
-  entrenamiento, modo sombra ni la fase siguiente.
 
 ### DAG-FOUNDATION-01 - Entrada, control y atajo seguro
 

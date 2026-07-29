@@ -19,8 +19,8 @@ El botón `Navegador protegido` solo se compila cuando
 - Beta: forzado a apagado.
 - Production: forzado a apagado.
 
-Si la APK nueva no está instalada, el intento queda contenido y Glosh no falla. DAG 1 y DAG 2 no
-se usan como fallback.
+Si la APK nueva no está instalada, el intento queda contenido y Glosh no falla. No existe fallback
+hacia otro navegador del proyecto.
 
 ## Identidad y firma
 

@@ -61,7 +61,7 @@ Indice tecnico por areas para que cada ticket pueda empezar con `Area: ...` y ev
 - Modelo/datos: `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`
 - Guia visual borrador: `docs/dag/v3/DAG_BROWSER_V3_ANNOTATION_GUIDE_V1_DRAFT.md`
 - Herramientas de corpus/evaluacion: `scripts/dag_v3_model/`
-- No tocar por defecto: `app-user/src/main/java/com/contentfilter/user/dag/`, `feature-dag2/`, Supabase, VPN, Accessibility, Admin ni publicadores.
+- No tocar por defecto: Supabase, VPN, Accessibility, Admin ni publicadores.
 
 ## Accessibility / Bloqueo Apps
 
