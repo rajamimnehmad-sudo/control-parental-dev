@@ -161,6 +161,7 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
 internal object DagImageDecodeContract {
     val SupportedMimeTypes =
         setOf(
+            "image/avif",
             "image/gif",
             "image/jpeg",
             "image/png",

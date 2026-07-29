@@ -24,6 +24,7 @@ const FALLBACK_REQUEST_MESSAGE = "media-fallback-request";
 const FALLBACK_RESPONSE_MESSAGE = "media-fallback-response";
 const INLINE_REQUEST_MESSAGE = "media-inline-request";
 const INLINE_RESPONSE_MESSAGE = "media-inline-response";
+const TECHNICAL_ERROR_ACTION = "error";
 const DOCUMENT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 let requestSequence = 0;
 let activeImageFilters = 0;
@@ -68,7 +69,7 @@ const isTrustedContentSender = (sender) =>
   typeof sender?.url === "string" &&
   /^(?:https?|blob):/iu.test(sender.url);
 
-const resolvePendingNativeDecisions = (action = "block") => {
+const resolvePendingNativeDecisions = (action = TECHNICAL_ERROR_ACTION) => {
   for (const pending of pendingNativeDecisions.values()) {
     clearTimeout(pending.timeout);
     pending.resolve(action);
@@ -95,7 +96,13 @@ const connectDecisionPort = () => {
       }
       pendingNativeDecisions.delete(message.candidateId);
       clearTimeout(pending.timeout);
-      pending.resolve(message.action);
+      pending.resolve(
+        message.action === "allow" && message.reason === "model_allow"
+          ? "allow"
+          : message.action === "block" && message.reason === "model_filter"
+            ? "block"
+            : TECHNICAL_ERROR_ACTION,
+      );
     });
     port.onDisconnect.addListener(() => {
       if (decisionPort === port) {
@@ -280,13 +287,13 @@ const encodeBase64 = (bytes) => {
 const requestNativeDecision = (details, bytes) => {
   connectDecisionPort();
   if (decisionPort === null) {
-    return Promise.resolve("block");
+    return Promise.resolve(TECHNICAL_ERROR_ACTION);
   }
   const id = nextCandidateId();
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       pendingNativeDecisions.delete(id);
-      resolve("block");
+      resolve(TECHNICAL_ERROR_ACTION);
     }, NATIVE_DECISION_TIMEOUT_MS);
     pendingNativeDecisions.set(id, { resolve, timeout });
     try {
@@ -303,7 +310,7 @@ const requestNativeDecision = (details, bytes) => {
     } catch {
       pendingNativeDecisions.delete(id);
       clearTimeout(timeout);
-      resolve("block");
+      resolve(TECHNICAL_ERROR_ACTION);
     }
   });
 };
@@ -338,7 +345,9 @@ const requestContentDecision = async (details, bytes) => {
   }
   const decisionPromise = requestNativeDecision(details, bytes)
     .then((action) => {
-      rememberContentDecision(hash, action);
+      if (action !== TECHNICAL_ERROR_ACTION) {
+        rememberContentDecision(hash, action);
+      }
       return action;
     })
     .finally(() => {
@@ -367,7 +376,7 @@ const fetchFallbackDecision = async (sourceUrl) => {
       signal: controller.signal,
     });
     if (!response.ok || !response.body) {
-      return "block";
+      return "retry";
     }
     const reader = response.body.getReader();
     const chunks = [];
@@ -382,20 +391,20 @@ const fetchFallbackDecision = async (sourceUrl) => {
         totalBytes + value.byteLength > MAX_ANALYSIS_BYTES
       ) {
         await reader.cancel();
-        return "block";
+        return "retry";
       }
       chunks.push(value);
       totalBytes += value.byteLength;
     }
     if (totalBytes === 0) {
-      return "block";
+      return "retry";
     }
     return requestContentDecision(
       { url: sourceUrl },
       combineChunks(chunks, totalBytes),
     );
   } catch {
-    return "block";
+    return "retry";
   } finally {
     clearTimeout(fetchTimeout);
   }
@@ -429,11 +438,13 @@ const drainFallbackQueue = () => {
     scheduleViewportReady();
     void fetchFallbackDecision(task.sourceUrl)
       .then((action) => {
-        rememberFallbackDecision(task.sourceUrl, action);
+        if (action !== "retry" && action !== TECHNICAL_ERROR_ACTION) {
+          rememberFallbackDecision(task.sourceUrl, action);
+        }
         task.resolve(action);
       })
       .catch(() => {
-        task.resolve("block");
+        task.resolve("retry");
       })
       .finally(() => {
         if (fallbackDecisionPromises.get(task.sourceUrl) === task) {
@@ -650,7 +661,7 @@ const interceptImageResponse = (details) => {
     const bytes = combineChunks(chunks, totalBytes);
     requestContentDecision(details, bytes)
       .then((action) => presentDecision(details, action))
-      .catch(() => presentDecision(details, "block"))
+      .catch(() => presentDecision(details, TECHNICAL_ERROR_ACTION))
       .finally(() => {
         nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
         scheduleViewportReady();

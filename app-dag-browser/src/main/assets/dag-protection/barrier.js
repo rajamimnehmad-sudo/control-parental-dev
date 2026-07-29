@@ -29,6 +29,8 @@
   const FALLBACK_RESPONSE_MESSAGE = "media-fallback-response";
   const INLINE_REQUEST_MESSAGE = "media-inline-request";
   const INLINE_RESPONSE_MESSAGE = "media-inline-response";
+  const DECISION_ACTIONS = ["allow", "block", "error"];
+  const FILTERED_ACCESSIBLE_DESCRIPTION = "Protegida por Glosh";
   const MAX_REMEMBERED_DECISIONS = 512;
   const FALLBACK_DELAY_MS = 80;
   const FALLBACK_RETRY_BASE_MS = 600;
@@ -348,11 +350,6 @@
       return true;
     }
     const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
-    if (sources.some((sourceUrl) => failedSources.has(sourceUrl))) {
-      element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
-      element.setAttribute(CSS_MEDIA_ATTRIBUTE, "error");
-      return true;
-    }
     if (actions.some((action) => action === "block")) {
       if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY)) {
         element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
@@ -360,6 +357,14 @@
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "block") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "block");
       }
+      return true;
+    }
+    if (
+      actions.some((action) => action === "error") ||
+      sources.some((sourceUrl) => failedSources.has(sourceUrl))
+    ) {
+      element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
+      element.setAttribute(CSS_MEDIA_ATTRIBUTE, "error");
       return true;
     }
     if (actions.every((action) => action === "allow")) {
@@ -394,7 +399,9 @@
       isSafeCssUiVector(element, sources) ||
       actions.every((action) => action === "allow");
     const shouldBlock = actions.some((action) => action === "block");
-    const shouldError = sources.some((sourceUrl) => failedSources.has(sourceUrl));
+    const shouldError =
+      actions.some((action) => action === "error") ||
+      sources.some((sourceUrl) => failedSources.has(sourceUrl));
     if (shouldAllow) {
       if (element.style.getPropertyValue(config.backgroundProperty) !== backgroundImage) {
         element.style.setProperty(config.backgroundProperty, backgroundImage);
@@ -476,7 +483,7 @@
           [FALLBACK_RESPONSE_MESSAGE, INLINE_RESPONSE_MESSAGE].includes(response?.type) &&
           response?.version === 1 &&
           normalizedSource(response.sourceUrl) === sourceUrl &&
-          ["allow", "block"].includes(response.action)
+          DECISION_ACTIONS.includes(response.action)
         ) {
           fallbackAttemptsBySource.delete(sourceUrl);
           rememberDecision(sourceUrl, response.action);
@@ -755,7 +762,7 @@
           [FALLBACK_RESPONSE_MESSAGE, INLINE_RESPONSE_MESSAGE].includes(response?.type) &&
           response?.version === 1 &&
           normalizedSource(response.sourceUrl) === sourceUrl &&
-          ["allow", "block"].includes(response.action)
+          DECISION_ACTIONS.includes(response.action)
         ) {
           fallbackAttemptsBySource.delete(sourceUrl);
           rememberDecision(sourceUrl, response.action);
@@ -883,12 +890,26 @@
     }
   };
 
+  const updateAccessibleMediaState = (element, action) => {
+    if (!(element instanceof Element)) {
+      return;
+    }
+    if (action === "block") {
+      element.setAttribute("aria-description", FILTERED_ACCESSIBLE_DESCRIPTION);
+    } else if (
+      element.getAttribute("aria-description") === FILTERED_ACCESSIBLE_DESCRIPTION
+    ) {
+      element.removeAttribute("aria-description");
+    }
+  };
+
   const applyKnownDecision = (element) => {
     if (!(element instanceof Element) || !element.matches(mediaSelector)) {
       return false;
     }
     if (applyInlineUiVectorDecision(element)) {
       stopFallbackObservation(element);
+      updateAccessibleMediaState(element, "allow");
       updateMediaHostState(element, "allow");
       return true;
     }
@@ -899,6 +920,7 @@
       stopFallbackObservation(element);
       element.setAttribute(UI_VECTOR_ATTRIBUTE, "allow");
       element.setAttribute("data-glosh-dag-media", "allow");
+      updateAccessibleMediaState(element, "allow");
       updateMediaHostState(element, "allow");
       return true;
     }
@@ -908,6 +930,7 @@
       analyzedSources.set(element, failedSource);
       stopFallbackObservation(element);
       element.setAttribute("data-glosh-dag-media", "error");
+      updateAccessibleMediaState(element, "error");
       updateMediaHostState(element, "error");
       return true;
     }
@@ -915,6 +938,7 @@
       if (!sourceUrl || analyzedSources.get(element) !== sourceUrl) {
         element.setAttribute("data-glosh-dag-media", "hidden");
       }
+      updateAccessibleMediaState(element, "hidden");
       updateMediaHostState(element, "waiting");
       const fallbackSource = candidateSourcesFor(element)[0];
       if (fallbackSource) {
@@ -925,7 +949,11 @@
     analyzedSources.set(element, sourceUrl);
     stopFallbackObservation(element);
     element.setAttribute("data-glosh-dag-media", action);
-    updateMediaHostState(element, action === "block" ? "filtered" : "allow");
+    updateAccessibleMediaState(element, action);
+    updateMediaHostState(
+      element,
+      action === "block" ? "filtered" : action === "error" ? "error" : "allow",
+    );
     return true;
   };
 
@@ -933,7 +961,7 @@
     if (
       message?.type !== PRESENTATION_DECISION_MESSAGE ||
       message?.version !== 1 ||
-      !["allow", "block"].includes(message?.action)
+      !DECISION_ACTIONS.includes(message?.action)
     ) {
       return undefined;
     }

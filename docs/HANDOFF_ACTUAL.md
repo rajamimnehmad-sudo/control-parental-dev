@@ -49,7 +49,7 @@ documentado arriba.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
-- El candidato integrado declara `versionCode 18`, `versionName 0.9.0-dev`.
+- El candidato integrado declara `versionCode 19`, `versionName 0.10.0-dev`.
 - La APK del gate físico midió 102.605.578 bytes y tuvo SHA-256
   `72a976dcafe1512f8afe8381936fc4ebebfadf4e66efff716ada0a73786e86c8`.
 - En SM-A235M se verificó apertura/regreso y ausencia de destellos para raster,
@@ -164,6 +164,30 @@ El lote integrado se desarrolló y validó en:
   franja blanca superior observada en el candidato anterior quedó corregida.
 - Los candidatos todavía no están publicados en DEV; instalación física no
   equivale a distribución.
+
+## Candidato local DAG 19
+
+- DAG 19 agrega AVIF estático al mismo preprocesador acotado y análisis ONNX
+  local; HEIC, SVG remoto, animaciones y errores de decodificación continúan
+  cerrados.
+- Una falla técnica ya no se presenta como decisión del modelo. `Analizando`,
+  foto filtrada con escudo pequeño e `Imagen no disponible` son estados
+  distintos; el escudo queda contenido dentro de la foto y no atraviesa
+  modales del sitio.
+- En SM-S908E H&M dejó de rechazar sus fotos AVIF: se observaron 10
+  `model_allow`, 3 `model_filter` y 1 dimensión insegura. Cheeky y Frávega
+  conservaron navegación e imágenes; Mimo cargó después de repetir una entrada
+  afectada por errores JavaScript propios de VTEX.
+- Instagram abre su página oficial, controles e inicio de sesión. Un SVG
+  decorativo de Meta permanece oculto; no se observó bloqueo de navegación.
+- `ktlintCheck`, 61 tareas del lote (unitarios, APK y Lint vital) y la
+  reinstalación in-place fueron correctos. DAG sigue como navegador
+  predeterminado y Accessibility de Glosh quedó restaurado y enlazado.
+- APK local: 121.096.554 bytes, SHA-256
+  `aa221b1ed17e4b9c13709fc90eb6ccb5bb63be8ea3ff0c9fead6d661880fdc8d`.
+  No se publicó ni se modificaron Usuario, Admin, Supabase o Production.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v3-avif-sm-s908e-2026-07-29.md`.
 
 ## Cierre del lote local recuperado
 

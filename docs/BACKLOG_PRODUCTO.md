@@ -574,6 +574,7 @@ Flujo de una entrada:
 | DAG-SEARCH-FP-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Evitar el falso positivo de Yeshurun social sin ocultar vocabulario riesgoso | S | Medio |
 | DAG-MODESTY-CHEST-02 | Implementado DEV 239; pendiente prueba fisica | P0 | Desenfocar pecho y regiones cubiertas aunque no se detecte un rostro | S | Alto |
 | DAG-IMAGE-DELIVERY-02 | Implementado DEV 239; pendiente prueba fisica | P1 | Procesar tambien las fotos posteriores de paginas densas sin abandonarlas por espera interna | M | Medio |
+| DAG-IMAGE-PRESENTATION-06 | Resuelto en candidato local DAG 19; instalado en SM-S908E | P1 | Admitir AVIF estático y distinguir carga, filtro y error técnico sin una leyenda pesada | S | Medio |
 | DAG-LOCAL-IMAGE-PERF-03 | Resuelto y publicado DEV 279; validado en SM-S908E | P1 | Acelerar localmente la primera carga visual sin enviar fotos fuera del telefono ni mostrarlas antes de decidir | M | Alto |
 | DAG-IMAGE-FILTER-1 | Candidato descartado por regresion fisica; codigo retirado | P1 | Prefiltro local liviano que libera solo imagenes confirmadas sin presencia ni rasgos humanos y deriva el resto al analisis completo | M | Alto |
 | DAG-CATEGORY-FAST-PATH-04 | DEV 277 revertido; permanece retirado como en DEV 276 | P1 | Mostrar antes texto y estructura en categorias de bajo riesgo sin adelantar imagenes no clasificadas | S | Alto |
@@ -1587,6 +1588,13 @@ Flujo de una entrada:
 - Seguridad: una correccion no puede mostrar una imagen antes de aprobarla ni convertir el fallo en un bypass. El contenido inseguro conserva bloqueo o blur; logos, controles y recursos seguros recuperan su representacion normal.
 - Aceptacion: el sitio de la captura y una segunda tienda dinamica no muestran rectangulos negros en recursos seguros; los bloqueos intencionales son distinguibles de un recurso roto; se mantienen los filtros de imagenes; recarga y navegacion interna no reintroducen los bloques; queda una prueba general que no dependa de Cheeky/Mimo.
 - Implementacion candidata: la respuesta PNG neutra del filtro dejo de ser un pixel negro opaco y ahora es transparente. Mimo fue repetido fisicamente sin los rectangulos negros de la captura y sin liberar imagenes antes de su decision.
+
+#### DAG-IMAGE-PRESENTATION-06 - AVIF y estados visuales inequívocos
+
+- Estado: `Resuelto en candidato local DAG 19; instalado en SM-S908E`. Tipo: compatibilidad y presentación segura. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Causa: H&M entrega AVIF aunque parte de sus URLs terminen en `.jpg`; el contrato de decodificación no incluía AVIF y toda falla técnica se mostraba igual que una decisión de filtrado. La leyenda de protección además ocupaba demasiado espacio.
+- Solución: AVIF estático entra al decodificador acotado y al único modelo local; errores técnicos quedan ocultos con estado propio, mientras un filtro real mantiene blur y muestra sólo un escudo pequeño. El indicador crea su propio contexto de apilado para no atravesar modales.
+- Evidencia: H&M, Cheeky, Frávega, Mimo e Instagram recorridos en SM-S908E; pruebas unitarias, formato, APK y Lint vital correctos. No cambió el modelo, el umbral ni la política.
 
 #### DAG-REFRESH-03 - Actualizar la pestana activa
 

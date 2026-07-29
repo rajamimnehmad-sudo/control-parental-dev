@@ -97,11 +97,25 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
-    fun `unsupported decoded format stays blocked`() {
+    fun `static avif reaches the same bounded classifier`() {
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
                 boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/avif") },
+                preprocessor = readyPreprocessor,
+                analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.2f) },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+    }
+
+    @Test
+    fun `unsupported decoded format stays blocked`() {
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/heic") },
             )
 
         assertEquals(DagMediaAction.Block, decision.action)
