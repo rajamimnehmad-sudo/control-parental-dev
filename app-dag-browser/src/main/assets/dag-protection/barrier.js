@@ -30,6 +30,7 @@
   const INLINE_REQUEST_MESSAGE = "media-inline-request";
   const INLINE_RESPONSE_MESSAGE = "media-inline-response";
   const DECISION_ACTIONS = ["allow", "block", "error"];
+  const PLAYABLE_MEDIA_SELECTOR = "video, audio";
   const FILTERED_ACCESSIBLE_DESCRIPTION = "Protegida por Glosh";
   const MAX_REMEMBERED_DECISIONS = 512;
   const FALLBACK_DELAY_MS = 80;
@@ -130,6 +131,41 @@
       addSource(element.href?.baseVal || element.getAttribute("href"));
     }
     return sources;
+  };
+
+  const stopPlayableMedia = (element) => {
+    if (!(element instanceof HTMLMediaElement)) {
+      return;
+    }
+    element.autoplay = false;
+    element.defaultMuted = true;
+    if (!element.muted) {
+      element.muted = true;
+    }
+    element.setAttribute("preload", "none");
+    element.setAttribute("aria-hidden", "true");
+    try {
+      element.pause();
+    } catch {
+      // A detached or not-yet-initialized media element is already fail-closed.
+    }
+    if (element.srcObject !== null) {
+      try {
+        element.srcObject = null;
+      } catch {
+        // Some page-owned streams expose a read-only assignment boundary.
+      }
+    }
+  };
+
+  const stopPlayableMediaIn = (root) => {
+    if (!(root instanceof Element) && root !== document) {
+      return;
+    }
+    if (root instanceof HTMLMediaElement) {
+      stopPlayableMedia(root);
+    }
+    root.querySelectorAll?.(PLAYABLE_MEDIA_SELECTOR).forEach(stopPlayableMedia);
   };
 
   const isSvgSource = (sourceUrl) => {
@@ -620,7 +656,6 @@
     location.pathname === "/search";
 
   const markSponsoredGoogleResults = () => {
-    sponsoredScanTimer = null;
     if (!isGoogleSearchDocument()) {
       return;
     }
@@ -628,6 +663,11 @@
       "[data-text-ad]",
       "[data-pla-slot]",
       "[data-ta-slot]",
+      "#tads",
+      "#taw",
+      "[aria-label='Anuncios']",
+      "[aria-label='Sponsored products']",
+      "[aria-label='Productos patrocinados']",
       ".uEierd",
     ].join(",");
     document.querySelectorAll(knownAdContainers).forEach((container) => {
@@ -656,11 +696,42 @@
     });
   };
 
-  const scheduleSponsoredGoogleScan = (delayMs = 120) => {
-    if (!isGoogleSearchDocument() || sponsoredScanTimer !== null) {
+  const markExplicitAdvertisementFrames = () => {
+    const explicitAdvertisementFrames = [
+      "iframe[title='Advertisement' i]",
+      "iframe[aria-label='Advertisement' i]",
+      "iframe[name^='google_ads_iframe']",
+    ].join(",");
+    document.querySelectorAll(explicitAdvertisementFrames).forEach((frame) => {
+      frame.setAttribute(SPONSORED_RESULT_ATTRIBUTE, "true");
+      let ancestor = frame.parentElement;
+      for (let depth = 0; ancestor && depth < 4; depth += 1) {
+        const bounds = ancestor.getBoundingClientRect();
+        const position = getComputedStyle(ancestor).position;
+        const isLargeOverlay =
+          ["fixed", "sticky"].includes(position) &&
+          bounds.width >= window.innerWidth * 0.6 &&
+          bounds.height >= window.innerHeight * 0.3;
+        if (isLargeOverlay) {
+          ancestor.setAttribute(SPONSORED_RESULT_ATTRIBUTE, "true");
+          break;
+        }
+        ancestor = ancestor.parentElement;
+      }
+    });
+  };
+
+  const scanSponsoredContent = () => {
+    sponsoredScanTimer = null;
+    markExplicitAdvertisementFrames();
+    markSponsoredGoogleResults();
+  };
+
+  const scheduleSponsoredScan = (delayMs = 120) => {
+    if (sponsoredScanTimer !== null) {
       return;
     }
-    sponsoredScanTimer = setTimeout(markSponsoredGoogleResults, delayMs);
+    sponsoredScanTimer = setTimeout(scanSponsoredContent, delayMs);
   };
 
   const stopFallbackObservation = (element) => {
@@ -874,15 +945,21 @@
     const siblingStates =
       Array.from(host.children)
         .filter((child) => child instanceof HTMLImageElement)
+        .filter((child) => {
+          const bounds = child.getBoundingClientRect();
+          return bounds.width >= 1 && bounds.height >= 1;
+        })
         .map((child) => child.getAttribute("data-glosh-dag-media"));
     const hostState =
-      siblingStates.includes("hidden")
-        ? "waiting"
-        : siblingStates.includes("error")
-          ? "error"
-          : siblingStates.includes("block")
-            ? "filtered"
-            : null;
+      siblingStates.includes("block")
+        ? "filtered"
+        : siblingStates.includes("allow")
+          ? null
+          : siblingStates.includes("hidden")
+            ? "waiting"
+            : siblingStates.includes("error")
+              ? "error"
+              : null;
     if (hostState === null) {
       host.removeAttribute(MEDIA_HOST_ATTRIBUTE);
     } else {
@@ -913,7 +990,9 @@
       updateMediaHostState(element, "allow");
       return true;
     }
-    const sourceUrl = candidateSourcesFor(element).find((source) => decisionsBySource.has(source));
+    const activeSource = candidateSourcesFor(element)[0];
+    const sourceUrl =
+      activeSource && decisionsBySource.has(activeSource) ? activeSource : null;
     const action = sourceUrl ? decisionsBySource.get(sourceUrl) : null;
     if (sourceUrl && isSafeRemoteUiVector(element, sourceUrl)) {
       analyzedSources.set(element, sourceUrl);
@@ -925,7 +1004,8 @@
       return true;
     }
     element.removeAttribute(UI_VECTOR_ATTRIBUTE);
-    const failedSource = candidateSourcesFor(element).find((source) => failedSources.has(source));
+    const failedSource =
+      activeSource && failedSources.has(activeSource) ? activeSource : null;
     if (failedSource) {
       analyzedSources.set(element, failedSource);
       stopFallbackObservation(element);
@@ -1018,10 +1098,19 @@
     if (root instanceof Element && root.matches(mediaSelector)) {
       applyKnownDecision(root);
     }
+    stopPlayableMediaIn(root);
     root.querySelectorAll?.(mediaSelector).forEach((element) => {
       applyKnownDecision(element);
     });
   };
+
+  for (const eventName of ["play", "playing", "volumechange", "loadedmetadata"]) {
+    document.addEventListener(
+      eventName,
+      (event) => stopPlayableMedia(event.target),
+      true,
+    );
+  }
 
   document.addEventListener(
     "load",
@@ -1033,7 +1122,7 @@
 
   markHidden(document);
   scheduleCssBackgroundProbe(0);
-  scheduleSponsoredGoogleScan(0);
+  scheduleSponsoredScan(0);
   const observer = new MutationObserver((mutations) => {
     let shouldProbeBackgrounds = false;
     for (const mutation of mutations) {
@@ -1048,7 +1137,7 @@
     }
     if (shouldProbeBackgrounds) {
       scheduleCssBackgroundProbe();
-      scheduleSponsoredGoogleScan();
+      scheduleSponsoredScan();
     }
   });
   observer.observe(document, {
@@ -1094,7 +1183,7 @@
       () => {
         markHidden(document);
         scheduleCssBackgroundProbe(0);
-        scheduleSponsoredGoogleScan(0);
+        scheduleSponsoredScan(0);
         reportDocumentState("document-loaded");
       },
       { once: true },

@@ -81,8 +81,36 @@ class DagNavigationPolicyTest {
 
     @Test
     fun `unsafe new window is blocked`() {
-        assertIs<DagLoadDecision.Block>(
+        assertIs<DagLoadDecision.BlockExternalApp>(
             DagNavigationPolicy.decideLoad("intent://external-app", opensNewWindow = true),
+        )
+    }
+
+    @Test
+    fun `intent link exposes only a valid encoded HTTPS fallback`() {
+        assertEquals(
+            "https://www.instagram.com/",
+            DagNavigationPolicy.httpsFallbackFromExternalLink(
+                "intent://profile/#Intent;scheme=instagram;" +
+                    "S.browser_fallback_url=https%3A%2F%2Fwww.instagram.com%2F;end",
+            ),
+        )
+        assertNull(
+            DagNavigationPolicy.httpsFallbackFromExternalLink(
+                "intent://profile/#Intent;scheme=instagram;" +
+                    "S.browser_fallback_url=javascript%3Aalert%281%29;end",
+            ),
+        )
+    }
+
+    @Test
+    fun `HTTPS intent can fall back to the same protected web destination`() {
+        assertEquals(
+            "https://www.instagram.com/accounts/login/",
+            DagNavigationPolicy.httpsFallbackFromExternalLink(
+                "intent://www.instagram.com/accounts/login/#Intent;scheme=https;" +
+                    "package=com.instagram.android;end",
+            ),
         )
     }
 

@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Glosh DAG Protection",
-  "version": "1.17.0",
+  "version": "1.18.0",
   "description": "Fail-closed media interception and analysis barrier bundled with DAG Browser.",
   "browser_specific_settings": {
     "gecko": {

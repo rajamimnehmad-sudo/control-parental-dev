@@ -103,9 +103,14 @@ internal object DagMediaBytesPolicy {
                                         candidateId = payload.candidateId,
                                         action = DagMediaAction.Allow,
                                         reason = DagOnDeviceImageAnalyzer.ModelAllowReason,
+                                        filterProbability = analysis.filterProbability,
                                     )
                                 } else {
-                                    blocked(payload, DagOnDeviceImageAnalyzer.ModelFilterReason)
+                                    blocked(
+                                        payload,
+                                        DagOnDeviceImageAnalyzer.ModelFilterReason,
+                                        analysis.filterProbability,
+                                    )
                                 }
                             is DagImageAnalysisResult.Unavailable ->
                                 blocked(payload, analysis.reason)
@@ -124,10 +129,12 @@ internal object DagMediaBytesPolicy {
     private fun blocked(
         payload: DagMediaBytesPayload,
         reason: String,
+        filterProbability: Float? = null,
     ) = DagMediaDecision(
         candidateId = payload.candidateId.take(MaxCandidateIdLength),
         action = DagMediaAction.Block,
         reason = reason,
+        filterProbability = filterProbability,
     )
 
     private fun isAllowedUrl(value: String): Boolean {

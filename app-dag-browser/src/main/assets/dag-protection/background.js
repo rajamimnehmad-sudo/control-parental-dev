@@ -2,6 +2,8 @@
 
 const INTERCEPTED_RESOURCE_TYPES = new Set(["image", "imageset"]);
 const BLOCKED_RESOURCE_TYPES = new Set(["media", "object"]);
+const BLOCKED_MEDIA_MIME_PATTERN =
+  /^(?:audio|video)\/|^application\/(?:dash\+xml|vnd\.apple\.mpegurl|x-mpegurl)/iu;
 const MAX_INTERCEPT_CAPTURE_BYTES = 512 * 1024;
 const MAX_ANALYSIS_BYTES = 2 * 1024 * 1024;
 const MAX_SOURCE_URL_LENGTH = 4_096;
@@ -688,4 +690,17 @@ browser.webRequest.onBeforeRequest.addListener(
   },
   { urls: ["<all_urls>"] },
   ["blocking"],
+);
+
+browser.webRequest.onHeadersReceived.addListener(
+  (details) => {
+    const contentType = details.responseHeaders
+      ?.find((header) => header.name.toLowerCase() === "content-type")
+      ?.value?.trim();
+    return contentType && BLOCKED_MEDIA_MIME_PATTERN.test(contentType)
+      ? { cancel: true }
+      : {};
+  },
+  { urls: ["<all_urls>"] },
+  ["blocking", "responseHeaders"],
 );

@@ -21,11 +21,16 @@ class MediaBarrierContractTest {
     @Test
     fun `network barrier cancels visual resources`() {
         val background = extensionRoot.resolve("background.js").readText()
+        val script = extensionRoot.resolve("barrier.js").readText()
 
         assertContains(background, "\"image\"")
         assertContains(background, "\"media\"")
         assertContains(background, "\"object\"")
+        assertContains(background, "onHeadersReceived")
+        assertContains(background, "BLOCKED_MEDIA_MIME_PATTERN")
         assertContains(background, "cancel: true")
+        assertContains(script, "stopPlayableMedia")
+        assertContains(script, "\"play\", \"playing\", \"volumechange\", \"loadedmetadata\"")
     }
 
     @Test
@@ -117,16 +122,22 @@ class MediaBarrierContractTest {
     }
 
     @Test
-    fun `google sponsored results are hidden only inside known ad containers`() {
+    fun `explicit sponsored results and advertisement overlays are hidden`() {
         val css = extensionRoot.resolve("barrier.css").readText()
         val script = extensionRoot.resolve("barrier.js").readText()
 
         assertContains(script, "isGoogleSearchDocument")
         assertContains(script, "\"[data-text-ad]\"")
         assertContains(script, "\"[data-pla-slot]\"")
+        assertContains(script, "\"#tads\"")
+        assertContains(script, "\"[aria-label='Productos patrocinados']\"")
         assertContains(script, "/^(patrocinado|sponsored)$/")
         assertContains(script, "ocultar resultados patrocinados")
         assertContains(script, "|| control).click()")
+        assertContains(script, "markExplicitAdvertisementFrames")
+        assertContains(script, "\"iframe[name^='google_ads_iframe']\"")
+        assertContains(script, "isLargeOverlay")
+        assertContains(script, "scheduleSponsoredScan")
         assertContains(css, "data-glosh-dag-sponsored-result=\"true\"")
     }
 
@@ -208,6 +219,9 @@ class MediaBarrierContractTest {
         assertContains(script, "failedSources")
         assertContains(script, "data-glosh-dag-media\", \"error\"")
         assertContains(script, "updateMediaHostState")
+        assertContains(script, "siblingStates.includes(\"block\")")
+        assertContains(script, "siblingStates.includes(\"allow\")")
+        assertContains(script, "candidateSourcesFor(element)[0]")
         assertContains(css, "data-glosh-dag-media-host=\"waiting\"")
         assertContains(css, "Analizando…")
         assertContains(css, "data-glosh-dag-media-host=\"filtered\"")

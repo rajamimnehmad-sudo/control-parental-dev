@@ -50,6 +50,7 @@
     <string name="extension_failed_detail">DAG no abrirá páginas hasta recuperar la barrera visual.</string>
     <string name="navigation_blocked">Dirección bloqueada</string>
     <string name="navigation_blocked_detail">Esta prueba permite solamente páginas HTTPS.</string>
+    <string name="external_app_link_kept_in_dag">La aplicación externa quedó bloqueada. Seguís navegando dentro de DAG.</string>
     <plurals name="open_tabs_count">
         <item quantity="one">%d pestaña</item>
         <item quantity="other">%d pestañas</item>

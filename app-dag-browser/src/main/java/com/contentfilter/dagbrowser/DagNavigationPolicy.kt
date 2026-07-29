@@ -1,6 +1,7 @@
 package com.contentfilter.dagbrowser
 
 import java.net.URI
+import java.net.URLDecoder
 import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 
@@ -49,11 +50,64 @@ internal object DagNavigationPolicy {
         if (url == "about:blank" && !opensNewWindow) {
             return DagLoadDecision.Allow
         }
-        val safeUrl = sanitizeTopLevel(url) ?: return DagLoadDecision.Block
+        val safeUrl =
+            sanitizeTopLevel(url)
+                ?: return if (isExternalAppLink(url)) {
+                    DagLoadDecision.BlockExternalApp(httpsFallbackFromExternalLink(url))
+                } else {
+                    DagLoadDecision.Block
+                }
         return when {
             opensNewWindow || safeUrl != url -> DagLoadDecision.Redirect(safeUrl)
             else -> DagLoadDecision.Allow
         }
+    }
+
+    internal fun httpsFallbackFromExternalLink(url: String): String? {
+        val fallbackMarker = "S.browser_fallback_url="
+        val encodedFallback =
+            url
+                .substringAfter(fallbackMarker, missingDelimiterValue = "")
+                .substringBefore(";")
+        if (encodedFallback.isNotBlank()) {
+            val decoded =
+                runCatching {
+                    URLDecoder.decode(encodedFallback, StandardCharsets.UTF_8.toString())
+                }.getOrNull()
+            sanitizeTopLevel(decoded.orEmpty())?.let { return it }
+        }
+
+        if (!url.startsWith("intent://", ignoreCase = true)) return null
+        val intentParameters = url.substringAfter("#Intent;", missingDelimiterValue = "")
+        val authorityAndPath =
+            url
+                .substringAfter("intent://")
+                .substringBefore("#Intent;")
+        if (
+            authorityAndPath.isBlank() ||
+            !intentParameters
+                .split(";")
+                .any { it.equals("scheme=https", ignoreCase = true) }
+        ) {
+            return null
+        }
+        return sanitizeTopLevel("https://$authorityAndPath")
+    }
+
+    private fun isExternalAppLink(url: String): Boolean {
+        val scheme = runCatching { URI(url).scheme?.lowercase() }.getOrNull() ?: return false
+        return scheme == "intent" ||
+            scheme !in
+            setOf(
+                "about",
+                "blob",
+                "content",
+                "data",
+                "file",
+                "http",
+                "https",
+                "javascript",
+            )
     }
 
     private fun looksLikeHost(value: String): Boolean =
@@ -85,6 +139,10 @@ internal sealed interface DagLoadDecision {
     data object Allow : DagLoadDecision
 
     data object Block : DagLoadDecision
+
+    data class BlockExternalApp(
+        val httpsFallback: String?,
+    ) : DagLoadDecision
 
     data class Redirect(
         val url: String,

@@ -49,7 +49,14 @@ documentado arriba.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
-- El candidato integrado declara `versionCode 19`, `versionName 0.10.0-dev`.
+- El candidato local declara `versionCode 20`, `versionName 0.10.0-dev`.
+- V20 endurece el bloqueo de audio/video, mantiene Atrás dentro de DAG, evita
+  saltos a apps externas, corrige indicadores visuales vencidos y oculta
+  contenedores publicitarios explícitos. Build y unitarios locales aprobados;
+  instalación y matriz física pendientes porque el teléfono fue desconectado.
+- El modelo y su umbral `0.4` no cambiaron: el ajuste siguiente debe incorporar
+  ejemplos actuales de falsos permisos y falsos filtros, no bajar el umbral a
+  ciegas.
 - La APK del gate físico midió 102.605.578 bytes y tuvo SHA-256
   `72a976dcafe1512f8afe8381936fc4ebebfadf4e66efff716ada0a73786e86c8`.
 - En SM-A235M se verificó apertura/regreso y ausencia de destellos para raster,

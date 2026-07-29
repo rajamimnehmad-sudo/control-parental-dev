@@ -31,6 +31,7 @@ class DagMediaBytesPolicyTest {
 
         assertEquals(DagMediaAction.Allow, decision.action)
         assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+        assertEquals(0.399f, decision.filterProbability)
     }
 
     @Test
@@ -45,6 +46,7 @@ class DagMediaBytesPolicyTest {
 
         assertEquals(DagMediaAction.Block, decision.action)
         assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+        assertEquals(0.4f, decision.filterProbability)
     }
 
     @Test

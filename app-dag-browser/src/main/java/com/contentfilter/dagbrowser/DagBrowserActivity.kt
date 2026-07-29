@@ -7,6 +7,7 @@ import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
@@ -32,6 +33,7 @@ import org.mozilla.geckoview.GeckoSessionSettings
 import org.mozilla.geckoview.GeckoView
 import org.mozilla.geckoview.StorageController
 import org.mozilla.geckoview.WebExtension
+import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -162,8 +164,18 @@ class DagBrowserActivity : Activity() {
 
     private fun applySystemBarInsets() {
         findViewById<View>(R.id.browser_root).setOnApplyWindowInsetsListener { view, insets ->
-            val systemBars = insets.getInsets(WindowInsets.Type.systemBars())
-            view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                val systemBars = insets.getInsets(WindowInsets.Type.systemBars())
+                view.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            } else {
+                @Suppress("DEPRECATION")
+                view.setPadding(
+                    insets.systemWindowInsetLeft,
+                    insets.systemWindowInsetTop,
+                    insets.systemWindowInsetRight,
+                    insets.systemWindowInsetBottom,
+                )
+            }
             insets
         }
     }
@@ -271,6 +283,10 @@ class DagBrowserActivity : Activity() {
                         DagLoadDecision.Allow -> GeckoResult.fromValue(AllowOrDeny.ALLOW)
                         DagLoadDecision.Block -> {
                             showBlockedNavigation(tab)
+                            GeckoResult.fromValue(AllowOrDeny.DENY)
+                        }
+                        is DagLoadDecision.BlockExternalApp -> {
+                            handleExternalAppLink(tab, decision.httpsFallback)
                             GeckoResult.fromValue(AllowOrDeny.DENY)
                         }
                         is DagLoadDecision.Redirect -> {
@@ -393,8 +409,21 @@ class DagBrowserActivity : Activity() {
         when (val decision = DagNavigationPolicy.decideLoad(uri, opensNewWindow = true)) {
             DagLoadDecision.Allow -> createTab(switchToTab = true, initialUrl = uri)
             DagLoadDecision.Block -> activeTab?.let(::showBlockedNavigation)
+            is DagLoadDecision.BlockExternalApp ->
+                activeTab?.let { handleExternalAppLink(it, decision.httpsFallback) }
             is DagLoadDecision.Redirect -> createTab(switchToTab = true, initialUrl = decision.url)
         }
+    }
+
+    private fun handleExternalAppLink(
+        tab: BrowserTab,
+        httpsFallback: String?,
+    ) {
+        if (httpsFallback != null && httpsFallback != tab.url) {
+            beginProtectedLoad(tab, startNewPerformanceNavigation = true)
+            tab.session.loadUri(httpsFallback)
+        }
+        Toast.makeText(this, R.string.external_app_link_kept_in_dag, Toast.LENGTH_SHORT).show()
     }
 
     private fun installProtectionExtension() {
@@ -576,9 +605,13 @@ class DagBrowserActivity : Activity() {
             )
         val decision = DagMediaBytesPolicy.decide(bytesPayload, analyzer = imageAnalyzer)
         if (packageName.endsWith(".dev")) {
+            val score =
+                decision.filterProbability?.let {
+                    " score=${String.format(Locale.US, "%.4f", it)}"
+                }.orEmpty()
             Log.i(
                 MediaTransportLogTag,
-                "bytes=${bytesPayload.declaredByteLength} reason=${decision.reason} " +
+                "bytes=${bytesPayload.declaredByteLength} reason=${decision.reason}$score " +
                     "elapsed_ms=${SystemClock.elapsedRealtime() - startedAt}",
             )
         }
@@ -865,6 +898,7 @@ class DagBrowserActivity : Activity() {
         when (val decision = DagNavigationPolicy.decideLoad(url, opensNewWindow = false)) {
             DagLoadDecision.Allow -> url
             DagLoadDecision.Block -> null
+            is DagLoadDecision.BlockExternalApp -> null
             is DagLoadDecision.Redirect -> decision.url
         }
 
@@ -1110,6 +1144,8 @@ class DagBrowserActivity : Activity() {
         val tab = activeTab
         if (tab != null && tab.canGoBack) {
             tab.session.goBack()
+        } else if (tab != null) {
+            goHome(tab)
         } else {
             super.onBackPressed()
         }
