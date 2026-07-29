@@ -116,6 +116,77 @@ busquedas de vestimenta, pero tambien duplicados y ruido semantico: por ejemplo,
 transparente devolvio recursos con fondo PNG transparente. Openverse queda como descubrimiento
 acotado, nunca como etiqueta ni licencia aprobada.
 
+## Politica de fuentes cerrada para el piloto 05A
+
+Esta politica se verifico nuevamente el 2026-07-29 contra las fuentes primarias enlazadas al final
+del documento. Es una puerta de elegibilidad tecnica y de producto, no asesoramiento legal general.
+
+### Licencias y derechos admisibles
+
+Una muestra puede pasar a `eligible` solamente si la revision individual conserva evidencia de
+origen, autor, licencia, atribucion, permiso comercial, permiso de derivados y derechos de imagen.
+El orden de preferencia es:
+
+1. `owned` o `commissioned`, con permiso escrito que cubra entrenamiento, evaluacion, derivados,
+   distribucion del modelo y uso comercial;
+2. CC0 o dominio publico verificado en la pagina original;
+3. CC BY 2.0 o CC BY 4.0 verificada en la pagina original, con atribucion completa conservada.
+
+CC BY-SA puede aparecer en un inventario de descubrimiento, pero queda `needs_review` y no entra a
+entrenamiento, validacion ni test hasta una revision legal separada que defina las obligaciones
+sobre dataset, transformaciones y pesos. Se excluyen CC BY-NC, CC BY-ND, licencias solo para
+investigacion, terminos incompatibles con derivados o uso comercial y cualquier estado ambiguo.
+
+Openverse, Wikimedia Commons y Open Images son catalogos de descubrimiento, no autoridades finales
+de licencia. La pagina original de cada archivo debe seguir accesible y coincidir con los metadatos
+registrados. Fashionpedia se admite para ontologia y preseleccion; una imagen suya solo puede entrar
+si supera exactamente la misma revision individual.
+
+Una licencia de copyright no resuelve automaticamente privacidad, publicidad, personalidad,
+marcas ni consentimiento. Toda muestra con una persona identificable permanece `needs_review`
+hasta registrar una base suficiente para su uso. Una persona posiblemente menor de edad solo se
+admite desde material `owned` o `commissioned` con autorizacion verificable del responsable. Si una
+imagen pudiera combinar contenido sexual con una persona menor, se rechaza antes de descargar o se
+elimina del piloto aislado sin conservar copia; nunca se etiqueta ni se incorpora al dataset.
+
+### Evidencia minima de revision
+
+La revision de cada archivo conserva en el manifiesto:
+
+- pagina original y URL exacta del archivo;
+- autor o creador, titulo cuando exista y atribucion requerida;
+- identificador, version y URL legal de la licencia;
+- fecha de verificacion y fuente de los metadatos;
+- permisos comercial y de derivados como decisiones explicitas;
+- estado separado de derechos de imagen y restricciones no relacionadas con copyright;
+- motivo estructurado si queda `needs_review`, `rejected` o `excluded`.
+
+Un dato de Openverse, una etiqueta de categoria, un filtro `mature=false` o una licencia informada
+por un catalogo nunca se transforma automaticamente en aprobacion.
+
+### Limites del primer piloto
+
+El primer tramo de 05B valida el pipeline; no pretende entrenar ni demostrar cobertura final:
+
+- hasta 12 consultas unicas por inventario, 20 resultados por pagina y tres paginas;
+- primera descarga de 20 candidatos y maximo absoluto de 100;
+- maximo de 8 MiB por archivo y 100 MiB descargados en total;
+- maximo de 250 MiB de almacenamiento temporal total para originales, normalizados y manifiestos;
+- cero GPU, cero API paga, cero Supabase, cero Production y cero imagenes en Git;
+- procesos seriales o acotados, con deduplicacion contra lotes anteriores;
+- todo pixel descargado permanece fuera del repositorio y sigue
+  `needs_license_and_visual_review`.
+
+La seleccion busca cobertura de las 21 senales, negativos dificiles y diversidad de fuente,
+iluminacion, presentacion y tipo de medio. Ninguna fuente puede aportar mas del 40 % del piloto
+elegible. Imagenes del mismo creador, sesion, producto, campana o cluster permanecen en un unico
+grupo. No se fuerza una cuota inventando positivos: la ausencia o escasez por senal se informa y
+define el siguiente tramo.
+
+Estos limites no son el tamaño del dataset final. Para categorias criticas se conserva la referencia
+estadistica de al menos 300 positivos independientes para aproximar, con cero errores, un limite
+superior de falsos negativos cercano al 1 % con 95 % de confianza.
+
 ## Manifiesto minimo por muestra
 
 El dataset se almacena como objetos inmutables y manifiestos JSONL con
@@ -227,6 +298,12 @@ distribucion del piloto. Hasta entonces, ningun resultado puede generar `allow` 
 - Metadata de Open Images: <https://storage.googleapis.com/openimages/web/download_v7.html>
 - Licencia Fashionpedia: <https://fashionpedia.github.io/home/data_license.html>
 - Openverse API: <https://api.openverse.org/>
+- Terminos de Openverse:
+  <https://docs.openverse.org/terms_of_service.html>
 - Politica de licencias de Wikimedia Commons: <https://commons.wikimedia.org/wiki/Commons:Licensing>
 - Metadata de licencia mediante Wikimedia API:
   <https://commons.wikimedia.org/wiki/Commons:Credit_line>
+- Restricciones no relacionadas con copyright en Wikimedia Commons:
+  <https://commons.wikimedia.org/wiki/Commons:Non-copyright_restrictions>
+- Derechos de privacidad, publicidad y personalidad en Creative Commons:
+  <https://creativecommons.org/faq/#what-are-publicity-personality-and-privacy-rights>

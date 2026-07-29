@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Content Filter
 
-Fecha de corte: 2026-07-26
+Fecha de corte: 2026-07-29
 
 Tomar este archivo como contexto oficial. No reanalizar arquitectura desde cero.
 
@@ -78,6 +78,48 @@ SHA-256 publicados:
 Usuario 5d98a83b992042477059a7809df140b6545ded03f8e52704c883a8add0aee2cc
 Admin   abeced4fb2e5589f920290c1bf64b57f50019dc9e6f9c80ce5790c7c9ff46298
 ```
+
+## Estado DAG Browser V3 posterior al corte anterior - 2026-07-27 a 2026-07-29
+
+Este bloque reemplaza como verdad técnica vigente los planes anteriores que
+todavía describen DAG v1 como runtime activo o DAG v2 como continuación. Esos
+bloques se conservan debajo como historia de decisiones.
+
+- PR #74 retiró del código los runtimes DAG 1 y DAG 2 y agregó
+  `app-dag-browser`, una APK GeckoView aislada y fail-closed. App Usuario sólo
+  abre el nuevo navegador mediante un puente DEV explícito; no existe fallback
+  hacia los runtimes retirados.
+- PR #76 retiró exclusivamente de Supabase DEV las funciones, tablas, RPC,
+  cuota y buckets heredados de DAG 1/2 después de respaldar nueve tablas y 85
+  archivos. Se conservaron `dag_entitled`, `__dag_enabled__` y sus RPC de
+  acceso. Production no fue modificada.
+- App Usuario `versionCode 281` y DAG Browser V3 fueron instalados y se
+  comprobó apertura/regreso. El código actual de DAG Browser declara
+  `versionCode 5`, `0.3.0-dev`; su APK firmada del gate físico midió
+  102.605.578 bytes y SHA-256
+  `72a976dcafe1512f8afe8381936fc4ebebfadf4e66efff716ada0a73786e86c8`.
+  Es un artefacto DEV separado, no una publicación en el manifiesto público de
+  App Usuario/Admin.
+- PR #77–#81 cerraron contrato de análisis, transporte de la respuesta original,
+  preprocesado RGB 224 x 224 y métricas físicas. En SM-A235M ningún raster,
+  video, canvas, SVG o fondo produjo destello; toda salida sigue en
+  `block / analyzer_unavailable`.
+- PR #82–#89 fijaron el contrato multietiqueta de 21 señales, manifiesto,
+  validador, evaluación, revisiones independientes, acuerdo y guía de
+  anotación. PR #90–#92 agregaron inventarios Openverse/Wikimedia y descarga
+  piloto acotada, sin incorporar imágenes al repositorio ni habilitar
+  entrenamiento.
+- `DAG-V3-DATA-LICENSE-CONTRACT-05A` se cerró documentalmente el 2026-07-29:
+  cada imagen exige licencia y derechos verificados individualmente; se
+  prefieren datos propios/encargados, CC0, dominio público y CC BY 2.0/4.0.
+  CC BY-SA no entra a splits sin revisión legal separada; NC, ND,
+  investigación-only y estados ambiguos se excluyen. El primer piloto queda
+  limitado a 100 imágenes/100 MiB, 250 MiB temporales, sin GPU, API paga,
+  Supabase, Production ni imágenes en Git.
+- Próximo gate del lote: `DAG-V3-DIRECTED-DATASET-PILOT-05B`. La
+  infraestructura está fusionada, pero la adquisición real debe conservar
+  revisión individual, deduplicación, procedencia y los límites cerrados en
+  `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`.
 
 ## DAG-V1-ARCHIVE-V2-CONTRACT-01 - archivo y contrato, sin cambio funcional - 2026-07-24
 

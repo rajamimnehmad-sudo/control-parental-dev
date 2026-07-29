@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-22
+Ultima sincronizacion: 2026-07-29
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -44,7 +44,13 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado publicado: App Usuario DEV 271 y App Admin DEV 271, `1.0.1-dev`.
+- Estado público verificado en el handoff: App Usuario DEV 279 y App Admin DEV
+  275, `1.0.1-dev`.
+- Estado DAG posterior: App Usuario 281 y DAG Browser V3 aislado hasta
+  `versionCode 5` fueron candidatos físicos; el navegador se distribuye como
+  artefacto DEV separado y no comparte el manifiesto público de Glosh.
+- DAG 1 y DAG 2 fueron retirados del código y backend DEV en PR #74/#76, con
+  respaldo previo de datos; el navegador actual es DAG Browser V3 fail-closed.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
@@ -72,12 +78,141 @@ Flujo de una entrada:
   cobertura 33,33%, incertidumbre/segmentación requerida 66,67% y ninguna
   predicción Show. La ruta paralela sí cumple rendimiento en SM-A235M
   (309,44/472,24 ms p50/p95), por lo que el bloqueo es de calidad de señales.
-- Decisión: `NO-GO`; no corresponde iniciar 04C. Próximo ticket sólo propuesto:
-  `DAG-V2-DIRECTED-VISUAL-MODEL-DATASET-05`, para ampliar datos públicos
-  equilibrados y evaluar un modelo visual dirigido pequeño.
+- Decisión histórica: `NO-GO`; no corresponde iniciar 04C. En ese cierre se
+  propuso `DAG-V2-DIRECTED-VISUAL-MODEL-DATASET-05`. Luego DAG 1/2 fueron
+  retirados y la continuación se normalizó como el lote DAG Browser V3 que
+  figura a continuación.
 - No se integró modelo, no se creó caché activa, no hubo entrenamiento, GPU,
   Supabase, Production, publicación ni inicio de 04C. Provider v2 sigue en
   `Hide`.
+
+### LOTE-DAG-V3-DIRECTED-VISUAL-MODEL-DATASET-05 - Datos dirigidos y candidato visual pequeño
+
+- Estado: `En progreso; 05A cerrado documentalmente el 2026-07-29`. Autorizado
+  por el usuario el 2026-07-29. Tipo: lote de investigación, datos, licencias y
+  evaluación visual reproducible. Prioridad: P0. Evidencia: la evaluación 04B
+  de DAG v2 cerró en NO-GO por cobertura/calidad y el repositorio reemplazó DAG
+  1/2 por DAG Browser V3 aislado; PR #82–#92 prepararon el contrato y tooling
+  inicial sin habilitar imágenes. Esfuerzo total estimado: XL. Riesgo: alto.
+- Objetivo: determinar, con datos públicos equilibrados y una prueba pequeña
+  de costo acotado, si un modelo visual dirigido puede separar `Show`, `Hide`
+  y evidencia insuficiente mejor que la política CPU descartada, sin integrar
+  todavía ningún modelo al navegador DAG Browser V3.
+- Orden obligatorio: `05A` contrato y fuentes; `05B` corpus piloto; `05C`
+  etiquetado y split sellado; `05D` experimento de modelo pequeño; `05E`
+  evaluación independiente y decisión GO/NO-GO. Cada ticket exige aprobación
+  explícita propia y el fracaso de un gate detiene los siguientes.
+- Fuera de alcance del lote: habilitar `allow` o `blur`, cambiar el cierre
+  `block / analyzer_unavailable`, integrar un runtime antes del gate, activar
+  caché, entrenar en Supabase o GitHub Actions estándar,
+  publicar APK, cambiar `versionCode`, usar Production, borrar evidencia de
+  04A/04B o iniciar optimización Android, modo sombra, canary o retiro de DAG
+  1/2.
+- Dependencias generales: contrato y preprocesador de DAG Browser V3, evidencia
+  congelada de 04A/04B, guía de anotación, presupuesto explícito antes de
+  cualquier GPU externa, licencias compatibles con uso comercial y límites de
+  la Mac M2 de 8 GB.
+- Aceptación del lote: termina con artefactos trazables y una decisión
+  reproducible; no con una integración automática. Un GO sólo habilita
+  proponer el lote siguiente y un NO-GO conserva DAG Browser V3 cerrado en
+  `block`.
+
+#### DAG-V3-DATA-LICENSE-CONTRACT-05A - Contrato, categorías y fuentes
+
+- Estado: `Resuelto documentalmente; sin descarga ni entrenamiento`. Tipo:
+  investigación documental y gobernanza de datos. Prioridad: P0. Evidencia:
+  contrato de 21 señales, guía de anotación, manifiesto y validadores fusionados
+  en PR #82–#89; fuentes y advertencias verificadas de nuevo el 2026-07-29 en
+  Open Images, Fashionpedia, Openverse, Wikimedia y Creative Commons. Esfuerzo:
+  M. Riesgo: alto.
+- Resultado: `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md` fija
+  taxonomía, estados no concluyentes, procedencia individual, privacidad,
+  derechos de imagen, fuentes admisibles y límites del piloto.
+- Política: preferir material propio/encargado; admitir CC0, dominio público y
+  CC BY 2.0/4.0 sólo después de verificación individual. CC BY-SA queda fuera
+  de splits hasta revisión legal separada; NC, ND, investigación-only y
+  licencias ambiguas se excluyen. Una posible persona menor sólo entra desde
+  material propio/encargado con autorización verificable; contenido sexual que
+  pudiera involucrarla se rechaza antes de conservarlo.
+- Límites cerrados: hasta 12 consultas, 20 resultados por página y tres
+  páginas; primera descarga de 20 y máximo absoluto 100; 8 MiB por archivo,
+  100 MiB descargados, 250 MiB temporales, cero GPU/API paga/Supabase/Production
+  y ninguna imagen en Git.
+- Aceptación alcanzada: fuentes primarias y obligaciones registradas,
+  categorías/estados versionados, exclusiones y derechos separados de la
+  etiqueta visual, presupuesto cuantificado y ninguna descarga o entrenamiento.
+- Seguimiento: los ejemplos de borde y gates de acuerdo de la guía pertenecen
+  a 05C; cualquier admisión de CC BY-SA requiere ticket/revisión legal propia.
+
+#### DAG-V3-DIRECTED-DATASET-PILOT-05B - Corpus público piloto
+
+- Estado: `Listo para ejecutar; infraestructura fusionada en PR #90–#92`.
+  Tipo: adquisición reproducible y calidad de datos. Prioridad: P0. Esfuerzo:
+  L. Riesgo: alto.
+- Alcance propuesto: adquirir sólo el piloto autorizado, validar licencias y
+  checksums, normalizar sin cargar el corpus completo en RAM, deduplicar por
+  SHA-256/dHash/cluster y producir manifiestos reproducibles sin mezclar el
+  test congelado de 04B.
+- Dependencias: aprobación y aceptación de 05A, límites de costo/almacenamiento
+  y herramientas externas al producto.
+- Criterios de aceptación: inventario exacto por fuente/clase; cero duplicados
+  conocidos entre splits potenciales; hashes y procedencia auditables; reporte
+  de descarte; prueba pequeña antes de escalar; ausencia de cambios Android,
+  Supabase y Production.
+- Decisiones pendientes: tamaño exacto por categoría, resolución mínima,
+  política de imágenes ambiguas y umbral de duplicación.
+
+#### DAG-V3-DIRECTED-LABELING-SPLIT-05C - Etiquetado y test sellado
+
+- Estado: `Propuesto; bloqueado por 05B y no aprobado para código`. Tipo:
+  evaluación humana reproducible. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
+- Alcance propuesto: adaptar el revisor autónomo de 04B al contrato 05A,
+  ejecutar piloto ciego con `Show`, `Hide` y `Unsure`, medir desacuerdo y sellar
+  entrenamiento, validación y test por identidad/cluster antes de experimentar.
+- Dependencias: corpus 05B, guía de anotación versionada y revisor sin WebView
+  ni Internet.
+- Criterios de aceptación: cada decisión es explícita y reversible durante la
+  revisión; `Unsure` no se fuerza a positivo o negativo; split sin fuga sellado
+  una sola vez; desacuerdos y balance publicados como agregados; imágenes y
+  etiquetas no entran al producto ni a Production.
+- Decisiones pendientes: cantidad de revisores, regla de desempate, muestra de
+  control y umbral máximo de desacuerdo.
+
+#### DAG-V3-SMALL-DIRECTED-MODEL-EXPERIMENT-05D - Experimento acotado
+
+- Estado: `Propuesto; bloqueado por 05C y no aprobado para código`. Tipo:
+  entrenamiento experimental y comparación. Prioridad: P0. Esfuerzo: XL.
+  Riesgo: alto.
+- Alcance propuesto: comparar un número cerrado de candidatos pequeños con
+  pesos preentrenados y licencia verificada; ejecutar primero una prueba
+  mínima, registrar costo/tiempo/semillas/configuración y usar GPU externa
+  efímera únicamente si existe presupuesto aprobado y apagado automático.
+- Dependencias: splits sellados de 05C, selección previa de arquitecturas,
+  licencias comerciales, pipeline reanudable y presupuesto explícito.
+- Criterios de aceptación: baselines y candidatos comparables sobre validación
+  sin abrir el test; límites de tiempo, costo, reintentos y artefactos
+  respetados; pesos, configuración y métricas reproducibles; ninguna
+  integración Android, publicación o activación.
+- Decisiones pendientes: arquitecturas máximas, métrica primaria, presupuesto
+  GPU, tamaño/latencia objetivo y condición de abandono temprano.
+
+#### DAG-V3-DIRECTED-MODEL-GATE-05E - Evaluación independiente GO/NO-GO
+
+- Estado: `Propuesto; bloqueado por 05D y no aprobado para código`. Tipo:
+  evaluación final, seguridad y factibilidad Android. Prioridad: P0. Esfuerzo:
+  M. Riesgo: alto.
+- Alcance propuesto: abrir el test sellado una sola vez, medir por clase y
+  audiencia, verificar falsos permisos críticos, incertidumbre, cobertura,
+  calibración, tamaño y latencia preliminar en el teléfono objetivo, y emitir
+  una decisión única.
+- Dependencias: candidato congelado de 05D, SM-A235M y criterios numéricos
+  definidos antes de abrir el test.
+- Criterios de aceptación: cero selección posterior basada en el test; matriz
+  de errores revisable; métricas y límites informados incluso ante fallo; GO
+  sólo si cumple todos los gates predefinidos. Un resultado insuficiente es
+  NO-GO y no habilita integración ni reajuste sobre el mismo test.
+- Decisiones pendientes: límites exactos de falsos permisos, recall/cobertura,
+  incertidumbre, p50/p95, tamaño del artefacto y criterio de nuevo dataset.
 
 ### DAG-V2-NO-GPU-BASELINE-BENCHMARK-04A - comparación visual independiente
 
