@@ -21,10 +21,12 @@ data class RulesUiState(
     val internetBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = true,
     val safeSearchEnabled: Boolean = true,
+    val protectedBrowserRequired: Boolean = false,
     val internetSavingDeviceIds: Set<String> = emptySet(),
     val pendingInternetBlockedByDevice: Map<String, Boolean> = emptyMap(),
     val pendingExternalSearchResultsAllowedByDevice: Map<String, Boolean> = emptyMap(),
     val pendingSafeSearchEnabledByDevice: Map<String, Boolean> = emptyMap(),
+    val pendingProtectedBrowserRequiredByDevice: Map<String, Boolean> = emptyMap(),
     val limitPackageName: String = "",
     val limitMinutes: String = "",
     val appSearchQuery: String = "",
@@ -76,6 +78,9 @@ data class RulesUiState(
     val pendingSafeSearchEnabled: Boolean?
         get() = selectedDeviceId?.let(pendingSafeSearchEnabledByDevice::get)
 
+    val pendingProtectedBrowserRequired: Boolean?
+        get() = selectedDeviceId?.let(pendingProtectedBrowserRequiredByDevice::get)
+
     val pendingAppAllowed: Map<String, Boolean>
         get() = selectedDeviceId?.let(pendingAppAllowedByDevice::get).orEmpty()
 
@@ -124,6 +129,7 @@ internal fun RulesUiState.webPanelPresentation(): WebPanelPresentation {
         buildList {
             if (safeSearchEnabled) add("SafeSearch")
             if (onlyResultsEnabled) add("Solo resultados")
+            if (protectedBrowserRequired) add("DAG")
         }
     return WebPanelPresentation(
         headline = if (layers.isEmpty()) "Internet totalmente abierto" else "Internet abierto con protecciones",

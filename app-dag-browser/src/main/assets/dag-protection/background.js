@@ -2,27 +2,119 @@
 
 const INTERCEPTED_RESOURCE_TYPES = new Set(["image", "imageset"]);
 const BLOCKED_RESOURCE_TYPES = new Set(["media", "object"]);
-const MAX_CAPTURE_BYTES = 256 * 1024;
+const MAX_INTERCEPT_CAPTURE_BYTES = 512 * 1024;
+const MAX_ANALYSIS_BYTES = 2 * 1024 * 1024;
 const MAX_SOURCE_URL_LENGTH = 4_096;
+const MAX_INLINE_IMAGE_URL_LENGTH = 512 * 1024;
 const MAX_ACTIVE_IMAGE_FILTERS = 16;
 const MAX_NATIVE_IN_FLIGHT = 10;
+const MAX_ACTIVE_FALLBACK_ANALYSES = 2;
+const MAX_QUEUED_FALLBACK_ANALYSES = 256;
+const MAX_FALLBACK_DECISIONS = 256;
+const MAX_CONTENT_DECISIONS = 256;
 const RESPONSE_CAPTURE_TIMEOUT_MS = 5_000;
+const FALLBACK_FETCH_TIMEOUT_MS = 10_000;
 const NATIVE_DECISION_TIMEOUT_MS = 2_500;
 const VIEWPORT_SETTLE_MS = 250;
 const NATIVE_APP = "glosh.dag.protection";
 const PROTOCOL_VERSION = 1;
+const PRESENTATION_DECISION_MESSAGE = "media-presentation-decision";
+const PRESENTATION_APPLIED_MESSAGE = "media-presentation-applied";
+const FALLBACK_REQUEST_MESSAGE = "media-fallback-request";
+const FALLBACK_RESPONSE_MESSAGE = "media-fallback-response";
+const INLINE_REQUEST_MESSAGE = "media-inline-request";
+const INLINE_RESPONSE_MESSAGE = "media-inline-response";
 const DOCUMENT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
-const TRANSPARENT_GIF = Uint8Array.from(
-  atob("R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs="),
-  (character) => character.charCodeAt(0),
-);
 let requestSequence = 0;
 let activeImageFilters = 0;
 let nativeRequestsInFlight = 0;
+let presentationRequestsInFlight = 0;
+let activeFallbackAnalyses = 0;
 let trackedDocumentToken = null;
 let trackedDocumentLoaded = false;
 let viewportReadyReported = false;
 let viewportSettleTimeout = null;
+let decisionPort = null;
+let decisionPortReconnectTimeout = null;
+const pendingNativeDecisions = new Map();
+const fallbackDecisionPromises = new Map();
+const fallbackDecisionCache = new Map();
+const contentDecisionPromises = new Map();
+const contentDecisionCache = new Map();
+const fallbackAnalysisQueue = [];
+
+const isSupportedSourceUrl = (value) => {
+  if (typeof value !== "string" || value.length === 0) {
+    return false;
+  }
+  if (
+    value.length <= MAX_INLINE_IMAGE_URL_LENGTH &&
+    /^data:image\/(?:avif|gif|jpeg|jpg|png|webp);base64,/iu.test(value)
+  ) {
+    return true;
+  }
+  if (value.length > MAX_SOURCE_URL_LENGTH) {
+    return false;
+  }
+  try {
+    return ["http:", "https:"].includes(new URL(value).protocol);
+  } catch {
+    return false;
+  }
+};
+
+const isTrustedContentSender = (sender) =>
+  sender?.id === browser.runtime.id &&
+  typeof sender?.url === "string" &&
+  /^(?:https?|blob):/iu.test(sender.url);
+
+const resolvePendingNativeDecisions = (action = "block") => {
+  for (const pending of pendingNativeDecisions.values()) {
+    clearTimeout(pending.timeout);
+    pending.resolve(action);
+  }
+  pendingNativeDecisions.clear();
+};
+
+const connectDecisionPort = () => {
+  if (decisionPort !== null) {
+    return;
+  }
+  try {
+    const port = browser.runtime.connectNative(NATIVE_APP);
+    decisionPort = port;
+    port.onMessage.addListener((message) => {
+      const pending = pendingNativeDecisions.get(message?.candidateId);
+      const valid =
+        pending !== undefined &&
+        message?.type === "media-decision" &&
+        message?.version === PROTOCOL_VERSION &&
+        ["allow", "block"].includes(message?.action);
+      if (!valid) {
+        return;
+      }
+      pendingNativeDecisions.delete(message.candidateId);
+      clearTimeout(pending.timeout);
+      pending.resolve(message.action);
+    });
+    port.onDisconnect.addListener(() => {
+      if (decisionPort === port) {
+        decisionPort = null;
+      }
+      resolvePendingNativeDecisions();
+      if (decisionPortReconnectTimeout === null) {
+        decisionPortReconnectTimeout = setTimeout(() => {
+          decisionPortReconnectTimeout = null;
+          connectDecisionPort();
+        }, 250);
+      }
+    });
+  } catch {
+    decisionPort = null;
+  }
+};
+
+connectDecisionPort();
 
 const clearViewportSettleTimeout = () => {
   if (viewportSettleTimeout !== null) {
@@ -38,7 +130,10 @@ const scheduleViewportReady = () => {
     !trackedDocumentLoaded ||
     viewportReadyReported ||
     activeImageFilters !== 0 ||
-    nativeRequestsInFlight !== 0
+    nativeRequestsInFlight !== 0 ||
+    presentationRequestsInFlight !== 0 ||
+    activeFallbackAnalyses !== 0 ||
+    fallbackAnalysisQueue.length !== 0
   ) {
     return;
   }
@@ -49,20 +144,26 @@ const scheduleViewportReady = () => {
       !trackedDocumentLoaded ||
       viewportReadyReported ||
       activeImageFilters !== 0 ||
-      nativeRequestsInFlight !== 0
+      nativeRequestsInFlight !== 0 ||
+      presentationRequestsInFlight !== 0 ||
+      activeFallbackAnalyses !== 0 ||
+      fallbackAnalysisQueue.length !== 0
     ) {
       return;
     }
-    viewportReadyReported = true;
-    browser.runtime
-      .sendNativeMessage(NATIVE_APP, {
+    if (decisionPort === null) {
+      return;
+    }
+    try {
+      decisionPort.postMessage({
         type: "viewport-images-ready",
         version: PROTOCOL_VERSION,
         documentToken: trackedDocumentToken,
-      })
-      .catch(() => {
-        // Performance evidence is DEV-only and never changes the fail-closed barrier.
       });
+      viewportReadyReported = true;
+    } catch {
+      // Performance evidence is DEV-only and never changes the fail-closed barrier.
+    }
   }, VIEWPORT_SETTLE_MS);
 };
 
@@ -74,7 +175,64 @@ const resetViewportTracking = (documentToken) => {
 };
 
 browser.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type === INLINE_REQUEST_MESSAGE) {
+    const sourceUrl = message?.sourceUrl;
+    const declaredByteLength = message?.byteLength;
+    const bytesBase64 = message?.bytesBase64;
+    const valid =
+      message?.version === PROTOCOL_VERSION &&
+      isTrustedContentSender(sender) &&
+      typeof sourceUrl === "string" &&
+      sourceUrl.length <= MAX_SOURCE_URL_LENGTH &&
+      sourceUrl.startsWith("blob:") &&
+      Number.isInteger(declaredByteLength) &&
+      declaredByteLength > 0 &&
+      declaredByteLength <= MAX_ANALYSIS_BYTES &&
+      typeof bytesBase64 === "string" &&
+      bytesBase64.length > 0 &&
+      bytesBase64.length <= Math.ceil((MAX_ANALYSIS_BYTES * 4) / 3) + 4;
+    if (!valid) {
+      return undefined;
+    }
+    let bytes;
+    try {
+      const binary = atob(bytesBase64);
+      if (binary.length !== declaredByteLength) {
+        return undefined;
+      }
+      bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    } catch {
+      return undefined;
+    }
+    return requestContentDecision(
+      { url: sourceUrl },
+      bytes,
+    ).then((action) => ({
+      type: INLINE_RESPONSE_MESSAGE,
+      version: PROTOCOL_VERSION,
+      sourceUrl,
+      action,
+    }));
+  }
+  if (message?.type === FALLBACK_REQUEST_MESSAGE) {
+    const sourceUrl = message?.sourceUrl;
+    if (
+      message?.version !== PROTOCOL_VERSION ||
+      !isTrustedContentSender(sender) ||
+      !isSupportedSourceUrl(sourceUrl)
+    ) {
+      return undefined;
+    }
+    const priority = message?.priority === "visible" ? "visible" : "nearby";
+    return analyzeFallbackSource(sourceUrl, priority).then((action) => ({
+      type: FALLBACK_RESPONSE_MESSAGE,
+      version: PROTOCOL_VERSION,
+      sourceUrl,
+      action,
+    }));
+  }
   if (
+    !isTrustedContentSender(sender) ||
     sender.frameId !== 0 ||
     message?.version !== PROTOCOL_VERSION ||
     !DOCUMENT_TOKEN_PATTERN.test(message?.documentToken || "")
@@ -119,55 +277,277 @@ const encodeBase64 = (bytes) => {
   return btoa(binary);
 };
 
-const closeWithPlaceholder = (filter) => {
-  try {
-    filter.write(TRANSPARENT_GIF.buffer.slice(0));
-    filter.close();
-  } catch {
+const requestNativeDecision = (details, bytes) => {
+  connectDecisionPort();
+  if (decisionPort === null) {
+    return Promise.resolve("block");
+  }
+  const id = nextCandidateId();
+  return new Promise((resolve) => {
+    const timeout = setTimeout(() => {
+      pendingNativeDecisions.delete(id);
+      resolve("block");
+    }, NATIVE_DECISION_TIMEOUT_MS);
+    pendingNativeDecisions.set(id, { resolve, timeout });
     try {
-      filter.close();
+      decisionPort.postMessage({
+        type: "media-bytes",
+        version: PROTOCOL_VERSION,
+        candidateId: id,
+        sourceUrl: details.url.startsWith("data:image/") || details.url.startsWith("blob:")
+          ? `https://inline-image.glosh.local/${id}`
+          : details.url,
+        byteLength: bytes.byteLength,
+        bytesBase64: encodeBase64(bytes),
+      });
     } catch {
-      // A failed stream is already closed by Gecko.
+      pendingNativeDecisions.delete(id);
+      clearTimeout(timeout);
+      resolve("block");
     }
+  });
+};
+
+const contentHash = async (bytes) => {
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) =>
+    byte.toString(16).padStart(2, "0")).join("");
+};
+
+const rememberContentDecision = (hash, action) => {
+  if (!contentDecisionCache.has(hash) && contentDecisionCache.size >= MAX_CONTENT_DECISIONS) {
+    contentDecisionCache.delete(contentDecisionCache.keys().next().value);
+  }
+  contentDecisionCache.set(hash, action);
+};
+
+const requestContentDecision = async (details, bytes) => {
+  let hash;
+  try {
+    hash = await contentHash(bytes);
+  } catch {
+    return requestNativeDecision(details, bytes);
+  }
+  const cached = contentDecisionCache.get(hash);
+  if (cached) {
+    return cached;
+  }
+  const pending = contentDecisionPromises.get(hash);
+  if (pending) {
+    return pending;
+  }
+  const decisionPromise = requestNativeDecision(details, bytes)
+    .then((action) => {
+      rememberContentDecision(hash, action);
+      return action;
+    })
+    .finally(() => {
+      if (contentDecisionPromises.get(hash) === decisionPromise) {
+        contentDecisionPromises.delete(hash);
+      }
+    });
+  contentDecisionPromises.set(hash, decisionPromise);
+  return decisionPromise;
+};
+
+const rememberFallbackDecision = (sourceUrl, action) => {
+  if (!fallbackDecisionCache.has(sourceUrl) && fallbackDecisionCache.size >= MAX_FALLBACK_DECISIONS) {
+    fallbackDecisionCache.delete(fallbackDecisionCache.keys().next().value);
+  }
+  fallbackDecisionCache.set(sourceUrl, action);
+};
+
+const fetchFallbackDecision = async (sourceUrl) => {
+  const controller = new AbortController();
+  const fetchTimeout = setTimeout(() => controller.abort(), FALLBACK_FETCH_TIMEOUT_MS);
+  try {
+    const response = await fetch(sourceUrl, {
+      credentials: "include",
+      cache: "force-cache",
+      signal: controller.signal,
+    });
+    if (!response.ok || !response.body) {
+      return "block";
+    }
+    const reader = response.body.getReader();
+    const chunks = [];
+    let totalBytes = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+      if (
+        !(value instanceof Uint8Array) ||
+        totalBytes + value.byteLength > MAX_ANALYSIS_BYTES
+      ) {
+        await reader.cancel();
+        return "block";
+      }
+      chunks.push(value);
+      totalBytes += value.byteLength;
+    }
+    if (totalBytes === 0) {
+      return "block";
+    }
+    return requestContentDecision(
+      { url: sourceUrl },
+      combineChunks(chunks, totalBytes),
+    );
+  } catch {
+    return "block";
+  } finally {
+    clearTimeout(fetchTimeout);
   }
 };
 
-const requestNativeBlockDecision = async (details, bytes) => {
-  const id = nextCandidateId();
-  const response = await browser.runtime.sendNativeMessage(NATIVE_APP, {
-    type: "media-bytes",
-    version: PROTOCOL_VERSION,
-    candidateId: id,
-    sourceUrl: details.url,
-    byteLength: bytes.byteLength,
-    bytesBase64: encodeBase64(bytes),
+const promoteFallbackTask = (task) => {
+  if (task.priority === "visible" || task.state !== "queued") {
+    return;
+  }
+  const queueIndex = fallbackAnalysisQueue.indexOf(task);
+  if (queueIndex >= 0) {
+    fallbackAnalysisQueue.splice(queueIndex, 1);
+    task.priority = "visible";
+    fallbackAnalysisQueue.unshift(task);
+  }
+};
+
+const drainFallbackQueue = () => {
+  while (
+    activeFallbackAnalyses < MAX_ACTIVE_FALLBACK_ANALYSES &&
+    nativeRequestsInFlight < MAX_NATIVE_IN_FLIGHT &&
+    fallbackAnalysisQueue.length > 0
+  ) {
+    const task = fallbackAnalysisQueue.shift();
+    if (!task || task.state !== "queued") {
+      continue;
+    }
+    task.state = "running";
+    activeFallbackAnalyses += 1;
+    nativeRequestsInFlight += 1;
+    scheduleViewportReady();
+    void fetchFallbackDecision(task.sourceUrl)
+      .then((action) => {
+        rememberFallbackDecision(task.sourceUrl, action);
+        task.resolve(action);
+      })
+      .catch(() => {
+        task.resolve("block");
+      })
+      .finally(() => {
+        if (fallbackDecisionPromises.get(task.sourceUrl) === task) {
+          fallbackDecisionPromises.delete(task.sourceUrl);
+        }
+        activeFallbackAnalyses = Math.max(0, activeFallbackAnalyses - 1);
+        nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
+        scheduleViewportReady();
+        drainFallbackQueue();
+      });
+  }
+  scheduleViewportReady();
+};
+
+const analyzeFallbackSource = (sourceUrl, priority) => {
+  const cached = fallbackDecisionCache.get(sourceUrl);
+  if (cached) {
+    return Promise.resolve(cached);
+  }
+  const existing = fallbackDecisionPromises.get(sourceUrl);
+  if (existing) {
+    if (priority === "visible") {
+      promoteFallbackTask(existing);
+    }
+    return existing.promise;
+  }
+  if (fallbackAnalysisQueue.length >= MAX_QUEUED_FALLBACK_ANALYSES) {
+    return Promise.resolve("retry");
+  }
+  let resolveTask;
+  const promise = new Promise((resolve) => {
+    resolveTask = resolve;
   });
-  return (
-    response?.type === "media-decision" &&
-    response?.version === PROTOCOL_VERSION &&
-    response?.candidateId === id &&
-    response?.action === "block"
-  );
+  const task = {
+    sourceUrl,
+    priority,
+    state: "queued",
+    promise,
+    resolve: resolveTask,
+  };
+  fallbackDecisionPromises.set(sourceUrl, task);
+  if (priority === "visible") {
+    fallbackAnalysisQueue.unshift(task);
+  } else {
+    fallbackAnalysisQueue.push(task);
+  }
+  drainFallbackQueue();
+  return promise;
+};
+
+const notifyPresentationDecision = (details, action) => {
+  if (!Number.isInteger(details.tabId) || details.tabId < 0) {
+    return Promise.resolve(false);
+  }
+  const message = {
+    type: PRESENTATION_DECISION_MESSAGE,
+    version: PROTOCOL_VERSION,
+    sourceUrl: details.url,
+    action,
+  };
+  const response =
+    Number.isInteger(details.frameId) && details.frameId >= 0
+      ? browser.tabs.sendMessage(details.tabId, message, { frameId: details.frameId })
+      : browser.tabs.sendMessage(details.tabId, message);
+  return response
+    .then((response) => {
+      if (decisionPort !== null) {
+        try {
+          decisionPort.postMessage({
+            type: "media-presentation-status",
+            version: PROTOCOL_VERSION,
+            action,
+            frameId: details.frameId,
+            matchedCount: response?.matchedCount ?? -1,
+            matchedStates: response?.matchedStates ?? "",
+            sourceUrl: details.url,
+          });
+        } catch {
+          // DEV presentation evidence never changes the fail-closed decision.
+        }
+      }
+      return (
+        response?.type === PRESENTATION_APPLIED_MESSAGE &&
+        response?.version === PROTOCOL_VERSION
+      );
+    })
+    .catch(() => false);
+};
+
+const presentDecision = (details, action) => {
+  presentationRequestsInFlight += 1;
+  scheduleViewportReady();
+  return notifyPresentationDecision(details, action).finally(() => {
+    presentationRequestsInFlight = Math.max(0, presentationRequestsInFlight - 1);
+    scheduleViewportReady();
+  });
 };
 
 const interceptImageResponse = (details) => {
-  if (typeof browser.webRequest.filterResponseData !== "function") {
+  if (!isSupportedSourceUrl(details.url)) {
     return { cancel: true };
   }
   if (
-    typeof details.url !== "string" ||
-    details.url.length === 0 ||
-    details.url.length > MAX_SOURCE_URL_LENGTH ||
+    typeof browser.webRequest.filterResponseData !== "function" ||
     activeImageFilters >= MAX_ACTIVE_IMAGE_FILTERS
   ) {
-    return { cancel: true };
+    return {};
   }
 
   let filter;
   try {
     filter = browser.webRequest.filterResponseData(details.requestId);
   } catch {
-    return { cancel: true };
+    return {};
   }
   activeImageFilters += 1;
   scheduleViewportReady();
@@ -179,39 +559,72 @@ const interceptImageResponse = (details) => {
   let ownsActiveSlot = true;
   let captureTimeout = null;
 
-  const finalize = () => {
+  const releaseActiveSlot = () => {
+    if (ownsActiveSlot) {
+      ownsActiveSlot = false;
+      activeImageFilters = Math.max(0, activeImageFilters - 1);
+    }
+  };
+
+  const closeStream = () => {
+    try {
+      filter.close();
+    } catch {
+      // A failed or timed-out response stream may already be closed by Gecko.
+    }
+  };
+
+  const disconnectStream = () => {
+    try {
+      filter.disconnect();
+    } catch {
+      closeStream();
+    }
+  };
+
+  const finalizeWithoutDecision = (disconnect = false) => {
     if (finalized) {
       return;
     }
     finalized = true;
     if (captureTimeout !== null) {
       clearTimeout(captureTimeout);
+      captureTimeout = null;
     }
-    if (ownsActiveSlot) {
-      ownsActiveSlot = false;
-      activeImageFilters = Math.max(0, activeImageFilters - 1);
+    if (disconnect) {
+      disconnectStream();
+    } else {
+      closeStream();
     }
-    closeWithPlaceholder(filter);
+    releaseActiveSlot();
     scheduleViewportReady();
   };
 
   filter.ondata = (event) => {
-    if (finalized || overflow) {
+    if (finalized) {
       return;
     }
     const chunk = new Uint8Array(event.data);
-    if (totalBytes + chunk.byteLength > MAX_CAPTURE_BYTES) {
-      overflow = true;
-      chunks.length = 0;
-      totalBytes = 0;
-      finalize();
+    const capturedChunk = overflow ? null : chunk.slice();
+    try {
+      filter.write(event.data);
+    } catch {
+      finalizeWithoutDecision();
       return;
     }
-    chunks.push(chunk);
-    totalBytes += chunk.byteLength;
+    if (!overflow) {
+      if (totalBytes + capturedChunk.byteLength > MAX_INTERCEPT_CAPTURE_BYTES) {
+        overflow = true;
+        chunks.length = 0;
+        totalBytes = 0;
+      } else {
+        chunks.push(capturedChunk);
+        totalBytes += capturedChunk.byteLength;
+      }
+    }
   };
 
-  filter.onerror = finalize;
+  filter.onerror = () => finalizeWithoutDecision();
   filter.onstop = () => {
     if (finalized) {
       return;
@@ -220,29 +633,34 @@ const interceptImageResponse = (details) => {
       clearTimeout(captureTimeout);
       captureTimeout = null;
     }
+    finalized = true;
+    closeStream();
+    releaseActiveSlot();
     if (overflow || totalBytes === 0) {
-      finalize();
+      scheduleViewportReady();
       return;
     }
     if (nativeRequestsInFlight >= MAX_NATIVE_IN_FLIGHT) {
-      finalize();
+      scheduleViewportReady();
       return;
     }
 
     nativeRequestsInFlight += 1;
     scheduleViewportReady();
-    const timeout = setTimeout(finalize, NATIVE_DECISION_TIMEOUT_MS);
     const bytes = combineChunks(chunks, totalBytes);
-    requestNativeBlockDecision(details, bytes)
-      .catch(() => false)
+    requestContentDecision(details, bytes)
+      .then((action) => presentDecision(details, action))
+      .catch(() => presentDecision(details, "block"))
       .finally(() => {
         nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
-        clearTimeout(timeout);
-        finalize();
         scheduleViewportReady();
+        drainFallbackQueue();
       });
   };
-  captureTimeout = setTimeout(finalize, RESPONSE_CAPTURE_TIMEOUT_MS);
+  captureTimeout = setTimeout(
+    () => finalizeWithoutDecision(true),
+    RESPONSE_CAPTURE_TIMEOUT_MS,
+  );
 
   return {};
 };

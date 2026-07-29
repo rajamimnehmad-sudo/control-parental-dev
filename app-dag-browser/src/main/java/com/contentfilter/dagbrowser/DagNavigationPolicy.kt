@@ -46,6 +46,9 @@ internal object DagNavigationPolicy {
         url: String,
         opensNewWindow: Boolean,
     ): DagLoadDecision {
+        if (url == "about:blank" && !opensNewWindow) {
+            return DagLoadDecision.Allow
+        }
         val safeUrl = sanitizeTopLevel(url) ?: return DagLoadDecision.Block
         return when {
             opensNewWindow || safeUrl != url -> DagLoadDecision.Redirect(safeUrl)

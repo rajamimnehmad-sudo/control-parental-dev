@@ -92,4 +92,14 @@ class DagNavigationPolicyTest {
             DagNavigationPolicy.decideLoad("https://example.com", opensNewWindow = false),
         )
     }
+
+    @Test
+    fun `internal home is allowed only in the current tab`() {
+        assertIs<DagLoadDecision.Allow>(
+            DagNavigationPolicy.decideLoad("about:blank", opensNewWindow = false),
+        )
+        assertIs<DagLoadDecision.Block>(
+            DagNavigationPolicy.decideLoad("about:blank", opensNewWindow = true),
+        )
+    }
 }

@@ -16,6 +16,7 @@ import com.contentfilter.admin.push.DeviceNameKey
 import com.contentfilter.admin.push.EventIdKey
 import com.contentfilter.admin.push.OpenAnnouncementsAction
 import com.contentfilter.admin.push.parseAdminProtectionAlertPayload
+import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.ui.ContentFilterTheme
 import dagger.hilt.android.AndroidEntryPoint
 
@@ -23,6 +24,9 @@ import dagger.hilt.android.AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private var protectionAlertPayload by mutableStateOf<AdminProtectionAlertPayload?>(null)
     private var announcementOpenRequest by mutableStateOf(0)
+
+    @javax.inject.Inject
+    lateinit var syncScheduler: SyncScheduler
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -46,6 +50,11 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         recordLaunchIntent(intent)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        syncScheduler.requestSync()
     }
 
     private fun recordLaunchIntent(intent: android.content.Intent) {

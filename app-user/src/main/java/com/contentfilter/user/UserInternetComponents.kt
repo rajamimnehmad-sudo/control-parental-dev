@@ -189,15 +189,21 @@ private fun InternetProtectionList(
             value = if (state.onlyResultsEnabled) "Activo" else "Navegación autorizada",
             active = true,
         )
-        if (protectedBrowserAvailable) {
+        if (protectedBrowserAvailable || state.protectedBrowserRequired) {
             InternetProtectionRow(
                 icon = ProductIcon.Search,
-                label = "Navegador protegido",
-                value = "Prueba DEV independiente",
-                active = true,
-                onClick = onOpenProtectedBrowser,
+                label = "Navegador DAG",
+                value =
+                    when {
+                        state.protectedBrowserRequired && protectedBrowserAvailable ->
+                            "Obligatorio · tocar para completar o abrir"
+                        state.protectedBrowserRequired -> "Obligatorio · falta instalar"
+                        else -> "Disponible · todavía no obligatorio"
+                    },
+                active = protectedBrowserAvailable,
+                onClick = onOpenProtectedBrowser.takeIf { protectedBrowserAvailable },
                 showDivider = state.schedule != null,
-                navigation = true,
+                navigation = protectedBrowserAvailable,
             )
         }
         state.schedule?.let { schedule ->
@@ -250,6 +256,7 @@ private val com.contentfilter.user.internet.UserWebUiState.compactProtectionSumm
         buildList {
             if (safeSearchEnabled) add("SafeSearch")
             if (onlyResultsEnabled) add("Solo resultados")
+            if (protectedBrowserRequired) add("DAG")
         }.joinToString(" · ").ifBlank { "Protección Web configurada" }
 
 private enum class InternetVisualStatus(

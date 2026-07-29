@@ -37,10 +37,10 @@ internal object AndroidImageBoundsReader : DagImageBoundsReader {
 }
 
 /**
- * Validates a bounded image response before a future classifier can decode pixels.
+ * Validates and preprocesses a bounded image response before the local classifier sees pixels.
  *
- * Passing this boundary never means that media is safe. The only possible
- * decision remains block until a benchmarked model is connected.
+ * Passing the envelope and decode boundary never means that media is safe. Only a valid result
+ * from the bundled model can produce allow; every error and unsupported input remains block.
  */
 internal object DagMediaBytesPolicy {
     private val candidateIdPattern = Regex("^[A-Za-z0-9_-]{1,80}$")
@@ -49,17 +49,10 @@ internal object DagMediaBytesPolicy {
         payload: DagMediaBytesPayload,
         boundsReader: DagImageBoundsReader = AndroidImageBoundsReader,
         preprocessor: DagImagePreprocessor = AndroidDagImagePreprocessor,
+        analyzer: DagImageAnalyzer = UnavailableDagImageAnalyzer,
     ): DagMediaDecision {
-        val reason =
-            when {
-                !validEnvelope(payload) -> InvalidPayloadReason
-                else -> inspectImage(payload, boundsReader, preprocessor)
-            }
-        return DagMediaDecision(
-            candidateId = payload.candidateId.take(MaxCandidateIdLength),
-            action = DagMediaAction.Block,
-            reason = reason,
-        )
+        if (!validEnvelope(payload)) return blocked(payload, InvalidPayloadReason)
+        return inspectImage(payload, boundsReader, preprocessor, analyzer)
     }
 
     private fun validEnvelope(payload: DagMediaBytesPayload): Boolean {
@@ -73,17 +66,20 @@ internal object DagMediaBytesPolicy {
         payload: DagMediaBytesPayload,
         boundsReader: DagImageBoundsReader,
         preprocessor: DagImagePreprocessor,
-    ): String {
+        analyzer: DagImageAnalyzer,
+    ): DagMediaDecision {
         val bytes =
             runCatching { Base64.getDecoder().decode(payload.bytesBase64) }
-                .getOrElse { return InvalidPayloadReason }
+                .getOrElse { return blocked(payload, InvalidPayloadReason) }
         if (bytes.size != payload.declaredByteLength || bytes.size > MaxCaptureBytes) {
-            return InvalidPayloadReason
+            return blocked(payload, InvalidPayloadReason)
         }
-        val bounds = boundsReader.read(bytes) ?: return UnsupportedImageReason
-        if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) return UnsupportedImageReason
+        val bounds = boundsReader.read(bytes) ?: return blocked(payload, UnsupportedImageReason)
+        if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) {
+            return blocked(payload, UnsupportedImageReason)
+        }
         if (!DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height)) {
-            return UnsafeDimensionsReason
+            return blocked(payload, UnsafeDimensionsReason)
         }
         return when (
             val result =
@@ -96,16 +92,43 @@ internal object DagMediaBytesPolicy {
         ) {
             is DagImagePreprocessResult.Ready -> {
                 val valid = DagImageDecodeContract.isValid(result.image)
-                result.image.rgb888.fill(0)
-                if (valid) {
-                    DagMediaAnalysisPolicy.AnalyzerUnavailableReason
-                } else {
-                    AndroidDagImagePreprocessor.DecodeFailedReason
+                try {
+                    if (!valid) {
+                        blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
+                    } else {
+                        when (val analysis = analyzer.analyze(result.image)) {
+                            is DagImageAnalysisResult.Classified ->
+                                if (analysis.filterProbability < DagOnDeviceImageAnalyzer.FilterThreshold) {
+                                    DagMediaDecision(
+                                        candidateId = payload.candidateId,
+                                        action = DagMediaAction.Allow,
+                                        reason = DagOnDeviceImageAnalyzer.ModelAllowReason,
+                                    )
+                                } else {
+                                    blocked(payload, DagOnDeviceImageAnalyzer.ModelFilterReason)
+                                }
+                            is DagImageAnalysisResult.Unavailable ->
+                                blocked(payload, analysis.reason)
+                        }
+                    }
+                } catch (_: Exception) {
+                    blocked(payload, DagOnDeviceImageAnalyzer.ModelExecutionFailedReason)
+                } finally {
+                    result.image.rgb888.fill(0)
                 }
             }
-            is DagImagePreprocessResult.Rejected -> result.reason
+            is DagImagePreprocessResult.Rejected -> blocked(payload, result.reason)
         }
     }
+
+    private fun blocked(
+        payload: DagMediaBytesPayload,
+        reason: String,
+    ) = DagMediaDecision(
+        candidateId = payload.candidateId.take(MaxCandidateIdLength),
+        action = DagMediaAction.Block,
+        reason = reason,
+    )
 
     private fun isAllowedUrl(value: String): Boolean {
         if (value.length !in 1..MaxUrlLength) return false
@@ -114,7 +137,7 @@ internal object DagMediaBytesPolicy {
 
     private const val MaxCandidateIdLength = 80
     private const val MaxUrlLength = 4_096
-    const val MaxCaptureBytes = 256 * 1024
+    const val MaxCaptureBytes = 2 * 1024 * 1024
     private const val MaxBase64Length = ((MaxCaptureBytes + 2) / 3) * 4
     const val InvalidPayloadReason = "invalid_payload"
     const val UnsupportedImageReason = "unsupported_image"

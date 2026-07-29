@@ -20,6 +20,7 @@ internal data class DagMediaDecision(
 internal enum class DagMediaAction(
     val wireValue: String,
 ) {
+    Allow("allow"),
     Block("block"),
 }
 

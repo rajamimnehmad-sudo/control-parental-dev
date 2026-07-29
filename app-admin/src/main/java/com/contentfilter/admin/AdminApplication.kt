@@ -4,16 +4,16 @@ import android.app.Application
 import android.os.Build
 import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
-import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.domain.repository.AppFeedbackRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
+import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.realtime.RealtimeSyncCoordinator
 import dagger.hilt.android.HiltAndroidApp
-import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import javax.inject.Inject
 
 @HiltAndroidApp
 class AdminApplication :

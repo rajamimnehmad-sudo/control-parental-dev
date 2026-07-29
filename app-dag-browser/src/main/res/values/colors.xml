@@ -1,8 +1,21 @@
 <resources>
-    <color name="dag_navy">#102A43</color>
-    <color name="dag_blue">#1F6F8B</color>
-    <color name="dag_background">#F3F7FA</color>
+    <color name="dag_navy">#10243A</color>
+    <color name="dag_navy_soft">#173650</color>
+    <color name="dag_blue">#099ED2</color>
+    <color name="dag_blue_soft">#E6F6FC</color>
+    <color name="dag_teal">#39C6B4</color>
+    <color name="dag_background">#F2F7F9</color>
     <color name="dag_surface">#FFFFFF</color>
-    <color name="dag_text">#102A43</color>
-    <color name="dag_muted">#52677A</color>
+    <color name="dag_text">#14283D</color>
+    <color name="dag_muted">#607488</color>
+    <color name="dag_on_navy">#FFFFFF</color>
+    <color name="dag_on_navy_muted">#BFD3E2</color>
+    <color name="dag_toolbar_button">#26445E</color>
+    <color name="dag_border">#D9E4EA</color>
+    <color name="dag_status_ready">#B8F3E8</color>
+    <color name="dag_status_ready_text">#075E52</color>
+    <color name="dag_status_waiting">#D7EAF4</color>
+    <color name="dag_status_waiting_text">#244B64</color>
+    <color name="dag_status_error">#FFE1DE</color>
+    <color name="dag_status_error_text">#8B2820</color>
 </resources>

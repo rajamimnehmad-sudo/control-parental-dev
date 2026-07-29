@@ -1,9 +1,9 @@
 /*
  * This stylesheet is injected at document_start. Media remains hidden while
- * it is pending, blocked, invalid, or cannot reach the native analyzer.
+ * pending or when a trusted decision cannot be presented. Rejected images
+ * become strongly blurred only after the native analyzer decides.
  */
 img,
-picture,
 video,
 audio,
 canvas,
@@ -17,15 +17,161 @@ embed {
   background: #dce7ee !important;
 }
 
+img[data-glosh-dag-media="allow"],
+image[data-glosh-dag-media="allow"],
+input[type="image"][data-glosh-dag-media="allow"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  filter: none !important;
+  background: initial !important;
+}
+
+img[data-glosh-dag-ui-vector="allow"],
+svg[data-glosh-dag-ui-vector="allow"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  filter: none !important;
+  background: initial !important;
+}
+
+img[data-glosh-dag-media="block"],
+image[data-glosh-dag-media="block"],
+input[type="image"][data-glosh-dag-media="block"] {
+  visibility: visible !important;
+  opacity: 1 !important;
+  filter: blur(28px) brightness(0.78) saturate(0.55) !important;
+  background: #dce7ee !important;
+}
+
+img[data-glosh-dag-media="error"],
+image[data-glosh-dag-media="error"],
+input[type="image"][data-glosh-dag-media="error"] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+html:not([data-glosh-dag-background-probe]) *,
+html:not([data-glosh-dag-background-probe]) *::before,
+html:not([data-glosh-dag-background-probe]) *::after {
+  background-image: none !important;
+}
+
+html[data-glosh-dag-background-probe] body,
+html[data-glosh-dag-background-probe] body * {
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+[data-glosh-dag-sponsored-result="true"] {
+  display: none !important;
+}
+
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-media="allow"] {
+  background-image: var(--glosh-dag-background-image) !important;
+}
+
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-media="hidden"],
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-media="error"],
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-media="block"] {
+  background-image: none !important;
+  background-color: #dce7ee !important;
+}
+
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-before="allow"]::before {
+  content: var(--glosh-dag-before-content) !important;
+  background-image: var(--glosh-dag-before-background-image) !important;
+}
+
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-after="allow"]::after {
+  content: var(--glosh-dag-after-content) !important;
+  background-image: var(--glosh-dag-after-background-image) !important;
+}
+
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-before="hidden"]::before,
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-before="block"]::before,
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-after="hidden"]::after,
+html:not([data-glosh-dag-background-probe])
+  [data-glosh-dag-css-after="block"]::after {
+  content: none !important;
+  background-image: none !important;
+}
+
 *,
 *::before,
 *::after {
-  background-image: none !important;
   border-image-source: none !important;
   list-style-image: none !important;
 }
 
-*::before,
-*::after {
+html:not([data-glosh-dag-background-probe]) *::before,
+html:not([data-glosh-dag-background-probe]) *::after {
   content: none !important;
+}
+
+@keyframes glosh-dag-waiting {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+[data-glosh-dag-media-host] {
+  position: relative !important;
+}
+
+[data-glosh-dag-media-host]::after {
+  box-sizing: border-box !important;
+  content: "" !important;
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 2147483646 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  min-width: 48px !important;
+  min-height: 48px !important;
+  border: 1px solid rgba(42, 86, 112, 0.2) !important;
+  border-radius: 8px !important;
+  color: #173247 !important;
+  background: #dce7ee !important;
+  font: 600 12px/1.25 sans-serif !important;
+  letter-spacing: 0.01em !important;
+  text-align: center !important;
+  pointer-events: none !important;
+}
+
+[data-glosh-dag-media-host="waiting"]::after {
+  content: "Analizando…" !important;
+  background:
+    linear-gradient(100deg, #dce7ee 25%, #edf4f7 45%, #dce7ee 65%) !important;
+  background-size: 220% 100% !important;
+  animation: glosh-dag-waiting 1.3s linear infinite !important;
+}
+
+[data-glosh-dag-media-host="filtered"]::after {
+  content: "Protegida por Glosh" !important;
+  inset: auto 8px 8px 8px !important;
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  color: #ffffff !important;
+  background: rgba(10, 33, 49, 0.84) !important;
+  backdrop-filter: blur(6px) !important;
+}
+
+[data-glosh-dag-media-host="error"]::after {
+  content: "Imagen no disponible" !important;
+  color: #5f3a22 !important;
+  background: #f3e8df !important;
+  border-color: rgba(128, 76, 38, 0.25) !important;
 }

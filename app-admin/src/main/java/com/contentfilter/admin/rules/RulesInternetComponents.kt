@@ -165,12 +165,17 @@ internal fun DomainRuleEditor(
 internal fun WebNavigationPanel(
     blocked: Boolean,
     onlyResultsEnabled: Boolean,
+    protectedBrowserRequired: Boolean,
     presentation: WebPanelPresentation,
     navigationSaving: Boolean,
     onlyResultsSaving: Boolean,
+    protectedBrowserSaving: Boolean,
     protectionActive: Boolean,
+    protectedBrowserInstalled: Boolean,
+    alternativeBrowsers: List<AppControlUiState>,
     onBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
+    onProtectedBrowserRequiredChanged: (Boolean) -> Unit,
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
         Text("Acceso a Internet", style = MaterialTheme.typography.titleLarge)
@@ -215,6 +220,70 @@ internal fun WebNavigationPanel(
                     saving = onlyResultsSaving,
                     onCheckedChange = onOnlyResultsChanged,
                 )
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                WebSwitchRow(
+                    icon = ProductIcon.ShieldCheck,
+                    title = "Usar navegador DAG",
+                    description = "Hace obligatorio el navegador que revisa las fotos antes de mostrarlas.",
+                    checked = protectedBrowserRequired,
+                    enabled = !protectedBrowserSaving,
+                    saving = protectedBrowserSaving,
+                    onCheckedChange = onProtectedBrowserRequiredChanged,
+                )
+                AnimatedVisibility(visible = protectedBrowserRequired) {
+                    Column(
+                        modifier =
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(Color(0xFFF1F6F8))
+                                .padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text("Configuración necesaria", style = MaterialTheme.typography.titleSmall)
+                        SetupStatusLine(
+                            complete = protectedBrowserInstalled,
+                            text =
+                                if (protectedBrowserInstalled) {
+                                    "DAG está instalado"
+                                } else {
+                                    "Falta instalar DAG en el teléfono"
+                                },
+                        )
+                        SetupStatusLine(
+                            complete = protectionActive,
+                            text =
+                                if (protectionActive) {
+                                    "Glosh y Accesibilidad están activos"
+                                } else {
+                                    "Falta reparar Glosh o Accesibilidad"
+                                },
+                        )
+                        SetupStatusLine(
+                            complete = false,
+                            text = "Confirmar DAG como navegador predeterminado en el teléfono",
+                        )
+                        Text(
+                            if (alternativeBrowsers.isEmpty()) {
+                                "Glosh bloqueará automáticamente otros navegadores que detecte."
+                            } else {
+                                "Glosh bloqueará: " +
+                                    alternativeBrowsers
+                                        .map(AppControlUiState::appName)
+                                        .distinct()
+                                        .sorted()
+                                        .joinToString(", ")
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HeaderMuted,
+                        )
+                        Text(
+                            "No requiere reiniciar ni borrar el teléfono. Android siempre pide una confirmación local para cambiar el navegador predeterminado.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = HeaderMuted,
+                        )
+                    }
+                }
             }
         }
         if (blocked && !protectionActive) {
@@ -223,6 +292,24 @@ internal fun WebNavigationPanel(
                 isError = true,
             )
         }
+    }
+}
+
+@Composable
+private fun SetupStatusLine(
+    complete: Boolean,
+    text: String,
+) {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ProductGlyph(
+            icon = if (complete) ProductIcon.ShieldCheck else ProductIcon.ShieldAlert,
+            color = if (complete) Color(0xFF17895D) else MaterialTheme.colorScheme.tertiary,
+            modifier = Modifier.size(18.dp),
+        )
+        Text(text, style = MaterialTheme.typography.bodySmall)
     }
 }
 

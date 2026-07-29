@@ -26,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -181,6 +182,12 @@ internal fun UserAppRoot(
     }
     Scaffold(
         modifier = modifier,
+        containerColor =
+            if (destination == UserDestination.Home) {
+                UserHomeHeaderTop
+            } else {
+                Color.White
+            },
         bottomBar = {
             NavigationBar {
                 UserDestination.entries.filter { it.showInNav }.forEach { item ->
@@ -231,7 +238,9 @@ internal fun UserAppRoot(
                         onOpenProtectedBrowser = {
                             ProtectedBrowserLauncher.open(context)
                         },
-                        protectedBrowserAvailable = BuildConfig.DAG_BROWSER_V3_BRIDGE_AVAILABLE,
+                        protectedBrowserAvailable =
+                            BuildConfig.DAG_BROWSER_V3_BRIDGE_AVAILABLE &&
+                                ProtectedBrowserLauncher.isInstalled(context),
                         vpnActive = statusState.isVpnActive,
                         onActivateWebProtection = {
                             val permissionIntent = VpnController.prepareIntent(context)

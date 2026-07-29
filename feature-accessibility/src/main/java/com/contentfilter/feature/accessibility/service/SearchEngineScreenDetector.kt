@@ -1,9 +1,11 @@
 package com.contentfilter.feature.accessibility.service
 
 import com.contentfilter.core.domain.model.PolicySnapshot
+import com.contentfilter.core.domain.model.ProtectedBrowserPolicy
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
 import com.contentfilter.core.domain.model.onlySearchResultsEnabled
+import com.contentfilter.core.domain.model.protectedBrowserRequired
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import java.net.URI
 
@@ -19,10 +21,12 @@ class SearchEngineScreenDetector(
         currentHost: String?,
         addressBarFocused: Boolean = false,
         recentSearchEngineId: String? = null,
+        browserCandidate: Boolean = false,
         elapsedRealtimeMillis: Long = System.nanoTime() / NanosPerMillisecond,
     ): SearchEngineScreenDiagnosis {
-        val packageCategory = packageName.searchSurfaceCategory()
+        val packageCategory = packageName.searchSurfaceCategory(browserCandidate)
         val webNavigationBlocked = snapshot.rules.webNavigationBlocked()
+        val protectedBrowserRequired = snapshot.rules.protectedBrowserRequired()
         val externalResultsAllowed = snapshot.rules.externalSearchResultsAllowed()
         val onlyResultsEnabled = snapshot.rules.onlySearchResultsEnabled()
         val detectedEngine = SearchEngineCatalog.engineForDomain(currentHost)
@@ -44,6 +48,25 @@ class SearchEngineScreenDetector(
                 previousPolicy != null &&
                 (previousPolicy.webNavigationBlocked || previousPolicy.onlyResultsEnabled.not())
 
+        if (packageCategory == SearchSurfaceCategory.ProtectedBrowser) {
+            return diagnosis(
+                action =
+                    if (webNavigationBlocked) {
+                        SearchNavigationAction.GoHome
+                    } else {
+                        SearchNavigationAction.Allow
+                    },
+                reason =
+                    if (webNavigationBlocked) {
+                        "web-navigation-blocked"
+                    } else {
+                        "protected-browser"
+                    },
+                snapshot = snapshot,
+                packageCategory = packageCategory,
+                engineId = detectedEngine?.id,
+            )
+        }
         if (packageCategory == SearchSurfaceCategory.NonBrowser) {
             searchOrigins.remove(packageName)
             observedPolicies.remove(packageName)
@@ -53,6 +76,16 @@ class SearchEngineScreenDetector(
                 snapshot = snapshot,
                 packageCategory = packageCategory,
                 engineId = detectedEngine?.id,
+            )
+        }
+        if (protectedBrowserRequired) {
+            searchOrigins.remove(packageName)
+            return diagnosis(
+                action = SearchNavigationAction.GoHome,
+                reason = "dag-browser-required",
+                snapshot = snapshot,
+                packageCategory = packageCategory,
+                engineId = detectedEngine?.id ?: recentSearchEngineId,
             )
         }
         if (webNavigationBlocked) {
@@ -128,16 +161,18 @@ class SearchEngineScreenDetector(
             reason = reason,
             webNavigationBlocked = snapshot.rules.webNavigationBlocked(),
             externalSearchResultsAllowed = snapshot.rules.externalSearchResultsAllowed(),
+            protectedBrowserRequired = snapshot.rules.protectedBrowserRequired(),
             packageCategory = packageCategory.label,
             searchEngineId = engineId,
             policyRevision = snapshot.version,
         )
 
-    private fun String.searchSurfaceCategory(): SearchSurfaceCategory =
+    private fun String.searchSurfaceCategory(browserCandidate: Boolean): SearchSurfaceCategory =
         when (this) {
-            in BrowserPackageNames -> SearchSurfaceCategory.Browser
-            in SearchAppPackageNames -> SearchSurfaceCategory.SearchApp
-            else -> SearchSurfaceCategory.NonBrowser
+            in ProtectedBrowserPolicy.ProtectedBrowserPackages -> SearchSurfaceCategory.ProtectedBrowser
+            in ProtectedBrowserPolicy.KnownAlternativeBrowserPackages -> SearchSurfaceCategory.Browser
+            in ProtectedBrowserPolicy.SearchAppPackages -> SearchSurfaceCategory.SearchApp
+            else -> if (browserCandidate) SearchSurfaceCategory.Browser else SearchSurfaceCategory.NonBrowser
         }
 
     private data class SearchOrigin(
@@ -151,7 +186,8 @@ class SearchEngineScreenDetector(
     )
 
     companion object {
-        fun isBrowserPackage(packageName: String): Boolean = packageName in BrowserPackageNames
+        fun isBrowserPackage(packageName: String): Boolean =
+            packageName in ProtectedBrowserPolicy.KnownAlternativeBrowserPackages
 
         fun addressObservationFromAddressBarText(value: CharSequence?): BrowserAddressObservation? {
             val raw = value?.toString()?.trim()?.takeIf { it.isNotBlank() } ?: return null
@@ -177,23 +213,6 @@ class SearchEngineScreenDetector(
 
         private const val DefaultSearchSessionWindowMillis = 10 * 60 * 1_000L
         private const val NanosPerMillisecond = 1_000_000L
-        private val BrowserPackageNames =
-            setOf(
-                "com.android.chrome",
-                "com.sec.android.app.sbrowser",
-                "org.mozilla.firefox",
-                "org.mozilla.firefox_beta",
-                "com.microsoft.emmx",
-                "com.brave.browser",
-                "com.opera.browser",
-                "com.opera.mini.native",
-                "com.duckduckgo.mobile.android",
-                "com.vivaldi.browser",
-                "com.kiwibrowser.browser",
-                "com.UCMobile.intl",
-                "mark.via.gp",
-            )
-        private val SearchAppPackageNames = setOf("com.google.android.googlequicksearchbox")
     }
 }
 
@@ -202,6 +221,7 @@ data class SearchEngineScreenDiagnosis(
     val reason: String,
     val webNavigationBlocked: Boolean,
     val externalSearchResultsAllowed: Boolean,
+    val protectedBrowserRequired: Boolean,
     val packageCategory: String,
     val searchEngineId: String?,
     val policyRevision: Long,
@@ -217,6 +237,7 @@ enum class SearchNavigationAction {
 
 private enum class SearchSurfaceCategory(val label: String) {
     Browser("browser"),
+    ProtectedBrowser("protectedBrowser"),
     SearchApp("searchApp"),
     NonBrowser("non-browser"),
 }

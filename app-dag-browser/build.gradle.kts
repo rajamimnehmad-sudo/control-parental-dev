@@ -28,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.3.0"
+        versionCode = 18
+        versionName = "0.9.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The first physical gate targets the current 64-bit Samsung devices.
@@ -86,7 +86,10 @@ ktlint {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.18.0")
+    implementation("androidx.recyclerview:recyclerview:1.4.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.0")
     implementation("org.mozilla.geckoview:geckoview-arm64-v8a:153.0.20260715202819")
 
     testImplementation(kotlin("test"))
+    testImplementation("org.json:json:20250517")
 }

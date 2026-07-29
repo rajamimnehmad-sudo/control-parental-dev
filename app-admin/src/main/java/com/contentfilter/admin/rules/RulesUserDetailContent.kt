@@ -59,6 +59,7 @@ import com.contentfilter.core.domain.model.PolicySchedulePolicy
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.ProtectedBrowserPolicy
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.ui.ProductSectionHeader
 import kotlinx.coroutines.launch
@@ -96,6 +97,7 @@ internal fun UserDetailContent(
     onSaveAllowedDomainLimit: () -> Unit,
     onWebNavigationBlockedChanged: (Boolean) -> Unit,
     onOnlyResultsChanged: (Boolean) -> Unit,
+    onProtectedBrowserRequiredChanged: (Boolean) -> Unit,
     onProtectionArmedChanged: (String, Boolean) -> Unit,
     onAuthorizeRemoval: (String) -> Unit,
     onGenerateRecoveryCode: (String) -> Unit,
@@ -324,12 +326,23 @@ internal fun UserDetailContent(
                         WebNavigationPanel(
                             blocked = state.internetBlocked,
                             onlyResultsEnabled = state.onlyResultsEnabled,
+                            protectedBrowserRequired = state.protectedBrowserRequired,
                             presentation = state.webPanelPresentation(),
                             navigationSaving = state.pendingInternetBlocked != null,
                             onlyResultsSaving = state.pendingOnlyResultsEnabled != null,
+                            protectedBrowserSaving = state.pendingProtectedBrowserRequired != null,
                             protectionActive = selectedDevice.status == UserDeviceStatus.Active,
+                            protectedBrowserInstalled =
+                                state.appControls.any {
+                                    ProtectedBrowserPolicy.isProtectedBrowser(it.packageName)
+                                },
+                            alternativeBrowsers =
+                                state.appControls.filter {
+                                    ProtectedBrowserPolicy.isKnownAlternativeBrowser(it.packageName)
+                                },
                             onBlockedChanged = onWebNavigationBlockedChanged,
                             onOnlyResultsChanged = onOnlyResultsChanged,
+                            onProtectedBrowserRequiredChanged = onProtectedBrowserRequiredChanged,
                         )
                     }
                     item {

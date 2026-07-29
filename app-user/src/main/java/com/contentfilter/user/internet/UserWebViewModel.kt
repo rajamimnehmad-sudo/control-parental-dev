@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.model.WebProtectionSemantics
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
+import com.contentfilter.core.domain.model.protectedBrowserRequired
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import com.contentfilter.core.domain.repository.PolicyRepository
@@ -35,12 +36,14 @@ class UserWebViewModel
                     "webNavigation user snapshot policy=${snapshot.id.take(8)} version=${snapshot.version} " +
                         "webNavigationBlocked=$blocked " +
                         "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
-                        "safeSearch=${snapshot.rules.safeSearchEnabled()}",
+                        "safeSearch=${snapshot.rules.safeSearchEnabled()} " +
+                        "protectedBrowserRequired=${snapshot.rules.protectedBrowserRequired()}",
                 )
                 UserWebUiState(
                     webNavigationBlocked = blocked,
                     externalSearchResultsAllowed = snapshot.rules.externalSearchResultsAllowed(),
                     safeSearchEnabled = snapshot.rules.safeSearchEnabled(),
+                    protectedBrowserRequired = snapshot.rules.protectedBrowserRequired(),
                     schedule = resolveWebScheduleStatus(snapshot.rules, nowEpochMillis),
                 )
             }
@@ -55,6 +58,7 @@ data class UserWebUiState(
     val webNavigationBlocked: Boolean = false,
     val externalSearchResultsAllowed: Boolean = true,
     val safeSearchEnabled: Boolean = true,
+    val protectedBrowserRequired: Boolean = false,
     val schedule: WebScheduleStatus? = null,
 ) {
     val onlyResultsEnabled: Boolean
@@ -65,6 +69,7 @@ data class UserWebUiState(
             buildList {
                 if (safeSearchEnabled) add("SafeSearch")
                 if (onlyResultsEnabled) add("Solo resultados")
+                if (protectedBrowserRequired) add("DAG")
             }
 }
 

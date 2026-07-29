@@ -46,7 +46,7 @@ documentado arriba.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
-- El código de `main` declara `versionCode 5`, `versionName 0.3.0-dev`.
+- El candidato integrado declara `versionCode 18`, `versionName 0.9.0-dev`.
 - La APK del gate físico midió 102.605.578 bytes y tuvo SHA-256
   `72a976dcafe1512f8afe8381936fc4ebebfadf4e66efff716ada0a73786e86c8`.
 - En SM-A235M se verificó apertura/regreso y ausencia de destellos para raster,
@@ -58,13 +58,14 @@ documentado arriba.
 
 ## Candidato local de DAG Browser
 
-Existe trabajo posterior sin commit en:
+El lote integrado se desarrolló y validó en:
 
 ```text
 /Users/yejielnehmad/Developer/content-filter-dag-browser-v3
 ```
 
-- Ese worktree contiene el candidato `versionCode 17`, `0.8.0-dev`, mejoras de
+- Ese worktree contiene la evolución del candidato `versionCode 18`,
+  `0.9.0-dev`, con mejoras de
   pestañas, interfaz, compatibilidad y análisis local.
 - El selector usa dos columnas con miniaturas efímeras de páginas ya filtradas,
   nueva pestaña, cierre por botón o deslizamiento y reordenamiento por pulsación
@@ -82,21 +83,28 @@ Existe trabajo posterior sin commit en:
   `6cfe35c70a69ed5d0db0a0e64a21ca55939f8c14ba9ad0a9d5f43d22d8af8b08`.
 - Evidencia detallada:
   `docs/compatibility/results/dag-browser-v3-optimization-sm-s908e-2026-07-29.md`.
-- También contiene archivos nuevos y modificaciones todavía no conciliadas con
-  `main`.
-- No borrar, limpiar, resetear ni sobrescribir ese worktree.
-- Antes de integrar cualquier cambio se debe revisar su diff, separar producto
-  de experimentos y validar proporcionalmente.
+- El cierre del lote concilia estos cambios con `main`; no volver a abrir una
+  línea DAG paralela ni restaurar runtimes retirados.
+- Los builds desde worktrees deben recibir `SUPABASE_URL` y
+  `SUPABASE_ANON_KEY` DEV mediante el entorno. Un worktree no hereda `.env`
+  ignorados por Git; un APK con valores vacíos queda offline aunque el código y
+  el `versionCode` sean nuevos.
 
 ## Investigación visual
 
 - El contrato de 21 señales, preprocesado RGB 224 x 224, manifiesto, validadores
   y guía de anotación pertenecen al navegador actual.
-- El lote de adquisición/entrenamiento queda `Pausado por decisión de producto`.
-- No se descargaron imágenes, no se entrenó ningún modelo y no se habilitó
-  ninguna salida visual.
-- No continuar corpus, etiquetado, GPU, entrenamiento, modo sombra o canary sin
-  una nueva aprobación explícita.
+- El piloto humano produjo un único clasificador binario `allow/filter` afinado
+  sobre 197 ejemplos. La validación congelada contiene 21 casos y el holdout
+  independiente 4 permitidos.
+- Candidato elegido: `tinyclip-bounded-finetune-r1-int8.onnx`, SHA-256
+  `2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee`,
+  umbral `0.4`, inferencia ONNX íntegramente local.
+- En la validación congelada registró recall de filtro `1.0`, cero falsos
+  permisos, un falso filtro y exactitud `0.952381`; el holdout quedó `4/4`.
+- Esto demuestra el piloto y habilita el candidato DEV, no prueba cobertura
+  poblacional ni autoriza Production. Nuevos pesos o ampliaciones de corpus
+  requieren otro ticket y validación independiente.
 
 ## Dirección de producto acordada
 
@@ -113,6 +121,40 @@ Existe trabajo posterior sin commit en:
   conservando packageName como identidad confiable.
 - DAG debe distinguir visualmente imagen cargando, imagen bloqueada y error sin
   revelar píxeles antes de la decisión.
+
+## Candidato integrado v18
+
+- DAG se registra como navegador HTTP/HTTPS, acepta enlaces externos mediante
+  la misma política segura y solicita el rol oficial de navegador
+  predeterminado con confirmación local de Android.
+- La política Web remota incorpora `__dag_browser_required__`; viaja por el
+  snapshot existente, sin una API ni tabla paralela.
+- Cuando DAG es obligatorio, Accesibilidad permite DAG y expulsa a Home
+  navegadores alternativos conocidos o detectados como handlers Web. Es una
+  barrera best-effort compatible con teléfonos personales, sin Device Owner.
+- Admin agrega activación guiada, instalación detectada, salud de Glosh,
+  recordatorio del rol predeterminado y lista de navegadores alternativos.
+- Usuario muestra si DAG es obligatorio, está instalado y permite abrirlo para
+  completar la confirmación.
+- Las fotos diferencian `Analizando`, `Protegida por Glosh` y `Imagen no
+  disponible`; espera y error siguen sin revelar píxeles.
+- Solicitudes Admin presentan icono grande, nombre confiable, packageName, tipo
+  y estado.
+- Candidatos independientes instalados in-place en SM-S908E: Usuario `292`,
+  Admin `283`, DAG `18`. Compilación, tests, Lint, apertura fría, inferencia
+  ONNX, rol predeterminado y `ACTION_VIEW` HTTPS fueron correctos.
+- Supabase DEV confirmó licencia efectiva activa hasta el 03/08/2026. Admin
+  refresca la licencia al abrir y muestra `Licencia por vencer · 5 días
+  restantes`.
+- La política `Usar navegador DAG` se aplicó físicamente: Chrome y Brave
+  regresaron a Home con motivo `dag-browser-required`; DAG permaneció permitido
+  con motivo `protected-browser`.
+- Android desactivó Accessibility después de la actualización in-place; la
+  recuperación guiada funcionó y el servicio quedó habilitado otra vez.
+- Usuario y Admin extienden el encabezado oscuro bajo la barra de estado; la
+  franja blanca superior observada en el candidato anterior quedó corregida.
+- Los candidatos todavía no están publicados en DEV; instalación física no
+  equivale a distribución.
 
 ## Estado funcional de Glosh
 

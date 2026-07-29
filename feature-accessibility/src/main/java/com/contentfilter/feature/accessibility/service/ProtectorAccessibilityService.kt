@@ -19,6 +19,7 @@ import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.UsageSession
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
+import com.contentfilter.core.domain.model.protectedBrowserRequired
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import com.contentfilter.core.domain.repository.InstallApprovalStore
@@ -75,6 +76,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
     private val searchEngineScreenDetector = SearchEngineScreenDetector()
     private val webActionDebouncer = AccessibilityWebActionDebouncer()
     private val explicitSearchClassifier = ExplicitSearchClassifier()
+    private val browserCandidateCache = mutableMapOf<String, Boolean>()
     private var serviceScope: CoroutineScope? = null
     private var extraTimeExpiryJob: Job? = null
     private var extraTimeExpiryPackageName: String? = null
@@ -486,6 +488,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 currentHost = page.host,
                 addressBarFocused = page.addressBarFocused,
                 recentSearchEngineId = recentSearchEngine?.engineId,
+                browserCandidate = isBrowserCandidate(packageName),
                 elapsedRealtimeMillis = clock.elapsedRealtimeMillis(),
             )
         Log.i(
@@ -494,6 +497,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
                 "package=$packageName policyVersion=${snapshot.version} " +
                 "webNavigationBlocked=${diagnosis.webNavigationBlocked} " +
                 "externalSearchResultsAllowed=${snapshot.rules.externalSearchResultsAllowed()} " +
+                "protectedBrowserRequired=${snapshot.rules.protectedBrowserRequired()} " +
                 "safeSearch=${snapshot.rules.safeSearchEnabled()} " +
                 "searchEngine=${diagnosis.searchEngineId ?: "none"} " +
                 "action=${diagnosis.action} reason=${diagnosis.reason}",
@@ -537,6 +541,22 @@ class ProtectorAccessibilityService : AccessibilityService() {
             )
         }
         return true
+    }
+
+    private fun isBrowserCandidate(packageName: String): Boolean {
+        if (SearchEngineScreenDetector.isBrowserPackage(packageName)) return true
+        return synchronized(browserCandidateCache) {
+            browserCandidateCache.getOrPut(packageName) {
+                runCatching {
+                    packageManager
+                        .queryIntentActivities(
+                            Intent(Intent.ACTION_VIEW, Uri.parse(BrowserProbeUrl))
+                                .addCategory(Intent.CATEGORY_BROWSABLE),
+                            android.content.pm.PackageManager.MATCH_DEFAULT_ONLY,
+                        ).any { it.activityInfo?.packageName == packageName }
+                }.getOrDefault(false)
+            }
+        }
     }
 
     private fun evaluateForegroundApp(
@@ -800,6 +820,7 @@ class ProtectorAccessibilityService : AccessibilityService() {
         const val CheckpointIntervalMillis = 15_000L
         const val ForegroundRecheckMillis = 250L
         const val MillisPerMinute = 60_000L
+        const val BrowserProbeUrl = "https://www.example.com/"
         const val MaxDeadlineDelayMillis = 60_000L
         const val BlockRecheckDelayMillis = 120L
         const val BlockHomeRetries = 2

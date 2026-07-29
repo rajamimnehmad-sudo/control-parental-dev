@@ -1,5 +1,6 @@
 package com.contentfilter.core.network
 
+import com.contentfilter.core.domain.repository.AppFeedbackRepository
 import com.contentfilter.core.domain.repository.ProtectionControlRepository
 import com.contentfilter.core.domain.repository.PushNotificationRepository
 import com.contentfilter.core.network.config.BuildConfigSupabaseConfigProvider
@@ -14,8 +15,8 @@ import com.contentfilter.core.network.remote.RemoteLimitRepository
 import com.contentfilter.core.network.remote.RemotePolicyRepository
 import com.contentfilter.core.network.remote.RemoteProtectionAlertRepository
 import com.contentfilter.core.network.remote.RemoteRequestRepository
-import com.contentfilter.core.network.remote.SupabaseProtectionControlRepository
 import com.contentfilter.core.network.remote.SupabaseAppFeedbackRepository
+import com.contentfilter.core.network.remote.SupabaseProtectionControlRepository
 import com.contentfilter.core.network.remote.SupabasePushNotificationRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteAccountRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteDeviceRepository
@@ -25,7 +26,6 @@ import com.contentfilter.core.network.remote.SupabaseRemoteLimitRepository
 import com.contentfilter.core.network.remote.SupabaseRemotePolicyRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteProtectionAlertRepository
 import com.contentfilter.core.network.remote.SupabaseRemoteRequestRepository
-import com.contentfilter.core.domain.repository.AppFeedbackRepository
 import dagger.Binds
 import dagger.Module
 import dagger.Provides

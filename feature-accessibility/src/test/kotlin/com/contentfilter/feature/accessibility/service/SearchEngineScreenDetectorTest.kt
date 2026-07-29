@@ -3,6 +3,7 @@ package com.contentfilter.feature.accessibility.service
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySnapshot
+import com.contentfilter.core.domain.model.ProtectedBrowserPolicy
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.WebNavigationPolicy
@@ -28,6 +29,50 @@ class SearchEngineScreenDetectorTest {
 
         assertEquals(SearchNavigationAction.GoHome, diagnosis.action)
         assertEquals("web-navigation-blocked", diagnosis.reason)
+    }
+
+    @Test
+    fun `required DAG blocks known alternative browsers`() {
+        val diagnosis =
+            SearchEngineScreenDetector().diagnose(
+                packageName = Chrome,
+                snapshot = snapshot(rule(ProtectedBrowserPolicy.RuleTarget, RuleAction.Allow)),
+                currentHost = "google.com",
+                elapsedRealtimeMillis = 1L,
+            )
+
+        assertEquals(SearchNavigationAction.GoHome, diagnosis.action)
+        assertEquals("dag-browser-required", diagnosis.reason)
+        assertEquals(true, diagnosis.protectedBrowserRequired)
+    }
+
+    @Test
+    fun `required DAG blocks dynamically detected browser handlers`() {
+        val diagnosis =
+            SearchEngineScreenDetector().diagnose(
+                packageName = "com.example.newbrowser",
+                snapshot = snapshot(rule(ProtectedBrowserPolicy.RuleTarget, RuleAction.Allow)),
+                currentHost = null,
+                browserCandidate = true,
+                elapsedRealtimeMillis = 1L,
+            )
+
+        assertEquals(SearchNavigationAction.GoHome, diagnosis.action)
+        assertEquals("dag-browser-required", diagnosis.reason)
+    }
+
+    @Test
+    fun `protected DAG browser stays open while Web is allowed`() {
+        val diagnosis =
+            SearchEngineScreenDetector().diagnose(
+                packageName = ProtectedBrowserPolicy.DevPackageName,
+                snapshot = snapshot(rule(ProtectedBrowserPolicy.RuleTarget, RuleAction.Allow)),
+                currentHost = "example.com",
+                elapsedRealtimeMillis = 1L,
+            )
+
+        assertEquals(SearchNavigationAction.Allow, diagnosis.action)
+        assertEquals("protected-browser", diagnosis.reason)
     }
 
     @Test

@@ -20,6 +20,47 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
+    fun `model probability below threshold releases the image`() {
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.399f) },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+    }
+
+    @Test
+    fun `model probability at threshold stays blocked`() {
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.4f) },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+    }
+
+    @Test
+    fun `invalid model probability stays blocked`() {
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(Float.NaN) },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+    }
+
+    @Test
     fun `invalid base64 stays blocked`() {
         val decision =
             DagMediaBytesPolicy.decide(
@@ -79,6 +120,21 @@ class DagMediaBytesPolicyTest {
 
         assertEquals(DagMediaAction.Block, decision.action)
         assertEquals(DagMediaBytesPolicy.InvalidPayloadReason, decision.reason)
+    }
+
+    @Test
+    fun `large ordinary image can use the fallback transport`() {
+        val bytes = ByteArray(512 * 1024 + 1) { 1 }
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(bytes),
+                boundsReader = DagImageBoundsReader { DagImageBounds(1_200, 1_600, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.2f) },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
     }
 
     @Test

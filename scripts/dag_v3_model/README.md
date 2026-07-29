@@ -167,8 +167,125 @@ La herramienta no abre imagenes, no usa red, no entrena y no decide si un modelo
 Limita archivo, filas, variantes, campos de corte y cantidad de valores por corte para que un
 reporte accidentalmente enorme falle de manera controlada.
 
+## Linea base binaria del piloto humano
+
+La primera revision privada puede medirse como `allow` frente a `filter`, combinando `blur` y
+`block` segun la aclaracion de politica del piloto. Esta prueba no cambia Android, no produce un
+modelo aprobable ni reemplaza el contrato multietiqueta:
+
+```bash
+python scripts/dag_v3_model/pilot_binary_baseline.py \
+  revision-humana.json \
+  review-items.json \
+  public/ \
+  .codex-tmp/dag-v3-pilot/baseline-report.json \
+  --weights-cache .codex-tmp/dag-v3-baseline-cache
+```
+
+La herramienta valida que la revision este completa, que IDs e imagenes coincidan y que no haya
+acciones dudosas. Extrae rasgos congelados de MobileNetV3-Small preentrenado, respetando el
+letterbox gris de 224 px del contrato, y mide una regresion logistica mediante validacion cruzada
+estratificada repetida. El reporte conserva falsos permisos y falsos filtros por ID.
+`--pooling average-max` permite medir, en la misma pasada del modelo, si conservar tambien la
+activacion espacial maxima ayuda con sujetos pequenos; es una ablacion y no una decision aprobada.
+Una segunda revision independiente puede pasarse con `--external-review`, `--external-items` y
+`--external-public-dir`. En ese modo el clasificador aprende solo de la primera ronda y la segunda
+se conserva como prueba dirigida que nunca participa del ajuste.
+
+Es solamente una comprobacion de viabilidad con 100 imagenes. Sin un split aprobado por origen y
+cluster perceptual, ni un conjunto externo, sus resultados no autorizan enforcement ni APK.
+
+## Afinado acotado del piloto
+
+`pilot_finetune.py` combina rondas humanas ya resueltas, conserva cinco pliegues de prueba y afina
+primero la cabeza binaria y despues solamente las ultimas tres capas de MobileNetV3-Small. Mantiene
+BatchNorm congelado, no recorta la imagen, limita epocas y no produce un modelo para Android:
+
+```bash
+python scripts/dag_v3_model/pilot_finetune.py \
+  --review revision-ronda-1.json --items items-ronda-1.json --public-dir public \
+  --review revision-ronda-2.json --items items-ronda-2.json --public-dir public \
+  --weights-cache .codex-tmp/dag-v3-baseline-cache \
+  --output .codex-tmp/dag-v3-pilot/finetune-report.json
+```
+
+El reporte es investigacion local. Aun con buenos resultados, requiere una tercera prueba
+independiente y exportacion/benchmark LiteRT antes de entrar al APK.
+
+## Profesor experimental por regiones
+
+Si la linea de imagen completa no alcanza el gate, `pilot_region_teacher.py` compara rasgos de la
+imagen con regiones de persona, torso superior y zona inferior detectadas localmente. El detector
+SSDLite se usa exclusivamente como profesor de investigacion: no se exporta, no se integra a
+Android y no cambia la meta de un unico modelo final. La ronda de validacion no participa del ajuste
+ni de la seleccion del candidato:
+
+```bash
+python scripts/dag_v3_model/pilot_region_teacher.py \
+  --review revision-ronda-1.json --items items-ronda-1.json --public-dir public \
+  --review revision-ronda-2.json --items items-ronda-2.json --public-dir public \
+  --validation-review revision-ronda-3.json \
+  --validation-items items-ronda-3.json \
+  --validation-public-dir public \
+  --weights-cache .codex-tmp/dag-v3-baseline-cache \
+  --output .codex-tmp/dag-v3-pilot/region-teacher-report.json
+```
+
+Los pesos de TorchVision/COCO no quedan aprobados para redistribucion por esta prueba. Antes de usar
+un detector o pose landmarker en un pipeline comercial se verifica por separado licencia, modelo,
+privacidad, mantenimiento y compatibilidad. Un resultado favorable solo autoriza estudiar
+supervision regional o destilacion hacia el modelo unico.
+
+## Estudiante unico con supervision regional
+
+`pilot_single_student.py` usa el detector solamente durante entrenamiento para crear una mascara de
+atencion sobre el torso superior. Entrena un MobileNetV3-Small con atencion espacial incorporada y
+lo evalua sin detector, recortes ni segundo modelo. El checkpoint sigue siendo investigacion local:
+no se exporta ni entra a Android.
+
+```bash
+python scripts/dag_v3_model/pilot_single_student.py \
+  --review revision-ronda-1.json --items items-ronda-1.json --public-dir public \
+  --review revision-ronda-2.json --items items-ronda-2.json --public-dir public \
+  --review revision-ronda-4.json --items items-ronda-4.json --public-dir public \
+  --validation-review revision-ronda-3.json \
+  --validation-items items-ronda-3.json \
+  --validation-public-dir public \
+  --weights-cache .codex-tmp/dag-v3-baseline-cache \
+  --checkpoint .codex-tmp/dag-v3-pilot/single-student.pt \
+  --output .codex-tmp/dag-v3-pilot/single-student-report.json
+```
+
+La validacion no ajusta pesos ni detiene epocas, pero la ronda 3 ya influyo en la eleccion de la
+arquitectura. Por eso un resultado favorable exige otra prueba independiente antes de exportar.
+
 ## Tests
 
 ```bash
 python3 -m unittest discover -s scripts/dag_v3_model/tests -p 'test_*.py'
 ```
+
+## Artefacto DEV integrado
+
+El piloto convergió en un único clasificador binario `allow/filter` para el
+navegador actual. No son varios motores de generaciones anteriores.
+
+```text
+modelo: tinyclip-bounded-finetune-r1-int8.onnx
+sha256: 2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee
+entrada: pixel_values float32 [1, 3, 224, 224]
+salida: probabilidad de filter
+umbral Android: 0.4
+entrenamiento: 197 ejemplos
+validacion congelada: 21 casos
+holdout independiente: 4 casos allow
+```
+
+Resultado congelado: recall de filtro `1.0`, cero falsos permisos, un falso
+filtro y exactitud `0.952381`; el holdout obtuvo `4/4`. El archivo está
+cuantizado para distribución, aunque conserva entrada float normalizada para
+ONNX Runtime. El nombre del asset y su test de SHA-256 son canónicos desde v18.
+
+El artefacto queda habilitado solamente como candidato DEV. No debe presentarse
+como certificación universal, cobertura de todas las edades o autorización de
+Production.

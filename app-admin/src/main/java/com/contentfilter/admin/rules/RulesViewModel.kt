@@ -139,9 +139,11 @@ class RulesViewModel
                             "webNavigationBlocked=$savedInternetBlocked " +
                             "externalSearchResultsAllowed=${selectedPolicy.rules.externalSearchResultsAllowedForWeb()} " +
                             "safeSearch=${selectedPolicy.rules.safeSearchEnabledForWeb()} " +
+                            "protectedBrowserRequired=${selectedPolicy.rules.protectedBrowserRequiredForWeb()} " +
                             "pendingNavigation=${formState.pendingInternetBlocked} " +
                             "pendingExternalResults=${formState.pendingExternalSearchResultsAllowed} " +
                             "pendingSafeSearch=${formState.pendingSafeSearchEnabled} " +
+                            "pendingProtectedBrowser=${formState.pendingProtectedBrowserRequired} " +
                             "policyRevision=${selectedPolicy.rules.webPolicyRevision()}",
                     )
                 }
@@ -166,6 +168,9 @@ class RulesViewModel
                             ?: selectedPolicy.rules.externalSearchResultsAllowedForWeb(),
                     safeSearchEnabled =
                         formState.pendingSafeSearchEnabled ?: selectedPolicy.rules.safeSearchEnabledForWeb(),
+                    protectedBrowserRequired =
+                        formState.pendingProtectedBrowserRequired
+                            ?: selectedPolicy.rules.protectedBrowserRequiredForWeb(),
                     appControls =
                         if (selectedDeviceId == null) {
                             emptyList()
@@ -826,6 +831,21 @@ class RulesViewModel
                         "SafeSearch activado."
                     } else {
                         "SafeSearch desactivado."
+                    },
+            )
+        }
+
+        fun setProtectedBrowserRequired(enabled: Boolean) {
+            setWebOption(
+                preference = WebPolicyPreference.ProtectedBrowserRequired,
+                action = "protected-browser",
+                requestedState = enabled,
+                previousState = uiState.value.protectedBrowserRequired,
+                successMessage =
+                    if (enabled) {
+                        "DAG activado. El teléfono debe confirmar navegador predeterminado y Accesibilidad."
+                    } else {
+                        "DAG dejó de ser obligatorio."
                     },
             )
         }

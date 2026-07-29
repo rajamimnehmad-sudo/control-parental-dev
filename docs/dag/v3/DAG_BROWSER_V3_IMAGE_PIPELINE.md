@@ -2,9 +2,16 @@
 
 ## Decision
 
-DAG intercepta la respuesta HTTP(S) original mediante `webRequest.filterResponseData`. Gecko no
-recibe los bytes mientras la extension los retiene. No se hace una segunda descarga y no se confia
-en un atributo DOM para decidir si una foto es segura.
+DAG copia la respuesta HTTP(S) original mediante `webRequest.filterResponseData` mientras mantiene
+la barrera visual inyectada en `document_start`. Gecko puede terminar la descarga, pero la pagina no
+puede presentar el recurso hasta recibir una decision local `allow` o `block`. No se confia en un
+atributo de la pagina: los atributos de estado pertenecen al content script aislado y la hoja
+privilegiada sigue cerrada por defecto.
+
+Si Gecko entrega el recurso desde cache, el cuerpo supera el limite de captura o una libreria lo
+crea como `blob:`, la extension usa un fallback acotado de hasta 2 MiB. Ese camino puede hacer una
+lectura adicional con las credenciales de la misma sesion, pero conserva el mismo analizador local,
+los mismos limites y el fallo cerrado.
 
 Referencias de plataforma:
 
@@ -26,8 +33,8 @@ codigo empaquetado de esa dependencia.
 
 1. La hoja inyectada en `document_start` mantiene todos los medios ocultos.
 2. La extension crea un filtro de respuesta para `image` e `imageset`.
-3. Acumula hasta 256 KiB sin escribir nada hacia la pagina.
-4. Si el limite se supera, la descarga falla o falta el API, el resultado es bloqueo.
+3. Copia hasta 512 KiB de la respuesta original mientras Gecko completa la descarga.
+4. Un recurso no capturado queda oculto y entra en el fallback visible-first de hasta 2 MiB.
 5. La extension envia bytes Base64 al Android local mediante el canal de fondo privilegiado.
 6. Android valida remitente, version, URL, longitud Base64, formato y dimensiones sin decodificar
    el bitmap completo.
@@ -36,15 +43,24 @@ codigo empaquetado de esa dependencia.
 8. El trabajo se limita a dos hilos y ocho elementos en espera.
 9. Como maximo hay 16 respuestas de imagen activas y 10 pedidos nativos simultaneos.
 10. Capturar una respuesta puede demorar como maximo 5 segundos y la decision nativa 2,5 segundos.
-11. Limite, cola llena o timeout significan bloqueo.
-12. En esta etapa Android solo puede responder `block`.
-13. La extension reemplaza siempre la respuesta por un GIF transparente de 1x1.
+11. Limite, cola llena o timeout significan bloqueo o reintento acotado sin exponer el recurso.
+12. El único artefacto
+    `tinyclip-bounded-finetune-r1-int8.onnx` y su cabeza binaria responden
+    `allow` o `block`; error, formato no soportado, salida inválida o analizador
+    ausente siempre responden `block`.
+13. `allow` muestra el recurso original y `block` lo muestra con desenfoque fuerte. Mientras no hay
+    decisión conserva espacio, permanece oculto y muestra `Analizando`. Un
+    rechazo muestra `Protegida por Glosh`; un fallo terminal sigue oculto y
+    muestra `Imagen no disponible`.
+14. Las decisiones exactas se deduplican por SHA-256 de los bytes y viven solo en memoria, con un
+    maximo de 256 entradas.
 
 Ningun byte se guarda en disco, se registra en logs o se envia a Supabase.
 
 ## Limites contra imagenes maliciosas
 
-- cuerpo capturado: maximo 256 KiB;
+- cuerpo capturado en la respuesta original: maximo 512 KiB;
+- cuerpo analizado por fallback: maximo 2 MiB;
 - respuestas de imagen simultaneas: maximo 16;
 - mensajes simultaneos hacia el analizador: maximo 10;
 - respuesta lenta: maximo 5 segundos antes de bloquear;
@@ -58,10 +74,12 @@ Ningun byte se guarda en disco, se registra en logs o se envia a Supabase.
 Estas reglas reducen mensajes excesivos, bombas de descompresion, colas infinitas y respuestas
 falsificadas.
 
-## Alcance inicial
+## Alcance actual
 
-El primer filtro funcional mostrara solamente raster HTTP(S) que haya atravesado esta tuberia.
-Video, audio, `object`, canvas, SVG, fondos y pseudo-elementos continuan bloqueados.
+El filtro funcional muestra raster HTTP(S), `data:` o `blob:` solamente tras atravesar la tuberia.
+Los fondos y pseudo-elementos con URL se descubren con un sondeo acotado y usan el mismo fallback.
+SVG pequenos y autocontenidos de interfaz pueden mostrarse; SVG complejos, video, audio, `object`,
+canvas y formatos no soportados permanecen cerrados.
 
 Una pagina hostil puede generar graficos mediante JavaScript sin descargar una imagen tradicional.
 Por eso la primera apertura no se declarara navegador general: se limitara al buscador y a destinos
@@ -74,9 +92,12 @@ archivos.
 1. Transporte fisico con formatos pequenos, grandes, corruptos y lentos: completo.
 2. Latencia y memoria sin habilitar fotos: completo.
 3. Agregar reduccion local a la entrada exacta del modelo: completo, incluida evidencia fisica.
-4. Comparar los modelos candidatos con el mismo conjunto de evaluacion y contrato de senales
-   versionado.
-5. Habilitar `allow` y luego `blur` solamente tras cerrar precision y fugas.
+4. Comparar candidatos con el mismo conjunto congelado: completo para el piloto
+   binario DEV. El candidato fijado tiene SHA-256
+   `2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee`.
+5. Habilitar `allow` y `blur`: completo en DEV con umbral `0.4`, cero falsos
+   permisos en 21 casos congelados y gate físico inicial aprobado. Production
+   sigue sin autorización.
 
 Evidencia de los dos primeros gates:
 `docs/compatibility/results/dag-browser-v3-image-transport-sm-a235m-2026-07-27.md`.

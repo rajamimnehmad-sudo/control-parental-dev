@@ -10,6 +10,7 @@ import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.ProtectedBrowserPolicy
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.WebNavigationPolicy
@@ -52,6 +53,26 @@ class RulesViewModelHelpersTest {
             )
 
         assertEquals(first.map { it.id }.take(3), second.map { it.id }.take(3))
+    }
+
+    @Test
+    fun `protected browser preference is canonical remote policy`() {
+        val result =
+            emptyList<PolicyRule>()
+                .webPolicyChanges(
+                    desired = preferences(webBlocked = false, protectedBrowser = true),
+                    deviceId = DeviceId,
+                ).applyTo(emptyList())
+
+        assertTrue(result.protectedBrowserRequiredForWeb())
+        assertEquals(
+            1,
+            result.count {
+                it.target == ProtectedBrowserPolicy.RuleTarget &&
+                    it.action == RuleAction.Allow &&
+                    it.enabled
+            },
+        )
     }
 
     @Test
@@ -709,11 +730,13 @@ class RulesViewModelHelpersTest {
         webBlocked: Boolean,
         externalResultsAllowed: Boolean = false,
         safeSearch: Boolean = true,
+        protectedBrowser: Boolean = false,
     ): WebPolicyPreferences =
         WebPolicyPreferences(
             webNavigationBlocked = webBlocked,
             externalSearchResultsAllowed = externalResultsAllowed,
             safeSearchEnabled = true,
+            protectedBrowserRequired = protectedBrowser,
         )
 
     private fun preferencesFromBits(bits: Int): WebPolicyPreferences =
@@ -721,6 +744,7 @@ class RulesViewModelHelpersTest {
             webBlocked = bits and 1 != 0,
             externalResultsAllowed = bits and 2 != 0,
             safeSearch = true,
+            protectedBrowser = bits and 4 != 0,
         )
 
     private fun appRule(

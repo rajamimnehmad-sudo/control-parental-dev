@@ -46,9 +46,9 @@ Flujo de una entrada:
 
 - Estado público verificado en el handoff: App Usuario DEV 279 y App Admin DEV
   275, `1.0.1-dev`.
-- Estado DAG posterior: App Usuario 281 y DAG Browser V3 aislado hasta
-  `versionCode 5` fueron candidatos físicos; el navegador se distribuye como
-  artefacto DEV separado y no comparte el manifiesto público de Glosh.
+- Candidatos actuales sin publicación: App Usuario 292, App Admin 283 y DAG
+  Browser V3 18. El navegador se distribuye como artefacto DEV separado y no
+  comparte el manifiesto público de Glosh.
 - El navegador actual es DAG Browser V3 fail-closed y no conserva fallbacks,
   módulos ni documentación operativa de runtimes retirados.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -59,31 +59,28 @@ Flujo de una entrada:
 
 ### LOTE-DAG-V3-DIRECTED-VISUAL-MODEL-DATASET-05 - Datos dirigidos y candidato visual pequeño
 
-- Estado: `Pausado por decisión del usuario; no continuar sin nueva aprobación
-  explícita`. Tipo: lote de investigación, datos, licencias y evaluación visual
-  reproducible. Prioridad: P3 mientras permanezca pausado. Evidencia: PR #82–#94
-  prepararon contrato, tooling y un sondeo de metadatos sin habilitar imágenes.
-  Esfuerzo total estimado: XL. Riesgo: alto.
-- Objetivo: determinar, con datos públicos equilibrados y una prueba pequeña
+- Estado: `Resuelto como piloto DEV; no autorizado para Production`. Tipo: lote
+  de investigación, datos, licencias y evaluación visual reproducible.
+  Evidencia: después de las aprobaciones explícitas del usuario se completaron
+  cinco rondas humanas, entrenamiento local acotado, validación congelada,
+  holdout y exportación ONNX. Esfuerzo total: XL. Riesgo: alto.
+- Resultado: se determinó, con datos públicos acotados y una prueba pequeña
   de costo acotado, si un modelo visual dirigido puede separar `Show`, `Hide`
-  y evidencia insuficiente mejor que la política CPU descartada, sin integrar
-  todavía ningún modelo al navegador DAG Browser V3.
+  y evidencia insuficiente mejor que la política CPU descartada. El candidato
+  binario único quedó integrado en DAG Browser DEV.
 - Orden obligatorio: `05A` contrato y fuentes; `05B` corpus piloto; `05C`
   etiquetado y split sellado; `05D` experimento de modelo pequeño; `05E`
   evaluación independiente y decisión GO/NO-GO. Cada ticket exige aprobación
   explícita propia y el fracaso de un gate detiene los siguientes.
-- Fuera de alcance del lote: habilitar `allow` o `blur`, cambiar el cierre
-  `block / analyzer_unavailable`, integrar un runtime antes del gate, activar
-  caché, entrenar en Supabase o GitHub Actions estándar,
-  publicar APK, cambiar `versionCode`, usar Production o iniciar optimización
-  Android, modo sombra o canary.
+- El lote nunca usó Supabase ni GitHub Actions para entrenar y no habilita
+  Production. Las imágenes no entran al APK ni a Git.
 - Dependencias generales: contrato y preprocesador de DAG Browser V3, guía de
   anotación, presupuesto explícito antes de cualquier GPU externa, licencias
   compatibles con uso comercial y límites de la Mac M2 de 8 GB.
-- Aceptación del lote: termina con artefactos trazables y una decisión
-  reproducible; no con una integración automática. Un GO sólo habilita
-  proponer el lote siguiente y un NO-GO conserva DAG Browser V3 cerrado en
-  `block`.
+- Aceptación alcanzada para DEV: artefacto trazable, SHA-256 fijado, cero falsos
+  permisos en la validación congelada, holdout 4/4 e integración fail-closed.
+  Falta un corpus con derechos comerciales y cobertura representativa antes de
+  cualquier evaluación para Production.
 
 #### DAG-V3-DATA-LICENSE-CONTRACT-05A - Contrato, categorías y fuentes
 
@@ -114,7 +111,7 @@ Flujo de una entrada:
 
 #### DAG-V3-DIRECTED-DATASET-PILOT-05B - Corpus público piloto
 
-- Estado: `Pausado por decisión del usuario; no descargar ni continuar`. Tipo:
+- Estado: `Cerrado como corpus piloto local; no reutilizar como corpus comercial`. Tipo:
   adquisición reproducible y calidad de datos. Prioridad: P3. Esfuerzo: L.
   Riesgo: alto.
 - Alcance propuesto: adquirir sólo el piloto autorizado, validar licencias y
@@ -134,14 +131,14 @@ Flujo de una entrada:
   catálogos.
 - Corrección preventiva: el descargador ya no acepta BY-SA y falla antes de
   solicitar la URL; el inventario puede conservarlo sólo como descubrimiento.
-- Bloqueo: falta material propio/encargado o una fuente adicional con derechos
-  verificables, además de una decisión legal para cualquier persona
-  identificable. No se descargó ninguna imagen y 05C no comienza.
+- Bloqueo vigente para escalar: falta material propio/encargado o una fuente
+  adicional con derechos verificables, además de una decisión legal para
+  cualquier persona identificable. El piloto local no resuelve ese requisito.
 - Informe: `docs/dag/v3/DAG_BROWSER_V3_DATASET_PILOT_05B.md`.
 
 #### DAG-V3-DIRECTED-LABELING-SPLIT-05C - Etiquetado y test sellado
 
-- Estado: `Propuesto; bloqueado por 05B y no aprobado para código`. Tipo:
+- Estado: `Resuelto para piloto binario DEV`. Tipo:
   evaluación humana reproducible. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
 - Alcance propuesto: usar el contrato 05A para ejecutar un piloto ciego con
   `Show`, `Hide` y `Unsure`, medir desacuerdo y sellar entrenamiento, validación
@@ -152,12 +149,13 @@ Flujo de una entrada:
   revisión; `Unsure` no se fuerza a positivo o negativo; split sin fuga sellado
   una sola vez; desacuerdos y balance publicados como agregados; imágenes y
   etiquetas no entran al producto ni a Production.
-- Decisiones pendientes: cantidad de revisores, regla de desempate, muestra de
-  control y umbral máximo de desacuerdo.
+- Resultado: cinco rondas humanas, criterio `allow` frente a `filter` y
+  aclaración de que los motivos pueden ser incompletos. El split congelado no
+  vuelve a entrenamiento.
 
 #### DAG-V3-SMALL-DIRECTED-MODEL-EXPERIMENT-05D - Experimento acotado
 
-- Estado: `Propuesto; bloqueado por 05C y no aprobado para código`. Tipo:
+- Estado: `Resuelto para piloto DEV`. Tipo:
   entrenamiento experimental y comparación. Prioridad: P0. Esfuerzo: XL.
   Riesgo: alto.
 - Alcance propuesto: comparar un número cerrado de candidatos pequeños con
@@ -170,12 +168,12 @@ Flujo de una entrada:
   sin abrir el test; límites de tiempo, costo, reintentos y artefactos
   respetados; pesos, configuración y métricas reproducibles; ninguna
   integración Android, publicación o activación.
-- Decisiones pendientes: arquitecturas máximas, métrica primaria, presupuesto
-  GPU, tamaño/latencia objetivo y condición de abandono temprano.
+- Resultado: TinyCLIP afinado de forma acotada y exportado a un único ONNX
+  cuantizado. No hubo API paga por consulta ni GPU necesaria en runtime.
 
 #### DAG-V3-DIRECTED-MODEL-GATE-05E - Evaluación independiente GO/NO-GO
 
-- Estado: `Propuesto; bloqueado por 05D y no aprobado para código`. Tipo:
+- Estado: `GO sólo para candidato DEV; NO-GO para Production`. Tipo:
   evaluación final, seguridad y factibilidad Android. Prioridad: P0. Esfuerzo:
   M. Riesgo: alto.
 - Alcance propuesto: abrir el test sellado una sola vez, medir por clase y
@@ -193,8 +191,9 @@ Flujo de una entrada:
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
-- Estado: `Propuesto; registrado por pedido del usuario; no aprobado para
-  código`. Tipo: UX, App Admin, navegador y seguridad Android. Prioridad: P1.
+- Estado: `Resuelto como candidato DEV y validado físicamente; sin publicación`.
+  Aprobado explícitamente por el usuario el 2026-07-29. Tipo: UX, App Admin,
+  navegador y seguridad Android. Prioridad: P1.
   Esfuerzo total: XL. Riesgo: alto.
 - Decisión de plataforma: conservar instalación y configuración remota en
   teléfonos personales. No usar Device Owner, MDM, Knox ni restablecimiento.
@@ -204,7 +203,7 @@ Flujo de una entrada:
 
 #### DAG-IMAGE-STATE-UX-05 - Diferenciar imagen cargando de imagen bloqueada
 
-- Estado: `Propuesto; no aprobado para código`. Prioridad: P1. Esfuerzo: M.
+- Estado: `Resuelto en candidato DAG 18`. Prioridad: P1. Esfuerzo: M.
   Riesgo: medio.
 - Mientras una imagen se descarga o analiza, mostrar superficie neutra con
   pulso suave sin revelar píxeles. Al bloquear, detener la animación y dejar
@@ -215,7 +214,7 @@ Flujo de una entrada:
 
 #### ADMIN-REQUESTS-APP-IDENTITY-02 - Solicitudes de aplicaciones reconocibles
 
-- Estado: `Propuesto; no aprobado para código`. Prioridad: P2. Esfuerzo: S.
+- Estado: `Resuelto en candidato Admin 283`. Prioridad: P2. Esfuerzo: S.
   Riesgo: bajo.
 - Cada solicitud muestra icono real, nombre visible, usuario, dispositivo,
   origen y estado. El packageName permanece como identidad confiable y detalle
@@ -227,7 +226,7 @@ Flujo de una entrada:
 
 #### ADMIN-DAG-ACTIVATION-GUIDE-01 - Activación guiada y navegadores incompatibles
 
-- Estado: `Propuesto; no aprobado para código`. Prioridad: P1. Esfuerzo: L.
+- Estado: `Resuelto en candidato Admin 283/Usuario 292`. Prioridad: P1. Esfuerzo: L.
   Riesgo: medio.
 - Reemplazar el interruptor aislado por un asistente que explique DAG/Glosh,
   muestre navegadores reales detectados con icono y estado recomendado, confirme
@@ -242,7 +241,7 @@ Flujo de una entrada:
 
 #### DAG-DEFAULT-BROWSER-01 - DAG como navegador predeterminado
 
-- Estado: `Propuesto; no aprobado para código`. Prioridad: P1. Esfuerzo: M.
+- Estado: `Resuelto y validado físicamente con DAG 18`. Prioridad: P1. Esfuerzo: M.
   Riesgo: medio.
 - DAG debe calificar para el rol oficial de navegador y solicitarlo con
   consentimiento del Usuario. Una app común no puede asignárselo en silencio.
@@ -251,7 +250,7 @@ Flujo de una entrada:
 
 #### GLOSH-BROWSER-ENFORCEMENT-01 - Cerrar navegadores no protegidos
 
-- Estado: `Propuesto; no aprobado para código`. Prioridad: P0. Esfuerzo: L.
+- Estado: `Resuelto y validado físicamente en SM-S908E`. Prioridad: P0. Esfuerzo: L.
   Riesgo: alto.
 - Glosh detecta navegadores por packageName e inventario instalado, bloquea o
   expulsa su apertura mediante Accessibility y mantiene navegadores nuevos en

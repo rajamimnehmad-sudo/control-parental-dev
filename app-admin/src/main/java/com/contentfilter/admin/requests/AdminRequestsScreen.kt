@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -254,6 +255,16 @@ private fun RequestCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    Text(
+                        when (request.requestType) {
+                            AccessRequestType.DOMAIN_ACCESS -> "Solicitud de sitio"
+                            AccessRequestType.APP_ACCESS -> "Solicitud de aplicación"
+                            AccessRequestType.EXTRA_TIME -> "Solicitud de tiempo"
+                            AccessRequestType.OTHER -> "Solicitud"
+                        },
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
                 }
                 StatusChip(
                     request.status.displayName(),
@@ -339,18 +350,22 @@ private fun AppRequestIcon(
         modifier =
             Modifier
                 .size(64.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
+                .clip(RoundedCornerShape(18.dp))
+                .background(Color(0xFFF1F5F7)),
         contentAlignment = Alignment.Center,
     ) {
         if (bitmap != null) {
             Image(
                 bitmap = bitmap.asImageBitmap(),
                 contentDescription = appName,
-                modifier = Modifier.size(48.dp),
+                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(14.dp)),
             )
         } else {
-            Text(appName.take(1).uppercase(), style = MaterialTheme.typography.titleLarge)
+            ProductGlyph(
+                icon = ProductIcon.Apps,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(30.dp),
+            )
         }
     }
 }

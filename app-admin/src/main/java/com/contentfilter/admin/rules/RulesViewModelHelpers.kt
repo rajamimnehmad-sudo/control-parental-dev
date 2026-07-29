@@ -11,11 +11,13 @@ import com.contentfilter.core.domain.model.InstalledApp
 import com.contentfilter.core.domain.model.PolicyLevel
 import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicyTargetType
+import com.contentfilter.core.domain.model.ProtectedBrowserPolicy
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
 import com.contentfilter.core.domain.model.SearchEngineCatalog
 import com.contentfilter.core.domain.model.WebNavigationPolicy
 import com.contentfilter.core.domain.model.externalSearchResultsAllowed
+import com.contentfilter.core.domain.model.protectedBrowserRequired
 import com.contentfilter.core.domain.model.safeSearchEnabled
 import com.contentfilter.core.domain.model.webNavigationBlocked
 import java.time.Duration
@@ -126,6 +128,8 @@ internal fun List<PolicyRule>.externalSearchResultsAllowedForWeb(): Boolean = ex
 
 internal fun List<PolicyRule>.safeSearchEnabledForWeb(): Boolean = safeSearchEnabled()
 
+internal fun List<PolicyRule>.protectedBrowserRequiredForWeb(): Boolean = protectedBrowserRequired()
+
 internal fun List<PolicyRule>.internetBlockRules(): List<PolicyRule> =
     filter {
         it.scope == RuleScope.Domain &&
@@ -146,6 +150,7 @@ internal fun List<PolicyRule>.webPolicyPreferences(): WebPolicyPreferences =
         webNavigationBlocked = webNavigationBlocked(),
         externalSearchResultsAllowed = externalSearchResultsAllowed(),
         safeSearchEnabled = safeSearchEnabled(),
+        protectedBrowserRequired = protectedBrowserRequired(),
     )
 
 internal fun List<PolicyRule>.webPolicyChanges(
@@ -207,6 +212,12 @@ internal fun List<PolicyRule>.webPolicyChanges(
         enabled = true,
         priority = WebNavigationBlockPriority + 20,
     )
+    planCanonical(
+        target = ProtectedBrowserPolicy.RuleTarget,
+        action = RuleAction.Allow,
+        enabled = desired.protectedBrowserRequired,
+        priority = ProtectedBrowserPolicy.RulePriority,
+    )
     working
         .filter { rule ->
             rule.enabled &&
@@ -224,7 +235,8 @@ internal fun List<PolicyRule>.webPolicyChanges(
 private fun PolicyRule.isCanonicalWebPreference(): Boolean =
     (target == WebNavigationPolicy.RuleTarget && action == RuleAction.Block) ||
         (target == WebNavigationPolicy.ExternalSearchResultsAllowedTarget && action == RuleAction.Allow) ||
-        (target == WebNavigationPolicy.SafeSearchTarget && action == RuleAction.Allow)
+        (target == WebNavigationPolicy.SafeSearchTarget && action == RuleAction.Allow) ||
+        (target == ProtectedBrowserPolicy.RuleTarget && action == RuleAction.Allow)
 
 internal fun webRuleId(
     deviceId: String,
@@ -236,12 +248,14 @@ internal data class WebPolicyPreferences(
     val webNavigationBlocked: Boolean,
     val externalSearchResultsAllowed: Boolean,
     val safeSearchEnabled: Boolean,
+    val protectedBrowserRequired: Boolean = false,
 )
 
 internal enum class WebPolicyPreference {
     NavigationBlocked,
     ExternalSearchResultsAllowed,
     SafeSearchEnabled,
+    ProtectedBrowserRequired,
 }
 
 internal fun WebPolicyPreferences.withPreference(
@@ -252,6 +266,7 @@ internal fun WebPolicyPreferences.withPreference(
         WebPolicyPreference.NavigationBlocked -> copy(webNavigationBlocked = enabled)
         WebPolicyPreference.ExternalSearchResultsAllowed -> copy(externalSearchResultsAllowed = enabled)
         WebPolicyPreference.SafeSearchEnabled -> copy(safeSearchEnabled = true)
+        WebPolicyPreference.ProtectedBrowserRequired -> copy(protectedBrowserRequired = enabled)
     }
 
 internal fun WebPolicyPreferences.matchesPreference(
@@ -262,6 +277,7 @@ internal fun WebPolicyPreferences.matchesPreference(
         WebPolicyPreference.NavigationBlocked -> webNavigationBlocked == enabled
         WebPolicyPreference.ExternalSearchResultsAllowed -> externalSearchResultsAllowed == enabled
         WebPolicyPreference.SafeSearchEnabled -> safeSearchEnabled == enabled
+        WebPolicyPreference.ProtectedBrowserRequired -> protectedBrowserRequired == enabled
     }
 
 internal fun List<PolicyRule>.webPolicyPreferenceChanges(
@@ -289,6 +305,11 @@ internal fun RulesUiState.withPendingWebPreference(
             )
         WebPolicyPreference.SafeSearchEnabled ->
             copy(pendingSafeSearchEnabledByDevice = pendingSafeSearchEnabledByDevice + (deviceId to enabled))
+        WebPolicyPreference.ProtectedBrowserRequired ->
+            copy(
+                pendingProtectedBrowserRequiredByDevice =
+                    pendingProtectedBrowserRequiredByDevice + (deviceId to enabled),
+            )
     }
 
 internal fun RulesUiState.clearPendingWebPreference(
@@ -304,6 +325,8 @@ internal fun RulesUiState.clearPendingWebPreference(
             )
         WebPolicyPreference.SafeSearchEnabled ->
             copy(pendingSafeSearchEnabledByDevice = pendingSafeSearchEnabledByDevice - deviceId)
+        WebPolicyPreference.ProtectedBrowserRequired ->
+            copy(pendingProtectedBrowserRequiredByDevice = pendingProtectedBrowserRequiredByDevice - deviceId)
     }
 
 internal fun RulesUiState.withPendingAppAllowed(

@@ -4,6 +4,12 @@ import android.content.Context
 import android.content.Intent
 
 internal object ProtectedBrowserLauncher {
+    fun isInstalled(context: Context): Boolean =
+        runCatching {
+            context.packageManager.getApplicationInfo(BrowserPackageName, 0)
+            true
+        }.getOrDefault(false)
+
     fun open(context: Context): Boolean =
         runCatching {
             context.startActivity(

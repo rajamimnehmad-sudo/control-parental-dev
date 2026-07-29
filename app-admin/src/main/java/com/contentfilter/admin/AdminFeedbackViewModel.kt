@@ -27,9 +27,10 @@ class AdminFeedbackViewModel
             feedbackRepository.submitRating(deviceId, stars, comment, BuildConfig.VERSION_CODE)
         }
 
-        fun savePhone(phone: String) = runAction("Contacto actualizado.") { deviceId ->
-            feedbackRepository.updateAdminPhone(deviceId, phone)
-        }
+        fun savePhone(phone: String) =
+            runAction("Contacto actualizado.") { deviceId ->
+                feedbackRepository.updateAdminPhone(deviceId, phone)
+            }
 
         private fun runAction(
             successMessage: String,
