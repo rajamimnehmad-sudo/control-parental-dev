@@ -92,6 +92,21 @@ class OpenversePilotDownloaderTest(unittest.TestCase):
             self.assertEqual(0, summary["downloaded"])
             self.assertEqual(1, summary["failed"])
 
+    def test_rejects_share_alike_until_separate_legal_review(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            row = candidate()
+            row["license_id"] = "by-sa"
+            inventory = self._write_inventory(root, [row])
+
+            summary = downloader.download_pilot(inventory, root / "output")
+
+            self.assertEqual(0, summary["downloaded"])
+            self.assertEqual(1, summary["failed"])
+            record = json.loads((root / "output/downloads.jsonl").read_text())
+            self.assertEqual("failed", record["status"])
+            self.assertIn("license is not allowed", record["error"])
+
     def test_rejects_non_image_and_oversized_body(self) -> None:
         cases = [
             b"<html>not an image</html>",

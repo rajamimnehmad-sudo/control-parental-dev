@@ -27,7 +27,7 @@ USER_AGENT = (
     "GloshDAGBot/1.0 "
     "(https://github.com/rajamimnehmad-sudo/control-parental-dev) Python-urllib/3"
 )
-ALLOWED_LICENSES = {"by", "by-sa", "cc0", "pdm"}
+ALLOWED_LICENSES = {"by", "cc0", "pdm"}
 
 
 def _public_https_url(value: Any) -> str:
