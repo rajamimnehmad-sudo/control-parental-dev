@@ -35,6 +35,7 @@ class UpdatesViewModel
         val uiState: StateFlow<UpdatesUiState> = _uiState.asStateFlow()
         private var downloadedApk: File? = null
         private var downloadedAdminApk: File? = null
+        private var downloadedDagApk: File? = null
         private var autoCheckStarted = false
 
         fun autoCheckAndDownload() {
@@ -137,10 +138,15 @@ class UpdatesViewModel
                     _uiState.update { it.copy(status = UpdatesStatus.ReadyToInstall) }
                     installDownloadedUpdate()
                 }
-                _uiState.value.adminInstallStatus == AdminInstallStatus.NeedsInstallPermission &&
+                _uiState.value.adminInstallStatus == CompanionInstallStatus.NeedsInstallPermission &&
                     downloadedAdminApk != null -> {
-                    _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.ReadyToInstall) }
+                    _uiState.update { it.copy(adminInstallStatus = CompanionInstallStatus.ReadyToInstall) }
                     installDownloadedAdmin()
+                }
+                _uiState.value.dagInstallStatus == CompanionInstallStatus.NeedsInstallPermission &&
+                    downloadedDagApk != null -> {
+                    _uiState.update { it.copy(dagInstallStatus = CompanionInstallStatus.ReadyToInstall) }
+                    installDownloadedDag()
                 }
             }
         }
@@ -149,7 +155,7 @@ class UpdatesViewModel
             viewModelScope.launch {
                 _uiState.update {
                     it.copy(
-                        adminInstallStatus = AdminInstallStatus.Checking,
+                        adminInstallStatus = CompanionInstallStatus.Checking,
                         adminDownloadProgressPercent = null,
                     )
                 }
@@ -163,15 +169,15 @@ class UpdatesViewModel
                     ) {
                         is UpdateCheckResult.Available -> downloadAdmin(result.manifest)
                         is UpdateCheckResult.UpToDate -> {
-                            _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.AlreadyInstalled) }
+                            _uiState.update { it.copy(adminInstallStatus = CompanionInstallStatus.AlreadyInstalled) }
                         }
                         UpdateCheckResult.NetworkError,
                         UpdateCheckResult.NotConfigured,
-                        -> _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.Failed) }
+                        -> _uiState.update { it.copy(adminInstallStatus = CompanionInstallStatus.Failed) }
                     }
                 }.onFailure { exception ->
                     Log.e(LogTag, "Admin bootstrap failed: ${exception.message}", exception)
-                    _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.Failed) }
+                    _uiState.update { it.copy(adminInstallStatus = CompanionInstallStatus.Failed) }
                 }
             }
         }
@@ -179,19 +185,62 @@ class UpdatesViewModel
         fun installDownloadedAdmin() {
             val apk = downloadedAdminApk ?: return
             if (!apkInstaller.canRequestPackageInstalls()) {
-                _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.NeedsInstallPermission) }
+                _uiState.update { it.copy(adminInstallStatus = CompanionInstallStatus.NeedsInstallPermission) }
                 return
             }
             val opened = apkInstaller.openVerifiedCompanionInstaller(apk, adminPackageName())
             if (!opened) {
-                _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.VerificationFailed) }
+                _uiState.update { it.copy(adminInstallStatus = CompanionInstallStatus.VerificationFailed) }
+            }
+        }
+
+        fun prepareDagInstall() {
+            viewModelScope.launch {
+                _uiState.update {
+                    it.copy(
+                        dagInstallStatus = CompanionInstallStatus.Checking,
+                        dagDownloadProgressPercent = null,
+                    )
+                }
+                runCatching {
+                    when (
+                        val result =
+                            updateRepository.checkForUpdate(
+                                dagManifestUrl(updateConfigProvider.manifestUrl()),
+                                installedVersionCode(dagPackageName()),
+                            )
+                    ) {
+                        is UpdateCheckResult.Available -> downloadDag(result.manifest)
+                        is UpdateCheckResult.UpToDate -> {
+                            _uiState.update { it.copy(dagInstallStatus = CompanionInstallStatus.AlreadyInstalled) }
+                        }
+                        UpdateCheckResult.NetworkError,
+                        UpdateCheckResult.NotConfigured,
+                        -> _uiState.update { it.copy(dagInstallStatus = CompanionInstallStatus.Failed) }
+                    }
+                }.onFailure { exception ->
+                    Log.e(LogTag, "DAG bootstrap failed: ${exception.message}", exception)
+                    _uiState.update { it.copy(dagInstallStatus = CompanionInstallStatus.Failed) }
+                }
+            }
+        }
+
+        fun installDownloadedDag() {
+            val apk = downloadedDagApk ?: return
+            if (!apkInstaller.canRequestPackageInstalls()) {
+                _uiState.update { it.copy(dagInstallStatus = CompanionInstallStatus.NeedsInstallPermission) }
+                return
+            }
+            val opened = apkInstaller.openVerifiedCompanionInstaller(apk, dagPackageName())
+            if (!opened) {
+                _uiState.update { it.copy(dagInstallStatus = CompanionInstallStatus.VerificationFailed) }
             }
         }
 
         private suspend fun downloadAdmin(manifest: com.contentfilter.core.update.model.UpdateManifest) {
             _uiState.update {
                 it.copy(
-                    adminInstallStatus = AdminInstallStatus.Downloading,
+                    adminInstallStatus = CompanionInstallStatus.Downloading,
                     adminDownloadProgressPercent = 0,
                 )
             }
@@ -207,34 +256,73 @@ class UpdatesViewModel
                         it.copy(
                             adminInstallStatus =
                                 if (apkInstaller.canRequestPackageInstalls()) {
-                                    AdminInstallStatus.ReadyToInstall
+                                    CompanionInstallStatus.ReadyToInstall
                                 } else {
-                                    AdminInstallStatus.NeedsInstallPermission
+                                    CompanionInstallStatus.NeedsInstallPermission
                                 },
                             adminDownloadProgressPercent = 100,
                         )
                     }
                 }
                 UpdateDownloadResult.DownloadError -> {
-                    _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.Failed) }
+                    _uiState.update { it.copy(adminInstallStatus = CompanionInstallStatus.Failed) }
                 }
                 UpdateDownloadResult.InvalidChecksum -> {
-                    _uiState.update { it.copy(adminInstallStatus = AdminInstallStatus.VerificationFailed) }
+                    _uiState.update { it.copy(adminInstallStatus = CompanionInstallStatus.VerificationFailed) }
+                }
+            }
+        }
+
+        private suspend fun downloadDag(manifest: com.contentfilter.core.update.model.UpdateManifest) {
+            _uiState.update {
+                it.copy(
+                    dagInstallStatus = CompanionInstallStatus.Downloading,
+                    dagDownloadProgressPercent = 0,
+                )
+            }
+            when (
+                val result =
+                    updateRepository.download(manifest) { progress ->
+                        _uiState.update { it.copy(dagDownloadProgressPercent = progress) }
+                    }
+            ) {
+                is UpdateDownloadResult.Success -> {
+                    downloadedDagApk = result.apk
+                    _uiState.update {
+                        it.copy(
+                            dagInstallStatus =
+                                if (apkInstaller.canRequestPackageInstalls()) {
+                                    CompanionInstallStatus.ReadyToInstall
+                                } else {
+                                    CompanionInstallStatus.NeedsInstallPermission
+                                },
+                            dagDownloadProgressPercent = 100,
+                        )
+                    }
+                }
+                UpdateDownloadResult.DownloadError -> {
+                    _uiState.update { it.copy(dagInstallStatus = CompanionInstallStatus.Failed) }
+                }
+                UpdateDownloadResult.InvalidChecksum -> {
+                    _uiState.update { it.copy(dagInstallStatus = CompanionInstallStatus.VerificationFailed) }
                 }
             }
         }
 
         @Suppress("DEPRECATION")
-        private fun installedAdminVersionCode(): Int =
+        private fun installedAdminVersionCode(): Int = installedVersionCode(adminPackageName())
+
+        @Suppress("DEPRECATION")
+        private fun installedVersionCode(packageName: String): Int =
             runCatching {
                 val packageInfo =
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         context.packageManager.getPackageInfo(
-                            adminPackageName(),
+                            packageName,
                             PackageManager.PackageInfoFlags.of(0),
                         )
                     } else {
-                        context.packageManager.getPackageInfo(adminPackageName(), 0)
+                        context.packageManager.getPackageInfo(packageName, 0)
                     }
                 packageInfo.longVersionCode.toInt()
             }.getOrDefault(0)
@@ -244,6 +332,13 @@ class UpdatesViewModel
                 context.packageName.endsWith(".dev") -> "com.contentfilter.admin.dev"
                 context.packageName.endsWith(".beta") -> "com.contentfilter.admin.beta"
                 else -> "com.contentfilter.admin"
+            }
+
+        private fun dagPackageName(): String =
+            when {
+                context.packageName.endsWith(".dev") -> "com.contentfilter.dagbrowser.dev"
+                context.packageName.endsWith(".beta") -> "com.contentfilter.dagbrowser.beta"
+                else -> "com.contentfilter.dagbrowser"
             }
 
         private suspend fun downloadAndMaybeInstall(manifest: com.contentfilter.core.update.model.UpdateManifest) {
@@ -284,3 +379,10 @@ class UpdatesViewModel
             const val LogTag = "Updates"
         }
     }
+
+internal fun dagManifestUrl(baseUrl: String): String {
+    if (baseUrl.isBlank()) return ""
+    val suffixIndex = baseUrl.indexOfAny(charArrayOf('?', '#')).let { if (it < 0) baseUrl.length else it }
+    val directory = baseUrl.substring(0, suffixIndex).substringBeforeLast('/', missingDelimiterValue = "")
+    return if (directory.isBlank()) "" else "$directory/app-dag-browser-dev-manifest.json"
+}

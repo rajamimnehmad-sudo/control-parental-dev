@@ -238,6 +238,10 @@ internal fun UserAppRoot(
                         onOpenProtectedBrowser = {
                             ProtectedBrowserLauncher.open(context)
                         },
+                        onInstallProtectedBrowser = {
+                            updatesViewModel.prepareDagInstall()
+                            selectTopLevel(UserDestination.Updates)
+                        },
                         protectedBrowserAvailable =
                             BuildConfig.DAG_BROWSER_V3_BRIDGE_AVAILABLE &&
                                 ProtectedBrowserLauncher.isInstalled(context),
@@ -258,6 +262,7 @@ internal fun UserAppRoot(
                     val protectionViewModel: ProtectionViewModel = hiltViewModel()
                     val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
                     UpdatesRoute(
+                        viewModel = updatesViewModel,
                         onBack = null,
                         onHelp = { navigateTo(UserDestination.Help) },
                         activationState = statusState.activationState,

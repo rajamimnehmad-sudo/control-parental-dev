@@ -62,6 +62,8 @@ fun UpdatesRoute(
         onInstallPermission = viewModel::openInstallPermissionSettings,
         onPrepareAdminInstall = viewModel::prepareAdminInstall,
         onInstallAdmin = viewModel::installDownloadedAdmin,
+        onPrepareDagInstall = viewModel::prepareDagInstall,
+        onInstallDag = viewModel::installDownloadedDag,
         onBack = onBack,
         onHelp = onHelp,
         activationState = activationState,
@@ -83,6 +85,8 @@ private fun UpdatesScreen(
     onInstallPermission: () -> Unit,
     onPrepareAdminInstall: () -> Unit,
     onInstallAdmin: () -> Unit,
+    onPrepareDagInstall: () -> Unit,
+    onInstallDag: () -> Unit,
     onBack: (() -> Unit)?,
     onHelp: () -> Unit,
     activationState: String,
@@ -309,22 +313,22 @@ private fun UpdatesScreen(
         Text("App Administrador", style = MaterialTheme.typography.titleSmall)
         ProductCard {
             Text(
-                text = state.adminInstallStatus.message(),
+                text = state.adminInstallStatus.message("App Administrador"),
                 style = MaterialTheme.typography.bodyMedium,
             )
-            if (state.adminInstallStatus == AdminInstallStatus.Downloading) {
+            if (state.adminInstallStatus == CompanionInstallStatus.Downloading) {
                 LinearProgressIndicator(
                     progress = { (state.adminDownloadProgressPercent ?: 0) / 100f },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }
             when (state.adminInstallStatus) {
-                AdminInstallStatus.ReadyToInstall -> {
+                CompanionInstallStatus.ReadyToInstall -> {
                     Button(modifier = Modifier.fillMaxWidth(), onClick = onInstallAdmin) {
                         Text("Instalar App Administrador")
                     }
                 }
-                AdminInstallStatus.NeedsInstallPermission -> {
+                CompanionInstallStatus.NeedsInstallPermission -> {
                     Button(modifier = Modifier.fillMaxWidth(), onClick = onInstallPermission) {
                         Text("Permitir instalación oficial")
                     }
@@ -332,12 +336,48 @@ private fun UpdatesScreen(
                         Text("Continuar instalación")
                     }
                 }
-                AdminInstallStatus.Checking,
-                AdminInstallStatus.Downloading,
+                CompanionInstallStatus.Checking,
+                CompanionInstallStatus.Downloading,
                 -> Unit
                 else -> {
                     OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onPrepareAdminInstall) {
                         Text("Comprobar e instalar Admin")
+                    }
+                }
+            }
+        }
+        Text("Navegador DAG", style = MaterialTheme.typography.titleSmall)
+        ProductCard {
+            Text(
+                text = state.dagInstallStatus.message("Navegador DAG"),
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            if (state.dagInstallStatus == CompanionInstallStatus.Downloading) {
+                LinearProgressIndicator(
+                    progress = { (state.dagDownloadProgressPercent ?: 0) / 100f },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+            when (state.dagInstallStatus) {
+                CompanionInstallStatus.ReadyToInstall -> {
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = onInstallDag) {
+                        Text("Instalar Navegador DAG")
+                    }
+                }
+                CompanionInstallStatus.NeedsInstallPermission -> {
+                    Button(modifier = Modifier.fillMaxWidth(), onClick = onInstallPermission) {
+                        Text("Permitir instalación oficial")
+                    }
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onInstallDag) {
+                        Text("Continuar instalación")
+                    }
+                }
+                CompanionInstallStatus.Checking,
+                CompanionInstallStatus.Downloading,
+                -> Unit
+                else -> {
+                    OutlinedButton(modifier = Modifier.fillMaxWidth(), onClick = onPrepareDagInstall) {
+                        Text("Comprobar e instalar DAG")
                     }
                 }
             }
@@ -368,14 +408,14 @@ private fun UpdatesStatus.versionLabel(): String =
         else -> "Version disponible"
     }
 
-private fun AdminInstallStatus.message(): String =
+private fun CompanionInstallStatus.message(appName: String): String =
     when (this) {
-        AdminInstallStatus.Idle -> "Comprobá la versión oficial de App Administrador."
-        AdminInstallStatus.Checking -> "Comprobando App Administrador."
-        AdminInstallStatus.Downloading -> "Descargando y verificando App Administrador."
-        AdminInstallStatus.ReadyToInstall -> "APK oficial verificado. Android pedirá confirmación para instalar."
-        AdminInstallStatus.NeedsInstallPermission -> "Android requiere autorizar a Content Filter como instalador."
-        AdminInstallStatus.AlreadyInstalled -> "App Administrador ya está instalada y actualizada."
-        AdminInstallStatus.VerificationFailed -> "El APK no coincide con el manifiesto o la firma de Content Filter."
-        AdminInstallStatus.Failed -> "No se pudo preparar App Administrador. Intentá nuevamente."
+        CompanionInstallStatus.Idle -> "Comprobá la versión oficial de $appName."
+        CompanionInstallStatus.Checking -> "Comprobando $appName."
+        CompanionInstallStatus.Downloading -> "Descargando y verificando $appName."
+        CompanionInstallStatus.ReadyToInstall -> "APK oficial verificado. Android pedirá confirmación para instalar."
+        CompanionInstallStatus.NeedsInstallPermission -> "Android requiere autorizar a Content Filter como instalador."
+        CompanionInstallStatus.AlreadyInstalled -> "$appName ya está instalado y actualizado."
+        CompanionInstallStatus.VerificationFailed -> "El APK no coincide con el manifiesto o la firma de Content Filter."
+        CompanionInstallStatus.Failed -> "No se pudo preparar $appName. Intentá nuevamente."
     }

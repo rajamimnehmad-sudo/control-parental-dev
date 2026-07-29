@@ -248,6 +248,18 @@ Flujo de una entrada:
 - Verificar el rol real durante activación y reparación, sin prompts repetidos.
 - Ser predeterminado no equivale a bloquear otro navegador.
 
+#### DAG-INSTALL-FROM-USER-01 - Instalar DAG desde App Usuario
+
+- Estado: `Resuelto localmente en candidato Usuario 294; pendiente publicación
+  DEV y prueba física`. Aprobado explícitamente por el usuario el 2026-07-29.
+  Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- App Usuario detecta si DAG falta, permite comprobar y descargar su manifiesto
+  DEV y abre solamente el instalador oficial de Android.
+- Antes de instalar valida SHA-256, packageName y el mismo certificado estable
+  de Content Filter. El APK de DAG sigue siendo una aplicación separada.
+- El manifiesto y APK de DAG 18 quedaron preparados localmente; no se publicaron
+  en Supabase ni se hizo push.
+
 #### GLOSH-BROWSER-ENFORCEMENT-01 - Cerrar navegadores no protegidos
 
 - Estado: `Resuelto y validado físicamente en SM-S908E`. Prioridad: P0. Esfuerzo: L.

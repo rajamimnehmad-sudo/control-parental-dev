@@ -139,6 +139,12 @@ El lote integrado se desarrolló y validó en:
   recordatorio del rol predeterminado y lista de navegadores alternativos.
 - Usuario muestra si DAG es obligatorio, está instalado y permite abrirlo para
   completar la confirmación.
+- Candidato Usuario `294` agrega instalación de DAG desde Internet o Ajustes:
+  descarga el manifiesto separado, verifica SHA-256, packageName y firma de
+  Content Filter, y delega la confirmación final al instalador oficial Android.
+- El APK y manifiesto de DAG `18` están preparados sólo en
+  `build/dev-updates`; todavía no fueron publicados, por lo que la descarga
+  remota queda pendiente de autorización.
 - Las fotos diferencian `Analizando`, `Protegida por Glosh` y `Imagen no
   disponible`; espera y error siguen sin revelar píxeles.
 - Solicitudes Admin presentan icono grande, nombre confiable, packageName, tipo

@@ -1,0 +1,1 @@
+Navegador DAG con filtrado visual local y navegación protegida.

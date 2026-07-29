@@ -41,6 +41,7 @@ import com.contentfilter.user.internet.UserWebViewModel
 internal fun UserWebTab(
     onBack: (() -> Unit)?,
     onOpenProtectedBrowser: () -> Unit,
+    onInstallProtectedBrowser: () -> Unit,
     protectedBrowserAvailable: Boolean,
     vpnActive: Boolean,
     onActivateWebProtection: () -> Unit,
@@ -75,6 +76,7 @@ internal fun UserWebTab(
                     state = state,
                     vpnActive = vpnActive,
                     onOpenProtectedBrowser = onOpenProtectedBrowser,
+                    onInstallProtectedBrowser = onInstallProtectedBrowser,
                     protectedBrowserAvailable = protectedBrowserAvailable,
                     onActivateWebProtection = onActivateWebProtection,
                 )
@@ -161,6 +163,7 @@ private fun InternetProtectionList(
     state: com.contentfilter.user.internet.UserWebUiState,
     vpnActive: Boolean,
     onOpenProtectedBrowser: () -> Unit,
+    onInstallProtectedBrowser: () -> Unit,
     protectedBrowserAvailable: Boolean,
     onActivateWebProtection: () -> Unit,
 ) {
@@ -201,9 +204,14 @@ private fun InternetProtectionList(
                         else -> "Disponible · todavía no obligatorio"
                     },
                 active = protectedBrowserAvailable,
-                onClick = onOpenProtectedBrowser.takeIf { protectedBrowserAvailable },
+                onClick =
+                    if (protectedBrowserAvailable) {
+                        onOpenProtectedBrowser
+                    } else {
+                        onInstallProtectedBrowser
+                    },
                 showDivider = state.schedule != null,
-                navigation = protectedBrowserAvailable,
+                navigation = true,
             )
         }
         state.schedule?.let { schedule ->

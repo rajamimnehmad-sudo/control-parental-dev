@@ -6,11 +6,13 @@ data class UpdatesUiState(
     val status: UpdatesStatus = UpdatesStatus.Idle,
     val manifest: UpdateManifest? = null,
     val downloadProgressPercent: Int? = null,
-    val adminInstallStatus: AdminInstallStatus = AdminInstallStatus.Idle,
+    val adminInstallStatus: CompanionInstallStatus = CompanionInstallStatus.Idle,
     val adminDownloadProgressPercent: Int? = null,
+    val dagInstallStatus: CompanionInstallStatus = CompanionInstallStatus.Idle,
+    val dagDownloadProgressPercent: Int? = null,
 )
 
-enum class AdminInstallStatus {
+enum class CompanionInstallStatus {
     Idle,
     Checking,
     Downloading,

@@ -1,0 +1,2 @@
+App Usuario ahora permite comprobar, descargar y abrir la instalación oficial del Navegador DAG.
+La descarga se valida por hash, paquete y firma antes de mostrar la confirmación de Android.
