@@ -389,8 +389,9 @@ Flujo de una entrada:
 
 ### HELP-CONTEXTUAL-CHAT-01 - Asistente privado de Content Filter
 
-- Estado: `Integrado en el lote local 6 con Usuario 302 y Admin 287; pendiente
-  gate físico e instalación`. Aprobado explicitamente el 2026-07-20, ampliado
+- Estado: `Correctivo Usuario 303 instalado en SM-S908E; crash resuelto y
+  pendiente calibrar una salida rechazada por la barrera de calidad`. Aprobado
+  explicitamente el 2026-07-20, ampliado
   el 2026-07-29 y ejecutado el 2026-07-30. Tipo: ayuda, UX y privacidad.
   Prioridad: P1. Esfuerzo: L. Riesgo: medio.
 - Alcance: chat interactivo disponible en Usuario y Admin, con preguntas sugeridas segun el estado real propio o agregado de todos los dispositivos y acciones directas hacia la seccion correcta.
@@ -410,7 +411,11 @@ Flujo de una entrada:
   del modelo contra respuestas repetidas, extensas, ajenas a la guía o con
   secretos; Admin 287 comparte saludos, capacidades, seguimiento, contexto
   visible y borrado local. Ambos superaron ktlint, unitarios y APK minificada.
-  Pendiente instalar y probar la conversación generativa en el teléfono.
+  En el SM-S908E, Usuario 303 conservó modelo, Accessibility y VPN; la llamada
+  completa de LiteRT-LM 0.14 evitó el choque ABI del streaming y terminó sin
+  caída. La salida probada fue rechazada de forma segura y volvió a la respuesta
+  determinista; resta identificar el motivo técnico ya instrumentado y calibrar
+  sin registrar texto privado.
 
 ### LOTE-HELP-BOTH-APPS-02 - GloshIA útil y coherente en Usuario y Admin
 
@@ -659,7 +664,7 @@ Flujo de una entrada:
 | PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; UI fisica validada, pendiente ciclo offline real | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
 | PROTECTION-OFFLINE-RECOVERY-AUTO-03 | Idea; no aprobada para codigo | P0 | Preparar automaticamente el kit de emergencia al crear y enlazar un Usuario | M | Alto |
 | DAG-DOWNLOADS-01 | Idea; no aprobada para codigo | P1 | Descargas seguras de documentos con control Admin y bloqueo permanente de APK/ejecutables | L | Alto |
-| HELP-CONTEXTUAL-CHAT-01 | Candidato conversacional Usuario 297 compilado; pendiente gate físico e instalación | P1 | Chat privado de ayuda y diagnóstico seguro automático | L | Medio |
+| HELP-CONTEXTUAL-CHAT-01 | Usuario 303 instalado: crash resuelto; calidad generativa pendiente | P1 | Chat privado de ayuda y diagnóstico seguro automático | L | Medio |
 | LOTE-HELP-BOTH-APPS-02 | Idea agrupada; no aprobada para codigo | P1 | Mejorar GloshIA e integrarla con contexto y acciones seguras en Usuario y Admin | L | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |

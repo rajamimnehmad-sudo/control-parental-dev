@@ -76,10 +76,8 @@ documentado arriba.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
-- La última instalación física sigue siendo DAG 21. El candidato local
-  integrado en `main` declara `versionCode 24`, `versionName 0.14.0-dev`; por
-  pedido del usuario no debe instalarse ningún APK hasta completar los seis
-  lotes planificados.
+- La instalación física vigente en el SM-S908E es DAG 25. El candidato local
+  declara `versionCode 25`, `versionName 0.15.0-dev`; no fue publicado.
 - V21 cerró el primer lote de estabilidad: `Analizando` se desmonta cuando la
   presentación queda resuelta, los corazones de Favoritos conservan una
   representación funcional segura aunque su sprite permanezca bloqueado y
@@ -105,6 +103,14 @@ documentado arriba.
   PDF desde el menú `Descargas`. APK, ejecutables, scripts, comprimidos y demás
   formatos continúan bloqueados. La política Admin y nuevos formatos quedan
   fuera de esta primera etapa.
+- V25 corrige dos gates físicos del lote integrado. Registra el callback moderno
+  de Atrás requerido por Android 13 o posterior y distingue Home real de un URL
+  interno desactualizado mientras la página protegida continúa visible. En el
+  SM-S908E con Android 16, el primer Atrás desde una página volvió a Home y el
+  segundo cerró DAG. La captura de pestañas espera la elegibilidad del documento,
+  reintenta una vez y conserva sólo capturas efímeras de páginas seguras: una
+  página neutra mostró miniatura real y Frávega mantuvo tarjeta neutra al pasar a
+  estado restringido/CAPTCHA. Formato, 92 unitarios, build y lint correctos.
 - El modelo y su umbral `0.4` no cambiaron: el ajuste siguiente debe incorporar
   ejemplos actuales de falsos permisos y falsos filtros, no bajar el umbral a
   ciegas.
@@ -437,11 +443,31 @@ El lote integrado se desarrolló y validó en:
 - No se instaló, publicó ni hizo push durante el lote. Supabase y Production no
   se modificaron.
 
+### Correctivo local Usuario 303
+
+- Usuario 303 está instalado in-place en el SM-S908E; conservó el modelo local
+  verificado de 647.377.840 bytes, Accessibility y la VPN activa.
+- LiteRT-LM permanece en 0.14.0, pero la generación usa su llamada completa
+  fuera del hilo visual. Esto evita el choque ABI del flujo `sendMessageAsync`
+  que producía `NoSuchMethodError` y cerraba el proceso.
+- La prueba física completó inferencia sin caída ni pérdida de protección. La
+  primera salida no superó la barrera de calidad y la pantalla usó correctamente
+  la respuesta determinista segura. El candidato registra sólo tipo de error o
+  motivo de descarte y longitud; nunca pregunta, respuesta, URL ni secretos.
+- Ktlint, unitarios, R8, APK y lint DEV correctos. Falta repetir una consulta en
+  el APK final para identificar el motivo de descarte y calibrar la conversación
+  sin debilitar privacidad ni fundamentación.
+- APK final Usuario 303: 26.569.022 bytes, SHA-256
+  `d0f147df96a5fe6750ebd307476e7415d394e172bfef7668190b92591d0604e0`.
+  APK final DAG 25: 121.172.970 bytes, SHA-256
+  `ec7f47f72d5f8347fd505b487a5e939cbfcca7227f000c95cfe272bd76426151`.
+  Ambas quedaron instaladas desde esos artefactos en el SM-S908E; Admin 287 no
+  fue recompilado ni modificado.
+
 ## Próximo trabajo autorizado
 
-Los seis lotes están implementados localmente. Generar nuevamente los APK
-canónicos desde `main` ya integrado e iniciar la matriz física conjunta:
-Usuario 302, Admin 287 y el DAG vigente, incluyendo Ajustes, chat offline,
-borrado, secretos sintéticos, acciones seguras, pestañas, miniaturas,
-descargas, imágenes y navegación atrás. No publicar ni hacer push sin un nuevo
-OK explícito.
+Repetir el diagnóstico físico de calidad de GloshIA en Usuario 303 y, después,
+completar la matriz conjunta con Admin 287 y DAG 25: Ajustes, chat offline,
+borrado, secretos sintéticos, acciones seguras, pestañas, descargas PDF e
+imágenes. Atrás moderno y miniaturas seguras ya tienen evidencia física en el
+SM-S908E. No publicar ni hacer push sin un nuevo OK explícito.
