@@ -1151,9 +1151,7 @@
         })
         .map((child) => child.getAttribute("data-glosh-dag-media"));
     const hostState =
-      siblingStates.includes("block")
-        ? "filtered"
-        : siblingStates.includes("allow")
+      siblingStates.includes("allow")
           ? null
           : siblingStates.includes("hidden")
             ? "waiting"
@@ -1189,8 +1187,12 @@
     root.querySelectorAll(mediaSelector).forEach(releaseTrackedMedia);
   };
 
-  const updateMediaHostState = (element) => {
+  const updateMediaHostState = (element, presentationState) => {
     if (!(element instanceof HTMLImageElement)) return;
+    if (presentationState === "filtered") {
+      releaseMediaHost(element);
+      return;
+    }
     const previousHost = mediaHostsByElement.get(element);
     const host = element.parentElement;
     if (previousHost && previousHost !== host) {

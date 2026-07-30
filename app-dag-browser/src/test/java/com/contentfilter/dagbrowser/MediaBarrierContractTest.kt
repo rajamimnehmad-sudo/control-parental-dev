@@ -224,7 +224,7 @@ class MediaBarrierContractTest {
     }
 
     @Test
-    fun `media states distinguish waiting filtered and terminal error without exposing pixels`() {
+    fun `media states keep waiting and terminal error overlays but filtered media only blurred`() {
         val css = extensionRoot.resolve("barrier.css").readText()
         val script = extensionRoot.resolve("barrier.js").readText()
         val background = extensionRoot.resolve("background.js").readText()
@@ -241,15 +241,17 @@ class MediaBarrierContractTest {
         assertContains(script, "APPROVED_PRESENTATION_SELECTOR")
         assertContains(script, "clearWaitingMediaHostsAround")
         assertContains(script, "if (action === \"allow\")")
-        assertContains(script, "siblingStates.includes(\"block\")")
+        assertFalse(script.contains("siblingStates.includes(\"block\")"))
         assertContains(script, "siblingStates.includes(\"allow\")")
         assertContains(script, "candidateSourcesFor(element)[0]")
         assertContains(css, "data-glosh-dag-media-host=\"waiting\"")
         assertContains(css, "@keyframes glosh-dag-waiting")
         assertContains(css, "linear-gradient(100deg")
         assertFalse(css.contains("Analizando…"))
-        assertContains(css, "data-glosh-dag-media-host=\"filtered\"")
-        assertContains(css, "clip-path: polygon")
+        assertFalse(css.contains("data-glosh-dag-media-host=\"filtered\""))
+        assertFalse(css.contains("clip-path: polygon"))
+        assertContains(script, "presentationState === \"filtered\"")
+        assertContains(script, "releaseMediaHost(element)")
         assertContains(css, "isolation: isolate !important")
         assertFalse(css.contains("content: \"Protegida por Glosh\""))
         assertContains(script, "FILTERED_ACCESSIBLE_DESCRIPTION")

@@ -178,23 +178,6 @@ html:not([data-glosh-dag-background-probe]) *::after {
   animation: glosh-dag-waiting 1.3s linear infinite !important;
 }
 
-[data-glosh-dag-media-host="filtered"]::after {
-  content: "✓" !important;
-  inset: auto 8px 8px auto !important;
-  width: 28px !important;
-  min-width: 28px !important;
-  height: 32px !important;
-  min-height: 32px !important;
-  padding: 0 !important;
-  border: 0 !important;
-  border-radius: 0 !important;
-  color: #ffffff !important;
-  background: rgba(10, 33, 49, 0.84) !important;
-  clip-path: polygon(50% 0, 91% 15%, 84% 70%, 50% 100%, 16% 70%, 9% 15%) !important;
-  backdrop-filter: blur(6px) !important;
-  font: 700 14px/1 sans-serif !important;
-}
-
 [data-glosh-dag-media-host="error"]::after {
   content: "Imagen no disponible" !important;
   color: #5f3a22 !important;
