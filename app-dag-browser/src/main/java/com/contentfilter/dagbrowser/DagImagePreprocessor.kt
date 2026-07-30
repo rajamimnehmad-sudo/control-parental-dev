@@ -55,6 +55,57 @@ internal data class DagImageCropPlan(
     val height: Int,
 )
 
+internal object DagUncertainRegionalCropper {
+    fun quadrantViews(image: DagPreparedImage): List<DagPreparedImage> {
+        if (!DagImageDecodeContract.isValid(image)) return emptyList()
+        val cropSize =
+            (DagImageDecodeContract.TargetSize * CropFraction)
+                .roundToInt()
+                .coerceIn(1, DagImageDecodeContract.TargetSize)
+        val lastStart = DagImageDecodeContract.TargetSize - cropSize
+        return listOf(
+            Pair(0, 0),
+            Pair(lastStart, 0),
+            Pair(0, lastStart),
+            Pair(lastStart, lastStart),
+        ).map { (left, top) ->
+            image.cropAndScale(
+                left = left,
+                top = top,
+                cropSize = cropSize,
+            )
+        }
+    }
+
+    private fun DagPreparedImage.cropAndScale(
+        left: Int,
+        top: Int,
+        cropSize: Int,
+    ): DagPreparedImage {
+        val targetSize = DagImageDecodeContract.TargetSize
+        val channels = DagImageDecodeContract.RgbChannelCount
+        val output = ByteArray(DagImageDecodeContract.PreparedByteCount)
+        var outputIndex = 0
+        for (targetY in 0 until targetSize) {
+            val sourceY = top + (targetY * cropSize / targetSize).coerceAtMost(cropSize - 1)
+            for (targetX in 0 until targetSize) {
+                val sourceX = left + (targetX * cropSize / targetSize).coerceAtMost(cropSize - 1)
+                val sourceIndex = (sourceY * width + sourceX) * channels
+                repeat(channels) { channel ->
+                    output[outputIndex++] = rgb888[sourceIndex + channel]
+                }
+            }
+        }
+        return DagPreparedImage(
+            width = targetSize,
+            height = targetSize,
+            rgb888 = output,
+        )
+    }
+
+    private const val CropFraction = 0.56
+}
+
 internal object DagRegionalCropPlanner {
     fun plan(
         sourceWidth: Int,

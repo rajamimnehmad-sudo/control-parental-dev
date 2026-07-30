@@ -35,6 +35,82 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
+    fun `clear ordinary allow skips regional review`() {
+        var callCount = 0
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        callCount += 1
+                        DagImageAnalysisResult.Classified(0.299f)
+                    },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(1, callCount)
+    }
+
+    @Test
+    fun `one strong quadrant blocks an uncertain ordinary image`() {
+        val probabilities = listOf(0.336f, 0.8f).iterator()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+        assertEquals(0.8f, decision.filterProbability)
+    }
+
+    @Test
+    fun `quadrant signal at uncertain threshold blocks an ordinary image`() {
+        val probabilities = listOf(0.336f, 0.45f).iterator()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+        assertEquals(0.45f, decision.filterProbability)
+    }
+
+    @Test
+    fun `weak quadrants keep an uncertain ordinary image allowed`() {
+        val probabilities = listOf(0.336f, 0.44f, 0.2f, 0.1f, 0.2f).iterator()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+        assertEquals(0.44f, decision.filterProbability)
+    }
+
+    @Test
     fun `model probability at threshold stays blocked`() {
         val decision =
             DagMediaBytesPolicy.decide(
@@ -376,6 +452,26 @@ class DagMediaBytesPolicyTest {
         assertEquals(DagMediaAction.Block, decision.action)
         assertTrue(fullRgb.all { it == 0.toByte() })
         assertTrue(regionalRgb.all { it == 0.toByte() })
+    }
+
+    @Test
+    fun `generated quadrant rgb buffers are overwritten after review`() {
+        val reviewedBuffers = mutableListOf<ByteArray>()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer { image ->
+                        reviewedBuffers += image.rgb888
+                        DagImageAnalysisResult.Classified(0.35f)
+                    },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(5, reviewedBuffers.size)
+        assertTrue(reviewedBuffers.drop(1).all { rgb -> rgb.all { it == 0.toByte() } })
     }
 
     private val readyPreprocessor =

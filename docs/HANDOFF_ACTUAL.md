@@ -76,8 +76,8 @@ documentado arriba.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
-- La instalación física vigente en el SM-S908E es DAG 25. El candidato local
-  declara `versionCode 25`, `versionName 0.15.0-dev`; no fue publicado.
+- La instalación física vigente en el SM-S908E es DAG 36. El candidato local
+  declara `versionCode 36`, `versionName 0.26.0-dev`; no fue publicado.
 - V21 cerró el primer lote de estabilidad: `Analizando` se desmonta cuando la
   presentación queda resuelta, los corazones de Favoritos conservan una
   representación funcional segura aunque su sprite permanezca bloqueado y
@@ -587,6 +587,26 @@ El lote integrado se desarrolló y validó en:
   modelo y 17 presentaciones bloqueadas, físicamente sin escudo. Se preservaron
   navegador predeterminado y Accessibility. Evidencia:
   `docs/compatibility/results/dag-browser-v33-filtered-overlay-sm-s908e-2026-07-30.md`.
+- DAG 34 (`0.24.0-dev`), extensión `1.24.0`, refuerza fuentes dinámicas:
+  un cambio de `src`, `srcset`, `data-src` o `poster` vuelve a ocultar el medio,
+  invalida la decisión anterior y exige analizar la fuente activa antes de
+  presentarla. El cambio quedó integrado en `main` local.
+- `DAG-V3-FALSE-ALLOW-08` quedó resuelto localmente en DAG 36
+  (`0.26.0-dev`). El umbral global continúa en `0,40`. Sólo una imagen ordinaria
+  ya dudosa, con score desde `0,30`, recibe cuatro vistas regionales del tensor
+  ya preparado; una región desde `0,45` la filtra. Las fotos claras por debajo
+  de `0,30` conservan una inferencia y las panorámicas mantienen su consenso
+  separado.
+- Validación de DAG 36: 111 unitarios, `ktlintCheck`, `lintDevDebug` y
+  `assembleDevDebug` correctos. APK de 121.210.914 bytes, SHA-256
+  `5bed28cf235007c5622b54f241c01d4dd6ac40c0679f5b09812eac73faa9f3ce`,
+  instalada in-place en SM-S908E. La fuente reproducida de Google Imágenes que
+  el candidato intermedio permitió con máximo `0,4600` terminó
+  `model_filter 0,4600` y siguió difuminada a los 12 segundos. Cheeky y Mimo
+  completaron sus señales; Frávega quedó visible y analizada, con quietud de
+  fotos incompleta en la muestra de 12 segundos. No hubo crash ni ANR y se
+  preservaron navegador predeterminado y Accessibility. Evidencia:
+  `docs/compatibility/results/dag-browser-v36-uncertain-collage-sm-s908e-2026-07-30.md`.
 
 ### Matriz conjunta Usuario 304, Admin 287 y DAG 29
 
@@ -617,7 +637,6 @@ El siguiente correctivo recomendado es `DAG-DOWNLOADS-01`: preservar semántica
 PDF inline sin debilitar la barrera. La inteligencia conversacional avanzada de
 GloshIA queda para el ticket posterior ya diferido. `DAG-V3-DOCUMENT-ISOLATION-07` y
 `DAG-V3-TAB-HIBERNATION-09` continúan como tickets separados sin autorización
-de código en este lote. La quietud incompleta de Frávega y Mimo observada con
-DAG 32 debe diagnosticarse sin volver a modificar la calibración regional.
-Reproducir la variante panorámica exacta cuando vuelva a aparecer antes de
-cerrar `DAG-V3-FALSE-ALLOW-08`. No publicar sin un nuevo OK explícito.
+de código en este lote. La quietud incompleta de Frávega observada en la muestra
+acotada de DAG 36 debe tratarse como entrega/quietud, no corrigiendo nuevamente
+la calibración regional. No publicar sin un nuevo OK explícito.

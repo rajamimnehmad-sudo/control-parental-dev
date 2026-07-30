@@ -114,4 +114,31 @@ class DagImagePreprocessorTest {
             ),
         )
     }
+
+    @Test
+    fun `uncertain image receives four overlapping quadrant views`() {
+        val source =
+            DagPreparedImage(
+                width = DagImageDecodeContract.TargetSize,
+                height = DagImageDecodeContract.TargetSize,
+                rgb888 =
+                    ByteArray(DagImageDecodeContract.PreparedByteCount) { index ->
+                        (index % 251).toByte()
+                    },
+            )
+
+        val views = DagUncertainRegionalCropper.quadrantViews(source)
+
+        assertEquals(4, views.size)
+        assertTrue(views.all(DagImageDecodeContract::isValid))
+        assertTrue(views.all { it.rgb888 !== source.rgb888 })
+        assertEquals(source.rgb888.take(3), views.first().rgb888.take(3))
+        val lowerRightSourceIndex =
+            ((99 * DagImageDecodeContract.TargetSize) + 99) *
+                DagImageDecodeContract.RgbChannelCount
+        assertEquals(
+            source.rgb888.slice(lowerRightSourceIndex until lowerRightSourceIndex + 3),
+            views.last().rgb888.take(3),
+        )
+    }
 }

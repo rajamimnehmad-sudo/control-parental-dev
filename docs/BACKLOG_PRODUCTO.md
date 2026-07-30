@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-29
+Ultima sincronizacion: 2026-07-30
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -739,10 +739,10 @@ Flujo de una entrada:
 | DAG-ABOUT-VERSION-05 | Resuelto y validado físicamente en DAG 26 | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
 | DAG-V3-PRIVATE-DIAGNOSTICS-06 | Resuelto y validado físicamente en DAG 29 | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
 | DAG-V3-DOCUMENT-ISOLATION-07 | Diagnosticado; pendiente aprobación para código | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
-| DAG-V3-FALSE-ALLOW-08 | Candidato general activo en DAG 29; pendiente variante exacta | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
+| DAG-V3-FALSE-ALLOW-08 | Resuelto localmente y validado físicamente en DAG 36 | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
 | DAG-V3-TAB-HIBERNATION-09 | Riesgo físico confirmado; pendiente aprobación para código | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
-| DAG-V3-MEDIA-PRESENTATION-11 | Resuelto y validado físicamente en DAG 29 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
+| DAG-V3-MEDIA-PRESENTATION-11 | Reforzado localmente en DAG 34 y revalidado con DAG 36 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
 | DAG-V3-FILTERED-OVERLAY-13 | Resuelto localmente y validado físicamente en DAG 33 | P2 | Mostrar fotos filtradas sólo difuminadas, sin escudo ni rastreo final de contenedor | S | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
@@ -1924,7 +1924,7 @@ Flujo de una entrada:
 
 #### DAG-V3-FALSE-ALLOW-08 - Falso permiso visual reproducible
 
-- Estado: `Candidato general activo en DAG 29; pendiente variante exacta`.
+- Estado: `Resuelto localmente y validado físicamente en DAG 36`.
   Tipo: seguridad visual y modelo. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
 - Evidencia: el usuario señaló en DAG 25 una foto raster de la portada pública
   de Instagram que debía difuminarse y apareció permitida. La captura temporal
@@ -1937,7 +1937,7 @@ Flujo de una entrada:
   humana independiente incluye permisos correctos en esa zona. La portada
   pública rota el recurso, por lo que falta correlacionar físicamente la
   variante exacta; no se conservó ninguna captura ni URL de imagen.
-- Corrección candidata: imágenes con relación extrema, donde una persona puede
+- Primera corrección: imágenes con relación extrema, donde una persona puede
   quedar demasiado pequeña al encajar la foto completa en `224 x 224`, reciben
   tres vistas regionales acotadas del mismo modelo. La foto normal conserva una
   sola inferencia; las regiones usan umbral más estricto `0,50`, se ejecutan
@@ -1948,6 +1948,13 @@ Flujo de una entrada:
   sin regresión visible. Instagram impuso su muro para abrir la aplicación y no
   mostró la variante rotativa exacta; por eso la aceptación principal continúa
   abierta.
+- Cierre DAG 36: una composición ordinaria reproducible llegó al modelo con
+  score completo `0,3360`. Sólo las imágenes ordinarias ya dudosas, desde
+  `0,30` y por debajo del umbral global `0,40`, reciben cuatro vistas
+  superpuestas del tensor RGB ya preparado. Una región desde `0,45` filtra la
+  composición; los casos claros por debajo de `0,30` conservan una inferencia.
+  La fuente observada pasó a `model_filter 0,4600` y permaneció difuminada. No
+  se agregó regla por dominio, segundo modelo, API ni persistencia de píxeles.
 - Aceptación: el caso reproducido queda difuminado; fotos normales de hombres,
   niñas permitidas y controles seguros no empeoran en la matriz independiente;
   el APK mantiene un único modelo local y no usa API.
@@ -1988,6 +1995,9 @@ Flujo de una entrada:
   permitida limpia esperas heredadas en sus contenedores. La espera conserva el
   CSS fail-closed y usa un brillo barrido neutro, sin texto `Analizando…`.
   Una imagen filtrada sigue desenfocada y mantiene el escudo.
+- Refuerzo DAG 34: cambios de `src`, `srcset`, `data-src` y `poster` ocultan el
+  elemento de inmediato, invalidan la fuente anterior y exigen una decisión de
+  la fuente nueva. DAG 36 revalidó el flujo sobre una miniatura dinámica real.
 - Evidencia: Frávega y Mimo quedaron sin leyendas residuales después de cargar
   y desplazarse. Google Imágenes conservó el desenfoque preventivo. El cambio
   no agrega reglas por dominio ni libera recursos sin decisión.
