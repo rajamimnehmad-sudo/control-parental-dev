@@ -20,4 +20,15 @@ interface AppFeedbackRepository {
         deviceId: String,
         phoneE164: String,
     ): Result<Unit>
+
+    suspend fun submitSupportReport(
+        deviceId: String,
+        category: String,
+        safeSummary: String,
+        appVersionCode: Int,
+        manufacturer: String,
+        model: String,
+        androidVersion: String,
+        diagnosticCodes: List<String>,
+    ): Result<Unit>
 }

@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Sparkles,
   Star,
+  MessageCircleWarning,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -32,7 +33,10 @@ const groups = [
   },
   {
     label: "Experiencia",
-    items: [{ href: "/ratings", label: "Valoraciones", icon: Star }],
+    items: [
+      { href: "/support", label: "Reportes GloshIA", icon: MessageCircleWarning },
+      { href: "/ratings", label: "Valoraciones", icon: Star },
+    ],
   },
 ] as const;
 

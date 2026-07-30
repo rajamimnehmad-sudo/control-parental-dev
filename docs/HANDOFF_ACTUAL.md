@@ -267,6 +267,32 @@ El lote integrado se desarrolló y validó en:
 - Evidencia:
   `docs/compatibility/results/dag-browser-v20-sm-a235m-2026-07-29.md`.
 
+## Candidato local GloshIA Ayuda y reportes seguros
+
+- App Usuario `296` y App Admin `285` reutilizan el chat contextual existente y
+  agregan respuestas especializadas para DAG, imágenes, Accessibility,
+  aplicaciones, actualizaciones, activación y sincronización.
+- El motor sigue siendo local, determinista, gratuito y funcional sin Internet.
+  No usa una API de IA ni envía el texto de la conversación.
+- Cuando una pregunta expresa una falla, la app genera un resumen técnico
+  predeterminado y lo envía a Supabase DEV con categoría, versión, fabricante,
+  modelo, Android y códigos de estado permitidos. No envía contraseñas, fotos,
+  búsquedas ni el texto escrito por el usuario.
+- Supabase DEV incorpora `support_reports`, RLS y RPC separadas para envío desde
+  dispositivos y lectura exclusiva de Super Admin. La Superweb agrega la
+  bandeja `Reportes GloshIA`.
+- Prueba física SM-A235M: el chat respondió a una pregunta libre que contenía
+  una contraseña sintética; Supabase recibió solamente
+  `DAG presentó un problema al cargar, analizar o mostrar imágenes.`, categoría
+  `dag-images`, modelo `SM-A235M`, Android `14` y versión `296`.
+- El puente con DAG V3 queda habilitado por defecto solamente en DEV para evitar
+  que futuras compilaciones locales vuelvan a diagnosticar como ausente una APK
+  instalada. Beta y Production permanecen apagados.
+- Validación: unitarios y ktlint Android, APK Usuario/Admin, typecheck y build de
+  Superweb, lint y asesores de seguridad de Supabase, y prueba física del flujo
+  Usuario a backend. App Usuario `296` quedó reinstalada en el SM-A235M.
+- No se hizo push, publicación DEV ni cambio en Production.
+
 ## Límites vigentes
 
 - Sin Device Owner no existe garantía absoluta contra modo seguro, ADB

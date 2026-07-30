@@ -37,4 +37,31 @@ class AppHelpAssistantTest {
 
         assertEquals("Sólo puedo ayudar con Content Filter", answer.title)
     }
+
+    @Test
+    fun `dag image failure creates only a sanitized report`() {
+        val answer =
+            AppHelpAssistant.answer(
+                "H&M no muestra fotos y mi contraseña es secreta",
+                HelpContext(audience = HelpAudience.User),
+            )
+
+        assertEquals(HelpReportCategory.DagImages, answer.report?.category)
+        assertEquals(
+            "DAG presentó un problema al cargar, analizar o mostrar imágenes.",
+            answer.report?.safeSummary,
+        )
+        assertTrue(answer.report?.safeSummary?.contains("contraseña") == false)
+    }
+
+    @Test
+    fun `ordinary help question is not reported`() {
+        val answer =
+            AppHelpAssistant.answer(
+                "¿Cómo funciona DAG?",
+                HelpContext(audience = HelpAudience.User),
+            )
+
+        assertEquals(null, answer.report)
+    }
 }

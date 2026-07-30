@@ -59,13 +59,9 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 295
+            versionCode = 296
             versionNameSuffix = "-dev"
-            buildConfigField(
-                "boolean",
-                "DAG_BROWSER_V3_BRIDGE_AVAILABLE",
-                (envValue("DAG_BROWSER_V3_BRIDGE_AVAILABLE").equals("true", ignoreCase = true)).toString(),
-            )
+            buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "true")
         }
         create("beta") {
             dimension = "distribution"

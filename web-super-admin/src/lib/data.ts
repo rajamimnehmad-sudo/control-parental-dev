@@ -9,6 +9,7 @@ import type {
   ProtectionAlertEvent,
   Announcement,
   AppRating,
+  SupportReport,
 } from "@/lib/types";
 
 const devUpdateBase = "https://syeycayasyufedwoprea.supabase.co/storage/v1/object/public/dev-updates";
@@ -55,6 +56,13 @@ export async function listAppRatings() {
   const { data, error } = await supabase.rpc("super_admin_list_app_ratings", { max_rows: 500 });
   if (error) raise(error);
   return (data ?? []) as AppRating[];
+}
+
+export async function listSupportReports() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("super_admin_list_support_reports", { max_rows: 500 });
+  if (error) raise(error);
+  return (data ?? []) as SupportReport[];
 }
 
 export async function getCommunityBundle(communityId: string) {

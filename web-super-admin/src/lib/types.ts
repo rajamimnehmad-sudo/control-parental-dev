@@ -70,6 +70,24 @@ export type AppRating = {
   updated_at: string;
 };
 
+export type SupportReport = {
+  report_id: string;
+  community_id: string | null;
+  community_name: string | null;
+  device_id: string;
+  device_name: string;
+  app_role: "user" | "admin";
+  category: string;
+  safe_summary: string;
+  app_version_code: number;
+  manufacturer: string | null;
+  model: string | null;
+  android_version: string | null;
+  diagnostic_codes: string[];
+  status: "open" | "reviewing" | "resolved";
+  created_at: string;
+};
+
 export type DevAppVersions = {
   user: number | null;
   admin: number | null;

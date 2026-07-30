@@ -38,12 +38,14 @@ import com.contentfilter.core.domain.help.AppHelpAssistant
 import com.contentfilter.core.domain.help.HelpAction
 import com.contentfilter.core.domain.help.HelpAnswer
 import com.contentfilter.core.domain.help.HelpContext
+import com.contentfilter.core.domain.help.HelpReportDraft
 
 @Composable
 fun AppHelpAssistantScreen(
     context: HelpContext,
     onBack: () -> Unit,
     onAction: (HelpAction) -> Unit,
+    onAutomaticReport: (HelpReportDraft) -> Unit = {},
 ) {
     var question by rememberSaveable { mutableStateOf("") }
     val messages = remember { mutableStateListOf(HelpChatMessage.assistant(AppHelpAssistant.welcome(context))) }
@@ -56,6 +58,7 @@ fun AppHelpAssistantScreen(
         val answer = AppHelpAssistant.answer(prompt, context, previousAction = lastAction)
         messages += HelpChatMessage.user(prompt)
         messages += HelpChatMessage.assistant(answer)
+        answer.report?.let(onAutomaticReport)
         suggestions = AppHelpAssistant.followUpSuggestions(answer, context)
         lastAction = answer.action ?: lastAction
         question = ""

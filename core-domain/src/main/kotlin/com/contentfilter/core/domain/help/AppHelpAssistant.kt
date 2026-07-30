@@ -15,6 +15,26 @@ enum class HelpAction {
     Settings,
 }
 
+enum class HelpReportCategory(
+    val wireValue: String,
+) {
+    DagImages("dag-images"),
+    DagNavigation("dag-navigation"),
+    WebProtection("web-protection"),
+    AppProtection("app-protection"),
+    Accessibility("accessibility"),
+    Updates("updates"),
+    Activation("activation"),
+    UninstallProtection("uninstall-protection"),
+    Sync("sync"),
+    Unclassified("unclassified"),
+}
+
+data class HelpReportDraft(
+    val category: HelpReportCategory,
+    val safeSummary: String,
+)
+
 data class HelpContext(
     val audience: HelpAudience,
     val offline: Boolean = false,
@@ -24,6 +44,7 @@ data class HelpContext(
     val accessibilityActive: Boolean = true,
     val uninstallProtectionActive: Boolean = true,
     val recoveryKitReady: Boolean = false,
+    val dagInstalled: Boolean = true,
 )
 
 data class HelpAnswer(
@@ -31,6 +52,7 @@ data class HelpAnswer(
     val body: String,
     val actionLabel: String? = null,
     val action: HelpAction? = null,
+    val report: HelpReportDraft? = null,
 )
 
 object AppHelpAssistant {
@@ -61,7 +83,58 @@ object AppHelpAssistant {
     ): HelpAnswer {
         val normalized = question.normalized()
         if (normalized.isBlank()) return welcome(context)
+        val reportsFailure = normalized.reportsFailure()
         return when {
+            normalized.hasAny("dag", "gloshia", "foto", "fotos", "imagen", "imagenes", "difuminada", "transparente") ->
+                HelpAnswer(
+                    title = "Navegación protegida DAG",
+                    body =
+                        when {
+                            !context.dagInstalled ->
+                                "DAG no está instalado en este teléfono. Abrí Ajustes para instalarlo y después confirmalo como navegador predeterminado."
+                            normalized.hasAny("foto", "fotos", "imagen", "imagenes", "difuminada", "transparente") ->
+                                "DAG mantiene cada imagen oculta mientras GloshIA la analiza. Si queda difuminada fue filtrada; si figura como no disponible hubo un formato o una carga que no pudo validarse."
+                            else ->
+                                "DAG es el navegador protegido. Si una página no abre, comprobá primero conexión, versión instalada y que DAG continúe como navegador predeterminado."
+                        },
+                    actionLabel = if (context.dagInstalled) "Abrir Web" else "Abrir Ajustes",
+                    action = if (context.dagInstalled) HelpAction.Web else HelpAction.Settings,
+                    report =
+                        if (reportsFailure) {
+                            HelpReportDraft(
+                                category =
+                                    if (normalized.hasAny(
+                                            "foto",
+                                            "fotos",
+                                            "imagen",
+                                            "imagenes",
+                                            "difuminada",
+                                            "transparente",
+                                        )
+                                    ) {
+                                        HelpReportCategory.DagImages
+                                    } else {
+                                        HelpReportCategory.DagNavigation
+                                    },
+                                safeSummary =
+                                    if (normalized.hasAny(
+                                            "foto",
+                                            "fotos",
+                                            "imagen",
+                                            "imagenes",
+                                            "difuminada",
+                                            "transparente",
+                                        )
+                                    ) {
+                                        "DAG presentó un problema al cargar, analizar o mostrar imágenes."
+                                    } else {
+                                        "DAG presentó un problema de navegación o apertura."
+                                    },
+                            )
+                        } else {
+                            null
+                        },
+                )
             normalized.hasAny(
                 "alerta maxima",
                 "desinstalo",
@@ -69,7 +142,11 @@ object AppHelpAssistant {
                 "reinstala sola",
                 "restablece sola",
             ) ->
-                uninstallAnswer(context)
+                uninstallAnswer(context).withFailureReport(
+                    reportsFailure,
+                    HelpReportCategory.UninstallProtection,
+                    "La protección contra desinstalación o la presencia de la app requiere revisión.",
+                )
             normalized.hasAny(
                 "sin internet",
                 "sin conexion",
@@ -91,8 +168,30 @@ object AppHelpAssistant {
                         },
                     actionLabel = "Abrir Web",
                     action = HelpAction.Web,
+                    report =
+                        reportsFailure.report(
+                            HelpReportCategory.WebProtection,
+                            "La protección web o la VPN presentó un problema.",
+                        ),
                 )
-            normalized.hasAny("accesibilidad", "bloqueo de apps", "aplicaciones", "apps", "limites") ->
+            normalized.hasAny("accesibilidad") ->
+                HelpAnswer(
+                    title = "Accesibilidad",
+                    body =
+                        if (context.accessibilityActive) {
+                            "Accesibilidad está activa. Si una app no responde a la regla, revisá su permiso y el horario configurado."
+                        } else {
+                            "Accesibilidad está apagada. Abrí Seguridad y activá “Usar Content Filter” en los ajustes de Android."
+                        },
+                    actionLabel = "Ver estado",
+                    action = HelpAction.Security,
+                    report =
+                        reportsFailure.report(
+                            HelpReportCategory.Accessibility,
+                            "Accesibilidad o el bloqueo asociado presentó un problema.",
+                        ),
+                )
+            normalized.hasAny("bloqueo de apps", "aplicaciones", "apps", "limites") ->
                 HelpAnswer(
                     title = "Protección de aplicaciones",
                     body =
@@ -103,6 +202,50 @@ object AppHelpAssistant {
                         },
                     actionLabel = if (context.audience == HelpAudience.Admin) "Abrir Apps" else "Ver estado",
                     action = if (context.audience == HelpAudience.Admin) HelpAction.Apps else HelpAction.Security,
+                    report =
+                        reportsFailure.report(
+                            HelpReportCategory.AppProtection,
+                            "Una regla, límite o bloqueo de aplicaciones no funcionó como se esperaba.",
+                        ),
+                )
+            normalized.hasAny("actualizacion", "actualizar", "version", "instalar apk", "descarga") ->
+                HelpAnswer(
+                    title = "Actualizaciones",
+                    body = "Abrí Ajustes para comprobar la versión. Android puede pedir permiso para instalar y una confirmación final.",
+                    actionLabel = "Abrir Ajustes",
+                    action = HelpAction.Settings,
+                    report =
+                        reportsFailure.report(
+                            HelpReportCategory.Updates,
+                            "La descarga, instalación o comprobación de una actualización presentó un problema.",
+                        ),
+                )
+            normalized.hasAny("activar", "activacion", "enlace", "token", "licencia") ->
+                HelpAnswer(
+                    title = "Activación y enlace",
+                    body = "La activación necesita un token vigente del administrador. La licencia y el enlace se actualizan al sincronizar.",
+                    actionLabel = "Abrir Ajustes",
+                    action = HelpAction.Settings,
+                    report =
+                        reportsFailure.report(
+                            HelpReportCategory.Activation,
+                            "La activación, licencia o enlace del dispositivo presentó un problema.",
+                        ),
+                )
+            normalized.hasAny("sincroniza", "sincronizacion", "no llega", "no aparece") ->
+                HelpAnswer(
+                    title = "Sincronización",
+                    body =
+                        if (context.offline) {
+                            "El teléfono está sin sincronización. La protección local continúa y los cambios remotos se retomarán cuando vuelva la conexión."
+                        } else {
+                            "La sincronización informa un estado activo. Si un cambio no aparece, abrí nuevamente la pantalla para forzar una actualización."
+                        },
+                    report =
+                        reportsFailure.report(
+                            HelpReportCategory.Sync,
+                            "Un cambio o estado no se sincronizó como se esperaba.",
+                        ),
                 )
             normalized.hasAny("seguridad", "proteccion", "barrera", "desinstalacion") ->
                 HelpAnswer(
@@ -129,7 +272,18 @@ object AppHelpAssistant {
                     action = HelpAction.Settings,
                 )
             previousAction != null && normalized.isContextualFollowUp() -> contextualFollowUp(previousAction, context)
-            else -> outOfScopeAnswer()
+            else ->
+                outOfScopeAnswer().copy(
+                    report =
+                        if (reportsFailure) {
+                            HelpReportDraft(
+                                HelpReportCategory.Unclassified,
+                                "El asistente recibió un problema de Content Filter que no pudo clasificar.",
+                            )
+                        } else {
+                            null
+                        },
+                )
         }
     }
 
@@ -224,6 +378,17 @@ object AppHelpAssistant {
                 "Preguntame sobre Apps, Web, protección, solicitudes, actualizaciones, instalación, reenlace o recuperación offline.",
         )
 
+    private fun HelpAnswer.withFailureReport(
+        reportsFailure: Boolean,
+        category: HelpReportCategory,
+        safeSummary: String,
+    ): HelpAnswer = copy(report = reportsFailure.report(category, safeSummary))
+
+    private fun Boolean.report(
+        category: HelpReportCategory,
+        safeSummary: String,
+    ): HelpReportDraft? = if (this) HelpReportDraft(category, safeSummary) else null
+
     private fun String.normalized(): String =
         Normalizer
             .normalize(lowercase(), Normalizer.Form.NFD)
@@ -235,6 +400,22 @@ object AppHelpAssistant {
 
     private fun String.isContextualFollowUp(): Boolean =
         split(' ').size <= 8 && hasAny("y si", "entonces", "eso", "cuando", "como", "por que", "que pasa", "puede")
+
+    private fun String.reportsFailure(): Boolean =
+        hasAny(
+            "error",
+            "falla",
+            "fallo",
+            "no funciona",
+            "no abre",
+            "no carga",
+            "no aparece",
+            "no muestra",
+            "se cierra",
+            "se traba",
+            "queda transparente",
+            "problema",
+        )
 
     private val CombiningMarks = Regex("\\p{M}+")
     private val NonWords = Regex("[^a-z0-9]+")

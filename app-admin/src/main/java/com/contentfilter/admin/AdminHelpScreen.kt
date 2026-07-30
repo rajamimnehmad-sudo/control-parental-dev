@@ -5,6 +5,7 @@ import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.admin.dashboard.DashboardViewModel
+import com.contentfilter.admin.help.AdminHelpReportViewModel
 import com.contentfilter.core.domain.help.HelpAction
 import com.contentfilter.core.domain.help.HelpAudience
 import com.contentfilter.core.domain.help.HelpContext
@@ -15,21 +16,24 @@ internal fun AdminHelpRoute(
     onBack: () -> Unit,
     onAction: (HelpAction) -> Unit,
     viewModel: DashboardViewModel = hiltViewModel(),
+    reportViewModel: AdminHelpReportViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val users = state.protectedUsers
+    val helpContext =
+        HelpContext(
+            audience = HelpAudience.Admin,
+            offline = state.syncState != "Enabled",
+            possibleUninstall = users.any { it.possibleUninstall },
+            protectionNeedsAttention = users.any { it.hasConfirmedProblem || it.requiresVerification },
+            vpnActive = users.none { it.vpnProblem },
+            accessibilityActive = users.none { it.accessibilityProblem },
+            uninstallProtectionActive = users.none { it.deviceAdminProblem },
+        )
     AppHelpAssistantScreen(
-        context =
-            HelpContext(
-                audience = HelpAudience.Admin,
-                offline = state.syncState != "Enabled",
-                possibleUninstall = users.any { it.possibleUninstall },
-                protectionNeedsAttention = users.any { it.hasConfirmedProblem || it.requiresVerification },
-                vpnActive = users.none { it.vpnProblem },
-                accessibilityActive = users.none { it.accessibilityProblem },
-                uninstallProtectionActive = users.none { it.deviceAdminProblem },
-            ),
+        context = helpContext,
         onBack = onBack,
         onAction = onAction,
+        onAutomaticReport = { reportViewModel.report(it, helpContext) },
     )
 }

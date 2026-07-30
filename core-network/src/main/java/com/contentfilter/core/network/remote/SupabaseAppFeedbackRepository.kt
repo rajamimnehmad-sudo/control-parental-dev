@@ -1,6 +1,7 @@
 package com.contentfilter.core.network.remote
 
 import com.contentfilter.core.domain.repository.AppFeedbackRepository
+import org.json.JSONArray
 import org.json.JSONObject
 import javax.inject.Inject
 
@@ -53,6 +54,30 @@ class SupabaseAppFeedbackRepository
                     JSONObject()
                         .put("p_device_id", deviceId)
                         .put("p_phone_e164", phoneE164),
+                ).asResult()
+
+        override suspend fun submitSupportReport(
+            deviceId: String,
+            category: String,
+            safeSummary: String,
+            appVersionCode: Int,
+            manufacturer: String,
+            model: String,
+            androidVersion: String,
+            diagnosticCodes: List<String>,
+        ): Result<Unit> =
+            client
+                .invokeRpc(
+                    "submit_own_support_report",
+                    JSONObject()
+                        .put("p_device_id", deviceId)
+                        .put("p_category", category)
+                        .put("p_safe_summary", safeSummary)
+                        .put("p_app_version_code", appVersionCode)
+                        .put("p_manufacturer", manufacturer)
+                        .put("p_model", model)
+                        .put("p_android_version", androidVersion)
+                        .put("p_diagnostic_codes", JSONArray(diagnosticCodes)),
                 ).asResult()
 
         private fun RemoteResult<Unit>.asResult(): Result<Unit> =

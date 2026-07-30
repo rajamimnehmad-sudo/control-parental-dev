@@ -12,10 +12,10 @@ Este corte agrega un puente unidireccional y opt-in desde App Usuario DEV hacia 
 
 ## Interruptor
 
-El botón `Navegador protegido` solo se compila cuando
-`DAG_BROWSER_V3_BRIDGE_AVAILABLE=true`.
+El botón `Navegador protegido` se compila habilitado en DEV.
 
-- DEV: apagado por defecto y activable solo al construir explicitamente el candidato.
+- DEV: habilitado por defecto para que las compilaciones locales y las actualizaciones mantengan
+  el puente con DAG V3.
 - Beta: forzado a apagado.
 - Production: forzado a apagado.
 
