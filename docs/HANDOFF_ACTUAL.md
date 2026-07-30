@@ -465,6 +465,33 @@ El lote integrado se desarrolló y validó en:
   Ambas quedaron instaladas desde esos artefactos en el SM-S908E; Admin 287 no
   fue recompilado ni modificado.
 
+### Línea base profesional DAG 25 iniciada
+
+- El 2026-07-30 se midió DAG 25 sobre SM-S908E sin cambiar APK, datos ni
+  configuración. Una página simple quedó visible en 198 ms y con viewport listo
+  en 456 ms; Google web en 178/3.440 ms; Google Imágenes en 412/966 ms;
+  Instagram en 288/1.956 ms; Frávega en 1.053/9.830 ms. No hubo crash ni ANR.
+- Cheeky fue visible en 1.852 ms y Mimo en 267 ms, pero no emitieron quietud
+  dentro de 15 segundos. H&M emitió análisis/viewport en 841/1.094 ms sin una
+  señal coherente de página visible. La causa general es que la extensión
+  condiciona la quietud del documento actual a estado y colas globales que
+  también reciben carga dinámica o trabajo de otras pestañas.
+- El usuario confirmó un falso permiso real en una foto raster de la portada
+  pública de Instagram. No se retuvo la captura porque coincidió con una
+  notificación personal. Antes de tocar umbrales debe distinguirse score del
+  modelo, caché o bypass de transporte.
+- `DagMediaTransport` registra actualmente URL, texto alternativo y estado DOM
+  en DEV. Es una regresión respecto de la evidencia privada anterior y queda
+  como `DAG-V3-PRIVATE-DIAGNOSTICS-06`.
+- La matriz dejó 15 pestañas y aproximadamente 310.924 KiB PSS/487.696 KiB RSS.
+  El presupuesto de 12 MB sólo cubre miniaturas; las sesiones Gecko abiertas en
+  la misma ejecución requieren `DAG-V3-TAB-HIBERNATION-09` antes de aprobar 50.
+- Tickets de causa general capturados: `DAG-V3-PRIVATE-DIAGNOSTICS-06`,
+  `DAG-V3-DOCUMENT-ISOLATION-07`, `DAG-V3-FALSE-ALLOW-08` y
+  `DAG-V3-TAB-HIBERNATION-09`. Ninguno agrega excepciones por sitio. No se
+  escribió código, incrementó versión, compiló, instaló ni publicó durante esta
+  etapa.
+
 ## Próximo trabajo autorizado
 
 Completar la matriz conjunta con Usuario 304, Admin 287 y DAG 25: Ajustes, chat offline,
@@ -473,4 +500,8 @@ imágenes. Atrás moderno y miniaturas seguras ya tienen evidencia física en el
 SM-S908E. La inteligencia conversacional avanzada de GloshIA queda para un
 ticket posterior. Para DAG, iniciar primero una línea base profesional de
 rendimiento/compatibilidad y luego ejecutar tickets pequeños; el primero
-aprobado es `DAG-ABOUT-VERSION-05`. No publicar sin un nuevo OK explícito.
+aprobado es `DAG-ABOUT-VERSION-05`. La línea base ya identificó cuatro tickets
+generales todavía no aprobados para código; por prioridad se propone
+`DAG-V3-PRIVATE-DIAGNOSTICS-06`, luego el diagnóstico de
+`DAG-V3-FALSE-ALLOW-08`, aislamiento de documento y finalmente hibernación. No
+publicar sin un nuevo OK explícito.

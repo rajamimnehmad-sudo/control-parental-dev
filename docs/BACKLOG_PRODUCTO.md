@@ -735,6 +735,10 @@ Flujo de una entrada:
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-ABOUT-VERSION-05 | Aprobado; pendiente línea base profesional | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
+| DAG-V3-PRIVATE-DIAGNOSTICS-06 | Diagnosticado; pendiente aprobación para código | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
+| DAG-V3-DOCUMENT-ISOLATION-07 | Diagnosticado; pendiente aprobación para código | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
+| DAG-V3-FALSE-ALLOW-08 | Caso físico confirmado; pendiente diagnóstico reproducible y aprobación para código | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
+| DAG-V3-TAB-HIBERNATION-09 | Riesgo físico confirmado; pendiente aprobación para código | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Resuelto y publicado DEV 279 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
@@ -1853,6 +1857,88 @@ Flujo de una entrada:
   automáticamente sus valores; Atrás vuelve al navegador; no cambia filtros,
   navegación, red, consultas, permisos, historial ni seguridad.
 
+#### DAG-V3-PRIVATE-DIAGNOSTICS-06 - Diagnóstico DEV sin contenido de navegación
+
+- Estado: `Diagnosticado; pendiente aprobación para código`. Hallazgo de la
+  línea base física del 2026-07-30 sobre DAG 25 en SM-S908E. Tipo: privacidad y
+  observabilidad. Prioridad: P0. Esfuerzo: S. Riesgo: alto.
+- Causa raíz: el mensaje de presentación y `DagMediaTransport` incluyen
+  `sourceUrl`, texto alternativo y estados de elementos DOM. Una versión
+  anterior había limitado la evidencia a bytes, motivo, score y tiempo, pero la
+  integración de DAG V3 reintrodujo esos campos.
+- Propuesta: no enviar ni registrar URL, texto, selectores, contenido de página
+  ni píxeles en la evidencia DEV. Conservar únicamente identificadores
+  efímeros no reversibles, acción, motivo, score, tamaño, conteos agregados y
+  latencia.
+- Aceptación: una matriz con Google, tiendas e Instagram no deja URL, búsquedas,
+  texto alternativo ni contenido DOM en `logcat`; siguen disponibles conteos,
+  tiempos, motivos y scores suficientes para diagnosticar; Beta/Production no
+  agregan telemetría nueva.
+
+#### DAG-V3-DOCUMENT-ISOLATION-07 - Quietud y trabajo aislados por documento
+
+- Estado: `Diagnosticado; pendiente aprobación para código`. Tipo: rendimiento,
+  ciclo de vida y compatibilidad general. Prioridad: P1. Esfuerzo: M. Riesgo:
+  alto.
+- Evidencia DAG 25/SM-S908E: Cheeky fue visible en 1.852 ms y Mimo en 267 ms,
+  pero ninguna emitió quietud dentro de 15 segundos; H&M emitió análisis e
+  imágenes listas en 1.094 ms sin una señal coherente de página visible.
+  Google Imágenes y una página simple sí cerraron el ciclo.
+- Causa raíz: la extensión mantiene token de documento, filtros activos,
+  solicitudes nativas, presentaciones y cola fallback como estado global. La
+  señal del viewport exige que toda esa cola quede en cero; carruseles, pestañas
+  anteriores o carga continua pueden impedirlo o atribuir trabajo viejo a la
+  navegación actual.
+- Propuesta: asociar generación, cancelación y métricas al documento/pestaña
+  exactos; priorizar sólo recursos del viewport inicial; dejar el resto como
+  procesamiento progresivo seguro; usar una salida acotada que no libere una
+  imagen sin decisión ni confunda “página usable” con “sitio entero quieto”.
+- Aceptación: navegación rápida entre varias pestañas no cruza decisiones ni
+  métricas; Cheeky, Mimo, H&M, Frávega, Google Imágenes e Instagram emiten
+  estados coherentes; contenido dinámico puede continuar agregando imágenes sin
+  mantener eternamente el viewport inicial en espera; todo recurso no resuelto
+  permanece fail-closed.
+
+#### DAG-V3-FALSE-ALLOW-08 - Falso permiso visual reproducible
+
+- Estado: `Caso físico confirmado; pendiente diagnóstico reproducible y
+  aprobación para código`. Tipo: seguridad visual y modelo. Prioridad: P0.
+  Esfuerzo: M. Riesgo: alto.
+- Evidencia: el usuario señaló en DAG 25 una foto raster de la portada pública
+  de Instagram que debía difuminarse y apareció permitida. La captura temporal
+  usada para reconocer el caso fue eliminada porque coincidió con una
+  notificación personal; no se conserva imagen, mensaje, URL completa ni
+  píxeles en el repositorio.
+- Primera etapa obligatoria: reproducir el recurso público con diagnóstico
+  privado y determinar si el modelo produjo score menor a `0,40`, si una caché
+  devolvió una decisión anterior o si la imagen evitó el transporte. No cambiar
+  globalmente el umbral antes de conocer esa ruta.
+- Corrección: si es modelo, incorporar un conjunto pequeño de casos difíciles
+  actuales y revalidar falsos permisos/filtros por audiencia; si es entrega o
+  caché, corregir esa clase de recurso/documento. Nunca agregar una excepción
+  por dominio o por Instagram.
+- Aceptación: el caso reproducido queda difuminado; fotos normales de hombres,
+  niñas permitidas y controles seguros no empeoran en la matriz independiente;
+  el APK mantiene una sola inferencia local y no usa API.
+
+#### DAG-V3-TAB-HIBERNATION-09 - Presupuesto real para 50 pestañas
+
+- Estado: `Riesgo físico confirmado; pendiente aprobación para código`. Tipo:
+  memoria, estabilidad y pestañas. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- Evidencia DAG 25/SM-S908E: después de la matriz con 15 pestañas, DAG registró
+  aproximadamente 310.924 KiB PSS y 487.696 KiB RSS. El presupuesto actual de
+  12 MB cubre las 50 miniaturas, pero no las sesiones Gecko creadas durante la
+  misma ejecución; sólo las pestañas restauradas tras reiniciar usan apertura
+  diferida.
+- Propuesta: mantener activas únicamente la pestaña visible y un conjunto LRU
+  pequeño medido; capturar miniatura segura, persistir sólo URL/título/orden y
+  cerrar la sesión de pestañas antiguas. Al reabrir, crear sesión y revalidar
+  normalmente. Presión de memoria hiberna antes, sin perder la lista.
+- Aceptación: matriz física 1/10/50 en SM-S908E y SM-A235M; selector y cierre
+  fluidos; ninguna sesión en segundo plano reproduce medios; memoria acotada con
+  umbrales medidos, no estimados sólo por bitmaps; restaurar nunca reutiliza una
+  aprobación ni persiste miniaturas.
+
 #### DAG-TABS-UX-03 - Hasta 50 pestanas con selector visual completo
 
 - Estado: `Implementado en main como DAG 23 e instalado dentro de DAG 25;
@@ -1871,7 +1957,11 @@ Flujo de una entrada:
 - Presupuesto implementado: cada miniatura se reduce a `200 x 300` ARGB; las 50
   capturas consumen como máximo teórico 12.000.000 bytes. Se mantiene un solo
   GeckoView adjunto/activo, medios suspendidos en sesiones inactivas y
-  restauración diferida tras reiniciar.
+  restauración diferida tras reiniciar. La línea base DAG 25 comprobó que las
+  sesiones creadas durante la misma ejecución siguen dominando la memoria:
+  15 pestañas alcanzaron aproximadamente 310.924 KiB PSS. La matriz de 50 no se
+  considera aprobada hasta resolver o descartar con mediciones
+  `DAG-V3-TAB-HIBERNATION-09`.
 - Validación DAG 23: 50 pestañas sobreviven al códec con la última activa; una
   entrada 51 se trunca de forma determinista; `node --check`, `ktlintCheck`, 80
   unitarios, `assembleDevDebug` y `lintDevDebug` correctos desde `main`. No se
