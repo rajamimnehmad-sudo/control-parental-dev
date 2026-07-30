@@ -532,14 +532,46 @@ El lote integrado se desarrolló y validó en:
   Accessibility activa. `Acerca de DAG` mostró `Versión 0.19.0-dev (29)`.
   `DAG-V3-DOCUMENT-ISOLATION-07`, `DAG-V3-TAB-HIBERNATION-09` y la reproducción
   exacta del falso permiso rotativo siguen pendientes.
+- `DAG-WEB-PROMPTS-01` quedó resuelto en DAG 30 (`0.20.0-dev`). La causa de que
+  los desplegables HTML recibieran el toque sin abrir era la ausencia del
+  `GeckoSession.PromptDelegate`. DAG ahora presenta selectores nativos simples y
+  múltiples, conserva selección, grupos y opciones deshabilitadas, y cancela
+  de forma segura al cambiar de pestaña o salir de la app.
+- Validación de DAG 30: 99 unitarios, `ktlintCheck`, `lintDevDebug` y
+  `assembleDevDebug` correctos. APK SHA-256
+  `875aa162c9c2aebbe6cf4fd4d8c0499bd77a43760d1e224cca059169c070508b`,
+  instalado in-place en SM-S908E. Un selector HTML real abrió y el usuario
+  confirmó físicamente que funciona. La variante múltiple queda cubierta por
+  la implementación y pendiente de un recorrido físico específico.
+
+### Matriz conjunta Usuario 304, Admin 287 y DAG 29
+
+- El 2026-07-30 se recorrieron físicamente las tres apps en SM-S908E/Android 16
+  sin borrar datos. Usuario y Admin conservaron sus secciones independientes de
+  Ajustes y ambos chats funcionaron offline.
+- Usuario respondió con estado propio y no repitió una clave sintética; Admin
+  mostró solamente el resumen agregado de dos usuarios. `Borrar chat` funcionó
+  y `Cambiar administrador` exigió confirmación, que fue cancelada.
+- La calidad contextual avanzada sigue diferida: Usuario explicó la activación
+  sin informar el estado concreto de la licencia; Admin clasificó una pregunta
+  de identidad como ayuda de bloqueo de apps. Fueron respuestas seguras pero
+  poco pertinentes, sin crash ni fuga.
+- El organizador DAG funcionó con 20 pestañas y las dos pestañas técnicas se
+  cerraron. `DAG-DOWNLOADS-01` no pasó la prueba física: un PDF inline entró al
+  visor PDF.js, donde la barrera cerró seguro; una descarga real por formulario
+  `POST target=_blank` fue reabierta por DAG como `GET` y el servidor respondió
+  `Method Not Allowed`. No quedó archivo ni parcial.
+- Causa de descarga confirmada: `onLoadRequest` crea manualmente la nueva
+  pestaña con `loadUri(request.uri)` y pierde método/cuerpo del formulario. El
+  visor PDF inline es un segundo recorrido pendiente. Evidencia:
+  `docs/compatibility/results/joint-user304-admin287-dag29-sm-s908e-2026-07-30.md`.
 
 ## Próximo trabajo autorizado
 
-Completar la matriz conjunta con Usuario 304, Admin 287 y DAG 29: Ajustes, chat offline,
-borrado, secretos sintéticos, acciones seguras, pestañas, descargas PDF e
-imágenes. Atrás moderno y miniaturas seguras ya tienen evidencia física en el
-SM-S908E. La inteligencia conversacional avanzada de GloshIA queda para un
-ticket posterior. `DAG-V3-DOCUMENT-ISOLATION-07` y
+El siguiente correctivo recomendado es `DAG-DOWNLOADS-01`: preservar semántica
+`POST` al abrir una descarga en nueva pestaña y definir el tratamiento seguro de
+PDF inline sin debilitar la barrera. La inteligencia conversacional avanzada de
+GloshIA queda para el ticket posterior ya diferido. `DAG-V3-DOCUMENT-ISOLATION-07` y
 `DAG-V3-TAB-HIBERNATION-09` continúan como tickets separados sin autorización
 de código en este lote. Reproducir la variante panorámica exacta cuando vuelva a
 aparecer antes de cerrar `DAG-V3-FALSE-ALLOW-08`. No publicar sin un nuevo OK

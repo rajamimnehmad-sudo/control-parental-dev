@@ -421,8 +421,9 @@ Flujo de una entrada:
 
 ### LOTE-HELP-BOTH-APPS-02 - GloshIA útil y coherente en Usuario y Admin
 
-- Estado: `Resuelto en lote local 6; pendiente gate físico`. El usuario lo
-  aprobó como sexto lote y autorizó su ejecución el 2026-07-30. Tipo:
+- Estado: `Resuelto en lote local 6; gate físico seguro aprobado y calidad
+  contextual avanzada diferida`. El usuario lo aprobó como sexto lote y
+  autorizó su ejecución el 2026-07-30. Tipo:
   asistencia contextual, UX, privacidad y arquitectura Android. Prioridad: P1.
   Esfuerzo: L. Riesgo: medio.
 - Objetivo: Usuario y Admin ofrecen una experiencia conversacional consistente,
@@ -665,9 +666,10 @@ Flujo de una entrada:
 | PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; pendiente episodio real controlado | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
 | PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; UI fisica validada, pendiente ciclo offline real | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
 | PROTECTION-OFFLINE-RECOVERY-AUTO-03 | Idea; no aprobada para codigo | P0 | Preparar automaticamente el kit de emergencia al crear y enlazar un Usuario | M | Alto |
-| DAG-DOWNLOADS-01 | Primera etapa PDF implementada en DAG 24; pendiente matriz física y política Admin | P1 | Descargas seguras de documentos con control Admin y bloqueo permanente de APK/ejecutables | L | Alto |
-| HELP-CONTEXTUAL-CHAT-01 | Usuario 304 instalado: crash resuelto; mejora conversacional diferida | P1 | Chat privado de ayuda y diagnóstico seguro automático | L | Medio |
-| LOTE-HELP-BOTH-APPS-02 | Idea agrupada; no aprobada para codigo | P1 | Mejorar GloshIA e integrarla con contexto y acciones seguras en Usuario y Admin | L | Medio |
+| DAG-DOWNLOADS-01 | Primera etapa PDF implementada; matriz física fallida por POST/nueva pestaña y PDF inline | P1 | Descargas seguras de documentos con control Admin y bloqueo permanente de APK/ejecutables | L | Alto |
+| DAG-WEB-PROMPTS-01 | Resuelto e instalado en DAG 30; selector simple validado físicamente | P1 | Selectores HTML nativos simples, múltiples, agrupados y deshabilitados | M | Medio |
+| HELP-CONTEXTUAL-CHAT-01 | Usuario 304 instalado: crash resuelto; seguro offline; mejora contextual diferida | P1 | Chat privado de ayuda y diagnóstico seguro automático | L | Medio |
+| LOTE-HELP-BOTH-APPS-02 | Implementado y recorrido físicamente; calidad contextual avanzada pendiente | P1 | Mejorar GloshIA e integrarla con contexto y acciones seguras en Usuario y Admin | L | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
 | USER-APPS-REFRESH-FEEDBACK-01 | Validado fisicamente en SM-A235M DEV 270 con inventario existente | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
