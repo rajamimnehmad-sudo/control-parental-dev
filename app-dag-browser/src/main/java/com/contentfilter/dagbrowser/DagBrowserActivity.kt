@@ -24,6 +24,8 @@ import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import android.window.OnBackInvokedCallback
+import android.window.OnBackInvokedDispatcher
 import androidx.core.content.FileProvider
 import org.json.JSONObject
 import org.mozilla.geckoview.AllowOrDeny
@@ -84,6 +86,7 @@ class DagBrowserActivity : Activity() {
     private var pendingExternalUrl: String? = null
     private var activeDownload: ActiveDownload? = null
     private var downloadDialog: AlertDialog? = null
+    private var backInvokedCallback: OnBackInvokedCallback? = null
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
     private val messageDelegate =
@@ -115,6 +118,13 @@ class DagBrowserActivity : Activity() {
                                         senderTab.previewDocumentToken =
                                             payload.optString("documentToken")
                                                 .takeIf(PreviewDocumentTokenPattern::matches)
+                                        if (packageName.endsWith(".dev")) {
+                                            Log.i(
+                                                TabPreviewLogTag,
+                                                "barrier tab=${senderTab.id} " +
+                                                    "token=${senderTab.previewDocumentToken != null}",
+                                            )
+                                        }
                                         completeProtectedLoad(senderTab)
                                     } else if (
                                         payload.optString("type") == PreviewEligibilityMessage &&
@@ -178,7 +188,18 @@ class DagBrowserActivity : Activity() {
         imageAnalyzer = DagOnDeviceImageAnalyzer.create(applicationContext)
         bindViews()
         configureControls()
+        registerModernBackCallback()
         installProtectionExtension()
+    }
+
+    private fun registerModernBackCallback() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val callback = OnBackInvokedCallback(::handleBackNavigation)
+        onBackInvokedDispatcher.registerOnBackInvokedCallback(
+            OnBackInvokedDispatcher.PRIORITY_DEFAULT,
+            callback,
+        )
+        backInvokedCallback = callback
     }
 
     private fun applySystemBarInsets() {
@@ -999,7 +1020,11 @@ class DagBrowserActivity : Activity() {
             return
         }
         val previousTab = activeTab
-        if (previousTab != null && canCaptureThumbnail(previousTab)) {
+        if (
+            previousTab != null &&
+            previousTab.thumbnail == null &&
+            canCaptureThumbnail(previousTab)
+        ) {
             captureActiveTabThumbnail {
                 switchToWithoutCapture(tab)
             }
@@ -1162,30 +1187,81 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun captureActiveTabThumbnail(onCaptureReady: () -> Unit = {}) {
+        captureActiveTabThumbnailAttempt(
+            retriesRemaining = ThumbnailCaptureRetries,
+            onCaptureReady = onCaptureReady,
+        )
+    }
+
+    private fun captureActiveTabThumbnailAttempt(
+        retriesRemaining: Int,
+        onCaptureReady: () -> Unit,
+    ) {
         val tab = activeTab ?: return onCaptureReady()
         if (!canCaptureThumbnail(tab)) {
+            if (packageName.endsWith(".dev")) {
+                Log.i(
+                    TabPreviewLogTag,
+                    "capture_skip tab=${tab.id} view=${geckoView.visibility} " +
+                        "open=${tab.session.isOpen} state=${tab.displayState} " +
+                        "document=${tab.previewDocumentToken != null} " +
+                        "eligible=${tab.previewEligibilityToken == tab.previewDocumentToken} " +
+                        "restricted=${tab.previewRestricted}",
+                )
+            }
             onCaptureReady()
             return
         }
         val request = DagTabPreviewRequest(tab.id, tab.previewRevision)
         var completionPending = true
         var captureExpired = false
-        val completeOnce = {
+        val completeOnce: () -> Unit = {
             if (completionPending) {
                 completionPending = false
+                onCaptureReady()
+            }
+        }
+        val retryOrComplete: () -> Unit = retryOrComplete@{
+            if (!completionPending) return@retryOrComplete
+            completionPending = false
+            if (
+                retriesRemaining > 0 &&
+                activeTab === tab &&
+                canCaptureThumbnail(tab)
+            ) {
+                handler.postDelayed(
+                    {
+                        captureActiveTabThumbnailAttempt(
+                            retriesRemaining = retriesRemaining - 1,
+                            onCaptureReady = onCaptureReady,
+                        )
+                    },
+                    ThumbnailCaptureRetryDelayMillis,
+                )
+            } else {
                 onCaptureReady()
             }
         }
         val timeout =
             Runnable {
                 captureExpired = true
-                completeOnce()
+                if (packageName.endsWith(".dev")) {
+                    Log.i(TabPreviewLogTag, "capture_timeout tab=${tab.id} retries=$retriesRemaining")
+                }
+                retryOrComplete()
             }
         handler.postDelayed(timeout, ThumbnailCaptureTimeoutMillis)
         geckoView.capturePixels().accept(
             { bitmap ->
                 handler.removeCallbacks(timeout)
                 val acceptsBitmap = !captureExpired && activeTab === tab
+                if (packageName.endsWith(".dev")) {
+                    Log.i(
+                        TabPreviewLogTag,
+                        "capture_result tab=${tab.id} bitmap=${bitmap?.width}x${bitmap?.height} " +
+                            "accepted=$acceptsBitmap",
+                    )
+                }
                 completeOnce()
                 if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) return@accept
                 if (
@@ -1227,7 +1303,10 @@ class DagBrowserActivity : Activity() {
             },
             {
                 handler.removeCallbacks(timeout)
-                completeOnce()
+                if (packageName.endsWith(".dev")) {
+                    Log.i(TabPreviewLogTag, "capture_error tab=${tab.id} retries=$retriesRemaining")
+                }
+                retryOrComplete()
             },
         )
     }
@@ -1251,12 +1330,23 @@ class DagBrowserActivity : Activity() {
             payload.optString("documentToken")
                 .takeIf(PreviewDocumentTokenPattern::matches)
                 ?: return
-        if (token != tab.previewDocumentToken) return
+        if (token != tab.previewDocumentToken) {
+            if (packageName.endsWith(".dev")) {
+                Log.i(TabPreviewLogTag, "eligibility_mismatch tab=${tab.id}")
+            }
+            return
+        }
         tab.previewEligibilityToken = token
         tab.previewRestricted = payload.optBoolean("restricted", true)
+        if (packageName.endsWith(".dev")) {
+            Log.i(
+                TabPreviewLogTag,
+                "eligibility tab=${tab.id} restricted=${tab.previewRestricted}",
+            )
+        }
         if (tab.previewRestricted) {
             invalidateTabThumbnail(tab)
-        } else if (tab === activeTab && tabSwitcher.isOpen()) {
+        } else if (tab === activeTab) {
             captureActiveTabThumbnail()
         }
     }
@@ -1616,16 +1706,32 @@ class DagBrowserActivity : Activity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
+        handleBackNavigation()
+    }
+
+    private fun handleBackNavigation() {
         val tab = activeTab
-        when (
+        val action =
             DagBackNavigationPolicy.decide(
                 addressEditing = addressInput.hasFocus(),
                 tabSwitcherOpen = tabSwitcher.isOpen(),
                 hasActiveTab = tab != null,
                 canGoBackInPage = tab?.canGoBack == true,
-                isHome = tab?.url == InitialBlankPage,
+                isHome =
+                    DagBackNavigationPolicy.isTerminalHome(
+                        blankDocument = tab?.url == InitialBlankPage,
+                        protectedPageVisible = tab?.displayState == TabDisplayState.Visible,
+                    ),
             )
-        ) {
+        if (packageName.endsWith(".dev")) {
+            Log.i(
+                BackNavigationLogTag,
+                "action=$action tab=${tab?.id} blank=${tab?.url == InitialBlankPage} " +
+                    "state=${tab?.displayState} view=${geckoView.visibility} " +
+                    "canGoBack=${tab?.canGoBack} tabs=${tabs.size}",
+            )
+        }
+        when (action) {
             DagBackAction.CloseKeyboard -> {
                 addressInput.clearFocus()
                 getSystemService(InputMethodManager::class.java)
@@ -1634,7 +1740,7 @@ class DagBrowserActivity : Activity() {
             DagBackAction.CloseTabSwitcher -> tabSwitcher.hide()
             DagBackAction.GoBackInPage -> tab?.session?.goBack()
             DagBackAction.GoHome -> tab?.let(::goHome)
-            DagBackAction.ExitBrowser -> super.onBackPressed()
+            DagBackAction.ExitBrowser -> finish()
         }
     }
 
@@ -1668,6 +1774,10 @@ class DagBrowserActivity : Activity() {
 
     override fun onDestroy() {
         persistTabsNow()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            backInvokedCallback?.let(onBackInvokedDispatcher::unregisterOnBackInvokedCallback)
+            backInvokedCallback = null
+        }
         activeDownload?.let(::cancelDownload)
         handler.removeCallbacksAndMessages(null)
         protectionExtension?.let { extension ->
@@ -1748,11 +1858,15 @@ class DagBrowserActivity : Activity() {
         const val MediaAnalysisQueueCapacity = 8
         const val MediaTransportLogTag = "DagMediaTransport"
         const val PerformanceLogTag = "DagPerformance"
+        const val BackNavigationLogTag = "DagBackNavigation"
+        const val TabPreviewLogTag = "DagTabPreview"
         const val BarrierTimeoutMillis = 12_000L
         const val InitialBlankPage = "about:blank"
         const val MaxTabLabelLength = 36
         const val PersistTabsDelayMillis = 250L
-        const val ThumbnailCaptureTimeoutMillis = 350L
+        const val ThumbnailCaptureTimeoutMillis = 1_200L
+        const val ThumbnailCaptureRetryDelayMillis = 120L
+        const val ThumbnailCaptureRetries = 1
         const val DownloadsDirectory = "downloads"
         const val DownloadBufferBytes = 16 * 1024
         const val PdfHeaderBytes = 8

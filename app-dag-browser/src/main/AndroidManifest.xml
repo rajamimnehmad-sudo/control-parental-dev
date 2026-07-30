@@ -13,6 +13,7 @@
         android:theme="@style/Theme.DagBrowser">
         <activity
             android:name=".DagBrowserActivity"
+            android:enableOnBackInvokedCallback="true"
             android:exported="true"
             android:launchMode="singleTask"
             android:windowSoftInputMode="stateUnspecified|adjustResize">

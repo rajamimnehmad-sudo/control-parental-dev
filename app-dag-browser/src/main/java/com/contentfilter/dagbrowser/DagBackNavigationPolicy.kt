@@ -9,6 +9,11 @@ internal enum class DagBackAction {
 }
 
 internal object DagBackNavigationPolicy {
+    fun isTerminalHome(
+        blankDocument: Boolean,
+        protectedPageVisible: Boolean,
+    ): Boolean = blankDocument && !protectedPageVisible
+
     fun decide(
         addressEditing: Boolean,
         tabSwitcherOpen: Boolean,

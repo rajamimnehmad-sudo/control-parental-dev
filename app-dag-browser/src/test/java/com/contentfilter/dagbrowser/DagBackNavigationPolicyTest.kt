@@ -2,8 +2,26 @@ package com.contentfilter.dagbrowser
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class DagBackNavigationPolicyTest {
+    @Test
+    fun `stale blank url never exits while a protected page remains visible`() {
+        assertFalse(
+            DagBackNavigationPolicy.isTerminalHome(
+                blankDocument = true,
+                protectedPageVisible = true,
+            ),
+        )
+        assertTrue(
+            DagBackNavigationPolicy.isTerminalHome(
+                blankDocument = true,
+                protectedPageVisible = false,
+            ),
+        )
+    }
+
     @Test
     fun `editing address closes keyboard before consuming navigation`() {
         assertEquals(
