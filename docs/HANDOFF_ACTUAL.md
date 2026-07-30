@@ -49,22 +49,31 @@ documentado arriba.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
-- El candidato local declara `versionCode 20`, `versionName 0.10.0-dev`.
-- V20 endurece el bloqueo de audio/video, mantiene Atrás dentro de DAG, evita
-  saltos a apps externas, corrige indicadores visuales vencidos y oculta
-  contenedores publicitarios explícitos. Build y unitarios locales aprobados;
-  instalación y matriz física ejecutadas en SM-A235M.
+- El candidato local integrado en `main` declara `versionCode 21`,
+  `versionName 0.11.0-dev`.
+- V21 cierra el primer lote de estabilidad: `Analizando` se desmonta cuando la
+  presentación queda resuelta, los corazones de Favoritos conservan una
+  representación funcional segura aunque su sprite permanezca bloqueado y
+  Atrás sólo sale de DAG desde Home. Build, Lint, 71 unitarios e instalación
+  física aprobados en SM-A235M.
 - El modelo y su umbral `0.4` no cambiaron: el ajuste siguiente debe incorporar
   ejemplos actuales de falsos permisos y falsos filtros, no bajar el umbral a
   ciegas.
-- La APK del gate físico midió 102.605.578 bytes y tuvo SHA-256
-  `72a976dcafe1512f8afe8381936fc4ebebfadf4e66efff716ada0a73786e86c8`.
+- La APK final construida desde `main` mide 121.111.194 bytes y tiene SHA-256
+  `9532ca6e0a451cc0cddf7bb673e852b98e61f55aad7d1cef025cfc4c9ceaef66`.
 - En SM-A235M se verificó apertura/regreso y ausencia de destellos para raster,
   video, canvas, SVG y fondos.
 - Mientras no exista una decisión visual válida, cada recurso permanece en
   `block / analyzer_unavailable`.
 - El navegador no usa infraestructura, código, modelos ni datos de runtimes
   retirados.
+- Matriz física final en SM-A235M/Android 14, con perfil DEV borrado y cache
+  bust: Frávega `20.258 / 20.487 / 1.347 ms`, Mimo
+  `5.638 / 6.224 / 594 ms`; Cheeky Home quedó visible en `1.671 ms` pero no
+  emitió quietud dentro de 45 s. El recorrido de categoría Cheeky verificó
+  físicamente corazones visibles y ausencia de indicadores residuales.
+- Evidencia detallada:
+  `docs/compatibility/results/dag-browser-v21-stability-sm-a235m-2026-07-29.md`.
 
 ## Candidato local de DAG Browser
 

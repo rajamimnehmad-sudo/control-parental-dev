@@ -340,6 +340,53 @@ Flujo de una entrada:
 - Alcance: Admin prepara cinco codigos por dispositivo mientras tiene conexion y revela el siguiente aun offline. Usuario valida un codigo no consumido sin Internet, habilita diez minutos para desinstalar y sincroniza el consumo al reconectar.
 - Seguridad: Supabase conserva solo verificadores con salt y slots consumidos; Admin cifra los codigos legibles con Android Keystore. Cada codigo se usa una vez, rotar invalida el kit anterior y cinco intentos fallidos bloquean durante 15 minutos.
 
+### PROTECTION-OFFLINE-RECOVERY-AUTO-03 - Kit listo desde el alta del Usuario
+
+- Estado: `Idea; no aprobada para diagnostico tecnico ni codigo`. Evidencia:
+  pedido del usuario del 2026-07-29 de preparar automaticamente el codigo de
+  emergencia y dejar listo el kit al generar un Usuario. Tipo: seguridad,
+  onboarding y automatizacion de recuperacion. Prioridad propuesta: P0.
+  Esfuerzo estimado: M. Riesgo: alto.
+- Objetivo: eliminar la preparacion manual posterior. Crear un Usuario inicia
+  automaticamente el ciclo del kit de emergencia y la interfaz informa su
+  estado real sin exigir entrar a Ajustes o Seguridad para generarlo.
+- Dependencia de identidad: el kit vigente pertenece a un dispositivo, no solo
+  al Usuario. Si el Usuario se crea antes de enlazar un telefono, el sistema
+  registra `Kit pendiente de dispositivo` y completa automaticamente la
+  generacion al primer enlace valido. Si ya existe un dispositivo activo, lo
+  prepara durante el alta.
+- Alcance temporal decidido por el usuario el 2026-07-29: esta automatizacion
+  aplica solamente a Usuarios creados despues de incorporarla. No se exige
+  migrar, completar ni mostrar como deuda los kits faltantes de Usuarios
+  anteriores; esos casos conservan el flujo manual vigente si alguna vez se
+  necesita recuperarlos.
+- Resultado requerido: al terminar alta y enlace, Admin dispone de cinco
+  codigos de un solo uso cifrados localmente y el dispositivo Usuario tiene los
+  verificadores necesarios para validarlos offline. El estado final visible es
+  `Kit listo`; nunca se muestra listo por haber iniciado solamente el proceso.
+- Recuperacion y reintento: falta de red, cierre de la app o sincronizacion
+  incompleta conservan un estado reintentable y se completan automaticamente al
+  recuperar condiciones. No se generan silenciosamente varios kits ni se
+  invalida uno vigente por un reintento.
+- Ciclo de vida: reenlace o reemplazo de dispositivo prepara un kit nuevo para
+  la nueva identidad e invalida el anterior solo cuando el nuevo queda
+  confirmado; archivar o borrar un Usuario conserva las reglas específicas de
+  esos flujos y no revela codigos. Rotacion manual sigue disponible como accion
+  sensible confirmada.
+- Seguridad: Supabase mantiene exclusivamente verificadores, salt, slots y
+  estado; los codigos legibles permanecen cifrados mediante Android Keystore en
+  Admin. No se incluyen codigos en notificaciones, logs, telemetria, backups
+  inseguros ni App Usuario.
+- Relacion: automatiza `PROTECTION-OFFLINE-RECOVERY-02`; no reemplaza su matriz
+  pendiente de consumo offline real ni cambia la ventana de diez minutos, los
+  cinco intentos, el bloqueo de quince minutos o el uso unico.
+- Aceptacion: Usuario creado sin dispositivo pasa de pendiente a listo al
+  enlazar; Usuario creado con dispositivo termina con kit listo; alta offline
+  se recupera sin duplicar; reinstalacion/reenlace no deja el kit viejo activo;
+  Admin puede revelar el siguiente codigo offline y Usuario lo consume una sola
+  vez; ninguna UI exige tocar `Preparar kit`; Usuarios anteriores no se
+  migran ni generan alertas por carecer del kit automatico.
+
 ### HELP-CONTEXTUAL-CHAT-01 - Asistente privado de Content Filter
 
 - Estado: `Candidato local conversacional Usuario 297 compilado; pendiente gate físico e instalación`. Aprobado explicitamente el 2026-07-20 y ampliado por el usuario el 2026-07-29. Tipo: ayuda, UX y privacidad. Prioridad: P1. Esfuerzo: L. Riesgo: medio.
@@ -361,6 +408,68 @@ Flujo de una entrada:
   y verificado por SHA-256 en la Mac. Pendiente probar la conversación
   generativa e instalarla cuando ADB detecte el teléfono.
 
+### LOTE-HELP-BOTH-APPS-02 - GloshIA útil y coherente en Usuario y Admin
+
+- Estado: `Idea agrupada; no aprobada para codigo`. Evidencia: el usuario pide
+  el 2026-07-29 mejorar el chat de ayuda e integrarlo plenamente en ambas apps.
+  Tipo: asistencia contextual, UX, privacidad y arquitectura Android.
+  Prioridad propuesta: P1. Esfuerzo estimado: L. Riesgo: medio.
+- Objetivo: Usuario y Admin ofrecen una experiencia conversacional consistente,
+  accesible desde Ayuda y desde los estados que requieren explicación o
+  reparación. Comparten lenguaje, componentes y motor confiable, pero reciben
+  exclusivamente el contexto y las acciones autorizadas para su rol.
+- Tickets y orden recomendado:
+  1. `HELP-SHARED-CONTRACT-02A`: definir intenciones, respuestas
+     deterministas, contexto permitido, redacción, historial local, privacidad,
+     estados de carga/error y acciones seguras compartidas.
+  2. `HELP-USER-INTEGRATION-02B`: integrar GloshIA con Inicio, Protección,
+     Mis apps, Internet, DAG, activación, actualizaciones y solicitudes de App
+     Usuario, sin exponer controles Admin.
+  3. `HELP-ADMIN-INTEGRATION-02C`: integrar GloshIA con Usuarios, solicitudes,
+     aplicaciones, Web, Seguridad, licencia, sincronización y actualizaciones
+     de App Admin; toda recomendación identifica el Usuario/dispositivo
+     seleccionado y nunca modifica políticas por texto libre.
+  4. `HELP-CONVERSATION-QUALITY-02D`: mejorar continuidad, preguntas de
+     seguimiento, explicación simple, sugerencias contextuales y recuperación
+     ante consultas incompletas, manteniendo la capa determinista como autoridad
+     de hechos y acciones.
+  5. `HELP-PRIVACY-PERF-QA-02E`: validar offline, modelo ausente, dispositivo de
+     poca memoria, reinicio, textos largos, lector de pantalla, datos sensibles,
+     reportes seguros y paridad visual en ambas apps.
+- Navegación: cada respuesta puede ofrecer una acción explícita como `Abrir
+  Protección`, `Ver solicitud` o `Revisar actualización`. GloshIA navega a la
+  pantalla correcta, pero no activa permisos, cambia reglas, aprueba
+  solicitudes, borra datos ni concede mantenimiento sin el flujo normal y sus
+  confirmaciones.
+- Contexto Usuario: solamente estado propio del dispositivo y del Usuario
+  activado. Contexto Admin: estado agregado o del Usuario/dispositivo
+  seleccionado, con identificación visible para evitar aplicar una explicación
+  al objetivo equivocado.
+- Privacidad: conversación e historial permanecen locales; reportes continúan
+  enviando únicamente resúmenes técnicos predeterminados y metadatos permitidos.
+  Contraseñas, códigos de emergencia, tokens, búsquedas, URLs, fotos y texto
+  libre no salen del teléfono.
+- Rendimiento y distribución: antes de incluir el modelo de aproximadamente
+  647 MB en las dos APK, medir descarga, almacenamiento duplicado, RAM,
+  latencia, compatibilidad y actualizaciones. Recomendación: modelo opcional
+  descargable y verificado por hash, con ayuda determinista disponible desde el
+  primer inicio; no duplicar el peso dentro de cada APK sin una decisión
+  explícita.
+- Relación: amplía `HELP-CONTEXTUAL-CHAT-01`; no descarta el candidato Usuario
+  297 ni duplica reportes. Primero se reconcilia ese candidato con `main` y se
+  extrae únicamente lo compartible sin mezclar estados, repositorios o
+  autoridades de Usuario y Admin.
+- Aceptación: las mismas preguntas generales reciben respuestas coherentes en
+  ambas apps; preguntas contextuales usan el dispositivo correcto; cada acción
+  abre un destino válido y conserva controles de seguridad; funciona sin red y
+  sin modelo generativo; cerrar/borrar el chat elimina su historial local; una
+  consulta con secretos sintéticos no los registra ni transmite; el tamaño y
+  consumo quedan dentro del presupuesto aprobado por app.
+- Decisiones antes de ejecutar: distribución del modelo en Admin, conservación
+  del historial entre sesiones, punto de entrada principal y si Admin necesita
+  comparar varios dispositivos en una misma conversación o debe fijar siempre
+  uno.
+
 ### ADMIN-USER-SECTIONS-UX-04 - Apps, Web y Seguridad separadas
 
 - Estado: `Resuelto y validado fisicamente en DEV 267`. Aprobado explicitamente el 2026-07-20. Tipo: UX Admin. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
@@ -375,6 +484,35 @@ Flujo de una entrada:
 - Causa confirmada: el ViewModel ya conserva el inventario y bloquea refrescos simultaneos; la ambiguedad provenia del primer escaneo, cuando la lista aun vacia se mostraba sin progreso ni un texto de carga correcto.
 - Implementacion publicada: indicador lineal durante el escaneo y mensaje explicito mientras el inventario inicial esta vacio; sin cambiar PackageManager, datos ni contratos remotos.
 - Evidencia fisica DEV 270: con 161 apps visibles, actualizar mostro `Actualizando…`, mantuvo el inventario y termino en `Actualizado ahora`; dos desplazamientos largos no superpusieron ni cortaron la lista. El primer escaneo de una instalacion nueva no se repitio para no borrar datos.
+
+### APPS-LIST-STABLE-ORDER-03 - Bloquear no reordena la lista
+
+- Estado: `Idea; no aprobada para diagnostico tecnico ni codigo`. Evidencia: el
+  usuario pide el 2026-07-29 que las aplicaciones bloqueadas no suban al
+  principio de las listas en App Admin ni App Usuario. Tipo: UX compartida,
+  listas y estabilidad visual. Prioridad propuesta: P2. Esfuerzo estimado: S.
+  Riesgo: bajo.
+- Comportamiento requerido: el estado permitido/bloqueado no participa del
+  orden predeterminado. Cambiar una regla o recibir una actualizacion remota no
+  mueve la fila, no cambia la posicion de scroll y no interrumpe el siguiente
+  control que la persona iba a tocar.
+- Orden recomendado: nombre visible normalizado en orden alfabetico estable,
+  con `packageName` como desempate determinista. Aplicaciones sin nombre valido
+  usan una etiqueta segura y permanecen en el mismo criterio; no se agrupan
+  automaticamente por bloqueadas, permitidas o pendientes.
+- Filtros: Admin y Usuario pueden seguir filtrando o buscando bloqueadas cuando
+  lo necesiten. Un filtro explícito cambia el conjunto visible, pero apagarlo
+  restaura el orden alfabetico y no una prioridad oculta por estado.
+- Alcance: lista de aplicaciones del Usuario y lista/control equivalente en
+  Admin. Grupos, solicitudes, aplicaciones desconocidas o críticas conservan
+  sus reglas de seguridad y etiquetas, pero no alteran el orden general salvo
+  que exista una seccion visual explícita ya aprobada.
+- No alcance: cambiar reglas, switches, sincronizacion, inventario,
+  packageName, bloqueo mediante Accessibility o autoridad Admin.
+- Aceptacion: bloquear y permitir varias apps en ambas pantallas conserva orden
+  y scroll; un cambio remoto no hace saltar filas; refrescar mantiene el mismo
+  criterio; busqueda y filtros funcionan; nombres iguales tienen orden
+  determinista; listas grandes siguen usando el componente nativo reciclable.
 
 ### ADMIN-WEB-ADD-SITE-UX-01 - Formulario Web plano y compacto
 
@@ -508,10 +646,14 @@ Flujo de una entrada:
 | ANDROID-FLAT-LISTS-UX-01 | Validacion fisica parcial ampliada en SM-A235M DEV 270 | P2 | Listas continuas, compactas y modernas en ambas apps | M | Bajo |
 | PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; pendiente episodio real controlado | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
 | PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; UI fisica validada, pendiente ciclo offline real | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
+| PROTECTION-OFFLINE-RECOVERY-AUTO-03 | Idea; no aprobada para codigo | P0 | Preparar automaticamente el kit de emergencia al crear y enlazar un Usuario | M | Alto |
+| DAG-DOWNLOADS-01 | Idea; no aprobada para codigo | P1 | Descargas seguras de documentos con control Admin y bloqueo permanente de APK/ejecutables | L | Alto |
 | HELP-CONTEXTUAL-CHAT-01 | Candidato conversacional Usuario 297 compilado; pendiente gate físico e instalación | P1 | Chat privado de ayuda y diagnóstico seguro automático | L | Medio |
+| LOTE-HELP-BOTH-APPS-02 | Idea agrupada; no aprobada para codigo | P1 | Mejorar GloshIA e integrarla con contexto y acciones seguras en Usuario y Admin | L | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
 | ADMIN-USER-SECTIONS-UX-05 | Resuelto y validado fisicamente en DEV 267 | P1 | Selector adaptable, encabezado compacto, horario dedicado y controles de Apps persistentes | M | Medio |
 | USER-APPS-REFRESH-FEEDBACK-01 | Validado fisicamente en SM-A235M DEV 270 con inventario existente | P2 | Refrescar Apps sin vaciar el inventario ni ocultar el progreso | S | Bajo |
+| APPS-LIST-STABLE-ORDER-03 | Idea; no aprobada para codigo | P2 | Orden alfabetico estable en Usuario/Admin sin priorizar ni mover aplicaciones bloqueadas | S | Bajo |
 | ADMIN-WEB-ADD-SITE-UX-01 | Publicado DEV 269; pendiente recorrido visual | P2 | Formulario Agregar sitio plano y compacto | S | Bajo |
 | SEC-LICENSE-01 | Implementado candidato DEV 241; pendiente prueba fisica | P0 | Ciclo de vida de comunidad y licencia: alta, renovacion, vencimiento y restauracion sin perder configuracion | L | Alto |
 | DATA-DELETE-01 | Resuelto y publicado DEV 241; prueba destructiva aislada correcta | P0 | Borrado definitivo y auditable de usuario; la accion actual falla para todos los usuarios | L | Muy alto |
@@ -815,6 +957,57 @@ Flujo de una entrada:
 - Resultado en fuente: Internet usa una unica pieza panoramica compacta y una lista blanca de VPN, SafeSearch, resultados, DAG y horario; solo VPN degradada ofrece Reparar. Ajustes integra estado, version, activacion y Ayuda como filas continuas, preservando como bloques los formularios y flujos de instalacion complejos.
 - Aceptacion: lenguaje no tecnico, estados reales, superficie blanca continua, navegacion/Volver coherentes y sin cambiar politica remota.
 - Evidencia fisica: Internet mostro una pieza panoramica compacta y filas legibles de VPN activa, SafeSearch, Solo resultados y DAG; Ajustes mostro actualizacion, version 270, activacion y Ayuda, conservando Codigo de emergencia como bloque complejo. No se desactivo VPN para probar Reparar.
+
+### LOTE-SETTINGS-INFORMATION-ARCHITECTURE-03 - Ajustes ordenados por pantallas
+
+- Estado: `Idea agrupada; no aprobada para codigo`. Evidencia: el usuario
+  informa el 2026-07-29 que Ajustes es desordenado tanto en Admin como en
+  Usuario y propone una lista ordenada cuyas filas abran pantallas
+  independientes. Tipo: arquitectura de informacion, navegacion y UX Android.
+  Prioridad propuesta: P1. Esfuerzo estimado: L. Riesgo: medio.
+- Objetivo comun: convertir la raiz de Ajustes de cada app en un indice simple,
+  ordenado y escaneable. Cada fila representa una seccion, muestra icono,
+  titulo, resumen breve o estado cuando aporte valor y flecha de navegacion; al
+  tocarla abre una pantalla dedicada con encabezado y Atrás coherentes.
+- Relacion: extiende `ADMIN-WEB-SETTINGS-UX-02` y
+  `USER-INTERNET-SETTINGS-UX-02`. Esos tickets ordenaron visualmente filas y
+  grupos, pero conservaron demasiados estados, bloques complejos y acciones en
+  la misma raiz. No se revierten sus componentes ni criterios de accesibilidad.
+- Orden recomendado de tickets:
+  1. `SETTINGS-IA-SHARED-03A`: inventariar solamente los controles existentes,
+     definir nombres, orden, destino, autoridad y componente de navegacion
+     compartido; no agregar capacidades.
+  2. `ADMIN-SETTINGS-SCREENS-03B`: migrar Ajustes Admin por secciones,
+     conservando Cuenta/comunidad, licencia, apariencia, notificaciones,
+     actualizaciones, ayuda/privacidad y acciones sensibles.
+  3. `USER-SETTINGS-SCREENS-03C`: migrar Ajustes Usuario por secciones,
+     conservando estado, activacion, codigo de emergencia, actualizaciones,
+     ayuda y los flujos complejos que correspondan.
+  4. `SETTINGS-NAV-QA-03D`: validar Atrás fisico y gestual, enlaces profundos,
+     retorno desde Ajustes Android, rotacion/recreacion, scroll, escalado de
+     texto y lector de pantalla en ambas apps.
+- Recomendacion: la raiz no debe contener formularios, explicaciones largas ni
+  acciones destructivas. Puede mostrar un estado resumido, pero la accion vive
+  en su pantalla dedicada. Las acciones sensibles quedan dentro de una seccion
+  final claramente rotulada y mantienen confirmacion; el codigo de emergencia
+  no se expone completo en la lista.
+- Consistencia sin mezclar autoridades: ambas apps comparten lenguaje visual y
+  comportamiento de navegacion, pero Admin y Usuario muestran unicamente las
+  secciones y controles permitidos para su rol. No se crea una pantalla
+  generica que accidentalmente exponga opciones Admin en Usuario.
+- No alcance: cambiar reglas, permisos, activacion, sincronizacion, backend,
+  Supabase, barreras antimanipulacion o comportamiento de los controles. La
+  primera iteracion redistribuye capacidades existentes.
+- Aceptacion comun: ninguna capacidad actual desaparece; cada fila abre un
+  unico destino predecible; no hay botones ambiguos ni bloques mezclados en la
+  raiz; Atrás vuelve exactamente al indice y otro Atrás respeta el destino
+  principal de la app; estados y acciones no se duplican entre raiz y detalle;
+  acciones destructivas siguen al final y requieren confirmacion.
+- Decisiones para preparar ejecucion: orden final de las secciones; si
+  Apariencia merece pantalla propia aun cuando tenga pocos controles; donde
+  ubicar licencia/activacion y codigo de emergencia; y si una fila puede
+  conservar un switch directo o todas las modificaciones deben ocurrir
+  exclusivamente dentro del detalle, como propone el usuario.
 
 ### USER-DAG-LAUNCHER-PREFERENCE-01 - DAG como app separada opcional
 
@@ -1500,6 +1693,53 @@ Flujo de una entrada:
 - Decisiones pendientes antes de aprobar codigo: ubicacion aproximada o precisa; permiso por uso, sesion o sitio; autoridad Usuario/Admin; comportamiento offline; revocacion; tratamiento de mapas embebidos; texto de consentimiento y lista inicial de recorridos reales a validar.
 - Aceptacion preliminar: un sitio permitido puede pedir ubicacion mediante el dialogo de DAG y el permiso Android correspondiente; rechazar no rompe la pagina ni genera nuevos pedidos automaticos; cambiar de sitio o cerrar la sesion revoca el alcance temporal; ninguna coordenada sale del telefono salvo hacia el sitio que el Usuario autorizo en ese momento.
 
+#### DAG-DOWNLOADS-01 - Descargas seguras y administrables
+
+- Estado: `Idea autorizada para backlog; no aprobada para diagnostico tecnico ni
+  implementacion`. Evidencia: el usuario confirma el 2026-07-29 que las
+  descargas son importantes para que DAG sea un navegador profesional. Tipo:
+  compatibilidad Web, archivos, seguridad y control parental. Prioridad
+  propuesta: P1. Esfuerzo estimado: L. Riesgo: alto.
+- Necesidad: permitir usos cotidianos como comprobantes, facturas, entradas,
+  material escolar, formularios y documentos, sin convertir DAG en una via para
+  instalar aplicaciones o sacar contenido inseguro hacia otra app.
+- Primera etapa recomendada: descarga iniciada por gesto del Usuario, desde una
+  pagina HTTPS ya permitida, con nombre, dominio, tipo y tamaño visibles antes
+  de confirmar. Admitir inicialmente una lista cerrada de documentos comunes
+  definidos por contenido real y MIME; aplicar limite de tamaño, destino
+  mediante almacenamiento acotado de Android, progreso, cancelacion, error y
+  reintento explícitos.
+- Bloqueo permanente inicial: APK, XAPK/APKS, ejecutables, scripts, archivos
+  comprimidos ambiguos, MIME desconocido, redirecciones a origen no aprobado,
+  descargas automaticas, multiples descargas y cualquier archivo sin tamaño
+  acotable. Extension, MIME declarado y firma magica deben coincidir; cambiar el
+  nombre no vuelve seguro un archivo.
+- Apertura: el archivo descargado no se ejecuta dentro de DAG. Se abre mediante
+  un visor compatible elegido de forma controlada, con URI temporal y permiso
+  de solo lectura; nunca se concede acceso amplio al almacenamiento ni permiso
+  para instalar paquetes.
+- Autoridad: definir una politica Admin por tipo de archivo y tamaño. Si un
+  tipo no esta permitido, DAG puede crear una solicitud de descarga con dominio,
+  nombre, tipo y tamaño, sin subir el contenido. Una aprobacion debe ser puntual
+  o seguir una regla explícita; no habilita todo el sitio ni futuras descargas
+  diferentes.
+- Privacidad: historial y metadatos de descarga permanecen locales y cifrados
+  salvo la solicitud mínima al Admin. No se sube el archivo a Supabase para
+  analizarlo y no se registra la URL completa en telemetria o Logcat.
+- Relacion: amplia deliberadamente el bloqueo total vigente de descargas y
+  reutiliza el tipo de solicitud `descargas` previsto en producto. No modifica
+  la barrera que bloquea Package Installer, fuentes desconocidas y APK externos.
+- Aceptacion preliminar: PDF/documento permitido descarga con progreso y abre
+  en solo lectura; cancelacion y red interrumpida no dejan un archivo parcial
+  utilizable; APK renombrado y MIME discordante fallan cerrados; descarga sin
+  gesto o desde iframe/redireccion no aprobada se rechaza; archivo bloqueado
+  puede solicitarse sin enviar su contenido; borrar descargas elimina archivos
+  y metadatos locales correspondientes.
+- Decisiones antes de ejecutar: formatos iniciales, tamaño máximo, autoridad
+  Admin/Usuario por tipo, política offline, retención, visor interno o externo
+  controlado y si imágenes individuales pueden descargarse después de haber
+  sido aprobadas visualmente.
+
 #### DAG-TABS-UX-02 - Selector reciente, limpio y sin vacias duplicadas
 
 - Estado: `Implementado candidato DEV 241; pendiente prueba fisica`. Aprobado al ordenar ejecutar todos los tickets el 2026-07-16. Tipo: UX, identidad visual y gestion de pestanas. Prioridad: P2.
@@ -1520,6 +1760,40 @@ Flujo de una entrada:
 - Implementacion: el selector se titula `Pestañas recientes`, ordena las pestañas abiertas por ultimo uso y persiste esa marca junto al estado cifrado. No conserva ni reabre pestañas cerradas. Las tarjetas sin miniatura muestran una superficie neutra con `DAG`, sin peces.
 - Reutilizacion: se considera vacia solamente una pestaña en Home sin texto, consulta, resultados ni URL. `Nueva` enfoca la vacia usada mas recientemente —incluida la activa— antes de crear otra; las vacias heredadas restantes se pueden cerrar normalmente. El limite continua en ocho.
 - Compatibilidad: sesiones cifradas anteriores sin fecha se restauran con un orden determinista; resultados y paginas no se recargan al abrir el selector ni se ejecuta una consulta Brave.
+
+### LOTE-DAG-NAVEGACION-Y-PESTANAS-06 - Atrás predecible y organizador tipo navegador
+
+- Estado: `Idea agrupada; no aprobada para codigo`. Evidencia: pedido del
+  usuario del 2026-07-29. Tipo: lote de UX, navegacion, pestanas, privacidad y
+  rendimiento. Prioridad propuesta: P1. Esfuerzo estimado: L. Riesgo: alto.
+- Objetivo: cerrar la experiencia general de navegacion DAG con tres resultados
+  observables: Atrás solo cierra la app cuando la pestaña activa ya esta en
+  Home sin otro estado que consumir; el organizador representa fielmente las
+  paginas reales como un navegador moderno; y crear pestañas no queda limitado
+  a ocho.
+- Tickets relacionados y orden recomendado:
+  1. `DAG-IMAGE-INDICATOR-LIFECYCLE-07` y
+     `DAG-UI-RESOURCE-COMPAT-08`: cerrar primero estados visuales vencidos e
+     iconos funcionales seguros faltantes sin relajar fotografias.
+  2. `DAG-BACK-NAV-01`: verificar y, si corresponde, corregir la semantica de
+     Atrás en pagina, historial Web, resultados, teclado, selector y Home.
+  3. `DAG-TAB-PREVIEW-04`: reconciliar el candidato ya implementado con la
+     version realmente instalada y completar miniaturas correctas para todas
+     las pestañas seguras.
+  4. `DAG-TABS-UX-03`: ampliar capacidad y selector solamente despues de fijar
+     presupuesto de memoria, restauracion y prueba con muchas pestañas.
+- Recomendacion tecnica pendiente de decision: evitar un crecimiento
+  literalmente ilimitado. La experiencia puede no presentar el limite de ocho,
+  pero el runtime debe conservar un techo alto y medido —50 es el valor
+  provisional ya propuesto— porque cada pestaña mantiene metadatos, estado
+  cifrado y eventualmente una miniatura en memoria. Subir o retirar ese techo
+  requiere primero evidencia fisica de memoria, fluidez y recuperacion.
+- No alcance: cambiar filtros, modelo visual, decisiones de seguridad, Brave,
+  Supabase, Glosh Usuario/Admin o persistir capturas de paginas en disco.
+- Gate comun: matriz DAG obligatoria en el mismo telefono objetivo, incluyendo
+  Fravega, Mimo y Cheeky sin cache, mas recorridos con 1, 10 y el maximo
+  aprobado de pestañas; verificar Atrás fisico y gestual, cierre/reapertura,
+  cambio, cierre individual y `Cerrar todo`.
 
 #### DAG-CHROME-UX-01 - Direccion de experiencia familiar tipo Chrome
 
@@ -1542,13 +1816,20 @@ Flujo de una entrada:
 
 #### DAG-TABS-UX-03 - Hasta 50 pestanas con selector visual completo
 
-- Estado: `Idea autorizada para backlog; no aprobada para codigo`. Tipo: gestion de pestanas, rendimiento y privacidad visual. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
+- Estado: `Idea autorizada para backlog; no aprobada para codigo`, reafirmada
+  por el usuario el 2026-07-29 al pedir eliminar el maximo de ocho. Tipo:
+  gestion de pestanas, rendimiento y privacidad visual. Prioridad: P1.
+  Esfuerzo: L. Riesgo: alto.
 - Problema: el limite actual es ocho y el selector puede mostrar una superficie neutra/Home en lugar de una miniatura util de la pagina. Tampoco ocupa toda la pantalla como un selector moderno ni ofrece una accion evidente para cerrar todo.
 - Propuesta: permitir un maximo estricto de 50 pestanas; abrir un selector a pantalla completa con tarjetas amplias y miniatura efimera de la ultima pagina aprobada; incluir cierre individual y `Cerrar todo` con confirmacion cuando haya varias pestanas.
 - Presupuesto: mantener un solo WebView activo. Las demas pestanas quedan suspendidas con estado cifrado y, si corresponde, una miniatura efimera acotada; no conservar 50 WebViews ni decodificaciones activas en memoria. Al llegar a 50, enfocar el selector y pedir cerrar una antes de crear otra.
 - Privacidad y seguridad: no persistir pixeles de miniaturas en disco; paginas bloqueadas, inciertas, en analisis o sensibles usan tarjeta neutra. Una miniatura nunca cuenta como aprobacion y restaurar una pagina vuelve a validarla.
 - Relacion: reemplaza la decision historica de maximo ocho de `DAG-TABS-UX-01` y extiende `DAG-TABS-UX-02`; no reabre sus correcciones de orden, cifrado ni pestanas vacias.
 - Aceptacion: 1, 10 y 50 pestanas mantienen cambio/cierre fluido; selector usa toda la pantalla; la tarjeta representa la pagina correcta y no Home salvo que esa pestana este realmente en Home; `Cerrar todo` deja una Home segura; reinicio no restaura miniaturas persistidas ni carga paginas automaticamente.
+- Decision pendiente: el usuario prefiere no tener maximo visible. Confirmar al
+  preparar ejecucion si se adopta el techo interno seguro de 50, si se eleva
+  despues de medir o si se exige crecimiento literalmente ilimitado aceptando
+  su riesgo de recursos.
 
 #### DAG-HOME-RECENTS-02 - Inicio limpio y accesos circulares recientes
 
@@ -1611,6 +1892,73 @@ Flujo de una entrada:
 - Solución: AVIF estático entra al decodificador acotado y al único modelo local; errores técnicos quedan ocultos con estado propio, mientras un filtro real mantiene blur y muestra sólo un escudo pequeño. El indicador crea su propio contexto de apilado para no atravesar modales.
 - Evidencia: H&M, Cheeky, Frávega, Mimo e Instagram recorridos en SM-S908E; pruebas unitarias, formato, APK y Lint vital correctos. No cambió el modelo, el umbral ni la política.
 
+#### DAG-IMAGE-INDICATOR-LIFECYCLE-07 - Analizando no persiste sobre fotos resueltas
+
+- Estado: `Resuelto y validado fisicamente en DAG 21`. El usuario aprobó el
+  primer lote el 2026-07-29. La barrera ahora desvincula hosts al retirar o
+  mover nodos y limpia la espera cuando la instancia ya tiene una presentación
+  aprobada. En Cheeky desaparecieron los `Analizando` residuales sin adelantar
+  fotos ni retirar el estado de protección.
+- Relacion: reabre para un caso incompleto la correccion de indicadores
+  visuales vencidos documentada en DAG 20 y complementa
+  `DAG-IMAGE-PRESENTATION-06`. No autoriza cambiar el modelo, el umbral ni
+  permitir una foto antes de su decision.
+- Comportamiento requerido: el indicador `Analizando` existe solamente mientras
+  esa instancia exacta de imagen tiene una decision pendiente. Al recibir una
+  decision permitida desaparece por completo; una decision filtrada cambia al
+  estado de proteccion; una falla tecnica cambia a imagen no disponible. Una
+  foto visible y permitida nunca conserva simultaneamente el estado de espera.
+- Causa raiz a comprobar al ejecutar: desincronizacion entre identificador de
+  recurso y elemento DOM, callback tardio de una generacion anterior,
+  reutilizacion lazy de `img`/`picture`, overlay no desmontado o limpieza
+  incompleta tras cambio de `src`, navegacion, scroll o restauracion.
+- Seguridad: retirar un indicador vencido no puede adelantar la visibilidad,
+  reutilizar una decision de otra imagen ni eliminar el blur/escudo de una foto
+  filtrada. La decision visual sigue siendo la unica autoridad.
+- Aceptacion: fotos permitidas terminan sin logo ni capa residual; fotos
+  filtradas conservan exclusivamente su estado de proteccion; errores conservan
+  exclusivamente su estado tecnico; scroll lazy, carrusel, cambio de variante,
+  recarga, Atrás/Adelante, restauracion de pestaña y callbacks tardios no
+  mezclan estados entre recursos.
+- Evidencia deseable para el diagnostico: sitio y recorrido donde ocurre,
+  captura de pantalla y si desaparece al desplazar, recargar o volver a la
+  pestaña. No es requisito para conservar la idea en backlog.
+
+#### DAG-UI-RESOURCE-COMPAT-08 - Iconos funcionales seguros sin huecos
+
+- Estado: `Resuelto para el alcance del primer lote y validado fisicamente en
+  DAG 21`. El corazón de producto de Cheeky proviene de un sprite PNG animado
+  de `6144 x 64`, no de una foto aislada. DAG mantiene ese sprite cerrado y
+  representa un corazón neutro sobre el mismo control semántico; el enlace de
+  favoritos conserva su interacción. SVG pasivo y acotado tiene además un
+  contrato general probado; scripts, eventos, referencias externas y raster
+  incierto siguen cerrados.
+- Problema: algunos controles visuales esenciales pueden llegar como SVG
+  externo, sprite, `mask-image`, fondo CSS, icon font, `picture` diminuto o
+  raster de interfaz. Si el cargador no reconoce o sanitiza ese formato, DAG lo
+  reemplaza por un recurso neutro aunque no sea una fotografia y la pagina
+  pierde funcionalidad o claridad.
+- Causa raiz requerida: identificar el mecanismo exacto del corazon de Cheeky y
+  separar fallo de red, formato no soportado, sanitizacion SVG, referencia
+  interna/externa, CSS mask, fuente, sprite, interceptacion o clasificacion. No
+  agregar una excepcion por dominio, ruta, palabra `favorite` o tamaño.
+- Solucion general esperada: admitir controles vectoriales o de interfaz
+  solamente mediante un contrato pasivo y sanitizado, sin scripts, eventos,
+  embeds, referencias remotas activas ni acceso al documento. Los raster siguen
+  el cargador y la decision visual aplicable; la condicion de ser pequeño nunca
+  equivale por si sola a ser seguro.
+- Interaccion: recuperar la representacion no alcanza; el corazon debe conservar
+  toque, cambio seleccionado/no seleccionado, descripcion accesible y estado al
+  navegar o volver, sin permitir que el recurso ejecute codigo.
+- Relacion: seguimiento de `DAG-IMAGE-QUEUE-03`, que incorporo SVG estatico
+  seguro, sprites y gradientes, y de `DAG-BLACK-RESOURCES-05`. No modifica el
+  modelo visual, el umbral ni la politica de fotografias.
+- Aceptacion: los corazones de cada articulo Cheeky aparecen y funcionan; una
+  segunda tienda con iconos implementados mediante otro mecanismo conserva sus
+  controles; logos, menu, carrito y favicons seguros no dejan huecos; SVG con
+  script/referencia activa, raster pequeño sensible y formatos inciertos siguen
+  cerrados; no se agrega permiso especifico para Cheeky.
+
 #### DAG-REFRESH-03 - Actualizar la pestana activa
 
 - Estado: `Implementado en candidato local; validacion automatica correcta`. Evidencia: el usuario informa el 2026-07-23 que el boton `Actualizar` no actualiza. Tipo: navegacion WebView. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
@@ -1630,7 +1978,12 @@ Flujo de una entrada:
 
 #### DAG-TAB-PREVIEW-04 - Miniatura real por pestana
 
-- Estado: `Implementado y validado en candidato local`. Evidencia: el usuario informa el 2026-07-23 que el selector no muestra las paginas en miniatura. Tipo: pestanas, privacidad y memoria. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Estado: `Implementado y validado en candidato local; reafirmado como mejora
+  pendiente en la experiencia usada por el usuario`. Evidencia: el usuario
+  informa el 2026-07-23 y nuevamente el 2026-07-29 que el selector debe mostrar
+  las paginas reales en miniatura, como en Chrome. Antes de reimplementar,
+  reconciliar candidato, `main` y APK instalada. Tipo: pestanas, privacidad y
+  memoria. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Problema: el candidato local solo puede capturar de forma efimera el WebView activo y visible al abrir el selector; las demas tarjetas pueden quedar neutras o representar Home, por lo que el alcance de `DAG-TABS-UX-03` esta incompleto.
 - Propuesta: actualizar la miniatura efimera aprobada antes de suspender o cambiar de pestana y asociarla estrictamente con su identificador. Mantener un solo WebView activo y un presupuesto de memoria limitado.
 - Privacidad y seguridad: no escribir pixeles en disco; bloqueo, analisis, CAPTCHA, formularios sensibles o contenido incierto usan tarjeta neutra; una miniatura nunca evita la revalidacion al restaurar.
@@ -1639,7 +1992,10 @@ Flujo de una entrada:
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
-- Estado: `Resuelto` en DEV 233; aprobado por el usuario al pedir continuar con los pendientes DAG el 2026-07-16. Pendiente prueba fisica.
+- Estado: `Resuelto y validado fisicamente en DAG 21`. Atrás cierra primero
+  teclado o selector, respeta historial, vuelve a Home desde una URL directa y
+  sólo sale de DAG cuando Home ya es el estado visible. La prueba física
+  detectó y corrigió también historial residual de Gecko en `about:blank`.
 - Tipo: bug/UX de navegacion DAG.
 - Prioridad: P2.
 - Problema: al usar Atras desde una pagina, DAG puede volver directamente a Home y omitir el listado de resultados desde el que se abrio.
@@ -1655,7 +2011,9 @@ Flujo de una entrada:
   - cada pestana conserva su propia pila y no muestra resultados de otra;
   - cerrar el teclado tiene prioridad cuando corresponde y no consume un paso de historial;
   - recarga, aprobacion, bloqueo o recuperacion del renderer no crean saltos ni bucles;
-  - Home sin historial aplica el comportamiento de salida definido para DAG.
+  - selector, modal, menu o teclado visibles se cierran antes de navegar o salir;
+  - Home sin historial, teclado, modal ni otro estado consumible cierra DAG;
+  - fuera de ese Home terminal, Atrás nunca cierra ni expulsa DAG.
 - Decisiones cerradas: URL directa vuelve a Home; pagina desde resultados vuelve primero a esos resultados; historial WebView tiene prioridad; cada pestaña conserva su propio origen; el teclado se cierra antes; la restauracion conserva resultados pero revalida paginas.
 
 #### DAG-RESULTS-DIAG-01 - Diagnostico agregado del embudo de resultados
