@@ -1188,11 +1188,60 @@
         type: "barrier-ready",
         version: 1,
         url: location.href,
+        documentToken: performanceDocumentToken,
       });
     }
   } catch {
     // Without the authenticated native channel, media remains hidden.
   }
+
+  let previewEligibilityTimer = null;
+  let lastPreviewRestriction = null;
+  const hasSensitivePreviewContent = () =>
+    document.querySelector([
+      'input[type="password"]',
+      'input[autocomplete="current-password" i]',
+      'input[autocomplete="new-password" i]',
+      'input[autocomplete^="cc-" i]',
+      'iframe[src*="recaptcha" i]',
+      'iframe[src*="hcaptcha" i]',
+      'iframe[src*="challenges.cloudflare.com" i]',
+      "[data-sitekey]",
+    ].join(",")) !== null;
+
+  const reportPreviewEligibility = () => {
+    if (window.top !== window || nativeDecisionPort === null) {
+      return;
+    }
+    const restricted = hasSensitivePreviewContent();
+    if (restricted === lastPreviewRestriction) {
+      return;
+    }
+    lastPreviewRestriction = restricted;
+    try {
+      nativeDecisionPort.postMessage({
+        type: "tab-preview-eligibility",
+        version: 1,
+        documentToken: performanceDocumentToken,
+        restricted,
+      });
+    } catch {
+      // Missing preview eligibility keeps the native thumbnail fail-closed.
+    }
+  };
+
+  const schedulePreviewEligibilityReport = () => {
+    if (window.top !== window) {
+      return;
+    }
+    if (previewEligibilityTimer !== null) {
+      clearTimeout(previewEligibilityTimer);
+    }
+    previewEligibilityTimer = setTimeout(() => {
+      previewEligibilityTimer = null;
+      reportPreviewEligibility();
+    }, 180);
+  };
 
   const markHidden = (root) => {
     if (!(root instanceof Element) && root !== document) {
@@ -1244,6 +1293,7 @@
     if (shouldProbeBackgrounds) {
       scheduleCssBackgroundProbe();
       scheduleSponsoredScan();
+      schedulePreviewEligibilityReport();
     }
   });
   observer.observe(document, {
@@ -1261,6 +1311,8 @@
       "style",
       "alt",
       "aria-label",
+      "autocomplete",
+      "type",
     ],
     childList: true,
     subtree: true,
@@ -1284,12 +1336,18 @@
         });
     };
     reportDocumentState("document-started");
+    window.addEventListener(
+      "DOMContentLoaded",
+      schedulePreviewEligibilityReport,
+      { once: true },
+    );
   window.addEventListener(
       "load",
       () => {
         markHidden(document);
         scheduleCssBackgroundProbe(0);
         scheduleSponsoredScan(0);
+        schedulePreviewEligibilityReport();
         reportDocumentState("document-loaded");
       },
       { once: true },

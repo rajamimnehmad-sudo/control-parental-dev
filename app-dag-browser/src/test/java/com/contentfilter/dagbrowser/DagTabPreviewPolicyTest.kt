@@ -1,0 +1,87 @@
+package com.contentfilter.dagbrowser
+
+import kotlin.test.Test
+import kotlin.test.assertFalse
+import kotlin.test.assertTrue
+
+class DagTabPreviewPolicyTest {
+    @Test
+    fun `capture requires a visible approved page in an open session`() {
+        assertTrue(canCapture())
+        assertFalse(canCapture(viewVisible = false))
+        assertFalse(canCapture(sessionOpen = false))
+        assertFalse(canCapture(pageVisible = false))
+        assertFalse(canCapture(eligibilityConfirmed = false))
+        assertFalse(canCapture(previewRestricted = true))
+    }
+
+    @Test
+    fun `late result is rejected after tab navigates`() {
+        val request = DagTabPreviewRequest(tabId = 4, revision = 8)
+
+        assertFalse(
+            DagTabPreviewPolicy.acceptsResult(
+                request = request,
+                currentTabId = 4,
+                currentRevision = 9,
+                pageVisible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `result cannot cross into another tab`() {
+        val request = DagTabPreviewRequest(tabId = 4, revision = 8)
+
+        assertFalse(
+            DagTabPreviewPolicy.acceptsResult(
+                request = request,
+                currentTabId = 5,
+                currentRevision = 8,
+                pageVisible = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `result is rejected if page stopped being visible`() {
+        val request = DagTabPreviewRequest(tabId = 4, revision = 8)
+
+        assertFalse(
+            DagTabPreviewPolicy.acceptsResult(
+                request = request,
+                currentTabId = 4,
+                currentRevision = 8,
+                pageVisible = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `matching result remains attached to its exact page revision`() {
+        val request = DagTabPreviewRequest(tabId = 4, revision = 8)
+
+        assertTrue(
+            DagTabPreviewPolicy.acceptsResult(
+                request = request,
+                currentTabId = 4,
+                currentRevision = 8,
+                pageVisible = true,
+            ),
+        )
+    }
+
+    private fun canCapture(
+        viewVisible: Boolean = true,
+        sessionOpen: Boolean = true,
+        pageVisible: Boolean = true,
+        eligibilityConfirmed: Boolean = true,
+        previewRestricted: Boolean = false,
+    ) = DagTabPreviewPolicy.canCapture(
+        viewVisible = viewVisible,
+        sessionOpen = sessionOpen,
+        pageVisible = pageVisible,
+        eligibilityConfirmed = eligibilityConfirmed,
+        previewRestricted = previewRestricted,
+    )
+}

@@ -102,7 +102,16 @@ class DagBrowserActivity : Activity() {
                                         sender.isTopLevel &&
                                         senderTab.waitingForBarrier
                                     ) {
+                                        senderTab.previewDocumentToken =
+                                            payload.optString("documentToken")
+                                                .takeIf(PreviewDocumentTokenPattern::matches)
                                         completeProtectedLoad(senderTab)
+                                    } else if (
+                                        payload.optString("type") == PreviewEligibilityMessage &&
+                                        payload.optInt("version") == ProtectionProtocolVersion &&
+                                        sender.isTopLevel
+                                    ) {
+                                        applyPreviewEligibility(senderTab, payload)
                                     }
                                 }
                             },
@@ -311,6 +320,9 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     url: String,
                 ) {
+                    if (tab.displayState != TabDisplayState.Loading) {
+                        invalidateTabThumbnail(tab)
+                    }
                     tab.url = url
                     tab.needsRestore = false
                     schedulePersistTabs()
@@ -498,6 +510,9 @@ class DagBrowserActivity : Activity() {
         tab: BrowserTab,
         startNewPerformanceNavigation: Boolean = false,
     ) {
+        if (tab.displayState != TabDisplayState.Loading) {
+            invalidateTabThumbnail(tab)
+        }
         if (tab === activeTab && (startNewPerformanceNavigation || !tab.waitingForBarrier)) {
             recordPerformanceEvent(performanceTracker.begin())
         }
@@ -511,7 +526,10 @@ class DagBrowserActivity : Activity() {
         tab.waitingForBarrier = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Visible
-        if (tab === activeTab) revealProtectedPage()
+        if (tab === activeTab) {
+            revealProtectedPage()
+            if (tabSwitcher.isOpen()) captureActiveTabThumbnail()
+        }
     }
 
     private fun revealProtectedPage() {
@@ -628,6 +646,7 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showClosedPage(tab: BrowserTab) {
+        invalidateTabThumbnail(tab)
         tab.waitingForBarrier = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Closed
@@ -635,6 +654,7 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showBlockedNavigation(tab: BrowserTab) {
+        invalidateTabThumbnail(tab)
         tab.waitingForBarrier = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Blocked
@@ -665,6 +685,7 @@ class DagBrowserActivity : Activity() {
 
     private fun goHome(tab: BrowserTab) {
         if (!extensionReady || !tab.session.isOpen) return
+        invalidateTabThumbnail(tab)
         addressInput.clearFocus()
         getSystemService(InputMethodManager::class.java)
             .hideSoftInputFromWindow(addressInput.windowToken, 0)
@@ -678,6 +699,18 @@ class DagBrowserActivity : Activity() {
             renderActiveTab()
             return
         }
+        val previousTab = activeTab
+        if (previousTab != null && canCaptureThumbnail(previousTab)) {
+            captureActiveTabThumbnail {
+                switchToWithoutCapture(tab)
+            }
+            return
+        }
+        switchToWithoutCapture(tab)
+    }
+
+    private fun switchToWithoutCapture(tab: BrowserTab) {
+        if (!tabs.contains(tab) || tab === activeTab) return
         activeTab?.let { setTabActivity(it, active = false) }
         if (activeTab != null) runCatching { geckoView.releaseSession() }
         activeTab = tab
@@ -829,19 +862,39 @@ class DagBrowserActivity : Activity() {
         schedulePersistTabs()
     }
 
-    private fun captureActiveTabThumbnail() {
-        val tab = activeTab ?: return
-        if (
-            geckoView.visibility != View.VISIBLE ||
-            !tab.session.isOpen ||
-            tab.displayState != TabDisplayState.Visible
-        ) {
+    private fun captureActiveTabThumbnail(onCaptureReady: () -> Unit = {}) {
+        val tab = activeTab ?: return onCaptureReady()
+        if (!canCaptureThumbnail(tab)) {
+            onCaptureReady()
             return
         }
+        val request = DagTabPreviewRequest(tab.id, tab.previewRevision)
+        var completionPending = true
+        var captureExpired = false
+        val completeOnce = {
+            if (completionPending) {
+                completionPending = false
+                onCaptureReady()
+            }
+        }
+        val timeout =
+            Runnable {
+                captureExpired = true
+                completeOnce()
+            }
+        handler.postDelayed(timeout, ThumbnailCaptureTimeoutMillis)
         geckoView.capturePixels().accept(
             { bitmap ->
+                handler.removeCallbacks(timeout)
+                val acceptsBitmap = !captureExpired && activeTab === tab
+                completeOnce()
                 if (bitmap == null || bitmap.width <= 0 || bitmap.height <= 0) return@accept
-                if (isFinishing || isDestroyed || thumbnailExecutor.isShutdown) {
+                if (
+                    !acceptsBitmap ||
+                    isFinishing ||
+                    isDestroyed ||
+                    thumbnailExecutor.isShutdown
+                ) {
                     bitmap.recycle()
                     return@accept
                 }
@@ -850,7 +903,17 @@ class DagBrowserActivity : Activity() {
                         val scaled = scaleThumbnail(bitmap)
                         if (scaled !== bitmap) bitmap.recycle()
                         handler.post {
-                            if (isFinishing || isDestroyed || !tabs.contains(tab)) {
+                            if (
+                                isFinishing ||
+                                isDestroyed ||
+                                !tabs.contains(tab) ||
+                                !DagTabPreviewPolicy.acceptsResult(
+                                    request = request,
+                                    currentTabId = tab.id,
+                                    currentRevision = tab.previewRevision,
+                                    pageVisible = tab.displayState == TabDisplayState.Visible,
+                                )
+                            ) {
                                 scaled.recycle()
                             } else {
                                 tab.thumbnail?.takeIf { it !== scaled }?.recycle()
@@ -863,8 +926,47 @@ class DagBrowserActivity : Activity() {
                     bitmap.recycle()
                 }
             },
-            {},
+            {
+                handler.removeCallbacks(timeout)
+                completeOnce()
+            },
         )
+    }
+
+    private fun canCaptureThumbnail(tab: BrowserTab): Boolean =
+        DagTabPreviewPolicy.canCapture(
+            viewVisible = geckoView.visibility == View.VISIBLE,
+            sessionOpen = tab.session.isOpen,
+            pageVisible = tab.displayState == TabDisplayState.Visible,
+            eligibilityConfirmed =
+                tab.previewDocumentToken != null &&
+                    tab.previewEligibilityToken == tab.previewDocumentToken,
+            previewRestricted = tab.previewRestricted,
+        )
+
+    private fun applyPreviewEligibility(
+        tab: BrowserTab,
+        payload: JSONObject,
+    ) {
+        val token =
+            payload.optString("documentToken")
+                .takeIf(PreviewDocumentTokenPattern::matches)
+                ?: return
+        if (token != tab.previewDocumentToken) return
+        tab.previewEligibilityToken = token
+        tab.previewRestricted = payload.optBoolean("restricted", true)
+        if (tab.previewRestricted) {
+            invalidateTabThumbnail(tab)
+        } else if (tab === activeTab && tabSwitcher.isOpen()) {
+            captureActiveTabThumbnail()
+        }
+    }
+
+    private fun invalidateTabThumbnail(tab: BrowserTab) {
+        tab.previewRevision += 1
+        tab.thumbnail?.recycle()
+        tab.thumbnail = null
+        refreshTabSwitcher()
     }
 
     private fun scaleThumbnail(source: Bitmap): Bitmap {
@@ -1180,6 +1282,7 @@ class DagBrowserActivity : Activity() {
 
     private fun releaseTabThumbnails() {
         tabs.forEach { tab ->
+            tab.previewRevision += 1
             tab.thumbnail?.recycle()
             tab.thumbnail = null
         }
@@ -1233,6 +1336,10 @@ class DagBrowserActivity : Activity() {
         var barrierTimeout: Runnable? = null,
         var needsRestore: Boolean = false,
         var thumbnail: Bitmap? = null,
+        var previewRevision: Long = 0,
+        var previewDocumentToken: String? = null,
+        var previewEligibilityToken: String? = null,
+        var previewRestricted: Boolean = true,
         var recovering: Boolean = false,
     )
 
@@ -1241,6 +1348,7 @@ class DagBrowserActivity : Activity() {
         const val ExtensionId = "dag-protection@glosh.local"
         const val NativeApp = "glosh.dag.protection"
         const val BarrierReadyMessage = "barrier-ready"
+        const val PreviewEligibilityMessage = "tab-preview-eligibility"
         const val MediaBytesMessage = "media-bytes"
         const val MediaDecisionMessage = "media-decision"
         const val MediaPresentationStatusMessage = "media-presentation-status"
@@ -1258,6 +1366,8 @@ class DagBrowserActivity : Activity() {
         const val PersistTabsDelayMillis = 250L
         const val ThumbnailWidth = 300
         const val ThumbnailHeight = 450
+        const val ThumbnailCaptureTimeoutMillis = 350L
+        val PreviewDocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
         const val EnabledControlAlpha = 1f
         const val DisabledControlAlpha = 0.45f
         const val DefaultBrowserRoleRequestCode = 4_201
