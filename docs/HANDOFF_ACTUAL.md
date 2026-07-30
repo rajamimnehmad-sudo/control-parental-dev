@@ -410,9 +410,38 @@ El lote integrado se desarrolló y validó en:
 - Una VPN/DNS no puede aplicar blur individual dentro de HTTPS sin una
   interceptación TLS que no está autorizada ni recomendada.
 
+## Lote 6 de 6: chat de ayuda integrado
+
+- Commit local `ce98ca5`: Usuario 302 y Admin 287 comparten el contrato
+  determinista de ayuda, con saludos, capacidades, agradecimientos,
+  repreguntas, sugerencias contextuales y acciones que sólo navegan.
+- Ambas pantallas identifican su contexto: Usuario muestra que usa este
+  teléfono y Admin que presenta el resumen agregado con cantidad de usuarios.
+  El botón `Borrar chat` elimina los mensajes locales; al cerrar la pantalla no
+  se conserva historial.
+- Usuario conserva LiteRT-LM 0.14 y el modelo Qwen2 0.5B opcional fuera del APK.
+  La salida generativa rechaza respuestas largas, repetidas, no fundamentadas o
+  con patrones inválidos, y vuelve a la respuesta determinista segura.
+- Admin no incorpora el modelo de 647 MB: funciona offline con el mismo
+  contrato confiable sin duplicar almacenamiento ni memoria. No se mezclan
+  estados, repositorios, permisos o acciones de ambos roles.
+- Una falla de página como `No me abre una página` queda clasificada como DAG y
+  genera sólo el resumen técnico permitido. El texto libre y los secretos no
+  forman parte del reporte.
+- Validación automática correcta: 142 pruebas entre contrato, Usuario y Admin,
+  ktlint de los cuatro módulos y ambos `assembleDevDebug`, incluyendo R8 y lint
+  vital. APK Usuario: 26.569.022 bytes, SHA-256
+  `45beb84ec2ae9a114f414fb6e75b8ae9196498dce08135944bd6da201e2e969e`.
+  APK Admin: 28.818.004 bytes, SHA-256
+  `2b15a09d7e61fe334bc70e58e7894553ee7174c9c6b08dbe5a3cf6e36197b648`.
+- No se instaló, publicó ni hizo push durante el lote. Supabase y Production no
+  se modificaron.
+
 ## Próximo trabajo autorizado
 
-Continuar con el lote 6 de 6: mejorar e integrar el chat de ayuda en App Usuario
-y App Admin, conciliando primero los cambios locales de GloshIA sin perderlos.
-Después se podrán generar los APK canónicos desde `main` local y ejecutar la
-matriz física conjunta que el usuario pidió postergar hasta el cierre.
+Los seis lotes están implementados localmente. Generar nuevamente los APK
+canónicos desde `main` ya integrado e iniciar la matriz física conjunta:
+Usuario 302, Admin 287 y el DAG vigente, incluyendo Ajustes, chat offline,
+borrado, secretos sintéticos, acciones seguras, pestañas, miniaturas,
+descargas, imágenes y navegación atrás. No publicar ni hacer push sin un nuevo
+OK explícito.

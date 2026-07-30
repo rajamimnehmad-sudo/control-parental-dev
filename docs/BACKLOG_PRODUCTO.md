@@ -389,10 +389,13 @@ Flujo de una entrada:
 
 ### HELP-CONTEXTUAL-CHAT-01 - Asistente privado de Content Filter
 
-- Estado: `Candidato local conversacional Usuario 297 compilado; pendiente gate físico e instalación`. Aprobado explicitamente el 2026-07-20 y ampliado por el usuario el 2026-07-29. Tipo: ayuda, UX y privacidad. Prioridad: P1. Esfuerzo: L. Riesgo: medio.
+- Estado: `Integrado en el lote local 6 con Usuario 302 y Admin 287; pendiente
+  gate físico e instalación`. Aprobado explicitamente el 2026-07-20, ampliado
+  el 2026-07-29 y ejecutado el 2026-07-30. Tipo: ayuda, UX y privacidad.
+  Prioridad: P1. Esfuerzo: L. Riesgo: medio.
 - Alcance: chat interactivo disponible en Usuario y Admin, con preguntas sugeridas segun el estado real propio o agregado de todos los dispositivos y acciones directas hacia la seccion correcta.
 - Decision: la capa determinista sigue siendo la fuente confiable de estado,
-  acciones y reportes. Usuario 297 agrega LiteRT-LM 0.14 y Qwen2 0.5B local
+  acciones y reportes. Usuario 302 agrega LiteRT-LM 0.14 y Qwen2 0.5B local
   para redactar respuestas conversacionales con contexto corto, sin API ni
   costo por consulta. Ante ausencia, incompatibilidad o falla del modelo,
   conserva la ayuda básica.
@@ -403,17 +406,18 @@ Flujo de una entrada:
   datos privados. El chat sigue funcionando offline; el reporte requiere red.
 - Evidencia SM-A235M: una pregunta libre con una contraseña sintética produjo
   una respuesta contextual y Supabase DEV recibió solo el resumen seguro de
-  `dag-images`, sin el texto ni la contraseña. El candidato 297 superó ktlint,
-  unitarios y APK minificada; el modelo fijo de 647377840 bytes fue descargado
-  y verificado por SHA-256 en la Mac. Pendiente probar la conversación
-  generativa e instalarla cuando ADB detecte el teléfono.
+  `dag-images`, sin el texto ni la contraseña. Usuario 302 endurece la salida
+  del modelo contra respuestas repetidas, extensas, ajenas a la guía o con
+  secretos; Admin 287 comparte saludos, capacidades, seguimiento, contexto
+  visible y borrado local. Ambos superaron ktlint, unitarios y APK minificada.
+  Pendiente instalar y probar la conversación generativa en el teléfono.
 
 ### LOTE-HELP-BOTH-APPS-02 - GloshIA útil y coherente en Usuario y Admin
 
-- Estado: `Idea agrupada; no aprobada para codigo`. Evidencia: el usuario pide
-  el 2026-07-29 mejorar el chat de ayuda e integrarlo plenamente en ambas apps.
-  Tipo: asistencia contextual, UX, privacidad y arquitectura Android.
-  Prioridad propuesta: P1. Esfuerzo estimado: L. Riesgo: medio.
+- Estado: `Resuelto en lote local 6; pendiente gate físico`. El usuario lo
+  aprobó como sexto lote y autorizó su ejecución el 2026-07-30. Tipo:
+  asistencia contextual, UX, privacidad y arquitectura Android. Prioridad: P1.
+  Esfuerzo: L. Riesgo: medio.
 - Objetivo: Usuario y Admin ofrecen una experiencia conversacional consistente,
   accesible desde Ayuda y desde los estados que requieren explicación o
   reparación. Comparten lenguaje, componentes y motor confiable, pero reciben
@@ -459,16 +463,23 @@ Flujo de una entrada:
   297 ni duplica reportes. Primero se reconcilia ese candidato con `main` y se
   extrae únicamente lo compartible sin mezclar estados, repositorios o
   autoridades de Usuario y Admin.
+- Implementación: Usuario 302 conserva el modelo local opcional, verificado y
+  descargable; Admin 287 usa solamente el motor determinista compartido para no
+  duplicar 647 MB ni ampliar su superficie de memoria. Ambas apps responden
+  saludos, capacidades, agradecimientos y repreguntas, muestran el contexto
+  activo, permiten borrar la conversación y destruyen el historial al cerrar.
+  Las acciones siguen siendo navegación explícita y los reportes continúan
+  construyéndose exclusivamente desde resúmenes predeterminados.
 - Aceptación: las mismas preguntas generales reciben respuestas coherentes en
   ambas apps; preguntas contextuales usan el dispositivo correcto; cada acción
   abre un destino válido y conserva controles de seguridad; funciona sin red y
   sin modelo generativo; cerrar/borrar el chat elimina su historial local; una
   consulta con secretos sintéticos no los registra ni transmite; el tamaño y
   consumo quedan dentro del presupuesto aprobado por app.
-- Decisiones antes de ejecutar: distribución del modelo en Admin, conservación
-  del historial entre sesiones, punto de entrada principal y si Admin necesita
-  comparar varios dispositivos en una misma conversación o debe fijar siempre
-  uno.
+- Decisiones aplicadas: el modelo no se distribuye en Admin; no se conserva
+  historial entre sesiones; Ayuda permanece como entrada principal desde
+  Ajustes; Admin identifica visiblemente que usa un resumen general agregado.
+  Una futura conversación fijada a un dispositivo requerirá un ticket separado.
 
 ### ADMIN-USER-SECTIONS-UX-04 - Apps, Web y Seguridad separadas
 
