@@ -500,18 +500,40 @@ El lote integrado se desarrolló y validó en:
   rol de navegador. El diálogo mostró físicamente `Versión 0.16.0-dev (26)` y
   Atrás volvió a los controles del navegador sin recargar la página. No se
   publicó.
+- El lote general aprobado después de esa línea base quedó compilado localmente
+  como DAG 27 (`0.17.0-dev`), extensión `1.20.0`, todavía sin instalar ni
+  publicar. `DAG-V3-PRIVATE-DIAGNOSTICS-06` elimina URL, texto alternativo y
+  estados DOM del protocolo/log de presentación; quedan acción, frame y
+  cantidad de coincidencias.
+- `DAG-V3-FALSE-ALLOW-08` no baja el umbral global: durante la reproducción se
+  observaron scores de permiso alrededor de `0,27-0,28` y existen permisos
+  humanos correctos en esa zona; la variante rotativa exacta aún debe
+  correlacionarse físicamente. Sólo las imágenes con relación extrema desde
+  `2:1` reciben tres vistas regionales del mismo modelo, con umbral `0,50`;
+  fotos normales siguen con una inferencia. No hay regla por Instagram, API,
+  segundo modelo ni persistencia de píxeles.
+- `DAG-V3-FRAME-STABILITY-10` reemplaza recorridos DOM globales repetidos por
+  raíces incrementales, ignora mutaciones de estilo propias, espera 160 ms de
+  quietud después del scroll y mantiene un índice efímero fuente-elementos para
+  aplicar cada decisión sólo donde corresponde. El CSS fail-closed de
+  `document_start` no cambió.
+- Validación local de DAG 27: `node --check`, 99 unitarios, `ktlintCheck`,
+  `lintDevDebug` y `assembleDevDebug` correctos. APK de 121.182.502 bytes,
+  SHA-256
+  `f2c6fca95215cb0f8608f74ee716035366804a1488dad00430449ead9d4a1b2c`.
+  Falta instalarlo y comparar tiempos/frames, además de Frávega, Mimo, Cheeky,
+  Google Imágenes e Instagram. `DAG-V3-DOCUMENT-ISOLATION-07` y
+  `DAG-V3-TAB-HIBERNATION-09` siguen pendientes; este lote no los declara
+  resueltos.
 
 ## Próximo trabajo autorizado
 
-Completar la matriz conjunta con Usuario 304, Admin 287 y DAG 25: Ajustes, chat offline,
+Instalar primero el candidato local DAG 27 en el SM-S908E y ejecutar su matriz
+de privacidad, clasificación panorámica, compatibilidad y frames. Después,
+completar la matriz conjunta con Usuario 304, Admin 287 y DAG 27: Ajustes, chat offline,
 borrado, secretos sintéticos, acciones seguras, pestañas, descargas PDF e
 imágenes. Atrás moderno y miniaturas seguras ya tienen evidencia física en el
 SM-S908E. La inteligencia conversacional avanzada de GloshIA queda para un
-ticket posterior. Para DAG, iniciar primero una línea base profesional de
-rendimiento/compatibilidad y luego ejecutar tickets pequeños; el primero
-aprobado, `DAG-ABOUT-VERSION-05`, ya está resuelto y validado en DAG 26. La
-línea base identificó cuatro tickets generales todavía no aprobados para
-código; por prioridad se propone
-`DAG-V3-PRIVATE-DIAGNOSTICS-06`, luego el diagnóstico de
-`DAG-V3-FALSE-ALLOW-08`, aislamiento de documento y finalmente hibernación. No
-publicar sin un nuevo OK explícito.
+ticket posterior. `DAG-V3-DOCUMENT-ISOLATION-07` y
+`DAG-V3-TAB-HIBERNATION-09` continúan como tickets separados sin autorización
+de código en este lote. No publicar sin un nuevo OK explícito.

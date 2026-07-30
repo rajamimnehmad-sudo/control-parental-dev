@@ -735,10 +735,11 @@ Flujo de una entrada:
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-ABOUT-VERSION-05 | Resuelto y validado físicamente en DAG 26 | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
-| DAG-V3-PRIVATE-DIAGNOSTICS-06 | Diagnosticado; pendiente aprobación para código | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
+| DAG-V3-PRIVATE-DIAGNOSTICS-06 | Implementado localmente en DAG 27; pendiente matriz física | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
 | DAG-V3-DOCUMENT-ISOLATION-07 | Diagnosticado; pendiente aprobación para código | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
-| DAG-V3-FALSE-ALLOW-08 | Caso físico confirmado; pendiente diagnóstico reproducible y aprobación para código | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
+| DAG-V3-FALSE-ALLOW-08 | Corrección general candidata en DAG 27; pendiente matriz física | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
 | DAG-V3-TAB-HIBERNATION-09 | Riesgo físico confirmado; pendiente aprobación para código | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
+| DAG-V3-FRAME-STABILITY-10 | Implementado localmente en DAG 27; pendiente medición física | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Resuelto y publicado DEV 279 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
@@ -1870,9 +1871,9 @@ Flujo de una entrada:
 
 #### DAG-V3-PRIVATE-DIAGNOSTICS-06 - Diagnóstico DEV sin contenido de navegación
 
-- Estado: `Diagnosticado; pendiente aprobación para código`. Hallazgo de la
-  línea base física del 2026-07-30 sobre DAG 25 en SM-S908E. Tipo: privacidad y
-  observabilidad. Prioridad: P0. Esfuerzo: S. Riesgo: alto.
+- Estado: `Implementado localmente en DAG 27; pendiente matriz física`. Hallazgo
+  de la línea base física del 2026-07-30 sobre DAG 25 en SM-S908E. Tipo:
+  privacidad y observabilidad. Prioridad: P0. Esfuerzo: S. Riesgo: alto.
 - Causa raíz: el mensaje de presentación y `DagMediaTransport` incluyen
   `sourceUrl`, texto alternativo y estados de elementos DOM. Una versión
   anterior había limitado la evidencia a bytes, motivo, score y tiempo, pero la
@@ -1881,6 +1882,10 @@ Flujo de una entrada:
   ni píxeles en la evidencia DEV. Conservar únicamente identificadores
   efímeros no reversibles, acción, motivo, score, tamaño, conteos agregados y
   latencia.
+- Implementación candidata: el content script dejó de enviar URL, texto
+  alternativo y estados DOM en el acuse de presentación; el background y la
+  actividad nativa registran sólo acción, frame y cantidad de coincidencias.
+  El contrato automatizado impide reintroducir esos campos.
 - Aceptación: una matriz con Google, tiendas e Instagram no deja URL, búsquedas,
   texto alternativo ni contenido DOM en `logcat`; siguen disponibles conteos,
   tiempos, motivos y scores suficientes para diagnosticar; Beta/Production no
@@ -1912,25 +1917,50 @@ Flujo de una entrada:
 
 #### DAG-V3-FALSE-ALLOW-08 - Falso permiso visual reproducible
 
-- Estado: `Caso físico confirmado; pendiente diagnóstico reproducible y
-  aprobación para código`. Tipo: seguridad visual y modelo. Prioridad: P0.
-  Esfuerzo: M. Riesgo: alto.
+- Estado: `Corrección general candidata en DAG 27; pendiente matriz física`.
+  Tipo: seguridad visual y modelo. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
 - Evidencia: el usuario señaló en DAG 25 una foto raster de la portada pública
   de Instagram que debía difuminarse y apareció permitida. La captura temporal
   usada para reconocer el caso fue eliminada porque coincidió con una
   notificación personal; no se conserva imagen, mensaje, URL completa ni
   píxeles en el repositorio.
-- Primera etapa obligatoria: reproducir el recurso público con diagnóstico
-  privado y determinar si el modelo produjo score menor a `0,40`, si una caché
-  devolvió una decisión anterior o si la imagen evitó el transporte. No cambiar
-  globalmente el umbral antes de conocer esa ruta.
-- Corrección: si es modelo, incorporar un conjunto pequeño de casos difíciles
-  actuales y revalidar falsos permisos/filtros por audiencia; si es entrega o
-  caché, corregir esa clase de recurso/documento. Nunca agregar una excepción
-  por dominio o por Instagram.
+- Diagnóstico: durante la reproducción del documento el transporte entregó
+  respuestas raster al único modelo local con scores de permiso alrededor de
+  `0,27-0,28`; bajar globalmente el umbral fue descartado porque la muestra
+  humana independiente incluye permisos correctos en esa zona. La portada
+  pública rota el recurso, por lo que falta correlacionar físicamente la
+  variante exacta; no se conservó ninguna captura ni URL de imagen.
+- Corrección candidata: imágenes con relación extrema, donde una persona puede
+  quedar demasiado pequeña al encajar la foto completa en `224 x 224`, reciben
+  tres vistas regionales acotadas del mismo modelo. La foto normal conserva una
+  sola inferencia; las regiones usan umbral más estricto `0,50`, se ejecutan
+  sólo desde relación `2:1` y sus buffers RGB se sobrescriben al terminar. No
+  existe regla por sitio, segundo modelo, API ni persistencia de píxeles.
 - Aceptación: el caso reproducido queda difuminado; fotos normales de hombres,
   niñas permitidas y controles seguros no empeoran en la matriz independiente;
-  el APK mantiene una sola inferencia local y no usa API.
+  el APK mantiene un único modelo local y no usa API.
+
+#### DAG-V3-FRAME-STABILITY-10 - Fluidez en páginas dinámicas
+
+- Estado: `Implementado localmente en DAG 27; pendiente medición física`. El
+  usuario aprobó el lote el 2026-07-30. Tipo: rendimiento y compatibilidad
+  general. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Causa raíz: cualquier cambio de `class` o `style` disparaba un recorrido
+  amplio de fondos, pseudo-elementos y publicidad; el scroll podía ejecutar
+  esos recorridos mientras el gesto seguía activo. Cada decisión de una imagen
+  también volvía a recorrer todos los medios del documento.
+- Implementación: los cambios DOM acumulan raíces y revisan sólo el subárbol
+  afectado; las escrituras de estilo hechas por la propia barrera no se
+  reanalizan; el probe de fondos espera 160 ms de quietud después del scroll; y
+  un índice efímero `fuente -> elementos` aplica cada decisión únicamente a los
+  medios correspondientes. El índice vive sólo en memoria de la pestaña y se
+  limpia al retirar o cambiar elementos.
+- Seguridad: el CSS fail-closed sigue ocultando medios y fondos desde
+  `document_start`; el procesamiento incremental no libera una imagen sin
+  decisión y una vista nueva durante scroll permanece oculta hasta su revisión.
+- Validación local DAG 27: `node --check`, 99 unitarios, `ktlintCheck`,
+  `lintDevDebug` y `assembleDevDebug` correctos. Falta comparar frames y tiempos
+  en SM-S908E y completar Frávega, Mimo, Cheeky, Google Imágenes e Instagram.
 
 #### DAG-V3-TAB-HIBERNATION-09 - Presupuesto real para 50 pestañas
 
