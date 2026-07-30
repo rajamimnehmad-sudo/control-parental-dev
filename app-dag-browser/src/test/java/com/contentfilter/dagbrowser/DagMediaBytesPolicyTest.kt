@@ -50,13 +50,32 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
-    fun `regional view catches a risky subject reduced inside a panoramic image`() {
-        val probabilities = listOf(0.27f, 0.51f).iterator()
+    fun `one marginal regional signal does not block a panoramic image`() {
+        val probabilities = listOf(0.27f, 0.51f, 0.2f, 0.1f).iterator()
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
                 boundsReader = DagImageBoundsReader { DagImageBounds(1_200, 300, "image/jpeg") },
-                preprocessor = preprocessorWithRegionalImages(1),
+                preprocessor = preprocessorWithRegionalImages(3),
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+        assertEquals(0.51f, decision.filterProbability)
+    }
+
+    @Test
+    fun `two regional signals block a risky subject reduced inside a panoramic image`() {
+        val probabilities = listOf(0.27f, 0.51f, 0.52f, 0.1f).iterator()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(1_200, 300, "image/jpeg") },
+                preprocessor = preprocessorWithRegionalImages(3),
                 analyzer =
                     DagImageAnalyzer {
                         DagImageAnalysisResult.Classified(probabilities.next())
@@ -65,7 +84,26 @@ class DagMediaBytesPolicyTest {
 
         assertEquals(DagMediaAction.Block, decision.action)
         assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
-        assertEquals(0.51f, decision.filterProbability)
+        assertEquals(0.52f, decision.filterProbability)
+    }
+
+    @Test
+    fun `one strong regional signal still blocks a panoramic image`() {
+        val probabilities = listOf(0.27f, 0.7f).iterator()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(1_200, 300, "image/jpeg") },
+                preprocessor = preprocessorWithRegionalImages(3),
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+        assertEquals(0.7f, decision.filterProbability)
     }
 
     @Test

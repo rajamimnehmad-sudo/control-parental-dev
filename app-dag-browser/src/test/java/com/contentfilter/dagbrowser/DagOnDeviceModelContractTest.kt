@@ -15,6 +15,9 @@ class DagOnDeviceModelContractTest {
         assertEquals(ExpectedModelSha256, model.sha256())
         assertTrue(model.length() in 8_000_000L..9_000_000L)
         assertEquals(0.4f, DagOnDeviceImageAnalyzer.FilterThreshold)
+        assertEquals(0.5f, DagOnDeviceImageAnalyzer.RegionalFilterThreshold)
+        assertEquals(0.7f, DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold)
+        assertEquals(2, DagOnDeviceImageAnalyzer.RegionalConsensusMinimum)
     }
 
     private fun File.sha256(): String =

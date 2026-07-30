@@ -119,6 +119,8 @@ internal class DagOnDeviceImageAnalyzer private constructor(
         const val ModelInputName = "pixel_values"
         const val FilterThreshold = 0.4f
         const val RegionalFilterThreshold = 0.5f
+        const val RegionalStrongFilterThreshold = 0.7f
+        const val RegionalConsensusMinimum = 2
         const val ModelAllowReason = "model_allow"
         const val ModelFilterReason = "model_filter"
         const val InvalidModelInputReason = "invalid_model_input"

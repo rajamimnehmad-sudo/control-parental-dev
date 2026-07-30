@@ -141,6 +141,7 @@ internal object DagMediaBytesPolicy {
         }
 
         var maximumProbability = fullProbability
+        var regionalFilterVotes = 0
         for (regionalImage in preparedImages.drop(1)) {
             val regionalProbability =
                 when (val analysis = analyzer.analyze(regionalImage)) {
@@ -154,16 +155,23 @@ internal object DagMediaBytesPolicy {
                         return blocked(payload, analysis.reason)
                 }
             maximumProbability = maxOf(maximumProbability, regionalProbability)
-            if (
-                regionalProbability >=
-                DagOnDeviceImageAnalyzer.RegionalFilterThreshold
-            ) {
+            if (regionalProbability >= DagOnDeviceImageAnalyzer.RegionalFilterThreshold) {
+                regionalFilterVotes += 1
+            }
+            if (regionalProbability >= DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold) {
                 return blocked(
                     payload,
                     DagOnDeviceImageAnalyzer.ModelFilterReason,
                     maximumProbability,
                 )
             }
+        }
+        if (regionalFilterVotes >= DagOnDeviceImageAnalyzer.RegionalConsensusMinimum) {
+            return blocked(
+                payload,
+                DagOnDeviceImageAnalyzer.ModelFilterReason,
+                maximumProbability,
+            )
         }
         return DagMediaDecision(
             candidateId = payload.candidateId,
