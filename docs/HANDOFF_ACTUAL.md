@@ -50,7 +50,7 @@ documentado arriba.
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
 - La última instalación física sigue siendo DAG 21. El candidato local
-  integrado en `main` declara `versionCode 22`, `versionName 0.12.0-dev`; por
+  integrado en `main` declara `versionCode 23`, `versionName 0.13.0-dev`; por
   pedido del usuario no debe instalarse ningún APK hasta completar los seis
   lotes planificados.
 - V21 cerró el primer lote de estabilidad: `Analizando` se desmonta cuando la
@@ -63,6 +63,11 @@ documentado arriba.
   respuestas tardías. Contraseñas, pagos y CAPTCHA mantienen tarjeta neutra;
   las capturas quedan sólo en memoria y se invalidan al navegar o pasar la UI a
   segundo plano.
+- V23 implementa el tercer lote: runtime y persistencia admiten hasta 50
+  pestañas, el organizador ocupa la pantalla y agrega `Cerrar todo` con
+  confirmación. Las miniaturas bajan a `200 x 300`, con presupuesto máximo
+  teórico de 12 MB para 50 capturas; al alcanzar el techo DAG abre el
+  organizador para cerrar una.
 - El modelo y su umbral `0.4` no cambiaron: el ajuste siguiente debe incorporar
   ejemplos actuales de falsos permisos y falsos filtros, no bajar el umbral a
   ciegas.
@@ -73,6 +78,11 @@ documentado arriba.
   `f44de29cd1659e2e0946fb18bc01ad6f5944971d1ed1a850e3e3522f8afa4a73`.
   Pasó `node --check`, Ktlint, 76 unitarios, APK y Lint; no fue instalado ni
   probado físicamente.
+- El build automático de V23 desde `main` mide 121.122.946 bytes y tiene
+  SHA-256
+  `bb42718aa8890304ccd2077e34db2311c21d99a63bb13d76e0926af84c3c42a3`.
+  Pasó Ktlint, 80 unitarios, APK y Lint; no fue instalado ni probado
+  físicamente.
 - En SM-A235M se verificó apertura/regreso y ausencia de destellos para raster,
   video, canvas, SVG y fondos.
 - Mientras no exista una decisión visual válida, cada recurso permanece en

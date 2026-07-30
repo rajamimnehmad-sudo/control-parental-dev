@@ -1758,16 +1758,17 @@ Flujo de una entrada:
   - el limite de ocho, el aislamiento de historial y la restauracion cifrada continuan funcionando;
   - cambiar el orden o abrir una reciente no recarga resultados ni consume una consulta Brave innecesaria.
 - Implementacion: el selector se titula `Pestañas recientes`, ordena las pestañas abiertas por ultimo uso y persiste esa marca junto al estado cifrado. No conserva ni reabre pestañas cerradas. Las tarjetas sin miniatura muestran una superficie neutra con `DAG`, sin peces.
-- Reutilizacion: se considera vacia solamente una pestaña en Home sin texto, consulta, resultados ni URL. `Nueva` enfoca la vacia usada mas recientemente —incluida la activa— antes de crear otra; las vacias heredadas restantes se pueden cerrar normalmente. El limite continua en ocho.
+- Reutilizacion: se considera vacia solamente una pestaña en Home sin texto, consulta, resultados ni URL. `Nueva` enfoca la vacia usada mas recientemente —incluida la activa— antes de crear otra; las vacias heredadas restantes se pueden cerrar normalmente. El límite de ocho de este cierre histórico fue reemplazado por el techo interno de 50 de `DAG-TABS-UX-03`.
 - Compatibilidad: sesiones cifradas anteriores sin fecha se restauran con un orden determinista; resultados y paginas no se recargan al abrir el selector ni se ejecuta una consulta Brave.
 
 ### LOTE-DAG-NAVEGACION-Y-PESTANAS-06 - Atrás predecible y organizador tipo navegador
 
 - Estado: `En ejecución por lotes aprobados`. El primer lote cerró indicadores,
   iconos funcionales y Atrás en DAG 21. El segundo lote implementó
-  `DAG-TAB-PREVIEW-04` en el candidato local DAG 22; la instalación y matriz
-  física quedan acumuladas hasta terminar los seis lotes por decisión explícita
-  del usuario del 2026-07-30.
+  `DAG-TAB-PREVIEW-04` en DAG 22 y el tercero implementó
+  `DAG-TABS-UX-03` en DAG 23. La instalación y matriz física quedan acumuladas
+  hasta terminar los seis lotes por decisión explícita del usuario del
+  2026-07-30.
 - Objetivo: cerrar la experiencia general de navegacion DAG con tres resultados
   observables: Atrás solo cierra la app cuando la pestaña activa ya esta en
   Home sin otro estado que consumir; el organizador representa fielmente las
@@ -1784,12 +1785,10 @@ Flujo de una entrada:
      las pestañas seguras.
   4. `DAG-TABS-UX-03`: ampliar capacidad y selector solamente despues de fijar
      presupuesto de memoria, restauracion y prueba con muchas pestañas.
-- Recomendacion tecnica pendiente de decision: evitar un crecimiento
-  literalmente ilimitado. La experiencia puede no presentar el limite de ocho,
-  pero el runtime debe conservar un techo alto y medido —50 es el valor
-  provisional ya propuesto— porque cada pestaña mantiene metadatos, estado
-  cifrado y eventualmente una miniatura en memoria. Subir o retirar ese techo
-  requiere primero evidencia fisica de memoria, fluidez y recuperacion.
+- Decisión técnica: la experiencia no presenta el límite histórico de ocho,
+  pero el runtime conserva un techo interno de 50 porque cada pestaña mantiene
+  metadatos, estado cifrado y eventualmente una miniatura en memoria. Subir ese
+  techo requiere primero evidencia física de memoria, fluidez y recuperación.
 - No alcance: cambiar filtros, modelo visual, decisiones de seguridad, Brave,
   Supabase, Glosh Usuario/Admin o persistir capturas de paginas en disco.
 - Gate comun: matriz DAG obligatoria en el mismo telefono objetivo, incluyendo
@@ -1818,20 +1817,28 @@ Flujo de una entrada:
 
 #### DAG-TABS-UX-03 - Hasta 50 pestanas con selector visual completo
 
-- Estado: `Idea autorizada para backlog; no aprobada para codigo`, reafirmada
-  por el usuario el 2026-07-29 al pedir eliminar el maximo de ocho. Tipo:
-  gestion de pestanas, rendimiento y privacidad visual. Prioridad: P1.
-  Esfuerzo: L. Riesgo: alto.
+- Estado: `Implementado en main como candidato DAG 23; validación automática
+  correcta; instalación física diferida por el usuario`. El usuario autorizó
+  el lote el 2026-07-30. El límite visible de ocho desapareció y el runtime y
+  el códec cifrado comparten un techo interno de 50.
 - Problema: el limite actual es ocho y el selector puede mostrar una superficie neutra/Home en lugar de una miniatura util de la pagina. Tampoco ocupa toda la pantalla como un selector moderno ni ofrece una accion evidente para cerrar todo.
 - Propuesta: permitir un maximo estricto de 50 pestanas; abrir un selector a pantalla completa con tarjetas amplias y miniatura efimera de la ultima pagina aprobada; incluir cierre individual y `Cerrar todo` con confirmacion cuando haya varias pestanas.
 - Presupuesto: mantener un solo WebView activo. Las demas pestanas quedan suspendidas con estado cifrado y, si corresponde, una miniatura efimera acotada; no conservar 50 WebViews ni decodificaciones activas en memoria. Al llegar a 50, enfocar el selector y pedir cerrar una antes de crear otra.
 - Privacidad y seguridad: no persistir pixeles de miniaturas en disco; paginas bloqueadas, inciertas, en analisis o sensibles usan tarjeta neutra. Una miniatura nunca cuenta como aprobacion y restaurar una pagina vuelve a validarla.
 - Relacion: reemplaza la decision historica de maximo ocho de `DAG-TABS-UX-01` y extiende `DAG-TABS-UX-02`; no reabre sus correcciones de orden, cifrado ni pestanas vacias.
 - Aceptacion: 1, 10 y 50 pestanas mantienen cambio/cierre fluido; selector usa toda la pantalla; la tarjeta representa la pagina correcta y no Home salvo que esa pestana este realmente en Home; `Cerrar todo` deja una Home segura; reinicio no restaura miniaturas persistidas ni carga paginas automaticamente.
-- Decision pendiente: el usuario prefiere no tener maximo visible. Confirmar al
-  preparar ejecucion si se adopta el techo interno seguro de 50, si se eleva
-  despues de medir o si se exige crecimiento literalmente ilimitado aceptando
-  su riesgo de recursos.
+- Decisión cerrada: se adoptó el techo interno seguro de 50. Al alcanzarlo, DAG
+  abre el organizador y pide cerrar una pestaña, sin presentar un máximo de
+  ocho. `Cerrar todo` requiere confirmación y deja una única Home segura.
+- Presupuesto implementado: cada miniatura se reduce a `200 x 300` ARGB; las 50
+  capturas consumen como máximo teórico 12.000.000 bytes. Se mantiene un solo
+  GeckoView adjunto/activo, medios suspendidos en sesiones inactivas y
+  restauración diferida tras reiniciar.
+- Validación DAG 23: 50 pestañas sobreviven al códec con la última activa; una
+  entrada 51 se trunca de forma determinista; `node --check`, `ktlintCheck`, 80
+  unitarios, `assembleDevDebug` y `lintDevDebug` correctos desde `main`. No se
+  instaló APK ni se midió PSS/fluidez física por la decisión de acumular los
+  seis lotes.
 
 #### DAG-HOME-RECENTS-02 - Inicio limpio y accesos circulares recientes
 
