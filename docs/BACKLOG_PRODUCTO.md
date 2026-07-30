@@ -735,11 +735,12 @@ Flujo de una entrada:
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-ABOUT-VERSION-05 | Resuelto y validado físicamente en DAG 26 | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
-| DAG-V3-PRIVATE-DIAGNOSTICS-06 | Implementado localmente en DAG 27; pendiente matriz física | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
+| DAG-V3-PRIVATE-DIAGNOSTICS-06 | Resuelto y validado físicamente en DAG 29 | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
 | DAG-V3-DOCUMENT-ISOLATION-07 | Diagnosticado; pendiente aprobación para código | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
-| DAG-V3-FALSE-ALLOW-08 | Corrección general candidata en DAG 27; pendiente matriz física | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
+| DAG-V3-FALSE-ALLOW-08 | Candidato general activo en DAG 29; pendiente variante exacta | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
 | DAG-V3-TAB-HIBERNATION-09 | Riesgo físico confirmado; pendiente aprobación para código | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
-| DAG-V3-FRAME-STABILITY-10 | Implementado localmente en DAG 27; pendiente medición física | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
+| DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
+| DAG-V3-MEDIA-PRESENTATION-11 | Resuelto y validado físicamente en DAG 29 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Resuelto y publicado DEV 279 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
@@ -1871,7 +1872,7 @@ Flujo de una entrada:
 
 #### DAG-V3-PRIVATE-DIAGNOSTICS-06 - Diagnóstico DEV sin contenido de navegación
 
-- Estado: `Implementado localmente en DAG 27; pendiente matriz física`. Hallazgo
+- Estado: `Resuelto y validado físicamente en DAG 29`. Hallazgo
   de la línea base física del 2026-07-30 sobre DAG 25 en SM-S908E. Tipo:
   privacidad y observabilidad. Prioridad: P0. Esfuerzo: S. Riesgo: alto.
 - Causa raíz: el mensaje de presentación y `DagMediaTransport` incluyen
@@ -1886,6 +1887,8 @@ Flujo de una entrada:
   alternativo y estados DOM en el acuse de presentación; el background y la
   actividad nativa registran sólo acción, frame y cantidad de coincidencias.
   El contrato automatizado impide reintroducir esos campos.
+- Evidencia física: Frávega, Mimo, Cheeky, Google Imágenes e Instagram no
+  dejaron URL, búsqueda, texto alternativo ni estado DOM en `DagMediaTransport`.
 - Aceptación: una matriz con Google, tiendas e Instagram no deja URL, búsquedas,
   texto alternativo ni contenido DOM en `logcat`; siguen disponibles conteos,
   tiempos, motivos y scores suficientes para diagnosticar; Beta/Production no
@@ -1917,7 +1920,7 @@ Flujo de una entrada:
 
 #### DAG-V3-FALSE-ALLOW-08 - Falso permiso visual reproducible
 
-- Estado: `Corrección general candidata en DAG 27; pendiente matriz física`.
+- Estado: `Candidato general activo en DAG 29; pendiente variante exacta`.
   Tipo: seguridad visual y modelo. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
 - Evidencia: el usuario señaló en DAG 25 una foto raster de la portada pública
   de Instagram que debía difuminarse y apareció permitida. La captura temporal
@@ -1936,13 +1939,18 @@ Flujo de una entrada:
   sola inferencia; las regiones usan umbral más estricto `0,50`, se ejecutan
   sólo desde relación `2:1` y sus buffers RGB se sobrescriben al terminar. No
   existe regla por sitio, segundo modelo, API ni persistencia de píxeles.
+- Evidencia DAG 29: Google Imágenes produjo 25 decisiones sensibles y 10
+  presentaciones bloqueadas para una consulta actual de moda/trajes de baño,
+  sin regresión visible. Instagram impuso su muro para abrir la aplicación y no
+  mostró la variante rotativa exacta; por eso la aceptación principal continúa
+  abierta.
 - Aceptación: el caso reproducido queda difuminado; fotos normales de hombres,
   niñas permitidas y controles seguros no empeoran en la matriz independiente;
   el APK mantiene un único modelo local y no usa API.
 
 #### DAG-V3-FRAME-STABILITY-10 - Fluidez en páginas dinámicas
 
-- Estado: `Implementado localmente en DAG 27; pendiente medición física`. El
+- Estado: `Resuelto y validado físicamente en DAG 29`. El
   usuario aprobó el lote el 2026-07-30. Tipo: rendimiento y compatibilidad
   general. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Causa raíz: cualquier cambio de `class` o `style` disparaba un recorrido
@@ -1958,9 +1966,27 @@ Flujo de una entrada:
 - Seguridad: el CSS fail-closed sigue ocultando medios y fondos desde
   `document_start`; el procesamiento incremental no libera una imagen sin
   decisión y una vista nueva durante scroll permanece oculta hasta su revisión.
-- Validación local DAG 27: `node --check`, 99 unitarios, `ktlintCheck`,
-  `lintDevDebug` y `assembleDevDebug` correctos. Falta comparar frames y tiempos
-  en SM-S908E y completar Frávega, Mimo, Cheeky, Google Imágenes e Instagram.
+- Validación DAG 29: `node --check`, 99 unitarios, `ktlintCheck`,
+  `lintDevDebug` y `assembleDevDebug` correctos. En SM-S908E, Frávega registró
+  83 cuadros sin tardíos y Cheeky 127 sin tardíos. Mimo tuvo dos tardíos en una
+  muestra corta de 20 cuadros, quedó visible en 231 ms y con viewport listo en
+  1.693 ms. No hubo crash ni ANR.
+
+#### DAG-V3-MEDIA-PRESENTATION-11 - Espera moderna y fuentes rotativas
+
+- Estado: `Resuelto y validado físicamente en DAG 29`. Tipo: compatibilidad y
+  presentación general. Prioridad: P1. Esfuerzo: S. Riesgo: medio.
+- Causa raíz: una decisión podía llegar después de que una página dinámica
+  reemplazara la fuente del elemento. El índice se actualizaba, pero no siempre
+  reconciliaba la fuente activa; recursos auxiliares también podían conservar
+  un contenedor en espera aunque ya existiera un visual permitido.
+- Implementación: toda respuesta tardía reevalúa la fuente actual; una imagen
+  permitida limpia esperas heredadas en sus contenedores. La espera conserva el
+  CSS fail-closed y usa un brillo barrido neutro, sin texto `Analizando…`.
+  Una imagen filtrada sigue desenfocada y mantiene el escudo.
+- Evidencia: Frávega y Mimo quedaron sin leyendas residuales después de cargar
+  y desplazarse. Google Imágenes conservó el desenfoque preventivo. El cambio
+  no agrega reglas por dominio ni libera recursos sin decisión.
 
 #### DAG-V3-TAB-HIBERNATION-09 - Presupuesto real para 50 pestañas
 
