@@ -69,6 +69,10 @@
     <string name="download_blocked">DAG bloqueó una descarga no permitida. Solo admite PDF seguro de hasta 20 MB.</string>
     <string name="download_one_at_a_time">Terminá o cancelá la descarga actual antes de iniciar otra.</string>
     <string name="downloads">Descargas</string>
+    <string name="history">Historial</string>
+    <string name="history_empty">Todavía no hay páginas en el historial.</string>
+    <string name="clear_history">Borrar historial</string>
+    <string name="history_cleared">Historial borrado</string>
     <string name="downloads_empty">Todavía no hay archivos descargados.</string>
     <string name="delete_download_title">¿Borrar este PDF?</string>
     <string name="download_deleted">PDF borrado</string>

@@ -1332,17 +1332,18 @@
 
   let previewEligibilityTimer = null;
   let lastPreviewRestriction = null;
+  const sensitivePreviewSelector = [
+    'input[type="password"]',
+    'input[autocomplete="current-password" i]',
+    'input[autocomplete="new-password" i]',
+    'input[autocomplete^="cc-" i]',
+    'iframe[src*="recaptcha" i]',
+    'iframe[src*="hcaptcha" i]',
+    'iframe[src*="challenges.cloudflare.com" i]',
+    "[data-sitekey]",
+  ].join(",");
   const hasSensitivePreviewContent = () =>
-    document.querySelector([
-      'input[type="password"]',
-      'input[autocomplete="current-password" i]',
-      'input[autocomplete="new-password" i]',
-      'input[autocomplete^="cc-" i]',
-      'iframe[src*="recaptcha" i]',
-      'iframe[src*="hcaptcha" i]',
-      'iframe[src*="challenges.cloudflare.com" i]',
-      "[data-sitekey]",
-    ].join(",")) !== null;
+    Array.from(document.querySelectorAll(sensitivePreviewSelector)).some(isVisibleNow);
 
   const reportPreviewEligibility = () => {
     if (window.top !== window || nativeDecisionPort === null) {

@@ -57,6 +57,7 @@ class DagBrowserActivity : Activity() {
     private lateinit var geckoView: GeckoView
     private lateinit var addressInput: EditText
     private lateinit var homeButton: ImageButton
+    private lateinit var newTabButton: ImageButton
     private lateinit var goButton: ImageButton
     private lateinit var tabButton: TextView
     private lateinit var menuButton: ImageButton
@@ -66,6 +67,7 @@ class DagBrowserActivity : Activity() {
     private lateinit var safetyDetail: TextView
     private lateinit var tabSwitcher: DagTabSwitcherView
     private lateinit var tabPersistence: DagTabPersistence
+    private lateinit var historyPersistence: DagHistoryPersistence
     private lateinit var imageAnalyzer: DagImageAnalyzer
     private lateinit var runtime: GeckoRuntime
 
@@ -188,6 +190,7 @@ class DagBrowserActivity : Activity() {
         pendingExternalUrl = safeExternalUrl(intent)
         applySystemBarInsets()
         tabPersistence = DagTabPersistence(applicationContext)
+        historyPersistence = DagHistoryPersistence(applicationContext)
         imageAnalyzer = DagOnDeviceImageAnalyzer.create(applicationContext)
         bindViews()
         configureControls()
@@ -227,6 +230,7 @@ class DagBrowserActivity : Activity() {
         geckoView = findViewById(R.id.gecko_view)
         addressInput = findViewById(R.id.address_input)
         homeButton = findViewById(R.id.home_button)
+        newTabButton = findViewById(R.id.new_tab_button)
         goButton = findViewById(R.id.go_button)
         tabButton = findViewById(R.id.tab_button)
         menuButton = findViewById(R.id.menu_button)
@@ -240,6 +244,7 @@ class DagBrowserActivity : Activity() {
     private fun configureControls() {
         setNavigationControlsEnabled(false)
         goButton.setOnClickListener { navigateFromInput() }
+        newTabButton.setOnClickListener { createTab(switchToTab = true) }
         addressInput.setOnEditorActionListener { _, actionId, event ->
             val submitted =
                 actionId == EditorInfo.IME_ACTION_GO ||
@@ -298,6 +303,7 @@ class DagBrowserActivity : Activity() {
                     title: String?,
                 ) {
                     tab.title = title.orEmpty()
+                    if (tab.displayState == TabDisplayState.Visible) recordHistory(tab)
                     schedulePersistTabs()
                     refreshTabSwitcher()
                 }
@@ -1001,6 +1007,7 @@ class DagBrowserActivity : Activity() {
         tab.waitingForBarrier = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Visible
+        recordHistory(tab)
         if (tab === activeTab) {
             revealProtectedPage()
             if (tabSwitcher.isOpen()) captureActiveTabThumbnail()
@@ -1151,10 +1158,12 @@ class DagBrowserActivity : Activity() {
     private fun setNavigationControlsEnabled(enabled: Boolean) {
         addressInput.isEnabled = enabled
         homeButton.isEnabled = enabled
+        newTabButton.isEnabled = enabled
         goButton.isEnabled = enabled
         val alpha = if (enabled) EnabledControlAlpha else DisabledControlAlpha
         addressInput.alpha = alpha
         homeButton.alpha = alpha
+        newTabButton.alpha = alpha
         goButton.alpha = alpha
     }
 
@@ -1579,9 +1588,12 @@ class DagBrowserActivity : Activity() {
             menu.findItem(R.id.menu_default_browser)?.isVisible = !isDefaultBrowser()
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
-                    R.id.menu_new_tab -> createTab(switchToTab = true) != null
                     R.id.menu_reload -> {
                         activeTab?.session?.reload()
+                        true
+                    }
+                    R.id.menu_history -> {
+                        showHistory()
                         true
                     }
                     R.id.menu_default_browser -> {
@@ -1642,6 +1654,60 @@ class DagBrowserActivity : Activity() {
             .setMessage(detail)
             .setPositiveButton(R.string.close, null)
             .show()
+    }
+
+    private fun recordHistory(tab: BrowserTab) {
+        if (tab.url == InitialBlankPage || restorableUrl(tab.url) == null) return
+        historyPersistence.record(
+            entry =
+                DagHistoryEntry(
+                    url = tab.url,
+                    title = tab.title,
+                    visitedAtMillis = System.currentTimeMillis(),
+                ),
+            isAllowedUrl = ::isRestorableUrl,
+        )
+    }
+
+    private fun showHistory() {
+        val entries = historyPersistence.load(::isRestorableUrl)
+        if (entries.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.history)
+                .setMessage(R.string.history_empty)
+                .setPositiveButton(R.string.close, null)
+                .show()
+            return
+        }
+        val labels =
+            entries.map { entry ->
+                val host =
+                    runCatching { Uri.parse(entry.url).host }
+                        .getOrNull()
+                        ?.removePrefix("www.")
+                        .orEmpty()
+                entry.title.takeIf(String::isNotBlank)?.let { "$it\n$host" } ?: host
+            }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.history)
+            .setItems(labels.toTypedArray()) { _, index -> openHistoryEntry(entries[index]) }
+            .setNeutralButton(R.string.clear_history) { _, _ ->
+                historyPersistence.clear()
+                Toast.makeText(this, R.string.history_cleared, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun openHistoryEntry(entry: DagHistoryEntry) {
+        val safeUrl = restorableUrl(entry.url) ?: return
+        val tab = activeTab
+        if (tab == null) {
+            createTab(switchToTab = true, initialUrl = safeUrl)
+            return
+        }
+        beginProtectedLoad(tab, startNewPerformanceNavigation = true)
+        tab.session.loadUri(safeUrl)
     }
 
     private fun showDownloads() {
@@ -1866,6 +1932,7 @@ class DagBrowserActivity : Activity() {
 
     private fun clearBrowsingData() {
         tabPersistence.clear()
+        historyPersistence.clear()
         val flags =
             StorageController.ClearFlags.ALL_CACHES or
                 StorageController.ClearFlags.SITE_DATA or
