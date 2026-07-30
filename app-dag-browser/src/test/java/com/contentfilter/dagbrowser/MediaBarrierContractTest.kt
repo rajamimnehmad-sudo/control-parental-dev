@@ -98,6 +98,22 @@ class MediaBarrierContractTest {
     }
 
     @Test
+    fun `late source mutations return to fail closed before reusing a decision`() {
+        val script = extensionRoot.resolve("barrier.js").readText()
+
+        assertContains(script, "SOURCE_MUTATION_ATTRIBUTES")
+        assertContains(script, "SOURCE_RECONCILE_DELAY_MS = 160")
+        assertContains(script, "pendingSourceChanges")
+        assertContains(script, "protectSourceMutation")
+        assertContains(script, "analyzedSources.delete(element)")
+        assertContains(script, "data-glosh-dag-media\", \"hidden\"")
+        assertContains(script, "pendingSafetySource")
+        assertContains(script, "protectSourceMutation(mutation.target)")
+        assertContains(script, "pendingSourceChanges.delete(event.target)")
+        assertContains(script, "clearSourceReconcileTimer(event.target)")
+    }
+
+    @Test
     fun `css background photos stay hidden until a native decision restores them`() {
         val css = extensionRoot.resolve("barrier.css").readText()
         val script = extensionRoot.resolve("barrier.js").readText()

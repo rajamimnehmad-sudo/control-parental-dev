@@ -38,6 +38,17 @@
   const FALLBACK_RETRY_MAX_MS = 6_000;
   const MAX_FALLBACK_ATTEMPTS = 4;
   const FALLBACK_ROOT_MARGIN = "640px 0px";
+  const SOURCE_RECONCILE_DELAY_MS = 160;
+  const SOURCE_MUTATION_ATTRIBUTES = new Set([
+    "src",
+    "srcset",
+    "data-src",
+    "data-srcset",
+    "data-lazy-src",
+    "data-original",
+    "data-url",
+    "poster",
+  ]);
   const UI_VECTOR_ATTRIBUTE = "data-glosh-dag-ui-vector";
   const CSS_MEDIA_ATTRIBUTE = "data-glosh-dag-css-media";
   const CSS_MEDIA_VALUE_PROPERTY = "--glosh-dag-background-image";
@@ -90,6 +101,8 @@
   const mediaHostsByElement = new WeakMap();
   const indexedSourcesByElement = new WeakMap();
   const mediaElementsBySource = new Map();
+  const pendingSourceChanges = new WeakSet();
+  const sourceReconcileTimers = new WeakMap();
   const cssBackgroundRecords = new Map();
   const cssBeforeRecords = new Map();
   const cssAfterRecords = new Map();
@@ -1235,6 +1248,39 @@
     }
   };
 
+  const clearSourceReconcileTimer = (element) => {
+    const timer = sourceReconcileTimers.get(element);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      sourceReconcileTimers.delete(element);
+    }
+  };
+
+  const protectSourceMutation = (element) => {
+    if (!(element instanceof Element) || !element.matches(mediaSelector)) {
+      return;
+    }
+    pendingSourceChanges.add(element);
+    clearSourceReconcileTimer(element);
+    analyzedSources.delete(element);
+    stopFallbackObservation(element);
+    removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
+    setAttributeIfChanged(element, "data-glosh-dag-media", "hidden");
+    updateAccessibleMediaState(element, "hidden");
+    updateMediaHostState(element, "waiting");
+    candidateSourcesFor(element);
+    const timer = setTimeout(() => {
+      sourceReconcileTimers.delete(element);
+      if (!element.isConnected) {
+        pendingSourceChanges.delete(element);
+        return;
+      }
+      pendingSourceChanges.delete(element);
+      applyKnownDecision(element);
+    }, SOURCE_RECONCILE_DELAY_MS);
+    sourceReconcileTimers.set(element, timer);
+  };
+
   const applyKnownDecision = (element) => {
     if (!(element instanceof Element) || !element.matches(mediaSelector)) {
       return false;
@@ -1245,9 +1291,19 @@
       updateMediaHostState(element, "allow");
       return true;
     }
-    const activeSource = candidateSourcesFor(element)[0];
+    const candidateSources = candidateSourcesFor(element);
+    const activeSource = candidateSources[0];
+    const sourceChangePending = pendingSourceChanges.has(element);
+    const pendingSafetySource = sourceChangePending
+      ? candidateSources.find((candidate) =>
+          ["block", "error"].includes(decisionsBySource.get(candidate)),
+        )
+      : null;
     const sourceUrl =
-      activeSource && decisionsBySource.has(activeSource) ? activeSource : null;
+      pendingSafetySource ||
+      (!sourceChangePending && activeSource && decisionsBySource.has(activeSource)
+        ? activeSource
+        : null);
     const action = sourceUrl ? decisionsBySource.get(sourceUrl) : null;
     if (sourceUrl && isSafeRemoteUiVector(element, sourceUrl)) {
       analyzedSources.set(element, sourceUrl);
@@ -1260,8 +1316,11 @@
       return true;
     }
     removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
-    const failedSource =
-      activeSource && failedSources.has(activeSource) ? activeSource : null;
+    const failedSource = sourceChangePending
+      ? candidateSources.find((candidate) => failedSources.has(candidate))
+      : activeSource && failedSources.has(activeSource)
+        ? activeSource
+        : null;
     if (failedSource) {
       analyzedSources.set(element, failedSource);
       stopFallbackObservation(element);
@@ -1405,6 +1464,10 @@
   document.addEventListener(
     "load",
     (event) => {
+      if (event.target instanceof Element && event.target.matches(mediaSelector)) {
+        pendingSourceChanges.delete(event.target);
+        clearSourceReconcileTimer(event.target);
+      }
       applyKnownDecision(event.target);
     },
     true,
@@ -1443,7 +1506,11 @@
           ownStyleSnapshots.delete(mutation.target);
         }
         if (mutation.target.matches(mediaSelector)) {
-          applyKnownDecision(mutation.target);
+          if (SOURCE_MUTATION_ATTRIBUTES.has(attributeName)) {
+            protectSourceMutation(mutation.target);
+          } else {
+            applyKnownDecision(mutation.target);
+          }
           stopPlayableMediaIn(mutation.target);
         }
         if (["class", "style", "alt", "aria-label"].includes(attributeName)) {
