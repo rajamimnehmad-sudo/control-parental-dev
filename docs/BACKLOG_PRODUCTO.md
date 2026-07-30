@@ -735,7 +735,7 @@ Flujo de una entrada:
 | BARRIER-SETTINGS-VISIBILITY-01 | Idea | P1 | Ocultar o neutralizar controles para eliminar apps y acceder a la configuracion VPN | M | Alto |
 | BARRIER-FACTORY-RESET-01 | Idea autorizada para backlog; no aprobada para codigo | P0 | Bloquear el restablecimiento desde Ajustes salvo autorizacion destructiva independiente | M | Critico |
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
-| DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
+| DAG-NAV-UX-01 | Revalidado en DAG 31: botón + dentro de la barra | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-ABOUT-VERSION-05 | Resuelto y validado físicamente en DAG 26 | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
 | DAG-V3-PRIVATE-DIAGNOSTICS-06 | Resuelto y validado físicamente en DAG 29 | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
 | DAG-V3-DOCUMENT-ISOLATION-07 | Diagnosticado; pendiente aprobación para código | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
@@ -768,7 +768,7 @@ Flujo de una entrada:
 | DAG-ULTRA-KOSHER-01 | Publicado DEV 261; pendiente prueba física completa | P1 | Modo Extra Kosher: fotos difuminadas salvo logos/controles esenciales y videos totalmente bloqueados | L | Alto |
 | DAG-RESULTS-DIAG-01 | Resuelto DEV 237 | P1 | Contabilizar localmente el embudo de resultados Brave y los descartes DAG sin guardar contenido | S | Bajo |
 | DAG-RESULTS-PAGE-01 | Implementado DEV 238; pendiente prueba fisica | P1 | Ofrecer una unica pagina adicional cuando Brave informa mas resultados, con costo explicito | S | Medio |
-| DAG-HISTORY-UX-01 | Resuelto DEV 234 | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
+| DAG-HISTORY-UX-01 | Reimplementado en navegador V3 e instalado con DAG 31 | P2 | Redisenar historial DAG como lista minimalista | S | Bajo |
 | DAG-ANALYSIS-UX-01 | Resuelto DEV 226 | P2 | Mostrar el analisis dentro del buscador con iluminacion neon inteligente | S | Bajo |
 | DAG-APPROVAL-CACHE-01 | Resuelto DEV 226 | P1 | Reutilizar temporalmente la aprobacion de paginas ya revisadas | M | Alto |
 | DAG-REVIEW-STAGING-01 | Resuelto DEV 225 | P1 | Analizar pagina completa antes de pedir revision por un resultado incierto | M | Medio |
@@ -795,7 +795,7 @@ Flujo de una entrada:
 | DAG-BLACK-RESOURCES-05 | Implementado y validado en candidato local | P1 | Evitar rectangulos negros en recursos seguros sin mostrar contenido no aprobado | M | Alto |
 | DAG-REFRESH-03 | Implementado en candidato local; validacion automatica correcta | P1 | Hacer que Actualizar recargue realmente la pestana activa con estado visible y seguro | S | Medio |
 | DAG-RECENTS-FAVICON-03 | Implementado y validado en candidato local | P2 | Mostrar el favicon real y seguro del sitio en los accesos recientes de Home | M | Medio |
-| DAG-TAB-PREVIEW-04 | Implementado y validado parcialmente en DAG 25; pendiente matriz 10/50 | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
+| DAG-TAB-PREVIEW-04 | Captura segura visible en DAG 31; pendiente matriz 10/50 | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
 | DAG-CALIBRATION-QUEUE-02 | Resuelto DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
 | DAG-CALIBRATION-REVIEW-03 | Reemplazado por calibracion binaria DEV 279 | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |

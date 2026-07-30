@@ -543,6 +543,21 @@ El lote integrado se desarrolló y validó en:
   instalado in-place en SM-S908E. Un selector HTML real abrió y el usuario
   confirmó físicamente que funciona. La variante múltiple queda cubierta por
   la implementación y pendiente de un recorrido físico específico.
+- DAG 31 (`0.21.0-dev`) agrega historial local acotado a 100 páginas, acceso
+  para reabrir y borrado integrado tanto en Historial como en `Borrar datos de
+  navegación`. El botón `+` ocupa el lugar del escudo estático dentro de la
+  barra y crea una pestaña nueva; se retiró su duplicado del menú.
+- Las miniaturas siguen viviendo sólo en memoria. La restricción ahora examina
+  contraseñas, pagos y CAPTCHA que sean realmente visibles en el viewport, en
+  vez de invalidar una tienda completa por formularios ocultos. Una página
+  HTTPS neutral mostró físicamente su captura real; contenido sensible visible
+  conserva tarjeta neutra.
+- Validación de DAG 31: `node --check`, 102 unitarios, `ktlintCheck`,
+  `lintDevDebug` y `assembleDevDebug` correctos. APK SHA-256
+  `51fc7b2720473693a0f545d61e28ea9f681a6f72ee7b986fc1c247b2111fdf4f`,
+  instalado in-place en SM-S908E. DAG conservó el rol de navegador y
+  Accessibility de Usuario permaneció activa. Los datos técnicos de historial
+  usados en la prueba se borraron al finalizar.
 
 ### Matriz conjunta Usuario 304, Admin 287 y DAG 29
 
