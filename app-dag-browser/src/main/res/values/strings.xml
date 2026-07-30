@@ -78,6 +78,10 @@
     <string name="retry">Reintentar</string>
     <string name="open_download">Abrir PDF descargado</string>
     <string name="no_pdf_viewer">No hay una aplicación disponible para abrir PDF.</string>
+    <string name="choose_option">Elegir una opción</string>
+    <string name="choose_options">Elegir opciones</string>
+    <string name="confirm">Confirmar</string>
+    <string name="unnamed_option">Opción sin nombre</string>
     <plurals name="open_tabs_count">
         <item quantity="one">%d pestaña</item>
         <item quantity="other">%d pestañas</item>

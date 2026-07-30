@@ -16,11 +16,14 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.KeyEvent
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ListView
 import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
@@ -87,6 +90,7 @@ class DagBrowserActivity : Activity() {
     private var pendingExternalUrl: String? = null
     private var activeDownload: ActiveDownload? = null
     private var downloadDialog: AlertDialog? = null
+    private var activeChoicePrompt: ActiveChoicePrompt? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
@@ -280,6 +284,13 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun configureSession(tab: BrowserTab) {
+        tab.session.promptDelegate =
+            object : GeckoSession.PromptDelegate {
+                override fun onChoicePrompt(
+                    session: GeckoSession,
+                    prompt: GeckoSession.PromptDelegate.ChoicePrompt,
+                ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> = showChoicePrompt(session, prompt)
+            }
         tab.session.contentDelegate =
             object : GeckoSession.ContentDelegate {
                 override fun onTitleChange(
@@ -415,6 +426,151 @@ class DagBrowserActivity : Activity() {
                     schedulePersistTabs()
                 }
             }
+    }
+
+    private fun showChoicePrompt(
+        session: GeckoSession,
+        prompt: GeckoSession.PromptDelegate.ChoicePrompt,
+    ): GeckoResult<GeckoSession.PromptDelegate.PromptResponse> {
+        if (session !== activeTab?.session || isFinishing || isDestroyed) {
+            return GeckoResult.fromValue(prompt.dismiss())
+        }
+        dismissActiveChoicePrompt()
+        val rows = flattenChoiceRows(prompt.choices)
+        if (rows.isEmpty()) {
+            return GeckoResult.fromValue(prompt.dismiss())
+        }
+
+        val result = GeckoResult<GeckoSession.PromptDelegate.PromptResponse>()
+        val multiple = prompt.type == GeckoSession.PromptDelegate.ChoicePrompt.Type.MULTIPLE
+        val rowLayout =
+            if (multiple) {
+                android.R.layout.simple_list_item_multiple_choice
+            } else {
+                android.R.layout.simple_list_item_single_choice
+            }
+        val adapter =
+            object : ArrayAdapter<ChoicePromptRow>(this, rowLayout, rows) {
+                override fun isEnabled(position: Int): Boolean = rows[position].enabled
+
+                override fun getView(
+                    position: Int,
+                    convertView: View?,
+                    parent: ViewGroup,
+                ): View =
+                    super.getView(position, convertView, parent).also { rowView ->
+                        rowView.findViewById<TextView>(android.R.id.text1)?.apply {
+                            text = rows[position].label
+                            isEnabled = rows[position].enabled
+                            alpha =
+                                if (rows[position].enabled) {
+                                    EnabledChoiceAlpha
+                                } else {
+                                    DisabledChoiceAlpha
+                                }
+                        }
+                    }
+            }
+        val listView =
+            ListView(this).apply {
+                choiceMode =
+                    if (multiple) {
+                        ListView.CHOICE_MODE_MULTIPLE
+                    } else {
+                        ListView.CHOICE_MODE_SINGLE
+                    }
+                this.adapter = adapter
+                rows.forEachIndexed { index, row ->
+                    if (row.selected) setItemChecked(index, true)
+                }
+            }
+
+        var completed = false
+        lateinit var dialog: AlertDialog
+
+        fun complete(response: GeckoSession.PromptDelegate.PromptResponse) {
+            if (completed) return
+            completed = true
+            if (activeChoicePrompt?.dialog === dialog) activeChoicePrompt = null
+            result.complete(response)
+        }
+
+        val builder =
+            AlertDialog.Builder(this)
+                .setTitle(if (multiple) R.string.choose_options else R.string.choose_option)
+                .setView(listView)
+                .setNegativeButton(R.string.cancel) { _, _ -> complete(prompt.dismiss()) }
+
+        if (multiple) {
+            builder.setPositiveButton(R.string.confirm) { _, _ ->
+                val selected =
+                    rows.indices
+                        .filter { rows[it].enabled && listView.isItemChecked(it) }
+                        .map { rows[it].choice }
+                        .toTypedArray()
+                complete(prompt.confirm(selected))
+            }
+        }
+
+        dialog = builder.create()
+        listView.setOnItemClickListener { _, _, position, _ ->
+            val row = rows[position]
+            if (!row.enabled || multiple) return@setOnItemClickListener
+            complete(prompt.confirm(row.choice))
+            dialog.dismiss()
+        }
+        dialog.setOnCancelListener { complete(prompt.dismiss()) }
+        dialog.setOnDismissListener {
+            if (!completed) complete(prompt.dismiss())
+        }
+        activeChoicePrompt =
+            ActiveChoicePrompt(
+                dialog = dialog,
+                dismissPrompt = {
+                    complete(prompt.dismiss())
+                    dialog.dismiss()
+                },
+            )
+        dialog.show()
+        return result
+    }
+
+    private fun flattenChoiceRows(
+        choices: Array<GeckoSession.PromptDelegate.ChoicePrompt.Choice>,
+        groupLabels: List<String> = emptyList(),
+    ): List<ChoicePromptRow> =
+        buildList {
+            choices.forEach { choice ->
+                if (choice.separator) return@forEach
+                val label = choice.label.trim().take(MaxChoiceLabelLength)
+                val children = choice.items
+                if (children != null) {
+                    val nextGroups =
+                        if (label.isBlank()) groupLabels else groupLabels + label
+                    addAll(flattenChoiceRows(children, nextGroups))
+                } else {
+                    val visibleLabel =
+                        (groupLabels + label.takeIf(String::isNotBlank).orEmpty())
+                            .filter(String::isNotBlank)
+                            .joinToString(ChoiceGroupSeparator)
+                            .ifBlank { getString(R.string.unnamed_option) }
+                            .take(MaxChoiceLabelLength)
+                    add(
+                        ChoicePromptRow(
+                            choice = choice,
+                            label = visibleLabel,
+                            enabled = !choice.disabled,
+                            selected = choice.selected,
+                        ),
+                    )
+                }
+            }
+        }
+
+    private fun dismissActiveChoicePrompt() {
+        val active = activeChoicePrompt ?: return
+        activeChoicePrompt = null
+        active.dismissPrompt()
     }
 
     private fun handleDownloadResponse(
@@ -1034,6 +1190,7 @@ class DagBrowserActivity : Activity() {
 
     private fun switchToWithoutCapture(tab: BrowserTab) {
         if (!tabs.contains(tab) || tab === activeTab) return
+        dismissActiveChoicePrompt()
         activeTab?.let { setTabActivity(it, active = false) }
         if (activeTab != null) runCatching { geckoView.releaseSession() }
         activeTab = tab
@@ -1783,6 +1940,7 @@ class DagBrowserActivity : Activity() {
     }
 
     override fun onStop() {
+        dismissActiveChoicePrompt()
         persistTabsNow()
         activeTab?.let { setTabActivity(it, active = false) }
         super.onStop()
@@ -1806,6 +1964,7 @@ class DagBrowserActivity : Activity() {
     }
 
     override fun onDestroy() {
+        dismissActiveChoicePrompt()
         persistTabsNow()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             backInvokedCallback?.let(onBackInvokedDispatcher::unregisterOnBackInvokedCallback)
@@ -1846,6 +2005,18 @@ class DagBrowserActivity : Activity() {
         Closed,
         Blocked,
     }
+
+    private data class ChoicePromptRow(
+        val choice: GeckoSession.PromptDelegate.ChoicePrompt.Choice,
+        val label: String,
+        val enabled: Boolean,
+        val selected: Boolean,
+    )
+
+    private data class ActiveChoicePrompt(
+        val dialog: AlertDialog,
+        val dismissPrompt: () -> Unit,
+    )
 
     private class BrowserTab(
         val id: Long,
@@ -1908,6 +2079,10 @@ class DagBrowserActivity : Activity() {
         val PreviewDocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
         const val EnabledControlAlpha = 1f
         const val DisabledControlAlpha = 0.45f
+        const val EnabledChoiceAlpha = 1f
+        const val DisabledChoiceAlpha = 0.38f
+        const val MaxChoiceLabelLength = 200
+        const val ChoiceGroupSeparator = " — "
         const val DefaultBrowserRoleRequestCode = 4_201
         const val BrowserSetupPreferences = "dag-browser-setup"
         const val DefaultBrowserPromptShownKey = "default-browser-prompt-shown"
