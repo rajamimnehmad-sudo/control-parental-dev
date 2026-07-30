@@ -279,8 +279,8 @@ El lote integrado se desarrolló y validó en:
   modelo, Android y códigos de estado permitidos. No envía contraseñas, fotos,
   búsquedas ni el texto escrito por el usuario.
 - Supabase DEV incorpora `support_reports`, RLS y RPC separadas para envío desde
-  dispositivos y lectura exclusiva de Super Admin. La Superweb agrega la
-  bandeja `Reportes GloshIA`.
+  dispositivos y lectura exclusiva de Super Admin. La Superweb oficial publica
+  la bandeja `Reportes GloshIA` en la build `0fbeed5`.
 - Prueba física SM-A235M: el chat respondió a una pregunta libre que contenía
   una contraseña sintética; Supabase recibió solamente
   `DAG presentó un problema al cargar, analizar o mostrar imágenes.`, categoría
@@ -290,8 +290,13 @@ El lote integrado se desarrolló y validó en:
   instalada. Beta y Production permanecen apagados.
 - Validación: unitarios y ktlint Android, APK Usuario/Admin, typecheck y build de
   Superweb, lint y asesores de seguridad de Supabase, y prueba física del flujo
-  Usuario a backend. App Usuario `296` quedó reinstalada en el SM-A235M.
-- No se hizo push, publicación DEV ni cambio en Production.
+  Usuario a backend. La URL oficial confirmó entorno DEV, commit `0fbeed5`,
+  autenticación en `/support` y navegación visible a `Reportes GloshIA`.
+- Instalación física adicional SM-S908E: Usuario `296`, Admin `285` y DAG `20`;
+  Accessibility siguió enlazada y DAG conservó el rol de navegador.
+- El código se respaldó en `main` y la Superweb quedó publicada. Las APK no se
+  publicaron al canal remoto de actualizaciones en este cierre; Supabase
+  Production no se modificó.
 
 ## Límites vigentes
 
