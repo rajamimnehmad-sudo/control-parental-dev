@@ -215,6 +215,9 @@ class MediaBarrierContractTest {
     fun `media states distinguish waiting filtered and terminal error without exposing pixels`() {
         val css = extensionRoot.resolve("barrier.css").readText()
         val script = extensionRoot.resolve("barrier.js").readText()
+        val background = extensionRoot.resolve("background.js").readText()
+        val activity =
+            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
 
         assertContains(script, "MAX_FALLBACK_ATTEMPTS = 4")
         assertContains(script, "failedSources")
@@ -238,5 +241,9 @@ class MediaBarrierContractTest {
         assertContains(script, "aria-description")
         assertContains(css, "data-glosh-dag-media=\"error\"")
         assertContains(css, "visibility: hidden !important")
+        assertFalse(script.contains("matchedStates"))
+        assertFalse(background.contains("response?.matchedStates"))
+        assertFalse(activity.contains("states=\${payload.optString"))
+        assertFalse(activity.contains("source=\${payload.optString"))
     }
 }

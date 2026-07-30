@@ -522,8 +522,6 @@ const notifyPresentationDecision = (details, action) => {
             action,
             frameId: details.frameId,
             matchedCount: response?.matchedCount ?? -1,
-            matchedStates: response?.matchedStates ?? "",
-            sourceUrl: details.url,
           });
         } catch {
           // DEV presentation evidence never changes the fail-closed decision.

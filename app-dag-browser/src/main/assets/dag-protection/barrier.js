@@ -1154,29 +1154,17 @@
     }
     rememberDecision(sourceUrl, message.action);
     let matchedCount = 0;
-    const matchedStates = [];
     document.querySelectorAll(mediaSelector).forEach((element) => {
       if (candidateSourcesFor(element).includes(sourceUrl)) {
         if (applyKnownDecision(element)) {
           matchedCount += 1;
-          if (matchedStates.length < 3) {
-            const style = getComputedStyle(element);
-            matchedStates.push(
-              `${element.tagName}:${element.getAttribute("alt") || ""}:` +
-                `display=${style.display}:visibility=${style.visibility}:` +
-                `opacity=${style.opacity}:size=${element.naturalWidth || 0}x` +
-                `${element.naturalHeight || 0}`,
-            );
-          }
         }
       }
     });
     return Promise.resolve({
       type: PRESENTATION_APPLIED_MESSAGE,
       version: 1,
-      sourceUrl,
       matchedCount,
-      matchedStates: matchedStates.join("|").slice(0, 900),
     });
   });
 

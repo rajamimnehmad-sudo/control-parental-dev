@@ -162,9 +162,7 @@ class DagBrowserActivity : Activity() {
                                                     MediaTransportLogTag,
                                                     "presentation action=${payload.optString("action")} " +
                                                         "frame=${payload.optInt("frameId", -1)} " +
-                                                        "matched=${payload.optInt("matchedCount", -1)} " +
-                                                        "states=${payload.optString("matchedStates").take(900)} " +
-                                                        "source=${payload.optString("sourceUrl").take(160)}",
+                                                        "matched=${payload.optInt("matchedCount", -1)}",
                                                 )
                                             }
                                         }
