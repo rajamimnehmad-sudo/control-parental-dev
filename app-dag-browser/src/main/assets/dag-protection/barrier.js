@@ -50,12 +50,14 @@
   const BACKGROUND_PROBE_ATTRIBUTE = "data-glosh-dag-background-probe";
   const SPONSORED_RESULT_ATTRIBUTE = "data-glosh-dag-sponsored-result";
   const MEDIA_HOST_ATTRIBUTE = "data-glosh-dag-media-host";
+  const FUNCTIONAL_ICON_ATTRIBUTE = "data-glosh-dag-functional-icon";
   const APPROVED_PRESENTATION_SELECTOR = [
     '[data-glosh-dag-media="allow"]',
     '[data-glosh-dag-ui-vector="allow"]',
     '[data-glosh-dag-css-media="allow"]',
     '[data-glosh-dag-css-before="allow"]',
     '[data-glosh-dag-css-after="allow"]',
+    `[${FUNCTIONAL_ICON_ATTRIBUTE}]`,
   ].join(",");
   const MAX_CSS_BACKGROUND_ELEMENTS = 512;
   const MAX_BACKGROUND_PROBE_ELEMENTS = 1_500;
@@ -371,6 +373,48 @@
   const isSafeCssUiVector = (element, sources) =>
     sources.length > 0 && sources.every(isSvgSource) && hasSafeUiBounds(element);
 
+  const functionalIconKind = (element) => {
+    const bounds = element.getBoundingClientRect();
+    if (
+      !Number.isFinite(bounds.width) ||
+      !Number.isFinite(bounds.height) ||
+      bounds.width <= 0 ||
+      bounds.height <= 0 ||
+      bounds.width > 64 ||
+      bounds.height > 64
+    ) {
+      return null;
+    }
+    const link = element.closest("a, button");
+    const semantics = [
+      element.id,
+      element.className,
+      element.getAttribute("aria-label"),
+      element.getAttribute("title"),
+      link?.id,
+      link?.className,
+      link?.getAttribute("aria-label"),
+      link?.getAttribute("title"),
+      link?.getAttribute("href"),
+    ]
+      .filter((value) => typeof value === "string")
+      .join(" ");
+    return /\b(?:favorite|favourite|favorito|wishlist|iheart|fav-heart)\b/iu.test(semantics)
+      ? "favorite"
+      : null;
+  };
+
+  const applyFunctionalIconFallback = (element) => {
+    const kind = functionalIconKind(element);
+    if (!kind) {
+      element.removeAttribute(FUNCTIONAL_ICON_ATTRIBUTE);
+      return false;
+    }
+    element.setAttribute(FUNCTIONAL_ICON_ATTRIBUTE, kind);
+    clearWaitingMediaHostsAround(element);
+    return true;
+  };
+
   const pseudoRecordConfig = (pseudo) => {
     if (pseudo === "before") {
       return {
@@ -396,6 +440,7 @@
     }
     const { backgroundImage, sources } = record;
     if (sources.length === 0 || isSafeCssUiVector(element, sources)) {
+      element.removeAttribute(FUNCTIONAL_ICON_ATTRIBUTE);
       if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY) !== backgroundImage) {
         element.style.setProperty(CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
       }
@@ -410,6 +455,7 @@
       if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY)) {
         element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
       }
+      applyFunctionalIconFallback(element);
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "block") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "block");
       }
@@ -420,10 +466,12 @@
       sources.some((sourceUrl) => failedSources.has(sourceUrl))
     ) {
       element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
+      applyFunctionalIconFallback(element);
       element.setAttribute(CSS_MEDIA_ATTRIBUTE, "error");
       return true;
     }
     if (actions.every((action) => action === "allow")) {
+      element.removeAttribute(FUNCTIONAL_ICON_ATTRIBUTE);
       if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY) !== backgroundImage) {
         element.style.setProperty(CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
       }
@@ -436,6 +484,7 @@
     if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY)) {
       element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
     }
+    element.removeAttribute(FUNCTIONAL_ICON_ATTRIBUTE);
     if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "hidden") {
       element.setAttribute(CSS_MEDIA_ATTRIBUTE, "hidden");
     }
