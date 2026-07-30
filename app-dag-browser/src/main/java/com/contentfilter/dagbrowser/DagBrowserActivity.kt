@@ -5,6 +5,7 @@ import android.app.AlertDialog
 import android.app.role.RoleManager
 import android.content.ComponentCallbacks2
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
@@ -1448,10 +1449,44 @@ class DagBrowserActivity : Activity() {
                         confirmClearBrowsingData()
                         true
                     }
+                    R.id.menu_about -> {
+                        showAboutDag()
+                        true
+                    }
                     else -> false
                 }
             }
         }.show()
+    }
+
+    private fun showAboutDag() {
+        val packageInfo =
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    packageManager.getPackageInfo(
+                        packageName,
+                        PackageManager.PackageInfoFlags.of(0),
+                    )
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageManager.getPackageInfo(packageName, 0)
+                }
+            }.getOrNull()
+        val detail =
+            if (packageInfo?.versionName.isNullOrBlank()) {
+                getString(R.string.about_version_unavailable)
+            } else {
+                getString(
+                    R.string.about_version_detail,
+                    packageInfo.versionName,
+                    packageInfo.longVersionCode,
+                )
+            }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.about_dag)
+            .setMessage(detail)
+            .setPositiveButton(R.string.close, null)
+            .show()
     }
 
     private fun showDownloads() {

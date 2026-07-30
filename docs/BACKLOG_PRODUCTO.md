@@ -734,7 +734,7 @@ Flujo de una entrada:
 | BARRIER-FACTORY-RESET-01 | Idea autorizada para backlog; no aprobada para codigo | P0 | Bloquear el restablecimiento desde Ajustes salvo autorizacion destructiva independiente | M | Critico |
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
-| DAG-ABOUT-VERSION-05 | Aprobado; pendiente línea base profesional | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
+| DAG-ABOUT-VERSION-05 | Resuelto y validado físicamente en DAG 26 | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
 | DAG-V3-PRIVATE-DIAGNOSTICS-06 | Diagnosticado; pendiente aprobación para código | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
 | DAG-V3-DOCUMENT-ISOLATION-07 | Diagnosticado; pendiente aprobación para código | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
 | DAG-V3-FALSE-ALLOW-08 | Caso físico confirmado; pendiente diagnóstico reproducible y aprobación para código | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
@@ -1847,15 +1847,26 @@ Flujo de una entrada:
 
 #### DAG-ABOUT-VERSION-05 - Versión visible de DAG
 
-- Estado: `Aprobado; pendiente línea base profesional`. Solicitado y aprobado
+- Estado: `Resuelto y validado físicamente en DAG 26`. Solicitado y aprobado
   por el usuario el 2026-07-30. Tipo: información de producto y soporte.
   Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
 - Alcance: agregar `Acerca de DAG` al menú y mostrar nombre, `versionName` y
   `versionCode` reales del APK instalado. La versión no ocupa espacio permanente
   en Home ni se escribe manualmente en dos lugares.
-- Aceptación: DAG 25 muestra `0.15.0-dev (25)`; futuras compilaciones reflejan
-  automáticamente sus valores; Atrás vuelve al navegador; no cambia filtros,
-  navegación, red, consultas, permisos, historial ni seguridad.
+- Implementación: el menú incorpora `Acerca de DAG`; el diálogo consulta
+  `PackageInfo` del paquete realmente instalado, sin duplicar la versión en
+  recursos o lógica. DAG 26 debe mostrar `0.16.0-dev (26)`.
+- Validación automática: contrato específico, unitarios DEV, `ktlintCheck`,
+  93 unitarios DEV, `assembleDevDebug` y `lintDevDebug` correctos. APK:
+  121.174.874 bytes, SHA-256
+  `09ddebacf4af0f29e5ed7860a5b6991be05e76125433136562bb75535d40fbcb`;
+  conserva el certificado DEV esperado. Quedó instalado in-place en SM-S908E,
+  DAG siguió como navegador predeterminado y el diálogo mostró exactamente
+  `Versión 0.16.0-dev (26)`. Atrás cerró el diálogo y devolvió los controles del
+  navegador sin recargar la página.
+- Aceptación: futuras compilaciones reflejan automáticamente sus valores; cerrar
+  el diálogo vuelve al navegador; no cambia filtros, navegación, red, consultas,
+  permisos, historial ni seguridad.
 
 #### DAG-V3-PRIVATE-DIAGNOSTICS-06 - Diagnóstico DEV sin contenido de navegación
 

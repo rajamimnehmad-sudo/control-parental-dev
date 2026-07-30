@@ -491,6 +491,15 @@ El lote integrado se desarrolló y validó en:
   `DAG-V3-TAB-HIBERNATION-09`. Ninguno agrega excepciones por sitio. No se
   escribió código, incrementó versión, compiló, instaló ni publicó durante esta
   etapa.
+- Después de cerrar la línea base se implementó el ticket ya aprobado
+  `DAG-ABOUT-VERSION-05`: DAG 26 (`0.16.0-dev`) agrega `Acerca de DAG` y lee
+  `versionName`/`versionCode` del paquete instalado. Formato, 93 unitarios, APK
+  y Lint DEV son correctos. APK de 121.174.874 bytes, SHA-256
+  `09ddebacf4af0f29e5ed7860a5b6991be05e76125433136562bb75535d40fbcb`,
+  instalado in-place en SM-S908E con certificado DEV esperado; DAG conservó el
+  rol de navegador. El diálogo mostró físicamente `Versión 0.16.0-dev (26)` y
+  Atrás volvió a los controles del navegador sin recargar la página. No se
+  publicó.
 
 ## Próximo trabajo autorizado
 
@@ -500,8 +509,9 @@ imágenes. Atrás moderno y miniaturas seguras ya tienen evidencia física en el
 SM-S908E. La inteligencia conversacional avanzada de GloshIA queda para un
 ticket posterior. Para DAG, iniciar primero una línea base profesional de
 rendimiento/compatibilidad y luego ejecutar tickets pequeños; el primero
-aprobado es `DAG-ABOUT-VERSION-05`. La línea base ya identificó cuatro tickets
-generales todavía no aprobados para código; por prioridad se propone
+aprobado, `DAG-ABOUT-VERSION-05`, ya está resuelto y validado en DAG 26. La
+línea base identificó cuatro tickets generales todavía no aprobados para
+código; por prioridad se propone
 `DAG-V3-PRIVATE-DIAGNOSTICS-06`, luego el diagnóstico de
 `DAG-V3-FALSE-ALLOW-08`, aislamiento de documento y finalmente hibernación. No
 publicar sin un nuevo OK explícito.
