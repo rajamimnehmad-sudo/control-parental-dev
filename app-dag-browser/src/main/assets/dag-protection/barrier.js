@@ -1254,6 +1254,7 @@
       setAttributeIfChanged(element, "data-glosh-dag-media", "allow");
       updateAccessibleMediaState(element, "allow");
       updateMediaHostState(element, "allow");
+      clearWaitingMediaHostsAround(element);
       return true;
     }
     removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
@@ -1287,6 +1288,9 @@
       element,
       action === "block" ? "filtered" : action === "error" ? "error" : "allow",
     );
+    if (action === "allow") {
+      clearWaitingMediaHostsAround(element);
+    }
     return true;
   };
 
