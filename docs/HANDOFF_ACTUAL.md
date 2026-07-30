@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-07-29
+Fecha de corte: 2026-07-30
 
 Tomar este archivo como contexto oficial. No reconstruir el estado desde
 documentos o commits históricos.
@@ -50,7 +50,7 @@ documentado arriba.
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
 - La última instalación física sigue siendo DAG 21. El candidato local
-  integrado en `main` declara `versionCode 23`, `versionName 0.13.0-dev`; por
+  integrado en `main` declara `versionCode 24`, `versionName 0.14.0-dev`; por
   pedido del usuario no debe instalarse ningún APK hasta completar los seis
   lotes planificados.
 - V21 cerró el primer lote de estabilidad: `Analizando` se desmonta cuando la
@@ -68,6 +68,16 @@ documentado arriba.
   confirmación. Las miniaturas bajan a `200 x 300`, con presupuesto máximo
   teórico de 12 MB para 50 capturas; al alcanzar el techo DAG abre el
   organizador para cerrar una.
+- V24 implementa el cuarto lote, primera etapa de descargas seguras. Sólo acepta
+  PDF de hasta 20 MB iniciado por gesto desde una página HTTPS ya visible;
+  muestra nombre, dominio, MIME y tamaño antes de confirmar. Requiere
+  coincidencia entre extensión, MIME y firma real, rechaza tamaño desconocido,
+  respuesta insegura, descarga paralela y redirección entre orígenes. Guarda
+  mediante archivo parcial dentro del espacio privado, permite cancelar,
+  reintentar, abrir con URI temporal de solo lectura y administrar/borrar los
+  PDF desde el menú `Descargas`. APK, ejecutables, scripts, comprimidos y demás
+  formatos continúan bloqueados. La política Admin y nuevos formatos quedan
+  fuera de esta primera etapa.
 - El modelo y su umbral `0.4` no cambiaron: el ajuste siguiente debe incorporar
   ejemplos actuales de falsos permisos y falsos filtros, no bajar el umbral a
   ciegas.
@@ -83,6 +93,13 @@ documentado arriba.
   `bb42718aa8890304ccd2077e34db2311c21d99a63bb13d76e0926af84c3c42a3`.
   Pasó Ktlint, 80 unitarios, APK y Lint; no fue instalado ni probado
   físicamente.
+- El build automático de V24 desde `main` mide 121.168.082 bytes y tiene
+  SHA-256
+  `f9af2e56bd3a8df066edae0c466ef5a757efd52dcc2e03bfac07d30b432a586a`.
+  Pasó Ktlint, 91 unitarios, APK y Lint. El manifiesto empaquetado conserva
+  únicamente permisos propios del navegador/GeckoView: no agrega almacenamiento
+  amplio ni instalación de paquetes; su `FileProvider` no es exportado. Por la
+  orden de cerrar seis lotes antes de instalar, todavía no tuvo matriz física.
 - En SM-A235M se verificó apertura/regreso y ausencia de destellos para raster,
   video, canvas, SVG y fondos.
 - Mientras no exista una decisión visual válida, cada recurso permanece en

@@ -1695,29 +1695,31 @@ Flujo de una entrada:
 
 #### DAG-DOWNLOADS-01 - Descargas seguras y administrables
 
-- Estado: `Idea autorizada para backlog; no aprobada para diagnostico tecnico ni
-  implementacion`. Evidencia: el usuario confirma el 2026-07-29 que las
-  descargas son importantes para que DAG sea un navegador profesional. Tipo:
-  compatibilidad Web, archivos, seguridad y control parental. Prioridad
-  propuesta: P1. Esfuerzo estimado: L. Riesgo: alto.
+- Estado: `Primera etapa implementada en candidato local DAG DEV 24; pendiente
+  prueba física al completar los seis lotes`. Evidencia: el usuario confirma el
+  2026-07-29 que las descargas son importantes para que DAG sea un navegador
+  profesional y autoriza ejecutar el lote 4 el 2026-07-30. Tipo: compatibilidad
+  Web, archivos, seguridad y control parental. Prioridad: P1. Esfuerzo estimado:
+  L. Riesgo: alto.
 - Necesidad: permitir usos cotidianos como comprobantes, facturas, entradas,
   material escolar, formularios y documentos, sin convertir DAG en una via para
   instalar aplicaciones o sacar contenido inseguro hacia otra app.
-- Primera etapa recomendada: descarga iniciada por gesto del Usuario, desde una
+- Primera etapa implementada: descarga iniciada por gesto del Usuario, desde una
   pagina HTTPS ya permitida, con nombre, dominio, tipo y tamaño visibles antes
-  de confirmar. Admitir inicialmente una lista cerrada de documentos comunes
-  definidos por contenido real y MIME; aplicar limite de tamaño, destino
-  mediante almacenamiento acotado de Android, progreso, cancelacion, error y
-  reintento explícitos.
+  de confirmar. La lista cerrada inicial contiene solamente PDF de hasta 20 MB,
+  definido por extensión `.pdf`, MIME `application/pdf`, cabecera `%PDF-` y
+  marcador final `%%EOF`. Aplica almacenamiento privado de Android, archivo
+  parcial no utilizable, progreso, cancelacion, error y reintento explícitos.
 - Bloqueo permanente inicial: APK, XAPK/APKS, ejecutables, scripts, archivos
   comprimidos ambiguos, MIME desconocido, redirecciones a origen no aprobado,
   descargas automaticas, multiples descargas y cualquier archivo sin tamaño
   acotable. Extension, MIME declarado y firma magica deben coincidir; cambiar el
   nombre no vuelve seguro un archivo.
-- Apertura: el archivo descargado no se ejecuta dentro de DAG. Se abre mediante
+- Apertura implementada: el archivo descargado no se ejecuta dentro de DAG. Se abre mediante
   un visor compatible elegido de forma controlada, con URI temporal y permiso
   de solo lectura; nunca se concede acceso amplio al almacenamiento ni permiso
-  para instalar paquetes.
+  para instalar paquetes. El menú `Descargas` lista los PDF privados y permite
+  abrirlos o borrarlos con confirmación.
 - Autoridad: definir una politica Admin por tipo de archivo y tamaño. Si un
   tipo no esta permitido, DAG puede crear una solicitud de descarga con dominio,
   nombre, tipo y tamaño, sin subir el contenido. Una aprobacion debe ser puntual
@@ -1729,16 +1731,15 @@ Flujo de una entrada:
 - Relacion: amplia deliberadamente el bloqueo total vigente de descargas y
   reutiliza el tipo de solicitud `descargas` previsto en producto. No modifica
   la barrera que bloquea Package Installer, fuentes desconocidas y APK externos.
-- Aceptacion preliminar: PDF/documento permitido descarga con progreso y abre
+- Aceptacion cubierta localmente para la primera etapa: PDF permitido descarga con progreso y abre
   en solo lectura; cancelacion y red interrumpida no dejan un archivo parcial
   utilizable; APK renombrado y MIME discordante fallan cerrados; descarga sin
-  gesto o desde iframe/redireccion no aprobada se rechaza; archivo bloqueado
-  puede solicitarse sin enviar su contenido; borrar descargas elimina archivos
-  y metadatos locales correspondientes.
-- Decisiones antes de ejecutar: formatos iniciales, tamaño máximo, autoridad
-  Admin/Usuario por tipo, política offline, retención, visor interno o externo
-  controlado y si imágenes individuales pueden descargarse después de haber
-  sido aprobadas visualmente.
+  gesto o desde iframe/redireccion entre orígenes se rechaza; borrar una
+  descarga elimina el archivo local. Validación: 91 unitarios, Ktlint, Lint y
+  APK DEV correctos; falta prueba física por orden explícita del usuario.
+- Pendiente para una etapa posterior: solicitud y política Admin, formatos
+  adicionales, límite de retención total, conducta offline y si imágenes
+  individuales pueden descargarse después de haber sido aprobadas visualmente.
 
 #### DAG-TABS-UX-02 - Selector reciente, limpio y sin vacias duplicadas
 
