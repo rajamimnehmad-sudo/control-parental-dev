@@ -88,6 +88,8 @@
   const fallbackNearElements = new WeakSet();
   const fallbackTimers = new WeakMap();
   const mediaHostsByElement = new WeakMap();
+  const indexedSourcesByElement = new WeakMap();
+  const mediaElementsBySource = new Map();
   const cssBackgroundRecords = new Map();
   const cssBeforeRecords = new Map();
   const cssAfterRecords = new Map();
@@ -153,6 +155,41 @@
       .map(normalizedSource)
       .filter(Boolean);
 
+  const removeElementFromSourceIndex = (element) => {
+    const previousSources = indexedSourcesByElement.get(element) || [];
+    for (const sourceUrl of previousSources) {
+      const elements = mediaElementsBySource.get(sourceUrl);
+      elements?.delete(element);
+      if (elements?.size === 0) {
+        mediaElementsBySource.delete(sourceUrl);
+      }
+    }
+    indexedSourcesByElement.delete(element);
+  };
+
+  const updateElementSourceIndex = (element, sources) => {
+    const previousSources = indexedSourcesByElement.get(element) || [];
+    if (
+      previousSources.length === sources.length &&
+      previousSources.every((sourceUrl, index) => sourceUrl === sources[index])
+    ) {
+      return;
+    }
+    removeElementFromSourceIndex(element);
+    if (sources.length === 0) {
+      return;
+    }
+    indexedSourcesByElement.set(element, sources);
+    for (const sourceUrl of sources) {
+      let elements = mediaElementsBySource.get(sourceUrl);
+      if (!elements) {
+        elements = new Set();
+        mediaElementsBySource.set(sourceUrl, elements);
+      }
+      elements.add(element);
+    }
+  };
+
   const candidateSourcesFor = (element) => {
     const sources = [];
     const addSource = (rawSource) => {
@@ -176,6 +213,7 @@
     } else if (element instanceof SVGImageElement) {
       addSource(element.href?.baseVal || element.getAttribute("href"));
     }
+    updateElementSourceIndex(element, sources);
     return sources;
   };
 
@@ -324,12 +362,30 @@
     }
   }
 
-  const applyDecisionToSource = (sourceUrl) => {
-    document.querySelectorAll(mediaSelector).forEach((element) => {
-      if (candidateSourcesFor(element).includes(sourceUrl)) {
-        applyKnownDecision(element);
+  const applyDecisionToMediaSource = (sourceUrl) => {
+    const indexedElements = mediaElementsBySource.get(sourceUrl);
+    const candidates =
+      indexedElements?.size > 0
+        ? [...indexedElements]
+        : [...document.querySelectorAll(mediaSelector)];
+    let matchedCount = 0;
+    for (const element of candidates) {
+      if (!element.isConnected) {
+        removeElementFromSourceIndex(element);
+        continue;
       }
-    });
+      if (
+        candidateSourcesFor(element).includes(sourceUrl) &&
+        applyKnownDecision(element)
+      ) {
+        matchedCount += 1;
+      }
+    }
+    return matchedCount;
+  };
+
+  const applyDecisionToSource = (sourceUrl) => {
+    applyDecisionToMediaSource(sourceUrl);
     applyCssBackgroundsForSource(sourceUrl);
   };
 
@@ -1120,8 +1176,17 @@
 
   const releaseMediaHostsIn = (root) => {
     if (!(root instanceof Element)) return;
-    if (root instanceof HTMLImageElement) releaseMediaHost(root);
-    root.querySelectorAll("img").forEach(releaseMediaHost);
+    const releaseTrackedMedia = (element) => {
+      if (element instanceof HTMLImageElement) {
+        releaseMediaHost(element);
+      }
+      removeElementFromSourceIndex(element);
+      stopFallbackObservation(element);
+    };
+    if (root.matches(mediaSelector)) {
+      releaseTrackedMedia(root);
+    }
+    root.querySelectorAll(mediaSelector).forEach(releaseTrackedMedia);
   };
 
   const updateMediaHostState = (element) => {
@@ -1238,14 +1303,7 @@
       return undefined;
     }
     rememberDecision(sourceUrl, message.action);
-    let matchedCount = 0;
-    document.querySelectorAll(mediaSelector).forEach((element) => {
-      if (candidateSourcesFor(element).includes(sourceUrl)) {
-        if (applyKnownDecision(element)) {
-          matchedCount += 1;
-        }
-      }
-    });
+    const matchedCount = applyDecisionToMediaSource(sourceUrl);
     return Promise.resolve({
       type: PRESENTATION_APPLIED_MESSAGE,
       version: 1,
