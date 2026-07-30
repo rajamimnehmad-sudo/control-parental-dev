@@ -4,6 +4,11 @@ import com.contentfilter.core.domain.help.HelpContext
 import java.text.Normalizer
 
 internal object GloshiaPromptPolicy {
+    data class SanitizedResponse(
+        val text: String,
+        val rejectionReason: String? = null,
+    )
+
     val systemInstruction =
         """
         Sos GloshIA Ayuda, el asistente privado de la app Content Filter para el teléfono del usuario.
@@ -78,9 +83,17 @@ internal object GloshiaPromptPolicy {
         response: String,
         originalPrompt: String,
         reliableAnswer: String? = null,
-    ): String {
+    ): String = evaluateResponse(response, originalPrompt, reliableAnswer).text
+
+    fun evaluateResponse(
+        response: String,
+        originalPrompt: String,
+        reliableAnswer: String? = null,
+    ): SanitizedResponse {
         val rawResponse = response.trim()
-        if (rawResponse.length > MaxResponseLength) return ""
+        if (rawResponse.length > MaxResponseLength) {
+            return SanitizedResponse(text = "", rejectionReason = "too_long")
+        }
         var sanitized = rawResponse
         sensitiveValues(originalPrompt).forEach { value ->
             if (value.length >= MinSensitiveValueLength) {
@@ -91,14 +104,20 @@ internal object GloshiaPromptPolicy {
             sanitized
                 .replace(SecretEchoPattern, "$1 [dato privado]")
                 .trim()
-        return result
-            .takeUnless {
-                val normalized = it.normalized()
-                normalized.hasAny(*InvalidResponseMarkers) ||
-                    it.count { character -> character == '?' } > MaxQuestionMarks ||
-                    normalized.hasRepeatedPhrase() ||
-                    !normalized.isGroundedIn(reliableAnswer)
-            }.orEmpty()
+        val normalized = result.normalized()
+        val rejectionReason =
+            when {
+                result.isBlank() -> "blank"
+                normalized.hasAny(*InvalidResponseMarkers) -> "invalid_marker"
+                result.count { character -> character == '?' } > MaxQuestionMarks -> "too_many_questions"
+                normalized.hasRepeatedPhrase() -> "repeated_phrase"
+                !normalized.isGroundedIn(reliableAnswer) -> "ungrounded"
+                else -> null
+            }
+        return SanitizedResponse(
+            text = result.takeIf { rejectionReason == null }.orEmpty(),
+            rejectionReason = rejectionReason,
+        )
     }
 
     private fun sensitiveValues(prompt: String): Set<String> =

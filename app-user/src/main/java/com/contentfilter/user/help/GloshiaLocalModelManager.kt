@@ -3,6 +3,7 @@ package com.contentfilter.user.help
 import android.app.ActivityManager
 import android.content.Context
 import android.os.Build
+import android.util.Log
 import com.contentfilter.core.domain.help.HelpContext
 import com.google.ai.edge.litertlm.Backend
 import com.google.ai.edge.litertlm.Content
@@ -13,6 +14,7 @@ import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.SamplerConfig
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -20,7 +22,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -156,43 +157,50 @@ class GloshiaLocalModelManager
                     val response =
                         withTimeout(GenerationTimeoutMs) {
                             withContext(Dispatchers.Default) {
-                                val output = StringBuilder()
-                                requireNotNull(conversation).sendMessageAsync(request).collect { message ->
-                                    val chunk =
-                                        message.contents.contents
-                                            .filterIsInstance<Content.Text>()
-                                            .joinToString(separator = "") { it.text }
-                                    if (chunk.startsWith(output.toString())) {
-                                        output.clear()
-                                    }
-                                    output.append(chunk)
-                                }
-                                output.toString()
+                                requireNotNull(conversation)
+                                    .sendMessage(request)
+                                    .contents.contents
+                                    .filterIsInstance<Content.Text>()
+                                    .joinToString(separator = "") { it.text }
                             }
                         }
                     conversationTurns += 1
-                    GloshiaPromptPolicy
-                        .sanitizeResponse(
+                    val sanitized =
+                        GloshiaPromptPolicy.evaluateResponse(
                             response = response,
                             originalPrompt = prompt,
                             reliableAnswer = reliableAnswer,
-                        ).takeIf(String::isNotBlank)
-                } catch (error: Throwable) {
-                    conversation?.close()
-                    conversation = null
-                    engine?.close()
-                    engine = null
-                    fail("No se pudo iniciar el chat local. La ayuda básica sigue disponible.")
+                        )
+                    sanitized.rejectionReason?.let { reason ->
+                        Log.w(LogTag, "response_rejected reason=$reason length=${response.length}")
+                    }
+                    sanitized.text.takeIf(String::isNotBlank)
+                } catch (error: CancellationException) {
+                    releaseRuntime()
                     throw error
+                } catch (error: Exception) {
+                    Log.e(LogTag, "generation_failed type=${error.javaClass.name}", error)
+                    releaseRuntime()
+                    fail("No se pudo iniciar el chat local. La ayuda básica sigue disponible.")
+                    null
+                } catch (error: LinkageError) {
+                    Log.e(LogTag, "runtime_linkage_failed type=${error.javaClass.name}", error)
+                    releaseRuntime()
+                    fail("No se pudo iniciar el chat local. La ayuda básica sigue disponible.")
+                    null
                 }
             }
 
         fun close() {
-            conversation?.close()
-            conversation = null
-            engine?.close()
-            engine = null
+            releaseRuntime()
             scope.cancel()
+        }
+
+        private fun releaseRuntime() {
+            runCatching { conversation?.close() }
+            conversation = null
+            runCatching { engine?.close() }
+            engine = null
         }
 
         private suspend fun ensureConversation(): Conversation {
@@ -201,7 +209,7 @@ class GloshiaLocalModelManager
             val loadedEngine =
                 withContext(Dispatchers.Default) {
                     runCatching { createEngine(Backend.GPU()) }
-                        .getOrElse { createEngine(Backend.CPU(threadCount = cpuThreadCount())) }
+                        .getOrElse { createEngine(Backend.CPU(numOfThreads = cpuThreadCount())) }
                 }
             engine = loadedEngine
             return createConversation(loadedEngine).also {
@@ -357,6 +365,7 @@ class GloshiaLocalModelManager
         }
 
         private companion object {
+            const val LogTag = "GloshiaLocalModel"
             const val ModelDirectoryName = "gloshia"
             const val ModelFileName = "Qwen2_0.5B_Instruct.litertlm"
             const val ModelUrl =

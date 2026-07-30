@@ -114,14 +114,15 @@ class GloshiaPromptPolicyTest {
     @Test
     fun `ungrounded model answer is rejected in favor of reliable fallback`() {
         val response =
-            GloshiaPromptPolicy.sanitizeResponse(
+            GloshiaPromptPolicy.evaluateResponse(
                 response = "Hola, ¿me puedes ayudar con algo? No entiendo cómo puedo abrir una página en DAG.",
                 originalPrompt = "No me abre una página",
                 reliableAnswer =
                     "DAG es el navegador protegido. Comprobá conexión, versión instalada y que continúe como navegador predeterminado.",
             )
 
-        assertTrue(response.isBlank())
+        assertTrue(response.text.isBlank())
+        assertEquals("invalid_marker", response.rejectionReason)
     }
 
     @Test
