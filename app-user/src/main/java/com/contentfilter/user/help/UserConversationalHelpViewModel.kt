@@ -22,12 +22,14 @@ class UserConversationalHelpViewModel
             prompt: String,
             context: HelpContext,
             reliableAnswer: String,
-        ): String? =
-            runCatching {
+        ): String? {
+            GloshiaPromptPolicy.directResponse(prompt, context)?.let { return it }
+            return runCatching {
                 modelManager.generate(
                     prompt = prompt,
                     context = context,
                     reliableAnswer = reliableAnswer,
                 )
             }.getOrNull()
+        }
     }

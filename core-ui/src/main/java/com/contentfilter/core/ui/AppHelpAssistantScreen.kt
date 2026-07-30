@@ -43,6 +43,7 @@ import com.contentfilter.core.domain.help.HelpReportDraft
 @Composable
 fun AppHelpAssistantScreen(
     context: HelpContext,
+    contextDescription: String,
     onBack: () -> Unit,
     onAction: (HelpAction) -> Unit,
     onAutomaticReport: (HelpReportDraft) -> Unit = {},
@@ -64,6 +65,14 @@ fun AppHelpAssistantScreen(
         question = ""
     }
 
+    fun clearConversation() {
+        messages.clear()
+        messages += HelpChatMessage.assistant(AppHelpAssistant.welcome(context))
+        suggestions = AppHelpAssistant.suggestions(context)
+        lastAction = null
+        question = ""
+    }
+
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
     }
@@ -81,6 +90,21 @@ fun AppHelpAssistantScreen(
             onBack = onBack,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
         )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                contextDescription,
+                style = MaterialTheme.typography.bodySmall,
+                color = ProductMutedInk,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(onClick = ::clearConversation) {
+                Text("Borrar chat")
+            }
+        }
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             state = listState,

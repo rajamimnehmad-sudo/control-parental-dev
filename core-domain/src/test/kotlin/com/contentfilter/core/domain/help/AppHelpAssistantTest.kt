@@ -64,4 +64,41 @@ class AppHelpAssistantTest {
 
         assertEquals(null, answer.report)
     }
+
+    @Test
+    fun `page navigation failure is diagnosed as DAG`() {
+        val answer =
+            AppHelpAssistant.answer(
+                "No me abre una página",
+                HelpContext(audience = HelpAudience.User, dagInstalled = true),
+            )
+
+        assertEquals("Navegación protegida DAG", answer.title)
+        assertEquals(HelpAction.Web, answer.action)
+        assertEquals(HelpReportCategory.DagNavigation, answer.report?.category)
+    }
+
+    @Test
+    fun `greeting responds conversationally without creating a report`() {
+        val answer =
+            AppHelpAssistant.answer(
+                "Hola, ¿cómo estás?",
+                HelpContext(audience = HelpAudience.Admin),
+            )
+
+        assertEquals("¡Hola!", answer.title)
+        assertEquals(null, answer.report)
+    }
+
+    @Test
+    fun `capabilities explain safe reporting`() {
+        val answer =
+            AppHelpAssistant.answer(
+                "¿Qué podés hacer?",
+                HelpContext(audience = HelpAudience.User),
+            )
+
+        assertEquals("Cómo puedo ayudarte", answer.title)
+        assertTrue(answer.body.contains("sin copiar tu conversación"))
+    }
 }

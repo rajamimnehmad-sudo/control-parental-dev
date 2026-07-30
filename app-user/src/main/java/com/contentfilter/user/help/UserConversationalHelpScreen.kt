@@ -111,6 +111,15 @@ internal fun UserConversationalHelpScreen(
         }
     }
 
+    fun clearConversation() {
+        if (generating) return
+        messages.clear()
+        messages += UserHelpMessage.assistant(AppHelpAssistant.welcome(context))
+        suggestions = AppHelpAssistant.suggestions(context)
+        lastAction = null
+        question = ""
+    }
+
     LaunchedEffect(messages.size) {
         if (messages.isNotEmpty()) listState.animateScrollToItem(messages.lastIndex)
     }
@@ -134,6 +143,24 @@ internal fun UserConversationalHelpScreen(
             onBack = onBack,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
         )
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                "Este teléfono · historial sólo durante esta pantalla",
+                style = MaterialTheme.typography.bodySmall,
+                color = ProductMutedInk,
+                modifier = Modifier.weight(1f),
+            )
+            OutlinedButton(
+                enabled = !generating,
+                onClick = ::clearConversation,
+            ) {
+                Text("Borrar chat")
+            }
+        }
         LazyColumn(
             modifier = Modifier.weight(1f).fillMaxWidth(),
             state = listState,

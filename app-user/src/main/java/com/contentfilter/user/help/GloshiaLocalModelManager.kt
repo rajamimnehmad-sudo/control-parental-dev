@@ -171,7 +171,12 @@ class GloshiaLocalModelManager
                             }
                         }
                     conversationTurns += 1
-                    GloshiaPromptPolicy.sanitizeResponse(response, prompt).takeIf(String::isNotBlank)
+                    GloshiaPromptPolicy
+                        .sanitizeResponse(
+                            response = response,
+                            originalPrompt = prompt,
+                            reliableAnswer = reliableAnswer,
+                        ).takeIf(String::isNotBlank)
                 } catch (error: Throwable) {
                     conversation?.close()
                     conversation = null
@@ -231,9 +236,9 @@ class GloshiaLocalModelManager
                     systemInstruction = Contents.of(GloshiaPromptPolicy.systemInstruction),
                     samplerConfig =
                         SamplerConfig(
-                            topK = 20,
-                            topP = 0.85,
-                            temperature = 0.3,
+                            topK = 5,
+                            topP = 0.75,
+                            temperature = 0.1,
                             seed = 42,
                         ),
                 ),

@@ -32,6 +32,12 @@ internal fun AdminHelpRoute(
         )
     AppHelpAssistantScreen(
         context = helpContext,
+        contextDescription =
+            if (users.size == 1) {
+                "Resumen general · 1 usuario protegido"
+            } else {
+                "Resumen general · ${users.size} usuarios protegidos"
+            },
         onBack = onBack,
         onAction = onAction,
         onAutomaticReport = { reportViewModel.report(it, helpContext) },

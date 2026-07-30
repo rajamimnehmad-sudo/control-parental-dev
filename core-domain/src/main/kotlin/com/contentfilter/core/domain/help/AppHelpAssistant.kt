@@ -85,7 +85,48 @@ object AppHelpAssistant {
         if (normalized.isBlank()) return welcome(context)
         val reportsFailure = normalized.reportsFailure()
         return when {
-            normalized.hasAny("dag", "gloshia", "foto", "fotos", "imagen", "imagenes", "difuminada", "transparente") ->
+            normalized.isGreeting() ->
+                HelpAnswer(
+                    title = "¡Hola!",
+                    body =
+                        if (context.protectionNeedsAttention || context.possibleUninstall) {
+                            "Soy la ayuda privada de Content Filter. Veo un estado que necesita atención; preguntame qué revisar o elegí una sugerencia."
+                        } else {
+                            "Soy la ayuda privada de Content Filter. La protección principal figura activa. ¿Qué querés revisar?"
+                        },
+                )
+            normalized.isCapabilitiesQuestion() ->
+                HelpAnswer(
+                    title = "Cómo puedo ayudarte",
+                    body =
+                        "Puedo explicar DAG, Apps, Web, seguridad, solicitudes, activación, actualizaciones y recuperación offline. " +
+                            "También uso el estado visible de la app para darte pasos concretos y preparar reportes sin copiar tu conversación.",
+                )
+            normalized.isThanks() ->
+                HelpAnswer(
+                    title = "¡De nada!",
+                    body = "Cuando quieras, seguimos con otra duda sobre Content Filter o DAG.",
+                )
+            normalized.isAcknowledgement() ->
+                HelpAnswer(
+                    title = "Perfecto",
+                    body = "Decime qué querés revisar y te guío paso a paso.",
+                )
+            normalized.hasAny(
+                "dag",
+                "gloshia",
+                "foto",
+                "fotos",
+                "imagen",
+                "imagenes",
+                "difuminada",
+                "transparente",
+                "pagina",
+                "paginas",
+                "sitio",
+                "sitios",
+                "navegador",
+            ) ->
                 HelpAnswer(
                     title = "Navegación protegida DAG",
                     body =
@@ -398,6 +439,24 @@ object AppHelpAssistant {
 
     private fun String.hasAny(vararg terms: String): Boolean = terms.any(::contains)
 
+    private fun String.isGreeting(): Boolean =
+        this in Greetings ||
+            (split(' ').size <= MaxGreetingWords && hasAny("hola", "buen dia", "buenas tardes", "buenas noches"))
+
+    private fun String.isCapabilitiesQuestion(): Boolean =
+        hasAny(
+            "que podes hacer",
+            "en que ayudas",
+            "como me ayudas",
+            "quien sos",
+            "para que servis",
+        )
+
+    private fun String.isThanks(): Boolean =
+        split(' ').size <= MaxAcknowledgementWords && hasAny("gracias", "muchas gracias", "te agradezco")
+
+    private fun String.isAcknowledgement(): Boolean = this in Acknowledgements
+
     private fun String.isContextualFollowUp(): Boolean =
         split(' ').size <= 8 && hasAny("y si", "entonces", "eso", "cuando", "como", "por que", "que pasa", "puede")
 
@@ -408,6 +467,7 @@ object AppHelpAssistant {
             "fallo",
             "no funciona",
             "no abre",
+            "no me abre",
             "no carga",
             "no aparece",
             "no muestra",
@@ -419,5 +479,18 @@ object AppHelpAssistant {
 
     private val CombiningMarks = Regex("\\p{M}+")
     private val NonWords = Regex("[^a-z0-9]+")
+    private val Greetings =
+        setOf(
+            "hola",
+            "buen dia",
+            "buenas",
+            "buenas tardes",
+            "buenas noches",
+            "que tal",
+            "como estas",
+        )
+    private val Acknowledgements = setOf("ok", "okay", "dale", "listo", "perfecto", "entendi", "entiendo")
+    private const val MaxGreetingWords = 5
+    private const val MaxAcknowledgementWords = 5
     private const val MaxSuggestions = 5
 }
