@@ -443,9 +443,9 @@ El lote integrado se desarrolló y validó en:
 - No se instaló, publicó ni hizo push durante el lote. Supabase y Production no
   se modificaron.
 
-### Correctivo local Usuario 303
+### Correctivo local Usuario 304
 
-- Usuario 303 está instalado in-place en el SM-S908E; conservó el modelo local
+- Usuario 304 está instalado in-place en el SM-S908E; conservó el modelo local
   verificado de 647.377.840 bytes, Accessibility y la VPN activa.
 - LiteRT-LM permanece en 0.14.0, pero la generación usa su llamada completa
   fuera del hilo visual. Esto evita el choque ABI del flujo `sendMessageAsync`
@@ -454,11 +454,12 @@ El lote integrado se desarrolló y validó en:
   primera salida no superó la barrera de calidad y la pantalla usó correctamente
   la respuesta determinista segura. El candidato registra sólo tipo de error o
   motivo de descarte y longitud; nunca pregunta, respuesta, URL ni secretos.
-- Ktlint, unitarios, R8, APK y lint DEV correctos. Falta repetir una consulta en
-  el APK final para identificar el motivo de descarte y calibrar la conversación
-  sin debilitar privacidad ni fundamentación.
-- APK final Usuario 303: 26.569.022 bytes, SHA-256
-  `d0f147df96a5fe6750ebd307476e7415d394e172bfef7668190b92591d0604e0`.
+- Ktlint, unitarios, R8, APK y lint DEV correctos. La prueba final identificó
+  `ungrounded` como motivo seguro de descarte. Por decisión del usuario, la
+  mejora conversacional queda diferida hasta que las funciones y el contexto de
+  la app estén más cerrados; no se redujo la barrera de calidad.
+- APK final Usuario 304: 26.569.022 bytes, SHA-256
+  `4802a51b2fde3b208a3efca04c0f29e0e0e10aad0b8d39ae9741eac04c2b4ab9`.
   APK final DAG 25: 121.172.970 bytes, SHA-256
   `ec7f47f72d5f8347fd505b487a5e939cbfcca7227f000c95cfe272bd76426151`.
   Ambas quedaron instaladas desde esos artefactos en el SM-S908E; Admin 287 no
@@ -466,8 +467,8 @@ El lote integrado se desarrolló y validó en:
 
 ## Próximo trabajo autorizado
 
-Repetir el diagnóstico físico de calidad de GloshIA en Usuario 303 y, después,
-completar la matriz conjunta con Admin 287 y DAG 25: Ajustes, chat offline,
+Completar la matriz conjunta con Usuario 304, Admin 287 y DAG 25: Ajustes, chat offline,
 borrado, secretos sintéticos, acciones seguras, pestañas, descargas PDF e
 imágenes. Atrás moderno y miniaturas seguras ya tienen evidencia física en el
-SM-S908E. No publicar ni hacer push sin un nuevo OK explícito.
+SM-S908E. La inteligencia conversacional avanzada de GloshIA queda para un
+ticket posterior. No publicar ni hacer push sin un nuevo OK explícito.
