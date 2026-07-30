@@ -43,6 +43,33 @@ App Usuario `versionCode 281` fue además un candidato físico para validar el
 puente hacia el navegador separado; no reemplazó el manifiesto público
 documentado arriba.
 
+## Lote local 5 de 6: Ajustes por pantallas
+
+- El commit local `cf88a28` convierte Ajustes de Usuario y Admin en índices
+  simples. Cada fila abre un único destino y Atrás vuelve primero al índice.
+- Usuario separa `Protección y activación`, `Actualizaciones e instalaciones`,
+  `Ayuda` y `Tu opinión`. El código de emergencia queda dentro de Protección y
+  no se expone en la lista. Actualizaciones conserva App Usuario, App Admin y
+  DAG sin duplicar esos controles en la raíz.
+- Admin separa `Cuenta y comunidad`, `Contacto adulto`, `Panel administrador`,
+  `Actualizaciones`, `Ayuda`, `Tu opinión` y `Administrador de este teléfono`.
+  Cambiar administrador sale de Actualizaciones y mantiene su confirmación
+  dentro de la sección sensible final.
+- No cambiaron autoridades, reglas, activación, repositorios, sincronización,
+  Supabase ni barreras antimanipulación.
+- Validación local correcta: Ktlint, 42 unitarios de Usuario, 57 unitarios de
+  Admin y ambos APK DEV. Admin queda en `versionCode 286`; su APK mide
+  28.801.620 bytes y tiene SHA-256
+  `93967cde19a83094bb4558302d4c131799b9161ff97ef0570eeff74ee48e57a8`.
+- El build de Usuario observado declara `versionCode 302`, pero ese incremento
+  y el APK de 28.518.877 bytes incluyen cambios locales preexistentes del lote
+  GloshIA todavía no integrados. El commit de Ajustes no tomó propiedad de esos
+  archivos; el artefacto canónico de Usuario se documentará al cerrar el lote
+  6.
+- Por pedido del usuario no se instaló ningún APK. Faltan el recorrido físico
+  de Atrás, rotación, scroll, texto grande y lector de pantalla cuando terminen
+  los seis lotes.
+
 ## Runtime único de navegador
 
 - El único navegador del proyecto es `app-dag-browser`.
@@ -385,7 +412,7 @@ El lote integrado se desarrolló y validó en:
 
 ## Próximo trabajo autorizado
 
-Completar el gate físico de GloshIA Ayuda Usuario 297 cuando ADB detecte el
-teléfono. Después, el siguiente lote recomendado sigue siendo ampliar la
-calibración visual con ejemplos actuales, priorizando el hero de H&M y falsos
-filtros de ropa masculina, sin reducir el umbral global a ciegas.
+Continuar con el lote 6 de 6: mejorar e integrar el chat de ayuda en App Usuario
+y App Admin, conciliando primero los cambios locales de GloshIA sin perderlos.
+Después se podrán generar los APK canónicos desde `main` local y ejecutar la
+matriz física conjunta que el usuario pidió postergar hasta el cierre.

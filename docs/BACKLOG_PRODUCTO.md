@@ -960,11 +960,12 @@ Flujo de una entrada:
 
 ### LOTE-SETTINGS-INFORMATION-ARCHITECTURE-03 - Ajustes ordenados por pantallas
 
-- Estado: `Idea agrupada; no aprobada para codigo`. Evidencia: el usuario
-  informa el 2026-07-29 que Ajustes es desordenado tanto en Admin como en
-  Usuario y propone una lista ordenada cuyas filas abran pantallas
-  independientes. Tipo: arquitectura de informacion, navegacion y UX Android.
-  Prioridad propuesta: P1. Esfuerzo estimado: L. Riesgo: medio.
+- Estado: `Implementado en main local; pendiente QA fisica al cerrar los seis
+  lotes`. Evidencia: el usuario informa el 2026-07-29 que Ajustes es desordenado
+  tanto en Admin como en Usuario, propone una lista ordenada cuyas filas abran
+  pantallas independientes y autoriza continuar con el lote 5 el 2026-07-30.
+  Tipo: arquitectura de informacion, navegacion y UX Android. Prioridad: P1.
+  Esfuerzo realizado: L. Riesgo: medio.
 - Objetivo comun: convertir la raiz de Ajustes de cada app en un indice simple,
   ordenado y escaneable. Cada fila representa una seccion, muestra icono,
   titulo, resumen breve o estado cuando aporte valor y flecha de navegacion; al
@@ -995,6 +996,12 @@ Flujo de una entrada:
   comportamiento de navegacion, pero Admin y Usuario muestran unicamente las
   secciones y controles permitidos para su rol. No se crea una pantalla
   generica que accidentalmente exponga opciones Admin en Usuario.
+- Resultado en fuente: Usuario muestra cuatro destinos —Proteccion y
+  activacion, Actualizaciones e instalaciones, Ayuda y Tu opinion—; Admin
+  muestra Cuenta y comunidad, Contacto adulto, Panel, Actualizaciones, Ayuda, Tu
+  opinion y la accion sensible Administrador de este telefono al final.
+  Actualizaciones deja de contener formularios ajenos y cada detalle conserva
+  su estado y accion original.
 - No alcance: cambiar reglas, permisos, activacion, sincronizacion, backend,
   Supabase, barreras antimanipulacion o comportamiento de los controles. La
   primera iteracion redistribuye capacidades existentes.
@@ -1003,11 +1010,10 @@ Flujo de una entrada:
   raiz; Atrás vuelve exactamente al indice y otro Atrás respeta el destino
   principal de la app; estados y acciones no se duplican entre raiz y detalle;
   acciones destructivas siguen al final y requieren confirmacion.
-- Decisiones para preparar ejecucion: orden final de las secciones; si
-  Apariencia merece pantalla propia aun cuando tenga pocos controles; donde
-  ubicar licencia/activacion y codigo de emergencia; y si una fila puede
-  conservar un switch directo o todas las modificaciones deben ocurrir
-  exclusivamente dentro del detalle, como propone el usuario.
+- Validacion local: Ktlint, 42 unitarios Usuario, 57 unitarios Admin y ambos
+  builds DEV correctos. Admin usa candidato 286; Usuario se coordino con el
+  `versionCode 302` ya reservado por el lote GloshIA pendiente. No hubo
+  instalacion ni QA fisica por la orden de esperar al cierre de los seis lotes.
 
 ### USER-DAG-LAUNCHER-PREFERENCE-01 - DAG como app separada opcional
 
