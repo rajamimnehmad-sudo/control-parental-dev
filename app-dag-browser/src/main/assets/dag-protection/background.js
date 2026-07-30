@@ -99,7 +99,8 @@ const connectDecisionPort = () => {
       pendingNativeDecisions.delete(message.candidateId);
       clearTimeout(pending.timeout);
       pending.resolve(
-        message.action === "allow" && message.reason === "model_allow"
+        message.action === "allow" &&
+          ["model_allow", "safe_ui_vector"].includes(message.reason)
           ? "allow"
           : message.action === "block" && message.reason === "model_filter"
             ? "block"

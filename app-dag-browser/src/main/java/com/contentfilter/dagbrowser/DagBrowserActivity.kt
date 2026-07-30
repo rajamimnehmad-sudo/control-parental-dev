@@ -1137,17 +1137,25 @@ class DagBrowserActivity : Activity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (tabSwitcher.isOpen()) {
-            tabSwitcher.hide()
-            return
-        }
         val tab = activeTab
-        if (tab != null && tab.canGoBack) {
-            tab.session.goBack()
-        } else if (tab != null) {
-            goHome(tab)
-        } else {
-            super.onBackPressed()
+        when (
+            DagBackNavigationPolicy.decide(
+                addressEditing = addressInput.hasFocus(),
+                tabSwitcherOpen = tabSwitcher.isOpen(),
+                hasActiveTab = tab != null,
+                canGoBackInPage = tab?.canGoBack == true,
+                isHome = tab?.url == InitialBlankPage,
+            )
+        ) {
+            DagBackAction.CloseKeyboard -> {
+                addressInput.clearFocus()
+                getSystemService(InputMethodManager::class.java)
+                    .hideSoftInputFromWindow(addressInput.windowToken, 0)
+            }
+            DagBackAction.CloseTabSwitcher -> tabSwitcher.hide()
+            DagBackAction.GoBackInPage -> tab?.session?.goBack()
+            DagBackAction.GoHome -> tab?.let(::goHome)
+            DagBackAction.ExitBrowser -> super.onBackPressed()
         }
     }
 

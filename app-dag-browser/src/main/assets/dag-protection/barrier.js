@@ -77,6 +77,7 @@
   const fallbackObservedSources = new WeakMap();
   const fallbackNearElements = new WeakSet();
   const fallbackTimers = new WeakMap();
+  const mediaHostsByElement = new WeakMap();
   const cssBackgroundRecords = new Map();
   const cssBeforeRecords = new Map();
   const cssAfterRecords = new Map();
@@ -921,30 +922,18 @@
         )
       : null;
 
-  const updateMediaHostState = (element) => {
-    if (!(element instanceof HTMLImageElement)) {
-      return;
-    }
-    const host = element.parentElement;
-    if (!host) {
-      return;
-    }
-    const mediaBounds = element.getBoundingClientRect();
-    const hostBounds = host.getBoundingClientRect();
-    const mediaArea = mediaBounds.width * mediaBounds.height;
-    const hostArea = hostBounds.width * hostBounds.height;
-    if (
-      mediaBounds.width < 48 ||
-      mediaBounds.height < 48 ||
-      hostArea <= 0 ||
-      hostArea > mediaArea * 2.5
-    ) {
+  const reconcileMediaHostState = (host) => {
+    if (!(host instanceof Element)) return;
+    const trackedImages =
+      Array.from(host.children)
+        .filter((child) => child instanceof HTMLImageElement)
+        .filter((child) => mediaHostsByElement.get(child) === host && child.isConnected);
+    if (trackedImages.length === 0) {
       host.removeAttribute(MEDIA_HOST_ATTRIBUTE);
       return;
     }
     const siblingStates =
-      Array.from(host.children)
-        .filter((child) => child instanceof HTMLImageElement)
+      trackedImages
         .filter((child) => {
           const bounds = child.getBoundingClientRect();
           return bounds.width >= 1 && bounds.height >= 1;
@@ -965,6 +954,46 @@
     } else {
       host.setAttribute(MEDIA_HOST_ATTRIBUTE, hostState);
     }
+  };
+
+  const releaseMediaHost = (element) => {
+    if (!(element instanceof HTMLImageElement)) return;
+    const previousHost = mediaHostsByElement.get(element);
+    mediaHostsByElement.delete(element);
+    reconcileMediaHostState(previousHost);
+  };
+
+  const releaseMediaHostsIn = (root) => {
+    if (!(root instanceof Element)) return;
+    if (root instanceof HTMLImageElement) releaseMediaHost(root);
+    root.querySelectorAll("img").forEach(releaseMediaHost);
+  };
+
+  const updateMediaHostState = (element) => {
+    if (!(element instanceof HTMLImageElement)) return;
+    const previousHost = mediaHostsByElement.get(element);
+    const host = element.parentElement;
+    if (previousHost && previousHost !== host) {
+      mediaHostsByElement.delete(element);
+      reconcileMediaHostState(previousHost);
+    }
+    if (!host) return;
+    const mediaBounds = element.getBoundingClientRect();
+    const hostBounds = host.getBoundingClientRect();
+    const mediaArea = mediaBounds.width * mediaBounds.height;
+    const hostArea = hostBounds.width * hostBounds.height;
+    if (
+      mediaBounds.width < 48 ||
+      mediaBounds.height < 48 ||
+      hostArea <= 0 ||
+      hostArea > mediaArea * 2.5
+    ) {
+      mediaHostsByElement.delete(element);
+      reconcileMediaHostState(host);
+      return;
+    }
+    mediaHostsByElement.set(element, host);
+    reconcileMediaHostState(host);
   };
 
   const updateAccessibleMediaState = (element, action) => {
@@ -1126,6 +1155,9 @@
   const observer = new MutationObserver((mutations) => {
     let shouldProbeBackgrounds = false;
     for (const mutation of mutations) {
+      for (const node of mutation.removedNodes) {
+        releaseMediaHostsIn(node);
+      }
       for (const node of mutation.addedNodes) {
         markHidden(node);
         shouldProbeBackgrounds = true;
