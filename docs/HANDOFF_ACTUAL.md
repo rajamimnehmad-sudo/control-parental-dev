@@ -471,4 +471,6 @@ Completar la matriz conjunta con Usuario 304, Admin 287 y DAG 25: Ajustes, chat 
 borrado, secretos sintéticos, acciones seguras, pestañas, descargas PDF e
 imágenes. Atrás moderno y miniaturas seguras ya tienen evidencia física en el
 SM-S908E. La inteligencia conversacional avanzada de GloshIA queda para un
-ticket posterior. No publicar ni hacer push sin un nuevo OK explícito.
+ticket posterior. Para DAG, iniciar primero una línea base profesional de
+rendimiento/compatibilidad y luego ejecutar tickets pequeños; el primero
+aprobado es `DAG-ABOUT-VERSION-05`. No publicar sin un nuevo OK explícito.

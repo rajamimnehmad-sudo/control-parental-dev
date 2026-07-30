@@ -665,7 +665,7 @@ Flujo de una entrada:
 | PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; pendiente episodio real controlado | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
 | PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; UI fisica validada, pendiente ciclo offline real | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
 | PROTECTION-OFFLINE-RECOVERY-AUTO-03 | Idea; no aprobada para codigo | P0 | Preparar automaticamente el kit de emergencia al crear y enlazar un Usuario | M | Alto |
-| DAG-DOWNLOADS-01 | Idea; no aprobada para codigo | P1 | Descargas seguras de documentos con control Admin y bloqueo permanente de APK/ejecutables | L | Alto |
+| DAG-DOWNLOADS-01 | Primera etapa PDF implementada en DAG 24; pendiente matriz física y política Admin | P1 | Descargas seguras de documentos con control Admin y bloqueo permanente de APK/ejecutables | L | Alto |
 | HELP-CONTEXTUAL-CHAT-01 | Usuario 304 instalado: crash resuelto; mejora conversacional diferida | P1 | Chat privado de ayuda y diagnóstico seguro automático | L | Medio |
 | LOTE-HELP-BOTH-APPS-02 | Idea agrupada; no aprobada para codigo | P1 | Mejorar GloshIA e integrarla con contexto y acciones seguras en Usuario y Admin | L | Medio |
 | ADMIN-USER-SECTIONS-UX-04 | Resuelto y validado fisicamente en DEV 267 | P1 | Separar Aplicaciones, Web y Seguridad con selector horizontal moderno | M | Medio |
@@ -734,6 +734,7 @@ Flujo de una entrada:
 | BARRIER-FACTORY-RESET-01 | Idea autorizada para backlog; no aprobada para codigo | P0 | Bloquear el restablecimiento desde Ajustes salvo autorizacion destructiva independiente | M | Critico |
 | BARRIER-ESCAPE-AUDIT-02 | Idea autorizada para backlog; no aprobada para codigo | P0 | Inventariar, cerrar y probar sistematicamente las vias de escape en Android soportado | XL | Critico |
 | DAG-NAV-UX-01 | Resuelto DEV 234 | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
+| DAG-ABOUT-VERSION-05 | Aprobado; pendiente línea base profesional | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Resuelto y publicado DEV 279 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
@@ -777,7 +778,7 @@ Flujo de una entrada:
 | DAG-TABS-UX-02 | Implementado candidato DEV 241; pendiente prueba fisica | P2 | Quitar peces del selector, mostrar recientes y evitar pestanas vacias duplicadas | M | Medio |
 | DAG-CHROME-UX-01 | Idea autorizada para backlog; no aprobada para codigo | P1 | Acercar la experiencia cotidiana de DAG a Chrome sin copiar marca ni relajar protecciones | XL | Alto |
 | DAG-UX-POLISH-04 | Implementado localmente; no publicado por pedido del usuario | P2 | Pulir exclusivamente la interfaz y ergonomia cotidiana de DAG sin cambiar logica, seguridad ni rendimiento | M | Bajo |
-| DAG-TABS-UX-03 | Idea autorizada para backlog; no aprobada para codigo | P1 | Hasta 50 pestanas, selector a pantalla completa con miniaturas reales y Cerrar todo | L | Alto |
+| DAG-TABS-UX-03 | Implementado en DAG 23 e instalado con DAG 25; pendiente matriz física 1/10/50 | P1 | Hasta 50 pestanas, selector a pantalla completa con miniaturas reales y Cerrar todo | L | Alto |
 | DAG-HOME-RECENTS-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Abrir DAG en Home y mostrar accesos circulares a sitios recientes | M | Medio |
 | DAG-SEARCH-SUGGEST-03 | Implementado y validado en candidato local; Edge DEV activo | P1 | Sugerencias en tiempo real y Tal vez quisiste decir sin saltar clasificacion | L | Alto |
 | DAG-RESULTS-CLARITY-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Resultados mas claros con dominio destacado e iconos de sitio no engañosos | M | Medio |
@@ -786,7 +787,7 @@ Flujo de una entrada:
 | DAG-BLACK-RESOURCES-05 | Implementado y validado en candidato local | P1 | Evitar rectangulos negros en recursos seguros sin mostrar contenido no aprobado | M | Alto |
 | DAG-REFRESH-03 | Implementado en candidato local; validacion automatica correcta | P1 | Hacer que Actualizar recargue realmente la pestana activa con estado visible y seguro | S | Medio |
 | DAG-RECENTS-FAVICON-03 | Implementado y validado en candidato local | P2 | Mostrar el favicon real y seguro del sitio en los accesos recientes de Home | M | Medio |
-| DAG-TAB-PREVIEW-04 | Implementado y validado en candidato local | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
+| DAG-TAB-PREVIEW-04 | Implementado y validado parcialmente en DAG 25; pendiente matriz 10/50 | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
 | DAG-CALIBRATION-QUEUE-02 | Resuelto DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
 | DAG-CALIBRATION-REVIEW-03 | Reemplazado por calibracion binaria DEV 279 | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
@@ -1719,8 +1720,8 @@ Flujo de una entrada:
 
 #### DAG-DOWNLOADS-01 - Descargas seguras y administrables
 
-- Estado: `Primera etapa implementada en candidato local DAG DEV 24; pendiente
-  prueba física al completar los seis lotes`. Evidencia: el usuario confirma el
+- Estado: `Primera etapa implementada en DAG 24 e instalada dentro de DAG 25;
+  pendiente prueba física de descarga`. Evidencia: el usuario confirma el
   2026-07-29 que las descargas son importantes para que DAG sea un navegador
   profesional y autoriza ejecutar el lote 4 el 2026-07-30. Tipo: compatibilidad
   Web, archivos, seguridad y control parental. Prioridad: P1. Esfuerzo estimado:
@@ -1788,12 +1789,12 @@ Flujo de una entrada:
 
 ### LOTE-DAG-NAVEGACION-Y-PESTANAS-06 - Atrás predecible y organizador tipo navegador
 
-- Estado: `En ejecución por lotes aprobados`. El primer lote cerró indicadores,
+- Estado: `Implementado hasta DAG 25; matriz física parcial`. El primer lote cerró indicadores,
   iconos funcionales y Atrás en DAG 21. El segundo lote implementó
   `DAG-TAB-PREVIEW-04` en DAG 22 y el tercero implementó
-  `DAG-TABS-UX-03` en DAG 23. La instalación y matriz física quedan acumuladas
-  hasta terminar los seis lotes por decisión explícita del usuario del
-  2026-07-30.
+  `DAG-TABS-UX-03` en DAG 23. DAG 25 está instalado en el SM-S908E; Atrás
+  moderno y una miniatura segura real tienen evidencia física. Quedan la
+  descarga PDF y la matriz de 1, 10 y 50 pestañas.
 - Objetivo: cerrar la experiencia general de navegacion DAG con tres resultados
   observables: Atrás solo cierra la app cuando la pestaña activa ya esta en
   Home sin otro estado que consumir; el organizador representa fielmente las
@@ -1840,10 +1841,22 @@ Flujo de una entrada:
 - Implementacion candidata: barras superiores de 56-60 dp con objetivos tactiles uniformes de 48 dp; texto de direccion mas legible; Home con jerarquia y espaciado mas claros; sugerencias con filas accesibles y separadores; encabezado y conteo de resultados; mensajes a ancho completo; encabezados coherentes de revisiones e historial; y accion `Listo` explicita en el selector existente. Solo se modificaron tres archivos Compose de presentacion.
 - Validacion local: `ktlintCheck`, unitarios DEV y `assembleDevDebug` de App Usuario completaron 694 tareas correctamente. `versionCode` permanece en 278; no se uso dispositivo, no se publico APK y no se modificaron ViewModel, WebView, filtros, red, Admin ni Production.
 
+#### DAG-ABOUT-VERSION-05 - Versión visible de DAG
+
+- Estado: `Aprobado; pendiente línea base profesional`. Solicitado y aprobado
+  por el usuario el 2026-07-30. Tipo: información de producto y soporte.
+  Prioridad: P2. Esfuerzo: S. Riesgo: bajo.
+- Alcance: agregar `Acerca de DAG` al menú y mostrar nombre, `versionName` y
+  `versionCode` reales del APK instalado. La versión no ocupa espacio permanente
+  en Home ni se escribe manualmente en dos lugares.
+- Aceptación: DAG 25 muestra `0.15.0-dev (25)`; futuras compilaciones reflejan
+  automáticamente sus valores; Atrás vuelve al navegador; no cambia filtros,
+  navegación, red, consultas, permisos, historial ni seguridad.
+
 #### DAG-TABS-UX-03 - Hasta 50 pestanas con selector visual completo
 
-- Estado: `Implementado en main como candidato DAG 23; validación automática
-  correcta; instalación física diferida por el usuario`. El usuario autorizó
+- Estado: `Implementado en main como DAG 23 e instalado dentro de DAG 25;
+  validación automática correcta y matriz física 1/10/50 pendiente`. El usuario autorizó
   el lote el 2026-07-30. El límite visible de ocho desapareció y el runtime y
   el códec cifrado comparten un techo interno de 50.
 - Problema: el limite actual es ocho y el selector puede mostrar una superficie neutra/Home en lugar de una miniatura util de la pagina. Tampoco ocupa toda la pantalla como un selector moderno ni ofrece una accion evidente para cerrar todo.
@@ -2012,8 +2025,8 @@ Flujo de una entrada:
 
 #### DAG-TAB-PREVIEW-04 - Miniatura real por pestana
 
-- Estado: `Implementado en main como candidato DAG 22; validación automática
-  correcta; instalación física diferida por el usuario`. La causa era que la
+- Estado: `Implementado en main desde DAG 22 y validado parcialmente en DAG 25
+  sobre SM-S908E; matriz física 10/50 pendiente`. La causa era que la
   captura sólo se solicitaba al abrir el organizador y la sesión podía cambiar
   antes de completarla. Cada cambio de pestaña captura ahora la página segura
   antes de liberar GeckoView y asocia el resultado con el identificador y la
@@ -2022,7 +2035,7 @@ Flujo de una entrada:
 - Propuesta: actualizar la miniatura efimera aprobada antes de suspender o cambiar de pestana y asociarla estrictamente con su identificador. Mantener un solo WebView activo y un presupuesto de memoria limitado.
 - Privacidad y seguridad: no escribir pixeles en disco; bloqueo, analisis, CAPTCHA, formularios sensibles o contenido incierto usan tarjeta neutra; una miniatura nunca evita la revalidacion al restaurar.
 - Aceptacion: con 1, 10 y 50 pestanas cada tarjeta representa su ultima pagina segura y solo muestra Home si esa pestana esta en Home; cambiar/cerrar no cruza miniaturas; `Cerrar todo` libera memoria; reiniciar no restaura capturas; el selector sigue fluido bajo el presupuesto definido.
-- Implementacion candidata: la pagina visible se captura antes de abrir, crear, cambiar o cerrar pestañas; la miniatura queda solo en memoria y asociada al identificador de la pestaña. El selector mostro fisicamente la pagina de Fravega en su tarjeta.
+- Implementacion candidata: la pagina visible se captura antes de abrir, crear, cambiar o cerrar pestañas; la miniatura queda solo en memoria y asociada al identificador de la pestaña. En DAG 25 una página neutra mostró captura real; Frávega pasó correctamente a tarjeta neutra al detectarse estado restringido/CAPTCHA.
 - Endurecimiento DAG 22: una navegación invalida inmediatamente la miniatura
   anterior; respuestas tardías, capturas vencidas y resultados de otra pestaña
   se descartan. El documento superior debe confirmar que no contiene
@@ -2035,7 +2048,7 @@ Flujo de una entrada:
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
-- Estado: `Resuelto y validado fisicamente en DAG 21`. Atrás cierra primero
+- Estado: `Resuelto en DAG 21 y reforzado/validado en DAG 25 sobre Android 16`. Atrás cierra primero
   teclado o selector, respeta historial, vuelve a Home desde una URL directa y
   sólo sale de DAG cuando Home ya es el estado visible. La prueba física
   detectó y corrigió también historial residual de Gecko en `about:blank`.
