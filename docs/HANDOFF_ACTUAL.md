@@ -573,6 +573,20 @@ El lote integrado se desarrolló y validó en:
   problema separado de entrega/quietud. No hubo crash y se preservaron
   navegador predeterminado y Accessibility. Evidencia:
   `docs/compatibility/results/dag-browser-v32-regional-consensus-sm-s908e-2026-07-30.md`.
+- `DAG-V3-FILTERED-OVERLAY-13` quedó resuelto localmente en DAG 33
+  (`0.23.0-dev`), extensión `1.23.0`. Las fotos rechazadas conservan solamente
+  el desenfoque fuerte y la descripción accesible; se retiraron el escudo/✓ y
+  el rastreo de su contenedor después de la decisión final. El brillo de espera
+  y el estado de error técnico no cambiaron.
+- Validación de DAG 33: `node --check`, 104 unitarios, `ktlintCheck`,
+  `lintDevDebug` y `assembleDevDebug` correctos. APK de 121.208.250 bytes,
+  SHA-256
+  `6e6810ba1e562664ef75d67493c10a620620ee47ab1af21791d901529963444d`,
+  instalada in-place en SM-S908E. Frávega, Mimo y Cheeky completaron la matriz
+  sin caché ni crash. Una búsqueda visual de control produjo 22 rechazos del
+  modelo y 17 presentaciones bloqueadas, físicamente sin escudo. Se preservaron
+  navegador predeterminado y Accessibility. Evidencia:
+  `docs/compatibility/results/dag-browser-v33-filtered-overlay-sm-s908e-2026-07-30.md`.
 
 ### Matriz conjunta Usuario 304, Admin 287 y DAG 29
 

@@ -744,6 +744,7 @@ Flujo de una entrada:
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
 | DAG-V3-MEDIA-PRESENTATION-11 | Resuelto y validado físicamente en DAG 29 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
+| DAG-V3-FILTERED-OVERLAY-13 | Resuelto localmente y validado físicamente en DAG 33 | P2 | Mostrar fotos filtradas sólo difuminadas, sin escudo ni rastreo final de contenedor | S | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |
 | DAG-WEB-INTERACTION-03 | Resuelto y publicado DEV 279 | P1 | Procesar subarboles dinamicos por lotes sin congelar menus ni relajar barreras | M | Alto |
 | DAG-SEARCH-CONTINUITY-03 | Publicado DEV 272; validado fisicamente en SM-A235M con DEV 274 | P1 | Buscar tambien ante incertidumbre y filtrar resultados/paginas sin relajar bloqueos duros | M | Alto |
