@@ -49,18 +49,30 @@ documentado arriba.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.
-- El candidato local integrado en `main` declara `versionCode 21`,
-  `versionName 0.11.0-dev`.
-- V21 cierra el primer lote de estabilidad: `Analizando` se desmonta cuando la
+- La última instalación física sigue siendo DAG 21. El candidato local
+  integrado en `main` declara `versionCode 22`, `versionName 0.12.0-dev`; por
+  pedido del usuario no debe instalarse ningún APK hasta completar los seis
+  lotes planificados.
+- V21 cerró el primer lote de estabilidad: `Analizando` se desmonta cuando la
   presentación queda resuelta, los corazones de Favoritos conservan una
   representación funcional segura aunque su sprite permanezca bloqueado y
   Atrás sólo sale de DAG desde Home. Build, Lint, 71 unitarios e instalación
   física aprobados en SM-A235M.
+- V22 implementa el segundo lote: captura la página segura antes de cambiar de
+  pestaña, liga cada miniatura a la revisión exacta del documento y descarta
+  respuestas tardías. Contraseñas, pagos y CAPTCHA mantienen tarjeta neutra;
+  las capturas quedan sólo en memoria y se invalidan al navegar o pasar la UI a
+  segundo plano.
 - El modelo y su umbral `0.4` no cambiaron: el ajuste siguiente debe incorporar
   ejemplos actuales de falsos permisos y falsos filtros, no bajar el umbral a
   ciegas.
-- La APK final construida desde `main` mide 121.111.194 bytes y tiene SHA-256
+- La APK físicamente validada V21 mide 121.111.194 bytes y tiene SHA-256
   `9532ca6e0a451cc0cddf7bb673e852b98e61f55aad7d1cef025cfc4c9ceaef66`.
+- El build automático de V22 desde `main` mide 121.119.378 bytes y tiene
+  SHA-256
+  `f44de29cd1659e2e0946fb18bc01ad6f5944971d1ed1a850e3e3522f8afa4a73`.
+  Pasó `node --check`, Ktlint, 76 unitarios, APK y Lint; no fue instalado ni
+  probado físicamente.
 - En SM-A235M se verificó apertura/regreso y ausencia de destellos para raster,
   video, canvas, SVG y fondos.
 - Mientras no exista una decisión visual válida, cada recurso permanece en

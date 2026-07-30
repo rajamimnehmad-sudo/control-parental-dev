@@ -1763,9 +1763,11 @@ Flujo de una entrada:
 
 ### LOTE-DAG-NAVEGACION-Y-PESTANAS-06 - Atrás predecible y organizador tipo navegador
 
-- Estado: `Idea agrupada; no aprobada para codigo`. Evidencia: pedido del
-  usuario del 2026-07-29. Tipo: lote de UX, navegacion, pestanas, privacidad y
-  rendimiento. Prioridad propuesta: P1. Esfuerzo estimado: L. Riesgo: alto.
+- Estado: `En ejecución por lotes aprobados`. El primer lote cerró indicadores,
+  iconos funcionales y Atrás en DAG 21. El segundo lote implementó
+  `DAG-TAB-PREVIEW-04` en el candidato local DAG 22; la instalación y matriz
+  física quedan acumuladas hasta terminar los seis lotes por decisión explícita
+  del usuario del 2026-07-30.
 - Objetivo: cerrar la experiencia general de navegacion DAG con tres resultados
   observables: Atrás solo cierra la app cuando la pestaña activa ya esta en
   Home sin otro estado que consumir; el organizador representa fielmente las
@@ -1978,17 +1980,26 @@ Flujo de una entrada:
 
 #### DAG-TAB-PREVIEW-04 - Miniatura real por pestana
 
-- Estado: `Implementado y validado en candidato local; reafirmado como mejora
-  pendiente en la experiencia usada por el usuario`. Evidencia: el usuario
-  informa el 2026-07-23 y nuevamente el 2026-07-29 que el selector debe mostrar
-  las paginas reales en miniatura, como en Chrome. Antes de reimplementar,
-  reconciliar candidato, `main` y APK instalada. Tipo: pestanas, privacidad y
-  memoria. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Estado: `Implementado en main como candidato DAG 22; validación automática
+  correcta; instalación física diferida por el usuario`. La causa era que la
+  captura sólo se solicitaba al abrir el organizador y la sesión podía cambiar
+  antes de completarla. Cada cambio de pestaña captura ahora la página segura
+  antes de liberar GeckoView y asocia el resultado con el identificador y la
+  revisión exacta del documento.
 - Problema: el candidato local solo puede capturar de forma efimera el WebView activo y visible al abrir el selector; las demas tarjetas pueden quedar neutras o representar Home, por lo que el alcance de `DAG-TABS-UX-03` esta incompleto.
 - Propuesta: actualizar la miniatura efimera aprobada antes de suspender o cambiar de pestana y asociarla estrictamente con su identificador. Mantener un solo WebView activo y un presupuesto de memoria limitado.
 - Privacidad y seguridad: no escribir pixeles en disco; bloqueo, analisis, CAPTCHA, formularios sensibles o contenido incierto usan tarjeta neutra; una miniatura nunca evita la revalidacion al restaurar.
 - Aceptacion: con 1, 10 y 50 pestanas cada tarjeta representa su ultima pagina segura y solo muestra Home si esa pestana esta en Home; cambiar/cerrar no cruza miniaturas; `Cerrar todo` libera memoria; reiniciar no restaura capturas; el selector sigue fluido bajo el presupuesto definido.
 - Implementacion candidata: la pagina visible se captura antes de abrir, crear, cambiar o cerrar pestañas; la miniatura queda solo en memoria y asociada al identificador de la pestaña. El selector mostro fisicamente la pagina de Fravega en su tarjeta.
+- Endurecimiento DAG 22: una navegación invalida inmediatamente la miniatura
+  anterior; respuestas tardías, capturas vencidas y resultados de otra pestaña
+  se descartan. El documento superior debe confirmar que no contiene
+  contraseña, pago o CAPTCHA antes de habilitar la captura; si ese contenido
+  aparece luego, la miniatura se elimina. Las capturas continúan sin
+  persistirse y se liberan cuando la UI pasa a segundo plano.
+- Validación DAG 22: `node --check`, `ktlintCheck`, 76 unitarios,
+  `assembleDevDebug` y `lintDevDebug` correctos desde `main`. No se instaló APK
+  ni se ejecutó la matriz física por la instrucción de acumular los seis lotes.
 
 #### DAG-BACK-NAV-01 - Atras respeta pagina, resultados y Home
 
