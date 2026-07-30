@@ -118,6 +118,7 @@ internal class DagOnDeviceImageAnalyzer private constructor(
         const val ModelAssetPath = "dag-model/tinyclip-bounded-finetune-r1-int8.onnx"
         const val ModelInputName = "pixel_values"
         const val FilterThreshold = 0.4f
+        const val RegionalFilterThreshold = 0.5f
         const val ModelAllowReason = "model_allow"
         const val ModelFilterReason = "model_filter"
         const val InvalidModelInputReason = "invalid_model_input"

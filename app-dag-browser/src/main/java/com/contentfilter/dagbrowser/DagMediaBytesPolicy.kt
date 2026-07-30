@@ -98,40 +98,82 @@ internal object DagMediaBytesPolicy {
                     }
         ) {
             is DagImagePreprocessResult.Ready -> {
-                val valid = DagImageDecodeContract.isValid(result.image)
+                val preparedImages = listOf(result.image) + result.regionalImages
+                val valid = preparedImages.all(DagImageDecodeContract::isValid)
                 try {
                     if (!valid) {
                         blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
                     } else {
-                        when (val analysis = analyzer.analyze(result.image)) {
-                            is DagImageAnalysisResult.Classified ->
-                                if (analysis.filterProbability < DagOnDeviceImageAnalyzer.FilterThreshold) {
-                                    DagMediaDecision(
-                                        candidateId = payload.candidateId,
-                                        action = DagMediaAction.Allow,
-                                        reason = DagOnDeviceImageAnalyzer.ModelAllowReason,
-                                        filterProbability = analysis.filterProbability,
-                                    )
-                                } else {
-                                    blocked(
-                                        payload,
-                                        DagOnDeviceImageAnalyzer.ModelFilterReason,
-                                        analysis.filterProbability,
-                                    )
-                                }
-                            is DagImageAnalysisResult.Unavailable ->
-                                blocked(payload, analysis.reason)
-                        }
+                        decidePreparedImages(payload, preparedImages, analyzer)
                     }
                 } catch (_: Exception) {
                     blocked(payload, DagOnDeviceImageAnalyzer.ModelExecutionFailedReason)
                 } finally {
-                    result.image.rgb888.fill(0)
+                    preparedImages.forEach { it.rgb888.fill(0) }
                 }
             }
             is DagImagePreprocessResult.Rejected -> blocked(payload, result.reason)
         }
     }
+
+    private fun decidePreparedImages(
+        payload: DagMediaBytesPayload,
+        preparedImages: List<DagPreparedImage>,
+        analyzer: DagImageAnalyzer,
+    ): DagMediaDecision {
+        val fullProbability =
+            when (val analysis = analyzer.analyze(preparedImages.first())) {
+                is DagImageAnalysisResult.Classified ->
+                    analysis.filterProbability.takeIf(::isValidProbability)
+                        ?: return blocked(
+                            payload,
+                            DagOnDeviceImageAnalyzer.InvalidModelOutputReason,
+                        )
+                is DagImageAnalysisResult.Unavailable ->
+                    return blocked(payload, analysis.reason)
+            }
+        if (fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold) {
+            return blocked(
+                payload,
+                DagOnDeviceImageAnalyzer.ModelFilterReason,
+                fullProbability,
+            )
+        }
+
+        var maximumProbability = fullProbability
+        for (regionalImage in preparedImages.drop(1)) {
+            val regionalProbability =
+                when (val analysis = analyzer.analyze(regionalImage)) {
+                    is DagImageAnalysisResult.Classified ->
+                        analysis.filterProbability.takeIf(::isValidProbability)
+                            ?: return blocked(
+                                payload,
+                                DagOnDeviceImageAnalyzer.InvalidModelOutputReason,
+                            )
+                    is DagImageAnalysisResult.Unavailable ->
+                        return blocked(payload, analysis.reason)
+                }
+            maximumProbability = maxOf(maximumProbability, regionalProbability)
+            if (
+                regionalProbability >=
+                DagOnDeviceImageAnalyzer.RegionalFilterThreshold
+            ) {
+                return blocked(
+                    payload,
+                    DagOnDeviceImageAnalyzer.ModelFilterReason,
+                    maximumProbability,
+                )
+            }
+        }
+        return DagMediaDecision(
+            candidateId = payload.candidateId,
+            action = DagMediaAction.Allow,
+            reason = DagOnDeviceImageAnalyzer.ModelAllowReason,
+            filterProbability = maximumProbability,
+        )
+    }
+
+    private fun isValidProbability(probability: Float): Boolean = probability.isFinite() && probability in 0f..1f
 
     private fun blocked(
         payload: DagMediaBytesPayload,

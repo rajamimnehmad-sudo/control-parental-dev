@@ -6,7 +6,9 @@ import android.graphics.Color
 import android.graphics.ColorSpace
 import android.graphics.ImageDecoder
 import android.graphics.Paint
+import android.graphics.Rect
 import java.nio.ByteBuffer
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -46,9 +48,82 @@ internal data class DagPreparedImage(
     val rgb888: ByteArray,
 )
 
+internal data class DagImageCropPlan(
+    val left: Int,
+    val top: Int,
+    val width: Int,
+    val height: Int,
+)
+
+internal object DagRegionalCropPlanner {
+    fun plan(
+        sourceWidth: Int,
+        sourceHeight: Int,
+    ): List<DagImageCropPlan> {
+        if (sourceWidth <= 0 || sourceHeight <= 0) return emptyList()
+        val longEdge = max(sourceWidth, sourceHeight)
+        val shortEdge = min(sourceWidth, sourceHeight)
+        if (longEdge.toDouble() / shortEdge.toDouble() < MinAspectRatio) {
+            return emptyList()
+        }
+        return if (sourceWidth >= sourceHeight) {
+            val cropWidth = (sourceWidth * CropFraction).roundToInt().coerceIn(1, sourceWidth)
+            cropStarts(sourceWidth, cropWidth).map { left ->
+                DagImageCropPlan(
+                    left = left,
+                    top = 0,
+                    width = cropWidth,
+                    height = sourceHeight,
+                )
+            }
+        } else {
+            val cropHeight = (sourceHeight * CropFraction).roundToInt().coerceIn(1, sourceHeight)
+            cropStarts(sourceHeight, cropHeight).map { top ->
+                DagImageCropPlan(
+                    left = 0,
+                    top = top,
+                    width = sourceWidth,
+                    height = cropHeight,
+                )
+            }
+        }
+    }
+
+    fun decodeSize(
+        sourceWidth: Int,
+        sourceHeight: Int,
+    ): Pair<Int, Int>? {
+        if (plan(sourceWidth, sourceHeight).isEmpty()) return null
+        val scale =
+            min(
+                1.0,
+                RegionalDecodeLongEdge.toDouble() / max(sourceWidth, sourceHeight).toDouble(),
+            )
+        return Pair(
+            (sourceWidth * scale).roundToInt().coerceAtLeast(1),
+            (sourceHeight * scale).roundToInt().coerceAtLeast(1),
+        )
+    }
+
+    private fun cropStarts(
+        longEdge: Int,
+        cropLength: Int,
+    ): List<Int> =
+        listOf(
+            0,
+            (longEdge - cropLength) / 2,
+            longEdge - cropLength,
+        ).distinct()
+
+    private const val MinAspectRatio = 2.0
+    private const val CropFraction = 0.42
+    private const val RegionalDecodeLongEdge = DagImageDecodeContract.TargetSize * 3
+}
+
 internal sealed interface DagImagePreprocessResult {
     data class Ready(
         val image: DagPreparedImage,
+        val regionalImages: List<DagPreparedImage> = emptyList(),
     ) : DagImagePreprocessResult
 
     data class Rejected(
@@ -63,16 +138,18 @@ internal fun interface DagImagePreprocessor {
 /**
  * Produces a bounded, model-neutral RGB image without retaining or persisting source media.
  *
- * The full image is fitted inside a square instead of being cropped. This preserves clothing and
- * body context for the future directed classifier. Animated and partial images fail closed.
+ * The full image is fitted inside a square instead of being cropped. Extremely wide or tall images
+ * also receive three bounded regional views so a small subject does not disappear during resize.
+ * Animated and partial images fail closed.
  */
 internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
     override fun prepare(bytes: ByteArray): DagImagePreprocessResult {
         var decoded: Bitmap? = null
-        var letterboxed: Bitmap? = null
+        val preparedImages = mutableListOf<DagPreparedImage>()
+        var returnedPreparedImages = false
         return try {
             val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes).asReadOnlyBuffer())
-            var fitPlan: DagImageFitPlan? = null
+            var expectedDecodeSize: Pair<Int, Int>? = null
             decoded =
                 ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                     val size = info.size
@@ -83,53 +160,97 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
                         !DagImageDecodeContract.hasSafeDimensions(size.width, size.height) ->
                             throw RejectedHeaderException(DagMediaBytesPolicy.UnsafeDimensionsReason)
                     }
-                    val plan =
+                    val fullImagePlan =
                         DagImageFitPlanner.plan(size.width, size.height)
-                            ?: throw RejectedHeaderException(DagMediaBytesPolicy.UnsafeDimensionsReason)
-                    fitPlan = plan
+                            ?: throw RejectedHeaderException(
+                                DagMediaBytesPolicy.UnsafeDimensionsReason,
+                            )
+                    expectedDecodeSize =
+                        DagRegionalCropPlanner.decodeSize(size.width, size.height)
+                            ?: Pair(fullImagePlan.contentWidth, fullImagePlan.contentHeight)
                     decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
                     decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
-                    decoder.setTargetSize(plan.contentWidth, plan.contentHeight)
+                    decoder.setTargetSize(
+                        requireNotNull(expectedDecodeSize).first,
+                        requireNotNull(expectedDecodeSize).second,
+                    )
                     decoder.setOnPartialImageListener { false }
                 }
 
-            val plan = fitPlan ?: return DagImagePreprocessResult.Rejected(DecodeFailedReason)
+            val decodeSize =
+                expectedDecodeSize ?: return DagImagePreprocessResult.Rejected(DecodeFailedReason)
             val sourceBitmap = decoded
             if (
-                sourceBitmap.width != plan.contentWidth ||
-                sourceBitmap.height != plan.contentHeight
+                sourceBitmap.width != decodeSize.first ||
+                sourceBitmap.height != decodeSize.second
             ) {
                 return DagImagePreprocessResult.Rejected(DecodeFailedReason)
             }
 
-            letterboxed =
-                Bitmap.createBitmap(
-                    DagImageDecodeContract.TargetSize,
-                    DagImageDecodeContract.TargetSize,
-                    Bitmap.Config.ARGB_8888,
-                )
-            letterboxed.eraseColor(PaddingColor)
-            Canvas(letterboxed).drawBitmap(
-                sourceBitmap,
-                plan.offsetX.toFloat(),
-                plan.offsetY.toFloat(),
-                Paint(Paint.FILTER_BITMAP_FLAG),
-            )
-
-            DagImagePreprocessResult.Ready(
-                DagPreparedImage(
-                    width = DagImageDecodeContract.TargetSize,
-                    height = DagImageDecodeContract.TargetSize,
-                    rgb888 = letterboxed.toRgb888(),
-                ),
-            )
+            preparedImages += sourceBitmap.toPreparedImage()
+            DagRegionalCropPlanner
+                .plan(sourceBitmap.width, sourceBitmap.height)
+                .forEach { crop -> preparedImages += sourceBitmap.toPreparedImage(crop) }
+            DagImagePreprocessResult
+                .Ready(
+                    image = preparedImages.first(),
+                    regionalImages = preparedImages.drop(1),
+                ).also {
+                    returnedPreparedImages = true
+                }
         } catch (rejected: RejectedHeaderException) {
             DagImagePreprocessResult.Rejected(rejected.reason)
         } catch (_: Exception) {
             DagImagePreprocessResult.Rejected(DecodeFailedReason)
         } finally {
+            if (!returnedPreparedImages) {
+                preparedImages.forEach { it.rgb888.fill(0) }
+            }
             decoded?.recycle()
-            letterboxed?.recycle()
+        }
+    }
+
+    private fun Bitmap.toPreparedImage(crop: DagImageCropPlan? = null): DagPreparedImage {
+        val sourceRect =
+            crop?.let {
+                Rect(
+                    it.left,
+                    it.top,
+                    it.left + it.width,
+                    it.top + it.height,
+                )
+            } ?: Rect(0, 0, width, height)
+        val plan =
+            DagImageFitPlanner.plan(sourceRect.width(), sourceRect.height())
+                ?: throw RejectedHeaderException(DecodeFailedReason)
+        val destinationRect =
+            Rect(
+                plan.offsetX,
+                plan.offsetY,
+                plan.offsetX + plan.contentWidth,
+                plan.offsetY + plan.contentHeight,
+            )
+        val letterboxed =
+            Bitmap.createBitmap(
+                DagImageDecodeContract.TargetSize,
+                DagImageDecodeContract.TargetSize,
+                Bitmap.Config.ARGB_8888,
+            )
+        return try {
+            letterboxed.eraseColor(PaddingColor)
+            Canvas(letterboxed).drawBitmap(
+                this,
+                sourceRect,
+                destinationRect,
+                Paint(Paint.FILTER_BITMAP_FLAG),
+            )
+            DagPreparedImage(
+                width = DagImageDecodeContract.TargetSize,
+                height = DagImageDecodeContract.TargetSize,
+                rgb888 = letterboxed.toRgb888(),
+            )
+        } finally {
+            letterboxed.recycle()
         }
     }
 

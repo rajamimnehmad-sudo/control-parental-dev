@@ -50,6 +50,67 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
+    fun `regional view catches a risky subject reduced inside a panoramic image`() {
+        val probabilities = listOf(0.27f, 0.51f).iterator()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(1_200, 300, "image/jpeg") },
+                preprocessor = preprocessorWithRegionalImages(1),
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+        assertEquals(0.51f, decision.filterProbability)
+    }
+
+    @Test
+    fun `regional views use their stricter threshold without changing ordinary decisions`() {
+        val probabilities = listOf(0.2f, 0.3f, 0.49f, 0.1f).iterator()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(1_200, 300, "image/jpeg") },
+                preprocessor = preprocessorWithRegionalImages(3),
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+        assertEquals(0.49f, decision.filterProbability)
+    }
+
+    @Test
+    fun `required regional analysis fails closed when the model becomes unavailable`() {
+        var callCount = 0
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(1_200, 300, "image/jpeg") },
+                preprocessor = preprocessorWithRegionalImages(1),
+                analyzer =
+                    DagImageAnalyzer {
+                        callCount += 1
+                        if (callCount == 1) {
+                            DagImageAnalysisResult.Classified(0.2f)
+                        } else {
+                            DagImageAnalysisResult.Unavailable("regional_unavailable")
+                        }
+                    },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals("regional_unavailable", decision.reason)
+    }
+
+    @Test
     fun `invalid model probability stays blocked`() {
         val decision =
             DagMediaBytesPolicy.decide(
@@ -247,8 +308,9 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
-    fun `prepared rgb is overwritten after the fail closed decision`() {
-        val rgb = ByteArray(DagImageDecodeContract.PreparedByteCount) { 127 }
+    fun `every prepared rgb view is overwritten after the fail closed decision`() {
+        val fullRgb = ByteArray(DagImageDecodeContract.PreparedByteCount) { 127 }
+        val regionalRgb = ByteArray(DagImageDecodeContract.PreparedByteCount) { 63 }
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
@@ -259,26 +321,46 @@ class DagMediaBytesPolicyTest {
                             DagPreparedImage(
                                 width = DagImageDecodeContract.TargetSize,
                                 height = DagImageDecodeContract.TargetSize,
-                                rgb888 = rgb,
+                                rgb888 = fullRgb,
                             ),
+                            regionalImages =
+                                listOf(
+                                    DagPreparedImage(
+                                        width = DagImageDecodeContract.TargetSize,
+                                        height = DagImageDecodeContract.TargetSize,
+                                        rgb888 = regionalRgb,
+                                    ),
+                                ),
                         )
                     },
             )
 
         assertEquals(DagMediaAction.Block, decision.action)
-        assertTrue(rgb.all { it == 0.toByte() })
+        assertTrue(fullRgb.all { it == 0.toByte() })
+        assertTrue(regionalRgb.all { it == 0.toByte() })
     }
 
     private val readyPreprocessor =
         DagImagePreprocessor {
             DagImagePreprocessResult.Ready(
-                DagPreparedImage(
-                    width = DagImageDecodeContract.TargetSize,
-                    height = DagImageDecodeContract.TargetSize,
-                    rgb888 = ByteArray(DagImageDecodeContract.PreparedByteCount),
-                ),
+                preparedImage(),
             )
         }
+
+    private fun preprocessorWithRegionalImages(count: Int) =
+        DagImagePreprocessor {
+            DagImagePreprocessResult.Ready(
+                image = preparedImage(),
+                regionalImages = List(count) { preparedImage() },
+            )
+        }
+
+    private fun preparedImage() =
+        DagPreparedImage(
+            width = DagImageDecodeContract.TargetSize,
+            height = DagImageDecodeContract.TargetSize,
+            rgb888 = ByteArray(DagImageDecodeContract.PreparedByteCount),
+        )
 
     private fun payload(bytes: ByteArray) =
         DagMediaBytesPayload(

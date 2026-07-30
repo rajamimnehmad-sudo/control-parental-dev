@@ -54,6 +54,39 @@ class DagImagePreprocessorTest {
     }
 
     @Test
+    fun `ordinary aspect ratios keep the single full image analysis`() {
+        assertTrue(DagRegionalCropPlanner.plan(800, 600).isEmpty())
+        assertTrue(DagRegionalCropPlanner.plan(600, 800).isEmpty())
+        assertNull(DagRegionalCropPlanner.decodeSize(800, 600))
+    }
+
+    @Test
+    fun `wide images receive three overlapping regional views`() {
+        assertEquals(
+            listOf(
+                DagImageCropPlan(left = 0, top = 0, width = 420, height = 300),
+                DagImageCropPlan(left = 290, top = 0, width = 420, height = 300),
+                DagImageCropPlan(left = 580, top = 0, width = 420, height = 300),
+            ),
+            DagRegionalCropPlanner.plan(1_000, 300),
+        )
+        assertEquals(Pair(672, 202), DagRegionalCropPlanner.decodeSize(1_000, 300))
+    }
+
+    @Test
+    fun `tall images receive top middle and bottom regional views`() {
+        assertEquals(
+            listOf(
+                DagImageCropPlan(left = 0, top = 0, width = 300, height = 420),
+                DagImageCropPlan(left = 0, top = 290, width = 300, height = 420),
+                DagImageCropPlan(left = 0, top = 580, width = 300, height = 420),
+            ),
+            DagRegionalCropPlanner.plan(300, 1_000),
+        )
+        assertEquals(Pair(202, 672), DagRegionalCropPlanner.decodeSize(300, 1_000))
+    }
+
+    @Test
     fun `decode contract rejects oversized dimensions`() {
         assertTrue(DagImageDecodeContract.hasSafeDimensions(4_096, 4_096))
         assertFalse(DagImageDecodeContract.hasSafeDimensions(4_097, 100))

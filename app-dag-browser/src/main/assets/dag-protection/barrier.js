@@ -63,6 +63,7 @@
   const MAX_BACKGROUND_PROBE_ELEMENTS = 1_500;
   const BACKGROUND_PROBE_DELAY_MS = 180;
   const MIN_BACKGROUND_PROBE_INTERVAL_MS = 450;
+  const BACKGROUND_SCROLL_SETTLE_MS = 160;
   const MAX_UI_VECTOR_RENDERED_WIDTH = 1_024;
   const MAX_UI_VECTOR_RENDERED_HEIGHT = 160;
   const MAX_UI_VECTOR_RENDERED_AREA = 96_000;
@@ -91,11 +92,46 @@
   const cssBeforeRecords = new Map();
   const cssAfterRecords = new Map();
   const cssFallbackTimers = new Map();
+  const pendingBackgroundProbeRoots = new Set();
+  const ownStyleSnapshots = new WeakMap();
   let backgroundProbeTimer = null;
+  let scrollBackgroundProbeTimer = null;
   let lastBackgroundProbeAt = Number.NEGATIVE_INFINITY;
   let sponsoredScanTimer = null;
   const performanceDocumentToken =
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
+
+  const setAttributeIfChanged = (element, name, value) => {
+    if (element.getAttribute(name) !== value) {
+      element.setAttribute(name, value);
+    }
+  };
+
+  const removeAttributeIfPresent = (element, name) => {
+    if (element.hasAttribute(name)) {
+      element.removeAttribute(name);
+    }
+  };
+
+  const rememberOwnStyleMutation = (element) => {
+    ownStyleSnapshots.set(element, element.getAttribute("style") || "");
+  };
+
+  const setStylePropertyIfChanged = (element, property, value) => {
+    if (element.style.getPropertyValue(property) === value) {
+      return;
+    }
+    element.style.setProperty(property, value);
+    rememberOwnStyleMutation(element);
+  };
+
+  const removeStylePropertyIfPresent = (element, property) => {
+    if (!element.style.getPropertyValue(property)) {
+      return;
+    }
+    element.style.removeProperty(property);
+    rememberOwnStyleMutation(element);
+  };
 
   const normalizedSource = (rawSource) => {
     if (!rawSource) {
@@ -152,8 +188,8 @@
     if (!element.muted) {
       element.muted = true;
     }
-    element.setAttribute("preload", "none");
-    element.setAttribute("aria-hidden", "true");
+    setAttributeIfChanged(element, "preload", "none");
+    setAttributeIfChanged(element, "aria-hidden", "true");
     try {
       element.pause();
     } catch {
@@ -261,12 +297,12 @@
       return false;
     }
     if (isSafeInlineUiVector(element)) {
-      element.setAttribute(UI_VECTOR_ATTRIBUTE, "allow");
+      setAttributeIfChanged(element, UI_VECTOR_ATTRIBUTE, "allow");
       clearWaitingMediaHostsAround(element);
       return true;
     }
-    element.removeAttribute(UI_VECTOR_ATTRIBUTE);
-    element.setAttribute("data-glosh-dag-media", "hidden");
+    removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
+    setAttributeIfChanged(element, "data-glosh-dag-media", "hidden");
     return false;
   };
 
@@ -282,7 +318,7 @@
     let current = element;
     for (let depth = 0; current instanceof Element && depth < 4; depth += 1) {
       if (current.getAttribute(MEDIA_HOST_ATTRIBUTE) === "waiting") {
-        current.removeAttribute(MEDIA_HOST_ATTRIBUTE);
+        removeAttributeIfPresent(current, MEDIA_HOST_ATTRIBUTE);
       }
       current = current.parentElement;
     }
@@ -407,10 +443,10 @@
   const applyFunctionalIconFallback = (element) => {
     const kind = functionalIconKind(element);
     if (!kind) {
-      element.removeAttribute(FUNCTIONAL_ICON_ATTRIBUTE);
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
       return false;
     }
-    element.setAttribute(FUNCTIONAL_ICON_ATTRIBUTE, kind);
+    setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, kind);
     clearWaitingMediaHostsAround(element);
     return true;
   };
@@ -440,10 +476,8 @@
     }
     const { backgroundImage, sources } = record;
     if (sources.length === 0 || isSafeCssUiVector(element, sources)) {
-      element.removeAttribute(FUNCTIONAL_ICON_ATTRIBUTE);
-      if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY) !== backgroundImage) {
-        element.style.setProperty(CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
-      }
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
+      setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "allow") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "allow");
       }
@@ -452,9 +486,7 @@
     }
     const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
     if (actions.some((action) => action === "block")) {
-      if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY)) {
-        element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
-      }
+      removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
       applyFunctionalIconFallback(element);
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "block") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "block");
@@ -465,26 +497,22 @@
       actions.some((action) => action === "error") ||
       sources.some((sourceUrl) => failedSources.has(sourceUrl))
     ) {
-      element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
+      removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
       applyFunctionalIconFallback(element);
-      element.setAttribute(CSS_MEDIA_ATTRIBUTE, "error");
+      setAttributeIfChanged(element, CSS_MEDIA_ATTRIBUTE, "error");
       return true;
     }
     if (actions.every((action) => action === "allow")) {
-      element.removeAttribute(FUNCTIONAL_ICON_ATTRIBUTE);
-      if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY) !== backgroundImage) {
-        element.style.setProperty(CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
-      }
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
+      setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "allow") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "allow");
       }
       clearWaitingMediaHostsAround(element);
       return true;
     }
-    if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY)) {
-      element.style.removeProperty(CSS_MEDIA_VALUE_PROPERTY);
-    }
-    element.removeAttribute(FUNCTIONAL_ICON_ATTRIBUTE);
+    removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
+    removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
     if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "hidden") {
       element.setAttribute(CSS_MEDIA_ATTRIBUTE, "hidden");
     }
@@ -509,12 +537,8 @@
       actions.some((action) => action === "error") ||
       sources.some((sourceUrl) => failedSources.has(sourceUrl));
     if (shouldAllow) {
-      if (element.style.getPropertyValue(config.backgroundProperty) !== backgroundImage) {
-        element.style.setProperty(config.backgroundProperty, backgroundImage);
-      }
-      if (element.style.getPropertyValue(config.contentProperty) !== content) {
-        element.style.setProperty(config.contentProperty, content);
-      }
+      setStylePropertyIfChanged(element, config.backgroundProperty, backgroundImage);
+      setStylePropertyIfChanged(element, config.contentProperty, content);
       if (element.getAttribute(config.attribute) !== "allow") {
         element.setAttribute(config.attribute, "allow");
       }
@@ -522,9 +546,7 @@
       return true;
     }
     for (const property of [config.backgroundProperty, config.contentProperty]) {
-      if (element.style.getPropertyValue(property)) {
-        element.style.removeProperty(property);
-      }
+      removeStylePropertyIfPresent(element, property);
     }
     const state = shouldBlock ? "block" : shouldError ? "error" : "hidden";
     if (element.getAttribute(config.attribute) !== state) {
@@ -654,46 +676,91 @@
     }
   };
 
+  const rememberBackgroundProbeRoot = (root) => {
+    const normalizedRoot =
+      root === document || root === document.documentElement
+        ? document
+        : root instanceof Element && root.isConnected
+          ? root
+          : null;
+    if (!normalizedRoot || pendingBackgroundProbeRoots.has(document)) {
+      return;
+    }
+    if (normalizedRoot === document) {
+      pendingBackgroundProbeRoots.clear();
+      pendingBackgroundProbeRoots.add(document);
+      return;
+    }
+    for (const existing of pendingBackgroundProbeRoots) {
+      if (existing instanceof Element && existing.contains(normalizedRoot)) {
+        return;
+      }
+      if (existing instanceof Element && normalizedRoot.contains(existing)) {
+        pendingBackgroundProbeRoots.delete(existing);
+      }
+    }
+    pendingBackgroundProbeRoots.add(normalizedRoot);
+  };
+
+  function* backgroundProbeCandidates(root) {
+    if (root === document) {
+      yield* document.querySelectorAll("*");
+      return;
+    }
+    yield root;
+    yield* root.querySelectorAll("*");
+  }
+
   const probeCssBackgrounds = () => {
     backgroundProbeTimer = null;
     lastBackgroundProbeAt = performance.now();
-    const root = document.documentElement;
-    if (!root) {
+    const documentRoot = document.documentElement;
+    if (!documentRoot) {
       return;
     }
+    const probeRoots =
+      pendingBackgroundProbeRoots.size > 0
+        ? [...pendingBackgroundProbeRoots]
+        : [document];
+    pendingBackgroundProbeRoots.clear();
     const discovered = [];
-    root.setAttribute(BACKGROUND_PROBE_ATTRIBUTE, "true");
+    documentRoot.setAttribute(BACKGROUND_PROBE_ATTRIBUTE, "true");
     try {
       let inspected = 0;
-      for (const element of document.querySelectorAll("*")) {
+      for (const probeRoot of probeRoots) {
+        for (const element of backgroundProbeCandidates(probeRoot)) {
+          if (inspected >= MAX_BACKGROUND_PROBE_ELEMENTS) {
+            break;
+          }
+          if (!(element instanceof HTMLElement) || !isNearViewport(element)) {
+            continue;
+          }
+          inspected += 1;
+          const backgroundImage = getComputedStyle(element).backgroundImage;
+          if (backgroundImage && backgroundImage !== "none") {
+            discovered.push({ element, backgroundImage, pseudo: null, content: "normal" });
+          }
+          for (const pseudo of ["before", "after"]) {
+            const style = getComputedStyle(element, `::${pseudo}`);
+            if (
+              (style.backgroundImage && style.backgroundImage !== "none") ||
+              (style.content && !["none", "normal"].includes(style.content))
+            ) {
+              discovered.push({
+                element,
+                backgroundImage: style.backgroundImage,
+                pseudo,
+                content: style.content,
+              });
+            }
+          }
+        }
         if (inspected >= MAX_BACKGROUND_PROBE_ELEMENTS) {
           break;
         }
-        if (!(element instanceof HTMLElement) || !isNearViewport(element)) {
-          continue;
-        }
-        inspected += 1;
-        const backgroundImage = getComputedStyle(element).backgroundImage;
-        if (backgroundImage && backgroundImage !== "none") {
-          discovered.push({ element, backgroundImage, pseudo: null, content: "normal" });
-        }
-        for (const pseudo of ["before", "after"]) {
-          const style = getComputedStyle(element, `::${pseudo}`);
-          if (
-            (style.backgroundImage && style.backgroundImage !== "none") ||
-            (style.content && !["none", "normal"].includes(style.content))
-          ) {
-            discovered.push({
-              element,
-              backgroundImage: style.backgroundImage,
-              pseudo,
-              content: style.content,
-            });
-          }
-        }
       }
     } finally {
-      root.removeAttribute(BACKGROUND_PROBE_ATTRIBUTE);
+      documentRoot.removeAttribute(BACKGROUND_PROBE_ATTRIBUTE);
     }
     for (const record of discovered) {
       if (record.pseudo) {
@@ -709,7 +776,11 @@
     }
   };
 
-  const scheduleCssBackgroundProbe = (delayMs = BACKGROUND_PROBE_DELAY_MS) => {
+  const scheduleCssBackgroundProbe = (
+    root = document,
+    delayMs = BACKGROUND_PROBE_DELAY_MS,
+  ) => {
+    rememberBackgroundProbeRoot(root);
     if (backgroundProbeTimer !== null) {
       return;
     }
@@ -719,6 +790,16 @@
       probeCssBackgrounds,
       Math.max(delayMs, remainingThrottle),
     );
+  };
+
+  const scheduleScrollBackgroundProbe = () => {
+    if (scrollBackgroundProbeTimer !== null) {
+      clearTimeout(scrollBackgroundProbeTimer);
+    }
+    scrollBackgroundProbeTimer = setTimeout(() => {
+      scrollBackgroundProbeTimer = null;
+      scheduleCssBackgroundProbe(document, 0);
+    }, BACKGROUND_SCROLL_SETTLE_MS);
   };
 
   const isGoogleSearchDocument = () =>
@@ -742,7 +823,7 @@
       ".uEierd",
     ].join(",");
     document.querySelectorAll(knownAdContainers).forEach((container) => {
-      container.setAttribute(SPONSORED_RESULT_ATTRIBUTE, "true");
+      setAttributeIfChanged(container, SPONSORED_RESULT_ATTRIBUTE, "true");
     });
     const collapseSponsoredResults =
       /^(ocultar resultados patrocinados|hide sponsored results)\b/iu;
@@ -751,7 +832,7 @@
         collapseSponsoredResults.test(control.textContent?.trim() || "") &&
         control.getAttribute(SPONSORED_RESULT_ATTRIBUTE) !== "collapsed"
       ) {
-        control.setAttribute(SPONSORED_RESULT_ATTRIBUTE, "collapsed");
+        setAttributeIfChanged(control, SPONSORED_RESULT_ATTRIBUTE, "collapsed");
         (control.closest("button, [role='button'], a") || control).click();
       }
     });
@@ -760,10 +841,10 @@
       if (!sponsoredLabel.test(label.textContent?.trim() || "")) {
         return;
       }
-      label.closest(knownAdContainers)?.setAttribute(
-        SPONSORED_RESULT_ATTRIBUTE,
-        "true",
-      );
+      const container = label.closest(knownAdContainers);
+      if (container) {
+        setAttributeIfChanged(container, SPONSORED_RESULT_ATTRIBUTE, "true");
+      }
     });
   };
 
@@ -774,7 +855,7 @@
       "iframe[name^='google_ads_iframe']",
     ].join(",");
     document.querySelectorAll(explicitAdvertisementFrames).forEach((frame) => {
-      frame.setAttribute(SPONSORED_RESULT_ATTRIBUTE, "true");
+      setAttributeIfChanged(frame, SPONSORED_RESULT_ATTRIBUTE, "true");
       let ancestor = frame.parentElement;
       for (let depth = 0; ancestor && depth < 4; depth += 1) {
         const bounds = ancestor.getBoundingClientRect();
@@ -784,7 +865,7 @@
           bounds.width >= window.innerWidth * 0.6 &&
           bounds.height >= window.innerHeight * 0.3;
         if (isLargeOverlay) {
-          ancestor.setAttribute(SPONSORED_RESULT_ATTRIBUTE, "true");
+          setAttributeIfChanged(ancestor, SPONSORED_RESULT_ATTRIBUTE, "true");
           break;
         }
         ancestor = ancestor.parentElement;
@@ -995,7 +1076,7 @@
   const reconcileMediaHostState = (host) => {
     if (!(host instanceof Element)) return;
     if (host.matches(APPROVED_PRESENTATION_SELECTOR) || host.querySelector(APPROVED_PRESENTATION_SELECTOR)) {
-      host.removeAttribute(MEDIA_HOST_ATTRIBUTE);
+      removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
       return;
     }
     const trackedImages =
@@ -1003,7 +1084,7 @@
         .filter((child) => child instanceof HTMLImageElement)
         .filter((child) => mediaHostsByElement.get(child) === host && child.isConnected);
     if (trackedImages.length === 0) {
-      host.removeAttribute(MEDIA_HOST_ATTRIBUTE);
+      removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
       return;
     }
     const siblingStates =
@@ -1024,9 +1105,9 @@
               ? "error"
               : null;
     if (hostState === null) {
-      host.removeAttribute(MEDIA_HOST_ATTRIBUTE);
+      removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
     } else {
-      host.setAttribute(MEDIA_HOST_ATTRIBUTE, hostState);
+      setAttributeIfChanged(host, MEDIA_HOST_ATTRIBUTE, hostState);
     }
   };
 
@@ -1075,11 +1156,15 @@
       return;
     }
     if (action === "block") {
-      element.setAttribute("aria-description", FILTERED_ACCESSIBLE_DESCRIPTION);
+      setAttributeIfChanged(
+        element,
+        "aria-description",
+        FILTERED_ACCESSIBLE_DESCRIPTION,
+      );
     } else if (
       element.getAttribute("aria-description") === FILTERED_ACCESSIBLE_DESCRIPTION
     ) {
-      element.removeAttribute("aria-description");
+      removeAttributeIfPresent(element, "aria-description");
     }
   };
 
@@ -1100,26 +1185,26 @@
     if (sourceUrl && isSafeRemoteUiVector(element, sourceUrl)) {
       analyzedSources.set(element, sourceUrl);
       stopFallbackObservation(element);
-      element.setAttribute(UI_VECTOR_ATTRIBUTE, "allow");
-      element.setAttribute("data-glosh-dag-media", "allow");
+      setAttributeIfChanged(element, UI_VECTOR_ATTRIBUTE, "allow");
+      setAttributeIfChanged(element, "data-glosh-dag-media", "allow");
       updateAccessibleMediaState(element, "allow");
       updateMediaHostState(element, "allow");
       return true;
     }
-    element.removeAttribute(UI_VECTOR_ATTRIBUTE);
+    removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
     const failedSource =
       activeSource && failedSources.has(activeSource) ? activeSource : null;
     if (failedSource) {
       analyzedSources.set(element, failedSource);
       stopFallbackObservation(element);
-      element.setAttribute("data-glosh-dag-media", "error");
+      setAttributeIfChanged(element, "data-glosh-dag-media", "error");
       updateAccessibleMediaState(element, "error");
       updateMediaHostState(element, "error");
       return true;
     }
     if (!sourceUrl || !action) {
       if (!sourceUrl || analyzedSources.get(element) !== sourceUrl) {
-        element.setAttribute("data-glosh-dag-media", "hidden");
+        setAttributeIfChanged(element, "data-glosh-dag-media", "hidden");
       }
       updateAccessibleMediaState(element, "hidden");
       updateMediaHostState(element, "waiting");
@@ -1131,7 +1216,7 @@
     }
     analyzedSources.set(element, sourceUrl);
     stopFallbackObservation(element);
-    element.setAttribute("data-glosh-dag-media", action);
+    setAttributeIfChanged(element, "data-glosh-dag-media", action);
     updateAccessibleMediaState(element, action);
     updateMediaHostState(
       element,
@@ -1261,26 +1346,56 @@
   );
 
   markHidden(document);
-  scheduleCssBackgroundProbe(0);
+  scheduleCssBackgroundProbe(document, 0);
   scheduleSponsoredScan(0);
   const observer = new MutationObserver((mutations) => {
-    let shouldProbeBackgrounds = false;
+    let shouldScanSponsoredContent = false;
+    let shouldReportPreviewEligibility = false;
     for (const mutation of mutations) {
       for (const node of mutation.removedNodes) {
         releaseMediaHostsIn(node);
       }
+      if (mutation.removedNodes.length > 0) {
+        scheduleCssBackgroundProbe(mutation.target);
+        shouldReportPreviewEligibility = true;
+      }
       for (const node of mutation.addedNodes) {
         markHidden(node);
-        shouldProbeBackgrounds = true;
+        scheduleCssBackgroundProbe(
+          node instanceof Element ? node : mutation.target,
+        );
+        shouldScanSponsoredContent = true;
+        shouldReportPreviewEligibility = true;
       }
       if (mutation.target instanceof Element && mutation.type === "attributes") {
-        markHidden(mutation.target);
-        shouldProbeBackgrounds = true;
+        const attributeName = mutation.attributeName || "";
+        if (attributeName === "style") {
+          const ownStyle = ownStyleSnapshots.get(mutation.target);
+          const currentStyle = mutation.target.getAttribute("style") || "";
+          if (ownStyle !== undefined && ownStyle === currentStyle) {
+            continue;
+          }
+          ownStyleSnapshots.delete(mutation.target);
+        }
+        if (mutation.target.matches(mediaSelector)) {
+          applyKnownDecision(mutation.target);
+          stopPlayableMediaIn(mutation.target);
+        }
+        if (["class", "style", "alt", "aria-label"].includes(attributeName)) {
+          scheduleCssBackgroundProbe(mutation.target);
+        }
+        if (["class", "aria-label"].includes(attributeName)) {
+          shouldScanSponsoredContent = true;
+        }
+        if (["autocomplete", "type", "src", "aria-label"].includes(attributeName)) {
+          shouldReportPreviewEligibility = true;
+        }
       }
     }
-    if (shouldProbeBackgrounds) {
-      scheduleCssBackgroundProbe();
+    if (shouldScanSponsoredContent) {
       scheduleSponsoredScan();
+    }
+    if (shouldReportPreviewEligibility) {
       schedulePreviewEligibilityReport();
     }
   });
@@ -1305,9 +1420,9 @@
     childList: true,
     subtree: true,
   });
-    window.addEventListener(
+  window.addEventListener(
     "scroll",
-    () => scheduleCssBackgroundProbe(),
+    scheduleScrollBackgroundProbe,
     { passive: true },
   );
 
@@ -1329,11 +1444,11 @@
       schedulePreviewEligibilityReport,
       { once: true },
     );
-  window.addEventListener(
+    window.addEventListener(
       "load",
       () => {
         markHidden(document);
-        scheduleCssBackgroundProbe(0);
+        scheduleCssBackgroundProbe(document, 0);
         scheduleSponsoredScan(0);
         schedulePreviewEligibilityReport();
         reportDocumentState("document-loaded");
