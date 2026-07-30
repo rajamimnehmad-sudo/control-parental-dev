@@ -19,6 +19,7 @@ internal object DagBackNavigationPolicy {
         when {
             addressEditing -> DagBackAction.CloseKeyboard
             tabSwitcherOpen -> DagBackAction.CloseTabSwitcher
+            hasActiveTab && isHome -> DagBackAction.ExitBrowser
             hasActiveTab && canGoBackInPage -> DagBackAction.GoBackInPage
             hasActiveTab && !isHome -> DagBackAction.GoHome
             else -> DagBackAction.ExitBrowser

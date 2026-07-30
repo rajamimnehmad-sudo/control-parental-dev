@@ -33,6 +33,7 @@ class DagBackNavigationPolicyTest {
     @Test
     fun `home is the only tab state that exits browser`() {
         assertEquals(DagBackAction.ExitBrowser, decide(isHome = true))
+        assertEquals(DagBackAction.ExitBrowser, decide(isHome = true, canGoBack = true))
         assertEquals(
             DagBackAction.ExitBrowser,
             decide(hasActiveTab = false, isHome = true),
