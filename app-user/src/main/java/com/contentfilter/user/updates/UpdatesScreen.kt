@@ -5,16 +5,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -28,27 +22,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.ui.ProductCard
-import com.contentfilter.core.ui.ProductGlyph
-import com.contentfilter.core.ui.ProductIcon
-import com.contentfilter.core.ui.ProductListRow
-import com.contentfilter.core.ui.ProductListSurface
 import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.user.BuildConfig
 
 @Composable
 fun UpdatesRoute(
-    onBack: (() -> Unit)? = null,
-    onHelp: () -> Unit = {},
-    activationState: String = "",
-    recoveryCode: String = "",
-    protectionMessage: String = "",
-    onRecoveryCodeChanged: (String) -> Unit = {},
-    onSubmitRecoveryCode: () -> Unit = {},
+    onBack: () -> Unit,
     viewModel: UpdatesViewModel = hiltViewModel(),
-    feedbackViewModel: UserFeedbackViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-    val feedbackState by feedbackViewModel.state.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) {
         if (state.status == UpdatesStatus.Idle) {
             viewModel.checkForUpdates()
@@ -65,14 +47,6 @@ fun UpdatesRoute(
         onPrepareDagInstall = viewModel::prepareDagInstall,
         onInstallDag = viewModel::installDownloadedDag,
         onBack = onBack,
-        onHelp = onHelp,
-        activationState = activationState,
-        recoveryCode = recoveryCode,
-        protectionMessage = protectionMessage,
-        onRecoveryCodeChanged = onRecoveryCodeChanged,
-        onSubmitRecoveryCode = onSubmitRecoveryCode,
-        feedbackState = feedbackState,
-        onSubmitFeedback = feedbackViewModel::submit,
     )
 }
 
@@ -87,133 +61,17 @@ private fun UpdatesScreen(
     onInstallAdmin: () -> Unit,
     onPrepareDagInstall: () -> Unit,
     onInstallDag: () -> Unit,
-    onBack: (() -> Unit)?,
-    onHelp: () -> Unit,
-    activationState: String,
-    recoveryCode: String,
-    protectionMessage: String,
-    onRecoveryCodeChanged: (String) -> Unit,
-    onSubmitRecoveryCode: () -> Unit,
-    feedbackState: FeedbackUiState,
-    onSubmitFeedback: (Int, String) -> Unit,
+    onBack: () -> Unit,
 ) {
     var showReleaseNotes by rememberSaveable { mutableStateOf(false) }
-    var rating by rememberSaveable { mutableStateOf(0) }
-    var ratingComment by rememberSaveable { mutableStateOf("") }
     ProductVisualPage(
-        title = "Ajustes",
-        subtitle = "Versión, actualización y acceso de emergencia",
+        title = "Actualizaciones e instalaciones",
+        subtitle = "Versiones oficiales de Content Filter y DAG",
         onBack = onBack,
     ) {
-        ProductListSurface {
-            ProductListRow(
-                leading = { ProductGlyph(ProductIcon.Update, MaterialTheme.colorScheme.primary, Modifier.size(24.dp)) },
-                headline = { Text("Estado de actualización", style = MaterialTheme.typography.titleMedium) },
-                supporting = { Text(state.status.message(), style = MaterialTheme.typography.bodyMedium) },
-            )
-            ProductListRow(
-                leading = {
-                    ProductGlyph(
-                        ProductIcon.Settings,
-                        MaterialTheme.colorScheme.primary,
-                        Modifier.size(24.dp),
-                    )
-                },
-                headline = { Text("Versión instalada", style = MaterialTheme.typography.titleMedium) },
-                supporting = { Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})") },
-            )
-            ProductListRow(
-                leading = {
-                    ProductGlyph(
-                        ProductIcon.ShieldCheck,
-                        MaterialTheme.colorScheme.primary,
-                        Modifier.size(24.dp),
-                    )
-                },
-                headline = { Text("Activación", style = MaterialTheme.typography.titleMedium) },
-                supporting = { Text(activationState.ifBlank { "Revisando…" }) },
-                showDivider = false,
-            )
-        }
-        ProductCard {
-            Text("Valorar App Usuario", style = MaterialTheme.typography.titleMedium)
-            Text("Tu calificación ayuda a mejorar la aplicación.", style = MaterialTheme.typography.bodyMedium)
-            Row {
-                (1..5).forEach { value ->
-                    IconButton(onClick = { rating = value }) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = "$value estrellas",
-                            tint =
-                                if (value <= rating) {
-                                    MaterialTheme.colorScheme.tertiary
-                                } else {
-                                    MaterialTheme.colorScheme.outlineVariant
-                                },
-                        )
-                    }
-                }
-            }
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = ratingComment,
-                onValueChange = { if (it.length <= 1000) ratingComment = it },
-                label = { Text("Comentario opcional") },
-                minLines = 3,
-            )
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = rating > 0 && !feedbackState.saving,
-                onClick = { onSubmitFeedback(rating, ratingComment) },
-            ) {
-                Text(if (feedbackState.saving) "Enviando…" else "Enviar valoración")
-            }
-            if (feedbackState.message.isNotBlank()) {
-                Text(feedbackState.message, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        ProductCard {
-            Text("Código de emergencia", style = MaterialTheme.typography.titleMedium)
-            Text(
-                "Ingresalo solamente si el administrador te dio un código para autorizar una desinstalación sin conexión.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            OutlinedTextField(
-                modifier = Modifier.fillMaxWidth(),
-                value = recoveryCode,
-                onValueChange = onRecoveryCodeChanged,
-                label = { Text("Código de emergencia") },
-                singleLine = true,
-            )
-            Button(
-                modifier = Modifier.fillMaxWidth(),
-                enabled = recoveryCode.isNotBlank(),
-                onClick = onSubmitRecoveryCode,
-            ) {
-                Text("Validar código")
-            }
-            if (protectionMessage.isNotBlank()) {
-                Text(protectionMessage, style = MaterialTheme.typography.bodyMedium)
-            }
-        }
-        ProductListSurface {
-            ProductListRow(
-                leading = { ProductGlyph(ProductIcon.Search, MaterialTheme.colorScheme.primary, Modifier.size(24.dp)) },
-                headline = { Text("Ayuda", style = MaterialTheme.typography.titleMedium) },
-                supporting = { Text("Conversá con el asistente según el estado actual") },
-                trailing = {
-                    ProductGlyph(
-                        ProductIcon.ChevronRight,
-                        MaterialTheme.colorScheme.onSurfaceVariant,
-                        Modifier.size(22.dp),
-                    )
-                },
-                onClick = onHelp,
-                showDivider = false,
-            )
-        }
         Text("Actualizaciones", style = MaterialTheme.typography.titleSmall)
         ProductCard {
+            Text(state.status.message(), style = MaterialTheme.typography.bodyMedium)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -399,6 +257,8 @@ private fun UpdatesStatus.message(): String =
         UpdatesStatus.ChecksumFailed -> "La descarga no paso la verificacion SHA-256."
         UpdatesStatus.DownloadFailed -> "No se pudo descargar la actualizacion."
     }
+
+internal fun UpdatesStatus.settingsSummary(): String = message()
 
 private fun UpdatesStatus.versionLabel(): String =
     when (this) {

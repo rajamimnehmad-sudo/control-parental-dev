@@ -32,6 +32,10 @@ class AdminFeedbackViewModel
                 feedbackRepository.updateAdminPhone(deviceId, phone)
             }
 
+        fun clearMessage() {
+            mutableState.value = mutableState.value.copy(message = "")
+        }
+
         private fun runAction(
             successMessage: String,
             action: suspend (String) -> Result<Unit>,

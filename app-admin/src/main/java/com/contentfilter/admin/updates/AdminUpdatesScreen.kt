@@ -43,9 +43,6 @@ fun AdminUpdatesRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
         onDownload = viewModel::downloadUpdate,
         onInstall = viewModel::installDownloadedUpdate,
         onInstallPermission = viewModel::openInstallPermissionSettings,
-        onRequestReset = viewModel::requestResetLocalAdmin,
-        onDismissReset = viewModel::dismissResetLocalAdmin,
-        onConfirmReset = viewModel::resetLocalAdmin,
     )
 }
 
@@ -56,39 +53,15 @@ private fun AdminUpdatesScreen(
     onDownload: () -> Unit,
     onInstall: () -> Unit,
     onInstallPermission: () -> Unit,
-    onRequestReset: () -> Unit,
-    onDismissReset: () -> Unit,
-    onConfirmReset: () -> Unit,
 ) {
     var showReleaseNotes by rememberSaveable { mutableStateOf(false) }
-    if (state.showResetConfirmation) {
-        AlertDialog(
-            onDismissRequest = onDismissReset,
-            title = { Text("Cambiar administrador") },
-            text = {
-                Text(
-                    "Se borrará el admin guardado solo en este teléfono. Después podrás ingresar un token nuevo desde Login.",
-                )
-            },
-            confirmButton = {
-                Button(onClick = onConfirmReset) {
-                    Text("Resetear")
-                }
-            },
-            dismissButton = {
-                OutlinedButton(onClick = onDismissReset) {
-                    Text("Cancelar")
-                }
-            },
-        )
-    }
     Column(
         modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         PremiumFeedbackBanner(
-            text = state.resetMessage.ifBlank { state.status.message() },
-            isError = state.resetMessage.startsWith("No se pudo") || (state.resetMessage.isBlank() && state.status.isError()),
+            text = state.status.message(),
+            isError = state.status.isError(),
         )
         Column(
             modifier = Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(bottom = 20.dp),
@@ -183,21 +156,61 @@ private fun AdminUpdatesScreen(
             ) {
                 Text("Buscar actualizacion")
             }
-            Spacer(modifier = Modifier.height(12.dp))
-            Text(
-                text = "Administrador de este teléfono",
-                style = MaterialTheme.typography.titleMedium,
+        }
+    }
+}
+
+@Composable
+fun AdminLocalAccessRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    if (state.showResetConfirmation) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissResetLocalAdmin,
+            title = { Text("Cambiar administrador") },
+            text = {
+                Text(
+                    "Se borrará el admin guardado solo en este teléfono. Después podrás ingresar un token nuevo desde Login.",
+                )
+            },
+            confirmButton = {
+                Button(onClick = viewModel::resetLocalAdmin) {
+                    Text("Resetear")
+                }
+            },
+            dismissButton = {
+                OutlinedButton(onClick = viewModel::dismissResetLocalAdmin) {
+                    Text("Cancelar")
+                }
+            },
+        )
+    }
+    Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (state.resetMessage.isNotBlank()) {
+            PremiumFeedbackBanner(
+                text = state.resetMessage,
+                isError = state.resetMessage.startsWith("No se pudo"),
             )
-            Text(
-                text = "Usá esta opción si quedó un admin viejo y necesitás ingresar un token nuevo.",
-                style = MaterialTheme.typography.bodyMedium,
-            )
-            OutlinedButton(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = onRequestReset,
-            ) {
-                Text("Cambiar administrador")
-            }
+        }
+        Text(
+            text = "Administrador de este teléfono",
+            style = MaterialTheme.typography.titleMedium,
+        )
+        Text(
+            text = "Usá esta opción si quedó un admin viejo y necesitás ingresar un token nuevo.",
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        OutlinedButton(
+            modifier = Modifier.fillMaxWidth(),
+            onClick = viewModel::requestResetLocalAdmin,
+        ) {
+            Text("Cambiar administrador")
         }
     }
 }

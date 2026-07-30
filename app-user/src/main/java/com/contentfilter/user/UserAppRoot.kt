@@ -51,6 +51,7 @@ import com.contentfilter.user.push.UserPushViewModel
 import com.contentfilter.user.updates.UpdatesRoute
 import com.contentfilter.user.updates.UpdatesStatus
 import com.contentfilter.user.updates.UpdatesViewModel
+import com.contentfilter.user.updates.settingsSummary
 import kotlinx.coroutines.launch
 
 @Composable
@@ -171,6 +172,11 @@ internal fun UserAppRoot(
         destination = target
     }
 
+    fun openSettingsSection(target: UserDestination) {
+        backStack = listOf(UserDestination.Settings)
+        destination = target
+    }
+
     fun goBack() {
         val previous = backStack.lastOrNull() ?: UserDestination.Home
         backStack = backStack.dropLast(1)
@@ -192,9 +198,14 @@ internal fun UserAppRoot(
             NavigationBar {
                 UserDestination.entries.filter { it.showInNav }.forEach { item ->
                     NavigationBarItem(
-                        selected = destination == item,
+                        selected = destination.topLevel() == item,
                         onClick = { selectTopLevel(item) },
-                        icon = { ProductNavGlyph(icon = item.icon, selected = destination == item) },
+                        icon = {
+                            ProductNavGlyph(
+                                icon = item.icon,
+                                selected = destination.topLevel() == item,
+                            )
+                        },
                         label = { Text(item.label) },
                     )
                 }
@@ -225,7 +236,7 @@ internal fun UserAppRoot(
                         onActivateDeviceAdmin = {
                             deviceAdminLauncher.launch(DeviceAdminController.activationIntent(context))
                         },
-                        onOpenSettings = { selectTopLevel(UserDestination.Updates) },
+                        onOpenSettings = { selectTopLevel(UserDestination.Settings) },
                     )
                 UserDestination.MyApps -> MyAppsRoute()
                 UserDestination.Requests -> RequestsRoute(onBack = ::goBack)
@@ -240,7 +251,7 @@ internal fun UserAppRoot(
                         },
                         onInstallProtectedBrowser = {
                             updatesViewModel.prepareDagInstall()
-                            selectTopLevel(UserDestination.Updates)
+                            openSettingsSection(UserDestination.Updates)
                         },
                         protectedBrowserAvailable =
                             BuildConfig.DAG_BROWSER_V3_BRIDGE_AVAILABLE &&
@@ -256,36 +267,56 @@ internal fun UserAppRoot(
                         },
                     )
                 }
-                UserDestination.Updates -> {
+                UserDestination.Settings -> {
+                    val statusViewModel: SystemStatusViewModel = hiltViewModel()
+                    val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
+                    UserSettingsTab(
+                        activationSummary = statusState.activationState,
+                        updateSummary = updateState.status.settingsSummary(),
+                        onProtection = { navigateTo(UserDestination.ProtectionSettings) },
+                        onUpdates = { navigateTo(UserDestination.Updates) },
+                        onHelp = { navigateTo(UserDestination.Help) },
+                        onFeedback = { navigateTo(UserDestination.FeedbackSettings) },
+                    )
+                }
+                UserDestination.ProtectionSettings -> {
                     val statusViewModel: SystemStatusViewModel = hiltViewModel()
                     val statusState by statusViewModel.uiState.collectAsStateWithLifecycle()
                     val protectionViewModel: ProtectionViewModel = hiltViewModel()
                     val protectionState by protectionViewModel.uiState.collectAsStateWithLifecycle()
-                    UpdatesRoute(
-                        viewModel = updatesViewModel,
-                        onBack = null,
-                        onHelp = { navigateTo(UserDestination.Help) },
+                    UserProtectionSettingsScreen(
                         activationState = statusState.activationState,
                         recoveryCode = protectionState.recoveryCode,
                         protectionMessage = protectionState.message,
                         onRecoveryCodeChanged = protectionViewModel::onRecoveryCodeChanged,
                         onSubmitRecoveryCode = protectionViewModel::submitRecoveryCode,
+                        onBack = ::goBack,
                     )
                 }
+                UserDestination.Updates ->
+                    UpdatesRoute(
+                        viewModel = updatesViewModel,
+                        onBack = ::goBack,
+                    )
+                UserDestination.FeedbackSettings ->
+                    UserFeedbackSettingsRoute(onBack = ::goBack)
                 UserDestination.Help ->
                     UserHelpRoute(
                         onBack = ::goBack,
                         onAction = { action ->
-                            selectTopLevel(
+                            val target =
                                 when (action) {
                                     HelpAction.Apps -> UserDestination.MyApps
                                     HelpAction.Web -> UserDestination.Web
                                     HelpAction.Security -> UserDestination.Home
-                                    HelpAction.Recovery,
-                                    HelpAction.Settings,
-                                    -> UserDestination.Updates
-                                },
-                            )
+                                    HelpAction.Recovery -> UserDestination.ProtectionSettings
+                                    HelpAction.Settings -> UserDestination.Settings
+                                }
+                            if (target == UserDestination.ProtectionSettings) {
+                                openSettingsSection(target)
+                            } else {
+                                selectTopLevel(target)
+                            }
                         },
                     )
             }
@@ -302,7 +333,7 @@ internal fun UserAppRoot(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { navigateTo(UserDestination.Updates) }) {
+                OutlinedButton(onClick = { openSettingsSection(UserDestination.Updates) }) {
                     Text("Ver")
                 }
             },
@@ -318,7 +349,7 @@ internal fun UserAppRoot(
                 }
             },
             dismissButton = {
-                OutlinedButton(onClick = { navigateTo(UserDestination.Updates) }) {
+                OutlinedButton(onClick = { openSettingsSection(UserDestination.Updates) }) {
                     Text("Ver")
                 }
             },
@@ -444,6 +475,19 @@ private enum class UserDestination(
     Web("Internet", ProductIcon.Web),
     Requests("Solicitudes", ProductIcon.Requests, showInNav = false),
     Announcements("Avisos", ProductIcon.Bell, showInNav = false),
-    Updates("Ajustes", ProductIcon.Settings),
+    Settings("Ajustes", ProductIcon.Settings),
+    ProtectionSettings("Protección", ProductIcon.ShieldCheck, showInNav = false),
+    Updates("Actualizaciones", ProductIcon.Update, showInNav = false),
+    FeedbackSettings("Tu opinión", ProductIcon.People, showInNav = false),
     Help("Ayuda", ProductIcon.Search, showInNav = false),
 }
+
+private fun UserDestination.topLevel(): UserDestination =
+    when (this) {
+        UserDestination.ProtectionSettings,
+        UserDestination.Updates,
+        UserDestination.FeedbackSettings,
+        UserDestination.Help,
+        -> UserDestination.Settings
+        else -> this
+    }

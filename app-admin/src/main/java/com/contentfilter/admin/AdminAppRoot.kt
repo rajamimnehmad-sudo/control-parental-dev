@@ -41,6 +41,7 @@ import com.contentfilter.admin.push.AdminPushViewModel
 import com.contentfilter.admin.requests.AdminRequestsRoute
 import com.contentfilter.admin.rules.RulesEntryMode
 import com.contentfilter.admin.rules.RulesRoute
+import com.contentfilter.admin.updates.AdminLocalAccessRoute
 import com.contentfilter.admin.updates.AdminUpdatesRoute
 import com.contentfilter.admin.updates.AdminUpdatesStatus
 import com.contentfilter.admin.updates.AdminUpdatesViewModel
@@ -171,6 +172,38 @@ internal fun AdminAppRoot(
                     ) {
                         DashboardRoute()
                     }
+                AdminSection.AccountDetails ->
+                    SectionContainer(
+                        title = "Cuenta y comunidad",
+                        subtitle = "Identidad, licencia y sincronización",
+                        onBack = { section = null },
+                    ) {
+                        AdminAccountDetailsScreen()
+                    }
+                AdminSection.Contact ->
+                    SectionContainer(
+                        title = "Contacto adulto",
+                        subtitle = "Número asociado a la comunidad",
+                        onBack = { section = null },
+                    ) {
+                        AdminContactSettingsRoute()
+                    }
+                AdminSection.Feedback ->
+                    SectionContainer(
+                        title = "Tu opinión",
+                        subtitle = "Ayudanos a mejorar App Administrador",
+                        onBack = { section = null },
+                    ) {
+                        AdminFeedbackSettingsRoute()
+                    }
+                AdminSection.LocalAdmin ->
+                    SectionContainer(
+                        title = "Administrador de este teléfono",
+                        subtitle = "Acceso local y cambio de administrador",
+                        onBack = { section = null },
+                    ) {
+                        AdminLocalAccessRoute()
+                    }
                 AdminSection.Apps -> RulesRoute(entryMode = RulesEntryMode.Apps, onBack = { section = null })
                 AdminSection.Web -> RulesRoute(entryMode = RulesEntryMode.Web, onBack = { section = null })
                 AdminSection.ManageUsers ->
@@ -268,9 +301,13 @@ internal fun AdminAppRoot(
                             AdminRequestsRoute(refreshKey = requestsRefreshKey)
                         AdminTab.Account ->
                             SettingsTab(
+                                onAccount = { section = AdminSection.AccountDetails },
+                                onContact = { section = AdminSection.Contact },
                                 onPanel = { section = AdminSection.Panel },
                                 onUpdates = { section = AdminSection.Updates },
                                 onHelp = { section = AdminSection.Help },
+                                onFeedback = { section = AdminSection.Feedback },
+                                onLocalAdmin = { section = AdminSection.LocalAdmin },
                             )
                     }
             }
@@ -324,11 +361,15 @@ private enum class AdminTab(
     Home("Home", ProductIcon.Home),
     Users("Usuarios", ProductIcon.People),
     Requests("Solicitudes", ProductIcon.Requests),
-    Account("Cuenta", ProductIcon.Settings),
+    Account("Ajustes", ProductIcon.Settings),
 }
 
 private enum class AdminSection {
     Panel,
+    AccountDetails,
+    Contact,
+    Feedback,
+    LocalAdmin,
     Apps,
     Web,
     ManageUsers,
