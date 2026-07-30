@@ -191,6 +191,8 @@ class MediaBarrierContractTest {
         assertContains(script, "mediaElementsBySource")
         assertContains(script, "updateElementSourceIndex")
         assertContains(script, "applyDecisionToMediaSource")
+        assertContains(script, "stillReferencesDecisionSource")
+        assertContains(script, "appliedCurrentDecision")
         assertContains(script, "removeElementFromSourceIndex")
         assertContains(script, "\"data-lazy-src\"")
         assertContains(script, "\"data-srcset\"")

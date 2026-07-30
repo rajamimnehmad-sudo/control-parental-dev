@@ -374,10 +374,10 @@
         removeElementFromSourceIndex(element);
         continue;
       }
-      if (
-        candidateSourcesFor(element).includes(sourceUrl) &&
-        applyKnownDecision(element)
-      ) {
+      const stillReferencesDecisionSource =
+        candidateSourcesFor(element).includes(sourceUrl);
+      const appliedCurrentDecision = applyKnownDecision(element);
+      if (stillReferencesDecisionSource && appliedCurrentDecision) {
         matchedCount += 1;
       }
     }
