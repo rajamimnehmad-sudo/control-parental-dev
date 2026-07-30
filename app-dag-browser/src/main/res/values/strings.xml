@@ -29,12 +29,15 @@
     <string name="cache_cleared">Caché borrada</string>
     <string name="browsing_data_cleared">Datos de navegación borrados</string>
     <string name="storage_clear_failed">No se pudieron borrar los datos</string>
-    <string name="tab_limit_reached">Máximo de 8 pestañas</string>
+    <string name="tab_limit_reached">Para abrir otra pestaña, cerrá una de las actuales</string>
     <string name="new_tab_title">Nueva pestaña</string>
     <string name="close_named_tab">Cerrar %1$s</string>
     <string name="active_tab">Pestaña actual</string>
     <string name="close_tab_switcher">Volver a la página</string>
     <string name="tab_switcher_hint">Mantené presionada una tarjeta para ordenarla o deslizala para cerrarla.</string>
+    <string name="close_all_tabs">Cerrar todo</string>
+    <string name="close_all_tabs_title">¿Cerrar todas las pestañas?</string>
+    <string name="close_all_tabs_detail">Se cerrarán las %1$d pestañas abiertas y quedará un Inicio seguro.</string>
     <string name="status_starting">Iniciando…</string>
     <string name="status_protected">Protegido</string>
     <string name="status_closed">Página cerrada</string>

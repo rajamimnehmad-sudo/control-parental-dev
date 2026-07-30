@@ -234,6 +234,10 @@ class DagBrowserActivity : Activity() {
                     createTab(switchToTab = true)
                 }
 
+                override fun onCloseAllTabs() {
+                    confirmCloseAllTabs()
+                }
+
                 override fun onTabsReordered(tabIds: List<Long>) {
                     reorderTabs(tabIds)
                 }
@@ -364,8 +368,9 @@ class DagBrowserActivity : Activity() {
         initialUrl: String? = null,
         restoredTab: DagPersistedTab? = null,
     ): BrowserTab? {
-        if (!extensionReady || tabs.size >= MaxTabs) {
-            if (tabs.size >= MaxTabs) {
+        if (!extensionReady || !DagTabCapacityPolicy.canCreate(tabs.size)) {
+            if (!DagTabCapacityPolicy.canCreate(tabs.size)) {
+                showTabSwitcher()
                 Toast.makeText(this, R.string.tab_limit_reached, Toast.LENGTH_SHORT).show()
             }
             return null
@@ -973,8 +978,8 @@ class DagBrowserActivity : Activity() {
         val scale =
             minOf(
                 1f,
-                ThumbnailWidth.toFloat() / source.width,
-                ThumbnailHeight.toFloat() / source.height,
+                DagTabCapacityPolicy.ThumbnailWidth.toFloat() / source.width,
+                DagTabCapacityPolicy.ThumbnailHeight.toFloat() / source.height,
             )
         if (scale >= 1f) return source
         return Bitmap.createScaledBitmap(
@@ -1145,6 +1150,19 @@ class DagBrowserActivity : Activity() {
 
     private fun closeActiveTab() {
         activeTab?.let(::closeTab)
+    }
+
+    private fun confirmCloseAllTabs() {
+        if (tabs.size <= 1) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.close_all_tabs_title)
+            .setMessage(getString(R.string.close_all_tabs_detail, tabs.size))
+            .setPositiveButton(R.string.close_all_tabs) { _, _ ->
+                tabSwitcher.hide()
+                resetTabs()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
     }
 
     private fun closeTab(tab: BrowserTab) {
@@ -1361,11 +1379,8 @@ class DagBrowserActivity : Activity() {
         const val PerformanceLogTag = "DagPerformance"
         const val BarrierTimeoutMillis = 12_000L
         const val InitialBlankPage = "about:blank"
-        const val MaxTabs = 8
         const val MaxTabLabelLength = 36
         const val PersistTabsDelayMillis = 250L
-        const val ThumbnailWidth = 300
-        const val ThumbnailHeight = 450
         const val ThumbnailCaptureTimeoutMillis = 350L
         val PreviewDocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
         const val EnabledControlAlpha = 1f

@@ -51,4 +51,46 @@ class DagTabStateCodecTest {
     fun invalidStateFailsClosed() {
         assertNull(DagTabStateCodec.decode("""{"version":99}""") { true })
     }
+
+    @Test
+    fun fiftyTabsRoundTripWithLastTabActive() {
+        val original =
+            DagPersistedTabs(
+                tabs =
+                    List(DagTabCapacityPolicy.MaxTabs) { index ->
+                        DagPersistedTab("https://example.com/$index", "Pestaña $index")
+                    },
+                activeIndex = DagTabCapacityPolicy.MaxTabs - 1,
+            )
+
+        val restored =
+            DagTabStateCodec.decode(
+                DagTabStateCodec.encode(original),
+                isAllowedUrl = { it.startsWith("https://") },
+            )
+
+        assertEquals(DagTabCapacityPolicy.MaxTabs, restored?.tabs?.size)
+        assertEquals(DagTabCapacityPolicy.MaxTabs - 1, restored?.activeIndex)
+    }
+
+    @Test
+    fun persistedStateNeverExceedsCapacity() {
+        val oversized =
+            DagPersistedTabs(
+                tabs =
+                    List(DagTabCapacityPolicy.MaxTabs + 1) { index ->
+                        DagPersistedTab("https://example.com/$index", "Pestaña $index")
+                    },
+                activeIndex = DagTabCapacityPolicy.MaxTabs,
+            )
+
+        val restored =
+            DagTabStateCodec.decode(
+                DagTabStateCodec.encode(oversized),
+                isAllowedUrl = { true },
+            )
+
+        assertEquals(DagTabCapacityPolicy.MaxTabs, restored?.tabs?.size)
+        assertEquals(DagTabCapacityPolicy.MaxTabs - 1, restored?.activeIndex)
+    }
 }

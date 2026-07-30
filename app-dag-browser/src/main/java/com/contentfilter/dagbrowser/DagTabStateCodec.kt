@@ -15,13 +15,12 @@ internal data class DagPersistedTabs(
 
 internal object DagTabStateCodec {
     private const val SchemaVersion = 1
-    private const val MaxTabs = 8
     private const val MaxUrlLength = 4_096
     private const val MaxTitleLength = 160
 
     fun encode(state: DagPersistedTabs): String {
         val rows = JSONArray()
-        state.tabs.take(MaxTabs).forEach { tab ->
+        state.tabs.take(DagTabCapacityPolicy.MaxTabs).forEach { tab ->
             rows.put(
                 JSONObject()
                     .put("url", tab.url.take(MaxUrlLength))
@@ -47,7 +46,7 @@ internal object DagTabStateCodec {
             val requestedActiveIndex = root.optInt("activeIndex", 0)
             val indexedTabs =
                 buildList {
-                    for (index in 0 until minOf(rows.length(), MaxTabs)) {
+                    for (index in 0 until minOf(rows.length(), DagTabCapacityPolicy.MaxTabs)) {
                         val row = rows.optJSONObject(index) ?: continue
                         val url = row.optString("url").take(MaxUrlLength)
                         if (!isAllowedUrl(url)) continue

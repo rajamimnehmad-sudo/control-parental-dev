@@ -63,4 +63,18 @@
         android:paddingEnd="8dp"
         android:paddingBottom="18dp"
         android:scrollbars="vertical" />
+
+    <Button
+        android:id="@+id/tab_switcher_close_all"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="12dp"
+        android:backgroundTint="@color/dag_status_error"
+        android:fontFamily="sans-serif-medium"
+        android:text="@string/close_all_tabs"
+        android:textAllCaps="false"
+        android:textColor="@color/dag_status_error_text"
+        android:textSize="15sp" />
 </LinearLayout>

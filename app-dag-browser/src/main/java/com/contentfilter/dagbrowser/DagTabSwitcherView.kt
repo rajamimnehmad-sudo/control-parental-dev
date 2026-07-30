@@ -38,12 +38,15 @@ internal class DagTabSwitcherView
 
             fun onNewTab()
 
+            fun onCloseAllTabs()
+
             fun onTabsReordered(tabIds: List<Long>)
 
             fun onSwitcherClosed()
         }
 
         private val title: TextView
+        private val closeAll: View
         private val recycler: RecyclerView
         private val adapter = TabAdapter()
         private var listener: Listener? = null
@@ -51,6 +54,7 @@ internal class DagTabSwitcherView
         init {
             LayoutInflater.from(context).inflate(R.layout.view_dag_tab_switcher, this, true)
             title = findViewById(R.id.tab_switcher_title)
+            closeAll = findViewById(R.id.tab_switcher_close_all)
             recycler =
                 findViewById<RecyclerView>(R.id.tab_switcher_grid).apply {
                     layoutManager = GridLayoutManager(context, 2)
@@ -63,6 +67,9 @@ internal class DagTabSwitcherView
             }
             findViewById<View>(R.id.tab_switcher_done).setOnClickListener {
                 listener?.onSwitcherClosed()
+            }
+            closeAll.setOnClickListener {
+                listener?.onCloseAllTabs()
             }
             ItemTouchHelper(
                 object : ItemTouchHelper.SimpleCallback(
@@ -125,6 +132,8 @@ internal class DagTabSwitcherView
                     tabs.size,
                 )
             adapter.submit(tabs)
+            closeAll.isEnabled = tabs.size > 1
+            closeAll.alpha = if (tabs.size > 1) 1f else 0.45f
         }
 
         fun hide() {
