@@ -15,4 +15,15 @@ class DagBrowserManifestContractTest {
         assertContains(manifest, "android:scheme=\"http\"")
         assertContains(manifest, "android:scheme=\"https\"")
     }
+
+    @Test
+    fun `download provider is private and grants only temporary URIs`() {
+        val manifest = File("src/main/AndroidManifest.xml").readText()
+        val paths = File("src/main/res/xml/dag_download_paths.xml").readText()
+
+        assertContains(manifest, "androidx.core.content.FileProvider")
+        assertContains(manifest, "android:exported=\"false\"")
+        assertContains(manifest, "\${applicationId}.downloads.fileprovider")
+        assertContains(paths, "path=\"downloads/\"")
+    }
 }

@@ -24,6 +24,7 @@ import android.widget.PopupMenu
 import android.widget.ProgressBar
 import android.widget.TextView
 import android.widget.Toast
+import androidx.core.content.FileProvider
 import org.json.JSONObject
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
@@ -33,6 +34,12 @@ import org.mozilla.geckoview.GeckoSessionSettings
 import org.mozilla.geckoview.GeckoView
 import org.mozilla.geckoview.StorageController
 import org.mozilla.geckoview.WebExtension
+import org.mozilla.geckoview.WebResponse
+import java.io.File
+import java.io.InputStream
+import java.io.RandomAccessFile
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
@@ -60,6 +67,7 @@ class DagBrowserActivity : Activity() {
     private val performanceTracker = DagPerformanceTracker(SystemClock::elapsedRealtime)
     private val tabs = mutableListOf<BrowserTab>()
     private val thumbnailExecutor = Executors.newSingleThreadExecutor()
+    private val downloadExecutor = Executors.newSingleThreadExecutor()
     private val mediaAnalysisExecutor =
         ThreadPoolExecutor(
             MediaAnalysisThreads,
@@ -74,6 +82,8 @@ class DagBrowserActivity : Activity() {
     private var nextTabId = 1L
     private var restoringTabs = false
     private var pendingExternalUrl: String? = null
+    private var activeDownload: ActiveDownload? = null
+    private var downloadDialog: AlertDialog? = null
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
     private val messageDelegate =
@@ -268,6 +278,13 @@ class DagBrowserActivity : Activity() {
                 override fun onKill(session: GeckoSession) {
                     recoverClosedSession(tab)
                 }
+
+                override fun onExternalResponse(
+                    session: GeckoSession,
+                    response: WebResponse,
+                ) {
+                    handleDownloadResponse(tab, response)
+                }
             }
         tab.session.navigationDelegate =
             object : GeckoSession.NavigationDelegate {
@@ -282,6 +299,21 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     request: GeckoSession.NavigationDelegate.LoadRequest,
                 ): GeckoResult<AllowOrDeny> {
+                    val downloadGesture =
+                        DagDownloadPolicy.recordGesture(
+                            requestUrl = request.uri,
+                            triggerUrl = request.triggerUri,
+                            currentPageUrl = tab.url,
+                            tabRevision = tab.navigationRevision,
+                            pageVisible = tab.displayState == TabDisplayState.Visible,
+                            hasUserGesture = request.hasUserGesture,
+                            opensNewWindow =
+                                request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW,
+                            nowMillis = SystemClock.elapsedRealtime(),
+                        )
+                    if (request.hasUserGesture) {
+                        tab.downloadGesture = downloadGesture
+                    }
                     if (request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW) {
                         openNewTabForUri(request.uri)
                         return GeckoResult.fromValue(AllowOrDeny.DENY)
@@ -324,6 +356,8 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     url: String,
                 ) {
+                    tab.downloadGesture = null
+                    tab.navigationRevision += 1
                     if (tab.displayState != TabDisplayState.Loading) {
                         invalidateTabThumbnail(tab)
                     }
@@ -361,6 +395,266 @@ class DagBrowserActivity : Activity() {
                     schedulePersistTabs()
                 }
             }
+    }
+
+    private fun handleDownloadResponse(
+        tab: BrowserTab,
+        response: WebResponse,
+    ) {
+        val input = response.body
+        if (activeDownload != null || input == null || tab !== activeTab) {
+            input?.closeQuietly()
+            if (activeDownload != null) {
+                Toast.makeText(this, R.string.download_one_at_a_time, Toast.LENGTH_LONG).show()
+            }
+            return
+        }
+        val headers = response.headers
+        val decision =
+            DagDownloadPolicy.decide(
+                gesture = tab.downloadGesture,
+                candidate =
+                    DagDownloadCandidate(
+                        responseUrl = response.uri,
+                        currentPageUrl = tab.url,
+                        currentTabRevision = tab.navigationRevision,
+                        secure = response.isSecure,
+                        redirected = response.redirected,
+                        statusCode = response.statusCode,
+                        mimeType = DagDownloadPolicy.header(headers, "Content-Type"),
+                        declaredBytes = DagDownloadPolicy.declaredLength(headers),
+                        suggestedFileName =
+                            DagDownloadPolicy.suggestedFileName(headers, response.uri),
+                        nowMillis = SystemClock.elapsedRealtime(),
+                    ),
+            )
+        tab.downloadGesture = null
+        when (decision) {
+            is DagDownloadDecision.Block -> {
+                input.closeQuietly()
+                Toast.makeText(this, R.string.download_blocked, Toast.LENGTH_LONG).show()
+            }
+            is DagDownloadDecision.Allow -> confirmDownload(tab, decision.download, input)
+        }
+    }
+
+    private fun confirmDownload(
+        tab: BrowserTab,
+        download: DagAllowedDownload,
+        input: InputStream,
+    ) {
+        if (activeDownload != null) {
+            input.closeQuietly()
+            return
+        }
+        val task = ActiveDownload(tab = tab, metadata = download, input = input)
+        activeDownload = task
+        val size = readableByteCount(download.declaredBytes)
+        downloadDialog =
+            AlertDialog.Builder(this)
+                .setTitle(R.string.download_confirm_title)
+                .setMessage(
+                    getString(
+                        R.string.download_confirm_detail,
+                        download.fileName,
+                        download.host,
+                        DagDownloadPolicy.PdfMimeType,
+                        size,
+                    ),
+                )
+                .setPositiveButton(R.string.download) { _, _ -> startDownload(task) }
+                .setNegativeButton(R.string.cancel) { _, _ -> cancelDownload(task) }
+                .setOnCancelListener { cancelDownload(task) }
+                .create()
+                .also(AlertDialog::show)
+    }
+
+    private fun startDownload(task: ActiveDownload) {
+        if (activeDownload !== task || task.cancelled) return
+        val progress =
+            ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = 100
+                progress = 0
+                setPadding(48, 0, 48, 0)
+            }
+        downloadDialog =
+            AlertDialog.Builder(this)
+                .setTitle(R.string.download_in_progress)
+                .setMessage(getString(R.string.download_progress, 0))
+                .setView(progress)
+                .setNegativeButton(R.string.cancel, null)
+                .setOnCancelListener { cancelDownload(task) }
+                .create()
+                .also { dialog ->
+                    dialog.setOnShowListener {
+                        dialog.getButton(AlertDialog.BUTTON_NEGATIVE).setOnClickListener {
+                            cancelDownload(task)
+                        }
+                    }
+                    dialog.show()
+                }
+        downloadExecutor.execute {
+            val result = runCatching { saveDownload(task, progress) }
+            handler.post {
+                if (activeDownload !== task) return@post
+                activeDownload = null
+                downloadDialog?.dismiss()
+                downloadDialog = null
+                result.fold(
+                    onSuccess = { file ->
+                        showDownloadReady(file, task.metadata)
+                    },
+                    onFailure = {
+                        showDownloadFailure(task)
+                    },
+                )
+            }
+        }
+    }
+
+    private fun saveDownload(
+        task: ActiveDownload,
+        progress: ProgressBar,
+    ): File {
+        val directory = File(filesDir, DownloadsDirectory).apply { mkdirs() }
+        check(directory.isDirectory)
+        val partial = File.createTempFile("dag-", ".part", directory)
+        task.partialFile = partial
+        try {
+            var total = 0L
+            task.input.use { input ->
+                partial.outputStream().buffered().use { output ->
+                    val buffer = ByteArray(DownloadBufferBytes)
+                    while (true) {
+                        check(!task.cancelled) { "cancelled" }
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        total += read
+                        check(total <= task.metadata.declaredBytes && total <= DagDownloadPolicy.MaxBytes) {
+                            "size_mismatch"
+                        }
+                        output.write(buffer, 0, read)
+                        val percent = ((total * 100) / task.metadata.declaredBytes).toInt()
+                        handler.post {
+                            if (activeDownload === task && !task.cancelled) {
+                                progress.progress = percent
+                                downloadDialog?.setMessage(getString(R.string.download_progress, percent))
+                            }
+                        }
+                    }
+                }
+            }
+            check(total == task.metadata.declaredBytes) { "size_mismatch" }
+            check(isValidPdf(partial)) { "invalid_pdf" }
+            val destination = uniqueDownloadFile(directory, task.metadata.fileName)
+            Files.move(
+                partial.toPath(),
+                destination.toPath(),
+                StandardCopyOption.ATOMIC_MOVE,
+            )
+            task.partialFile = null
+            return destination
+        } catch (failure: Throwable) {
+            partial.delete()
+            task.partialFile = null
+            throw failure
+        }
+    }
+
+    private fun cancelDownload(task: ActiveDownload) {
+        if (activeDownload !== task) return
+        task.cancelled = true
+        task.input.closeQuietly()
+        task.partialFile?.delete()
+        activeDownload = null
+        downloadDialog?.dismiss()
+        downloadDialog = null
+        Toast.makeText(this, R.string.download_cancelled, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showDownloadReady(
+        file: File,
+        metadata: DagAllowedDownload,
+    ) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.download_complete)
+            .setMessage(metadata.fileName)
+            .setPositiveButton(R.string.open) { _, _ -> openDownloadedPdf(file) }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun showDownloadFailure(task: ActiveDownload) {
+        if (task.cancelled || isFinishing || isDestroyed) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.download_failed)
+            .setMessage(R.string.download_failed_detail)
+            .setPositiveButton(R.string.retry) { _, _ -> retryDownload(task) }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun retryDownload(task: ActiveDownload) {
+        val tab = task.tab
+        if (tab !== activeTab || !tabs.contains(tab) || tab.displayState != TabDisplayState.Visible) return
+        tab.downloadGesture =
+            DagDownloadGesture(
+                targetUrl = task.metadata.responseUrl,
+                pageUrl = tab.url,
+                tabRevision = tab.navigationRevision,
+                createdAtMillis = SystemClock.elapsedRealtime(),
+            )
+        tab.session.loadUri(task.metadata.responseUrl)
+    }
+
+    private fun openDownloadedPdf(file: File) {
+        val uri =
+            FileProvider.getUriForFile(
+                this,
+                "$packageName.downloads.fileprovider",
+                file,
+            )
+        val intent =
+            Intent(Intent.ACTION_VIEW)
+                .setDataAndType(uri, DagDownloadPolicy.PdfMimeType)
+                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        runCatching { startActivity(Intent.createChooser(intent, getString(R.string.open_download))) }
+            .onFailure {
+                Toast.makeText(this, R.string.no_pdf_viewer, Toast.LENGTH_LONG).show()
+            }
+    }
+
+    private fun isValidPdf(file: File): Boolean {
+        RandomAccessFile(file, "r").use { input ->
+            val header = ByteArray(minOf(PdfHeaderBytes, input.length().toInt()))
+            input.readFully(header)
+            val tailSize = minOf(PdfTailBytes.toLong(), input.length()).toInt()
+            val tail = ByteArray(tailSize)
+            input.seek(input.length() - tailSize)
+            input.readFully(tail)
+            return DagDownloadPolicy.looksLikePdf(header, tail)
+        }
+    }
+
+    private fun uniqueDownloadFile(
+        directory: File,
+        requestedName: String,
+    ): File {
+        val direct = File(directory, requestedName)
+        if (!direct.exists()) return direct
+        val stem = requestedName.removeSuffix(".pdf")
+        for (suffix in 2..MaxDuplicateFileSuffix) {
+            val candidate = File(directory, "$stem ($suffix).pdf")
+            if (!candidate.exists()) return candidate
+        }
+        return File(directory, "$stem-${System.currentTimeMillis()}.pdf")
+    }
+
+    private fun readableByteCount(bytes: Long): String =
+        String.format(Locale.getDefault(), "%.1f MB", bytes / (1024.0 * 1024.0))
+
+    private fun InputStream.closeQuietly() {
+        runCatching { close() }
     }
 
     private fun createTab(
@@ -1052,6 +1346,10 @@ class DagBrowserActivity : Activity() {
                         closeActiveTab()
                         true
                     }
+                    R.id.menu_downloads -> {
+                        showDownloads()
+                        true
+                    }
                     R.id.menu_clear_cache -> {
                         clearCache()
                         true
@@ -1064,6 +1362,67 @@ class DagBrowserActivity : Activity() {
                 }
             }
         }.show()
+    }
+
+    private fun showDownloads() {
+        val files = downloadedPdfs()
+        if (files.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle(R.string.downloads)
+                .setMessage(R.string.downloads_empty)
+                .setPositiveButton(R.string.close, null)
+                .show()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.downloads)
+            .setItems(files.map(File::getName).toTypedArray()) { _, index ->
+                showDownloadedFile(files[index])
+            }
+            .setNegativeButton(R.string.close, null)
+            .show()
+    }
+
+    private fun showDownloadedFile(file: File) {
+        if (!isStoredDownload(file)) return
+        AlertDialog.Builder(this)
+            .setTitle(file.name)
+            .setMessage(readableByteCount(file.length()))
+            .setPositiveButton(R.string.open) { _, _ -> openDownloadedPdf(file) }
+            .setNegativeButton(R.string.delete) { _, _ -> confirmDeleteDownload(file) }
+            .setNeutralButton(R.string.close, null)
+            .show()
+    }
+
+    private fun confirmDeleteDownload(file: File) {
+        if (!isStoredDownload(file)) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.delete_download_title)
+            .setMessage(file.name)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                val message =
+                    if (file.delete()) {
+                        R.string.download_deleted
+                    } else {
+                        R.string.download_delete_failed
+                    }
+                Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun downloadedPdfs(): List<File> =
+        File(filesDir, DownloadsDirectory)
+            .listFiles { file -> file.isFile && file.name.endsWith(".pdf", ignoreCase = true) }
+            .orEmpty()
+            .sortedByDescending(File::lastModified)
+
+    private fun isStoredDownload(file: File): Boolean {
+        val directory = File(filesDir, DownloadsDirectory)
+        return file.isFile &&
+            file.name.endsWith(".pdf", ignoreCase = true) &&
+            runCatching { file.canonicalFile.parentFile == directory.canonicalFile }.getOrDefault(false)
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -1309,6 +1668,7 @@ class DagBrowserActivity : Activity() {
 
     override fun onDestroy() {
         persistTabsNow()
+        activeDownload?.let(::cancelDownload)
         handler.removeCallbacksAndMessages(null)
         protectionExtension?.let { extension ->
             extension.setMessageDelegate(null, NativeApp)
@@ -1320,6 +1680,7 @@ class DagBrowserActivity : Activity() {
         }
         protectionExtension = null
         thumbnailExecutor.shutdownNow()
+        downloadExecutor.shutdownNow()
         mediaAnalysisExecutor.shutdownNow()
         (imageAnalyzer as? AutoCloseable)?.close()
         tabs.forEach { tab ->
@@ -1359,6 +1720,16 @@ class DagBrowserActivity : Activity() {
         var previewEligibilityToken: String? = null,
         var previewRestricted: Boolean = true,
         var recovering: Boolean = false,
+        var navigationRevision: Long = 0,
+        var downloadGesture: DagDownloadGesture? = null,
+    )
+
+    private class ActiveDownload(
+        val tab: BrowserTab,
+        val metadata: DagAllowedDownload,
+        val input: InputStream,
+        @Volatile var cancelled: Boolean = false,
+        @Volatile var partialFile: File? = null,
     )
 
     private companion object {
@@ -1382,6 +1753,11 @@ class DagBrowserActivity : Activity() {
         const val MaxTabLabelLength = 36
         const val PersistTabsDelayMillis = 250L
         const val ThumbnailCaptureTimeoutMillis = 350L
+        const val DownloadsDirectory = "downloads"
+        const val DownloadBufferBytes = 16 * 1024
+        const val PdfHeaderBytes = 8
+        const val PdfTailBytes = 4 * 1024
+        const val MaxDuplicateFileSuffix = 999
         val PreviewDocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
         const val EnabledControlAlpha = 1f
         const val DisabledControlAlpha = 0.45f
