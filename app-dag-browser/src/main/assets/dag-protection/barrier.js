@@ -50,6 +50,13 @@
   const BACKGROUND_PROBE_ATTRIBUTE = "data-glosh-dag-background-probe";
   const SPONSORED_RESULT_ATTRIBUTE = "data-glosh-dag-sponsored-result";
   const MEDIA_HOST_ATTRIBUTE = "data-glosh-dag-media-host";
+  const APPROVED_PRESENTATION_SELECTOR = [
+    '[data-glosh-dag-media="allow"]',
+    '[data-glosh-dag-ui-vector="allow"]',
+    '[data-glosh-dag-css-media="allow"]',
+    '[data-glosh-dag-css-before="allow"]',
+    '[data-glosh-dag-css-after="allow"]',
+  ].join(",");
   const MAX_CSS_BACKGROUND_ELEMENTS = 512;
   const MAX_BACKGROUND_PROBE_ELEMENTS = 1_500;
   const BACKGROUND_PROBE_DELAY_MS = 180;
@@ -253,6 +260,7 @@
     }
     if (isSafeInlineUiVector(element)) {
       element.setAttribute(UI_VECTOR_ATTRIBUTE, "allow");
+      clearWaitingMediaHostsAround(element);
       return true;
     }
     element.removeAttribute(UI_VECTOR_ATTRIBUTE);
@@ -267,6 +275,16 @@
     decisionsBySource.set(sourceUrl, action);
     failedSources.delete(sourceUrl);
   };
+
+  function clearWaitingMediaHostsAround(element) {
+    let current = element;
+    for (let depth = 0; current instanceof Element && depth < 4; depth += 1) {
+      if (current.getAttribute(MEDIA_HOST_ATTRIBUTE) === "waiting") {
+        current.removeAttribute(MEDIA_HOST_ATTRIBUTE);
+      }
+      current = current.parentElement;
+    }
+  }
 
   const applyDecisionToSource = (sourceUrl) => {
     document.querySelectorAll(mediaSelector).forEach((element) => {
@@ -384,6 +402,7 @@
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "allow") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "allow");
       }
+      clearWaitingMediaHostsAround(element);
       return true;
     }
     const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
@@ -411,6 +430,7 @@
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "allow") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "allow");
       }
+      clearWaitingMediaHostsAround(element);
       return true;
     }
     if (element.style.getPropertyValue(CSS_MEDIA_VALUE_PROPERTY)) {
@@ -449,6 +469,7 @@
       if (element.getAttribute(config.attribute) !== "allow") {
         element.setAttribute(config.attribute, "allow");
       }
+      clearWaitingMediaHostsAround(element);
       return true;
     }
     for (const property of [config.backgroundProperty, config.contentProperty]) {
@@ -924,6 +945,10 @@
 
   const reconcileMediaHostState = (host) => {
     if (!(host instanceof Element)) return;
+    if (host.matches(APPROVED_PRESENTATION_SELECTOR) || host.querySelector(APPROVED_PRESENTATION_SELECTOR)) {
+      host.removeAttribute(MEDIA_HOST_ATTRIBUTE);
+      return;
+    }
     const trackedImages =
       Array.from(host.children)
         .filter((child) => child instanceof HTMLImageElement)

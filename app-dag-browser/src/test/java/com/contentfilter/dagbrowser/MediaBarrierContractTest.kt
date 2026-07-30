@@ -223,6 +223,8 @@ class MediaBarrierContractTest {
         assertContains(script, "mediaHostsByElement")
         assertContains(script, "releaseMediaHostsIn")
         assertContains(script, "mutation.removedNodes")
+        assertContains(script, "APPROVED_PRESENTATION_SELECTOR")
+        assertContains(script, "clearWaitingMediaHostsAround")
         assertContains(script, "siblingStates.includes(\"block\")")
         assertContains(script, "siblingStates.includes(\"allow\")")
         assertContains(script, "candidateSourcesFor(element)[0]")
