@@ -74,6 +74,13 @@ internal object DagMediaBytesPolicy {
         if (bytes.size != payload.declaredByteLength || bytes.size > MaxCaptureBytes) {
             return blocked(payload, InvalidPayloadReason)
         }
+        if (DagSafeUiVectorPolicy.isSafe(bytes)) {
+            return DagMediaDecision(
+                candidateId = payload.candidateId,
+                action = DagMediaAction.Allow,
+                reason = SafeUiVectorReason,
+            )
+        }
         val bounds = boundsReader.read(bytes) ?: return blocked(payload, UnsupportedImageReason)
         if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) {
             return blocked(payload, UnsupportedImageReason)
@@ -147,6 +154,7 @@ internal object DagMediaBytesPolicy {
     const val MaxCaptureBytes = 2 * 1024 * 1024
     private const val MaxBase64Length = ((MaxCaptureBytes + 2) / 3) * 4
     const val InvalidPayloadReason = "invalid_payload"
+    const val SafeUiVectorReason = "safe_ui_vector"
     const val UnsupportedImageReason = "unsupported_image"
     const val UnsafeDimensionsReason = "unsafe_dimensions"
     const val AnalyzerBusyReason = "analyzer_busy"

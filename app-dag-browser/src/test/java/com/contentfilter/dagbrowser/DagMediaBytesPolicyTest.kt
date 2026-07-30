@@ -99,6 +99,44 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
+    fun `bounded passive ui vector bypasses raster classifier safely`() {
+        val bytes =
+            """
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path d="M12 21s-8-4.5-8-11a4 4 0 0 1 8-1 4 4 0 0 1 8 1c0 6.5-8 11-8 11z"/>
+            </svg>
+            """.trimIndent().toByteArray()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(bytes),
+                boundsReader = DagImageBoundsReader { error("must not decode vector as raster") },
+                preprocessor = DagImagePreprocessor { error("must not preprocess safe vector") },
+                analyzer = DagImageAnalyzer { error("must not classify safe vector") },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagMediaBytesPolicy.SafeUiVectorReason, decision.reason)
+    }
+
+    @Test
+    fun `active svg remains unsupported and fail closed`() {
+        val bytes =
+            """
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+              <script>alert(1)</script>
+            </svg>
+            """.trimIndent().toByteArray()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(bytes),
+                boundsReader = DagImageBoundsReader { null },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.UnsupportedImageReason, decision.reason)
+    }
+
+    @Test
     fun `static avif reaches the same bounded classifier`() {
         val decision =
             DagMediaBytesPolicy.decide(
