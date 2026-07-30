@@ -59,7 +59,7 @@ android {
         create("dev") {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
-            versionCode = 296
+            versionCode = 297
             versionNameSuffix = "-dev"
             buildConfigField("boolean", "DAG_BROWSER_V3_BRIDGE_AVAILABLE", "true")
         }
@@ -107,7 +107,7 @@ android {
     }
 
     androidResources {
-        noCompress += "tflite"
+        noCompress += setOf("tflite", "litertlm")
     }
 
     packaging {
@@ -177,6 +177,7 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.messaging)
     implementation(libs.hilt.android)
+    implementation(libs.litertlm.android)
     implementation(libs.okhttp)
     ksp(libs.androidx.hilt.compiler)
     kapt(libs.hilt.compiler)

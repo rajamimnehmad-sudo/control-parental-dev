@@ -8,9 +8,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.contentfilter.core.domain.help.HelpAction
 import com.contentfilter.core.domain.help.HelpAudience
 import com.contentfilter.core.domain.help.HelpContext
-import com.contentfilter.core.ui.AppHelpAssistantScreen
 import com.contentfilter.feature.status.SystemStatusViewModel
 import com.contentfilter.user.browser.ProtectedBrowserLauncher
+import com.contentfilter.user.help.UserConversationalHelpScreen
+import com.contentfilter.user.help.UserConversationalHelpViewModel
 import com.contentfilter.user.help.UserHelpReportViewModel
 
 @Composable
@@ -19,9 +20,11 @@ internal fun UserHelpRoute(
     onAction: (HelpAction) -> Unit,
     statusViewModel: SystemStatusViewModel = hiltViewModel(),
     reportViewModel: UserHelpReportViewModel = hiltViewModel(),
+    conversationalViewModel: UserConversationalHelpViewModel = hiltViewModel(),
 ) {
     val androidContext = LocalContext.current
     val state by statusViewModel.uiState.collectAsStateWithLifecycle()
+    val modelState by conversationalViewModel.modelState.collectAsStateWithLifecycle()
     val vpnActive = state.vpnState == "Activa"
     val accessibilityActive = state.accessibilityState == "Activa"
     val uninstallProtectionActive = state.deviceAdminState == "Activa"
@@ -37,8 +40,11 @@ internal fun UserHelpRoute(
                 BuildConfig.DAG_BROWSER_V3_BRIDGE_AVAILABLE &&
                     ProtectedBrowserLauncher.isInstalled(androidContext),
         )
-    AppHelpAssistantScreen(
+    UserConversationalHelpScreen(
         context = helpContext,
+        modelState = modelState,
+        onPrepareModel = conversationalViewModel::prepareModel,
+        onGenerate = conversationalViewModel::generate,
         onBack = onBack,
         onAction = onAction,
         onAutomaticReport = { reportViewModel.report(it, helpContext) },

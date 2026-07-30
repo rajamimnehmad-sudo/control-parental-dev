@@ -298,6 +298,33 @@ El lote integrado se desarrolló y validó en:
   publicaron al canal remoto de actualizaciones en este cierre; Supabase
   Production no se modificó.
 
+### Extensión conversacional local Usuario 297
+
+- La causa de las respuestas rígidas era que el supuesto chat aceptaba texto
+  libre pero resolvía únicamente reglas y palabras clave.
+- Usuario 297 mantiene esa capa como verdad de estados, acciones y reportes, y
+  agrega generación local con LiteRT-LM 0.14 y Qwen2 0.5B Instruct. No usa una
+  API de IA y el texto de la conversación no sale del teléfono.
+- El modelo no viene dentro del APK: se descarga una sola vez, admite
+  reanudación y se acepta únicamente si coinciden sus `647377840` bytes y el
+  SHA-256
+  `0f01cc004b8eb62b92ba6be85ed05a248ba0d2f78af94c4949b313eccfb4c157`.
+- La conversación conserva hasta ocho turnos. El prompt queda limitado al
+  proyecto y la salida vuelve a redactar secretos detectados; los reportes
+  continúan construyéndose desde datos deterministas permitidos.
+- La ayuda básica sigue disponible si el modelo falta, no es compatible o no
+  inicia. El candidato soporta ARM64 y no declara disponible el modelo en
+  teléfonos con memoria insuficiente.
+- Toolchain actualizado a Java 21, Kotlin 2.3.20, KSP 2.3.0, Hilt 2.58 y R8
+  8.13.19, conservando bytecode objetivo Java 17. Detalle:
+  `docs/help/GLOSHIA_LOCAL_CHAT.md`.
+- Validación local correcta: ktlint, unitarios de Usuario y APK DEV minificada.
+  APK: `26552638` bytes; SHA-256
+  `f5fc27b103ae1cb11aaf9cd2df28ad37305cf700f9bc4bc1d894b1be076e884b`.
+- Pendiente: ADB no detectaba un teléfono al cerrar el build; falta instalar
+  Usuario 297, copiar el modelo verificado y ejecutar el gate conversacional
+  físico. No se hizo push ni publicación remota.
+
 ## Límites vigentes
 
 - Sin Device Owner no existe garantía absoluta contra modo seguro, ADB
@@ -310,6 +337,7 @@ El lote integrado se desarrolló y validó en:
 
 ## Próximo trabajo autorizado
 
-El gate actual quedó cerrado. El próximo lote recomendado es ampliar la
-calibración con ejemplos actuales, priorizando el hero de H&M y falsos filtros
-de ropa masculina, sin reducir el umbral global a ciegas.
+Completar el gate físico de GloshIA Ayuda Usuario 297 cuando ADB detecte el
+teléfono. Después, el siguiente lote recomendado sigue siendo ampliar la
+calibración visual con ejemplos actuales, priorizando el hero de H&M y falsos
+filtros de ropa masculina, sin reducir el umbral global a ciegas.

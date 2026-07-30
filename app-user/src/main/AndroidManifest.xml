@@ -44,6 +44,13 @@
         android:label="Content Filter"
         android:roundIcon="@drawable/user_fish_icon"
         android:theme="@style/AppTheme">
+        <uses-native-library
+            android:name="libvndksupport.so"
+            android:required="false" />
+        <uses-native-library
+            android:name="libOpenCL.so"
+            android:required="false" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
