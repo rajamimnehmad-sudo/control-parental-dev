@@ -558,6 +558,21 @@ El lote integrado se desarrolló y validó en:
   instalado in-place en SM-S908E. DAG conservó el rol de navegador y
   Accessibility de Usuario permaneció activa. Los datos técnicos de historial
   usados en la prueba se borraron al finalizar.
+- `DAG-V3-REGIONAL-FP-12` quedó resuelto localmente en DAG 32
+  (`0.22.0-dev`). El modelo y el umbral global `0,40` no cambiaron. En
+  panorámicas, una única vista regional apenas superior a `0,50` ya no bloquea
+  toda la imagen: se requieren dos vistas sobre `0,50` o una única señal fuerte
+  desde `0,70`. Los errores técnicos continúan cerrados por seguridad.
+- Validación de DAG 32: 104 unitarios, `ktlintCheck`, `lintDevDebug` y
+  `assembleDevDebug` correctos. APK de 121.208.374 bytes, SHA-256
+  `d96919c6590448e78e9f6ab21ec975097e5492ead016a4fccf65d27e0f38ba7e`,
+  instalada in-place en SM-S908E. Cheeky permitió físicamente una imagen con
+  máximo regional `0,5366`, que la regla anterior habría bloqueado, y completó
+  `5.333 / 5.625 / 1.791 ms`. Frávega y Mimo quedaron visibles pero no
+  completaron la quietud visual dentro de 35 segundos; se conserva como
+  problema separado de entrega/quietud. No hubo crash y se preservaron
+  navegador predeterminado y Accessibility. Evidencia:
+  `docs/compatibility/results/dag-browser-v32-regional-consensus-sm-s908e-2026-07-30.md`.
 
 ### Matriz conjunta Usuario 304, Admin 287 y DAG 29
 
@@ -588,6 +603,7 @@ El siguiente correctivo recomendado es `DAG-DOWNLOADS-01`: preservar semántica
 PDF inline sin debilitar la barrera. La inteligencia conversacional avanzada de
 GloshIA queda para el ticket posterior ya diferido. `DAG-V3-DOCUMENT-ISOLATION-07` y
 `DAG-V3-TAB-HIBERNATION-09` continúan como tickets separados sin autorización
-de código en este lote. Reproducir la variante panorámica exacta cuando vuelva a
-aparecer antes de cerrar `DAG-V3-FALSE-ALLOW-08`. No publicar sin un nuevo OK
-explícito.
+de código en este lote. La quietud incompleta de Frávega y Mimo observada con
+DAG 32 debe diagnosticarse sin volver a modificar la calibración regional.
+Reproducir la variante panorámica exacta cuando vuelva a aparecer antes de
+cerrar `DAG-V3-FALSE-ALLOW-08`. No publicar sin un nuevo OK explícito.
