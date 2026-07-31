@@ -386,6 +386,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
     return requestContentDecision(
       { url: sourceUrl },
       bytes,
+      message?.priority === "visible" ? "visible" : "nearby",
     ).then((action) => ({
       type: INLINE_RESPONSE_MESSAGE,
       version: PROTOCOL_VERSION,
@@ -477,7 +478,7 @@ const encodeBase64 = (bytes) => {
   return btoa(binary);
 };
 
-const requestNativeDecision = (details, bytes) => {
+const requestNativeDecision = (details, bytes, priority = "background") => {
   connectDecisionPort();
   if (decisionPort === null) {
     return Promise.resolve(TECHNICAL_ERROR_ACTION);
@@ -499,6 +500,7 @@ const requestNativeDecision = (details, bytes) => {
           : details.url,
         byteLength: bytes.byteLength,
         bytesBase64: encodeBase64(bytes),
+        priority,
       });
     } catch {
       pendingNativeDecisions.delete(id);
@@ -521,12 +523,12 @@ const rememberContentDecision = (hash, action) => {
   contentDecisionCache.set(hash, action);
 };
 
-const requestContentDecision = async (details, bytes) => {
+const requestContentDecision = async (details, bytes, priority = "background") => {
   let hash;
   try {
     hash = await contentHash(bytes);
   } catch {
-    return requestNativeDecision(details, bytes);
+    return requestNativeDecision(details, bytes, priority);
   }
   const cached = contentDecisionCache.get(hash);
   if (cached) {
@@ -536,7 +538,7 @@ const requestContentDecision = async (details, bytes) => {
   if (pending) {
     return pending;
   }
-  const decisionPromise = requestNativeDecision(details, bytes)
+  const decisionPromise = requestNativeDecision(details, bytes, priority)
     .then((action) => {
       if (action !== TECHNICAL_ERROR_ACTION) {
         rememberContentDecision(hash, action);
@@ -559,7 +561,7 @@ const rememberFallbackDecision = (sourceUrl, action) => {
   fallbackDecisionCache.set(sourceUrl, action);
 };
 
-const fetchFallbackDecision = async (sourceUrl) => {
+const fetchFallbackDecision = async (sourceUrl, priority) => {
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), FALLBACK_FETCH_TIMEOUT_MS);
   try {
@@ -595,6 +597,7 @@ const fetchFallbackDecision = async (sourceUrl) => {
     return requestContentDecision(
       { url: sourceUrl },
       combineChunks(chunks, totalBytes),
+      priority,
     );
   } catch {
     return "retry";
@@ -643,7 +646,7 @@ const drainFallbackQueue = () => {
     task.state = "running";
     activeFallbackAnalyses += 1;
     nativeRequestsInFlight += 1;
-    void fetchFallbackDecision(task.sourceUrl)
+    void fetchFallbackDecision(task.sourceUrl, task.priority)
       .then((action) => {
         if (action !== "retry" && action !== TECHNICAL_ERROR_ACTION) {
           rememberFallbackDecision(task.sourceUrl, action);
@@ -898,7 +901,7 @@ const interceptImageResponse = (details) => {
           : null;
       nativeRequestsInFlight += 1;
       adjustInitialCounter(initialState, "nativeRequestsInFlight", 1);
-      requestContentDecision(details, bytes)
+      requestContentDecision(details, bytes, "nearby")
         .then((action) =>
           presentDecision(details, action, documentGeneration, initialState))
         .catch(() =>

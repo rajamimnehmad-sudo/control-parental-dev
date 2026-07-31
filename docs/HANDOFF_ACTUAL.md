@@ -73,6 +73,16 @@ documentado arriba.
 ## Runtime único de navegador
 
 - El único navegador del proyecto es `app-dag-browser`.
+- El candidato local vigente es DAG `versionCode 54`, `0.34.0-dev`. Conserva
+  dos análisis nativos simultáneos y el máximo autenticado de diez pedidos,
+  pero ordena la espera como visible, cercano y fondo para que una foto recién
+  llegada a pantalla no quede detrás de trabajo especulativo. Pasó 132
+  unitarios, Ktlint, Lint y build. En SM-A235M/Android 14 la matriz fría quedó
+  Frávega `No completó / 17.611 / 1.252 ms`, Mimo
+  `No completó / 5.969 / 575 ms` y Cheeky
+  `No completó / 7.156 / 1.570 ms`, sin crash ni ANR. Un único A/B frío de
+  Mimo frente a V53 midió 1,6 % menos hasta fotos iniciales y 22,2 % menos
+  hasta página visible; no se extrapola como mejora general.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.

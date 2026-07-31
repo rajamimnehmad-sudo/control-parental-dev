@@ -58,11 +58,12 @@ import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
-import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
+import java.util.concurrent.PriorityBlockingQueue
 import java.util.concurrent.RejectedExecutionException
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicLong
 
 class DagBrowserActivity : Activity() {
     private lateinit var geckoView: GeckoView
@@ -96,13 +97,14 @@ class DagBrowserActivity : Activity() {
     private val tabs = mutableListOf<BrowserTab>()
     private val thumbnailExecutor = Executors.newSingleThreadExecutor()
     private val downloadExecutor = Executors.newSingleThreadExecutor()
+    private val mediaAnalysisSequence = AtomicLong(0L)
     private val mediaAnalysisExecutor =
         ThreadPoolExecutor(
             MediaAnalysisThreads,
             MediaAnalysisThreads,
             0L,
             TimeUnit.MILLISECONDS,
-            ArrayBlockingQueue(MediaAnalysisQueueCapacity),
+            PriorityBlockingQueue(),
         )
     private var protectionExtension: WebExtension? = null
     private var extensionReady = false
@@ -1461,18 +1463,23 @@ class DagBrowserActivity : Activity() {
             }
         }
         try {
-            mediaAnalysisExecutor.execute {
-                completeDecision(
-                    runCatching { mediaBytesDecision(payload) }
-                        .getOrElse {
-                            DagMediaDecision(
-                                candidateId = candidateId,
-                                action = DagMediaAction.Block,
-                                reason = DagMediaBytesPolicy.InvalidPayloadReason,
-                            )
-                        },
-                )
-            }
+            mediaAnalysisExecutor.execute(
+                DagPrioritizedMediaTask(
+                    priority = DagMediaAnalysisPriority.fromWire(payload.optString("priority")),
+                    sequence = mediaAnalysisSequence.getAndIncrement(),
+                ) {
+                    completeDecision(
+                        runCatching { mediaBytesDecision(payload) }
+                            .getOrElse {
+                                DagMediaDecision(
+                                    candidateId = candidateId,
+                                    action = DagMediaAction.Block,
+                                    reason = DagMediaBytesPolicy.InvalidPayloadReason,
+                                )
+                            },
+                    )
+                },
+            )
         } catch (_: RejectedExecutionException) {
             completeDecision(
                 DagMediaDecision(
@@ -2888,7 +2895,6 @@ class DagBrowserActivity : Activity() {
         const val ProtectionProtocolVersion = 1
         const val MaxMediaCandidateIdLength = 80
         const val MediaAnalysisThreads = 2
-        const val MediaAnalysisQueueCapacity = 8
         const val MediaTransportLogTag = "DagMediaTransport"
         const val PerformanceLogTag = "DagPerformance"
         const val BackNavigationLogTag = "DagBackNavigation"
