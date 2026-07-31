@@ -254,7 +254,7 @@ class DagBrowserActivity : Activity() {
         newPageButton.setOnClickListener { createTab(switchToTab = true) }
         securityButton.setOnClickListener { showSecurityDetails() }
         swipeRefresh.setOnChildScrollUpCallback { _, _ ->
-            geckoView.canScrollVertically(-1)
+            activeTab?.contentScrollY?.let { it > 0 } ?: false
         }
         swipeRefresh.setOnRefreshListener { reloadFromPullGesture() }
         addressInput.setOnEditorActionListener { _, actionId, event ->
@@ -407,6 +407,8 @@ class DagBrowserActivity : Activity() {
                     swipeRefresh.isRefreshing = false
                     tab.downloadGesture = null
                     tab.navigationRevision += 1
+                    tab.contentScrollY = 0
+                    if (tab === activeTab) swipeRefresh.isEnabled = true
                     if (tab.displayState != TabDisplayState.Loading) {
                         markTabThumbnailStale(tab)
                     }
@@ -443,6 +445,19 @@ class DagBrowserActivity : Activity() {
                         showClosedPage(tab)
                     }
                     schedulePersistTabs()
+                }
+            }
+        tab.session.scrollDelegate =
+            object : GeckoSession.ScrollDelegate {
+                override fun onScrollChanged(
+                    session: GeckoSession,
+                    scrollX: Int,
+                    scrollY: Int,
+                ) {
+                    tab.contentScrollY = scrollY.coerceAtLeast(0)
+                    if (tab === activeTab) {
+                        swipeRefresh.isEnabled = tab.contentScrollY == 0
+                    }
                 }
             }
     }
@@ -1269,6 +1284,7 @@ class DagBrowserActivity : Activity() {
         activeTab = tab
         ensureSessionOpen(tab)
         geckoView.setSession(tab.session)
+        swipeRefresh.isEnabled = tab.contentScrollY <= 0
         setTabActivity(tab, active = true)
         restoreTabIfNeeded(tab)
         renderActiveTab()
@@ -2262,6 +2278,7 @@ class DagBrowserActivity : Activity() {
         var downloadGesture: DagDownloadGesture? = null,
         var isPrivate: Boolean = false,
         var thumbnailStale: Boolean = false,
+        var contentScrollY: Int = 0,
     )
 
     private class ActiveDownload(

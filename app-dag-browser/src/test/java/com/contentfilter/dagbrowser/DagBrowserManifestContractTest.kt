@@ -32,6 +32,8 @@ class DagBrowserManifestContractTest {
         val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
 
         assertContains(activity, "setOnChildScrollUpCallback")
-        assertContains(activity, "geckoView.canScrollVertically(-1)")
+        assertContains(activity, "scrollDelegate")
+        assertContains(activity, "onScrollChanged")
+        assertContains(activity, "contentScrollY")
     }
 }
