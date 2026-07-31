@@ -201,6 +201,21 @@ class MediaBarrierContractTest {
     }
 
     @Test
+    fun `bounded semantic controls recover original icons without opening photo thumbnails`() {
+        val css = extensionRoot.resolve("barrier.css").readText()
+        val script = extensionRoot.resolve("barrier.js").readText()
+
+        assertContains(script, "MAX_FUNCTIONAL_ICON_SIZE = 72")
+        assertContains(script, "MAX_FUNCTIONAL_IMAGE_SOURCE_SIZE = 256")
+        assertContains(script, "FUNCTIONAL_ICON_SEMANTIC_PATTERN")
+        assertContains(script, "FUNCTIONAL_ICON_SOURCE_PATTERN")
+        assertContains(script, "applyFunctionalImageIconDecision")
+        assertContains(script, "element.closest(\"a, button, [role='button']")
+        assertContains(script, "removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE)")
+        assertFalse(css.contains("content: \"\\2661\""))
+    }
+
+    @Test
     fun `media analysis protocol is native and fail closed`() {
         val background = extensionRoot.resolve("background.js").readText()
         val script = extensionRoot.resolve("barrier.js").readText()

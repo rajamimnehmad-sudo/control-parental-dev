@@ -86,24 +86,6 @@ html:not([data-glosh-dag-background-probe])
 }
 
 html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-functional-icon="favorite"] {
-  background-image: none !important;
-  background-color: transparent !important;
-  color: #1876a3 !important;
-  display: inline-grid !important;
-  font-family: sans-serif !important;
-  font-size: 30px !important;
-  line-height: 1 !important;
-  place-items: center !important;
-}
-
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-functional-icon="favorite"]::before {
-  background-image: none !important;
-  content: "\2661" !important;
-}
-
-html:not([data-glosh-dag-background-probe])
   [data-glosh-dag-css-before="allow"]::before {
   content: var(--glosh-dag-before-content) !important;
   background-image: var(--glosh-dag-before-background-image) !important;

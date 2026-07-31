@@ -94,6 +94,12 @@
   const MAX_UI_VECTOR_RENDERED_HEIGHT = 160;
   const MAX_UI_VECTOR_RENDERED_AREA = 96_000;
   const MAX_INLINE_VECTOR_ELEMENTS = 256;
+  const MAX_FUNCTIONAL_ICON_SIZE = 72;
+  const MAX_FUNCTIONAL_IMAGE_SOURCE_SIZE = 256;
+  const FUNCTIONAL_ICON_SEMANTIC_PATTERN =
+    /\b(search|buscar|menu|nav|cart|bag|basket|carrito|account|profile|user|close|dismiss|next|previous|prev|arrow|chevron|favorite|favourite|favorito|wishlist|heart|share|filter|sort|zoom|home)\b/iu;
+  const FUNCTIONAL_ICON_SOURCE_PATTERN =
+    /(?:^|[/_.-])(icon|icons|sprite|sprites|search|menu|cart|bag|basket|account|profile|user|close|arrow|chevron|favorite|wishlist|heart|share|filter|sort|zoom|home)(?:[/_.-]|$)/iu;
   const MAX_INLINE_ANALYSIS_BYTES = 2 * 1024 * 1024;
   const BLOCKED_INLINE_VECTOR_ELEMENTS = new Set([
     "audio",
@@ -525,19 +531,22 @@
   const isSafeCssUiVector = (element, sources) =>
     sources.length > 0 && sources.every(isSvgSource) && hasSafeUiBounds(element);
 
-  const functionalIconKind = (element) => {
+  const functionalIconKind = (element, sources = []) => {
     const bounds = element.getBoundingClientRect();
     if (
       !Number.isFinite(bounds.width) ||
       !Number.isFinite(bounds.height) ||
       bounds.width <= 0 ||
       bounds.height <= 0 ||
-      bounds.width > 64 ||
-      bounds.height > 64
+      bounds.width > MAX_FUNCTIONAL_ICON_SIZE ||
+      bounds.height > MAX_FUNCTIONAL_ICON_SIZE
     ) {
       return null;
     }
-    const link = element.closest("a, button");
+    const link = element.closest("a, button, [role='button'], [role='link'], [role='menuitem']");
+    if (!link) {
+      return null;
+    }
     const semantics = [
       element.id,
       element.className,
@@ -551,18 +560,50 @@
     ]
       .filter((value) => typeof value === "string")
       .join(" ");
-    return /\b(?:favorite|favourite|favorito|wishlist|iheart|fav-heart)\b/iu.test(semantics)
-      ? "favorite"
-      : null;
+    const semanticMatch = semantics.match(FUNCTIONAL_ICON_SEMANTIC_PATTERN);
+    const sourceHasIconSignal = sources.some((source) => {
+      try {
+        return FUNCTIONAL_ICON_SOURCE_PATTERN.test(new URL(source).pathname);
+      } catch {
+        return false;
+      }
+    });
+    return semanticMatch && sourceHasIconSignal ? semanticMatch[1].toLowerCase() : null;
   };
 
-  const applyFunctionalIconFallback = (element) => {
-    const kind = functionalIconKind(element);
+  const applyFunctionalIconFallback = (element, sources) => {
+    const kind = functionalIconKind(element, sources);
     if (!kind) {
       removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
       return false;
     }
     setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, kind);
+    clearWaitingMediaHostsAround(element);
+    return true;
+  };
+
+  const applyFunctionalImageIconDecision = (element, sources) => {
+    if (!(element instanceof HTMLImageElement) || !element.complete) {
+      return false;
+    }
+    if (
+      element.naturalWidth <= 0 ||
+      element.naturalHeight <= 0 ||
+      element.naturalWidth > MAX_FUNCTIONAL_IMAGE_SOURCE_SIZE ||
+      element.naturalHeight > MAX_FUNCTIONAL_IMAGE_SOURCE_SIZE
+    ) {
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
+      return false;
+    }
+    const kind = functionalIconKind(element, sources);
+    if (!kind) {
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
+      return false;
+    }
+    setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, kind);
+    setAttributeIfChanged(element, "data-glosh-dag-media", "allow");
+    updateAccessibleMediaState(element, "allow");
+    updateMediaHostState(element, "allow");
     clearWaitingMediaHostsAround(element);
     return true;
   };
@@ -591,6 +632,14 @@
       return false;
     }
     const { backgroundImage, sources } = record;
+    const functionalKind = functionalIconKind(element, sources);
+    if (functionalKind) {
+      setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, functionalKind);
+      setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
+      setAttributeIfChanged(element, CSS_MEDIA_ATTRIBUTE, "allow");
+      clearWaitingMediaHostsAround(element);
+      return true;
+    }
     if (sources.length === 0 || isSafeCssUiVector(element, sources)) {
       removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
       setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
@@ -603,7 +652,7 @@
     const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
     if (actions.some((action) => action === "block")) {
       removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-      applyFunctionalIconFallback(element);
+      applyFunctionalIconFallback(element, sources);
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "block") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "block");
       }
@@ -614,7 +663,7 @@
       sources.some((sourceUrl) => failedSources.has(sourceUrl))
     ) {
       removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-      applyFunctionalIconFallback(element);
+      applyFunctionalIconFallback(element, sources);
       setAttributeIfChanged(element, CSS_MEDIA_ATTRIBUTE, "error");
       return true;
     }
@@ -643,6 +692,15 @@
       return false;
     }
     const { backgroundImage, content, sources } = record;
+    const functionalKind = functionalIconKind(element, sources);
+    if (functionalKind) {
+      setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, functionalKind);
+      setStylePropertyIfChanged(element, config.backgroundProperty, backgroundImage);
+      setStylePropertyIfChanged(element, config.contentProperty, content);
+      setAttributeIfChanged(element, config.attribute, "allow");
+      clearWaitingMediaHostsAround(element);
+      return true;
+    }
     const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
     const shouldAllow =
       sources.length === 0 ||
@@ -1360,6 +1418,7 @@
     analyzedSources.delete(element);
     stopFallbackObservation(element);
     removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
+    removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
     setAttributeIfChanged(element, "data-glosh-dag-media", "hidden");
     updateAccessibleMediaState(element, "hidden");
     updateMediaHostState(element, "waiting");
@@ -1387,6 +1446,10 @@
       return true;
     }
     const candidateSources = candidateSourcesFor(element);
+    if (applyFunctionalImageIconDecision(element, candidateSources)) {
+      stopFallbackObservation(element);
+      return true;
+    }
     const activeSource = candidateSources[0];
     const sourceChangePending = pendingSourceChanges.has(element);
     const pendingSafetySource = sourceChangePending
