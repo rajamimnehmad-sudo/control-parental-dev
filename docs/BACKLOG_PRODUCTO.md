@@ -227,6 +227,23 @@ Flujo de una entrada:
   reentrenar fuera del banco de evaluación y recién entonces proponer un nuevo
   candidato. No reutilizar estas 100 imágenes como entrenamiento ni ajustar
   otra vez el umbral sobre la misma verdad humana.
+- Auditoría posterior del 2026-07-31: el candidato actual quedó reconstruido en
+  197 entrenamientos, 21 validaciones y 4 holdouts, sin duplicados ni cruces.
+  Sólo 39/197 hashes de entrenamiento enlazan con los manifiestos conservados y
+  0/197 tiene autorización explícita completa bajo el gate actual. El auditor
+  reproducible queda en `pilot_training_provenance.py`; el reentrenamiento y
+  cualquier GPU permanecen bloqueados. Un sondeo separado de 30 candidatos CC0
+  comprobó la viabilidad del lote dirigido, pero sigue `needs_review` y fuera
+  del dataset.
+- Experimento privado R1: con autorización del propietario sólo para prueba
+  local se usaron 27 candidatos claros, balanceados `13 allow / 14 filter`, y
+  se afinaron junto a las 197 muestras históricas en la M2. Contra las 95
+  decisiones binarias recientes el resultado cambió de `8/2/40/45` a
+  `9/1/42/43`: reduce un permiso incorrecto, agrega dos filtros incorrectos y
+  baja exactitud a `0,547368`. Las cuantizaciones INT8 por canal y por tensor
+  cambiaron dos decisiones cada una. Quedó `NO-GO`, fuera de APK y sin abrir el
+  examen sellado. Próximo lote: más ejemplos independientes y revisados; no
+  ajustar nuevamente sobre las mismas 100 decisiones.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 

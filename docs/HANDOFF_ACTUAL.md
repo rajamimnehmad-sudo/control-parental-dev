@@ -703,12 +703,43 @@ El lote integrado se desarrolló y validó en:
   agrega un barrido regional protegido y un reporte reproducible; no cambió
   modelo, DAG, APK, versionCode, Supabase ni Production.
 
+### Procedencia de entrenamiento y sondeo dirigido del 2026-07-31
+
+- Se reconstruyó exactamente el candidato actual: 197 muestras de las rondas
+  1, 2, 4, 5, 6, 7 y 8; ronda 3 como validación efectiva de 21 y ronda 9 como
+  holdout de 4. No hay IDs o hashes duplicados ni cruces entre roles.
+- El entrenamiento contiene 89 permisos y 108 filtros (`83 blur + 25 block`).
+  Los archivos y las revisiones humanas siguen íntegros.
+- El nuevo auditor local `pilot_training_provenance.py` sólo pudo enlazar 39 de
+  197 hashes de entrenamiento con los manifiestos conservados y encontró cero
+  autorizaciones explícitas completas de entrenamiento, uso ML y derechos de
+  imagen. El gate reproducible queda `ready_for_retraining: false`, sin afirmar
+  por ello que el modelo actual esté roto o que el material sea ilegal.
+- Un sondeo nuevo descargó fuera de Git 30 candidatos CC0, sin duplicados ni
+  fallas, y confirmó que existen negativos dirigidos útiles para hombres,
+  personas cubiertas y grupos. Siguen `needs_review`, no son verdad humana y no
+  se mezclaron con el banco de evaluación.
+- Decisión: no usar GPU ni reentrenar aún. Evidencia y siguiente gate:
+  `docs/dag/v3/GLOSHIA_TRAINING_PROVENANCE_2026-07-31.md`.
+- Prueba privada posterior autorizada: se descartaron 3 candidatos irrelevantes
+  y se afinaron 27 claros sobre las 197 muestras históricas, en la M2 y sin
+  servicios pagos. El candidato mantuvo `20/21` en validación y `4/4` permisos
+  en el holdout pequeño, pero contra las 95 decisiones binarias recientes pasó
+  de `8/2/40/45` a `9/1/42/43` para filtro correcto, permiso incorrecto, filtro
+  incorrecto y permiso correcto. La exactitud bajó de `0,557895` a `0,547368`.
+- Dos exportaciones INT8, por canal y por tensor, cambiaron dos decisiones cada
+  una frente al FP32. Resultado `NO-GO`: artefactos sólo en `.codex-tmp`, modelo
+  vigente intacto, examen final sellado y cero cambios Android/APK.
+
 ## Próximo trabajo autorizado
 
-El próximo paso del laboratorio visual es preparar un dataset dirigido con
-autorización real de entrenamiento y mejorar el modelo fuera del banco de
-evaluación; no integrar la calibración preliminar ni abrir todavía
-`final_sealed`. La cola ciega restante se conserva para validaciones futuras,
+El próximo paso del laboratorio visual es ampliar y revisar un dataset nuevo y
+dirigido; 27 ejemplos no alcanzaron para mejorar el sobre-filtrado. Para una
+eventual publicación necesita autorización explícita por muestra, derechos
+aprobados o desidentificación verificable y aislamiento por hash/cluster. El
+auditor debe aprobarlo antes de decidir otra corrida M2 o GPU. No integrar la
+calibración preliminar ni abrir todavía
+`final_sealed`; la cola ciega restante se conserva para validaciones futuras,
 no para seguir ajustando el mismo umbral. El siguiente correctivo Android
 recomendado sigue siendo `DAG-DOWNLOADS-01`: preservar semántica `POST` al abrir una
 descarga en nueva pestaña y definir el tratamiento seguro de PDF inline sin
