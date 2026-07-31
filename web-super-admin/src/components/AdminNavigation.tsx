@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   BellRing,
+  BrainCircuit,
   Building2,
   Database,
   LayoutDashboard,
@@ -29,7 +30,10 @@ const groups = [
   },
   {
     label: "Protección",
-    items: [{ href: "/web-protection/domain-list", label: "Protección web", icon: Database }],
+    items: [
+      { href: "/web-protection/domain-list", label: "Protección web", icon: Database },
+      { href: "/gloshia", label: "GloshIA visual", icon: BrainCircuit },
+    ],
   },
   {
     label: "Experiencia",
