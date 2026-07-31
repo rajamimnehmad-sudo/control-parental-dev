@@ -260,7 +260,12 @@ class MediaBarrierContractTest {
         assertContains(script, "[\"http:\", \"https:\"]")
         assertContains(css, "data-glosh-dag-media=\"allow\"")
         assertContains(css, "data-glosh-dag-media=\"block\"")
-        assertContains(css, "filter: blur(28px)")
+        assertContains(
+            css,
+            "filter: blur(28px) brightness(0.74) saturate(0.5) contrast(0.88)",
+        )
+        assertContains(css, "transition: opacity 160ms ease-out")
+        assertFalse(css.contains("transition: filter"))
         assertContains(script, "Without the authenticated native channel, media remains hidden")
     }
 

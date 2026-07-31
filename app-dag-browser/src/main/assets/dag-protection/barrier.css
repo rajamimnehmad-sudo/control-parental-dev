@@ -39,8 +39,9 @@ image[data-glosh-dag-media="block"],
 input[type="image"][data-glosh-dag-media="block"] {
   visibility: visible !important;
   opacity: 1 !important;
-  filter: blur(28px) brightness(0.78) saturate(0.55) !important;
-  background: #dce7ee !important;
+  filter: blur(28px) brightness(0.74) saturate(0.5) contrast(0.88) !important;
+  background: #c8d4dc !important;
+  transition: opacity 160ms ease-out !important;
 }
 
 img[data-glosh-dag-media="error"],
