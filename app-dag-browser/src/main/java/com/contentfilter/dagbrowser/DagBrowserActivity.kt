@@ -2,6 +2,7 @@ package com.contentfilter.dagbrowser
 
 import android.app.Activity
 import android.app.AlertDialog
+import android.app.Dialog
 import android.app.role.RoleManager
 import android.content.ComponentCallbacks2
 import android.content.Intent
@@ -31,6 +32,7 @@ import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.core.content.FileProvider
+import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import org.json.JSONObject
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
@@ -56,8 +58,8 @@ import java.util.concurrent.TimeUnit
 class DagBrowserActivity : Activity() {
     private lateinit var geckoView: GeckoView
     private lateinit var addressInput: EditText
-    private lateinit var homeButton: ImageButton
-    private lateinit var newTabButton: ImageButton
+    private lateinit var newPageButton: ImageButton
+    private lateinit var securityButton: ImageButton
     private lateinit var goButton: ImageButton
     private lateinit var tabButton: TextView
     private lateinit var menuButton: ImageButton
@@ -66,6 +68,7 @@ class DagBrowserActivity : Activity() {
     private lateinit var safetyTitle: TextView
     private lateinit var safetyDetail: TextView
     private lateinit var tabSwitcher: DagTabSwitcherView
+    private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var tabPersistence: DagTabPersistence
     private lateinit var historyPersistence: DagHistoryPersistence
     private lateinit var imageAnalyzer: DagImageAnalyzer
@@ -92,6 +95,7 @@ class DagBrowserActivity : Activity() {
     private var pendingExternalUrl: String? = null
     private var activeDownload: ActiveDownload? = null
     private var downloadDialog: AlertDialog? = null
+    private var downloadsScreen: Dialog? = null
     private var activeChoicePrompt: ActiveChoicePrompt? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
     private val persistTabsRunnable = Runnable(::persistTabsNow)
@@ -229,8 +233,8 @@ class DagBrowserActivity : Activity() {
     private fun bindViews() {
         geckoView = findViewById(R.id.gecko_view)
         addressInput = findViewById(R.id.address_input)
-        homeButton = findViewById(R.id.home_button)
-        newTabButton = findViewById(R.id.new_tab_button)
+        newPageButton = findViewById(R.id.new_page_button)
+        securityButton = findViewById(R.id.security_button)
         goButton = findViewById(R.id.go_button)
         tabButton = findViewById(R.id.tab_button)
         menuButton = findViewById(R.id.menu_button)
@@ -239,12 +243,15 @@ class DagBrowserActivity : Activity() {
         safetyTitle = findViewById(R.id.safety_title)
         safetyDetail = findViewById(R.id.safety_detail)
         tabSwitcher = findViewById(R.id.tab_switcher)
+        swipeRefresh = findViewById(R.id.swipe_refresh)
     }
 
     private fun configureControls() {
         setNavigationControlsEnabled(false)
         goButton.setOnClickListener { navigateFromInput() }
-        newTabButton.setOnClickListener { createTab(switchToTab = true) }
+        newPageButton.setOnClickListener { createTab(switchToTab = true) }
+        securityButton.setOnClickListener { showSecurityDetails() }
+        swipeRefresh.setOnRefreshListener { reloadFromPullGesture() }
         addressInput.setOnEditorActionListener { _, actionId, event ->
             val submitted =
                 actionId == EditorInfo.IME_ACTION_GO ||
@@ -252,7 +259,6 @@ class DagBrowserActivity : Activity() {
             if (submitted) navigateFromInput()
             submitted
         }
-        homeButton.setOnClickListener { activeTab?.let(::goHome) }
         tabButton.setOnClickListener { showTabSwitcher() }
         menuButton.setOnClickListener { showBrowserMenu() }
         tabSwitcher.setListener(
@@ -393,6 +399,7 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     url: String,
                 ) {
+                    swipeRefresh.isRefreshing = false
                     tab.downloadGesture = null
                     tab.navigationRevision += 1
                     if (tab.displayState != TabDisplayState.Loading) {
@@ -418,6 +425,7 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     success: Boolean,
                 ) {
+                    swipeRefresh.isRefreshing = false
                     if (tab === activeTab) {
                         recordPerformanceMetric(
                             metric = DagPerformanceMetric.PageAnalysisReady,
@@ -1157,14 +1165,62 @@ class DagBrowserActivity : Activity() {
 
     private fun setNavigationControlsEnabled(enabled: Boolean) {
         addressInput.isEnabled = enabled
-        homeButton.isEnabled = enabled
-        newTabButton.isEnabled = enabled
+        newPageButton.isEnabled = enabled
+        securityButton.isEnabled = enabled
         goButton.isEnabled = enabled
         val alpha = if (enabled) EnabledControlAlpha else DisabledControlAlpha
         addressInput.alpha = alpha
-        homeButton.alpha = alpha
-        newTabButton.alpha = alpha
+        newPageButton.alpha = alpha
+        securityButton.alpha = alpha
         goButton.alpha = alpha
+    }
+
+    private fun reloadFromPullGesture() {
+        val tab = activeTab
+        if (!extensionReady || tab == null || tab.url == InitialBlankPage) {
+            swipeRefresh.isRefreshing = false
+            return
+        }
+        beginProtectedLoad(tab, startNewPerformanceNavigation = true)
+        tab.session.reload()
+        handler.postDelayed({ swipeRefresh.isRefreshing = false }, PullRefreshTimeoutMillis)
+    }
+
+    private fun showSecurityDetails() {
+        val tab = activeTab
+        val secureConnection = tab?.url?.startsWith("https://", ignoreCase = true) == true
+        val pageProtection = tab?.displayState == TabDisplayState.Visible && !tab.waitingForBarrier
+        val newPage = tab == null || tab.url == InitialBlankPage
+        val host = tab?.url?.let { runCatching { Uri.parse(it).host }.getOrNull() }.orEmpty()
+        val pageLabel = host.ifBlank { getString(R.string.security_new_page) }
+        val connectionLabel =
+            when {
+                newPage -> R.string.security_connection_unavailable
+                secureConnection -> R.string.security_secure_connection
+                else -> R.string.navigation_blocked
+            }
+        val protectionLabel =
+            when {
+                newPage -> R.string.security_dag_ready
+                pageProtection -> R.string.security_dag_protection
+                else -> R.string.status_closed
+            }
+        val message =
+            buildString {
+                append(pageLabel)
+                append("\n\n")
+                append("• ")
+                append(getString(connectionLabel))
+                append("\n• ")
+                append(getString(protectionLabel))
+                append("\n\n")
+                append(getString(R.string.security_detail))
+            }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.security_title)
+            .setMessage(message)
+            .setPositiveButton(R.string.close, null)
+            .show()
     }
 
     private fun goHome(tab: BrowserTab) {
@@ -1711,22 +1767,43 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showDownloads() {
-        val files = downloadedPdfs()
-        if (files.isEmpty()) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.downloads)
-                .setMessage(R.string.downloads_empty)
-                .setPositiveButton(R.string.close, null)
-                .show()
-            return
+        downloadsScreen?.dismiss()
+        val dialog = Dialog(this)
+        downloadsScreen = dialog
+        dialog.setContentView(R.layout.view_dag_downloads)
+        val list = dialog.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.downloads_list)
+        val emptyState = dialog.findViewById<TextView>(R.id.downloads_empty_state)
+        lateinit var adapter: DagDownloadsAdapter
+        adapter =
+            DagDownloadsAdapter(
+                onOpen = { file ->
+                    if (isStoredDownload(file)) openDownloadedPdf(file)
+                    dialog.dismiss()
+                },
+                onDelete = { file -> confirmDeleteDownload(file) { renderDownloads(adapter, list, emptyState) } },
+            )
+        list.adapter = adapter
+        dialog.findViewById<View>(R.id.downloads_close).setOnClickListener { dialog.dismiss() }
+        dialog.setOnDismissListener {
+            if (downloadsScreen === dialog) downloadsScreen = null
         }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.downloads)
-            .setItems(files.map(File::getName).toTypedArray()) { _, index ->
-                showDownloadedFile(files[index])
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
+        dialog.show()
+        dialog.window?.setLayout(
+            android.view.WindowManager.LayoutParams.MATCH_PARENT,
+            android.view.WindowManager.LayoutParams.MATCH_PARENT,
+        )
+        renderDownloads(adapter, list, emptyState)
+    }
+
+    private fun renderDownloads(
+        adapter: DagDownloadsAdapter,
+        list: androidx.recyclerview.widget.RecyclerView,
+        emptyState: TextView,
+    ) {
+        val files = downloadedPdfs()
+        adapter.submit(files)
+        list.visibility = if (files.isEmpty()) View.GONE else View.VISIBLE
+        emptyState.visibility = if (files.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun showDownloadedFile(file: File) {
@@ -1740,7 +1817,10 @@ class DagBrowserActivity : Activity() {
             .show()
     }
 
-    private fun confirmDeleteDownload(file: File) {
+    private fun confirmDeleteDownload(
+        file: File,
+        onDeleted: () -> Unit = {},
+    ) {
         if (!isStoredDownload(file)) return
         AlertDialog.Builder(this)
             .setTitle(R.string.delete_download_title)
@@ -1753,6 +1833,7 @@ class DagBrowserActivity : Activity() {
                         R.string.download_delete_failed
                     }
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+                onDeleted()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()
@@ -2138,6 +2219,7 @@ class DagBrowserActivity : Activity() {
         const val ThumbnailCaptureTimeoutMillis = 1_200L
         const val ThumbnailCaptureRetryDelayMillis = 120L
         const val ThumbnailCaptureRetries = 1
+        const val PullRefreshTimeoutMillis = 2_500L
         const val DownloadsDirectory = "downloads"
         const val DownloadBufferBytes = 16 * 1024
         const val PdfHeaderBytes = 8

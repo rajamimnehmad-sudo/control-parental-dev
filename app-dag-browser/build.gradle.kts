@@ -28,7 +28,7 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 36
+        versionCode = 37
         versionName = "0.26.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -87,6 +87,7 @@ ktlint {
 dependencies {
     implementation("androidx.core:core-ktx:1.18.0")
     implementation("androidx.recyclerview:recyclerview:1.4.0")
+    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.0")
     implementation("org.mozilla.geckoview:geckoview-arm64-v8a:153.0.20260715202819")
 

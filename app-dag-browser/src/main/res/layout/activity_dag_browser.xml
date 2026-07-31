@@ -23,14 +23,14 @@
             android:paddingBottom="7dp">
 
             <ImageButton
-                android:id="@+id/home_button"
+                android:id="@+id/new_page_button"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="@drawable/dag_toolbar_icon_background"
-                android:contentDescription="@string/home"
+                android:contentDescription="@string/new_page"
                 android:enabled="false"
                 android:padding="9dp"
-                android:src="@drawable/ic_dag_home" />
+                android:src="@drawable/ic_dag_add" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -45,13 +45,13 @@
                 android:paddingEnd="3dp">
 
                 <ImageButton
-                    android:id="@+id/new_tab_button"
+                    android:id="@+id/security_button"
                     android:layout_width="34dp"
                     android:layout_height="34dp"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/new_tab"
+                    android:contentDescription="@string/security_status"
                     android:padding="7dp"
-                    android:src="@drawable/ic_dag_add" />
+                    android:src="@drawable/ic_dag_shield" />
 
                 <EditText
                     android:id="@+id/address_input"
@@ -104,10 +104,15 @@
             android:src="@drawable/ic_dag_more" />
         </LinearLayout>
 
-        <FrameLayout
+        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+            android:id="@+id/swipe_refresh"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1">
+
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="match_parent">
 
         <org.mozilla.geckoview.GeckoView
             android:id="@+id/gecko_view"
@@ -176,6 +181,7 @@
             </LinearLayout>
         </FrameLayout>
         </FrameLayout>
+        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
     </LinearLayout>
 
     <com.contentfilter.dagbrowser.DagTabSwitcherView

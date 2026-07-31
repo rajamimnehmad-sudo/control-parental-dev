@@ -7,6 +7,16 @@
     <string name="search">Buscar</string>
     <string name="back">Atrás</string>
     <string name="home">Inicio</string>
+    <string name="new_page">Nueva página</string>
+    <string name="security_status">Estado de seguridad de esta página</string>
+    <string name="security_title">Seguridad de DAG</string>
+    <string name="security_secure_connection">Conexión segura (HTTPS)</string>
+    <string name="security_connection_unavailable">Todavía no hay una página HTTPS cargada</string>
+    <string name="security_dag_protection">Protección DAG activa</string>
+    <string name="security_dag_ready">Protección DAG lista para la nueva página</string>
+    <string name="security_new_page">Nueva página segura</string>
+    <string name="security_detail">HTTPS cifra la conexión, pero no garantiza que el sitio sea confiable. DAG además mantiene activa su barrera visual.</string>
+    <string name="refreshing_page">Actualizando página…</string>
     <string name="reload">Recargar</string>
     <string name="set_default_browser">Usar DAG como predeterminado</string>
     <string name="default_browser_active">DAG ya es el navegador predeterminado</string>
@@ -37,7 +47,7 @@
     <string name="close_named_tab">Cerrar %1$s</string>
     <string name="active_tab">Pestaña actual</string>
     <string name="close_tab_switcher">Volver a la página</string>
-    <string name="tab_switcher_hint">Mantené presionada una tarjeta para ordenarla o deslizala para cerrarla.</string>
+    <string name="tab_switcher_hint">Vista previa real de cada pestaña. Mantené presionada una tarjeta para ordenarla o deslizala para cerrarla.</string>
     <string name="close_all_tabs">Cerrar todo</string>
     <string name="close_all_tabs_title">¿Cerrar todas las pestañas?</string>
     <string name="close_all_tabs_detail">Se cerrarán las %1$d pestañas abiertas y quedará un Inicio seguro.</string>
@@ -69,6 +79,7 @@
     <string name="download_blocked">DAG bloqueó una descarga no permitida. Solo admite PDF seguro de hasta 20 MB.</string>
     <string name="download_one_at_a_time">Terminá o cancelá la descarga actual antes de iniciar otra.</string>
     <string name="downloads">Descargas</string>
+    <string name="downloads_subtitle">PDF verificados y guardados de forma privada</string>
     <string name="history">Historial</string>
     <string name="history_empty">Todavía no hay páginas en el historial.</string>
     <string name="clear_history">Borrar historial</string>
