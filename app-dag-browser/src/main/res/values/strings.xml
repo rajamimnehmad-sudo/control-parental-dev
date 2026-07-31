@@ -80,6 +80,10 @@
     <string name="download_one_at_a_time">Terminá o cancelá la descarga actual antes de iniciar otra.</string>
     <string name="downloads">Descargas</string>
     <string name="downloads_subtitle">PDF verificados y guardados de forma privada</string>
+    <string name="clear_downloads">Borrar todo</string>
+    <string name="clear_downloads_title">¿Borrar todas las descargas?</string>
+    <string name="clear_downloads_detail">Se eliminarán los PDF guardados en DAG.</string>
+    <string name="downloads_cleared">Descargas borradas</string>
     <string name="history">Historial</string>
     <string name="favorites">Favoritos</string>
     <string name="add_favorite">Agregar a favoritos</string>
@@ -88,6 +92,9 @@
     <string name="favorites_empty">Todavía no hay favoritos.</string>
     <string name="favorite_added">Agregado a favoritos</string>
     <string name="favorite_removed">Quitado de favoritos</string>
+    <string name="history_subtitle">Páginas visitadas recientemente</string>
+    <string name="favorites_subtitle">Tus páginas guardadas</string>
+    <string name="clear_favorites">Borrar favoritos</string>
     <string name="history_empty">Todavía no hay páginas en el historial.</string>
     <string name="clear_history">Borrar historial</string>
     <string name="history_cleared">Historial borrado</string>

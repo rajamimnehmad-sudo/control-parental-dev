@@ -12,6 +12,7 @@
         android:orientation="vertical">
 
         <LinearLayout
+            android:id="@+id/browser_toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="@color/dag_navy"
@@ -33,6 +34,7 @@
                 android:src="@drawable/ic_dag_add" />
 
             <LinearLayout
+                android:id="@+id/address_bar"
                 android:layout_width="0dp"
                 android:layout_height="44dp"
                 android:layout_marginStart="6dp"

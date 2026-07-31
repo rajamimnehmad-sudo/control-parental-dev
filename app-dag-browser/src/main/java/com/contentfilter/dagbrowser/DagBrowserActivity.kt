@@ -22,6 +22,7 @@ import android.view.WindowInsets
 import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.widget.ArrayAdapter
+import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
 import android.widget.ListView
@@ -32,6 +33,7 @@ import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.core.content.FileProvider
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import org.json.JSONObject
 import org.mozilla.geckoview.AllowOrDeny
@@ -48,6 +50,8 @@ import java.io.InputStream
 import java.io.RandomAccessFile
 import java.nio.file.Files
 import java.nio.file.StandardCopyOption
+import java.text.DateFormat
+import java.util.Date
 import java.util.Locale
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
@@ -57,6 +61,9 @@ import java.util.concurrent.TimeUnit
 
 class DagBrowserActivity : Activity() {
     private lateinit var geckoView: GeckoView
+    private lateinit var browserRoot: View
+    private lateinit var browserToolbar: View
+    private lateinit var addressBar: View
     private lateinit var addressInput: EditText
     private lateinit var newPageButton: ImageButton
     private lateinit var securityButton: ImageButton
@@ -97,6 +104,7 @@ class DagBrowserActivity : Activity() {
     private var activeDownload: ActiveDownload? = null
     private var downloadDialog: AlertDialog? = null
     private var downloadsScreen: Dialog? = null
+    private var pageListScreen: Dialog? = null
     private var activeChoicePrompt: ActiveChoicePrompt? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
     private val persistTabsRunnable = Runnable(::persistTabsNow)
@@ -233,6 +241,9 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun bindViews() {
+        browserRoot = findViewById(R.id.browser_root)
+        browserToolbar = findViewById(R.id.browser_toolbar)
+        addressBar = findViewById(R.id.address_bar)
         geckoView = findViewById(R.id.gecko_view)
         addressInput = findViewById(R.id.address_input)
         newPageButton = findViewById(R.id.new_page_button)
@@ -881,6 +892,12 @@ class DagBrowserActivity : Activity() {
             return null
         }
         if (protectionExtension == null) return null
+        if (restoredTab == null && initialUrl == null) {
+            tabs.firstOrNull { it.url == InitialBlankPage && it.isPrivate == privateTab }?.let { blankTab ->
+                if (switchToTab) switchTo(blankTab)
+                return blankTab
+            }
+        }
         val requestedUrl = restoredTab?.url ?: initialUrl ?: InitialBlankPage
         val tab =
             BrowserTab(
@@ -1357,8 +1374,7 @@ class DagBrowserActivity : Activity() {
         val tab = activeTab ?: return
         setNavigationControlsEnabled(extensionReady)
         updateTabButton()
-        addressInput.hint = getString(if (tab.isPrivate) R.string.private_tab else R.string.address_hint)
-        tabButton.contentDescription = getString(if (tab.isPrivate) R.string.private_tab else R.string.tabs)
+        updatePrivateAppearance(tab)
         if (tab.url == InitialBlankPage) {
             addressInput.text.clear()
         } else if (!addressInput.hasFocus()) {
@@ -1399,6 +1415,22 @@ class DagBrowserActivity : Activity() {
 
     private fun updateTabButton() {
         tabButton.text = tabs.size.coerceAtLeast(1).toString()
+    }
+
+    private fun updatePrivateAppearance(tab: BrowserTab) {
+        val privateTab = tab.isPrivate
+        val toolbarColor = getColor(if (privateTab) R.color.dag_private_navy else R.color.dag_navy)
+        browserRoot.setBackgroundColor(toolbarColor)
+        browserToolbar.setBackgroundColor(toolbarColor)
+        addressBar.setBackgroundResource(
+            if (privateTab) R.drawable.dag_private_address_background else R.drawable.dag_address_background,
+        )
+        addressInput.setTextColor(getColor(if (privateTab) R.color.dag_private_text else R.color.dag_text))
+        tabButton.setBackgroundResource(
+            if (privateTab) R.drawable.dag_private_tab_button_background else R.drawable.dag_tab_button_background,
+        )
+        addressInput.hint = getString(if (privateTab) R.string.private_tab else R.string.address_hint)
+        tabButton.contentDescription = getString(if (privateTab) R.string.private_tab else R.string.tabs)
     }
 
     private fun showTabSwitcher() {
@@ -1786,25 +1818,28 @@ class DagBrowserActivity : Activity() {
 
     private fun showFavorites() {
         val entries = favoritesPersistence.load(::isRestorableUrl)
-        if (entries.isEmpty()) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.favorites)
-                .setMessage(R.string.favorites_empty)
-                .setPositiveButton(R.string.close, null)
-                .show()
-            return
-        }
-        val labels =
+        val items =
             entries.map { entry ->
-                val host = Uri.parse(entry.url).host?.removePrefix("www.").orEmpty()
-                entry.title.takeIf(String::isNotBlank)?.let { "$it\n$host" } ?: host
+                DagPageListItem(
+                    title = entry.title.takeIf(String::isNotBlank) ?: pageHost(entry.url),
+                    host = pageHost(entry.url),
+                    detail = getString(R.string.favorites),
+                    url = entry.url,
+                )
             }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.favorites)
-            .setItems(labels.toTypedArray()) { _, index -> openFavorite(entries[index]) }
-            .setNegativeButton(R.string.close, null)
-            .show()
+        showPageListScreen(
+            titleRes = R.string.favorites,
+            subtitleRes = R.string.favorites_subtitle,
+            emptyRes = R.string.favorites_empty,
+            clearRes = R.string.clear_favorites,
+            items = items,
+            onOpen = { item -> openFavorite(DagFavorite(item.url, item.title)) },
+            onClear = { favoritesPersistence.clear() },
+        )
     }
+
+    private fun pageHost(url: String): String =
+        runCatching { Uri.parse(url).host?.removePrefix("www.").orEmpty() }.getOrDefault("")
 
     private fun openFavorite(entry: DagFavorite) {
         val safeUrl = restorableUrl(entry.url) ?: return
@@ -1819,32 +1854,82 @@ class DagBrowserActivity : Activity() {
 
     private fun showHistory() {
         val entries = historyPersistence.load(::isRestorableUrl)
-        if (entries.isEmpty()) {
-            AlertDialog.Builder(this)
-                .setTitle(R.string.history)
-                .setMessage(R.string.history_empty)
-                .setPositiveButton(R.string.close, null)
-                .show()
-            return
-        }
-        val labels =
+        val items =
             entries.map { entry ->
-                val host =
-                    runCatching { Uri.parse(entry.url).host }
-                        .getOrNull()
-                        ?.removePrefix("www.")
-                        .orEmpty()
-                entry.title.takeIf(String::isNotBlank)?.let { "$it\n$host" } ?: host
+                DagPageListItem(
+                    title = entry.title.takeIf(String::isNotBlank) ?: pageHost(entry.url),
+                    host = pageHost(entry.url),
+                    detail =
+                        DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
+                            .format(Date(entry.visitedAtMillis)),
+                    url = entry.url,
+                )
             }
-        AlertDialog.Builder(this)
-            .setTitle(R.string.history)
-            .setItems(labels.toTypedArray()) { _, index -> openHistoryEntry(entries[index]) }
-            .setNeutralButton(R.string.clear_history) { _, _ ->
+        showPageListScreen(
+            titleRes = R.string.history,
+            subtitleRes = R.string.history_subtitle,
+            emptyRes = R.string.history_empty,
+            clearRes = R.string.clear_history,
+            items = items,
+            onOpen = { item ->
+                val entry = entries.firstOrNull { it.url == item.url } ?: return@showPageListScreen
+                openHistoryEntry(entry)
+            },
+            onClear = {
                 historyPersistence.clear()
                 Toast.makeText(this, R.string.history_cleared, Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton(R.string.close, null)
-            .show()
+            },
+        )
+    }
+
+    private fun showPageListScreen(
+        titleRes: Int,
+        subtitleRes: Int,
+        emptyRes: Int,
+        clearRes: Int,
+        items: List<DagPageListItem>,
+        onOpen: (DagPageListItem) -> Unit,
+        onClear: () -> Unit,
+    ) {
+        pageListScreen?.dismiss()
+        val dialog = Dialog(this)
+        pageListScreen = dialog
+        dialog.setContentView(R.layout.view_dag_page_list)
+        val list = dialog.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.page_list_recycler)
+        val emptyState = dialog.findViewById<TextView>(R.id.page_list_empty)
+        val clearButton = dialog.findViewById<Button>(R.id.page_list_clear)
+        val adapter =
+            DagPageListAdapter(
+                onOpen = { item ->
+                    dialog.dismiss()
+                    onOpen(item)
+                },
+                onDelete = null,
+            )
+        list.layoutManager = LinearLayoutManager(this)
+        list.adapter = adapter
+        dialog.findViewById<TextView>(R.id.page_list_title).setText(titleRes)
+        dialog.findViewById<TextView>(R.id.page_list_subtitle).setText(subtitleRes)
+        dialog.findViewById<ImageButton>(R.id.page_list_close).setOnClickListener { dialog.dismiss() }
+        clearButton.setText(clearRes)
+        clearButton.isEnabled = items.isNotEmpty()
+        clearButton.setOnClickListener {
+            onClear()
+            dialog.dismiss()
+        }
+        emptyState.setText(emptyRes)
+        dialog.setOnDismissListener {
+            if (pageListScreen === dialog) pageListScreen = null
+        }
+        dialog.show()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
+        dialog.window?.setLayout(
+            android.view.WindowManager.LayoutParams.MATCH_PARENT,
+            android.view.WindowManager.LayoutParams.MATCH_PARENT,
+        )
+        adapter.submit(items)
+        list.visibility = if (items.isEmpty()) View.GONE else View.VISIBLE
+        emptyState.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
     }
 
     private fun openHistoryEntry(entry: DagHistoryEntry) {
@@ -1875,6 +1960,9 @@ class DagBrowserActivity : Activity() {
                 onDelete = { file -> confirmDeleteDownload(file) { renderDownloads(adapter, list, emptyState) } },
             )
         list.adapter = adapter
+        dialog.findViewById<Button>(R.id.downloads_clear).setOnClickListener {
+            confirmClearDownloads { renderDownloads(adapter, list, emptyState) }
+        }
         dialog.findViewById<View>(R.id.downloads_close).setOnClickListener { dialog.dismiss() }
         dialog.setOnDismissListener {
             if (downloadsScreen === dialog) downloadsScreen = null
@@ -1926,6 +2014,21 @@ class DagBrowserActivity : Activity() {
                     }
                 Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
                 onDeleted()
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun confirmClearDownloads(onCleared: () -> Unit) {
+        val files = downloadedPdfs()
+        if (files.isEmpty()) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.clear_downloads_title)
+            .setMessage(R.string.clear_downloads_detail)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                files.forEach { file -> file.delete() }
+                Toast.makeText(this, R.string.downloads_cleared, Toast.LENGTH_SHORT).show()
+                onCleared()
             }
             .setNegativeButton(R.string.cancel, null)
             .show()

@@ -16,6 +16,10 @@ internal class DagFavoritesPersistence(context: Context) {
     fun load(isAllowedUrl: (String) -> Boolean): List<DagFavorite> =
         DagFavoritesCodec.decode(preferences.getString(StateKey, null), isAllowedUrl)
 
+    fun clear() {
+        preferences.edit().remove(StateKey).apply()
+    }
+
     fun toggle(
         favorite: DagFavorite,
         isAllowedUrl: (String) -> Boolean,

@@ -3,15 +3,17 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/dag_background"
-    android:orientation="vertical"
-    android:paddingTop="18dp">
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:background="@color/dag_navy"
         android:gravity="center_vertical"
         android:paddingStart="20dp"
-        android:paddingEnd="12dp">
+        android:paddingTop="20dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="20dp">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -20,36 +22,26 @@
             android:orientation="vertical">
 
             <TextView
+                android:id="@+id/page_list_title"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="@string/downloads"
-                android:textColor="@color/dag_text"
-                android:textSize="26sp"
-                android:fontFamily="sans-serif-medium" />
+                android:fontFamily="sans-serif-medium"
+                android:textColor="@color/dag_on_navy"
+                android:textSize="26sp" />
 
             <TextView
+                android:id="@+id/page_list_subtitle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="4dp"
-                android:text="@string/downloads_subtitle"
-                android:textColor="@color/dag_muted"
+                android:textColor="@color/dag_on_navy_muted"
                 android:textSize="14sp" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/downloads_clear"
-            android:layout_width="wrap_content"
-            android:layout_height="40dp"
-            android:layout_marginEnd="8dp"
-            android:backgroundTint="@color/dag_status_error"
-            android:text="@string/clear_downloads"
-            android:textAllCaps="false"
-            android:textColor="@color/dag_status_error_text" />
-
         <ImageButton
-            android:id="@+id/downloads_close"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:id="@+id/page_list_close"
+            android:layout_width="46dp"
+            android:layout_height="46dp"
             android:background="@drawable/dag_switcher_button_background"
             android:contentDescription="@string/close"
             android:padding="12dp"
@@ -57,25 +49,35 @@
     </LinearLayout>
 
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/downloads_list"
+        android:id="@+id/page_list_recycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_marginTop="18dp"
         android:layout_weight="1"
         android:clipToPadding="false"
         android:paddingStart="16dp"
+        android:paddingTop="18dp"
         android:paddingEnd="16dp"
-        android:paddingBottom="24dp" />
+        android:paddingBottom="12dp" />
 
     <TextView
-        android:id="@+id/downloads_empty_state"
+        android:id="@+id/page_list_empty"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
         android:gravity="center"
         android:padding="36dp"
-        android:text="@string/downloads_empty"
         android:textColor="@color/dag_muted"
         android:textSize="17sp"
         android:visibility="gone" />
+
+    <Button
+        android:id="@+id/page_list_clear"
+        android:layout_width="match_parent"
+        android:layout_height="48dp"
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:backgroundTint="@color/dag_status_error"
+        android:textColor="@color/dag_status_error_text"
+        android:textAllCaps="false" />
 </LinearLayout>
