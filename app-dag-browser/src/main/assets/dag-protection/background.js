@@ -4,6 +4,28 @@ const INTERCEPTED_RESOURCE_TYPES = new Set(["image", "imageset"]);
 const BLOCKED_RESOURCE_TYPES = new Set(["media", "object"]);
 const BLOCKED_MEDIA_MIME_PATTERN =
   /^(?:audio|video)\/|^application\/(?:dash\+xml|vnd\.apple\.mpegurl|x-mpegurl)/iu;
+const PAGE_AD_HOSTS = new Set([
+  "doubleclick.net",
+  "googlesyndication.com",
+  "googleadservices.com",
+  "adservice.google.com",
+  "adsystem.com",
+  "adnxs.com",
+  "amazon-adsystem.com",
+  "criteo.com",
+  "outbrain.com",
+  "pubmatic.com",
+  "rubiconproject.com",
+  "taboola.com",
+]);
+const VIDEO_RESOURCE_TYPES = new Set(["media", "video", "audio"]);
+const VIDEO_SITE_HOSTS = new Set([
+  "youtube.com",
+  "youtube-nocookie.com",
+  "youtu.be",
+  "googlevideo.com",
+  "ytimg.com",
+]);
 const MAX_INTERCEPT_CAPTURE_BYTES = 512 * 1024;
 const MAX_ANALYSIS_BYTES = 2 * 1024 * 1024;
 const MAX_SOURCE_URL_LENGTH = 4_096;
@@ -45,6 +67,36 @@ const fallbackDecisionCache = new Map();
 const contentDecisionPromises = new Map();
 const contentDecisionCache = new Map();
 const fallbackAnalysisQueue = [];
+
+const hostMatches = (hostname, candidate) =>
+  hostname === candidate || hostname.endsWith(`.${candidate}`);
+
+const isVideoSiteUrl = (value) => {
+  try {
+    const hostname = new URL(value || "").hostname.toLowerCase();
+    return [...VIDEO_SITE_HOSTS].some((candidate) => hostMatches(hostname, candidate));
+  } catch {
+    return false;
+  }
+};
+
+const isPageAdvertisementRequest = (details) => {
+  if (!details || VIDEO_RESOURCE_TYPES.has(details.type)) {
+    return false;
+  }
+  if (details.type === "main_frame") {
+    return false;
+  }
+  if (isVideoSiteUrl(details.documentUrl) || isVideoSiteUrl(details.originUrl)) {
+    return false;
+  }
+  try {
+    const hostname = new URL(details.url).hostname.toLowerCase();
+    return [...PAGE_AD_HOSTS].some((candidate) => hostMatches(hostname, candidate));
+  } catch {
+    return false;
+  }
+};
 
 const isSupportedSourceUrl = (value) => {
   if (typeof value !== "string" || value.length === 0) {
@@ -679,6 +731,9 @@ const interceptImageResponse = (details) => {
 
 browser.webRequest.onBeforeRequest.addListener(
   (details) => {
+    if (isPageAdvertisementRequest(details)) {
+      return { cancel: true };
+    }
     if (INTERCEPTED_RESOURCE_TYPES.has(details.type)) {
       return interceptImageResponse(details);
     }

@@ -62,6 +62,20 @@
   const SPONSORED_RESULT_ATTRIBUTE = "data-glosh-dag-sponsored-result";
   const MEDIA_HOST_ATTRIBUTE = "data-glosh-dag-media-host";
   const FUNCTIONAL_ICON_ATTRIBUTE = "data-glosh-dag-functional-icon";
+  const PAGE_AD_HIDDEN_CLASS = "glosh-dag-page-ad-hidden";
+  const PAGE_AD_SELECTOR = [
+    "[data-ad]",
+    "[data-ad-slot]",
+    "[data-advertisement]",
+    "[aria-label*='advert' i]",
+    "[aria-label*='sponsored' i]",
+    "[class*='ad-container' i]",
+    "[class*='ad-wrapper' i]",
+    "[class*='advert' i]",
+    "[id*='advert' i]",
+    "[class*='sponsored' i]",
+    "[id*='sponsored' i]",
+  ].join(",");
   const APPROVED_PRESENTATION_SELECTOR = [
     '[data-glosh-dag-media="allow"]',
     '[data-glosh-dag-ui-vector="allow"]',
@@ -115,6 +129,38 @@
   let sponsoredScanTimer = null;
   const performanceDocumentToken =
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
+
+  const isVideoSiteDocument = () => {
+    const hostname = location.hostname.toLowerCase();
+    return /(?:^|\.)youtube(?:-nocookie)?\.com$/u.test(hostname) ||
+      /(?:^|\.)youtu\.be$/u.test(hostname);
+  };
+
+  const isInsideVideoPlayer = (element) =>
+    element instanceof Element &&
+    (element.matches("video, audio") ||
+      element.closest("video, audio, [class*='player' i], [id*='player' i]") !== null);
+
+  const hidePageAdvertisement = (element) => {
+    if (
+      !(element instanceof HTMLElement) ||
+      element.classList.contains(PAGE_AD_HIDDEN_CLASS) ||
+      isInsideVideoPlayer(element)
+    ) {
+      return;
+    }
+    element.classList.add(PAGE_AD_HIDDEN_CLASS);
+  };
+
+  const scanPageAdvertisements = (root = document) => {
+    if (isVideoSiteDocument()) {
+      return;
+    }
+    if (root instanceof HTMLElement && root.matches(PAGE_AD_SELECTOR)) {
+      hidePageAdvertisement(root);
+    }
+    root.querySelectorAll?.(PAGE_AD_SELECTOR).forEach(hidePageAdvertisement);
+  };
 
   const setAttributeIfChanged = (element, name, value) => {
     if (element.getAttribute(name) !== value) {
@@ -1474,6 +1520,7 @@
   );
 
   markHidden(document);
+  scanPageAdvertisements(document);
   scheduleCssBackgroundProbe(document, 0);
   scheduleSponsoredScan(0);
   const observer = new MutationObserver((mutations) => {
@@ -1489,6 +1536,7 @@
       }
       for (const node of mutation.addedNodes) {
         markHidden(node);
+        scanPageAdvertisements(node);
         scheduleCssBackgroundProbe(
           node instanceof Element ? node : mutation.target,
         );
@@ -1518,6 +1566,10 @@
         }
         if (["class", "aria-label"].includes(attributeName)) {
           shouldScanSponsoredContent = true;
+          scanPageAdvertisements(mutation.target);
+        }
+        if (["data-ad", "data-ad-slot", "data-advertisement"].includes(attributeName)) {
+          scanPageAdvertisements(mutation.target);
         }
         if (["autocomplete", "type", "src", "aria-label"].includes(attributeName)) {
           shouldReportPreviewEligibility = true;
@@ -1546,6 +1598,9 @@
       "style",
       "alt",
       "aria-label",
+      "data-ad",
+      "data-ad-slot",
+      "data-advertisement",
       "autocomplete",
       "type",
     ],
@@ -1580,6 +1635,7 @@
       "load",
       () => {
         markHidden(document);
+        scanPageAdvertisements(document);
         scheduleCssBackgroundProbe(document, 0);
         scheduleSponsoredScan(0);
         schedulePreviewEligibilityReport();

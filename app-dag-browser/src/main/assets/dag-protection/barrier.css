@@ -66,6 +66,10 @@ html[data-glosh-dag-background-probe] body * {
   display: none !important;
 }
 
+.glosh-dag-page-ad-hidden {
+  display: none !important;
+}
+
 html:not([data-glosh-dag-background-probe])
   [data-glosh-dag-css-media="allow"] {
   background-image: var(--glosh-dag-background-image) !important;

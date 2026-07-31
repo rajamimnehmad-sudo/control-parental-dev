@@ -34,6 +34,25 @@ class MediaBarrierContractTest {
     }
 
     @Test
+    fun `page ad filter blocks known ad networks without touching video sites`() {
+        val background = extensionRoot.resolve("background.js").readText()
+        val script = extensionRoot.resolve("barrier.js").readText()
+        val css = extensionRoot.resolve("barrier.css").readText()
+
+        assertContains(background, "PAGE_AD_HOSTS")
+        assertContains(background, "isPageAdvertisementRequest")
+        assertContains(background, "VIDEO_RESOURCE_TYPES")
+        assertContains(background, "isVideoSiteUrl(details.documentUrl)")
+        assertContains(background, "doubleclick.net")
+        assertContains(background, "return { cancel: true }")
+        assertContains(script, "PAGE_AD_SELECTOR")
+        assertContains(script, "isVideoSiteDocument")
+        assertContains(script, "isInsideVideoPlayer")
+        assertContains(script, "scanPageAdvertisements")
+        assertContains(css, "glosh-dag-page-ad-hidden")
+    }
+
+    @Test
     fun `image responses remain withheld during bounded native inspection`() {
         val background = extensionRoot.resolve("background.js").readText()
         val script = extensionRoot.resolve("barrier.js").readText()
