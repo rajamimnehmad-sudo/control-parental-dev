@@ -26,4 +26,12 @@ class DagBrowserManifestContractTest {
         assertContains(manifest, "\${applicationId}.downloads.fileprovider")
         assertContains(paths, "path=\"downloads/\"")
     }
+
+    @Test
+    fun `pull refresh is limited to the top of the page`() {
+        val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
+
+        assertContains(activity, "setOnChildScrollUpCallback")
+        assertContains(activity, "geckoView.canScrollVertically(-1)")
+    }
 }

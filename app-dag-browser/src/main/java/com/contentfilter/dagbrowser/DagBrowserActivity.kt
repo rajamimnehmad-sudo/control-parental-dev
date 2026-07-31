@@ -253,6 +253,9 @@ class DagBrowserActivity : Activity() {
         goButton.setOnClickListener { navigateFromInput() }
         newPageButton.setOnClickListener { createTab(switchToTab = true) }
         securityButton.setOnClickListener { showSecurityDetails() }
+        swipeRefresh.setOnChildScrollUpCallback { _, _ ->
+            geckoView.canScrollVertically(-1)
+        }
         swipeRefresh.setOnRefreshListener { reloadFromPullGesture() }
         addressInput.setOnEditorActionListener { _, actionId, event ->
             val submitted =
