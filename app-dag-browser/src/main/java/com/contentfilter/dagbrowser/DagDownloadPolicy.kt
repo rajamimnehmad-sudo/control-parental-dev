@@ -53,8 +53,9 @@ internal object DagDownloadPolicy {
         opensNewWindow: Boolean,
         nowMillis: Long,
     ): DagDownloadGesture? {
-        if (!pageVisible || !hasUserGesture || opensNewWindow) return null
+        if (!pageVisible || !hasUserGesture) return null
         if (!isHttps(requestUrl) || !isHttps(currentPageUrl)) return null
+        if (opensNewWindow && triggerUrl == null) return null
         if (triggerUrl != null && !sameDocument(triggerUrl, currentPageUrl)) return null
         return DagDownloadGesture(
             targetUrl = requestUrl,
@@ -97,6 +98,26 @@ internal object DagDownloadPolicy {
                 fileName = fileName,
                 declaredBytes = declaredBytes,
             ),
+        )
+    }
+
+    fun inlinePdfMetadata(
+        responseUrl: String,
+        currentPageUrl: String,
+        statusCode: Int,
+        mimeType: String?,
+        suggestedFileName: String?,
+    ): DagAllowedDownload? {
+        if (!isHttps(responseUrl) || !sameDocument(responseUrl, currentPageUrl)) return null
+        if (statusCode !in 200..299) return null
+        if (normalizedMime(mimeType) != PdfMimeType) return null
+        val fileName = safePdfFileName(suggestedFileName) ?: return null
+        val host = uri(responseUrl)?.host?.lowercase(Locale.ROOT) ?: return null
+        return DagAllowedDownload(
+            responseUrl = responseUrl,
+            host = host,
+            fileName = fileName,
+            declaredBytes = 0,
         )
     }
 

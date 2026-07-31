@@ -37,11 +37,17 @@ internal class DagOnDeviceImageAnalyzer private constructor(
     private val session: OrtSession,
 ) : DagImageAnalyzer,
     Closeable {
+    private val normalizedBuffers =
+        ThreadLocal.withInitial {
+            FloatArray(DagImageDecodeContract.PreparedByteCount)
+        }
+
     override fun analyze(image: DagPreparedImage): DagImageAnalysisResult {
         if (!DagImageDecodeContract.isValid(image)) {
             return DagImageAnalysisResult.Unavailable(InvalidModelInputReason)
         }
-        val normalized = normalizeNchw(image.rgb888)
+        val normalized = requireNotNull(normalizedBuffers.get())
+        normalizeNchw(image.rgb888, normalized)
         return try {
             OnnxTensor
                 .createTensor(
@@ -69,9 +75,11 @@ internal class DagOnDeviceImageAnalyzer private constructor(
         session.close()
     }
 
-    private fun normalizeNchw(rgb: ByteArray): FloatArray {
+    private fun normalizeNchw(
+        rgb: ByteArray,
+        output: FloatArray,
+    ) {
         val pixelCount = DagImageDecodeContract.TargetSize * DagImageDecodeContract.TargetSize
-        val output = FloatArray(pixelCount * DagImageDecodeContract.RgbChannelCount)
         for (pixelIndex in 0 until pixelCount) {
             val sourceIndex = pixelIndex * DagImageDecodeContract.RgbChannelCount
             for (channel in 0 until DagImageDecodeContract.RgbChannelCount) {
@@ -80,7 +88,6 @@ internal class DagOnDeviceImageAnalyzer private constructor(
                     (value - ImageMean[channel]) / ImageStandardDeviation[channel]
             }
         }
-        return output
     }
 
     private fun OrtSession.Result.filterProbability(): Float {

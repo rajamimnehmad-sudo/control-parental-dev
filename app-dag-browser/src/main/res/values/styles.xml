@@ -4,7 +4,7 @@
         parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">@color/dag_background</item>
+        <item name="android:windowBackground">@color/dag_navy</item>
         <item name="android:colorAccent">@color/dag_blue</item>
         <item name="android:navigationBarColor">@color/dag_navy</item>
         <item name="android:statusBarColor">@color/dag_navy</item>

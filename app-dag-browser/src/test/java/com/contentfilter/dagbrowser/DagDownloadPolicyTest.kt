@@ -135,9 +135,33 @@ class DagDownloadPolicyTest {
                 opensNewWindow = false,
                 nowMillis = 100,
             )
+        val newWindow =
+            DagDownloadPolicy.recordGesture(
+                requestUrl = "https://docs.example/guia.pdf",
+                triggerUrl = "https://docs.example/home",
+                currentPageUrl = "https://docs.example/home",
+                tabRevision = 4,
+                pageVisible = true,
+                hasUserGesture = true,
+                opensNewWindow = true,
+                nowMillis = 100,
+            )
+        val untrustedNewWindow =
+            DagDownloadPolicy.recordGesture(
+                requestUrl = "https://docs.example/guia.pdf",
+                triggerUrl = null,
+                currentPageUrl = "https://docs.example/home",
+                tabRevision = 4,
+                pageVisible = true,
+                hasUserGesture = true,
+                opensNewWindow = true,
+                nowMillis = 100,
+            )
 
         assertIs<DagDownloadGesture>(valid)
+        assertIs<DagDownloadGesture>(newWindow)
         assertNull(automatic)
+        assertNull(untrustedNewWindow)
     }
 
     @Test
@@ -164,6 +188,29 @@ class DagDownloadPolicyTest {
                 tail = "trailer\n%%EOF\n".toByteArray(),
             ),
         )
+    }
+
+    @Test
+    fun `accepts only same-document HTTPS metadata from the built-in PDF viewer`() {
+        val valid =
+            DagDownloadPolicy.inlinePdfMetadata(
+                responseUrl = "https://docs.example/guide.pdf",
+                currentPageUrl = "https://docs.example/guide.pdf#page=2",
+                statusCode = 200,
+                mimeType = "application/pdf",
+                suggestedFileName = "guide.pdf",
+            )
+        val otherDocument =
+            DagDownloadPolicy.inlinePdfMetadata(
+                responseUrl = "https://other.example/guide.pdf",
+                currentPageUrl = "https://docs.example/guide.pdf",
+                statusCode = 200,
+                mimeType = "application/pdf",
+                suggestedFileName = "guide.pdf",
+            )
+
+        assertIs<DagAllowedDownload>(valid)
+        assertNull(otherDocument)
     }
 
     private fun gesture() =

@@ -5,6 +5,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 
 internal data class DagPageListItem(
@@ -21,9 +22,28 @@ internal class DagPageListAdapter(
     private val items = mutableListOf<DagPageListItem>()
 
     fun submit(newItems: List<DagPageListItem>) {
+        val previous = items.toList()
+        val diff =
+            DiffUtil.calculateDiff(
+                object : DiffUtil.Callback() {
+                    override fun getOldListSize(): Int = previous.size
+
+                    override fun getNewListSize(): Int = newItems.size
+
+                    override fun areItemsTheSame(
+                        oldItemPosition: Int,
+                        newItemPosition: Int,
+                    ): Boolean = previous[oldItemPosition].url == newItems[newItemPosition].url
+
+                    override fun areContentsTheSame(
+                        oldItemPosition: Int,
+                        newItemPosition: Int,
+                    ): Boolean = previous[oldItemPosition] == newItems[newItemPosition]
+                },
+            )
         items.clear()
         items.addAll(newItems)
-        notifyDataSetChanged()
+        diff.dispatchUpdatesTo(this)
     }
 
     override fun onCreateViewHolder(

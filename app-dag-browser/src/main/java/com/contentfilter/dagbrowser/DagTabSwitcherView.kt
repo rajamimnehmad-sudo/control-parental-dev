@@ -12,6 +12,7 @@ import android.widget.FrameLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.RecyclerView
@@ -100,9 +101,7 @@ internal class DagTabSwitcherView
                     ) {
                         val position = viewHolder.bindingAdapterPosition
                         val tabId = adapter.idAt(position)
-                        if (tabId == null) {
-                            adapter.notifyDataSetChanged()
-                        } else {
+                        if (tabId != null) {
                             listener?.onTabClosed(tabId)
                         }
                     }
@@ -181,9 +180,28 @@ internal class DagTabSwitcherView
             override fun getItemCount(): Int = items.size
 
             fun submit(tabs: List<DagTabCard>) {
+                val previous = items.toList()
+                val diff =
+                    DiffUtil.calculateDiff(
+                        object : DiffUtil.Callback() {
+                            override fun getOldListSize(): Int = previous.size
+
+                            override fun getNewListSize(): Int = tabs.size
+
+                            override fun areItemsTheSame(
+                                oldItemPosition: Int,
+                                newItemPosition: Int,
+                            ): Boolean = previous[oldItemPosition].id == tabs[newItemPosition].id
+
+                            override fun areContentsTheSame(
+                                oldItemPosition: Int,
+                                newItemPosition: Int,
+                            ): Boolean = previous[oldItemPosition] == tabs[newItemPosition]
+                        },
+                    )
                 items.clear()
                 items.addAll(tabs)
-                notifyDataSetChanged()
+                diff.dispatchUpdatesTo(this)
             }
 
             fun move(

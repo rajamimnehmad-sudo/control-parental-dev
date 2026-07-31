@@ -86,6 +86,7 @@
   ].join(",");
   const MAX_CSS_BACKGROUND_ELEMENTS = 512;
   const MAX_BACKGROUND_PROBE_ELEMENTS = 1_500;
+  const MAX_VIEWPORT_BACKGROUND_ELEMENTS = 128;
   const BACKGROUND_PROBE_DELAY_MS = 180;
   const MIN_BACKGROUND_PROBE_INTERVAL_MS = 450;
   const BACKGROUND_SCROLL_SETTLE_MS = 160;
@@ -826,6 +827,46 @@
     yield* root.querySelectorAll("*");
   }
 
+  const inspectBackgroundElement = (element, discovered) => {
+    if (!(element instanceof HTMLElement) || !isNearViewport(element)) {
+      return false;
+    }
+    const backgroundImage = getComputedStyle(element).backgroundImage;
+    if (backgroundImage && backgroundImage !== "none") {
+      discovered.push({ element, backgroundImage, pseudo: null, content: "normal" });
+    }
+    for (const pseudo of ["before", "after"]) {
+      const style = getComputedStyle(element, `::${pseudo}`);
+      if (
+        (style.backgroundImage && style.backgroundImage !== "none") ||
+        (style.content && !["none", "normal"].includes(style.content))
+      ) {
+        discovered.push({
+          element,
+          backgroundImage: style.backgroundImage,
+          pseudo,
+          content: style.content,
+        });
+      }
+    }
+    return true;
+  };
+
+  const applyDiscoveredBackgrounds = (discovered) => {
+    for (const record of discovered) {
+      if (record.pseudo) {
+        recordPseudoCssVisual(
+          record.element,
+          record.pseudo,
+          record.backgroundImage,
+          record.content,
+        );
+      } else {
+        recordCssBackground(record.element, record.backgroundImage);
+      }
+    }
+  };
+
   const probeCssBackgrounds = () => {
     backgroundProbeTimer = null;
     lastBackgroundProbeAt = performance.now();
@@ -847,27 +888,8 @@
           if (inspected >= MAX_BACKGROUND_PROBE_ELEMENTS) {
             break;
           }
-          if (!(element instanceof HTMLElement) || !isNearViewport(element)) {
-            continue;
-          }
-          inspected += 1;
-          const backgroundImage = getComputedStyle(element).backgroundImage;
-          if (backgroundImage && backgroundImage !== "none") {
-            discovered.push({ element, backgroundImage, pseudo: null, content: "normal" });
-          }
-          for (const pseudo of ["before", "after"]) {
-            const style = getComputedStyle(element, `::${pseudo}`);
-            if (
-              (style.backgroundImage && style.backgroundImage !== "none") ||
-              (style.content && !["none", "normal"].includes(style.content))
-            ) {
-              discovered.push({
-                element,
-                backgroundImage: style.backgroundImage,
-                pseudo,
-                content: style.content,
-              });
-            }
+          if (inspectBackgroundElement(element, discovered)) {
+            inspected += 1;
           }
         }
         if (inspected >= MAX_BACKGROUND_PROBE_ELEMENTS) {
@@ -877,18 +899,42 @@
     } finally {
       documentRoot.removeAttribute(BACKGROUND_PROBE_ATTRIBUTE);
     }
-    for (const record of discovered) {
-      if (record.pseudo) {
-        recordPseudoCssVisual(
-          record.element,
-          record.pseudo,
-          record.backgroundImage,
-          record.content,
-        );
-      } else {
-        recordCssBackground(record.element, record.backgroundImage);
+    applyDiscoveredBackgrounds(discovered);
+  };
+
+  const viewportBackgroundElements = () => {
+    const elements = new Set();
+    const xPositions = [0.12, 0.5, 0.88].map((ratio) => window.innerWidth * ratio);
+    const verticalStep = Math.max(120, Math.floor(window.innerHeight / 8));
+    for (let y = 1; y < window.innerHeight; y += verticalStep) {
+      for (const x of xPositions) {
+        let candidate = document.elementFromPoint(x, y);
+        for (let depth = 0; candidate && depth < 4; depth += 1) {
+          elements.add(candidate);
+          if (elements.size >= MAX_VIEWPORT_BACKGROUND_ELEMENTS) {
+            return elements;
+          }
+          candidate = candidate.parentElement;
+        }
       }
     }
+    return elements;
+  };
+
+  const probeVisibleCssBackgrounds = () => {
+    lastBackgroundProbeAt = performance.now();
+    const documentRoot = document.documentElement;
+    if (!documentRoot) return;
+    const discovered = [];
+    documentRoot.setAttribute(BACKGROUND_PROBE_ATTRIBUTE, "true");
+    try {
+      for (const element of viewportBackgroundElements()) {
+        inspectBackgroundElement(element, discovered);
+      }
+    } finally {
+      documentRoot.removeAttribute(BACKGROUND_PROBE_ATTRIBUTE);
+    }
+    applyDiscoveredBackgrounds(discovered);
   };
 
   const scheduleCssBackgroundProbe = (
@@ -911,10 +957,12 @@
     if (scrollBackgroundProbeTimer !== null) {
       clearTimeout(scrollBackgroundProbeTimer);
     }
+    const elapsed = performance.now() - lastBackgroundProbeAt;
+    const remainingThrottle = Math.max(0, MIN_BACKGROUND_PROBE_INTERVAL_MS - elapsed);
     scrollBackgroundProbeTimer = setTimeout(() => {
       scrollBackgroundProbeTimer = null;
-      scheduleCssBackgroundProbe(document, 0);
-    }, BACKGROUND_SCROLL_SETTLE_MS);
+      probeVisibleCssBackgrounds();
+    }, Math.max(BACKGROUND_SCROLL_SETTLE_MS, remainingThrottle));
   };
 
   const isGoogleSearchDocument = () =>
@@ -937,12 +985,13 @@
       "[aria-label='Productos patrocinados']",
       ".uEierd",
     ].join(",");
-    document.querySelectorAll(knownAdContainers).forEach((container) => {
+    const knownContainers = [...document.querySelectorAll(knownAdContainers)];
+    knownContainers.forEach((container) => {
       setAttributeIfChanged(container, SPONSORED_RESULT_ATTRIBUTE, "true");
     });
     const collapseSponsoredResults =
       /^(ocultar resultados patrocinados|hide sponsored results)\b/iu;
-    document.querySelectorAll("button, [role='button'], a, span, div").forEach((control) => {
+    document.querySelectorAll("button, [role='button'], a").forEach((control) => {
       if (
         collapseSponsoredResults.test(control.textContent?.trim() || "") &&
         control.getAttribute(SPONSORED_RESULT_ATTRIBUTE) !== "collapsed"
@@ -952,14 +1001,12 @@
       }
     });
     const sponsoredLabel = /^(patrocinado|sponsored)$/iu;
-    document.querySelectorAll("span, div").forEach((label) => {
-      if (!sponsoredLabel.test(label.textContent?.trim() || "")) {
-        return;
-      }
-      const container = label.closest(knownAdContainers);
-      if (container) {
-        setAttributeIfChanged(container, SPONSORED_RESULT_ATTRIBUTE, "true");
-      }
+    knownContainers.forEach((container) => {
+      container.querySelectorAll("span, div").forEach((label) => {
+        if (sponsoredLabel.test(label.textContent?.trim() || "")) {
+          setAttributeIfChanged(container, SPONSORED_RESULT_ATTRIBUTE, "true");
+        }
+      });
     });
   };
 
@@ -1055,6 +1102,7 @@
       return browser.runtime.sendMessage({
         type: FALLBACK_REQUEST_MESSAGE,
         version: 1,
+        documentToken: performanceDocumentToken,
         sourceUrl,
         priority,
       });
@@ -1073,6 +1121,7 @@
     return browser.runtime.sendMessage({
       type: INLINE_REQUEST_MESSAGE,
       version: 1,
+      documentToken: performanceDocumentToken,
       sourceUrl,
       priority,
       byteLength: bytes.byteLength,
@@ -1402,6 +1451,13 @@
   };
 
   browser.runtime.onMessage.addListener((message) => {
+    if (message?.type === "document-token-request" && message?.version === 1) {
+      return Promise.resolve({
+        type: "document-token-response",
+        version: 1,
+        documentToken: performanceDocumentToken,
+      });
+    }
     if (
       message?.type !== PRESENTATION_DECISION_MESSAGE ||
       message?.version !== 1 ||
@@ -1614,6 +1670,7 @@
   );
 
   if (window.top === window) {
+    let documentLoadedReported = false;
     const reportDocumentState = (type) => {
       browser.runtime
         .sendMessage({
@@ -1625,10 +1682,18 @@
           // Missing performance evidence never weakens the media barrier.
         });
     };
+    const reportDocumentLoaded = () => {
+      if (documentLoadedReported) return;
+      documentLoadedReported = true;
+      reportDocumentState("document-loaded");
+    };
     reportDocumentState("document-started");
     window.addEventListener(
       "DOMContentLoaded",
-      schedulePreviewEligibilityReport,
+      () => {
+        schedulePreviewEligibilityReport();
+        reportDocumentLoaded();
+      },
       { once: true },
     );
     window.addEventListener(
@@ -1639,7 +1704,7 @@
         scheduleCssBackgroundProbe(document, 0);
         scheduleSponsoredScan(0);
         schedulePreviewEligibilityReport();
-        reportDocumentState("document-loaded");
+        reportDocumentLoaded();
       },
       { once: true },
     );

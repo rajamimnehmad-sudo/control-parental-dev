@@ -25,6 +25,9 @@
         android:id="@+id/menu_downloads"
         android:title="@string/downloads" />
     <item
+        android:id="@+id/menu_save_current_pdf"
+        android:title="@string/save_current_pdf" />
+    <item
         android:id="@+id/menu_clear_cache"
         android:title="@string/clear_cache" />
     <item

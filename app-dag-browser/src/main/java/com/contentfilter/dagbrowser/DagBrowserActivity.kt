@@ -99,13 +99,18 @@ class DagBrowserActivity : Activity() {
     private var extensionReady = false
     private var activeTab: BrowserTab? = null
     private var nextTabId = 1L
+    private var nextTabActivationSequence = 1L
     private var restoringTabs = false
     private var pendingExternalUrl: String? = null
     private var activeDownload: ActiveDownload? = null
+    private var pendingInlinePdfRequest: Long? = null
+    private var nextInlinePdfRequest = 1L
+    private var inlinePdfStage: InlinePdfStage? = null
     private var downloadDialog: AlertDialog? = null
     private var downloadsScreen: Dialog? = null
     private var pageListScreen: Dialog? = null
     private var activeChoicePrompt: ActiveChoicePrompt? = null
+    private var pendingNewSessionGesture: PendingNewSessionGesture? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
@@ -374,8 +379,31 @@ class DagBrowserActivity : Activity() {
                         tab.downloadGesture = downloadGesture
                     }
                     if (request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW) {
-                        openNewTabForUri(request.uri)
-                        return GeckoResult.fromValue(AllowOrDeny.DENY)
+                        return when (
+                            val decision =
+                                DagNavigationPolicy.decideLoad(
+                                    url = request.uri,
+                                    opensNewWindow = false,
+                                )
+                        ) {
+                            DagLoadDecision.Allow -> {
+                                pendingNewSessionGesture =
+                                    downloadGesture?.let { PendingNewSessionGesture(request.uri, it) }
+                                GeckoResult.fromValue(AllowOrDeny.ALLOW)
+                            }
+                            DagLoadDecision.Block -> {
+                                showBlockedNavigation(tab)
+                                GeckoResult.fromValue(AllowOrDeny.DENY)
+                            }
+                            is DagLoadDecision.BlockExternalApp -> {
+                                handleExternalAppLink(tab, decision.httpsFallback)
+                                GeckoResult.fromValue(AllowOrDeny.DENY)
+                            }
+                            is DagLoadDecision.Redirect -> {
+                                createTab(switchToTab = true, initialUrl = decision.url)
+                                GeckoResult.fromValue(AllowOrDeny.DENY)
+                            }
+                        }
                     }
                     return when (
                         val decision =
@@ -405,8 +433,30 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     uri: String,
                 ): GeckoResult<GeckoSession>? {
-                    openNewTabForUri(uri)
-                    return null
+                    if (DagNavigationPolicy.sanitizeTopLevel(uri) != uri) {
+                        pendingNewSessionGesture = null
+                        return null
+                    }
+                    val newTab =
+                        createTab(
+                            switchToTab = false,
+                            initialUrl = uri,
+                            reuseBlank = false,
+                        ) ?: return null
+                    newTab.needsRestore = false
+                    pendingNewSessionGesture
+                        ?.takeIf { it.targetUrl == uri }
+                        ?.gesture
+                        ?.let { gesture ->
+                            newTab.downloadGesture =
+                                gesture.copy(
+                                    pageUrl = uri,
+                                    tabRevision = newTab.navigationRevision,
+                                )
+                        }
+                    pendingNewSessionGesture = null
+                    switchTo(newTab)
+                    return GeckoResult.fromValue(newTab.session)
                 }
             }
         tab.session.progressDelegate =
@@ -417,6 +467,7 @@ class DagBrowserActivity : Activity() {
                 ) {
                     swipeRefresh.isRefreshing = false
                     tab.downloadGesture = null
+                    tab.pdfDocumentReady = false
                     tab.navigationRevision += 1
                     tab.contentScrollY = 0
                     if (tab === activeTab) swipeRefresh.isEnabled = true
@@ -454,6 +505,21 @@ class DagBrowserActivity : Activity() {
                         tab.waitingForBarrier = false
                         cancelBarrierTimeout(tab)
                         showClosedPage(tab)
+                    } else if (success) {
+                        session.isPdfJs().accept(
+                            { isPdf ->
+                                handler.post {
+                                    if (isPdf == true && tabs.contains(tab)) {
+                                        tab.pdfDocumentReady = true
+                                        tab.waitingForBarrier = false
+                                        cancelBarrierTimeout(tab)
+                                        tab.displayState = TabDisplayState.PdfReady
+                                        if (tab === activeTab) renderActiveTab()
+                                    }
+                                }
+                            },
+                            { },
+                        )
                     }
                     schedulePersistTabs()
                 }
@@ -623,9 +689,9 @@ class DagBrowserActivity : Activity() {
         response: WebResponse,
     ) {
         val input = response.body
-        if (activeDownload != null || input == null || tab !== activeTab) {
+        if (downloadBusy() || input == null || tab !== activeTab) {
             input?.closeQuietly()
-            if (activeDownload != null) {
+            if (downloadBusy()) {
                 Toast.makeText(this, R.string.download_one_at_a_time, Toast.LENGTH_LONG).show()
             }
             return
@@ -664,7 +730,7 @@ class DagBrowserActivity : Activity() {
         download: DagAllowedDownload,
         input: InputStream,
     ) {
-        if (activeDownload != null) {
+        if (downloadBusy()) {
             input.closeQuietly()
             return
         }
@@ -688,6 +754,223 @@ class DagBrowserActivity : Activity() {
                 .setOnCancelListener { cancelDownload(task) }
                 .create()
                 .also(AlertDialog::show)
+    }
+
+    private fun downloadBusy(): Boolean =
+        activeDownload != null || pendingInlinePdfRequest != null || inlinePdfStage != null
+
+    private fun requestCurrentPdfDownload() {
+        val tab = activeTab ?: return
+        if (downloadBusy()) {
+            Toast.makeText(this, R.string.download_one_at_a_time, Toast.LENGTH_LONG).show()
+            return
+        }
+        if (!tab.session.isOpen || !tab.pdfDocumentReady) {
+            Toast.makeText(this, R.string.current_page_is_not_pdf, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val requestId = nextInlinePdfRequest++
+        pendingInlinePdfRequest = requestId
+        downloadDialog =
+            AlertDialog.Builder(this)
+                .setTitle(R.string.download_in_progress)
+                .setMessage(R.string.preparing_pdf_download)
+                .setView(ProgressBar(this))
+                .setNegativeButton(R.string.cancel) { _, _ -> cancelPendingInlinePdf(requestId) }
+                .setOnCancelListener { cancelPendingInlinePdf(requestId) }
+                .create()
+                .also(AlertDialog::show)
+        tab.session.isPdfJs().accept(
+            { isPdf ->
+                handler.post {
+                    if (pendingInlinePdfRequest != requestId) return@post
+                    if (isPdf != true) {
+                        finishPendingInlinePdf(requestId)
+                        Toast.makeText(this, R.string.current_page_is_not_pdf, Toast.LENGTH_SHORT).show()
+                        return@post
+                    }
+                    tab.session.pdfFileSaver.save().accept(
+                        { response -> handler.post { receiveInlinePdfResponse(requestId, tab, response) } },
+                        { handler.post { failPendingInlinePdf(requestId) } },
+                    )
+                }
+            },
+            { handler.post { failPendingInlinePdf(requestId) } },
+        )
+    }
+
+    private fun receiveInlinePdfResponse(
+        requestId: Long,
+        tab: BrowserTab,
+        response: WebResponse?,
+    ) {
+        val input = response?.body
+        if (pendingInlinePdfRequest != requestId || input == null || tab !== activeTab) {
+            input?.closeQuietly()
+            if (pendingInlinePdfRequest == requestId) failPendingInlinePdf(requestId)
+            return
+        }
+        val metadata =
+            DagDownloadPolicy.inlinePdfMetadata(
+                responseUrl = response.uri,
+                currentPageUrl = tab.url,
+                statusCode = response.statusCode,
+                mimeType = DagDownloadPolicy.header(response.headers, "Content-Type"),
+                suggestedFileName =
+                    DagDownloadPolicy.suggestedFileName(response.headers, response.uri),
+            )
+        if (metadata == null) {
+            input.closeQuietly()
+            failPendingInlinePdf(requestId)
+            return
+        }
+        pendingInlinePdfRequest = null
+        downloadDialog?.dismiss()
+        val stage = InlinePdfStage(tab, metadata, input)
+        inlinePdfStage = stage
+        downloadDialog =
+            AlertDialog.Builder(this)
+                .setTitle(R.string.download_in_progress)
+                .setMessage(R.string.preparing_pdf_download)
+                .setView(ProgressBar(this))
+                .setNegativeButton(R.string.cancel) { _, _ -> cancelInlinePdfStage(stage) }
+                .setOnCancelListener { cancelInlinePdfStage(stage) }
+                .create()
+                .also(AlertDialog::show)
+        downloadExecutor.execute {
+            val result = runCatching { stageInlinePdf(stage) }
+            handler.post {
+                if (inlinePdfStage !== stage) {
+                    result.getOrNull()?.first?.delete()
+                    return@post
+                }
+                downloadDialog?.dismiss()
+                result.fold(
+                    onSuccess = { (file, verifiedMetadata) ->
+                        stage.partialFile = file
+                        confirmStagedInlinePdf(stage, verifiedMetadata)
+                    },
+                    onFailure = {
+                        inlinePdfStage = null
+                        showInlinePdfFailure()
+                    },
+                )
+            }
+        }
+    }
+
+    private fun stageInlinePdf(stage: InlinePdfStage): Pair<File, DagAllowedDownload> {
+        val directory = File(filesDir, DownloadsDirectory).apply { mkdirs() }
+        check(directory.isDirectory)
+        val partial = File.createTempFile("dag-inline-", ".part", directory)
+        stage.partialFile = partial
+        try {
+            var total = 0L
+            stage.input.use { input ->
+                partial.outputStream().buffered().use { output ->
+                    val buffer = ByteArray(DownloadBufferBytes)
+                    while (true) {
+                        check(!stage.cancelled) { "cancelled" }
+                        val read = input.read(buffer)
+                        if (read < 0) break
+                        total += read
+                        check(total <= DagDownloadPolicy.MaxBytes) { "blocked_size" }
+                        output.write(buffer, 0, read)
+                    }
+                }
+            }
+            check(total > 0 && isValidPdf(partial)) { "invalid_pdf" }
+            return partial to stage.metadata.copy(declaredBytes = total)
+        } catch (failure: Throwable) {
+            partial.delete()
+            stage.partialFile = null
+            throw failure
+        }
+    }
+
+    private fun confirmStagedInlinePdf(
+        stage: InlinePdfStage,
+        metadata: DagAllowedDownload,
+    ) {
+        downloadDialog =
+            AlertDialog.Builder(this)
+                .setTitle(R.string.download_confirm_title)
+                .setMessage(
+                    getString(
+                        R.string.download_confirm_detail,
+                        metadata.fileName,
+                        metadata.host,
+                        DagDownloadPolicy.PdfMimeType,
+                        readableByteCount(metadata.declaredBytes),
+                    ),
+                )
+                .setPositiveButton(R.string.download) { _, _ -> finishStagedInlinePdf(stage, metadata) }
+                .setNegativeButton(R.string.cancel) { _, _ -> cancelInlinePdfStage(stage) }
+                .setOnCancelListener { cancelInlinePdfStage(stage) }
+                .create()
+                .also(AlertDialog::show)
+    }
+
+    private fun finishStagedInlinePdf(
+        stage: InlinePdfStage,
+        metadata: DagAllowedDownload,
+    ) {
+        if (inlinePdfStage !== stage) return
+        val source = stage.partialFile ?: return
+        val result =
+            runCatching {
+                val destination = uniqueDownloadFile(source.parentFile ?: error("missing_directory"), metadata.fileName)
+                Files.move(source.toPath(), destination.toPath(), StandardCopyOption.ATOMIC_MOVE)
+                destination
+            }
+        stage.partialFile = null
+        inlinePdfStage = null
+        downloadDialog = null
+        result.fold(
+            onSuccess = { showDownloadReady(it, metadata) },
+            onFailure = { showInlinePdfFailure() },
+        )
+    }
+
+    private fun cancelPendingInlinePdf(requestId: Long) {
+        if (pendingInlinePdfRequest != requestId) return
+        pendingInlinePdfRequest = null
+        downloadDialog?.dismiss()
+        downloadDialog = null
+        Toast.makeText(this, R.string.download_cancelled, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun finishPendingInlinePdf(requestId: Long) {
+        if (pendingInlinePdfRequest != requestId) return
+        pendingInlinePdfRequest = null
+        downloadDialog?.dismiss()
+        downloadDialog = null
+    }
+
+    private fun failPendingInlinePdf(requestId: Long) {
+        if (pendingInlinePdfRequest != requestId) return
+        finishPendingInlinePdf(requestId)
+        showInlinePdfFailure()
+    }
+
+    private fun cancelInlinePdfStage(stage: InlinePdfStage) {
+        if (inlinePdfStage !== stage) return
+        stage.cancelled = true
+        stage.input.closeQuietly()
+        stage.partialFile?.delete()
+        inlinePdfStage = null
+        downloadDialog?.dismiss()
+        downloadDialog = null
+        Toast.makeText(this, R.string.download_cancelled, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun showInlinePdfFailure() {
+        if (isFinishing || isDestroyed) return
+        AlertDialog.Builder(this)
+            .setTitle(R.string.download_failed)
+            .setMessage(R.string.download_failed_detail)
+            .setPositiveButton(R.string.close, null)
+            .show()
     }
 
     private fun startDownload(task: ActiveDownload) {
@@ -883,6 +1166,7 @@ class DagBrowserActivity : Activity() {
         initialUrl: String? = null,
         restoredTab: DagPersistedTab? = null,
         privateTab: Boolean = false,
+        reuseBlank: Boolean = true,
     ): BrowserTab? {
         if (!extensionReady || !DagTabCapacityPolicy.canCreate(tabs.size)) {
             if (!DagTabCapacityPolicy.canCreate(tabs.size)) {
@@ -892,7 +1176,7 @@ class DagBrowserActivity : Activity() {
             return null
         }
         if (protectionExtension == null) return null
-        if (restoredTab == null && initialUrl == null) {
+        if (reuseBlank && restoredTab == null && initialUrl == null) {
             tabs.firstOrNull { it.url == InitialBlankPage && it.isPrivate == privateTab }?.let { blankTab ->
                 if (switchToTab) switchTo(blankTab)
                 return blankTab
@@ -1279,17 +1563,6 @@ class DagBrowserActivity : Activity() {
             renderActiveTab()
             return
         }
-        val previousTab = activeTab
-        if (
-            previousTab != null &&
-            (previousTab.thumbnail == null || previousTab.thumbnailStale) &&
-            canCaptureThumbnail(previousTab)
-        ) {
-            captureActiveTabThumbnail {
-                switchToWithoutCapture(tab)
-            }
-            return
-        }
         switchToWithoutCapture(tab)
     }
 
@@ -1299,6 +1572,7 @@ class DagBrowserActivity : Activity() {
         activeTab?.let { setTabActivity(it, active = false) }
         if (activeTab != null) runCatching { geckoView.releaseSession() }
         activeTab = tab
+        tab.lastActivatedSequence = nextTabActivationSequence++
         ensureSessionOpen(tab)
         geckoView.setSession(tab.session)
         swipeRefresh.isEnabled = tab.contentScrollY <= 0
@@ -1307,6 +1581,40 @@ class DagBrowserActivity : Activity() {
         renderActiveTab()
         schedulePersistTabs()
         refreshTabSwitcher()
+        handler.post(::hibernateLeastRecentSessions)
+    }
+
+    private fun hibernateLeastRecentSessions() {
+        val sessions =
+            tabs.map { tab ->
+                DagOpenTabSession(
+                    tabId = tab.id,
+                    active = tab === activeTab,
+                    open = tab.session.isOpen,
+                    lastActivatedSequence = tab.lastActivatedSequence,
+                )
+            }
+        val tabIds = DagTabSessionPolicy.sessionsToHibernate(sessions)
+        tabs.filter { it.id in tabIds }.forEach(::hibernateTab)
+    }
+
+    private fun hibernateInactiveTabs() {
+        tabs.filter { it !== activeTab && it.session.isOpen }.forEach(::hibernateTab)
+    }
+
+    private fun hibernateTab(tab: BrowserTab) {
+        if (tab === activeTab || !tab.session.isOpen) return
+        cancelBarrierTimeout(tab)
+        tab.waitingForBarrier = false
+        tab.canGoBack = false
+        tab.needsRestore = tab.url != InitialBlankPage && restorableUrl(tab.url) != null
+        tab.displayState = TabDisplayState.Ready
+        tab.pdfDocumentReady = false
+        tab.previewDocumentToken = null
+        tab.previewEligibilityToken = null
+        tab.previewRestricted = true
+        setTabActivity(tab, active = false)
+        runCatching { tab.session.close() }
     }
 
     private fun setTabActivity(
@@ -1393,6 +1701,14 @@ class DagBrowserActivity : Activity() {
             TabDisplayState.Visible -> {
                 geckoView.visibility = View.VISIBLE
                 safetyOverlay.visibility = View.GONE
+            }
+            TabDisplayState.PdfReady -> {
+                geckoView.visibility = View.INVISIBLE
+                showOverlay(
+                    title = getString(R.string.pdf_ready_title),
+                    detail = getString(R.string.pdf_ready_detail),
+                    spinning = false,
+                )
             }
             TabDisplayState.Closed -> {
                 geckoView.visibility = View.INVISIBLE
@@ -1742,6 +2058,10 @@ class DagBrowserActivity : Activity() {
                     }
                     R.id.menu_downloads -> {
                         showDownloads()
+                        true
+                    }
+                    R.id.menu_save_current_pdf -> {
+                        requestCurrentPdfDownload()
                         true
                     }
                     R.id.menu_clear_cache -> {
@@ -2137,7 +2457,7 @@ class DagBrowserActivity : Activity() {
         if (tabs.size <= 1) return
         AlertDialog.Builder(this)
             .setTitle(R.string.close_all_tabs_title)
-            .setMessage(getString(R.string.close_all_tabs_detail, tabs.size))
+            .setMessage(resources.getQuantityString(R.plurals.close_all_tabs_detail, tabs.size, tabs.size))
             .setPositiveButton(R.string.close_all_tabs) { _, _ ->
                 tabSwitcher.hide()
                 resetTabs()
@@ -2286,6 +2606,7 @@ class DagBrowserActivity : Activity() {
         dismissActiveChoicePrompt()
         persistTabsNow()
         activeTab?.let { setTabActivity(it, active = false) }
+        hibernateInactiveTabs()
         super.onStop()
     }
 
@@ -2294,6 +2615,7 @@ class DagBrowserActivity : Activity() {
         super.onTrimMemory(level)
         if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
             releaseTabThumbnails()
+            hibernateInactiveTabs()
         }
     }
 
@@ -2314,6 +2636,8 @@ class DagBrowserActivity : Activity() {
             backInvokedCallback = null
         }
         activeDownload?.let(::cancelDownload)
+        pendingInlinePdfRequest = null
+        inlinePdfStage?.let(::cancelInlinePdfStage)
         handler.removeCallbacksAndMessages(null)
         protectionExtension?.let { extension ->
             extension.setMessageDelegate(null, NativeApp)
@@ -2345,6 +2669,7 @@ class DagBrowserActivity : Activity() {
         Ready,
         Loading,
         Visible,
+        PdfReady,
         Closed,
         Blocked,
     }
@@ -2359,6 +2684,11 @@ class DagBrowserActivity : Activity() {
     private data class ActiveChoicePrompt(
         val dialog: AlertDialog,
         val dismissPrompt: () -> Unit,
+    )
+
+    private data class PendingNewSessionGesture(
+        val targetUrl: String,
+        val gesture: DagDownloadGesture,
     )
 
     private class BrowserTab(
@@ -2382,9 +2712,19 @@ class DagBrowserActivity : Activity() {
         var isPrivate: Boolean = false,
         var thumbnailStale: Boolean = false,
         var contentScrollY: Int = 0,
+        var lastActivatedSequence: Long = 0,
+        var pdfDocumentReady: Boolean = false,
     )
 
     private class ActiveDownload(
+        val tab: BrowserTab,
+        val metadata: DagAllowedDownload,
+        val input: InputStream,
+        @Volatile var cancelled: Boolean = false,
+        @Volatile var partialFile: File? = null,
+    )
+
+    private class InlinePdfStage(
         val tab: BrowserTab,
         val metadata: DagAllowedDownload,
         val input: InputStream,

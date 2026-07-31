@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.Button
 import android.widget.ImageButton
 import android.widget.TextView
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
 import java.text.DateFormat
@@ -18,9 +19,34 @@ internal class DagDownloadsAdapter(
     private val files = mutableListOf<File>()
 
     fun submit(newFiles: List<File>) {
+        val previous = files.toList()
+        val diff =
+            DiffUtil.calculateDiff(
+                object : DiffUtil.Callback() {
+                    override fun getOldListSize(): Int = previous.size
+
+                    override fun getNewListSize(): Int = newFiles.size
+
+                    override fun areItemsTheSame(
+                        oldItemPosition: Int,
+                        newItemPosition: Int,
+                    ): Boolean =
+                        previous[oldItemPosition].absolutePath ==
+                            newFiles[newItemPosition].absolutePath
+
+                    override fun areContentsTheSame(
+                        oldItemPosition: Int,
+                        newItemPosition: Int,
+                    ): Boolean {
+                        val old = previous[oldItemPosition]
+                        val new = newFiles[newItemPosition]
+                        return old.length() == new.length() && old.lastModified() == new.lastModified()
+                    }
+                },
+            )
         files.clear()
         files.addAll(newFiles)
-        notifyDataSetChanged()
+        diff.dispatchUpdatesTo(this)
     }
 
     override fun onCreateViewHolder(
@@ -51,7 +77,12 @@ internal class DagDownloadsAdapter(
             val modifiedAt =
                 DateFormat.getDateTimeInstance(DateFormat.MEDIUM, DateFormat.SHORT)
                     .format(Date(file.lastModified()))
-            detail.text = "${readableByteCount(file.length())} · $modifiedAt"
+            detail.text =
+                itemView.context.getString(
+                    R.string.download_list_detail,
+                    readableByteCount(file.length()),
+                    modifiedAt,
+                )
             open.setOnClickListener { onOpen(file) }
             delete.setOnClickListener { onDelete(file) }
         }

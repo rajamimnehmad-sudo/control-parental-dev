@@ -241,16 +241,28 @@ class MediaBarrierContractTest {
     }
 
     @Test
-    fun `performance evidence waits for document load and response quiescence`() {
+    fun `performance evidence is isolated to the initial window of each document`() {
         val background = extensionRoot.resolve("background.js").readText()
         val script = extensionRoot.resolve("barrier.js").readText()
 
         assertContains(script, "\"document-started\"")
         assertContains(script, "\"document-loaded\"")
+        assertContains(script, "documentToken: performanceDocumentToken")
         assertContains(script, "window.addEventListener")
+        assertContains(script, "reportDocumentLoaded()")
+        assertContains(script, "documentLoadedReported")
         assertContains(background, "VIEWPORT_SETTLE_MS = 250")
-        assertContains(background, "activeImageFilters !== 0")
-        assertContains(background, "nativeRequestsInFlight !== 0")
+        assertContains(background, "VIEWPORT_CAPTURE_WINDOW_MS = 750")
+        assertContains(background, "documentStatesByTab")
+        assertContains(background, "documentStatesByToken")
+        assertContains(background, "pendingInitialWork(state) !== 0")
+        assertContains(background, "currentDocumentStateForTab(details.tabId)")
+        assertContains(background, "initialDocumentStateForToken(message.documentToken)")
+        assertContains(background, "documentStatesByTab.get(state.tabId) === state")
+        assertContains(background, "documentStateForDetails(details)")
+        assertContains(background, "document-token-request")
+        assertContains(script, "document-token-response")
+        assertContains(background, "documentGeneration && !isCurrentDocumentState(documentGeneration)")
         assertContains(background, "\"viewport-images-ready\"")
         assertContains(
             background,
