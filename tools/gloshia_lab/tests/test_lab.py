@@ -4,9 +4,10 @@ import json
 import tempfile
 import threading
 import unittest
+from http.cookiejar import CookieJar
 from pathlib import Path
 from urllib.error import HTTPError
-from urllib.request import Request, urlopen
+from urllib.request import HTTPCookieProcessor, Request, build_opener, urlopen
 
 import numpy as np
 from PIL import Image
@@ -356,6 +357,39 @@ class MetricsTest(unittest.TestCase):
 
 
 class ReviewServerTest(unittest.TestCase):
+    def test_lan_mode_requires_token_then_uses_private_session_cookie(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            corpus = Path(temporary)
+            web = Path(__file__).resolve().parents[1] / "web"
+            server = ReviewServer(
+                ("127.0.0.1", 0),
+                corpus,
+                web,
+                False,
+                access_token="temporary-test-token",
+            )
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            base = f"http://127.0.0.1:{server.server_port}"
+            try:
+                with self.assertRaises(HTTPError) as unauthorized:
+                    urlopen(base, timeout=2)
+                self.assertEqual(401, unauthorized.exception.code)
+
+                opener = build_opener(HTTPCookieProcessor(CookieJar()))
+                page = opener.open(
+                    f"{base}/?token=temporary-test-token",
+                    timeout=2,
+                )
+                self.assertEqual(200, page.status)
+                self.assertIn(b"Laboratorio GloshIA", page.read())
+                status = json.loads(opener.open(f"{base}/api/status", timeout=2).read())
+                self.assertEqual(0, status["reviewed_total"])
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(timeout=2)
+
     def test_unreviewed_items_do_not_reveal_model_and_review_reveals_it(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             corpus = Path(temporary)

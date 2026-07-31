@@ -667,9 +667,11 @@ El lote integrado se desarrolló y validó en:
   real de gesto, desacuerdo y deshacer dejó nuevamente cero revisiones; no
   contaminó la verdad humana.
 - El diseño responde correctamente a `390 x 844` y `1280 x 800`, sin overflow
-  horizontal ni predicción anticipada. Sigue siendo loopback: el acceso desde
-  un teléfono físico necesita un canal autenticado separado y no está
-  autorizado a publicar el corpus.
+  horizontal ni predicción anticipada. El modo normal sigue siendo loopback;
+  `serve --lan` habilita de forma explícita una sesión temporal para la misma
+  Wi-Fi, con clave aleatoria, cookie `HttpOnly`, hosts IP privados y rechazo de
+  accesos sin autenticar. No publica el corpus ni sirve como acceso remoto por
+  Internet.
 - Todavía no hay métricas de precisión contra verdad humana. La revisión corta
   debe medir sobre-filtro en hombres, grupos y personas cubiertas, además de
   falsos permisos con personas pequeñas o lejanas. No ajustar umbral ni abrir

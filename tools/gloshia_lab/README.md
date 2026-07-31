@@ -102,9 +102,20 @@ para teléfono y computadora:
 - el resultado, score, split y estrato del modelo siguen ausentes de la API
   hasta que la decisión humana ya quedó guardada.
 
-El servidor permanece limitado a `127.0.0.1`: el diseño es móvil, pero no expone
-el banco en una red ni lo publica. Abrirlo desde un teléfono físico requerirá un
-canal local o remoto autenticado en un ticket separado.
+Por defecto el servidor permanece limitado a `127.0.0.1`. Para una revisión
+temporal desde un teléfono conectado a la misma Wi-Fi puede iniciarse con
+`--lan`: genera una clave aleatoria, acepta sólo hosts IP privados, crea una
+cookie `HttpOnly` de cuatro horas y rechaza accesos sin autenticación. No
+publica el banco en Internet y debe detenerse al terminar:
+
+```bash
+PYTHONPATH=. python -m tools.gloshia_lab.cli serve \
+  .codex-tmp/gloshia-lab-current-1000 --lan
+```
+
+La red local usa HTTP; debe emplearse únicamente en una Wi-Fi privada y
+confiable. El acceso remoto por Internet requiere HTTPS y autenticación en un
+ticket separado.
 
 La salida normal excluye las 200 muestras selladas. Sólo después de congelar
 decisiones y cualquier ajuste:

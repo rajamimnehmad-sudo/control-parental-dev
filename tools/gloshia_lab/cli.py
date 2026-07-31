@@ -211,6 +211,7 @@ def parser() -> argparse.ArgumentParser:
     web = subcommands.add_parser("serve")
     web.add_argument("corpus", type=Path)
     web.add_argument("--port", type=int, default=8765)
+    web.add_argument("--lan", action="store_true")
     web.add_argument("--unlock-sealed", action="store_true")
     web.set_defaults(
         handler=lambda args: (
@@ -219,6 +220,7 @@ def parser() -> argparse.ArgumentParser:
                 TOOL_DIR / "web",
                 args.port,
                 include_sealed=args.unlock_sealed,
+                lan=args.lan,
             )
             or 0
         )

@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
+import hmac
+import ipaddress
 import json
 import mimetypes
 import re
+import secrets
+import socket
 import threading
 from datetime import datetime, timezone
 from http import HTTPStatus
+from http.cookies import CookieError, SimpleCookie
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -60,6 +65,7 @@ class ReviewServer(ThreadingHTTPServer):
         corpus_dir: Path,
         web_dir: Path,
         include_sealed: bool,
+        access_token: str | None = None,
     ) -> None:
         super().__init__(address, ReviewHandler)
         self.corpus_dir = corpus_dir.resolve()
@@ -70,6 +76,7 @@ class ReviewServer(ThreadingHTTPServer):
         self.queue = build_review_queue(self.rows)
         self.queue_ids = {row["sample_id"] for row in self.queue}
         self.review_lock = threading.Lock()
+        self.access_token = access_token
 
 
 class ReviewHandler(BaseHTTPRequestHandler):
@@ -78,15 +85,65 @@ class ReviewHandler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: Any) -> None:
         return
 
-    def _trusted_loopback_request(self, require_origin: bool = False) -> bool:
+    def _trusted_host(self, require_origin: bool = False) -> bool:
         port = self.server.server_port
-        allowed_hosts = {f"127.0.0.1:{port}", f"localhost:{port}"}
-        if self.headers.get("Host", "").casefold() not in allowed_hosts:
+        host_header = self.headers.get("Host", "").casefold()
+        try:
+            parsed_host = urlparse(f"//{host_header}")
+            hostname = parsed_host.hostname
+            request_port = parsed_host.port
+        except ValueError:
             return False
+        if not hostname or request_port != port:
+            return False
+        if self.server.access_token is None:
+            if hostname not in {"127.0.0.1", "localhost"}:
+                return False
+        else:
+            try:
+                address = ipaddress.ip_address(hostname)
+            except ValueError:
+                return False
+            if (
+                not (address.is_private or address.is_loopback)
+                or address.is_unspecified
+                or address.is_multicast
+            ):
+                return False
         origin = self.headers.get("Origin")
         if not origin:
             return not require_origin
-        return origin.casefold() in {f"http://{host}" for host in allowed_hosts}
+        return origin.casefold() == f"http://{host_header}"
+
+    def _authenticated(self) -> bool:
+        expected = self.server.access_token
+        if expected is None:
+            return True
+        cookie = SimpleCookie()
+        try:
+            cookie.load(self.headers.get("Cookie", ""))
+        except CookieError:
+            return False
+        supplied = cookie.get("gloshia_session")
+        return bool(supplied and hmac.compare_digest(supplied.value, expected))
+
+    def _start_authenticated_session(self, parsed: Any) -> bool:
+        expected = self.server.access_token
+        if expected is None or parsed.path != "/":
+            return False
+        supplied = parse_qs(parsed.query).get("token", [""])[0]
+        if not hmac.compare_digest(supplied, expected):
+            return False
+        self.send_response(HTTPStatus.SEE_OTHER)
+        self.send_header("Location", "/")
+        self.send_header(
+            "Set-Cookie",
+            f"gloshia_session={expected}; HttpOnly; SameSite=Strict; Path=/; Max-Age=14400",
+        )
+        self.send_header("Cache-Control", "no-store")
+        self.send_header("Referrer-Policy", "no-referrer")
+        self.end_headers()
+        return True
 
     def _headers(
         self,
@@ -145,10 +202,15 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_GET(self) -> None:
-        if not self._trusted_loopback_request():
+        if not self._trusted_host():
             self.send_error(HTTPStatus.FORBIDDEN)
             return
         parsed = urlparse(self.path)
+        if self._start_authenticated_session(parsed):
+            return
+        if not self._authenticated():
+            self.send_error(HTTPStatus.UNAUTHORIZED)
+            return
         if parsed.path == "/":
             self._file(self.server.web_dir / "index.html", "text/html; charset=utf-8")
             return
@@ -239,7 +301,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND)
 
     def do_POST(self) -> None:
-        if not self._trusted_loopback_request(require_origin=True):
+        if not self._trusted_host(require_origin=True) or not self._authenticated():
             self.send_error(HTTPStatus.FORBIDDEN)
             return
         if urlparse(self.path).path != "/api/review":
@@ -297,7 +359,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
             self._json({"error": "invalid review"}, HTTPStatus.BAD_REQUEST)
 
     def do_DELETE(self) -> None:
-        if not self._trusted_loopback_request(require_origin=True):
+        if not self._trusted_host(require_origin=True) or not self._authenticated():
             self.send_error(HTTPStatus.FORBIDDEN)
             return
         if urlparse(self.path).path != "/api/review":
@@ -333,14 +395,39 @@ def serve(
     web_dir: Path,
     port: int,
     include_sealed: bool = False,
+    lan: bool = False,
 ) -> None:
+    access_token = secrets.token_urlsafe(24) if lan else None
     server = ReviewServer(
-        ("127.0.0.1", port),
+        ("0.0.0.0" if lan else "127.0.0.1", port),
         corpus_dir=corpus_dir,
         web_dir=web_dir,
         include_sealed=include_sealed,
+        access_token=access_token,
     )
-    print(f"Laboratorio GloshIA: http://127.0.0.1:{port}")
+    if lan:
+        addresses: set[str] = set()
+        try:
+            for result in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+                address = ipaddress.ip_address(result[4][0])
+                if address.is_private and not address.is_loopback:
+                    addresses.add(str(address))
+        except OSError:
+            pass
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as probe:
+                probe.connect(("8.8.8.8", 80))
+                address = ipaddress.ip_address(probe.getsockname()[0])
+                if address.is_private and not address.is_loopback:
+                    addresses.add(str(address))
+        except OSError:
+            pass
+        for address in sorted(addresses):
+            print(f"Laboratorio GloshIA móvil: http://{address}:{port}/?token={access_token}")
+        if not addresses:
+            print("No se detectó una dirección Wi-Fi privada para mostrar el enlace.")
+    else:
+        print(f"Laboratorio GloshIA: http://127.0.0.1:{port}")
     print(f"Cola de revisión: {len(server.queue)}")
     print("El examen final está ABIERTO." if include_sealed else "El examen final sigue SELLADO.")
     try:

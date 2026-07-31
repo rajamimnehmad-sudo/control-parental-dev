@@ -200,8 +200,9 @@ Flujo de una entrada:
   `600/200/200`, examen final sellado y servidor de revisión ciega en loopback.
 - La revisión ya tiene una ronda inicial móvil de 100, gestos derecha/izquierda,
   resultado de coincidencia posterior, motivos opcionales, botones/teclado y
-  deshacer transaccional. La publicación o acceso desde un teléfono físico
-  continúa fuera de alcance mientras el corpus permanezca sólo en loopback.
+  deshacer transaccional. El modo LAN temporal permite usarla desde un teléfono
+  en la misma Wi-Fi mediante clave aleatoria y cookie privada; publicación,
+  HTTPS y acceso remoto continúan fuera de alcance.
 - El runner fija por SHA-256 el mismo ONNX de DAG 36 y reproduce su
   preprocesamiento y política. Las 800 muestras evaluables se analizaron sin
   errores; el examen final no fue abierto. No hubo entrenamiento, cambio de
