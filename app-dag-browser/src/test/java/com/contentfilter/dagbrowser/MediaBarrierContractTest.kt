@@ -210,8 +210,17 @@ class MediaBarrierContractTest {
         assertContains(script, "FUNCTIONAL_ICON_SEMANTIC_PATTERN")
         assertContains(script, "FUNCTIONAL_ICON_SOURCE_PATTERN")
         assertContains(script, "applyFunctionalImageIconDecision")
+        assertContains(script, "functionalCssControlKind")
+        assertContains(script, "clippedSprite")
+        assertContains(script, "backgroundPosition")
+        assertContains(script, "backgroundRepeat")
+        assertContains(script, "MAX_VIEWPORT_INTERACTIVE_ELEMENTS = 96")
+        assertContains(script, "MAX_CONTROL_VISUAL_DESCENDANTS = 8")
+        assertContains(script, "document.querySelectorAll(INTERACTIVE_CONTROL_SELECTOR)")
         assertContains(script, "element.closest(\"a, button, [role='button']")
         assertContains(script, "removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE)")
+        assertFalse(script.contains("iheart", ignoreCase = true))
+        assertFalse(script.contains("fav-heart", ignoreCase = true))
         assertFalse(css.contains("content: \"\\2661\""))
     }
 

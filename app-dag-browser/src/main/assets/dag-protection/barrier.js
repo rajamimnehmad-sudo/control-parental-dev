@@ -87,6 +87,10 @@
   const MAX_CSS_BACKGROUND_ELEMENTS = 512;
   const MAX_BACKGROUND_PROBE_ELEMENTS = 1_500;
   const MAX_VIEWPORT_BACKGROUND_ELEMENTS = 128;
+  const MAX_VIEWPORT_INTERACTIVE_ELEMENTS = 96;
+  const MAX_CONTROL_VISUAL_DESCENDANTS = 8;
+  const INTERACTIVE_CONTROL_SELECTOR =
+    "button, [role='button'], [role='menuitem'], [role='link'], a";
   const BACKGROUND_PROBE_DELAY_MS = 180;
   const MIN_BACKGROUND_PROBE_INTERVAL_MS = 450;
   const BACKGROUND_SCROLL_SETTLE_MS = 160;
@@ -517,7 +521,7 @@
     }
   };
 
-  const rememberCssBackground = (element, backgroundImage, sources) => {
+  const rememberCssBackground = (element, visual) => {
     forgetDisconnectedCssBackgrounds();
     if (
       !cssBackgroundRecords.has(element) &&
@@ -525,7 +529,7 @@
     ) {
       cssBackgroundRecords.delete(cssBackgroundRecords.keys().next().value);
     }
-    cssBackgroundRecords.set(element, { backgroundImage, sources });
+    cssBackgroundRecords.set(element, visual);
   };
 
   const isSafeCssUiVector = (element, sources) =>
@@ -571,15 +575,33 @@
     return semanticMatch && sourceHasIconSignal ? semanticMatch[1].toLowerCase() : null;
   };
 
-  const applyFunctionalIconFallback = (element, sources) => {
-    const kind = functionalIconKind(element, sources);
-    if (!kind) {
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      return false;
+  const functionalCssControlKind = (element, record) => {
+    const bounds = element.getBoundingClientRect();
+    if (
+      !Number.isFinite(bounds.width) ||
+      !Number.isFinite(bounds.height) ||
+      bounds.width <= 0 ||
+      bounds.height <= 0 ||
+      bounds.width > MAX_FUNCTIONAL_ICON_SIZE ||
+      bounds.height > MAX_FUNCTIONAL_ICON_SIZE
+    ) {
+      return null;
     }
-    setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, kind);
-    clearWaitingMediaHostsAround(element);
-    return true;
+    const control =
+      element.closest("a, button, [role='button'], [role='link'], [role='menuitem']") ||
+      element.querySelector("a, button, [role='button'], [role='link'], [role='menuitem']");
+    if (!control) {
+      return null;
+    }
+    const vectorVisual =
+      (record.sources.length > 0 && record.sources.every(isSvgSource)) ||
+      /url\(["']?data:image\/svg\+xml/iu.test(record.backgroundImage);
+    const backgroundPosition = String(record.backgroundPosition || "").trim();
+    const clippedSprite =
+      String(record.backgroundRepeat || "").includes("no-repeat") &&
+      backgroundPosition.length > 0 &&
+      !["0% 0%", "0px 0px", "left top"].includes(backgroundPosition.toLowerCase());
+    return vectorVisual || clippedSprite ? "control" : null;
   };
 
   const applyFunctionalImageIconDecision = (element, sources) => {
@@ -632,7 +654,7 @@
       return false;
     }
     const { backgroundImage, sources } = record;
-    const functionalKind = functionalIconKind(element, sources);
+    const functionalKind = functionalCssControlKind(element, record);
     if (functionalKind) {
       setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, functionalKind);
       setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
@@ -652,7 +674,7 @@
     const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
     if (actions.some((action) => action === "block")) {
       removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-      applyFunctionalIconFallback(element, sources);
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "block") {
         element.setAttribute(CSS_MEDIA_ATTRIBUTE, "block");
       }
@@ -663,7 +685,7 @@
       sources.some((sourceUrl) => failedSources.has(sourceUrl))
     ) {
       removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-      applyFunctionalIconFallback(element, sources);
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
       setAttributeIfChanged(element, CSS_MEDIA_ATTRIBUTE, "error");
       return true;
     }
@@ -692,7 +714,7 @@
       return false;
     }
     const { backgroundImage, content, sources } = record;
-    const functionalKind = functionalIconKind(element, sources);
+    const functionalKind = functionalCssControlKind(element, record);
     if (functionalKind) {
       setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, functionalKind);
       setStylePropertyIfChanged(element, config.backgroundProperty, backgroundImage);
@@ -803,7 +825,13 @@
       });
   };
 
-  const recordCssBackground = (element, backgroundImage) => {
+  const recordCssBackground = (
+    element,
+    backgroundImage,
+    backgroundPosition,
+    backgroundSize,
+    backgroundRepeat,
+  ) => {
     if (
       !(element instanceof HTMLElement) ||
       !backgroundImage ||
@@ -812,7 +840,13 @@
       return;
     }
     const sources = backgroundSourcesFromValue(backgroundImage);
-    rememberCssBackground(element, backgroundImage, sources);
+    rememberCssBackground(element, {
+      backgroundImage,
+      backgroundPosition,
+      backgroundSize,
+      backgroundRepeat,
+      sources,
+    });
     if (applyCssBackgroundDecision(element)) {
       return;
     }
@@ -821,7 +855,15 @@
     }
   };
 
-  const recordPseudoCssVisual = (element, pseudo, backgroundImage, content) => {
+  const recordPseudoCssVisual = (
+    element,
+    pseudo,
+    backgroundImage,
+    backgroundPosition,
+    backgroundSize,
+    backgroundRepeat,
+    content,
+  ) => {
     const hasBackground = backgroundImage && backgroundImage !== "none";
     const hasContent = content && !["none", "normal"].includes(content);
     if (!(element instanceof HTMLElement) || (!hasBackground && !hasContent)) {
@@ -839,6 +881,9 @@
     );
     config.records.set(element, {
       backgroundImage: normalizedBackground,
+      backgroundPosition,
+      backgroundSize,
+      backgroundRepeat,
       content: normalizedContent,
       sources,
     });
@@ -889,9 +934,18 @@
     if (!(element instanceof HTMLElement) || !isNearViewport(element)) {
       return false;
     }
-    const backgroundImage = getComputedStyle(element).backgroundImage;
+    const elementStyle = getComputedStyle(element);
+    const backgroundImage = elementStyle.backgroundImage;
     if (backgroundImage && backgroundImage !== "none") {
-      discovered.push({ element, backgroundImage, pseudo: null, content: "normal" });
+      discovered.push({
+        element,
+        backgroundImage,
+        backgroundPosition: elementStyle.backgroundPosition,
+        backgroundSize: elementStyle.backgroundSize,
+        backgroundRepeat: elementStyle.backgroundRepeat,
+        pseudo: null,
+        content: "normal",
+      });
     }
     for (const pseudo of ["before", "after"]) {
       const style = getComputedStyle(element, `::${pseudo}`);
@@ -902,6 +956,9 @@
         discovered.push({
           element,
           backgroundImage: style.backgroundImage,
+          backgroundPosition: style.backgroundPosition,
+          backgroundSize: style.backgroundSize,
+          backgroundRepeat: style.backgroundRepeat,
           pseudo,
           content: style.content,
         });
@@ -917,10 +974,19 @@
           record.element,
           record.pseudo,
           record.backgroundImage,
+          record.backgroundPosition,
+          record.backgroundSize,
+          record.backgroundRepeat,
           record.content,
         );
       } else {
-        recordCssBackground(record.element, record.backgroundImage);
+        recordCssBackground(
+          record.element,
+          record.backgroundImage,
+          record.backgroundPosition,
+          record.backgroundSize,
+          record.backgroundRepeat,
+        );
       }
     }
   };
@@ -962,6 +1028,36 @@
 
   const viewportBackgroundElements = () => {
     const elements = new Set();
+    let interactiveElements = 0;
+    for (const control of document.querySelectorAll(INTERACTIVE_CONTROL_SELECTOR)) {
+      if (
+        interactiveElements >= MAX_VIEWPORT_INTERACTIVE_ELEMENTS ||
+        elements.size >= MAX_VIEWPORT_BACKGROUND_ELEMENTS
+      ) {
+        break;
+      }
+      if (!isVisibleNow(control)) {
+        continue;
+      }
+      const pending = [{ element: control, depth: 0 }];
+      let descendants = 0;
+      while (
+        pending.length > 0 &&
+        descendants < MAX_CONTROL_VISUAL_DESCENDANTS &&
+        elements.size < MAX_VIEWPORT_BACKGROUND_ELEMENTS
+      ) {
+        const candidate = pending.shift();
+        elements.add(candidate.element);
+        descendants += 1;
+        if (candidate.depth >= 2) {
+          continue;
+        }
+        for (const child of candidate.element.children) {
+          pending.push({ element: child, depth: candidate.depth + 1 });
+        }
+      }
+      interactiveElements += 1;
+    }
     const xPositions = [0.12, 0.5, 0.88].map((ratio) => window.innerWidth * ratio);
     const verticalStep = Math.max(120, Math.floor(window.innerHeight / 8));
     for (let y = 1; y < window.innerHeight; y += verticalStep) {
