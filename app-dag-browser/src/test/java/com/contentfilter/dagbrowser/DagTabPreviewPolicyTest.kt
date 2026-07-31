@@ -12,7 +12,14 @@ class DagTabPreviewPolicyTest {
         assertFalse(canCapture(sessionOpen = false))
         assertFalse(canCapture(pageVisible = false))
         assertFalse(canCapture(eligibilityConfirmed = false))
-        assertFalse(canCapture(previewRestricted = true))
+        assertTrue(
+            DagTabPreviewPolicy.canCapture(
+                viewVisible = true,
+                sessionOpen = true,
+                pageVisible = true,
+                eligibilityConfirmed = true,
+            ),
+        )
     }
 
     @Test
@@ -76,12 +83,10 @@ class DagTabPreviewPolicyTest {
         sessionOpen: Boolean = true,
         pageVisible: Boolean = true,
         eligibilityConfirmed: Boolean = true,
-        previewRestricted: Boolean = false,
     ) = DagTabPreviewPolicy.canCapture(
         viewVisible = viewVisible,
         sessionOpen = sessionOpen,
         pageVisible = pageVisible,
         eligibilityConfirmed = eligibilityConfirmed,
-        previewRestricted = previewRestricted,
     )
 }

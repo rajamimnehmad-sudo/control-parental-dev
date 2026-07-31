@@ -11,13 +11,11 @@ internal object DagTabPreviewPolicy {
         sessionOpen: Boolean,
         pageVisible: Boolean,
         eligibilityConfirmed: Boolean,
-        previewRestricted: Boolean,
     ): Boolean =
         viewVisible &&
             sessionOpen &&
             pageVisible &&
-            eligibilityConfirmed &&
-            !previewRestricted
+            eligibilityConfirmed
 
     fun acceptsResult(
         request: DagTabPreviewRequest,

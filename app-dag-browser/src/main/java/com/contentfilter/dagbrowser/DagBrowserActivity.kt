@@ -1548,7 +1548,6 @@ class DagBrowserActivity : Activity() {
             eligibilityConfirmed =
                 tab.previewDocumentToken != null &&
                     tab.previewEligibilityToken == tab.previewDocumentToken,
-            previewRestricted = tab.previewRestricted,
         )
 
     private fun applyPreviewEligibility(
@@ -1573,9 +1572,7 @@ class DagBrowserActivity : Activity() {
                 "eligibility tab=${tab.id} restricted=${tab.previewRestricted}",
             )
         }
-        if (tab.previewRestricted) {
-            invalidateTabThumbnail(tab)
-        } else if (tab === activeTab) {
+        if (tab === activeTab) {
             captureActiveTabThumbnail()
         }
     }
