@@ -405,7 +405,7 @@ class DagBrowserActivity : Activity() {
                     tab.downloadGesture = null
                     tab.navigationRevision += 1
                     if (tab.displayState != TabDisplayState.Loading) {
-                        invalidateTabThumbnail(tab)
+                        markTabThumbnailStale(tab)
                     }
                     tab.url = url
                     tab.needsRestore = false
@@ -1005,7 +1005,7 @@ class DagBrowserActivity : Activity() {
         startNewPerformanceNavigation: Boolean = false,
     ) {
         if (tab.displayState != TabDisplayState.Loading) {
-            invalidateTabThumbnail(tab)
+            markTabThumbnailStale(tab)
         }
         if (tab === activeTab && (startNewPerformanceNavigation || !tab.waitingForBarrier)) {
             recordPerformanceEvent(performanceTracker.begin())
@@ -1023,7 +1023,7 @@ class DagBrowserActivity : Activity() {
         recordHistory(tab)
         if (tab === activeTab) {
             revealProtectedPage()
-            if (tabSwitcher.isOpen()) captureActiveTabThumbnail()
+            captureActiveTabThumbnail()
         }
     }
 
@@ -1247,7 +1247,7 @@ class DagBrowserActivity : Activity() {
         val previousTab = activeTab
         if (
             previousTab != null &&
-            previousTab.thumbnail == null &&
+            (previousTab.thumbnail == null || previousTab.thumbnailStale) &&
             canCaptureThumbnail(previousTab)
         ) {
             captureActiveTabThumbnail {
@@ -1521,6 +1521,7 @@ class DagBrowserActivity : Activity() {
                             } else {
                                 tab.thumbnail?.takeIf { it !== scaled }?.recycle()
                                 tab.thumbnail = scaled
+                                tab.thumbnailStale = false
                                 refreshTabSwitcher()
                             }
                         }
@@ -1583,6 +1584,13 @@ class DagBrowserActivity : Activity() {
         tab.previewRevision += 1
         tab.thumbnail?.recycle()
         tab.thumbnail = null
+        tab.thumbnailStale = false
+        refreshTabSwitcher()
+    }
+
+    private fun markTabThumbnailStale(tab: BrowserTab) {
+        tab.previewRevision += 1
+        tab.thumbnailStale = true
         refreshTabSwitcher()
     }
 
@@ -2253,6 +2261,7 @@ class DagBrowserActivity : Activity() {
         var navigationRevision: Long = 0,
         var downloadGesture: DagDownloadGesture? = null,
         var isPrivate: Boolean = false,
+        var thumbnailStale: Boolean = false,
     )
 
     private class ActiveDownload(

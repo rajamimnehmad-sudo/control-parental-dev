@@ -125,7 +125,7 @@
             android:id="@+id/safety_overlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:background="@color/dag_background"
+            android:background="@color/dag_navy"
             android:padding="24dp">
 
             <LinearLayout
