@@ -15,13 +15,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -82,7 +77,7 @@ internal fun HomeTab(
                 onClick = onProtectionStatus,
             )
             FeatureTile(
-                icon = Icons.Filled.Person,
+                icon = ProductIcon.Person,
                 title = "Agregar usuario",
                 subtitle = "Crear y vincular un nuevo usuario",
                 accent = Sky,
@@ -222,7 +217,10 @@ private fun ProtectionSummaryCard(
                     color = accent,
                 )
             }
-            Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = accent)
+            ProductGlyph(
+                icon = ProductIcon.ChevronRight,
+                color = accent,
+            )
         }
     }
 }

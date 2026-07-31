@@ -5,11 +5,8 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -26,6 +23,8 @@ import com.contentfilter.core.domain.model.DeviceProtectionControl
 import com.contentfilter.core.domain.model.ProtectionAuthorizationScope
 import com.contentfilter.core.ui.ActionButtonTone
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProgressActionButton
 import com.contentfilter.core.ui.StatusChip
 
@@ -139,10 +138,10 @@ internal fun AdvancedUserOptions(
                         color = HeaderMuted,
                     )
                 }
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                ProductGlyph(
+                    icon = ProductIcon.ChevronRight,
+                    color = HeaderMuted,
                     contentDescription = if (expanded) "Cerrar más opciones" else "Abrir más opciones",
-                    tint = HeaderMuted,
                 )
             }
         }

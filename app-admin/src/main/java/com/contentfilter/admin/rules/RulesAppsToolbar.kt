@@ -16,10 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
@@ -36,6 +32,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.unit.dp
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.PremiumFeedbackBanner as FeedbackBanner
 
 @Composable
@@ -73,10 +71,7 @@ internal fun AppsToolbar(
                     onValueChange = onSearchChanged,
                     label = { Text("Buscar app") },
                     leadingIcon = {
-                        Icon(
-                            imageVector = Icons.Filled.Search,
-                            contentDescription = null,
-                        )
+                        ProductGlyph(icon = ProductIcon.Search, color = HeaderInk)
                     },
                     singleLine = true,
                 )
@@ -95,20 +90,20 @@ internal fun AppsToolbar(
                 }
             }
             HeaderIconButton(onClick = onRefreshApps) {
-                Icon(
-                    imageVector = Icons.Filled.Refresh,
+                ProductGlyph(
+                    icon = ProductIcon.Refresh,
+                    color = HeaderMuted,
                     contentDescription = "Actualizar",
-                    tint = HeaderMuted,
                     modifier = Modifier.size(22.dp),
                 )
             }
             HeaderIconButton(
                 onClick = { onSearchExpandedChanged(!searchExpanded) },
             ) {
-                Icon(
-                    imageVector = Icons.Filled.Search,
+                ProductGlyph(
+                    icon = ProductIcon.Search,
+                    color = HeaderInk,
                     contentDescription = "Buscar app",
-                    tint = HeaderInk,
                     modifier = Modifier.size(22.dp),
                 )
             }

@@ -11,13 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -42,6 +39,8 @@ import com.contentfilter.core.domain.model.PolicyRule
 import com.contentfilter.core.domain.model.PolicySchedulePolicy.isScheduleRule
 import com.contentfilter.core.domain.model.PolicyWeekdays
 import com.contentfilter.core.ui.ProductCard
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 
 @Composable
 internal fun GlobalScheduleButton(
@@ -94,8 +93,9 @@ internal fun GlobalScheduleButton(
                             enabled = !saving,
                             onClick = { visible = false },
                         ) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            ProductGlyph(
+                                icon = ProductIcon.Back,
+                                color = MaterialTheme.colorScheme.onSurface,
                                 contentDescription = "Volver",
                             )
                         }

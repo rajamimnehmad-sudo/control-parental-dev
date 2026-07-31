@@ -17,9 +17,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -37,6 +34,8 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.unit.dp
 import com.contentfilter.core.domain.model.LicenseState
 import com.contentfilter.core.domain.model.allowsProtection
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import java.time.Instant
 import java.time.ZoneId
 import java.time.temporal.ChronoUnit
@@ -78,7 +77,11 @@ internal fun PageHeader(
     ) {
         onBack?.let {
             IconButton(onClick = it) {
-                Icon(imageVector = Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Volver", tint = Ink)
+                ProductGlyph(
+                    icon = ProductIcon.Back,
+                    color = Ink,
+                    contentDescription = "Volver",
+                )
             }
         }
         Column(
@@ -138,7 +141,7 @@ internal fun LargeFeatureCard(
 
 @Composable
 internal fun FeatureTile(
-    icon: ImageVector,
+    icon: ProductIcon,
     title: String,
     subtitle: String,
     accent: Color,
@@ -166,7 +169,7 @@ internal fun FeatureTile(
                         .background(accent.copy(alpha = 0.18f), RoundedCornerShape(18.dp)),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(imageVector = icon, contentDescription = null, tint = accent, modifier = Modifier.size(28.dp))
+                ProductGlyph(icon = icon, color = accent, modifier = Modifier.size(28.dp))
             }
             Column(
                 modifier = Modifier.weight(1f),
@@ -175,10 +178,9 @@ internal fun FeatureTile(
                 Text(title, style = MaterialTheme.typography.titleMedium, color = Ink)
                 Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MutedInk)
             }
-            Icon(
-                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
-                contentDescription = null,
-                tint = accent,
+            ProductGlyph(
+                icon = ProductIcon.ChevronRight,
+                color = accent,
                 modifier = Modifier.size(28.dp),
             )
         }

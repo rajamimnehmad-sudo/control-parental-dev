@@ -27,11 +27,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -61,6 +57,8 @@ import com.contentfilter.core.domain.model.PolicySchedulePolicy.scheduleTarget
 import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.ProtectedBrowserPolicy
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductSectionHeader
 import kotlinx.coroutines.launch
 
@@ -469,10 +467,10 @@ private fun UserDetailHeader(
                 modifier = Modifier.size(iconSize),
                 onClick = onBack,
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                ProductGlyph(
+                    icon = ProductIcon.Back,
+                    color = HeaderInk,
                     contentDescription = "Volver",
-                    tint = HeaderInk,
                 )
             }
             Column(
@@ -582,10 +580,10 @@ private fun CompactPanelChip(
                         .background(attentionLevel.color, CircleShape),
             )
         }
-        Icon(
-            imageVector = Icons.Filled.KeyboardArrowDown,
+        ProductGlyph(
+            icon = ProductIcon.ChevronDown,
+            color = Color.White,
             contentDescription = "Mostrar secciones",
-            tint = Color.White,
             modifier = Modifier.size(17.dp),
         )
     }

@@ -3,10 +3,7 @@ package com.contentfilter.user
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -158,15 +155,15 @@ internal fun UserFeedbackSettingsRoute(
             Row {
                 (1..5).forEach { value ->
                     IconButton(onClick = { rating = value }) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = "$value estrellas",
-                            tint =
+                        ProductGlyph(
+                            icon = ProductIcon.Star,
+                            color =
                                 if (value <= rating) {
                                     MaterialTheme.colorScheme.tertiary
                                 } else {
                                     MaterialTheme.colorScheme.outlineVariant
                                 },
+                            contentDescription = "$value estrellas",
                         )
                     }
                 }

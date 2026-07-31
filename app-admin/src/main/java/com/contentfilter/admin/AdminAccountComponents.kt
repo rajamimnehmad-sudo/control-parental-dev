@@ -13,10 +13,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -211,15 +208,15 @@ internal fun AdminFeedbackSettingsRoute(viewModel: AdminFeedbackViewModel = hilt
             Row {
                 (1..5).forEach { value ->
                     IconButton(onClick = { rating = value }) {
-                        Icon(
-                            imageVector = Icons.Filled.Star,
-                            contentDescription = "$value estrellas",
-                            tint =
+                        ProductGlyph(
+                            icon = ProductIcon.Star,
+                            color =
                                 if (value <= rating) {
                                     MaterialTheme.colorScheme.tertiary
                                 } else {
                                     MaterialTheme.colorScheme.outlineVariant
                                 },
+                            contentDescription = "$value estrellas",
                         )
                     }
                 }

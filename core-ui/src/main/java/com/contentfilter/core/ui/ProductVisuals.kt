@@ -22,11 +22,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -169,10 +166,10 @@ fun ProductPageHeader(
                         .clickable(interactionSource = interactionSource, indication = null, onClick = it),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                ProductGlyph(
+                    icon = ProductIcon.Back,
+                    color = ProductInk,
                     contentDescription = "Volver",
-                    tint = ProductInk,
                     modifier = Modifier.size(24.dp),
                 )
             }
