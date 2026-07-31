@@ -283,10 +283,10 @@ class DagBrowserActivity : Activity() {
         goButton.setOnClickListener { navigateFromInput() }
         newPageButton.setOnClickListener { createTab(switchToTab = true) }
         securityButton.setOnClickListener { showSecurityDetails() }
-        swipeRefresh.setOnChildScrollUpCallback { _, _ ->
-            activeTab?.contentScrollY?.let { it > 0 } ?: false
-        }
-        swipeRefresh.setOnRefreshListener { reloadFromPullGesture() }
+        // Reload remains available from the browser menu. Pull-to-refresh is
+        // intentionally disabled because it competes with page scrolling at
+        // the top edge, especially on image-heavy storefronts.
+        swipeRefresh.isEnabled = false
         addressInput.setOnEditorActionListener { _, actionId, event ->
             val submitted =
                 actionId == EditorInfo.IME_ACTION_GO ||
@@ -487,7 +487,6 @@ class DagBrowserActivity : Activity() {
                     tab.pdfDocumentReady = false
                     tab.navigationRevision += 1
                     tab.contentScrollY = 0
-                    if (tab === activeTab) swipeRefresh.isEnabled = true
                     if (tab.displayState != TabDisplayState.Loading) {
                         markTabThumbnailStale(tab)
                     }
@@ -549,9 +548,6 @@ class DagBrowserActivity : Activity() {
                     scrollY: Int,
                 ) {
                     tab.contentScrollY = scrollY.coerceAtLeast(0)
-                    if (tab === activeTab) {
-                        swipeRefresh.isEnabled = tab.contentScrollY == 0
-                    }
                 }
             }
     }
@@ -1569,17 +1565,6 @@ class DagBrowserActivity : Activity() {
         goButton.alpha = alpha
     }
 
-    private fun reloadFromPullGesture() {
-        val tab = activeTab
-        if (!extensionReady || tab == null || tab.url == InitialBlankPage) {
-            swipeRefresh.isRefreshing = false
-            return
-        }
-        beginProtectedLoad(tab, startNewPerformanceNavigation = true)
-        tab.session.reload()
-        handler.postDelayed({ swipeRefresh.isRefreshing = false }, PullRefreshTimeoutMillis)
-    }
-
     private fun showSecurityDetails() {
         val tab = activeTab
         val secureConnection = tab?.url?.startsWith("https://", ignoreCase = true) == true
@@ -1645,7 +1630,6 @@ class DagBrowserActivity : Activity() {
         tab.lastActivatedSequence = nextTabActivationSequence++
         ensureSessionOpen(tab)
         geckoView.setSession(tab.session)
-        swipeRefresh.isEnabled = tab.contentScrollY <= 0
         setTabActivity(tab, active = true)
         restoreTabIfNeeded(tab)
         renderActiveTab()
@@ -2899,7 +2883,6 @@ class DagBrowserActivity : Activity() {
         const val ThumbnailCaptureTimeoutMillis = 1_200L
         const val ThumbnailCaptureRetryDelayMillis = 120L
         const val ThumbnailCaptureRetries = 1
-        const val PullRefreshTimeoutMillis = 2_500L
         const val DownloadsDirectory = "downloads"
         const val DownloadBufferBytes = 16 * 1024
         const val PdfHeaderBytes = 8

@@ -3,6 +3,7 @@ package com.contentfilter.dagbrowser
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertFalse
 
 class DagBrowserManifestContractTest {
     @Test
@@ -28,12 +29,11 @@ class DagBrowserManifestContractTest {
     }
 
     @Test
-    fun `pull refresh is limited to the top of the page`() {
+    fun `page scrolling is not intercepted by pull refresh`() {
         val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
 
-        assertContains(activity, "setOnChildScrollUpCallback")
-        assertContains(activity, "scrollDelegate")
-        assertContains(activity, "onScrollChanged")
-        assertContains(activity, "contentScrollY")
+        assertContains(activity, "swipeRefresh.isEnabled = false")
+        assertContains(activity, "R.id.menu_reload")
+        assertFalse(activity.contains("setOnRefreshListener"))
     }
 }
