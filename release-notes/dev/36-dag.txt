@@ -1,0 +1,1 @@
+DAG 36 mejora la compatibilidad y velocidad del filtrado visual, estabiliza imágenes dinámicas y simplifica la presentación de contenido protegido. También incorpora historial, pestañas con miniaturas y versión visible del navegador.
