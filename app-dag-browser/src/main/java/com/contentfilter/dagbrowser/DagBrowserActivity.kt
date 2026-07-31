@@ -280,7 +280,9 @@ class DagBrowserActivity : Activity() {
 
     private fun configureControls() {
         setNavigationControlsEnabled(false)
-        goButton.setOnClickListener { navigateFromInput() }
+        goButton.setOnClickListener {
+            if (shouldShowReloadAction()) reloadActivePage() else navigateFromInput()
+        }
         newPageButton.setOnClickListener { createTab(switchToTab = true) }
         securityButton.setOnClickListener { showSecurityDetails() }
         // Reload remains available from the browser menu. Pull-to-refresh is
@@ -294,6 +296,7 @@ class DagBrowserActivity : Activity() {
             if (submitted) navigateFromInput()
             submitted
         }
+        addressInput.setOnFocusChangeListener { _, _ -> updateAddressActionButton() }
         tabButton.setOnClickListener { showTabSwitcher() }
         menuButton.setOnClickListener { showBrowserMenu() }
         tabSwitcher.setListener(
@@ -1337,6 +1340,24 @@ class DagBrowserActivity : Activity() {
         tab.session.loadUri(safeUrl)
     }
 
+    private fun shouldShowReloadAction(): Boolean {
+        val tab = activeTab ?: return false
+        return tab.url != InitialBlankPage && !addressInput.hasFocus()
+    }
+
+    private fun updateAddressActionButton() {
+        val reload = shouldShowReloadAction()
+        goButton.setImageResource(if (reload) R.drawable.ic_dag_reload else R.drawable.ic_dag_search)
+        goButton.contentDescription = getString(if (reload) R.string.reload else R.string.search)
+    }
+
+    private fun reloadActivePage() {
+        val tab = activeTab ?: return
+        if (!extensionReady || tab.url == InitialBlankPage || !tab.session.isOpen) return
+        beginProtectedLoad(tab, startNewPerformanceNavigation = true)
+        tab.session.reload()
+    }
+
     private fun maybeCoverAcceptedNavigation(
         tab: BrowserTab,
         request: GeckoSession.NavigationDelegate.LoadRequest,
@@ -1735,6 +1756,7 @@ class DagBrowserActivity : Activity() {
     private fun renderActiveTab() {
         val tab = activeTab ?: return
         setNavigationControlsEnabled(extensionReady)
+        updateAddressActionButton()
         updateTabButton()
         updatePrivateAppearance(tab)
         if (tab.url == InitialBlankPage) {
@@ -2142,12 +2164,7 @@ class DagBrowserActivity : Activity() {
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.menu_reload -> {
-                        activeTab?.let { tab ->
-                            if (tab.url != InitialBlankPage) {
-                                beginProtectedLoad(tab, startNewPerformanceNavigation = true)
-                                tab.session.reload()
-                            }
-                        }
+                        reloadActivePage()
                         true
                     }
                     R.id.menu_history -> {

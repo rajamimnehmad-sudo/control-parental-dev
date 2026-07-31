@@ -36,4 +36,14 @@ class DagBrowserManifestContractTest {
         assertContains(activity, "R.id.menu_reload")
         assertFalse(activity.contains("setOnRefreshListener"))
     }
+
+    @Test
+    fun `address action reloads a loaded page without intercepting scroll`() {
+        val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
+
+        assertContains(activity, "if (shouldShowReloadAction()) reloadActivePage() else navigateFromInput()")
+        assertContains(activity, "R.drawable.ic_dag_reload")
+        assertContains(activity, "addressInput.setOnFocusChangeListener")
+        assertContains(activity, "R.id.menu_reload")
+    }
 }

@@ -28,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 47
-        versionName = "0.28.1"
+        versionCode = 48
+        versionName = "0.29.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The first physical gate targets the current 64-bit Samsung devices.
