@@ -34,6 +34,10 @@ function parseArguments(argv) {
       values.includeSealed = true;
       continue;
     }
+    if (key === "--diagnostic-regions") {
+      values.diagnosticRegions = true;
+      continue;
+    }
     const value = argv[index + 1];
     if (!value || value.startsWith("--")) throw new Error(`missing value for ${key}`);
     values[key.slice(2)] = value;
@@ -239,7 +243,7 @@ async function score(session, rgb) {
   return probability;
 }
 
-async function predict(session, filePath) {
+async function predict(session, filePath, diagnosticRegions = false) {
   const started = performance.now();
   const views = await preparedViews(filePath);
   const fullProbability = await score(session, views.full);
@@ -268,6 +272,13 @@ async function predict(session, filePath) {
       }
     }
   }
+  if (diagnosticRegions) {
+    const diagnosticViews =
+      views.panoramic.length > 0 ? views.panoramic : uncertainQuadrants(views.full);
+    while (regional.length < diagnosticViews.length) {
+      regional.push(await score(session, diagnosticViews[regional.length]));
+    }
+  }
   const maximum = Math.max(fullProbability, ...regional);
   return {
     schema_version: "gloshia-lab-prediction-v1",
@@ -281,6 +292,7 @@ async function predict(session, filePath) {
     source_width: views.width,
     source_height: views.height,
     policy_version: "dag-36",
+    diagnostic_region_sweep: diagnosticRegions,
   };
 }
 
@@ -301,7 +313,11 @@ async function main() {
   });
   const modelSha256 = sha256File(modelPath);
   if (args.one) {
-    const prediction = await predict(session, path.resolve(args.one));
+    const prediction = await predict(
+      session,
+      path.resolve(args.one),
+      Boolean(args.diagnosticRegions),
+    );
     console.log(JSON.stringify({ ...prediction, model_sha256: modelSha256 }));
     return;
   }
@@ -320,6 +336,7 @@ async function main() {
       const prediction = await predict(
         session,
         path.resolve(corpusRoot, row.local_path),
+        Boolean(args.diagnosticRegions),
       );
       outputRows.push({
         sample_id: row.sample_id,

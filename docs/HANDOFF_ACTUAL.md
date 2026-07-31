@@ -672,16 +672,45 @@ El lote integrado se desarrolló y validó en:
   Wi-Fi, con clave aleatoria, cookie `HttpOnly`, hosts IP privados y rechazo de
   accesos sin autenticar. No publica el corpus ni sirve como acceso remoto por
   Internet.
-- Todavía no hay métricas de precisión contra verdad humana. La revisión corta
-  debe medir sobre-filtro en hombres, grupos y personas cubiertas, además de
-  falsos permisos con personas pequeñas o lejanas. No ajustar umbral ni abrir
-  el examen final hasta congelar esas decisiones.
+- La ronda que inicialmente estaba pendiente ya produjo métricas contra verdad
+  humana; sus resultados y límites quedan en la sección siguiente. El examen
+  final continúa cerrado.
+
+### Ronda humana y calibración preliminar del 2026-07-31
+
+- La nueva ronda móvil quedó completa: 85 permisos, 10 filtros y 5 dudas. Las
+  95 decisiones binarias cubren 65 series; la cola está enriquecida con casos
+  difíciles y no representa una muestra aleatoria de Internet.
+- La política DAG 36 obtuvo 8 filtros correctos, 2 permisos incorrectos,
+  40 filtros incorrectos y 45 permisos correctos: recall de filtro `0,80`,
+  recall de permiso `0,529412` y exactitud de estrés `0,557895`.
+- Un barrido regional separado seleccionó sólo con `main_eval` el candidato
+  experimental `full 0,44 / regional 0,41 / 1 voto`, conservando panorámicas.
+  En `difficult`, sin reajuste, pasó de `0,608696` a `0,695652` de exactitud,
+  pero ese bloque contiene apenas 2 positivos.
+- Sobre las 95 decisiones, la candidata conserva 8 filtros correctos y
+  2 permisos incorrectos, reduce filtros incorrectos de 40 a 30 y eleva
+  permisos correctos de 45 a 55. Cambia 22 resultados: 16 `filter -> allow` y
+  6 `allow -> filter`.
+- El barrido de las 800 muestras no selladas terminó sin errores. La candidata
+  cambiaría `499/301` a `487/313 filter/allow`; las inferencias medias
+  estimadas suben de `1,485` a `1,624`, con mediana 1 y máximo 5 sin cambios.
+- Decisión: `NO-GO` para Android y `final_sealed`. La mejora es insuficiente,
+  los dos escapes pertenecen a una misma serie y el corpus continúa
+  `training_authorized: false`. Siguiente gate: datos autorizados e
+  independientes para mejorar el modelo, no más ajuste del mismo umbral.
+- Evidencia: `docs/dag/v3/GLOSHIA_LAB_CALIBRATION_2026-07-31.md`. El laboratorio
+  agrega un barrido regional protegido y un reporte reproducible; no cambió
+  modelo, DAG, APK, versionCode, Supabase ni Production.
 
 ## Próximo trabajo autorizado
 
-El próximo paso del laboratorio visual es la revisión humana ciega de su cola de
-200, sin modificar todavía DAG. El siguiente correctivo Android recomendado
-sigue siendo `DAG-DOWNLOADS-01`: preservar semántica `POST` al abrir una
+El próximo paso del laboratorio visual es preparar un dataset dirigido con
+autorización real de entrenamiento y mejorar el modelo fuera del banco de
+evaluación; no integrar la calibración preliminar ni abrir todavía
+`final_sealed`. La cola ciega restante se conserva para validaciones futuras,
+no para seguir ajustando el mismo umbral. El siguiente correctivo Android
+recomendado sigue siendo `DAG-DOWNLOADS-01`: preservar semántica `POST` al abrir una
 descarga en nueva pestaña y definir el tratamiento seguro de PDF inline sin
 debilitar la barrera. La inteligencia conversacional avanzada de GloshIA queda
 para el ticket posterior ya diferido. `DAG-V3-DOCUMENT-ISOLATION-07` y

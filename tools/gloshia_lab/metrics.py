@@ -12,6 +12,12 @@ from typing import Any, Iterable
 from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
+CALIBRATION_REVIEW_FLOOR = 0.30
+CALIBRATION_FULL_THRESHOLDS = tuple(value / 100 for value in range(40, 61))
+CALIBRATION_REGION_THRESHOLDS = tuple(value / 100 for value in range(35, 71))
+CALIBRATION_REGION_VOTES = (1, 2, 3, 4)
+
+
 def read_jsonl(path: Path) -> list[dict[str, Any]]:
     if not path.exists():
         return []
@@ -196,6 +202,222 @@ def evaluation_report(corpus_dir: Path, include_sealed: bool = False) -> dict[st
         "important_limit": (
             "Metrics against human truth are provisional until the requested review queue "
             "is completed. The final_sealed split remains excluded unless explicitly opened."
+        ),
+    }
+
+
+def _decision_metrics(rows: list[dict[str, Any]], key: str) -> dict[str, Any]:
+    matrix = Counter((row["human_action"], row[key]) for row in rows)
+    true_filter = matrix[("filter", "filter")]
+    false_allow = matrix[("filter", "allow")]
+    false_filter = matrix[("allow", "filter")]
+    true_allow = matrix[("allow", "allow")]
+    expected_filter = true_filter + false_allow
+    expected_allow = true_allow + false_filter
+    total = expected_filter + expected_allow
+    return {
+        "reviewed": total,
+        "true_filter": true_filter,
+        "false_allow": false_allow,
+        "false_filter": false_filter,
+        "true_allow": true_allow,
+        "accuracy": round((true_filter + true_allow) / total, 6) if total else None,
+        "filter_recall": round(true_filter / expected_filter, 6)
+        if expected_filter
+        else None,
+        "allow_recall": round(true_allow / expected_allow, 6)
+        if expected_allow
+        else None,
+    }
+
+
+def experimental_calibration_action(
+    full_probability: float,
+    regional_probabilities: list[float],
+    *,
+    full_threshold: float,
+    region_threshold: float,
+    region_votes: int,
+) -> str:
+    if full_probability >= full_threshold:
+        return "filter"
+    if full_probability < CALIBRATION_REVIEW_FLOOR:
+        return "allow"
+    return (
+        "filter"
+        if sum(value >= region_threshold for value in regional_probabilities)
+        >= region_votes
+        else "allow"
+    )
+
+
+def calibration_experiment_report(
+    corpus_dir: Path,
+    diagnostic_predictions_path: Path,
+) -> dict[str, Any]:
+    """Select on main_eval and report once on difficult without opening sealed."""
+    manifest = {row["sample_id"]: row for row in read_jsonl(corpus_dir / "manifest.jsonl")}
+    baseline = {
+        row["sample_id"]: row for row in read_jsonl(corpus_dir / "predictions.jsonl")
+    }
+    diagnostic = {
+        row["sample_id"]: row for row in read_jsonl(diagnostic_predictions_path)
+    }
+    reviews = read_reviews(corpus_dir / "reviews.json")
+    rows: list[dict[str, Any]] = []
+    doubt_count = 0
+    for sample_id, review in reviews.items():
+        if review.get("action") == "doubt":
+            doubt_count += 1
+            continue
+        if review.get("action") not in {"allow", "filter"}:
+            continue
+        item = manifest.get(sample_id)
+        current = baseline.get(sample_id)
+        sweep = diagnostic.get(sample_id)
+        if not item or not current or not sweep:
+            raise ValueError(f"missing calibration evidence for {sample_id}")
+        if item.get("split") == "final_sealed":
+            raise ValueError("refusing calibration with final_sealed evidence")
+        if not sweep.get("diagnostic_region_sweep"):
+            raise ValueError(f"diagnostic region sweep missing for {sample_id}")
+        width = int(sweep["source_width"])
+        height = int(sweep["source_height"])
+        panoramic = max(width, height) / min(width, height) >= 2.0
+        rows.append(
+            {
+                "sample_id": sample_id,
+                "split": item["split"],
+                "source_cluster": item.get("source_cluster") or "unknown",
+                "human_action": review["action"],
+                "baseline_action": current["action"],
+                "full_probability": float(sweep["full_probability"]),
+                "regional_probabilities": [
+                    float(value) for value in sweep["regional_probabilities"]
+                ],
+                "panoramic": panoramic,
+            }
+        )
+
+    development = [row for row in rows if row["split"] == "main_eval"]
+    validation = [row for row in rows if row["split"] == "difficult"]
+    if not development or not validation:
+        raise ValueError("main_eval and difficult reviewed evidence are both required")
+    baseline_development = _decision_metrics(development, "baseline_action")
+    recall_floor = baseline_development["filter_recall"]
+    if recall_floor is None:
+        raise ValueError("development evidence has no human filter decisions")
+
+    candidates: list[
+        tuple[tuple[float, float, float, float, float, int], dict[str, Any]]
+    ] = []
+    for full_threshold in CALIBRATION_FULL_THRESHOLDS:
+        for region_threshold in CALIBRATION_REGION_THRESHOLDS:
+            for region_votes in CALIBRATION_REGION_VOTES:
+                candidate_rows = []
+                for row in development:
+                    action = row["baseline_action"]
+                    if not row["panoramic"]:
+                        action = experimental_calibration_action(
+                            row["full_probability"],
+                            row["regional_probabilities"],
+                            full_threshold=full_threshold,
+                            region_threshold=region_threshold,
+                            region_votes=region_votes,
+                        )
+                    candidate_rows.append({**row, "candidate_action": action})
+                metrics = _decision_metrics(candidate_rows, "candidate_action")
+                if (metrics["filter_recall"] or 0.0) < recall_floor:
+                    continue
+                rank = (
+                    metrics["allow_recall"] or 0.0,
+                    metrics["accuracy"] or 0.0,
+                    metrics["filter_recall"] or 0.0,
+                    -full_threshold,
+                    -region_threshold,
+                    -region_votes,
+                )
+                candidates.append(
+                    (
+                        rank,
+                        {
+                            "full_threshold": full_threshold,
+                            "region_threshold": region_threshold,
+                            "region_votes": region_votes,
+                            "development_metrics": metrics,
+                        },
+                    )
+                )
+    if not candidates:
+        raise ValueError("no calibration candidate preserves development filter recall")
+    selected = max(candidates, key=lambda item: item[0])[1]
+
+    evaluated = []
+    for row in rows:
+        action = row["baseline_action"]
+        if not row["panoramic"]:
+            action = experimental_calibration_action(
+                row["full_probability"],
+                row["regional_probabilities"],
+                full_threshold=selected["full_threshold"],
+                region_threshold=selected["region_threshold"],
+                region_votes=selected["region_votes"],
+            )
+        evaluated.append({**row, "candidate_action": action})
+
+    def metrics_for(split: str | None, key: str) -> dict[str, Any]:
+        selected_rows = [
+            row for row in evaluated if split is None or row["split"] == split
+        ]
+        return _decision_metrics(selected_rows, key)
+
+    changed = [
+        row
+        for row in evaluated
+        if row["baseline_action"] != row["candidate_action"]
+    ]
+    return {
+        "schema_version": "gloshia-lab-calibration-experiment-v1",
+        "sealed_split_opened": False,
+        "reviewed_decisive": len(rows),
+        "reviewed_doubt_excluded": doubt_count,
+        "unique_source_clusters": len({row["source_cluster"] for row in rows}),
+        "selection": {
+            "development_split": "main_eval",
+            "validation_split": "difficult",
+            "recall_floor": recall_floor,
+            "grid_candidates": len(candidates),
+            "panoramic_policy": "unchanged",
+            **selected,
+        },
+        "baseline": {
+            "development": metrics_for("main_eval", "baseline_action"),
+            "validation": metrics_for("difficult", "baseline_action"),
+            "all_reviewed": metrics_for(None, "baseline_action"),
+        },
+        "candidate": {
+            "development": metrics_for("main_eval", "candidate_action"),
+            "validation": metrics_for("difficult", "candidate_action"),
+            "all_reviewed": metrics_for(None, "candidate_action"),
+        },
+        "changed_decisions": {
+            "total": len(changed),
+            "filter_to_allow": sum(
+                row["baseline_action"] == "filter"
+                and row["candidate_action"] == "allow"
+                for row in changed
+            ),
+            "allow_to_filter": sum(
+                row["baseline_action"] == "allow"
+                and row["candidate_action"] == "filter"
+                for row in changed
+            ),
+            "sample_ids": [row["sample_id"] for row in changed],
+        },
+        "decision": "LAB_CANDIDATE_ONLY",
+        "important_limit": (
+            "The difficult validation contains only two human filter decisions. This result "
+            "does not authorize Android integration or opening final_sealed."
         ),
     }
 

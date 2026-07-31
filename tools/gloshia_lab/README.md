@@ -90,6 +90,23 @@ PYTHONPATH=. python -m tools.gloshia_lab.cli serve \
   .codex-tmp/gloshia-lab-current-1000
 ```
 
+Después de una ronda humana, una lectura regional diagnóstica puede escribirse
+en un archivo separado sin reemplazar las predicciones canónicas:
+
+```bash
+PYTHONPATH=. python -m tools.gloshia_lab.cli score \
+  .codex-tmp/gloshia-lab-current-1000 \
+  --diagnostic-regions \
+  --output .codex-tmp/gloshia-lab-current-1000/diagnostic-regions.jsonl
+PYTHONPATH=. python -m tools.gloshia_lab.cli calibration-report \
+  .codex-tmp/gloshia-lab-current-1000 \
+  .codex-tmp/gloshia-lab-current-1000/diagnostic-regions.jsonl
+```
+
+El reporte elige parámetros solamente con revisiones `main_eval` y muestra por
+separado el resultado en `difficult`. No abre `final_sealed`, no modifica DAG y
+no convierte un candidato de laboratorio en política aprobada.
+
 La interfaz comienza con una ronda acotada a 100 decisiones y está preparada
 para teléfono y computadora:
 

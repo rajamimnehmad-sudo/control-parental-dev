@@ -29,7 +29,11 @@ from tools.gloshia_lab.model import (
     _uncertain_quadrants,
     action_from_scores,
 )
-from tools.gloshia_lab.metrics import evaluation_report
+from tools.gloshia_lab.metrics import (
+    calibration_experiment_report,
+    evaluation_report,
+    experimental_calibration_action,
+)
 from tools.gloshia_lab.server import ReviewServer
 
 
@@ -288,6 +292,38 @@ class CorpusTest(unittest.TestCase):
 
 
 class MetricsTest(unittest.TestCase):
+    def test_experimental_policy_requires_regional_support_below_high_gate(self) -> None:
+        self.assertEqual(
+            "filter",
+            experimental_calibration_action(
+                0.44,
+                [0.1, 0.1, 0.1, 0.1],
+                full_threshold=0.44,
+                region_threshold=0.41,
+                region_votes=1,
+            ),
+        )
+        self.assertEqual(
+            "allow",
+            experimental_calibration_action(
+                0.43,
+                [0.4, 0.2, 0.1, 0.1],
+                full_threshold=0.44,
+                region_threshold=0.41,
+                region_votes=1,
+            ),
+        )
+        self.assertEqual(
+            "filter",
+            experimental_calibration_action(
+                0.43,
+                [0.41, 0.2, 0.1, 0.1],
+                full_threshold=0.44,
+                region_threshold=0.41,
+                region_votes=1,
+            ),
+        )
+
     def test_report_excludes_sealed_and_computes_human_matrix(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             corpus = Path(temporary)
@@ -354,6 +390,70 @@ class MetricsTest(unittest.TestCase):
             self.assertEqual(1, report["confusion_matrix"]["filter_as_allow"])
             self.assertEqual(0.0, report["filter_recall"])
             self.assertEqual(1.0, report["allow_recall"])
+
+    def test_calibration_selects_on_main_and_reports_difficult_separately(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            corpus = Path(temporary)
+            manifest = []
+            predictions = []
+            diagnostics = []
+            reviews = {}
+            cases = [
+                ("main-filter", "main_eval", "filter", 0.45, [0.2] * 4),
+                ("main-safe", "main_eval", "allow", 0.41, [0.2] * 4),
+                ("hard-filter", "difficult", "filter", 0.46, [0.2] * 4),
+                ("hard-safe", "difficult", "allow", 0.42, [0.2] * 4),
+            ]
+            for sample_id, split, human, full, regions in cases:
+                manifest.append(
+                    {
+                        "sample_id": sample_id,
+                        "category": "boundary_current",
+                        "split": split,
+                        "source_cluster": sample_id,
+                    }
+                )
+                predictions.append(
+                    {
+                        "sample_id": sample_id,
+                        "action": "filter",
+                        "elapsed_ms": 1.0,
+                    }
+                )
+                diagnostics.append(
+                    {
+                        "sample_id": sample_id,
+                        "diagnostic_region_sweep": True,
+                        "full_probability": full,
+                        "regional_probabilities": regions,
+                        "source_width": 300,
+                        "source_height": 200,
+                    }
+                )
+                reviews[sample_id] = {"action": human}
+            (corpus / "manifest.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in manifest), encoding="utf-8"
+            )
+            (corpus / "predictions.jsonl").write_text(
+                "".join(json.dumps(row) + "\n" for row in predictions), encoding="utf-8"
+            )
+            diagnostic_path = corpus / "diagnostic.jsonl"
+            diagnostic_path.write_text(
+                "".join(json.dumps(row) + "\n" for row in diagnostics), encoding="utf-8"
+            )
+            (corpus / "reviews.json").write_text(
+                json.dumps({"reviews": reviews}), encoding="utf-8"
+            )
+
+            report = calibration_experiment_report(corpus, diagnostic_path)
+
+            self.assertFalse(report["sealed_split_opened"])
+            self.assertEqual(2, report["candidate"]["validation"]["reviewed"])
+            self.assertEqual(1.0, report["candidate"]["validation"]["filter_recall"])
+            self.assertGreaterEqual(
+                report["candidate"]["validation"]["allow_recall"],
+                report["baseline"]["validation"]["allow_recall"],
+            )
 
 
 class ReviewServerTest(unittest.TestCase):

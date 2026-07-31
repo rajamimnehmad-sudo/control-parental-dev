@@ -191,7 +191,8 @@ Flujo de una entrada:
 
 #### GLOSHIA-LOCAL-LAB-06 - Banco actual y evaluación local reproducible
 
-- Estado: `Infraestructura y banco local resueltos; revisión humana pendiente`.
+- Estado: `Infraestructura, banco y primera ronda humana resueltos; calibración
+  preliminar NO-GO para Android`.
   Tipo: laboratorio de evaluación visual. Prioridad: P1. Esfuerzo: XL. Riesgo:
   alto.
 - Resultado local: herramienta reproducible en `tools/gloshia_lab`, corpus de
@@ -215,6 +216,17 @@ Flujo de una entrada:
   y audiencia, revisar falsos permisos y falsos filtros, congelar cualquier
   propuesta de calibración antes de abrir una sola vez las 200 muestras
   selladas. Sólo esa evidencia puede proponer conservar, calibrar o reentrenar.
+- Ronda del 2026-07-31: 85 permisos, 10 filtros y 5 dudas. La política vigente
+  obtuvo 8 filtros correctos, 2 permisos incorrectos y 40 filtros incorrectos.
+  Un candidato regional elegido en `main_eval` redujo esos filtros incorrectos
+  a 30 y mantuvo los 8 aciertos; en `difficult` mejoró exactitud de `0,608696`
+  a `0,695652`, pero allí existen sólo dos positivos. Quedó `NO-GO` para DAG y
+  el examen final permanece sellado.
+- Próximo ticket: dataset pequeño y dirigido con autorización real de
+  entrenamiento para negativos difíciles y positivos pequeños/en grupos;
+  reentrenar fuera del banco de evaluación y recién entonces proponer un nuevo
+  candidato. No reutilizar estas 100 imágenes como entrenamiento ni ajustar
+  otra vez el umbral sobre la misma verdad humana.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 

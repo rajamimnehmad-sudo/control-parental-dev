@@ -15,6 +15,7 @@ from typing import Sequence
 from .corpus import build_corpus, repair_currentness
 from .metrics import (
     build_review_queue,
+    calibration_experiment_report,
     evaluation_report,
     joined_rows,
     write_contact_sheets,
@@ -65,7 +66,9 @@ def score_command(args: argparse.Namespace) -> int:
         raise ValueError(
             "refusing to score with a model that differs from the DAG artefact"
         )
-    output = corpus_dir / "predictions.jsonl"
+    output = args.output or corpus_dir / "predictions.jsonl"
+    if args.diagnostic_regions and args.output is None:
+        raise ValueError("--diagnostic-regions requires --output to protect baseline scores")
     command = [
         find_node(),
         str(TOOL_DIR / "model-runner.mjs"),
@@ -80,6 +83,8 @@ def score_command(args: argparse.Namespace) -> int:
         command.extend(("--limit", str(args.limit)))
     if args.include_sealed:
         command.append("--include-sealed")
+    if args.diagnostic_regions:
+        command.append("--diagnostic-regions")
     completed = subprocess.run(command, check=False)
     return completed.returncode
 
@@ -111,6 +116,17 @@ def verify_command(args: argparse.Namespace) -> int:
 def report_command(args: argparse.Namespace) -> int:
     report = evaluation_report(args.corpus, include_sealed=args.include_sealed)
     output = args.output or args.corpus / "evaluation-report.json"
+    output.write_text(
+        json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    print(json.dumps(report, indent=2, ensure_ascii=False))
+    return 0
+
+
+def calibration_command(args: argparse.Namespace) -> int:
+    report = calibration_experiment_report(args.corpus, args.diagnostic_predictions)
+    output = args.output or args.corpus / "calibration-experiment.json"
     output.write_text(
         json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
         encoding="utf-8",
@@ -194,6 +210,8 @@ def parser() -> argparse.ArgumentParser:
     score.add_argument("--model", type=Path, default=DEFAULT_MODEL)
     score.add_argument("--limit", type=int)
     score.add_argument("--include-sealed", action="store_true")
+    score.add_argument("--diagnostic-regions", action="store_true")
+    score.add_argument("--output", type=Path)
     score.set_defaults(handler=score_command)
 
     report = subcommands.add_parser("report")
@@ -201,6 +219,12 @@ def parser() -> argparse.ArgumentParser:
     report.add_argument("--output", type=Path)
     report.add_argument("--include-sealed", action="store_true")
     report.set_defaults(handler=report_command)
+
+    calibration = subcommands.add_parser("calibration-report")
+    calibration.add_argument("corpus", type=Path)
+    calibration.add_argument("diagnostic_predictions", type=Path)
+    calibration.add_argument("--output", type=Path)
+    calibration.set_defaults(handler=calibration_command)
 
     sheets = subcommands.add_parser("contact-sheets")
     sheets.add_argument("corpus", type=Path)
