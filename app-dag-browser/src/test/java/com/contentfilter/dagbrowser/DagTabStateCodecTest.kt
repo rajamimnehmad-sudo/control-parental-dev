@@ -12,7 +12,11 @@ class DagTabStateCodecTest {
                 tabs =
                     listOf(
                         DagPersistedTab("about:blank", "Nueva pestaña"),
-                        DagPersistedTab("https://example.com/path", "Ejemplo"),
+                        DagPersistedTab(
+                            "https://example.com/path",
+                            "Ejemplo",
+                            "0123456789abcdef0123456789abcdef",
+                        ),
                     ),
                 activeIndex = 1,
             )
@@ -50,6 +54,26 @@ class DagTabStateCodecTest {
     @Test
     fun invalidStateFailsClosed() {
         assertNull(DagTabStateCodec.decode("""{"version":99}""") { true })
+    }
+
+    @Test
+    fun `legacy tabs restore without inventing a preview key`() {
+        val restored =
+            DagTabStateCodec.decode(
+                """{"version":1,"activeIndex":0,"tabs":[{"url":"https://example.com","title":"Ejemplo"}]}""",
+            ) { true }
+
+        assertEquals(null, restored?.tabs?.single()?.previewKey)
+    }
+
+    @Test
+    fun `unsafe preview keys are discarded`() {
+        val restored =
+            DagTabStateCodec.decode(
+                """{"version":2,"activeIndex":0,"tabs":[{"url":"https://example.com","title":"Ejemplo","previewKey":"../outside"}]}""",
+            ) { true }
+
+        assertEquals(null, restored?.tabs?.single()?.previewKey)
     }
 
     @Test

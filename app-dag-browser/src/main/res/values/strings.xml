@@ -54,8 +54,6 @@
     <string name="preparing_protection">Preparando protección visual…</string>
     <string name="ready">Navegación protegida</string>
     <string name="ready_detail">Buscá arriba. DAG analizará las fotografías en este dispositivo antes de mostrarlas.</string>
-    <string name="loading_protected_page">Revisando la página…</string>
-    <string name="loading_protected_detail">Las fotografías permanecen ocultas mientras DAG las analiza.</string>
     <string name="barrier_not_confirmed">La página quedó cerrada</string>
     <string name="barrier_not_confirmed_detail">No se pudo confirmar la barrera visual. Probá recargar.</string>
     <string name="extension_failed">No se pudo iniciar la protección</string>

@@ -1,5 +1,7 @@
 package com.contentfilter.dagbrowser
 
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
 import android.app.Activity
 import android.app.AlertDialog
 import android.app.Dialog
@@ -8,6 +10,7 @@ import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -25,6 +28,7 @@ import android.widget.ArrayAdapter
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.ListView
 import android.widget.PopupMenu
 import android.widget.ProgressBar
@@ -53,6 +57,7 @@ import java.nio.file.StandardCopyOption
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
@@ -71,12 +76,16 @@ class DagBrowserActivity : Activity() {
     private lateinit var tabButton: TextView
     private lateinit var menuButton: ImageButton
     private lateinit var safetyOverlay: View
+    private lateinit var safetyCard: View
+    private lateinit var safetyIcon: ImageView
+    private lateinit var safetyShimmer: View
     private lateinit var safetyProgress: ProgressBar
     private lateinit var safetyTitle: TextView
     private lateinit var safetyDetail: TextView
     private lateinit var tabSwitcher: DagTabSwitcherView
     private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var tabPersistence: DagTabPersistence
+    private lateinit var tabThumbnailStore: DagTabThumbnailStore
     private lateinit var historyPersistence: DagHistoryPersistence
     private lateinit var favoritesPersistence: DagFavoritesPersistence
     private lateinit var imageAnalyzer: DagImageAnalyzer
@@ -112,6 +121,7 @@ class DagBrowserActivity : Activity() {
     private var activeChoicePrompt: ActiveChoicePrompt? = null
     private var pendingNewSessionGesture: PendingNewSessionGesture? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
+    private var loadingShimmerAnimator: ObjectAnimator? = null
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
     private val messageDelegate =
@@ -208,6 +218,7 @@ class DagBrowserActivity : Activity() {
         pendingExternalUrl = safeExternalUrl(intent)
         applySystemBarInsets()
         tabPersistence = DagTabPersistence(applicationContext)
+        tabThumbnailStore = DagTabThumbnailStore(applicationContext)
         historyPersistence = DagHistoryPersistence(applicationContext)
         favoritesPersistence = DagFavoritesPersistence(applicationContext)
         imageAnalyzer = DagOnDeviceImageAnalyzer.create(applicationContext)
@@ -257,6 +268,9 @@ class DagBrowserActivity : Activity() {
         tabButton = findViewById(R.id.tab_button)
         menuButton = findViewById(R.id.menu_button)
         safetyOverlay = findViewById(R.id.safety_overlay)
+        safetyCard = findViewById(R.id.safety_card)
+        safetyIcon = findViewById(R.id.safety_icon)
+        safetyShimmer = findViewById(R.id.safety_shimmer)
         safetyProgress = findViewById(R.id.safety_progress)
         safetyTitle = findViewById(R.id.safety_title)
         safetyDetail = findViewById(R.id.safety_detail)
@@ -412,7 +426,10 @@ class DagBrowserActivity : Activity() {
                                 opensNewWindow = false,
                             )
                     ) {
-                        DagLoadDecision.Allow -> GeckoResult.fromValue(AllowOrDeny.ALLOW)
+                        DagLoadDecision.Allow -> {
+                            maybeCoverAcceptedNavigation(tab, request)
+                            GeckoResult.fromValue(AllowOrDeny.ALLOW)
+                        }
                         DagLoadDecision.Block -> {
                             showBlockedNavigation(tab)
                             GeckoResult.fromValue(AllowOrDeny.DENY)
@@ -1197,8 +1214,13 @@ class DagBrowserActivity : Activity() {
                 title = restoredTab?.title.orEmpty(),
                 isPrivate = privateTab,
                 needsRestore = requestedUrl != InitialBlankPage,
+                previewKey =
+                    restoredTab?.previewKey
+                        ?.takeIf(DagTabThumbnailKeyPolicy::isValid)
+                        ?: UUID.randomUUID().toString().replace("-", ""),
             )
         tabs += tab
+        if (restoredTab != null) restoreTabThumbnail(tab)
         if (restoredTab == null || switchToTab) {
             ensureSessionOpen(tab)
             setTabActivity(tab, active = false)
@@ -1319,6 +1341,24 @@ class DagBrowserActivity : Activity() {
         tab.session.loadUri(safeUrl)
     }
 
+    private fun maybeCoverAcceptedNavigation(
+        tab: BrowserTab,
+        request: GeckoSession.NavigationDelegate.LoadRequest,
+    ) {
+        if (
+            DagLoadTransitionPolicy.shouldCover(
+                currentUrl = tab.url,
+                targetUrl = request.uri,
+                targetsCurrentWindow =
+                    request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_CURRENT,
+                pageVisible = tab.displayState == TabDisplayState.Visible,
+                barrierAlreadyWaiting = tab.waitingForBarrier,
+            )
+        ) {
+            beginProtectedLoad(tab, startNewPerformanceNavigation = true)
+        }
+    }
+
     private fun beginProtectedLoad(
         tab: BrowserTab,
         startNewPerformanceNavigation: Boolean = false,
@@ -1347,6 +1387,7 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun revealProtectedPage() {
+        updateLoadingShimmer(enabled = false)
         geckoView.visibility = View.VISIBLE
         safetyOverlay.visibility = View.GONE
         recordPerformanceMetric(DagPerformanceMetric.PageVisible)
@@ -1479,12 +1520,41 @@ class DagBrowserActivity : Activity() {
         title: String,
         detail: String,
         spinning: Boolean,
+        shimmer: Boolean = false,
     ) {
         safetyOverlay.visibility = View.VISIBLE
-        safetyProgress.visibility = if (spinning) View.VISIBLE else View.GONE
+        if (shimmer) {
+            safetyCard.setBackgroundColor(Color.TRANSPARENT)
+        } else {
+            safetyCard.setBackgroundResource(R.drawable.dag_overlay_card_background)
+        }
+        safetyIcon.visibility = if (shimmer) View.GONE else View.VISIBLE
+        safetyProgress.visibility = if (spinning && !shimmer) View.VISIBLE else View.GONE
         safetyTitle.text = title
+        safetyTitle.visibility = if (title.isBlank()) View.GONE else View.VISIBLE
         safetyDetail.text = detail
         safetyDetail.visibility = if (detail.isBlank()) View.GONE else View.VISIBLE
+        updateLoadingShimmer(shimmer)
+    }
+
+    private fun updateLoadingShimmer(enabled: Boolean) {
+        if (!enabled) {
+            loadingShimmerAnimator?.cancel()
+            loadingShimmerAnimator = null
+            safetyShimmer.translationX = 0f
+            safetyShimmer.visibility = View.GONE
+            return
+        }
+        safetyShimmer.visibility = View.VISIBLE
+        if (loadingShimmerAnimator != null) return
+        val travel = 180f * resources.displayMetrics.density
+        loadingShimmerAnimator =
+            ObjectAnimator.ofFloat(safetyShimmer, View.TRANSLATION_X, -travel, travel).apply {
+                duration = LoadingShimmerDurationMillis
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.RESTART
+                start()
+            }
     }
 
     private fun setNavigationControlsEnabled(enabled: Boolean) {
@@ -1693,12 +1763,14 @@ class DagBrowserActivity : Activity() {
             TabDisplayState.Loading -> {
                 geckoView.visibility = View.INVISIBLE
                 showOverlay(
-                    title = getString(R.string.loading_protected_page),
-                    detail = getString(R.string.loading_protected_detail),
-                    spinning = true,
+                    title = "",
+                    detail = "",
+                    spinning = false,
+                    shimmer = true,
                 )
             }
             TabDisplayState.Visible -> {
+                updateLoadingShimmer(enabled = false)
                 geckoView.visibility = View.VISIBLE
                 safetyOverlay.visibility = View.GONE
             }
@@ -1872,6 +1944,12 @@ class DagBrowserActivity : Activity() {
                     thumbnailExecutor.execute {
                         val scaled = scaleThumbnail(bitmap)
                         if (scaled !== bitmap) bitmap.recycle()
+                        val encoded =
+                            if (tab.isPrivate) {
+                                null
+                            } else {
+                                tabThumbnailStore.encode(scaled)
+                            }
                         handler.post {
                             if (
                                 isFinishing ||
@@ -1886,10 +1964,10 @@ class DagBrowserActivity : Activity() {
                             ) {
                                 scaled.recycle()
                             } else {
-                                tab.thumbnail?.takeIf { it !== scaled }?.recycle()
                                 tab.thumbnail = scaled
                                 tab.thumbnailStale = false
                                 refreshTabSwitcher()
+                                if (encoded != null) persistTabThumbnail(tab.previewKey, encoded)
                             }
                         }
                     }
@@ -1946,16 +2024,60 @@ class DagBrowserActivity : Activity() {
 
     private fun invalidateTabThumbnail(tab: BrowserTab) {
         tab.previewRevision += 1
-        tab.thumbnail?.recycle()
         tab.thumbnail = null
         tab.thumbnailStale = false
+        deletePersistedTabThumbnail(tab.previewKey)
         refreshTabSwitcher()
     }
 
     private fun markTabThumbnailStale(tab: BrowserTab) {
         tab.previewRevision += 1
         tab.thumbnailStale = true
+        deletePersistedTabThumbnail(tab.previewKey)
         refreshTabSwitcher()
+    }
+
+    private fun persistTabThumbnail(
+        key: String,
+        encoded: ByteArray,
+    ) {
+        if (thumbnailExecutor.isShutdown) return
+        runCatching {
+            thumbnailExecutor.execute { tabThumbnailStore.save(key, encoded) }
+        }
+    }
+
+    private fun restoreTabThumbnail(tab: BrowserTab) {
+        if (tab.isPrivate || thumbnailExecutor.isShutdown || tab.thumbnail != null) return
+        val revision = tab.previewRevision
+        val key = tab.previewKey
+        runCatching {
+            thumbnailExecutor.execute {
+                val restored = tabThumbnailStore.load(key) ?: return@execute
+                handler.post {
+                    if (
+                        isFinishing ||
+                        isDestroyed ||
+                        !tabs.contains(tab) ||
+                        tab.previewRevision != revision ||
+                        tab.thumbnailStale ||
+                        tab.thumbnail != null
+                    ) {
+                        restored.recycle()
+                    } else {
+                        tab.thumbnail = restored
+                        refreshTabSwitcher()
+                    }
+                }
+            }
+        }
+    }
+
+    private fun deletePersistedTabThumbnail(key: String) {
+        if (thumbnailExecutor.isShutdown) return
+        runCatching {
+            thumbnailExecutor.execute { tabThumbnailStore.delete(key) }
+        }
     }
 
     private fun scaleThumbnail(source: Bitmap): Bitmap {
@@ -2015,11 +2137,18 @@ class DagBrowserActivity : Activity() {
                         DagPersistedTab(
                             url = restorableUrl(it.url) ?: InitialBlankPage,
                             title = it.title,
+                            previewKey = it.previewKey,
                         )
                     },
                 activeIndex = activeIndex,
             ),
         )
+        val retainedPreviewKeys = persistentTabs.map(BrowserTab::previewKey).toSet()
+        if (!thumbnailExecutor.isShutdown) {
+            runCatching {
+                thumbnailExecutor.execute { tabThumbnailStore.retain(retainedPreviewKeys) }
+            }
+        }
     }
 
     private fun showBrowserMenu() {
@@ -2029,7 +2158,12 @@ class DagBrowserActivity : Activity() {
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.menu_reload -> {
-                        activeTab?.session?.reload()
+                        activeTab?.let { tab ->
+                            if (tab.url != InitialBlankPage) {
+                                beginProtectedLoad(tab, startNewPerformanceNavigation = true)
+                                tab.session.reload()
+                            }
+                        }
                         true
                     }
                     R.id.menu_history -> {
@@ -2476,7 +2610,7 @@ class DagBrowserActivity : Activity() {
             activeTab = null
         }
         tabs.removeAt(oldIndex)
-        disposeTab(tab)
+        disposeTab(tab, deletePersistedPreview = true)
         updateTabButton()
         when {
             !wasActive -> Unit
@@ -2487,7 +2621,10 @@ class DagBrowserActivity : Activity() {
         refreshTabSwitcher()
     }
 
-    private fun disposeTab(tab: BrowserTab) {
+    private fun disposeTab(
+        tab: BrowserTab,
+        deletePersistedPreview: Boolean,
+    ) {
         cancelBarrierTimeout(tab)
         protectionExtension?.let { extension ->
             runCatching {
@@ -2498,8 +2635,8 @@ class DagBrowserActivity : Activity() {
             setTabActivity(tab, active = false)
             tab.session.close()
         }
-        tab.thumbnail?.recycle()
         tab.thumbnail = null
+        if (deletePersistedPreview) deletePersistedTabThumbnail(tab.previewKey)
     }
 
     private fun clearCache() {
@@ -2529,6 +2666,9 @@ class DagBrowserActivity : Activity() {
     private fun clearBrowsingData() {
         tabPersistence.clear()
         historyPersistence.clear()
+        if (!thumbnailExecutor.isShutdown) {
+            runCatching { thumbnailExecutor.execute(tabThumbnailStore::clear) }
+        }
         val flags =
             StorageController.ClearFlags.ALL_CACHES or
                 StorageController.ClearFlags.SITE_DATA or
@@ -2551,7 +2691,7 @@ class DagBrowserActivity : Activity() {
     private fun resetTabs() {
         if (activeTab != null) runCatching { geckoView.releaseSession() }
         activeTab = null
-        tabs.forEach(::disposeTab)
+        tabs.forEach { disposeTab(it, deletePersistedPreview = true) }
         tabs.clear()
         updateTabButton()
         createTab(switchToTab = true)
@@ -2599,6 +2739,7 @@ class DagBrowserActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        tabs.filter { it.thumbnail == null }.forEach(::restoreTabThumbnail)
         activeTab?.let { setTabActivity(it, active = true) }
     }
 
@@ -2622,7 +2763,6 @@ class DagBrowserActivity : Activity() {
     private fun releaseTabThumbnails() {
         tabs.forEach { tab ->
             tab.previewRevision += 1
-            tab.thumbnail?.recycle()
             tab.thumbnail = null
         }
         refreshTabSwitcher()
@@ -2630,6 +2770,7 @@ class DagBrowserActivity : Activity() {
 
     override fun onDestroy() {
         dismissActiveChoicePrompt()
+        updateLoadingShimmer(enabled = false)
         persistTabsNow()
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             backInvokedCallback?.let(onBackInvokedDispatcher::unregisterOnBackInvokedCallback)
@@ -2659,7 +2800,7 @@ class DagBrowserActivity : Activity() {
         if (activeTab != null) {
             runCatching { geckoView.releaseSession() }
         }
-        tabs.forEach(::disposeTab)
+        tabs.forEach { disposeTab(it, deletePersistedPreview = false) }
         tabs.clear()
         activeTab = null
         super.onDestroy()
@@ -2714,6 +2855,7 @@ class DagBrowserActivity : Activity() {
         var contentScrollY: Int = 0,
         var lastActivatedSequence: Long = 0,
         var pdfDocumentReady: Boolean = false,
+        val previewKey: String,
     )
 
     private class ActiveDownload(
@@ -2773,5 +2915,6 @@ class DagBrowserActivity : Activity() {
         const val DefaultBrowserRoleRequestCode = 4_201
         const val BrowserSetupPreferences = "dag-browser-setup"
         const val DefaultBrowserPromptShownKey = "default-browser-prompt-shown"
+        const val LoadingShimmerDurationMillis = 850L
     }
 }

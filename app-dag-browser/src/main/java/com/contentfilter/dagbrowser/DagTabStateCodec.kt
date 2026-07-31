@@ -6,6 +6,7 @@ import org.json.JSONObject
 internal data class DagPersistedTab(
     val url: String,
     val title: String,
+    val previewKey: String? = null,
 )
 
 internal data class DagPersistedTabs(
@@ -14,18 +15,22 @@ internal data class DagPersistedTabs(
 )
 
 internal object DagTabStateCodec {
-    private const val SchemaVersion = 1
+    private const val SchemaVersion = 2
+    private const val LegacySchemaVersion = 1
     private const val MaxUrlLength = 4_096
     private const val MaxTitleLength = 160
 
     fun encode(state: DagPersistedTabs): String {
         val rows = JSONArray()
         state.tabs.take(DagTabCapacityPolicy.MaxTabs).forEach { tab ->
-            rows.put(
+            val row =
                 JSONObject()
                     .put("url", tab.url.take(MaxUrlLength))
-                    .put("title", tab.title.take(MaxTitleLength)),
-            )
+                    .put("title", tab.title.take(MaxTitleLength))
+            tab.previewKey
+                ?.takeIf(DagTabThumbnailKeyPolicy::isValid)
+                ?.let { row.put("previewKey", it) }
+            rows.put(row)
         }
         return JSONObject()
             .put("version", SchemaVersion)
@@ -41,7 +46,7 @@ internal object DagTabStateCodec {
         if (raw.isNullOrBlank()) return null
         return runCatching {
             val root = JSONObject(raw)
-            require(root.optInt("version", -1) == SchemaVersion)
+            require(root.optInt("version", -1) in LegacySchemaVersion..SchemaVersion)
             val rows = root.optJSONArray("tabs") ?: return null
             val requestedActiveIndex = root.optInt("activeIndex", 0)
             val indexedTabs =
@@ -55,6 +60,9 @@ internal object DagTabStateCodec {
                                 DagPersistedTab(
                                     url = url,
                                     title = row.optString("title").take(MaxTitleLength),
+                                    previewKey =
+                                        row.optString("previewKey")
+                                            .takeIf(DagTabThumbnailKeyPolicy::isValid),
                                 ),
                         )
                     }
