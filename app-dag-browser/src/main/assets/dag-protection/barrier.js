@@ -35,11 +35,12 @@
   const MAX_REMEMBERED_DECISIONS = 512;
   const FALLBACK_DELAY_MS = 80;
   const VISIBLE_FALLBACK_DELAY_MS = 0;
-  const NEARBY_FALLBACK_DELAY_MS = 180;
+  const NEARBY_FALLBACK_DELAY_MS = 120;
   const FALLBACK_RETRY_BASE_MS = 600;
   const FALLBACK_RETRY_MAX_MS = 6_000;
   const MAX_FALLBACK_ATTEMPTS = 4;
-  const FALLBACK_ROOT_MARGIN = "640px 0px";
+  const FALLBACK_ROOT_MARGIN = "1200px 0px";
+  const IMAGE_PREWARM_ROOT_MARGIN = "1200px 0px";
   const SOURCE_RECONCILE_DELAY_MS = 160;
   const SOURCE_MUTATION_ATTRIBUTES = new Set([
     "src",
@@ -1401,6 +1402,48 @@
         )
       : null;
 
+  const prepareImageForFastPresentation = (element) => {
+    if (!(element instanceof HTMLImageElement)) {
+      return;
+    }
+    if (!element.hasAttribute("decoding")) {
+      setAttributeIfChanged(element, "decoding", "async");
+    }
+    if (!element.hasAttribute("fetchpriority")) {
+      setAttributeIfChanged(element, "fetchpriority", "high");
+    }
+    if (element.getAttribute("loading") === "lazy") {
+      setAttributeIfChanged(element, "loading", "eager");
+    }
+  };
+
+  const imagePrewarmObserver =
+    typeof IntersectionObserver === "function"
+      ? new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (!entry.isIntersecting) {
+                continue;
+              }
+              prepareImageForFastPresentation(entry.target);
+              imagePrewarmObserver.unobserve(entry.target);
+            }
+          },
+          { rootMargin: IMAGE_PREWARM_ROOT_MARGIN },
+        )
+      : null;
+
+  const observeImagePrewarm = (element) => {
+    if (!(element instanceof HTMLImageElement) || element.complete) {
+      return;
+    }
+    if (imagePrewarmObserver) {
+      imagePrewarmObserver.observe(element);
+    } else if (isNearViewport(element)) {
+      prepareImageForFastPresentation(element);
+    }
+  };
+
   const reconcileMediaHostState = (host) => {
     if (!(host instanceof Element)) return;
     if (host.matches(APPROVED_PRESENTATION_SELECTOR) || host.querySelector(APPROVED_PRESENTATION_SELECTOR)) {
@@ -1449,6 +1492,7 @@
     const releaseTrackedMedia = (element) => {
       if (element instanceof HTMLImageElement) {
         releaseMediaHost(element);
+        imagePrewarmObserver?.unobserve(element);
       }
       removeElementFromSourceIndex(element);
       stopFallbackObservation(element);
@@ -1545,6 +1589,7 @@
     if (!(element instanceof Element) || !element.matches(mediaSelector)) {
       return false;
     }
+    observeImagePrewarm(element);
     if (applyInlineUiVectorDecision(element)) {
       stopFallbackObservation(element);
       updateAccessibleMediaState(element, "allow");
