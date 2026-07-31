@@ -49,6 +49,7 @@ const FALLBACK_REQUEST_MESSAGE = "media-fallback-request";
 const FALLBACK_RESPONSE_MESSAGE = "media-fallback-response";
 const INLINE_REQUEST_MESSAGE = "media-inline-request";
 const INLINE_RESPONSE_MESSAGE = "media-inline-response";
+const CLIENT_METRIC_MESSAGE = "media-client-metric";
 const TECHNICAL_ERROR_ACTION = "error";
 const DOCUMENT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
 let requestSequence = 0;
@@ -122,9 +123,43 @@ const isTrustedContentSender = (sender) =>
   typeof sender?.url === "string" &&
   /^(?:https?|blob):/iu.test(sender.url);
 
+const reportClientMediaMetric = ({
+  transportPath = "unknown",
+  priority = "background",
+  outcome = "error",
+  byteLength = -1,
+  hashMillis = -1,
+  encodeMillis = -1,
+  nativeRoundTripMillis = -1,
+}) => {
+  if (decisionPort === null) {
+    return;
+  }
+  try {
+    decisionPort.postMessage({
+      type: CLIENT_METRIC_MESSAGE,
+      version: PROTOCOL_VERSION,
+      transportPath,
+      priority,
+      outcome,
+      byteLength,
+      hashMillis,
+      encodeMillis,
+      nativeRoundTripMillis,
+    });
+  } catch {
+    // DEV-only numeric diagnostics never change a protection decision.
+  }
+};
+
 const resolvePendingNativeDecisions = (action = TECHNICAL_ERROR_ACTION) => {
   for (const pending of pendingNativeDecisions.values()) {
     clearTimeout(pending.timeout);
+    reportClientMediaMetric({
+      ...pending.metric,
+      outcome: action,
+      nativeRoundTripMillis: performance.now() - pending.startedAt,
+    });
     pending.resolve(action);
   }
   pendingNativeDecisions.clear();
@@ -149,14 +184,19 @@ const connectDecisionPort = () => {
       }
       pendingNativeDecisions.delete(message.candidateId);
       clearTimeout(pending.timeout);
-      pending.resolve(
+      const action =
         message.action === "allow" &&
           ["model_allow", "safe_ui_vector"].includes(message.reason)
           ? "allow"
           : message.action === "block" && message.reason === "model_filter"
             ? "block"
-            : TECHNICAL_ERROR_ACTION,
-      );
+            : TECHNICAL_ERROR_ACTION;
+      reportClientMediaMetric({
+        ...pending.metric,
+        outcome: action,
+        nativeRoundTripMillis: performance.now() - pending.startedAt,
+      });
+      pending.resolve(action);
     });
     port.onDisconnect.addListener(() => {
       if (decisionPort === port) {
@@ -387,6 +427,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
       { url: sourceUrl },
       bytes,
       message?.priority === "visible" ? "visible" : "nearby",
+      { transportPath: "inline" },
     ).then((action) => ({
       type: INLINE_RESPONSE_MESSAGE,
       version: PROTOCOL_VERSION,
@@ -478,18 +519,44 @@ const encodeBase64 = (bytes) => {
   return btoa(binary);
 };
 
-const requestNativeDecision = (details, bytes, priority = "background") => {
+const requestNativeDecision = (
+  details,
+  bytes,
+  priority = "background",
+  context = {},
+) => {
   connectDecisionPort();
   if (decisionPort === null) {
     return Promise.resolve(TECHNICAL_ERROR_ACTION);
   }
   const id = nextCandidateId();
+  const encodeStartedAt = performance.now();
+  let bytesBase64;
+  try {
+    bytesBase64 = encodeBase64(bytes);
+  } catch {
+    return Promise.resolve(TECHNICAL_ERROR_ACTION);
+  }
+  const encodeMillis = performance.now() - encodeStartedAt;
+  const metric = {
+    transportPath: context.transportPath || "intercept",
+    priority,
+    byteLength: bytes.byteLength,
+    hashMillis: context.hashMillis ?? -1,
+    encodeMillis,
+  };
   return new Promise((resolve) => {
+    const startedAt = performance.now();
     const timeout = setTimeout(() => {
       pendingNativeDecisions.delete(id);
+      reportClientMediaMetric({
+        ...metric,
+        outcome: "timeout",
+        nativeRoundTripMillis: performance.now() - startedAt,
+      });
       resolve(TECHNICAL_ERROR_ACTION);
     }, NATIVE_DECISION_TIMEOUT_MS);
-    pendingNativeDecisions.set(id, { resolve, timeout });
+    pendingNativeDecisions.set(id, { resolve, timeout, startedAt, metric });
     try {
       decisionPort.postMessage({
         type: "media-bytes",
@@ -499,8 +566,14 @@ const requestNativeDecision = (details, bytes, priority = "background") => {
           ? `https://inline-image.glosh.local/${id}`
           : details.url,
         byteLength: bytes.byteLength,
-        bytesBase64: encodeBase64(bytes),
+        bytesBase64,
         priority,
+        transportPath: metric.transportPath,
+        captureMillis: context.captureMillis ?? -1,
+        fetchMillis: context.fetchMillis ?? -1,
+        hashMillis: metric.hashMillis,
+        encodeMillis,
+        sentAtEpochMillis: Date.now(),
       });
     } catch {
       pendingNativeDecisions.delete(id);
@@ -523,22 +596,40 @@ const rememberContentDecision = (hash, action) => {
   contentDecisionCache.set(hash, action);
 };
 
-const requestContentDecision = async (details, bytes, priority = "background") => {
+const requestContentDecision = async (
+  details,
+  bytes,
+  priority = "background",
+  context = {},
+) => {
   let hash;
+  const hashStartedAt = performance.now();
   try {
     hash = await contentHash(bytes);
   } catch {
-    return requestNativeDecision(details, bytes, priority);
+    return requestNativeDecision(details, bytes, priority, context);
   }
+  const hashMillis = performance.now() - hashStartedAt;
+  const metric = {
+    transportPath: context.transportPath || "intercept",
+    priority,
+    byteLength: bytes.byteLength,
+    hashMillis,
+  };
   const cached = contentDecisionCache.get(hash);
   if (cached) {
+    reportClientMediaMetric({ ...metric, outcome: "cache_hit", nativeRoundTripMillis: 0 });
     return cached;
   }
   const pending = contentDecisionPromises.get(hash);
   if (pending) {
+    reportClientMediaMetric({ ...metric, outcome: "deduplicated", nativeRoundTripMillis: 0 });
     return pending;
   }
-  const decisionPromise = requestNativeDecision(details, bytes, priority)
+  const decisionPromise = requestNativeDecision(details, bytes, priority, {
+    ...context,
+    hashMillis,
+  })
     .then((action) => {
       if (action !== TECHNICAL_ERROR_ACTION) {
         rememberContentDecision(hash, action);
@@ -562,6 +653,7 @@ const rememberFallbackDecision = (sourceUrl, action) => {
 };
 
 const fetchFallbackDecision = async (sourceUrl, priority) => {
+  const fetchStartedAt = performance.now();
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), FALLBACK_FETCH_TIMEOUT_MS);
   try {
@@ -598,6 +690,10 @@ const fetchFallbackDecision = async (sourceUrl, priority) => {
       { url: sourceUrl },
       combineChunks(chunks, totalBytes),
       priority,
+      {
+        transportPath: "fallback",
+        fetchMillis: performance.now() - fetchStartedAt,
+      },
     );
   } catch {
     return "retry";
@@ -801,6 +897,7 @@ const interceptImageResponse = (details) => {
   });
 
   const chunks = [];
+  const captureStartedAt = performance.now();
   let totalBytes = 0;
   let overflow = false;
   let finalized = false;
@@ -901,7 +998,10 @@ const interceptImageResponse = (details) => {
           : null;
       nativeRequestsInFlight += 1;
       adjustInitialCounter(initialState, "nativeRequestsInFlight", 1);
-      requestContentDecision(details, bytes, "nearby")
+      requestContentDecision(details, bytes, "nearby", {
+        transportPath: "intercept",
+        captureMillis: performance.now() - captureStartedAt,
+      })
         .then((action) =>
           presentDecision(details, action, documentGeneration, initialState))
         .catch(() =>

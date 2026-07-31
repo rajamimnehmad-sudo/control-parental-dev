@@ -1956,6 +1956,30 @@ Flujo de una entrada:
   tiempos, motivos y scores suficientes para diagnosticar; Beta/Production no
   agregan telemetría nueva.
 
+#### DAG-V3-END-TO-END-PERF-AUDIT-13 - Auditoría integral y optimización medible
+
+- Estado: `En progreso`; aprobado explícitamente por el propietario el
+  2026-07-31, con autorización para borrar únicamente el perfil DEV de DAG en
+  el SM-A235M y sin push. Tipo: rendimiento, compatibilidad y observabilidad
+  local. Prioridad: P1. Esfuerzo: XL. Riesgo: alto.
+- Objetivo: medir de punta a punta red, captura, fallback, hash, Base64, puente,
+  cola, decodificación, preprocesamiento, inferencias regionales, presentación,
+  scroll, memoria, CPU, temperatura y estabilidad; comparar la experiencia con
+  Chrome como referencia, sin afirmar equivalencia absoluta entre motores.
+- Orden: instrumentación numérica privada; línea base representativa; ranking
+  de cuellos; correcciones pequeñas con A/B; matriz final y prueba prolongada.
+  Cada cambio que no demuestre mejora o rompa una página se retira.
+- Privacidad: métricas sólo en Logcat DEV; no registrar URL, búsqueda, texto,
+  DOM, imagen ni píxeles. No usar API, Supabase, Production ni publicación.
+- Primer gate V56: 133 unitarios, Ktlint, Lint y build correctos. En un smoke
+  Mimo/SM-A235M las inferencias comunes midieron `142-268 ms`, las cinco vistas
+  regionales `985-1.428 ms`, la cola hasta `432 ms`, Base64 hasta `71 ms` y
+  hash hasta `48 ms`; también aparecieron fallback duplicado y aplicaciones
+  `matched=0`. Falta la línea base amplia antes de corregir.
+- Aceptación: cero flash sin decisión, cero crash/ANR, imágenes seguras visibles,
+  fallos técnicos distinguibles, percentiles y recursos medidos en el mismo
+  A23, compatibilidad amplia, memoria estable y APK final desde `main` local.
+
 #### DAG-V3-DOCUMENT-ISOLATION-07 - Quietud y trabajo aislados por documento
 
 - Estado: `Resuelto y validado físicamente en DAG 45`. Tipo: rendimiento,

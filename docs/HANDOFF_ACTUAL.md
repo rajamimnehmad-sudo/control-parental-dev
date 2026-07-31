@@ -73,7 +73,7 @@ documentado arriba.
 ## Runtime único de navegador
 
 - El único navegador del proyecto es `app-dag-browser`.
-- El candidato local vigente es DAG `versionCode 55`, `0.35.0-dev`. Conserva
+- El candidato local vigente es DAG `versionCode 56`, `0.36.0-dev`. Conserva
   dos análisis nativos simultáneos y el máximo autenticado de diez pedidos,
   pero ordena la espera como visible, cercano y fondo para que una foto recién
   llegada a pantalla no quede detrás de trabajo especulativo. V55 separa la
@@ -85,6 +85,15 @@ documentado arriba.
   ANR. Frente a las muestras de V54, las fotos iniciales bajaron 59,1 %, 4,9 %
   y 3,7 % respectivamente; son muestras físicas individuales y no una
   estimación universal.
+- V56 inicia la auditoría integral autorizada por el propietario. Agrega sólo
+  telemetría numérica DEV, sin URL, consulta, texto, selector ni píxeles:
+  captura/fetch/hash/Base64, puente, cola, bounds, preprocesamiento, inferencia,
+  cantidad de regiones y aplicación. Pasó 133 unitarios, Ktlint, Lint y build.
+  El primer smoke físico Mimo/SM-A235M encontró inferencias normales de
+  `142-268 ms`, casos de cinco inferencias de `985-1.428 ms`, cola de hasta
+  `432 ms`, Base64 de hasta `71 ms`, hash de hasta `48 ms`, fallbacks
+  duplicados y varias presentaciones `matched=0`. Esta evidencia abre la línea
+  base; todavía no constituye optimización ni entrega final.
 - Es una APK GeckoView separada, fail-closed y conectada con Glosh mediante un
   puente DEV explícito.
 - No existe fallback hacia implementaciones retiradas.

@@ -202,6 +202,7 @@ class DagBrowserActivity : Activity() {
                                                 )
                                             }
                                         }
+                                        MediaClientMetricMessage -> logClientMediaMetric(payload)
                                         ViewportImagesReadyMessage ->
                                             recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)
                                     }
@@ -1457,6 +1458,8 @@ class DagBrowserActivity : Activity() {
         port: WebExtension.Port,
     ) {
         val candidateId = payload.optString("candidateId").take(MaxMediaCandidateIdLength)
+        val priority = DagMediaAnalysisPriority.fromWire(payload.optString("priority"))
+        val queuedAt = SystemClock.elapsedRealtime()
         val completeDecision: (DagMediaDecision) -> Unit = { decision ->
             handler.post {
                 runCatching { port.postMessage(decisionPayload(decision)) }
@@ -1465,11 +1468,13 @@ class DagBrowserActivity : Activity() {
         try {
             mediaAnalysisExecutor.execute(
                 DagPrioritizedMediaTask(
-                    priority = DagMediaAnalysisPriority.fromWire(payload.optString("priority")),
+                    priority = priority,
                     sequence = mediaAnalysisSequence.getAndIncrement(),
                 ) {
+                    val queueWaitMillis =
+                        (SystemClock.elapsedRealtime() - queuedAt).coerceAtLeast(0L)
                     completeDecision(
-                        runCatching { mediaBytesDecision(payload) }
+                        runCatching { mediaBytesDecision(payload, priority, queueWaitMillis) }
                             .getOrElse {
                                 DagMediaDecision(
                                     candidateId = candidateId,
@@ -1491,8 +1496,13 @@ class DagBrowserActivity : Activity() {
         }
     }
 
-    private fun mediaBytesDecision(payload: JSONObject): DagMediaDecision {
+    private fun mediaBytesDecision(
+        payload: JSONObject,
+        priority: DagMediaAnalysisPriority,
+        queueWaitMillis: Long,
+    ): DagMediaDecision {
         val startedAt = SystemClock.elapsedRealtime()
+        val trace = DagMediaPipelineTrace()
         val bytesPayload =
             DagMediaBytesPayload(
                 candidateId = payload.optString("candidateId"),
@@ -1500,7 +1510,12 @@ class DagBrowserActivity : Activity() {
                 declaredByteLength = payload.optInt("byteLength", -1),
                 bytesBase64 = payload.optString("bytesBase64"),
             )
-        val decision = DagMediaBytesPolicy.decide(bytesPayload, analyzer = imageAnalyzer)
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = bytesPayload,
+                analyzer = imageAnalyzer,
+                trace = trace,
+            )
         if (packageName.endsWith(".dev")) {
             val score =
                 decision.filterProbability?.let {
@@ -1508,12 +1523,66 @@ class DagBrowserActivity : Activity() {
                 }.orEmpty()
             Log.i(
                 MediaTransportLogTag,
-                "bytes=${bytesPayload.declaredByteLength} reason=${decision.reason}$score " +
-                    "elapsed_ms=${SystemClock.elapsedRealtime() - startedAt}",
+                "pipeline path=${safePipelineValue(payload.optString("transportPath"), PipelinePaths)} " +
+                    "priority=${priority.name.lowercase(Locale.US)} " +
+                    "bytes=${bytesPayload.declaredByteLength} " +
+                    "bridge_ms=${bridgeElapsedMillis(payload)} queue_ms=$queueWaitMillis " +
+                    "capture_ms=${payloadMetric(payload, "captureMillis")} " +
+                    "fetch_ms=${payloadMetric(payload, "fetchMillis")} " +
+                    "hash_ms=${payloadMetric(payload, "hashMillis")} " +
+                    "encode_ms=${payloadMetric(payload, "encodeMillis")} " +
+                    "base64_ms=${trace.metric(DagMediaPipelineStage.Base64Decode)} " +
+                    "vector_ms=${trace.metric(DagMediaPipelineStage.SafeVectorCheck)} " +
+                    "bounds_ms=${trace.metric(DagMediaPipelineStage.BoundsRead)} " +
+                    "preprocess_ms=${trace.metric(DagMediaPipelineStage.Preprocess)} " +
+                    "inference_ms=${trace.metric(DagMediaPipelineStage.Inference)} " +
+                    "inferences=${trace.inferenceCount} prepared=${trace.preparedImageCount} " +
+                    "regional=${trace.regionalImageCount} reason=${decision.reason}$score " +
+                    "native_ms=${SystemClock.elapsedRealtime() - startedAt}",
             )
         }
         return decision
     }
+
+    private fun logClientMediaMetric(payload: JSONObject) {
+        if (!packageName.endsWith(".dev")) return
+        Log.i(
+            MediaTransportLogTag,
+            "client path=${safePipelineValue(payload.optString("transportPath"), PipelinePaths)} " +
+                "priority=${safePipelineValue(payload.optString("priority"), PipelinePriorities)} " +
+                "outcome=${safePipelineValue(payload.optString("outcome"), PipelineOutcomes)} " +
+                "bytes=${payload.optInt("byteLength", -1).coerceIn(-1, DagMediaBytesPolicy.MaxCaptureBytes)} " +
+                "hash_ms=${payloadMetric(payload, "hashMillis")} " +
+                "encode_ms=${payloadMetric(payload, "encodeMillis")} " +
+                "native_roundtrip_ms=${payloadMetric(payload, "nativeRoundTripMillis")}",
+        )
+    }
+
+    private fun bridgeElapsedMillis(payload: JSONObject): Long {
+        val sentAt = payload.optLong("sentAtEpochMillis", -1L)
+        if (sentAt <= 0L) return -1L
+        return (System.currentTimeMillis() - sentAt).takeIf { it in 0..MaxPipelineMetricMillis } ?: -1L
+    }
+
+    private fun payloadMetric(
+        payload: JSONObject,
+        name: String,
+    ): String {
+        val value = payload.optDouble(name, -1.0)
+        return if (value.isFinite() && value in 0.0..MaxPipelineMetricMillis.toDouble()) {
+            String.format(Locale.US, "%.2f", value)
+        } else {
+            "-1"
+        }
+    }
+
+    private fun DagMediaPipelineTrace.metric(stage: DagMediaPipelineStage): String =
+        String.format(Locale.US, "%.2f", elapsedMillis(stage))
+
+    private fun safePipelineValue(
+        value: String,
+        allowed: Set<String>,
+    ): String = value.takeIf(allowed::contains) ?: "unknown"
 
     private fun decisionPayload(decision: DagMediaDecision): JSONObject {
         return JSONObject()
@@ -2891,11 +2960,16 @@ class DagBrowserActivity : Activity() {
         const val MediaBytesMessage = "media-bytes"
         const val MediaDecisionMessage = "media-decision"
         const val MediaPresentationStatusMessage = "media-presentation-status"
+        const val MediaClientMetricMessage = "media-client-metric"
         const val ViewportImagesReadyMessage = "viewport-images-ready"
         const val ProtectionProtocolVersion = 1
         const val MaxMediaCandidateIdLength = 80
         const val MediaAnalysisThreads = 2
         const val MediaTransportLogTag = "DagMediaTransport"
+        const val MaxPipelineMetricMillis = 60_000L
+        val PipelinePaths = setOf("intercept", "fallback", "inline")
+        val PipelinePriorities = setOf("visible", "nearby", "background")
+        val PipelineOutcomes = setOf("allow", "block", "error", "timeout", "cache_hit", "deduplicated")
         const val PerformanceLogTag = "DagPerformance"
         const val BackNavigationLogTag = "DagBackNavigation"
         const val TabPreviewLogTag = "DagTabPreview"

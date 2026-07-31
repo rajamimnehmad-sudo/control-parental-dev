@@ -50,9 +50,10 @@ internal object DagMediaBytesPolicy {
         boundsReader: DagImageBoundsReader = AndroidImageBoundsReader,
         preprocessor: DagImagePreprocessor = AndroidDagImagePreprocessor,
         analyzer: DagImageAnalyzer = UnavailableDagImageAnalyzer,
+        trace: DagMediaPipelineTrace? = null,
     ): DagMediaDecision {
         if (!validEnvelope(payload)) return blocked(payload, InvalidPayloadReason)
-        return inspectImage(payload, boundsReader, preprocessor, analyzer)
+        return inspectImage(payload, boundsReader, preprocessor, analyzer, trace)
     }
 
     private fun validEnvelope(payload: DagMediaBytesPayload): Boolean {
@@ -67,21 +68,28 @@ internal object DagMediaBytesPolicy {
         boundsReader: DagImageBoundsReader,
         preprocessor: DagImagePreprocessor,
         analyzer: DagImageAnalyzer,
+        trace: DagMediaPipelineTrace?,
     ): DagMediaDecision {
         val bytes =
-            runCatching { Base64.getDecoder().decode(payload.bytesBase64) }
+            runCatching {
+                trace.measure(DagMediaPipelineStage.Base64Decode) {
+                    Base64.getDecoder().decode(payload.bytesBase64)
+                }
+            }
                 .getOrElse { return blocked(payload, InvalidPayloadReason) }
         if (bytes.size != payload.declaredByteLength || bytes.size > MaxCaptureBytes) {
             return blocked(payload, InvalidPayloadReason)
         }
-        if (DagSafeUiVectorPolicy.isSafe(bytes)) {
+        if (trace.measure(DagMediaPipelineStage.SafeVectorCheck) { DagSafeUiVectorPolicy.isSafe(bytes) }) {
             return DagMediaDecision(
                 candidateId = payload.candidateId,
                 action = DagMediaAction.Allow,
                 reason = SafeUiVectorReason,
             )
         }
-        val bounds = boundsReader.read(bytes) ?: return blocked(payload, UnsupportedImageReason)
+        val bounds =
+            trace.measure(DagMediaPipelineStage.BoundsRead) { boundsReader.read(bytes) }
+                ?: return blocked(payload, UnsupportedImageReason)
         if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) {
             return blocked(payload, UnsupportedImageReason)
         }
@@ -90,7 +98,9 @@ internal object DagMediaBytesPolicy {
         }
         return when (
             val result =
-                runCatching { preprocessor.prepare(bytes) }
+                runCatching {
+                    trace.measure(DagMediaPipelineStage.Preprocess) { preprocessor.prepare(bytes) }
+                }
                     .getOrElse {
                         DagImagePreprocessResult.Rejected(
                             AndroidDagImagePreprocessor.DecodeFailedReason,
@@ -99,12 +109,14 @@ internal object DagMediaBytesPolicy {
         ) {
             is DagImagePreprocessResult.Ready -> {
                 val preparedImages = listOf(result.image) + result.regionalImages
+                trace?.preparedImageCount = preparedImages.size
+                trace?.regionalImageCount = result.regionalImages.size
                 val valid = preparedImages.all(DagImageDecodeContract::isValid)
                 try {
                     if (!valid) {
                         blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
                     } else {
-                        decidePreparedImages(payload, preparedImages, analyzer)
+                        decidePreparedImages(payload, preparedImages, analyzer, trace)
                     }
                 } catch (_: Exception) {
                     blocked(payload, DagOnDeviceImageAnalyzer.ModelExecutionFailedReason)
@@ -120,9 +132,13 @@ internal object DagMediaBytesPolicy {
         payload: DagMediaBytesPayload,
         preparedImages: List<DagPreparedImage>,
         analyzer: DagImageAnalyzer,
+        trace: DagMediaPipelineTrace?,
     ): DagMediaDecision {
         val fullProbability =
-            when (val analysis = analyzer.analyze(preparedImages.first())) {
+            when (
+                val analysis =
+                    trace.measureInference { analyzer.analyze(preparedImages.first()) }
+            ) {
                 is DagImageAnalysisResult.Classified ->
                     analysis.filterProbability.takeIf(::isValidProbability)
                         ?: return blocked(
@@ -151,12 +167,16 @@ internal object DagMediaBytesPolicy {
                 emptyList()
             }
         val regionalImages = preparedRegionalImages.ifEmpty { generatedUncertainRegions }
+        if (generatedUncertainRegions.isNotEmpty()) {
+            trace?.regionalImageCount = generatedUncertainRegions.size
+            trace?.preparedImageCount = 1 + generatedUncertainRegions.size
+        }
         return try {
             var maximumProbability = fullProbability
             var regionalFilterVotes = 0
             for (regionalImage in regionalImages) {
                 val regionalProbability =
-                    when (val analysis = analyzer.analyze(regionalImage)) {
+                    when (val analysis = trace.measureInference { analyzer.analyze(regionalImage) }) {
                         is DagImageAnalysisResult.Classified ->
                             analysis.filterProbability.takeIf(::isValidProbability)
                                 ?: return blocked(
@@ -225,3 +245,11 @@ internal object DagMediaBytesPolicy {
     const val UnsafeDimensionsReason = "unsafe_dimensions"
     const val AnalyzerBusyReason = "analyzer_busy"
 }
+
+private fun <T> DagMediaPipelineTrace?.measure(
+    stage: DagMediaPipelineStage,
+    operation: () -> T,
+): T = this?.measure(stage, operation) ?: operation()
+
+private fun <T> DagMediaPipelineTrace?.measureInference(operation: () -> T): T =
+    this?.measureInference(operation) ?: operation()
