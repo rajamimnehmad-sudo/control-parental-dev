@@ -34,6 +34,8 @@
   const FILTERED_ACCESSIBLE_DESCRIPTION = "Protegida por Glosh";
   const MAX_REMEMBERED_DECISIONS = 512;
   const FALLBACK_DELAY_MS = 80;
+  const VISIBLE_FALLBACK_DELAY_MS = 0;
+  const NEARBY_FALLBACK_DELAY_MS = 180;
   const FALLBACK_RETRY_BASE_MS = 600;
   const FALLBACK_RETRY_MAX_MS = 6_000;
   const MAX_FALLBACK_ATTEMPTS = 4;
@@ -1335,7 +1337,8 @@
       return;
     }
     const scheduled = fallbackTimers.get(element);
-    if (scheduled?.sourceUrl === sourceUrl) {
+    const dueAt = performance.now() + delayMs;
+    if (scheduled?.sourceUrl === sourceUrl && scheduled.dueAt <= dueAt) {
       return;
     }
     if (scheduled) {
@@ -1345,8 +1348,11 @@
       fallbackTimers.delete(element);
       requestFallbackDecision(element, sourceUrl);
     }, delayMs);
-    fallbackTimers.set(element, { sourceUrl, timer });
+    fallbackTimers.set(element, { sourceUrl, timer, dueAt });
   };
+
+  const prioritizedFallbackDelay = (element) =>
+    isVisibleNow(element) ? VISIBLE_FALLBACK_DELAY_MS : NEARBY_FALLBACK_DELAY_MS;
 
   const observeFallbackDecision = (element, sourceUrl) => {
     if (!hasLoadedPixels(element)) {
@@ -1357,7 +1363,7 @@
       fallbackObserver.observe(element);
       if (isNearViewport(element)) {
         fallbackNearElements.add(element);
-        scheduleFallbackDecision(element, sourceUrl);
+        scheduleFallbackDecision(element, sourceUrl, prioritizedFallbackDelay(element));
       }
     } else {
       scheduleFallbackDecision(element, sourceUrl);
@@ -1376,7 +1382,11 @@
               }
               if (entry.isIntersecting) {
                 fallbackNearElements.add(element);
-                scheduleFallbackDecision(element, sourceUrl);
+                scheduleFallbackDecision(
+                  element,
+                  sourceUrl,
+                  prioritizedFallbackDelay(element),
+                );
               } else {
                 fallbackNearElements.delete(element);
                 const scheduled = fallbackTimers.get(element);

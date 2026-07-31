@@ -46,4 +46,14 @@ class DagBrowserManifestContractTest {
         assertContains(activity, "addressInput.setOnFocusChangeListener")
         assertContains(activity, "R.id.menu_reload")
     }
+
+    @Test
+    fun `web content consistently requests the light color scheme`() {
+        val runtime = File("src/main/java/com/contentfilter/dagbrowser/DagGeckoRuntime.kt").readText()
+
+        assertContains(runtime, "GeckoRuntimeSettings")
+        assertContains(runtime, ".preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_LIGHT)")
+        assertFalse(runtime.contains("COLOR_SCHEME_DARK"))
+        assertFalse(runtime.contains("COLOR_SCHEME_SYSTEM"))
+    }
 }

@@ -2,6 +2,7 @@ package com.contentfilter.dagbrowser
 
 import android.content.Context
 import org.mozilla.geckoview.GeckoRuntime
+import org.mozilla.geckoview.GeckoRuntimeSettings
 
 internal object DagGeckoRuntime {
     @Volatile
@@ -9,6 +10,13 @@ internal object DagGeckoRuntime {
 
     fun get(context: Context): GeckoRuntime =
         instance ?: synchronized(this) {
-            instance ?: GeckoRuntime.create(context.applicationContext).also { instance = it }
+            instance
+                ?: GeckoRuntime.create(
+                    context.applicationContext,
+                    GeckoRuntimeSettings
+                        .Builder()
+                        .preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_LIGHT)
+                        .build(),
+                ).also { instance = it }
         }
 }
