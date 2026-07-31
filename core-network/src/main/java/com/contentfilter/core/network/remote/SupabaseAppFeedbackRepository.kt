@@ -3,6 +3,7 @@ package com.contentfilter.core.network.remote
 import com.contentfilter.core.domain.repository.AppFeedbackRepository
 import org.json.JSONArray
 import org.json.JSONObject
+import java.time.Instant
 import javax.inject.Inject
 
 class SupabaseAppFeedbackRepository
@@ -84,6 +85,47 @@ class SupabaseAppFeedbackRepository
                         .put("p_contact_email", contactEmail)
                         .put("p_phone_e164", phoneE164),
                 ).asResult()
+
+        override suspend fun getUserContact(deviceId: String): Result<AppFeedbackRepository.UserContact> =
+            when (val result = client.invokeRpcForArray("get_own_user_contact", JSONObject().put("p_device_id", deviceId))) {
+                is RemoteResult.Success -> {
+                    val row = result.value.optJSONObject(0)
+                        ?: return Result.failure(IllegalStateException("Missing user contact"))
+                    Result.success(
+                        AppFeedbackRepository.UserContact(
+                            contactEmail = row.optString("contact_email"),
+                            phoneE164 = row.optString("phone_e164"),
+                        ),
+                    )
+                }
+                is RemoteResult.Failure -> Result.failure(IllegalStateException(result.reason))
+            }
+
+        override suspend fun updateUserContact(
+            deviceId: String,
+            contactEmail: String,
+            phoneE164: String,
+        ): Result<Unit> =
+            client
+                .invokeRpc(
+                    "update_own_user_contact",
+                    JSONObject()
+                        .put("p_device_id", deviceId)
+                        .put("p_contact_email", contactEmail)
+                        .put("p_phone_e164", phoneE164),
+                ).asResult()
+
+        override suspend fun getRatingAvailability(deviceId: String): Result<AppFeedbackRepository.RatingAvailability> =
+            when (val result = client.invokeRpcForArray("get_own_app_rating_status", JSONObject().put("p_device_id", deviceId))) {
+                is RemoteResult.Success -> {
+                    val row = result.value.optJSONObject(0)
+                    val nextAvailableAt = row?.optString("next_available_at")
+                        ?.takeIf { it.isNotBlank() && it != "null" }
+                        ?.let { runCatching { Instant.parse(it).toEpochMilli() }.getOrNull() }
+                    Result.success(AppFeedbackRepository.RatingAvailability(nextAvailableAt))
+                }
+                is RemoteResult.Failure -> Result.failure(IllegalStateException(result.reason))
+            }
 
         override suspend fun submitSupportReport(
             deviceId: String,

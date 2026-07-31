@@ -39,6 +39,10 @@ import com.contentfilter.core.ui.ProductGlyph
 import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
 import com.contentfilter.core.ui.ProductListSurface
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 internal fun SettingsTab(
@@ -235,13 +239,26 @@ internal fun AdminFeedbackSettingsRoute(viewModel: AdminFeedbackViewModel = hilt
                 Text(if (state.saving) "Enviando…" else "Enviar valoración")
             }
             if (state.ratingAvailableAtEpochMillis > System.currentTimeMillis()) {
-                Text("Ya valoraste esta app. Podés volver a hacerlo en 7 días.", style = MaterialTheme.typography.bodySmall)
+                Text(ratingAvailabilityText(state.ratingAvailableAtEpochMillis), style = MaterialTheme.typography.bodySmall)
+            } else {
+                Text(ratingAvailabilityText(0L), style = MaterialTheme.typography.bodySmall)
             }
             if (state.message.isNotBlank()) {
                 Text(state.message, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
+}
+
+private fun ratingAvailabilityText(nextAvailableAtEpochMillis: Long): String {
+    if (nextAvailableAtEpochMillis <= System.currentTimeMillis()) {
+        return "Podés valorar una vez cada 7 días."
+    }
+    val dateTime = Instant.ofEpochMilli(nextAvailableAtEpochMillis).atZone(ZoneId.of("America/Argentina/Buenos_Aires"))
+    val locale = Locale.forLanguageTag("es-AR")
+    val date = dateTime.format(DateTimeFormatter.ofPattern("d/M", locale))
+    val time = dateTime.format(DateTimeFormatter.ofPattern("HH:mm", locale))
+    return "Podés volver a valorar el $date a las $time."
 }
 
 @Composable

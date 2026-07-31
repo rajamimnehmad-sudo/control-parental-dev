@@ -31,6 +31,7 @@ class AdminFeedbackViewModel
 
         init {
             loadContact()
+            loadRatingAvailability()
         }
 
         fun submitRating(
@@ -60,8 +61,11 @@ class AdminFeedbackViewModel
                 } else {
                     mutableState.value = mutableState.value.copy(
                         saving = false,
-                        message = "No se pudo enviar. Revisá los datos e intentá nuevamente.",
+                        message = ratingFailureMessage(result),
                     )
+                    if (result.exceptionOrNull()?.message?.contains("7 days", ignoreCase = true) == true) {
+                        loadRatingAvailability()
+                    }
                 }
             }
         }
@@ -90,6 +94,17 @@ class AdminFeedbackViewModel
             }
         }
 
+        private fun loadRatingAvailability() {
+            viewModelScope.launch {
+                val deviceId = activationRepository.currentActivation()?.deviceId ?: return@launch
+                feedbackRepository.getRatingAvailability(deviceId).onSuccess { availability ->
+                    mutableState.value = mutableState.value.copy(
+                        ratingAvailableAtEpochMillis = availability.nextAvailableAtEpochMillis ?: 0L,
+                    )
+                }
+            }
+        }
+
         fun clearMessage() {
             mutableState.value = mutableState.value.copy(message = "")
         }
@@ -105,8 +120,28 @@ class AdminFeedbackViewModel
                 val result = if (deviceId == null) Result.failure(IllegalStateException()) else action(deviceId)
                 mutableState.value = mutableState.value.copy(
                     saving = false,
-                    message = if (result.isSuccess) successMessage else "No se pudo guardar. Revisá los datos e intentá nuevamente.",
+                    message = if (result.isSuccess) successMessage else contactFailureMessage(result),
                 )
+            }
+        }
+
+        private fun ratingFailureMessage(result: Result<Unit>): String {
+            val reason = result.exceptionOrNull()?.message.orEmpty()
+            return if (reason.contains("7 days", ignoreCase = true)) {
+                "Ya valoraste esta app. La próxima valoración se habilita cuando pasen 7 días."
+            } else {
+                "No se pudo enviar la valoración. Intentá nuevamente."
+            }
+        }
+
+        private fun contactFailureMessage(result: Result<Unit>): String {
+            val reason = result.exceptionOrNull()?.message.orEmpty()
+            return when {
+                reason.contains("Email de contacto", ignoreCase = true) ->
+                    "El mail no tiene un formato válido. Ejemplo: nombre@dominio.com."
+                reason.contains("Phone must", ignoreCase = true) ->
+                    "El celular debe incluir código de país. Ejemplo: +5491123456789."
+                else -> "No se pudo guardar. Revisá los datos e intentá nuevamente."
             }
         }
 

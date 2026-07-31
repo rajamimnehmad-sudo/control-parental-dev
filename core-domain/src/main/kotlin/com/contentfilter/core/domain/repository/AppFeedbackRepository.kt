@@ -6,6 +6,15 @@ interface AppFeedbackRepository {
         val phoneE164: String,
     )
 
+    data class UserContact(
+        val contactEmail: String,
+        val phoneE164: String,
+    )
+
+    data class RatingAvailability(
+        val nextAvailableAtEpochMillis: Long?,
+    )
+
     suspend fun submitRating(
         deviceId: String,
         stars: Int,
@@ -33,6 +42,16 @@ interface AppFeedbackRepository {
         contactEmail: String,
         phoneE164: String,
     ): Result<Unit>
+
+    suspend fun getUserContact(deviceId: String): Result<UserContact>
+
+    suspend fun updateUserContact(
+        deviceId: String,
+        contactEmail: String,
+        phoneE164: String,
+    ): Result<Unit>
+
+    suspend fun getRatingAvailability(deviceId: String): Result<RatingAvailability>
 
     suspend fun submitSupportReport(
         deviceId: String,

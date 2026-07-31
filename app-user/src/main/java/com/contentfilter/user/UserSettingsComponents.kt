@@ -12,6 +12,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -28,6 +29,10 @@ import com.contentfilter.core.ui.ProductListRow
 import com.contentfilter.core.ui.ProductListSurface
 import com.contentfilter.core.ui.ProductVisualPage
 import com.contentfilter.user.updates.UserFeedbackViewModel
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 @Composable
 internal fun UserSettingsTab(
@@ -35,6 +40,7 @@ internal fun UserSettingsTab(
     updateSummary: String,
     onProtection: () -> Unit,
     onUpdates: () -> Unit,
+    onContact: () -> Unit,
     onHelp: () -> Unit,
     onFeedback: () -> Unit,
 ) {
@@ -54,6 +60,12 @@ internal fun UserSettingsTab(
                 title = "Actualizaciones e instalaciones",
                 subtitle = updateSummary,
                 onClick = onUpdates,
+            )
+            SettingsIndexRow(
+                icon = ProductIcon.People,
+                title = "Datos de contacto (opcional)",
+                subtitle = "Mail y número de celular",
+                onClick = onContact,
             )
             SettingsIndexRow(
                 icon = ProductIcon.Search,
@@ -173,14 +185,76 @@ internal fun UserFeedbackSettingsRoute(
             ) {
                 Text(if (state.saving) "Enviando…" else "Enviar valoración")
             }
-            if (state.ratingAvailableAtEpochMillis > System.currentTimeMillis()) {
-                Text("Ya valoraste esta app. Podés volver a hacerlo en 7 días.", style = MaterialTheme.typography.bodySmall)
+            Text(ratingAvailabilityText(state.ratingAvailableAtEpochMillis), style = MaterialTheme.typography.bodySmall)
+            if (state.message.isNotBlank()) {
+                Text(state.message, style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+    }
+}
+
+@Composable
+internal fun UserContactSettingsRoute(
+    onBack: () -> Unit,
+    viewModel: UserFeedbackViewModel = hiltViewModel(),
+) {
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    var contactEmail by rememberSaveable { mutableStateOf("") }
+    var phone by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(state.contactLoaded) {
+        if (state.contactLoaded) {
+            contactEmail = state.contactEmail
+            phone = state.phoneE164
+        }
+    }
+    ProductVisualPage(
+        title = "Datos de contacto",
+        subtitle = "Opcional para comunicaciones importantes",
+        onBack = onBack,
+    ) {
+        ProductCard {
+            Text("Datos de contacto (opcional)", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Podés dejar estos datos vacíos. Se guardan solo para facilitar comunicaciones relacionadas con este dispositivo.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = contactEmail,
+                onValueChange = { contactEmail = it.take(160) },
+                label = { Text("Mail") },
+                singleLine = true,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = phone,
+                onValueChange = { phone = it.take(18) },
+                label = { Text("Número de celular") },
+                singleLine = true,
+            )
+            Button(
+                modifier = Modifier.fillMaxWidth(),
+                enabled = state.contactLoaded && !state.saving,
+                onClick = { viewModel.saveContact(contactEmail, phone) },
+            ) {
+                Text(if (state.saving) "Guardando…" else "Guardar datos")
             }
             if (state.message.isNotBlank()) {
                 Text(state.message, style = MaterialTheme.typography.bodyMedium)
             }
         }
     }
+}
+
+private fun ratingAvailabilityText(nextAvailableAtEpochMillis: Long): String {
+    if (nextAvailableAtEpochMillis <= System.currentTimeMillis()) {
+        return "Podés valorar una vez cada 7 días."
+    }
+    val dateTime = Instant.ofEpochMilli(nextAvailableAtEpochMillis).atZone(ZoneId.of("America/Argentina/Buenos_Aires"))
+    val locale = Locale.forLanguageTag("es-AR")
+    val date = dateTime.format(DateTimeFormatter.ofPattern("d/M", locale))
+    val time = dateTime.format(DateTimeFormatter.ofPattern("HH:mm", locale))
+    return "Podés volver a valorar el $date a las $time."
 }
 
 @Composable

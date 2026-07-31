@@ -275,6 +275,7 @@ internal fun UserAppRoot(
                         updateSummary = updateState.status.settingsSummary(),
                         onProtection = { navigateTo(UserDestination.ProtectionSettings) },
                         onUpdates = { navigateTo(UserDestination.Updates) },
+                        onContact = { navigateTo(UserDestination.ContactSettings) },
                         onHelp = { navigateTo(UserDestination.Help) },
                         onFeedback = { navigateTo(UserDestination.FeedbackSettings) },
                     )
@@ -300,6 +301,8 @@ internal fun UserAppRoot(
                     )
                 UserDestination.FeedbackSettings ->
                     UserFeedbackSettingsRoute(onBack = ::goBack)
+                UserDestination.ContactSettings ->
+                    UserContactSettingsRoute(onBack = ::goBack)
                 UserDestination.Help ->
                     UserHelpRoute(
                         onBack = ::goBack,
@@ -478,6 +481,7 @@ private enum class UserDestination(
     Settings("Ajustes", ProductIcon.Settings),
     ProtectionSettings("Protección", ProductIcon.ShieldCheck, showInNav = false),
     Updates("Actualizaciones", ProductIcon.Update, showInNav = false),
+    ContactSettings("Datos de contacto", ProductIcon.People, showInNav = false),
     FeedbackSettings("Tu opinión", ProductIcon.People, showInNav = false),
     Help("Ayuda", ProductIcon.Search, showInNav = false),
 }
