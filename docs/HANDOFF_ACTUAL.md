@@ -733,6 +733,15 @@ El lote integrado se desarrolló y validó en:
 
 ## Próximo trabajo autorizado
 
+DAG Browser 46 (`0.28.0-dev`) cerró localmente `DAG-LOAD-TRANSITION-12` en
+SM-S908E: toda navegación superior se cubre antes de que Gecko limpie el
+documento, con fondo DAG y brillo barrido. Las miniaturas elegibles se conservan
+en almacenamiento privado entre cierre, reinicio y actualización por decisión
+expresa del usuario; contraseñas, pagos, CAPTCHA e incógnito siguen neutros. Se
+retiró además el reciclado manual que había provocado un cierre por bitmap aún
+visible. Pasaron 127 unitarios, formato, lint y build. Evidencia:
+`docs/compatibility/results/dag-browser-v46-loading-thumbnails-sm-s908e-2026-07-31.md`.
+
 DAG Browser 45 (`0.27.0-dev`, extensión `1.27.0`) cerró localmente el lote de
 optimización profesional autorizado: aislamiento por documento, ventana de
 viewport acotada, hibernación LRU, recorridos DOM más pequeños, listas

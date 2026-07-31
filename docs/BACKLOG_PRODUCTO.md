@@ -795,6 +795,7 @@ Flujo de una entrada:
 | DAG-ABOUT-VERSION-05 | Resuelto y validado físicamente en DAG 26 | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
 | DAG-V3-PRIVATE-DIAGNOSTICS-06 | Resuelto y validado físicamente en DAG 29 | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
 | DAG-V3-DOCUMENT-ISOLATION-07 | Resuelto y validado físicamente en DAG 45 | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
+| DAG-LOAD-TRANSITION-12 | Resuelto y validado físicamente en DAG 46 | P1 | Eliminar el flash blanco y conservar miniaturas seguras entre reinicios y actualizaciones | M | Medio |
 | DAG-V3-FALSE-ALLOW-08 | Resuelto localmente y validado físicamente en DAG 36 | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
 | DAG-V3-TAB-HIBERNATION-09 | Implementado en DAG 45; matriz física de 10 correcta, 50 pendiente | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
@@ -853,7 +854,7 @@ Flujo de una entrada:
 | DAG-BLACK-RESOURCES-05 | Implementado y validado en candidato local | P1 | Evitar rectangulos negros en recursos seguros sin mostrar contenido no aprobado | M | Alto |
 | DAG-REFRESH-03 | Implementado en candidato local; validacion automatica correcta | P1 | Hacer que Actualizar recargue realmente la pestana activa con estado visible y seguro | S | Medio |
 | DAG-RECENTS-FAVICON-03 | Implementado y validado en candidato local | P2 | Mostrar el favicon real y seguro del sitio en los accesos recientes de Home | M | Medio |
-| DAG-TAB-PREVIEW-04 | Captura segura visible en DAG 31; pendiente matriz 10/50 | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
+| DAG-TAB-PREVIEW-04 | Diez pestañas validadas en DAG 45; persistencia segura validada en DAG 46; matriz 50 pendiente | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
 | DAG-CALIBRATION-PROGRESS-01 | Resuelto DEV 253 | P1 | Mostrar progreso real y accesible del analisis DAG | S | Bajo |
 | DAG-CALIBRATION-QUEUE-02 | Resuelto DEV 253 | P0 | Enviar solo miniaturas inciertas a una cola privada y deduplicada | M | Alto |
 | DAG-CALIBRATION-REVIEW-03 | Reemplazado por calibracion binaria DEV 279 | P0 | Etiquetar criterio visual con motivo y auditoria en Super Admin | M | Alto |
@@ -1985,6 +1986,26 @@ Flujo de una entrada:
   Cheeky fue visible en 2.149 ms y cerró viewport en 8.414 ms; Mimo cerró en
   5.543 ms. No hubo decisiones cruzadas, crash ni ANR.
 
+#### DAG-LOAD-TRANSITION-12 - Transición protegida y miniaturas durables
+
+- Estado: `Resuelto y validado físicamente en DAG 46 sobre SM-S908E`. Tipo:
+  fluidez percibida, pestañas y ciclo de vida. Prioridad: P1. Esfuerzo: M.
+  Riesgo: medio.
+- Causa raíz: Gecko podía limpiar el documento visible antes de `onPageStart`,
+  dejando un cuadro blanco. Las miniaturas se eliminaban al ocultar la UI y el
+  reciclado manual de un bitmap todavía enlazado a un `ImageView` produjo un
+  cierre registrado.
+- Implementación: una navegación superior distinta se cubre antes de devolver
+  `ALLOW`; la pantalla muestra fondo DAG y brillo barrido. Miniaturas elegibles
+  se comprimen y guardan con clave cerrada en almacenamiento privado; navegación,
+  cierre y borrado de datos las invalidan. Android administra los bitmaps ya
+  mostrados dentro del presupuesto acotado.
+- Validación: un enlace Google -> Netflix no mostró blanco en capturas inmediatas
+  y a 120 ms. Cheeky conservó su miniatura tras `force-stop` y reinstalación
+  in-place. 127 unitarios, formato, lint y build correctos; sin crash ni ANR en
+  el recorrido final. Evidencia:
+  `docs/compatibility/results/dag-browser-v46-loading-thumbnails-sm-s908e-2026-07-31.md`.
+
 #### DAG-V3-FALSE-ALLOW-08 - Falso permiso visual reproducible
 
 - Estado: `Resuelto localmente y validado físicamente en DAG 36`.
@@ -2098,9 +2119,9 @@ Flujo de una entrada:
 - Problema: el limite actual es ocho y el selector puede mostrar una superficie neutra/Home en lugar de una miniatura util de la pagina. Tampoco ocupa toda la pantalla como un selector moderno ni ofrece una accion evidente para cerrar todo.
 - Propuesta: permitir un maximo estricto de 50 pestanas; abrir un selector a pantalla completa con tarjetas amplias y miniatura efimera de la ultima pagina aprobada; incluir cierre individual y `Cerrar todo` con confirmacion cuando haya varias pestanas.
 - Presupuesto: mantener un solo WebView activo. Las demas pestanas quedan suspendidas con estado cifrado y, si corresponde, una miniatura efimera acotada; no conservar 50 WebViews ni decodificaciones activas en memoria. Al llegar a 50, enfocar el selector y pedir cerrar una antes de crear otra.
-- Privacidad y seguridad: no persistir pixeles de miniaturas en disco; paginas bloqueadas, inciertas, en analisis o sensibles usan tarjeta neutra. Una miniatura nunca cuenta como aprobacion y restaurar una pagina vuelve a validarla.
+- Persistencia y seguridad: por decisión expresa del usuario en DAG 46, las miniaturas elegibles se guardan en almacenamiento privado para sobrevivir cierres y actualizaciones. Páginas bloqueadas, inciertas, en análisis, con contraseña, pago o CAPTCHA y pestañas incógnito usan tarjeta neutra. Una miniatura nunca cuenta como aprobación y restaurar una página vuelve a validarla.
 - Relacion: reemplaza la decision historica de maximo ocho de `DAG-TABS-UX-01` y extiende `DAG-TABS-UX-02`; no reabre sus correcciones de orden, cifrado ni pestanas vacias.
-- Aceptacion: 1, 10 y 50 pestanas mantienen cambio/cierre fluido; selector usa toda la pantalla; la tarjeta representa la pagina correcta y no Home salvo que esa pestana este realmente en Home; `Cerrar todo` deja una Home segura; reinicio no restaura miniaturas persistidas ni carga paginas automaticamente.
+- Aceptacion: 1, 10 y 50 pestanas mantienen cambio/cierre fluido; selector usa toda la pantalla; la tarjeta representa la pagina correcta y no Home salvo que esa pestana este realmente en Home; `Cerrar todo` deja una Home segura; reinicio restaura sólo miniaturas elegibles y no carga páginas inactivas automáticamente.
 - Decisión cerrada: se adoptó el techo interno seguro de 50. Al alcanzarlo, DAG
   abre el organizador y pide cerrar una pestaña, sin presentar un máximo de
   ocho. `Cerrar todo` requiere confirmación y deja una única Home segura.
@@ -2265,23 +2286,26 @@ Flujo de una entrada:
 
 #### DAG-TAB-PREVIEW-04 - Miniatura real por pestana
 
-- Estado: `Implementado en main y validado con diez pestañas en DAG 45 sobre
-  SM-A235M; matriz física de 50 pendiente`. La causa era que la
+- Estado: `Implementado en main; diez pestañas validadas en DAG 45 y persistencia
+  segura validada en DAG 46 sobre SM-S908E; matriz física de 50 pendiente`. La causa era que la
   captura sólo se solicitaba al abrir el organizador y la sesión podía cambiar
   antes de completarla. Cada cambio de pestaña captura ahora la página segura
   antes de liberar GeckoView y asocia el resultado con el identificador y la
   revisión exacta del documento.
 - Problema: el candidato local solo puede capturar de forma efimera el WebView activo y visible al abrir el selector; las demas tarjetas pueden quedar neutras o representar Home, por lo que el alcance de `DAG-TABS-UX-03` esta incompleto.
 - Propuesta: actualizar la miniatura efimera aprobada antes de suspender o cambiar de pestana y asociarla estrictamente con su identificador. Mantener un solo WebView activo y un presupuesto de memoria limitado.
-- Privacidad y seguridad: no escribir pixeles en disco; bloqueo, analisis, CAPTCHA, formularios sensibles o contenido incierto usan tarjeta neutra; una miniatura nunca evita la revalidacion al restaurar.
+- Persistencia y seguridad: las capturas elegibles se guardan en almacenamiento privado por decisión del usuario; bloqueo, análisis, CAPTCHA, contraseñas, pagos, incógnito o contenido incierto usan tarjeta neutra; una miniatura nunca evita la revalidación al restaurar.
 - Aceptacion: con 1, 10 y 50 pestanas cada tarjeta representa su ultima pagina segura y solo muestra Home si esa pestana esta en Home; cambiar/cerrar no cruza miniaturas; `Cerrar todo` libera memoria; reiniciar no restaura capturas; el selector sigue fluido bajo el presupuesto definido.
 - Implementacion candidata: la pagina visible se captura antes de abrir, crear, cambiar o cerrar pestañas; la miniatura queda solo en memoria y asociada al identificador de la pestaña. En DAG 25 una página neutra mostró captura real; Frávega pasó correctamente a tarjeta neutra al detectarse estado restringido/CAPTCHA.
 - Endurecimiento DAG 22: una navegación invalida inmediatamente la miniatura
   anterior; respuestas tardías, capturas vencidas y resultados de otra pestaña
   se descartan. El documento superior debe confirmar que no contiene
   contraseña, pago o CAPTCHA antes de habilitar la captura; si ese contenido
-  aparece luego, la miniatura se elimina. Las capturas continúan sin
-  persistirse y se liberan cuando la UI pasa a segundo plano.
+  aparece luego, la miniatura se elimina.
+- Continuidad DAG 46: una captura elegible queda asociada a una clave cerrada y
+  sobrevive segundo plano, cierre de proceso y actualización. Navegar o cerrar
+  elimina el archivo anterior. Se retiró el reciclado manual de bitmaps ya
+  enlazados al selector para evitar dibujar memoria liberada.
 - Validación DAG 22: `node --check`, `ktlintCheck`, 76 unitarios,
   `assembleDevDebug` y `lintDevDebug` correctos desde `main`. No se instaló APK
   ni se ejecutó la matriz física por la instrucción de acumular los seis lotes.
