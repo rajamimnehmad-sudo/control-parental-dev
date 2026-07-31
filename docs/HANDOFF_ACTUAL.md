@@ -733,19 +733,23 @@ El lote integrado se desarrolló y validó en:
 
 ## Próximo trabajo autorizado
 
-El próximo paso del laboratorio visual es ampliar y revisar un dataset nuevo y
-dirigido; 27 ejemplos no alcanzaron para mejorar el sobre-filtrado. Para una
-eventual publicación necesita autorización explícita por muestra, derechos
-aprobados o desidentificación verificable y aislamiento por hash/cluster. El
-auditor debe aprobarlo antes de decidir otra corrida M2 o GPU. No integrar la
-calibración preliminar ni abrir todavía
-`final_sealed`; la cola ciega restante se conserva para validaciones futuras,
-no para seguir ajustando el mismo umbral. El siguiente correctivo Android
-recomendado sigue siendo `DAG-DOWNLOADS-01`: preservar semántica `POST` al abrir una
-descarga en nueva pestaña y definir el tratamiento seguro de PDF inline sin
-debilitar la barrera. La inteligencia conversacional avanzada de GloshIA queda
-para el ticket posterior ya diferido. `DAG-V3-DOCUMENT-ISOLATION-07` y
-`DAG-V3-TAB-HIBERNATION-09` continúan como tickets separados sin autorización
-de código en este lote. La quietud incompleta de Frávega observada en la muestra
-acotada de DAG 36 debe tratarse como entrega/quietud, no corrigiendo nuevamente
-la calibración regional. No publicar sin un nuevo OK explícito.
+DAG Browser 45 (`0.27.0-dev`, extensión `1.27.0`) cerró localmente el lote de
+optimización profesional autorizado: aislamiento por documento, ventana de
+viewport acotada, hibernación LRU, recorridos DOM más pequeños, listas
+incrementales, preservación de nuevas ventanas `POST` y guardado seguro de PDF
+inline. Pasaron 120 unitarios, JavaScript, formato, lint y build. El APK final
+de `main` quedó instalado in-place en SM-A235M.
+
+La matriz física registró Mimo `4.511 / 5.543 / 625 ms` y Cheeky
+`No emitió / 8.414 / 2.149 ms` para página/fotos/visible; Cheeky ya cierra el
+viewport aunque su carga de red continúe. Frávega devolvió su propia pantalla
+“La página no existe” y no cuenta como éxito. Diez pestañas, restauración de una
+sesión hibernada y PDF inline quedaron verificados; continúan pendientes una
+matriz física de 50 pestañas, un `POST` real controlado y repetir Frávega con una
+portada normal. Evidencia:
+`docs/compatibility/results/dag-browser-v45-professional-optimization-sm-a235m-2026-07-31.md`.
+
+El laboratorio visual conserva su decisión `NO-GO`: no integrar la calibración
+preliminar ni abrir `final_sealed`. La inteligencia conversacional avanzada de
+GloshIA continúa diferida. No hacer push, publicación DEV ni Production sin un
+nuevo OK explícito.

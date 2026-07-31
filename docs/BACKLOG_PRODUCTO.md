@@ -722,7 +722,7 @@ Flujo de una entrada:
 | PROTECTION-POSSIBLE-UNINSTALL-01 | Publicado DEV 266; pendiente episodio real controlado | P0 | Alerta maxima persistente y pasos de restablecimiento ante posible desinstalacion | M | Alto |
 | PROTECTION-OFFLINE-RECOVERY-02 | Publicado DEV 266; UI fisica validada, pendiente ciclo offline real | P0 | Cinco codigos de recuperacion de un solo uso preparados para operar sin Internet | L | Alto |
 | PROTECTION-OFFLINE-RECOVERY-AUTO-03 | Idea; no aprobada para codigo | P0 | Preparar automaticamente el kit de emergencia al crear y enlazar un Usuario | M | Alto |
-| DAG-DOWNLOADS-01 | Primera etapa PDF implementada; matriz física fallida por POST/nueva pestaña y PDF inline | P1 | Descargas seguras de documentos con control Admin y bloqueo permanente de APK/ejecutables | L | Alto |
+| DAG-DOWNLOADS-01 | PDF inline resuelto y validado en DAG 45; preservación POST automatizada, reproducción física POST pendiente | P1 | Descargas seguras de documentos con control Admin y bloqueo permanente de APK/ejecutables | L | Alto |
 | DAG-WEB-PROMPTS-01 | Resuelto e instalado en DAG 30; selector simple validado físicamente | P1 | Selectores HTML nativos simples, múltiples, agrupados y deshabilitados | M | Medio |
 | HELP-CONTEXTUAL-CHAT-01 | Usuario 304 instalado: crash resuelto; seguro offline; mejora contextual diferida | P1 | Chat privado de ayuda y diagnóstico seguro automático | L | Medio |
 | LOTE-HELP-BOTH-APPS-02 | Implementado y recorrido físicamente; calidad contextual avanzada pendiente | P1 | Mejorar GloshIA e integrarla con contexto y acciones seguras en Usuario y Admin | L | Medio |
@@ -794,9 +794,9 @@ Flujo de una entrada:
 | DAG-NAV-UX-01 | Revalidado en DAG 31: botón + dentro de la barra | P2 | Simplificar barra DAG: Home y nueva pestana visibles; atras, adelante y actualizar en menu | M | Medio |
 | DAG-ABOUT-VERSION-05 | Resuelto y validado físicamente en DAG 26 | P2 | Mostrar versión de DAG en Acerca de, sin recargar Home | S | Bajo |
 | DAG-V3-PRIVATE-DIAGNOSTICS-06 | Resuelto y validado físicamente en DAG 29 | P0 | Eliminar URL, texto alternativo y estado DOM de los logs DEV de DAG V3 | S | Alto |
-| DAG-V3-DOCUMENT-ISOLATION-07 | Diagnosticado; pendiente aprobación para código | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
+| DAG-V3-DOCUMENT-ISOLATION-07 | Resuelto y validado físicamente en DAG 45 | P1 | Aislar trabajo y quietud por documento/pestaña, sin depender de una cola global infinita | M | Alto |
 | DAG-V3-FALSE-ALLOW-08 | Resuelto localmente y validado físicamente en DAG 36 | P0 | Distinguir falso permiso del modelo de omisión de entrega y corregirlo sin parche por sitio | M | Alto |
-| DAG-V3-TAB-HIBERNATION-09 | Riesgo físico confirmado; pendiente aprobación para código | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
+| DAG-V3-TAB-HIBERNATION-09 | Implementado en DAG 45; matriz física de 10 correcta, 50 pendiente | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
 | DAG-V3-MEDIA-PRESENTATION-11 | Reforzado localmente en DAG 34 y revalidado con DAG 36 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
@@ -1786,8 +1786,9 @@ Flujo de una entrada:
 
 #### DAG-DOWNLOADS-01 - Descargas seguras y administrables
 
-- Estado: `Primera etapa implementada en DAG 24 e instalada dentro de DAG 25;
-  pendiente prueba física de descarga`. Evidencia: el usuario confirma el
+- Estado: `PDF inline resuelto y validado físicamente en DAG 45; preservación
+  de POST cubierta por contrato automatizado y pendiente de reproducción física`.
+  Evidencia: el usuario confirma el
   2026-07-29 que las descargas son importantes para que DAG sea un navegador
   profesional y autoriza ejecutar el lote 4 el 2026-07-30. Tipo: compatibilidad
   Web, archivos, seguridad y control parental. Prioridad: P1. Esfuerzo estimado:
@@ -1956,7 +1957,7 @@ Flujo de una entrada:
 
 #### DAG-V3-DOCUMENT-ISOLATION-07 - Quietud y trabajo aislados por documento
 
-- Estado: `Diagnosticado; pendiente aprobación para código`. Tipo: rendimiento,
+- Estado: `Resuelto y validado físicamente en DAG 45`. Tipo: rendimiento,
   ciclo de vida y compatibilidad general. Prioridad: P1. Esfuerzo: M. Riesgo:
   alto.
 - Evidencia DAG 25/SM-S908E: Cheeky fue visible en 1.852 ms y Mimo en 267 ms,
@@ -1977,6 +1978,12 @@ Flujo de una entrada:
   estados coherentes; contenido dinámico puede continuar agregando imágenes sin
   mantener eternamente el viewport inicial en espera; todo recurso no resuelto
   permanece fail-closed.
+- Cierre DAG 45: cada documento conserva token, cola, contadores y ventana de
+  viewport propios. El content script enlaza de forma autenticada el documento
+  con la pestaña Gecko y descarta presentaciones tardías. La quietud inicial se
+  arma desde `DOMContentLoaded`, sin esperar el `load` infinito de carruseles.
+  Cheeky fue visible en 2.149 ms y cerró viewport en 8.414 ms; Mimo cerró en
+  5.543 ms. No hubo decisiones cruzadas, crash ni ANR.
 
 #### DAG-V3-FALSE-ALLOW-08 - Falso permiso visual reproducible
 
@@ -2060,7 +2067,8 @@ Flujo de una entrada:
 
 #### DAG-V3-TAB-HIBERNATION-09 - Presupuesto real para 50 pestañas
 
-- Estado: `Riesgo físico confirmado; pendiente aprobación para código`. Tipo:
+- Estado: `Implementado en DAG 45; matriz física de diez correcta y cincuenta
+  pendiente`. Tipo:
   memoria, estabilidad y pestañas. Prioridad: P1. Esfuerzo: L. Riesgo: alto.
 - Evidencia DAG 25/SM-S908E: después de la matriz con 15 pestañas, DAG registró
   aproximadamente 310.924 KiB PSS y 487.696 KiB RSS. El presupuesto actual de
@@ -2075,11 +2083,16 @@ Flujo de una entrada:
   fluidos; ninguna sesión en segundo plano reproduce medios; memoria acotada con
   umbrales medidos, no estimados sólo por bitmaps; restaurar nunca reutiliza una
   aprobación ni persiste miniaturas.
+- Implementación DAG 45: se conservan la sesión activa y las dos inactivas más
+  recientes. Las anteriores se hibernan luego de capturar sólo una miniatura
+  elegible en memoria; seleccionar una crea sesión nueva y revalida la página.
+  Con diez pestañas, una Cheeky hibernada restauró sin crash y el reinicio cargó
+  sólo la activa. La aceptación de 50 y el segundo dispositivo siguen abiertos.
 
 #### DAG-TABS-UX-03 - Hasta 50 pestanas con selector visual completo
 
-- Estado: `Implementado en main como DAG 23 e instalado dentro de DAG 25;
-  validación automática correcta y matriz física 1/10/50 pendiente`. El usuario autorizó
+- Estado: `Implementado en main; selector y hibernación validados con diez
+  pestañas en DAG 45; matriz física de 50 pendiente`. El usuario autorizó
   el lote el 2026-07-30. El límite visible de ocho desapareció y el runtime y
   el códec cifrado comparten un techo interno de 50.
 - Problema: el limite actual es ocho y el selector puede mostrar una superficie neutra/Home en lugar de una miniatura util de la pagina. Tampoco ocupa toda la pantalla como un selector moderno ni ofrece una accion evidente para cerrar todo.
@@ -2252,8 +2265,8 @@ Flujo de una entrada:
 
 #### DAG-TAB-PREVIEW-04 - Miniatura real por pestana
 
-- Estado: `Implementado en main desde DAG 22 y validado parcialmente en DAG 25
-  sobre SM-S908E; matriz física 10/50 pendiente`. La causa era que la
+- Estado: `Implementado en main y validado con diez pestañas en DAG 45 sobre
+  SM-A235M; matriz física de 50 pendiente`. La causa era que la
   captura sólo se solicitaba al abrir el organizador y la sesión podía cambiar
   antes de completarla. Cada cambio de pestaña captura ahora la página segura
   antes de liberar GeckoView y asocia el resultado con el identificador y la
