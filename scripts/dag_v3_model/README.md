@@ -3,6 +3,28 @@
 Herramientas locales, reproducibles y sin red para preparar el futuro dataset visual. No forman
 parte del APK y no activan decisiones del navegador.
 
+## Auditar procedencia del piloto binario
+
+Antes de reutilizar rondas historicas o pagar GPU, `pilot_training_provenance.py` comprueba que los
+archivos humanos sigan completos, calcula hashes reales y separa entrenamiento, validacion y
+holdout. Tambien cruza esos hashes con los manifiestos de descarga y exige autorizacion explicita
+de licencia, uso ML y derechos de imagen:
+
+```bash
+python3 scripts/dag_v3_model/pilot_training_provenance.py \
+  --train revision-ronda-1.json items-ronda-1.json public/ \
+  --validation revision-ronda-3.json items-ronda-3.json public/ \
+  --holdout revision-ronda-9.json items-ronda-9.json public/ \
+  --download-manifest descargas/downloads.jsonl \
+  --output .codex-tmp/dag-v3-pilot/provenance-report.json --pretty
+```
+
+El comando no copia fotos, no usa red y no entrena. Termina con `0` solamente cuando el conjunto
+esta listo para reentrenar, con `3` cuando la auditoria se completo pero hay bloqueos, y con `1`
+ante entradas invalidas. Una licencia abierta o `needs_license_and_visual_review` no se convierte
+automaticamente en permiso de entrenamiento: deben constar `training_authorized`, revision ML y
+derechos aprobados de manera explicita.
+
 ## Validar un manifiesto
 
 ```bash

@@ -86,6 +86,37 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _checkpoint_components(
+    checkpoint: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any], np.ndarray, np.ndarray]:
+    if "state_dict" not in checkpoint:
+        return (
+            checkpoint["vision_model"],
+            checkpoint["visual_projection"],
+            checkpoint["classifier_coef"],
+            checkpoint["classifier_intercept"],
+        )
+
+    state = checkpoint["state_dict"]
+    if not isinstance(state, dict):
+        raise ValueError("fine-tuned checkpoint state_dict must be an object")
+    vision = {
+        key.removeprefix("vision_model."): value
+        for key, value in state.items()
+        if key.startswith("vision_model.")
+    }
+    projection = {
+        key.removeprefix("visual_projection."): value
+        for key, value in state.items()
+        if key.startswith("visual_projection.")
+    }
+    coefficient = state.get("classifier.weight")
+    intercept = state.get("classifier.bias")
+    if not vision or not projection or coefficient is None or intercept is None:
+        raise ValueError("fine-tuned checkpoint is missing model components")
+    return vision, projection, coefficient.numpy(), intercept.numpy()
+
+
 def _preprocess(
     processor: Any,
     image_path: Path,
@@ -163,14 +194,17 @@ def main(argv: Sequence[str] | None = None) -> int:
         map_location="cpu",
         weights_only=False,
     )
+    vision_state, projection_state, coefficient, intercept = (
+        _checkpoint_components(checkpoint)
+    )
     base_model = AutoModel.from_pretrained(MODEL_ID)
-    base_model.vision_model.load_state_dict(checkpoint["vision_model"])
-    base_model.visual_projection.load_state_dict(checkpoint["visual_projection"])
+    base_model.vision_model.load_state_dict(vision_state)
+    base_model.visual_projection.load_state_dict(projection_state)
     policy = TinyClipPolicy(
         base_model.vision_model,
         base_model.visual_projection,
-        checkpoint["classifier_coef"],
-        checkpoint["classifier_intercept"],
+        coefficient,
+        intercept,
     ).eval()
     processor = AutoProcessor.from_pretrained(MODEL_ID)
     threshold = float(checkpoint["threshold"])
@@ -287,12 +321,12 @@ def main(argv: Sequence[str] | None = None) -> int:
         "schema_version": SCHEMA_VERSION,
         "status": (
             "quantized_export_passed_research_parity"
-            if not decision_changes and current_allow["predicted_action"] == "filter"
+            if not decision_changes
             else "quantized_export_failed_research_parity"
         ),
         "important_note": (
-            "The current holdout false filter remains a known model-quality issue. "
-            "Export parity means compression did not create additional changes."
+            "Export parity only compares float and quantized candidates. The known "
+            "human-confirmed allow is reported separately as a model-quality check."
         ),
         "model_id": MODEL_ID,
         "threshold": threshold,
