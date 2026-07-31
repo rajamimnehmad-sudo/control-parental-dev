@@ -431,6 +431,7 @@ class ReviewServerTest(unittest.TestCase):
                 )
                 saved = json.loads(urlopen(request, timeout=2).read())
                 self.assertEqual("filter", saved["model_prediction"]["action"])
+                self.assertTrue(saved["matched_model"])
 
                 after = json.loads(
                     urlopen(f"{base}/api/items?scope=all", timeout=2).read()
@@ -438,6 +439,26 @@ class ReviewServerTest(unittest.TestCase):
                 self.assertEqual("filter", after["model_prediction"]["action"])
                 self.assertEqual("boundary_current", after["category"])
                 self.assertEqual("main_eval", after["split"])
+                status = json.loads(urlopen(f"{base}/api/status", timeout=2).read())
+                self.assertEqual(1, status["reviewed_total"])
+                self.assertEqual(0, status["queue_remaining"])
+
+                undo_request = Request(
+                    f"{base}/api/review",
+                    data=json.dumps({"sample_id": "sample:one"}).encode(),
+                    headers={
+                        "Content-Type": "application/json",
+                        "Origin": base,
+                    },
+                    method="DELETE",
+                )
+                undone = json.loads(urlopen(undo_request, timeout=2).read())
+                self.assertTrue(undone["removed"])
+                restored = json.loads(
+                    urlopen(f"{base}/api/items?scope=all", timeout=2).read()
+                )["items"][0]
+                self.assertIsNone(restored["human_decision"])
+                self.assertIsNone(restored["model_prediction"])
             finally:
                 server.shutdown()
                 server.server_close()

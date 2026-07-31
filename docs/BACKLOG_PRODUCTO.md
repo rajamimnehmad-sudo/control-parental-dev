@@ -198,6 +198,10 @@ Flujo de una entrada:
   1.000 miniaturas públicas actuales fuera de Git, deduplicación exacta y
   perceptual, límites por serie/autor, split por cluster
   `600/200/200`, examen final sellado y servidor de revisión ciega en loopback.
+- La revisión ya tiene una ronda inicial móvil de 100, gestos derecha/izquierda,
+  resultado de coincidencia posterior, motivos opcionales, botones/teclado y
+  deshacer transaccional. La publicación o acceso desde un teléfono físico
+  continúa fuera de alcance mientras el corpus permanezca sólo en loopback.
 - El runner fija por SHA-256 el mismo ONNX de DAG 36 y reproduce su
   preprocesamiento y política. Las 800 muestras evaluables se analizaron sin
   errores; el examen final no fue abierto. No hubo entrenamiento, cambio de

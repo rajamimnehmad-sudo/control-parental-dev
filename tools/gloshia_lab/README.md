@@ -90,6 +90,22 @@ PYTHONPATH=. python -m tools.gloshia_lab.cli serve \
   .codex-tmp/gloshia-lab-current-1000
 ```
 
+La interfaz comienza con una ronda acotada a 100 decisiones y está preparada
+para teléfono y computadora:
+
+- deslizar a la derecha significa `Permitir`;
+- deslizar a la izquierda significa `Filtrar`;
+- `Dudosa` queda como botón separado;
+- después de guardar muestra si la decisión coincide con GloshIA;
+- `Deshacer última` elimina por completo la última revisión accidental;
+- los botones y las flechas del teclado permiten revisar sin gestos;
+- el resultado, score, split y estrato del modelo siguen ausentes de la API
+  hasta que la decisión humana ya quedó guardada.
+
+El servidor permanece limitado a `127.0.0.1`: el diseño es móvil, pero no expone
+el banco en una red ni lo publica. Abrirlo desde un teléfono físico requerirá un
+canal local o remoto autenticado en un ticket separado.
+
 La salida normal excluye las 200 muestras selladas. Sólo después de congelar
 decisiones y cualquier ajuste:
 

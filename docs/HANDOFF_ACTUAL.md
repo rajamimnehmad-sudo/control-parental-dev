@@ -659,6 +659,17 @@ El lote integrado se desarrolló y validó en:
   revisión como JSON descargable. La inspección visual confirmó contenido
   contemporáneo; además se retiró de forma recuperable una fotografía de la
   década de 1890 detectada por la auditoría reforzada.
+- La interfaz local ahora presenta primero una ronda móvil de 100: gesto a la
+  derecha `Permitir`, gesto a la izquierda `Filtrar`, botón `Dudosa`, motivos
+  opcionales, alternativa completa por botones/teclado y progreso persistente.
+  Después de guardar revela coincidencia o desacuerdo con el modelo. `Deshacer
+  última` borra esa revisión bajo el mismo bloqueo de escritura. El recorrido
+  real de gesto, desacuerdo y deshacer dejó nuevamente cero revisiones; no
+  contaminó la verdad humana.
+- El diseño responde correctamente a `390 x 844` y `1280 x 800`, sin overflow
+  horizontal ni predicción anticipada. Sigue siendo loopback: el acceso desde
+  un teléfono físico necesita un canal autenticado separado y no está
+  autorizado a publicar el corpus.
 - Todavía no hay métricas de precisión contra verdad humana. La revisión corta
   debe medir sobre-filtro en hombres, grupos y personas cubiertas, además de
   falsos permisos con personas pequeñas o lejanas. No ajustar umbral ni abrir

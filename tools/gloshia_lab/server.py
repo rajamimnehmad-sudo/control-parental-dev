@@ -155,6 +155,9 @@ class ReviewHandler(BaseHTTPRequestHandler):
         if parsed.path == "/app.js":
             self._file(self.server.web_dir / "app.js", "text/javascript; charset=utf-8")
             return
+        if parsed.path == "/styles.css":
+            self._file(self.server.web_dir / "styles.css", "text/css; charset=utf-8")
+            return
         if parsed.path.startswith("/image/"):
             sample_id = unquote(parsed.path.removeprefix("/image/"))
             row = self.server.by_id.get(sample_id)
@@ -168,10 +171,15 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 self.server.corpus_dir,
                 include_sealed=self.server.include_sealed,
             )
+            reviews = read_reviews(self.server.corpus_dir / "reviews.json")
             self._json(
                 {
                     **report,
                     "queue": len(self.server.queue),
+                    "queue_remaining": sum(
+                        sample_id not in reviews for sample_id in self.server.queue_ids
+                    ),
+                    "reviewed_total": len(reviews),
                     "sealed_unlocked": self.server.include_sealed,
                 }
             )
@@ -270,15 +278,52 @@ class ReviewHandler(BaseHTTPRequestHandler):
                 }
                 write_reviews(reviews_path, reviews)
             row = self.server.by_id[sample_id]
+            prediction = row.get("model_prediction")
             self._json(
                 {
                     "ok": True,
                     "review": reviews[sample_id],
-                    "model_prediction": row.get("model_prediction"),
+                    "model_prediction": prediction,
                     "category": row.get("category"),
                     "split": row.get("split"),
+                    "matched_model": (
+                        action == prediction.get("action")
+                        if action in {"allow", "filter"} and prediction
+                        else None
+                    ),
                 }
             )
+        except (json.JSONDecodeError, OSError, TypeError, ValueError):
+            self._json({"error": "invalid review"}, HTTPStatus.BAD_REQUEST)
+
+    def do_DELETE(self) -> None:
+        if not self._trusted_loopback_request(require_origin=True):
+            self.send_error(HTTPStatus.FORBIDDEN)
+            return
+        if urlparse(self.path).path != "/api/review":
+            self.send_error(HTTPStatus.NOT_FOUND)
+            return
+        if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
+            self.send_error(HTTPStatus.UNSUPPORTED_MEDIA_TYPE)
+            return
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+            if length <= 0 or length > 4096:
+                raise ValueError("invalid body size")
+            payload = json.loads(self.rfile.read(length))
+            sample_id = payload.get("sample_id")
+            if (
+                not isinstance(sample_id, str)
+                or not SAFE_ID.fullmatch(sample_id)
+                or sample_id not in self.server.by_id
+            ):
+                raise ValueError("invalid review")
+            reviews_path = self.server.corpus_dir / "reviews.json"
+            with self.server.review_lock:
+                reviews = read_reviews(reviews_path)
+                removed = reviews.pop(sample_id, None)
+                write_reviews(reviews_path, reviews)
+            self._json({"ok": True, "removed": removed is not None})
         except (json.JSONDecodeError, OSError, TypeError, ValueError):
             self._json({"error": "invalid review"}, HTTPStatus.BAD_REQUEST)
 
