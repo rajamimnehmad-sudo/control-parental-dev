@@ -138,7 +138,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         self.send_header("Location", "/")
         self.send_header(
             "Set-Cookie",
-            f"gloshia_session={expected}; HttpOnly; SameSite=Strict; Path=/; Max-Age=14400",
+            f"gloshia_session={expected}; HttpOnly; SameSite=Lax; Path=/; Max-Age=14400",
         )
         self.send_header("Cache-Control", "no-store")
         self.send_header("Referrer-Policy", "no-referrer")
