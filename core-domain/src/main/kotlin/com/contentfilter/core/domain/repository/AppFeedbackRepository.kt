@@ -1,6 +1,11 @@
 package com.contentfilter.core.domain.repository
 
 interface AppFeedbackRepository {
+    data class AdminContact(
+        val contactEmail: String,
+        val phoneE164: String,
+    )
+
     suspend fun submitRating(
         deviceId: String,
         stars: Int,
@@ -18,6 +23,14 @@ interface AppFeedbackRepository {
 
     suspend fun updateAdminPhone(
         deviceId: String,
+        phoneE164: String,
+    ): Result<Unit>
+
+    suspend fun getAdminContact(deviceId: String): Result<AdminContact>
+
+    suspend fun updateAdminContact(
+        deviceId: String,
+        contactEmail: String,
         phoneE164: String,
     ): Result<Unit>
 

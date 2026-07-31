@@ -56,6 +56,35 @@ class SupabaseAppFeedbackRepository
                         .put("p_phone_e164", phoneE164),
                 ).asResult()
 
+        override suspend fun getAdminContact(deviceId: String): Result<AppFeedbackRepository.AdminContact> =
+            when (val result = client.invokeRpcForArray("get_own_admin_contact", JSONObject().put("p_device_id", deviceId))) {
+                is RemoteResult.Success -> {
+                    val row = result.value.optJSONObject(0)
+                        ?: return Result.failure(IllegalStateException("Missing admin contact"))
+                    Result.success(
+                        AppFeedbackRepository.AdminContact(
+                            contactEmail = row.optString("contact_email"),
+                            phoneE164 = row.optString("phone_e164"),
+                        ),
+                    )
+                }
+                is RemoteResult.Failure -> Result.failure(IllegalStateException(result.reason))
+            }
+
+        override suspend fun updateAdminContact(
+            deviceId: String,
+            contactEmail: String,
+            phoneE164: String,
+        ): Result<Unit> =
+            client
+                .invokeRpc(
+                    "update_own_admin_contact_v2",
+                    JSONObject()
+                        .put("p_device_id", deviceId)
+                        .put("p_contact_email", contactEmail)
+                        .put("p_phone_e164", phoneE164),
+                ).asResult()
+
         override suspend fun submitSupportReport(
             deviceId: String,
             category: String,

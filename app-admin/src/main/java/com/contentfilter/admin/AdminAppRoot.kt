@@ -308,6 +308,12 @@ internal fun AdminAppRoot(
                                 onHelp = { section = AdminSection.Help },
                                 onFeedback = { section = AdminSection.Feedback },
                                 onLocalAdmin = { section = AdminSection.LocalAdmin },
+                                hasPendingUpdate = updateState.status in setOf(
+                                    AdminUpdatesStatus.Available,
+                                    AdminUpdatesStatus.Downloading,
+                                    AdminUpdatesStatus.ReadyToInstall,
+                                    AdminUpdatesStatus.NeedsInstallPermission,
+                                ),
                             )
                     }
             }

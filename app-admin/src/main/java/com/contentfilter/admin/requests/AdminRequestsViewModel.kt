@@ -1,5 +1,6 @@
 package com.contentfilter.admin.requests
 
+import android.content.Context
 import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,6 +20,7 @@ import com.contentfilter.core.sync.SyncScheduler
 import com.contentfilter.core.sync.engine.SyncEngine
 import com.contentfilter.core.sync.engine.TargetedPolicySyncCoordinator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -44,12 +46,17 @@ class AdminRequestsViewModel
         private val syncScheduler: SyncScheduler,
         private val syncEngine: SyncEngine,
         private val targetedPolicySyncCoordinator: TargetedPolicySyncCoordinator,
+        @ApplicationContext context: Context,
     ) : ViewModel() {
+        private val preferences = context.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
         private val syncMessage = MutableStateFlow("")
         private val isLoading = MutableStateFlow(false)
         private val lastRefreshedAtEpochMillis = MutableStateFlow<Long?>(null)
         private val selectedDeviceId = MutableStateFlow<String?>(null)
         private val pendingActionIds = MutableStateFlow<Set<String>>(emptySet())
+        private val hiddenHistoryIds = MutableStateFlow(
+            preferences.getStringSet(HiddenHistoryIdsKey, emptySet()).orEmpty(),
+        )
         private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
         private val refreshState =
             combine(syncMessage, isLoading, lastRefreshedAtEpochMillis) { message, loading, refreshedAt ->
@@ -61,7 +68,8 @@ class AdminRequestsViewModel
                 refreshState,
                 selectedDeviceId,
                 pendingActionIds,
-            ) { apps, refresh, selected, pendingActions ->
+                hiddenHistoryIds,
+            ) { apps, refresh, selected, pendingActions, hiddenIds ->
                 RequestsLocalState(
                     apps = apps,
                     message = refresh.message,
@@ -69,6 +77,7 @@ class AdminRequestsViewModel
                     lastRefreshedAtEpochMillis = refresh.lastRefreshedAtEpochMillis,
                     selectedDeviceId = selected,
                     pendingActionIds = pendingActions,
+                    hiddenHistoryIds = hiddenIds,
                 )
             }
 
@@ -89,7 +98,7 @@ class AdminRequestsViewModel
             ) { requests, devices, local ->
                 val pendingRequests = requests.filter { it.status.isPending() }
                 val resolvedRequests = requests.filterNot { it.status.isPending() }
-                val users = requests.toUserItems(devices)
+                val users = requests.toUserItems(devices, local.hiddenHistoryIds)
                 val resolvedSelected = local.selectedDeviceId?.takeIf { id -> users.any { it.deviceId == id } }
                 AdminRequestsUiState(
                     requests =
@@ -101,6 +110,7 @@ class AdminRequestsViewModel
                         resolvedSelected?.let { selectedId ->
                             resolvedRequests
                                 .filter { it.deviceGroupId == selectedId }
+                                .filterNot { it.id in local.hiddenHistoryIds }
                                 .sortedByDescending(AccessRequest::createdAtEpochMillis)
                                 .toRequestItems(local.apps)
                         }.orEmpty(),
@@ -136,6 +146,13 @@ class AdminRequestsViewModel
 
         fun clearUserSelection() {
             selectedDeviceId.value = null
+        }
+
+        fun clearHistory(requestIds: Set<String>) {
+            if (requestIds.isEmpty()) return
+            val updated = hiddenHistoryIds.value + requestIds
+            preferences.edit().putStringSet(HiddenHistoryIdsKey, updated).apply()
+            hiddenHistoryIds.value = updated
         }
 
         fun approve(requestId: String) {
@@ -206,11 +223,13 @@ class AdminRequestsViewModel
                     if (!request.status.isPending()) return@runCatching
                     val minutes =
                         rawMinutes.filter(Char::isDigit).toIntOrNull()
-                            ?: request.requestedMinutes
-                            ?: DefaultGrantMinutes
+                    if (minutes == null || minutes < 1) {
+                        syncMessage.update { "Ingresá cuántos minutos querés conceder." }
+                        return@runCatching
+                    }
                     grantExtraTime(
                         request = request,
-                        minutes = minutes.coerceAtLeast(1),
+                        minutes = minutes,
                         nowEpochMillis = System.currentTimeMillis(),
                     )
                     syncScheduler.requestSync()
@@ -276,7 +295,8 @@ class AdminRequestsViewModel
         }
 
         private companion object {
-            const val DefaultGrantMinutes = 15
+            const val PreferencesName = "admin-requests"
+            const val HiddenHistoryIdsKey = "hidden-history-request-ids"
             const val LogTag = "AdminRequests"
             const val UnknownDeviceId = "unknown-device"
         }
@@ -288,6 +308,7 @@ class AdminRequestsViewModel
             val lastRefreshedAtEpochMillis: Long?,
             val selectedDeviceId: String?,
             val pendingActionIds: Set<String>,
+            val hiddenHistoryIds: Set<String>,
         )
 
         private data class RequestsRefreshState(
@@ -305,7 +326,10 @@ private fun RequestStatus.isPending(): Boolean =
 private val AccessRequest.deviceGroupId: String
     get() = deviceId ?: "unknown-device"
 
-private fun List<AccessRequest>.toUserItems(devices: List<Device>): List<AdminRequestUserUiState> {
+private fun List<AccessRequest>.toUserItems(
+    devices: List<Device>,
+    hiddenHistoryIds: Set<String>,
+): List<AdminRequestUserUiState> {
     val devicesById = devices.associateBy { it.id }
     return groupBy { it.deviceGroupId }
         .map { (deviceId, requests) ->
@@ -313,7 +337,7 @@ private fun List<AccessRequest>.toUserItems(devices: List<Device>): List<AdminRe
                 deviceId = deviceId,
                 name = devicesById[deviceId]?.displayName ?: "Usuario",
                 pendingCount = requests.count { it.status.isPending() },
-                resolvedCount = requests.count { !it.status.isPending() },
+                resolvedCount = requests.count { !it.status.isPending() && it.id !in hiddenHistoryIds },
             )
         }
         .sortedWith(
@@ -341,7 +365,7 @@ private fun List<AccessRequest>.toRequestItems(apps: List<RemoteInstalledAppDto>
                 if (request.requestType == AccessRequestType.DOMAIN_ACCESS) {
                     request.targetDomain ?: request.target
                 } else {
-                    app?.appName?.takeIf { it.isNotBlank() } ?: packageName
+                    app?.appName?.takeIf { it.isNotBlank() } ?: "Aplicación solicitada"
                 },
             iconBase64 = app?.iconBase64,
         )

@@ -18,10 +18,12 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -124,6 +126,7 @@ fun AdminRequestsRoute(
             }
         } else {
             var showingHistory by remember(selectedUser.deviceId) { mutableStateOf(false) }
+            var confirmClearHistory by remember(selectedUser.deviceId) { mutableStateOf(false) }
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (showingHistory) {
                     OutlinedButton(modifier = Modifier.weight(1f), onClick = { showingHistory = false }) {
@@ -140,6 +143,38 @@ fun AdminRequestsRoute(
                         Text("Historial (${state.resolvedRequests.size})")
                     }
                 }
+            }
+            if (showingHistory && state.resolvedRequests.isNotEmpty()) {
+                TextButton(
+                    modifier = Modifier.align(Alignment.End),
+                    onClick = { confirmClearHistory = true },
+                ) {
+                    Text("Borrar historial")
+                }
+            }
+            if (confirmClearHistory) {
+                AlertDialog(
+                    onDismissRequest = { confirmClearHistory = false },
+                    title = { Text("Borrar historial") },
+                    text = {
+                        Text("Se ocultará el historial de este usuario en esta aplicación. Las solicitudes remotas no se borran.")
+                    },
+                    confirmButton = {
+                        TextButton(
+                            onClick = {
+                                viewModel.clearHistory(state.resolvedRequests.map { it.id }.toSet())
+                                confirmClearHistory = false
+                            },
+                        ) {
+                            Text("Borrar")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { confirmClearHistory = false }) {
+                            Text("Cancelar")
+                        }
+                    },
+                )
             }
             val displayedRequests = if (showingHistory) state.resolvedRequests else state.requests
             if (displayedRequests.isEmpty()) {
@@ -233,7 +268,7 @@ private fun RequestCard(
     val rejectLoading = "${request.id}:reject" in pendingActionIds
     val actionLoading = approveLoading || grantLoading || rejectLoading
     var grantMinutes by remember(request.id, request.requestedMinutes) {
-        mutableStateOf((request.requestedMinutes ?: 15).toString())
+        mutableStateOf(request.requestedMinutes?.toString().orEmpty())
     }
     ProductCard {
         Column(
@@ -246,11 +281,6 @@ private fun RequestCard(
                 AppRequestIcon(appName = item.appName, iconBase64 = item.iconBase64)
                 Column(modifier = Modifier.weight(1f)) {
                     Text(item.appName, style = MaterialTheme.typography.titleMedium)
-                    Text(
-                        request.targetPackageName ?: request.target,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                     Text(
                         when (request.requestType) {
                             AccessRequestType.DOMAIN_ACCESS -> "Solicitud de sitio"
@@ -303,7 +333,7 @@ private fun RequestCard(
                         ProgressActionButton(
                             modifier = Modifier.fillMaxWidth(),
                             onClick = { onGrant(grantMinutes) },
-                            enabled = !actionLoading,
+                            enabled = !actionLoading && grantMinutes.toIntOrNull()?.let { it > 0 } == true,
                             loading = grantLoading,
                             loadingText = "Guardando...",
                             successText = "Tiempo dado",
@@ -337,7 +367,8 @@ private fun AppRequestIcon(
         remember(iconBase64) {
             iconBase64?.let {
                 runCatching {
-                    val bytes = Base64.decode(it, Base64.DEFAULT)
+                    val normalized = it.substringAfter("base64,", it)
+                    val bytes = Base64.decode(normalized, Base64.DEFAULT)
                     BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
                 }.getOrNull()
             }

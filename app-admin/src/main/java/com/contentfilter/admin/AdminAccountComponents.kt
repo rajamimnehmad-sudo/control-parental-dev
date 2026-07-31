@@ -2,6 +2,7 @@ package com.contentfilter.admin
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Star
@@ -47,6 +49,7 @@ internal fun SettingsTab(
     onHelp: () -> Unit,
     onFeedback: () -> Unit,
     onLocalAdmin: () -> Unit,
+    hasPendingUpdate: Boolean,
 ) {
     val dashboardViewModel: DashboardViewModel = hiltViewModel()
     val state by dashboardViewModel.uiState.collectAsStateWithLifecycle()
@@ -70,8 +73,8 @@ internal fun SettingsTab(
             )
             SettingsNavigationRow(
                 icon = ProductIcon.Bell,
-                title = "Contacto adulto",
-                subtitle = "Número de contacto de la comunidad",
+                title = "Actualizar datos",
+                subtitle = "Mail y número de celular",
                 onClick = onContact,
             )
             SettingsNavigationRow(
@@ -85,6 +88,7 @@ internal fun SettingsTab(
                 title = "Actualizaciones",
                 subtitle = "Versión ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                 onClick = onUpdates,
+                showBlueDot = hasPendingUpdate,
             )
             SettingsNavigationRow(
                 icon = ProductIcon.Search,
@@ -100,8 +104,8 @@ internal fun SettingsTab(
             )
             SettingsNavigationRow(
                 icon = ProductIcon.ShieldAlert,
-                title = "Administrador de este teléfono",
-                subtitle = "Cambiar el acceso local guardado",
+                title = "Borrar cuenta del administrador",
+                subtitle = "Borra el acceso local solo en este teléfono",
                 onClick = onLocalAdmin,
                 showDivider = false,
             )
@@ -142,28 +146,42 @@ internal fun AdminAccountDetailsScreen() {
 @Composable
 internal fun AdminContactSettingsRoute(viewModel: AdminFeedbackViewModel = hiltViewModel()) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    var contactEmail by rememberSaveable { mutableStateOf("") }
     var phone by rememberSaveable { mutableStateOf("") }
+    LaunchedEffect(state.contactLoaded) {
+        if (state.contactLoaded) {
+            contactEmail = state.contactEmail
+            phone = state.phoneE164
+        }
+    }
     LaunchedEffect(Unit) {
         viewModel.clearMessage()
     }
     SettingsDetailColumn {
         ProductCard {
-            Text("Contacto adulto", style = MaterialTheme.typography.titleMedium)
+            Text("Actualizar datos", style = MaterialTheme.typography.titleMedium)
             Text(
-                "Este número queda asociado a la comunidad para comunicaciones administrativas.",
+                "Estos datos se usan para comunicaciones administrativas. No cambian el mail de inicio de sesión.",
                 style = MaterialTheme.typography.bodyMedium,
+            )
+            OutlinedTextField(
+                modifier = Modifier.fillMaxWidth(),
+                value = contactEmail,
+                onValueChange = { contactEmail = it.take(160) },
+                label = { Text("Mail de contacto") },
+                singleLine = true,
             )
             OutlinedTextField(
                 modifier = Modifier.fillMaxWidth(),
                 value = phone,
                 onValueChange = { phone = it.take(18) },
-                label = { Text("WhatsApp, por ejemplo +549…") },
+                label = { Text("Número de celular, por ejemplo +549…") },
                 singleLine = true,
             )
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = !state.saving,
-                onClick = { viewModel.savePhone(phone) },
+                enabled = !state.saving && state.contactLoaded,
+                onClick = { viewModel.saveContact(contactEmail, phone) },
             ) {
                 Text(if (state.saving) "Guardando…" else "Guardar contacto")
             }
@@ -211,10 +229,13 @@ internal fun AdminFeedbackSettingsRoute(viewModel: AdminFeedbackViewModel = hilt
             )
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = rating > 0 && !state.saving,
+                enabled = rating > 0 && !state.saving && state.ratingAvailableAtEpochMillis <= System.currentTimeMillis(),
                 onClick = { viewModel.submitRating(rating, comment) },
             ) {
                 Text(if (state.saving) "Enviando…" else "Enviar valoración")
+            }
+            if (state.ratingAvailableAtEpochMillis > System.currentTimeMillis()) {
+                Text("Ya valoraste esta app. Podés volver a hacerlo en 7 días.", style = MaterialTheme.typography.bodySmall)
             }
             if (state.message.isNotBlank()) {
                 Text(state.message, style = MaterialTheme.typography.bodyMedium)
@@ -263,12 +284,22 @@ private fun SettingsNavigationRow(
     subtitle: String,
     onClick: () -> Unit,
     showDivider: Boolean = true,
+    showBlueDot: Boolean = false,
 ) {
     ProductListRow(
         leading = { ProductGlyph(icon = icon, color = Teal, modifier = Modifier.size(24.dp)) },
         headline = { Text(title, style = MaterialTheme.typography.titleMedium, color = Ink) },
         supporting = { Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = MutedInk) },
-        trailing = { ProductGlyph(icon = ProductIcon.ChevronRight, color = MutedInk, modifier = Modifier.size(22.dp)) },
+        trailing = {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (showBlueDot) {
+                    Box(
+                        modifier = Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary, CircleShape),
+                    )
+                }
+                ProductGlyph(icon = ProductIcon.ChevronRight, color = MutedInk, modifier = Modifier.size(22.dp))
+            }
+        },
         onClick = onClick,
         showDivider = showDivider,
     )

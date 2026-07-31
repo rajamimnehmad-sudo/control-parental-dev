@@ -1,10 +1,12 @@
 package com.contentfilter.admin
 
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.contentfilter.core.domain.repository.AppFeedbackRepository
 import com.contentfilter.core.domain.repository.DeviceActivationRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -16,21 +18,77 @@ class AdminFeedbackViewModel
     constructor(
         private val activationRepository: DeviceActivationRepository,
         private val feedbackRepository: AppFeedbackRepository,
+        @ApplicationContext private val context: Context,
     ) : ViewModel() {
-        private val mutableState = MutableStateFlow(AdminFeedbackUiState())
+        private val preferences = context.getSharedPreferences(PreferencesName, Context.MODE_PRIVATE)
+        private val mutableState =
+            MutableStateFlow(
+                AdminFeedbackUiState(
+                    ratingAvailableAtEpochMillis = preferences.getLong(RatingAvailableAtKey, 0L),
+                ),
+            )
         val state = mutableState.asStateFlow()
+
+        init {
+            loadContact()
+        }
 
         fun submitRating(
             stars: Int,
             comment: String,
-        ) = runAction("Gracias. Tu valoración fue enviada.") { deviceId ->
-            feedbackRepository.submitRating(deviceId, stars, comment, BuildConfig.VERSION_CODE)
+        ) {
+            if (stars !in 1..5 || mutableState.value.saving) return
+            val now = System.currentTimeMillis()
+            if (mutableState.value.ratingAvailableAtEpochMillis > now) {
+                mutableState.value = mutableState.value.copy(message = RatingCooldownMessage)
+                return
+            }
+            mutableState.value = mutableState.value.copy(saving = true, message = "")
+            viewModelScope.launch {
+                val deviceId = activationRepository.currentActivation()?.deviceId
+                val result =
+                    if (deviceId == null) Result.failure(IllegalStateException())
+                    else feedbackRepository.submitRating(deviceId, stars, comment, BuildConfig.VERSION_CODE)
+                if (result.isSuccess) {
+                    val availableAt = System.currentTimeMillis() + RatingCooldownMillis
+                    preferences.edit().putLong(RatingAvailableAtKey, availableAt).apply()
+                    mutableState.value = mutableState.value.copy(
+                        saving = false,
+                        message = "Gracias. Tu valoración fue enviada.",
+                        ratingAvailableAtEpochMillis = availableAt,
+                    )
+                } else {
+                    mutableState.value = mutableState.value.copy(
+                        saving = false,
+                        message = "No se pudo enviar. Revisá los datos e intentá nuevamente.",
+                    )
+                }
+            }
         }
 
-        fun savePhone(phone: String) =
-            runAction("Contacto actualizado.") { deviceId ->
-                feedbackRepository.updateAdminPhone(deviceId, phone)
+        fun saveContact(
+            contactEmail: String,
+            phone: String,
+        ) = runAction("Datos actualizados.") { deviceId ->
+            feedbackRepository.updateAdminContact(deviceId, contactEmail.trim(), phone.trim())
+        }
+
+        fun savePhone(phone: String) = saveContact(mutableState.value.contactEmail, phone)
+
+        private fun loadContact() {
+            viewModelScope.launch {
+                val deviceId = activationRepository.currentActivation()?.deviceId ?: return@launch
+                feedbackRepository.getAdminContact(deviceId).onSuccess { contact ->
+                    mutableState.value = mutableState.value.copy(
+                        contactEmail = contact.contactEmail,
+                        phoneE164 = contact.phoneE164,
+                        contactLoaded = true,
+                    )
+                }.onFailure {
+                    mutableState.value = mutableState.value.copy(contactLoaded = true)
+                }
             }
+        }
 
         fun clearMessage() {
             mutableState.value = mutableState.value.copy(message = "")
@@ -45,16 +103,26 @@ class AdminFeedbackViewModel
             viewModelScope.launch {
                 val deviceId = activationRepository.currentActivation()?.deviceId
                 val result = if (deviceId == null) Result.failure(IllegalStateException()) else action(deviceId)
-                mutableState.value =
-                    AdminFeedbackUiState(
-                        saving = false,
-                        message = if (result.isSuccess) successMessage else "No se pudo guardar. Revisá los datos e intentá nuevamente.",
-                    )
+                mutableState.value = mutableState.value.copy(
+                    saving = false,
+                    message = if (result.isSuccess) successMessage else "No se pudo guardar. Revisá los datos e intentá nuevamente.",
+                )
             }
+        }
+
+        private companion object {
+            const val PreferencesName = "admin-feedback"
+            const val RatingAvailableAtKey = "rating-available-at"
+            const val RatingCooldownMillis = 7L * 24L * 60L * 60L * 1000L
+            const val RatingCooldownMessage = "Ya valoraste esta app. Podés volver a hacerlo en 7 días."
         }
     }
 
 data class AdminFeedbackUiState(
     val saving: Boolean = false,
     val message: String = "",
+    val contactEmail: String = "",
+    val phoneE164: String = "",
+    val contactLoaded: Boolean = false,
+    val ratingAvailableAtEpochMillis: Long = 0L,
 )

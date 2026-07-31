@@ -166,15 +166,15 @@ fun AdminLocalAccessRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
     if (state.showResetConfirmation) {
         AlertDialog(
             onDismissRequest = viewModel::dismissResetLocalAdmin,
-            title = { Text("Cambiar administrador") },
+            title = { Text("Borrar cuenta local") },
             text = {
                 Text(
-                    "Se borrará el admin guardado solo en este teléfono. Después podrás ingresar un token nuevo desde Login.",
+                    "Esto borra la cuenta del administrador solamente de este teléfono. La comunidad y sus datos remotos no se borran. Después podrás ingresar un token nuevo desde Login.",
                 )
             },
             confirmButton = {
                 Button(onClick = viewModel::resetLocalAdmin) {
-                    Text("Resetear")
+                    Text("Borrar cuenta")
                 }
             },
             dismissButton = {
@@ -199,18 +199,18 @@ fun AdminLocalAccessRoute(viewModel: AdminUpdatesViewModel = hiltViewModel()) {
             )
         }
         Text(
-            text = "Administrador de este teléfono",
+            text = "Borrar cuenta del administrador",
             style = MaterialTheme.typography.titleMedium,
         )
         Text(
-            text = "Usá esta opción si quedó un admin viejo y necesitás ingresar un token nuevo.",
+            text = "Elimina la cuenta del administrador guardada en este teléfono. No borra la comunidad ni sus datos remotos.",
             style = MaterialTheme.typography.bodyMedium,
         )
         OutlinedButton(
             modifier = Modifier.fillMaxWidth(),
             onClick = viewModel::requestResetLocalAdmin,
         ) {
-            Text("Cambiar administrador")
+            Text("Borrar cuenta del administrador en este teléfono")
         }
     }
 }

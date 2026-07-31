@@ -168,10 +168,13 @@ internal fun UserFeedbackSettingsRoute(
             )
             Button(
                 modifier = Modifier.fillMaxWidth(),
-                enabled = rating > 0 && !state.saving,
+                enabled = rating > 0 && !state.saving && state.ratingAvailableAtEpochMillis <= System.currentTimeMillis(),
                 onClick = { viewModel.submit(rating, comment) },
             ) {
                 Text(if (state.saving) "Enviando…" else "Enviar valoración")
+            }
+            if (state.ratingAvailableAtEpochMillis > System.currentTimeMillis()) {
+                Text("Ya valoraste esta app. Podés volver a hacerlo en 7 días.", style = MaterialTheme.typography.bodySmall)
             }
             if (state.message.isNotBlank()) {
                 Text(state.message, style = MaterialTheme.typography.bodyMedium)
