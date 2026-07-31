@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>Laboratorio GloshIA</title>
+    <style>
+      :root { color-scheme: light; font-family: Inter, system-ui, sans-serif; background:#f5f7f9; color:#10263b; }
+      * { box-sizing:border-box; }
+      body { margin:0; }
+      header { position:sticky; top:0; z-index:5; padding:18px 22px; background:#0d2d46; color:white; box-shadow:0 3px 16px #0019; }
+      h1 { margin:0; font-size:22px; }
+      header p { margin:5px 0 0; opacity:.8; font-size:13px; }
+      .summary { display:flex; gap:10px; flex-wrap:wrap; padding:16px 22px 0; }
+      .metric { background:white; border:1px solid #dce4ea; border-radius:14px; padding:10px 14px; min-width:135px; }
+      .metric strong { display:block; font-size:21px; }
+      .toolbar { display:flex; gap:10px; padding:14px 22px; flex-wrap:wrap; }
+      select,button { min-height:40px; border-radius:10px; border:1px solid #becbd5; background:white; padding:0 12px; font:inherit; }
+      button { cursor:pointer; font-weight:650; }
+      .grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; padding:0 22px 40px; }
+      article { background:white; border:1px solid #dce4ea; border-radius:16px; overflow:hidden; box-shadow:0 4px 18px #1231; }
+      article.reviewed { outline:3px solid #19a974; }
+      .image { display:block; width:100%; height:270px; object-fit:contain; background:#dce2e5; }
+      .body { padding:12px; }
+      .id { font:12px ui-monospace,monospace; overflow-wrap:anywhere; color:#587083; }
+      .score { display:flex; justify-content:space-between; gap:10px; margin:8px 0; }
+      .pill { border-radius:999px; padding:4px 9px; background:#e9eff3; font-size:12px; }
+      .pill.filter { background:#ffe0df; color:#9a211c; }
+      .prediction { visibility:hidden; }
+      article.reviewed .prediction { visibility:visible; }
+      .actions { display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:10px; }
+      .allow { color:#086c4d; }.filter-button { color:#a51e1e; }.doubt { color:#806000; }
+      .reasons { display:none; gap:5px; flex-wrap:wrap; margin-top:8px; }
+      article.open .reasons { display:flex; }
+      .reasons label { font-size:11px; background:#f0f3f5; border-radius:8px; padding:5px; }
+      .empty { padding:50px; text-align:center; color:#587083; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <h1>Laboratorio GloshIA</h1>
+      <p>Modelo local de DAG · revisión ciega · sin subir fotografías</p>
+    </header>
+    <section class="summary" id="summary"></section>
+    <section class="toolbar">
+      <select id="scope"><option value="queue">Cola recomendada</option><option value="all">Todas las evaluables</option></select>
+      <select id="action"><option value="">Todo resultado revisado o pendiente</option><option value="allow">Revisadas: permitidas por GloshIA</option><option value="filter">Revisadas: filtradas por GloshIA</option></select>
+      <select id="category"><option value="">Todo estrato revisado o pendiente</option><option>boundary_current</option><option>safe_hard</option><option>collage_group</option><option>children_normal</option><option>sensitive_control</option></select>
+      <button id="reload">Actualizar</button>
+      <button id="export">Exportar revisión</button>
+    </section>
+    <main class="grid" id="grid"></main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

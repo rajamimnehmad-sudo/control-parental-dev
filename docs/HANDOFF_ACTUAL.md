@@ -630,12 +630,48 @@ El lote integrado se desarrolló y validó en:
   visor PDF inline es un segundo recorrido pendiente. Evidencia:
   `docs/compatibility/results/joint-user304-admin287-dag29-sm-s908e-2026-07-30.md`.
 
+## Laboratorio local GloshIA visual
+
+- `tools/gloshia_lab` evalúa fuera de Android exactamente el modelo visual
+  integrado en DAG 36, con SHA-256
+  `2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee`,
+  el mismo preprocesamiento y la misma política de umbrales. No entrenó,
+  reemplazó ni modificó el modelo o las APK.
+- El banco local vigente está en
+  `.codex-tmp/gloshia-lab-current-1000`, fuera de Git. Contiene 1.000
+  miniaturas públicas actuales de Wikimedia Commons, 1.000 SHA-256 únicos y
+  214.967.752 bytes de imágenes. La distribución es 450 casos de borde
+  actuales, 250 permitidos difíciles, 150 grupos/collages, 100 menores en
+  contextos normales orientados a edad escolar desde aproximadamente seis años
+  —sin afirmar una edad exacta a partir de la foto— y 50 controles sensibles.
+- La división por serie es `600 main_eval / 200 difficult / 200 final_sealed`.
+  Ninguna serie cruza splits o categorías. El bloque final permanece sellado y
+  no tiene predicciones. La adquisición registra procedencia y licencia, pero
+  todo el corpus conserva `training_authorized: false`; CC BY-SA se admite sólo
+  para esta evaluación local hasta una revisión legal independiente.
+- El modelo procesó las 800 muestras no selladas sin errores: 499 decisiones de
+  filtro y 301 permisos. Latencia local mediana `59,675 ms`, p95 `278,622 ms` y
+  máxima `285,539 ms`. Son tiempos de la Mac y no reemplazan las mediciones
+  físicas Android.
+- Se generó una cola ciega de 200 casos y 13 hojas de contacto. La interfaz
+  escucha sólo en `127.0.0.1`, no usa Supabase ni sube fotografías, oculta
+  predicción/score/estrato hasta que exista decisión humana y exporta la
+  revisión como JSON descargable. La inspección visual confirmó contenido
+  contemporáneo; además se retiró de forma recuperable una fotografía de la
+  década de 1890 detectada por la auditoría reforzada.
+- Todavía no hay métricas de precisión contra verdad humana. La revisión corta
+  debe medir sobre-filtro en hombres, grupos y personas cubiertas, además de
+  falsos permisos con personas pequeñas o lejanas. No ajustar umbral ni abrir
+  el examen final hasta congelar esas decisiones.
+
 ## Próximo trabajo autorizado
 
-El siguiente correctivo recomendado es `DAG-DOWNLOADS-01`: preservar semántica
-`POST` al abrir una descarga en nueva pestaña y definir el tratamiento seguro de
-PDF inline sin debilitar la barrera. La inteligencia conversacional avanzada de
-GloshIA queda para el ticket posterior ya diferido. `DAG-V3-DOCUMENT-ISOLATION-07` y
+El próximo paso del laboratorio visual es la revisión humana ciega de su cola de
+200, sin modificar todavía DAG. El siguiente correctivo Android recomendado
+sigue siendo `DAG-DOWNLOADS-01`: preservar semántica `POST` al abrir una
+descarga en nueva pestaña y definir el tratamiento seguro de PDF inline sin
+debilitar la barrera. La inteligencia conversacional avanzada de GloshIA queda
+para el ticket posterior ya diferido. `DAG-V3-DOCUMENT-ISOLATION-07` y
 `DAG-V3-TAB-HIBERNATION-09` continúan como tickets separados sin autorización
 de código en este lote. La quietud incompleta de Frávega observada en la muestra
 acotada de DAG 36 debe tratarse como entrega/quietud, no corrigiendo nuevamente

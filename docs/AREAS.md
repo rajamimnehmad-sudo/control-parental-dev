@@ -61,6 +61,7 @@ Indice tecnico por areas para que cada ticket pueda empezar con `Area: ...` y ev
 - Modelo/datos: `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`
 - Guia visual borrador: `docs/dag/v3/DAG_BROWSER_V3_ANNOTATION_GUIDE_V1_DRAFT.md`
 - Herramientas de corpus/evaluacion: `scripts/dag_v3_model/`
+- Laboratorio local del modelo vigente: `tools/gloshia_lab/`
 - No tocar por defecto: Supabase, VPN, Accessibility, Admin ni publicadores.
 
 ## Accessibility / Bloqueo Apps

@@ -189,6 +189,28 @@ Flujo de una entrada:
 - Decisiones pendientes: límites exactos de falsos permisos, recall/cobertura,
   incertidumbre, p50/p95, tamaño del artefacto y criterio de nuevo dataset.
 
+#### GLOSHIA-LOCAL-LAB-06 - Banco actual y evaluación local reproducible
+
+- Estado: `Infraestructura y banco local resueltos; revisión humana pendiente`.
+  Tipo: laboratorio de evaluación visual. Prioridad: P1. Esfuerzo: XL. Riesgo:
+  alto.
+- Resultado local: herramienta reproducible en `tools/gloshia_lab`, corpus de
+  1.000 miniaturas públicas actuales fuera de Git, deduplicación exacta y
+  perceptual, límites por serie/autor, split por cluster
+  `600/200/200`, examen final sellado y servidor de revisión ciega en loopback.
+- El runner fija por SHA-256 el mismo ONNX de DAG 36 y reproduce su
+  preprocesamiento y política. Las 800 muestras evaluables se analizaron sin
+  errores; el examen final no fue abierto. No hubo entrenamiento, cambio de
+  umbral, modificación Android, Supabase, API paga, push ni publicación.
+- Gobernanza: los estratos de adquisición no son etiquetas humanas; todas las
+  filas permanecen no autorizadas para entrenamiento. Procedencia y licencias
+  se registran, y CC BY-SA queda limitada a evaluación local hasta revisión
+  legal/atribución independiente.
+- Criterios pendientes: completar la cola ciega, calcular matriz por categoría
+  y audiencia, revisar falsos permisos y falsos filtros, congelar cualquier
+  propuesta de calibración antes de abrir una sola vez las 200 muestras
+  selladas. Sólo esa evidencia puede proponer conservar, calibrar o reentrenar.
+
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
 - Estado: `Resuelto como candidato DEV y validado físicamente; sin publicación`.

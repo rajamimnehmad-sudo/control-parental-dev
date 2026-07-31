@@ -9,5 +9,8 @@ local.properties
 google-services.json
 supabase/.temp/
 .DS_Store
+node_modules/
+__pycache__/
+*.pyc
 *.apk
 *.aab
