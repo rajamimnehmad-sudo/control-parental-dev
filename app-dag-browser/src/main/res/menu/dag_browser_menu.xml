@@ -7,6 +7,15 @@
         android:id="@+id/menu_history"
         android:title="@string/history" />
     <item
+        android:id="@+id/menu_favorites"
+        android:title="@string/favorites" />
+    <item
+        android:id="@+id/menu_add_favorite"
+        android:title="@string/add_favorite" />
+    <item
+        android:id="@+id/menu_new_private_tab"
+        android:title="@string/new_private_tab" />
+    <item
         android:id="@+id/menu_default_browser"
         android:title="@string/set_default_browser" />
     <item

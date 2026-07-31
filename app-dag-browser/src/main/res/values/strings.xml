@@ -81,6 +81,13 @@
     <string name="downloads">Descargas</string>
     <string name="downloads_subtitle">PDF verificados y guardados de forma privada</string>
     <string name="history">Historial</string>
+    <string name="favorites">Favoritos</string>
+    <string name="add_favorite">Agregar a favoritos</string>
+    <string name="new_private_tab">Nueva pestaña incógnito</string>
+    <string name="private_tab">Incógnito</string>
+    <string name="favorites_empty">Todavía no hay favoritos.</string>
+    <string name="favorite_added">Agregado a favoritos</string>
+    <string name="favorite_removed">Quitado de favoritos</string>
     <string name="history_empty">Todavía no hay páginas en el historial.</string>
     <string name="clear_history">Borrar historial</string>
     <string name="history_cleared">Historial borrado</string>
