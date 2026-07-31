@@ -98,7 +98,7 @@ class MediaBarrierContractTest {
         assertContains(background, "promoteFallbackTask")
         assertContains(background, "filter.disconnect()")
         assertContains(script, "IntersectionObserver")
-        assertContains(script, "FALLBACK_ROOT_MARGIN = \"1200px 0px\"")
+        assertContains(script, "FALLBACK_ROOT_MARGIN = \"640px 0px\"")
         assertContains(script, "IMAGE_PREWARM_ROOT_MARGIN = \"1200px 0px\"")
         assertContains(script, "VISIBLE_FALLBACK_DELAY_MS = 0")
         assertContains(script, "NEARBY_FALLBACK_DELAY_MS = 120")

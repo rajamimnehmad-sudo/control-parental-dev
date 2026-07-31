@@ -39,7 +39,7 @@
   const FALLBACK_RETRY_BASE_MS = 600;
   const FALLBACK_RETRY_MAX_MS = 6_000;
   const MAX_FALLBACK_ATTEMPTS = 4;
-  const FALLBACK_ROOT_MARGIN = "1200px 0px";
+  const FALLBACK_ROOT_MARGIN = "640px 0px";
   const IMAGE_PREWARM_ROOT_MARGIN = "1200px 0px";
   const SOURCE_RECONCILE_DELAY_MS = 160;
   const SOURCE_MUTATION_ATTRIBUTES = new Set([
@@ -1439,7 +1439,7 @@
     }
     if (imagePrewarmObserver) {
       imagePrewarmObserver.observe(element);
-    } else if (isNearViewport(element)) {
+    } else if (isVisibleNow(element)) {
       prepareImageForFastPresentation(element);
     }
   };
