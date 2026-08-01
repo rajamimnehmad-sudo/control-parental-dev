@@ -26,16 +26,20 @@ const VIDEO_SITE_HOSTS = new Set([
   "googlevideo.com",
   "ytimg.com",
 ]);
-const MAX_INTERCEPT_CAPTURE_BYTES = 512 * 1024;
 const MAX_ANALYSIS_BYTES = 2 * 1024 * 1024;
+const MAX_INTERCEPT_CAPTURE_BYTES = MAX_ANALYSIS_BYTES;
+// A23 can keep many lightweight response handles open, but retained image bytes stay below the
+// previous 16 x 2 MiB theoretical ceiling. This admits ordinary icon bursts without unbounded RAM.
+const MAX_ACTIVE_IMAGE_STREAMS = 64;
+const MAX_INTERCEPT_CAPTURE_BUDGET_BYTES = 8 * 1024 * 1024;
 const MAX_SOURCE_URL_LENGTH = 4_096;
 const MAX_INLINE_IMAGE_URL_LENGTH = 512 * 1024;
-const MAX_ACTIVE_IMAGE_FILTERS = 16;
-const MAX_NATIVE_IN_FLIGHT = 10;
+const MAX_NATIVE_IN_FLIGHT = 4;
 const MAX_ACTIVE_FALLBACK_ANALYSES = 2;
 const MAX_QUEUED_FALLBACK_ANALYSES = 256;
-const MAX_FALLBACK_DECISIONS = 512;
 const MAX_CONTENT_DECISIONS = 512;
+const MAX_PRIORITY_HINTS_PER_DOCUMENT = 512;
+const MAX_CONSECUTIVE_VISIBLE_INTERCEPTS = 4;
 const RESPONSE_CAPTURE_TIMEOUT_MS = 5_000;
 const FALLBACK_FETCH_TIMEOUT_MS = 10_000;
 const NATIVE_DECISION_TIMEOUT_MS = 2_500;
@@ -49,24 +53,83 @@ const FALLBACK_REQUEST_MESSAGE = "media-fallback-request";
 const FALLBACK_RESPONSE_MESSAGE = "media-fallback-response";
 const INLINE_REQUEST_MESSAGE = "media-inline-request";
 const INLINE_RESPONSE_MESSAGE = "media-inline-response";
+const PRIORITY_HINT_MESSAGE = "media-priority-hint";
+const DOCUMENT_CURRENT_MESSAGE = "media-document-current";
+const DOCUMENT_RETIRED_MESSAGE = "media-document-retired";
+const DIAGNOSTICS_CONFIG_MESSAGE = "diagnostics-config";
 const CLIENT_METRIC_MESSAGE = "media-client-metric";
 const TECHNICAL_ERROR_ACTION = "error";
-const DOCUMENT_TOKEN_PATTERN = /^[A-Za-z0-9_-]{1,80}$/;
+const DOCUMENT_TOKEN_PATTERN = /^document_[a-f0-9]{1,16}$/;
 let requestSequence = 0;
 let activeImageFilters = 0;
+let reservedInterceptCaptureBytes = 0;
 let nativeRequestsInFlight = 0;
 let presentationRequestsInFlight = 0;
 let activeFallbackAnalyses = 0;
 let decisionPort = null;
 let decisionPortReconnectTimeout = null;
+let diagnosticsEnabled = false;
 const pendingNativeDecisions = new Map();
 const fallbackDecisionPromises = new Map();
-const fallbackDecisionCache = new Map();
 const contentDecisionPromises = new Map();
 const contentDecisionCache = new Map();
 const fallbackAnalysisQueue = [];
+const visibleInterceptAnalysisQueue = [];
+const nearbyInterceptAnalysisQueue = [];
+const activeInterceptStreams = new Set();
 const documentStatesByTab = new Map();
 const documentStatesByToken = new Map();
+let consecutiveVisibleIntercepts = 0;
+
+const reserveInterceptCaptureBytes = (byteLength) => {
+  if (
+    !Number.isInteger(byteLength) ||
+    byteLength <= 0 ||
+    reservedInterceptCaptureBytes + byteLength > MAX_INTERCEPT_CAPTURE_BUDGET_BYTES
+  ) {
+    return false;
+  }
+  reservedInterceptCaptureBytes += byteLength;
+  return true;
+};
+
+const releaseInterceptCaptureBytes = (byteLength) => {
+  if (!Number.isInteger(byteLength) || byteLength <= 0) {
+    return;
+  }
+  reservedInterceptCaptureBytes = Math.max(0, reservedInterceptCaptureBytes - byteLength);
+};
+
+const abortInterceptStreamsForDocument = (documentState) => {
+  if (!documentState) {
+    return;
+  }
+  documentState.priorityHints?.clear();
+  for (const stream of [...activeInterceptStreams]) {
+    if (stream.documentState === documentState) {
+      stream.failClosed();
+    }
+  }
+};
+
+const abortQueuedFallbackTasksForDocument = (documentState) => {
+  if (!documentState) {
+    return;
+  }
+  for (let index = fallbackAnalysisQueue.length - 1; index >= 0; index -= 1) {
+    const task = fallbackAnalysisQueue[index];
+    if (task?.state !== "queued" || task.documentState !== documentState) {
+      continue;
+    }
+    fallbackAnalysisQueue.splice(index, 1);
+    task.state = "settled";
+    if (fallbackDecisionPromises.get(task.key) === task) {
+      fallbackDecisionPromises.delete(task.key);
+    }
+    releaseFallbackDocumentStates(task);
+    task.resolve(TECHNICAL_ERROR_ACTION);
+  }
+};
 
 const hostMatches = (hostname, candidate) =>
   hostname === candidate || hostname.endsWith(`.${candidate}`);
@@ -104,7 +167,7 @@ const isSupportedSourceUrl = (value) => {
   }
   if (
     value.length <= MAX_INLINE_IMAGE_URL_LENGTH &&
-    /^data:image\/(?:avif|gif|jpeg|jpg|png|webp);base64,/iu.test(value)
+    /^data:image\/(?:avif|gif|jpeg|jpg|png|svg\+xml|webp)(?:;base64)?,/iu.test(value)
   ) {
     return true;
   }
@@ -115,6 +178,22 @@ const isSupportedSourceUrl = (value) => {
     return ["http:", "https:"].includes(new URL(value).protocol);
   } catch {
     return false;
+  }
+};
+
+const priorityHintKey = (value) => {
+  if (typeof value !== "string" || value.length === 0 || value.length > MAX_SOURCE_URL_LENGTH) {
+    return null;
+  }
+  try {
+    const url = new URL(value);
+    if (!["http:", "https:"].includes(url.protocol)) {
+      return null;
+    }
+    url.hash = "";
+    return url.href;
+  } catch {
+    return null;
   }
 };
 
@@ -132,7 +211,7 @@ const reportClientMediaMetric = ({
   encodeMillis = -1,
   nativeRoundTripMillis = -1,
 }) => {
-  if (decisionPort === null) {
+  if (!diagnosticsEnabled || decisionPort === null) {
     return;
   }
   try {
@@ -173,6 +252,14 @@ const connectDecisionPort = () => {
     const port = browser.runtime.connectNative(NATIVE_APP);
     decisionPort = port;
     port.onMessage.addListener((message) => {
+      if (
+        message?.type === DIAGNOSTICS_CONFIG_MESSAGE &&
+        message?.version === PROTOCOL_VERSION &&
+        typeof message?.enabled === "boolean"
+      ) {
+        diagnosticsEnabled = message.enabled;
+        return;
+      }
       const pending = pendingNativeDecisions.get(message?.candidateId);
       const valid =
         pending !== undefined &&
@@ -201,6 +288,7 @@ const connectDecisionPort = () => {
     port.onDisconnect.addListener(() => {
       if (decisionPort === port) {
         decisionPort = null;
+        diagnosticsEnabled = false;
       }
       resolvePendingNativeDecisions();
       if (decisionPortReconnectTimeout === null) {
@@ -210,12 +298,71 @@ const connectDecisionPort = () => {
         }, 250);
       }
     });
+    for (const state of documentStatesByTab.values()) {
+      if (
+        state?.tabId !== null &&
+        documentStatesByToken.get(state?.documentToken) === state &&
+        documentStatesByTab.get(state.tabId) === state
+      ) {
+        try {
+          port.postMessage({
+            type: DOCUMENT_CURRENT_MESSAGE,
+            version: PROTOCOL_VERSION,
+            tabId: state.tabId,
+            documentToken: state.documentToken,
+          });
+        } catch {
+          break;
+        }
+      }
+    }
   } catch {
     decisionPort = null;
   }
 };
 
 connectDecisionPort();
+
+const postNativeDocumentCurrent = (state) => {
+  if (
+    decisionPort === null ||
+    state?.tabId === null ||
+    !Number.isInteger(state?.tabId) ||
+    !DOCUMENT_TOKEN_PATTERN.test(state?.documentToken || "")
+  ) {
+    return;
+  }
+  try {
+    decisionPort.postMessage({
+      type: DOCUMENT_CURRENT_MESSAGE,
+      version: PROTOCOL_VERSION,
+      tabId: state.tabId,
+      documentToken: state.documentToken,
+    });
+  } catch {
+    // The reconnect path replays every current document before accepting more work.
+  }
+};
+
+const postNativeDocumentRetired = (tabId, documentToken) => {
+  if (
+    decisionPort === null ||
+    !Number.isInteger(tabId) ||
+    !DOCUMENT_TOKEN_PATTERN.test(documentToken || "")
+  ) {
+    return;
+  }
+  try {
+    decisionPort.postMessage({
+      type: DOCUMENT_RETIRED_MESSAGE,
+      version: PROTOCOL_VERSION,
+      tabId,
+      documentToken,
+    });
+  } catch {
+    // A disconnected port cannot retain useful native work for the retired document.
+  }
+};
 
 const clearDocumentTimers = (state) => {
   if (state?.settleTimeout !== null) {
@@ -241,7 +388,7 @@ const pendingInitialWork = (state) =>
   state.fallbackRequestsInFlight;
 
 const scheduleViewportReady = (state) => {
-  if (!isCurrentDocumentState(state)) {
+  if (!diagnosticsEnabled || !isCurrentDocumentState(state)) {
     return;
   }
   if (state.settleTimeout !== null) {
@@ -288,6 +435,8 @@ const scheduleViewportReady = (state) => {
 const resetViewportTracking = (tabId, documentToken) => {
   const previous = tabId === null ? null : documentStatesByTab.get(tabId);
   if (previous) {
+    abortInterceptStreamsForDocument(previous);
+    abortQueuedFallbackTasksForDocument(previous);
     clearDocumentTimers(previous);
     documentStatesByToken.delete(previous.documentToken);
   }
@@ -301,6 +450,7 @@ const resetViewportTracking = (tabId, documentToken) => {
     nativeRequestsInFlight: 0,
     presentationRequestsInFlight: 0,
     fallbackRequestsInFlight: 0,
+    priorityHints: new Map(),
     settleTimeout: null,
     captureTimeout: null,
   };
@@ -308,6 +458,7 @@ const resetViewportTracking = (tabId, documentToken) => {
     documentStatesByTab.set(tabId, state);
   }
   documentStatesByToken.set(documentToken, state);
+  postNativeDocumentCurrent(state);
   return state;
 };
 
@@ -317,6 +468,8 @@ const bindDocumentStateToTab = (state, tabId) => {
   }
   const previous = documentStatesByTab.get(tabId);
   if (previous && previous !== state) {
+    abortInterceptStreamsForDocument(previous);
+    abortQueuedFallbackTasksForDocument(previous);
     clearDocumentTimers(previous);
     documentStatesByToken.delete(previous.documentToken);
   }
@@ -325,6 +478,7 @@ const bindDocumentStateToTab = (state, tabId) => {
   }
   state.tabId = tabId;
   documentStatesByTab.set(tabId, state);
+  postNativeDocumentCurrent(state);
   scheduleViewportReady(state);
   return state;
 };
@@ -332,11 +486,6 @@ const bindDocumentStateToTab = (state, tabId) => {
 const currentDocumentStateForTab = (tabId) => {
   const state = Number.isInteger(tabId) ? documentStatesByTab.get(tabId) : null;
   return isCurrentDocumentState(state) ? state : null;
-};
-
-const initialDocumentStateForToken = (documentToken) => {
-  const state = documentStatesByToken.get(documentToken);
-  return isCurrentDocumentState(state) && !state.captureWindowClosed ? state : null;
 };
 
 const adjustInitialCounter = (state, field, delta) => {
@@ -351,6 +500,70 @@ const senderTabId = (sender) => {
   const candidate = sender?.tab?.id ?? sender?.tabId;
   return Number.isInteger(candidate) && candidate >= 0 ? candidate : null;
 };
+
+const currentDocumentForSender = (sender, claimedDocumentToken) => {
+  const tabId = senderTabId(sender);
+  if (tabId === null || !Number.isInteger(sender?.frameId) || sender.frameId < 0) {
+    return null;
+  }
+  const state = currentDocumentStateForTab(tabId);
+  if (!state || (sender.frameId === 0 && state.documentToken !== claimedDocumentToken)) {
+    return null;
+  }
+  return state;
+};
+
+const removeQueuedInterceptTask = (task) => {
+  for (const queue of [visibleInterceptAnalysisQueue, nearbyInterceptAnalysisQueue]) {
+    const index = queue.indexOf(task);
+    if (index >= 0) {
+      queue.splice(index, 1);
+      return true;
+    }
+  }
+  return false;
+};
+
+const promoteInterceptTasks = (documentState, sourceKey) => {
+  for (let index = 0; index < nearbyInterceptAnalysisQueue.length;) {
+    const task = nearbyInterceptAnalysisQueue[index];
+    if (
+      task?.state === "queued" &&
+      task.documentState === documentState &&
+      task.sourceKey === sourceKey
+    ) {
+      nearbyInterceptAnalysisQueue.splice(index, 1);
+      task.priority = "visible";
+      visibleInterceptAnalysisQueue.push(task);
+    } else {
+      index += 1;
+    }
+  }
+};
+
+const rememberInterceptPriorityHint = (documentState, sourceKey, priority) => {
+  if (!isCurrentDocumentState(documentState)) {
+    return false;
+  }
+  const previous = documentState.priorityHints.get(sourceKey);
+  if (previous === "visible" || previous === priority) {
+    return true;
+  }
+  if (
+    previous === undefined &&
+    documentState.priorityHints.size >= MAX_PRIORITY_HINTS_PER_DOCUMENT
+  ) {
+    documentState.priorityHints.delete(documentState.priorityHints.keys().next().value);
+  }
+  documentState.priorityHints.set(sourceKey, priority);
+  if (priority === "visible") {
+    promoteInterceptTasks(documentState, sourceKey);
+  }
+  return true;
+};
+
+const interceptPriorityFor = (documentState, sourceKey) =>
+  documentState?.priorityHints.get(sourceKey) === "visible" ? "visible" : "nearby";
 
 const documentStateForDetails = (details) => {
   const current = currentDocumentStateForTab(details.tabId);
@@ -382,6 +595,27 @@ const documentStateForDetails = (details) => {
 };
 
 browser.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type === PRIORITY_HINT_MESSAGE) {
+    const sourceKey = priorityHintKey(message?.sourceUrl);
+    const tabId = senderTabId(sender);
+    const documentState = documentStatesByToken.get(message?.documentToken);
+    const valid =
+      message?.version === PROTOCOL_VERSION &&
+      isTrustedContentSender(sender) &&
+      sender.frameId === 0 &&
+      DOCUMENT_TOKEN_PATTERN.test(message?.documentToken || "") &&
+      ["visible", "nearby"].includes(message?.priority) &&
+      sourceKey !== null &&
+      tabId !== null &&
+      documentState?.tabId === tabId &&
+      isCurrentDocumentState(documentState);
+    if (!valid) {
+      return undefined;
+    }
+    rememberInterceptPriorityHint(documentState, sourceKey, message.priority);
+    // A priority hint only reorders work. It never returns or creates a media decision.
+    return undefined;
+  }
   if (message?.type === INLINE_REQUEST_MESSAGE) {
     const sourceUrl = message?.sourceUrl;
     const declaredByteLength = message?.byteLength;
@@ -402,6 +636,24 @@ browser.runtime.onMessage.addListener((message, sender) => {
     if (!valid) {
       return undefined;
     }
+    const senderTab = senderTabId(sender);
+    const currentDocumentState = currentDocumentForSender(sender, message.documentToken);
+    if (!currentDocumentState || senderTab === null) {
+      return Promise.resolve({
+        type: INLINE_RESPONSE_MESSAGE,
+        version: PROTOCOL_VERSION,
+        sourceUrl,
+        action: TECHNICAL_ERROR_ACTION,
+      });
+    }
+    if (nativeRequestsInFlight >= MAX_NATIVE_IN_FLIGHT) {
+      return Promise.resolve({
+        type: INLINE_RESPONSE_MESSAGE,
+        version: PROTOCOL_VERSION,
+        sourceUrl,
+        action: TECHNICAL_ERROR_ACTION,
+      });
+    }
     let bytes;
     try {
       const binary = atob(bytesBase64);
@@ -412,22 +664,16 @@ browser.runtime.onMessage.addListener((message, sender) => {
     } catch {
       return undefined;
     }
-    if (nativeRequestsInFlight >= MAX_NATIVE_IN_FLIGHT) {
-      return Promise.resolve({
-        type: INLINE_RESPONSE_MESSAGE,
-        version: PROTOCOL_VERSION,
-        sourceUrl,
-        action: TECHNICAL_ERROR_ACTION,
-      });
-    }
-    const documentState = initialDocumentStateForToken(message.documentToken);
+    const documentState = currentDocumentState.captureWindowClosed
+      ? null
+      : currentDocumentState;
     nativeRequestsInFlight += 1;
     adjustInitialCounter(documentState, "nativeRequestsInFlight", 1);
     return requestContentDecision(
-      { url: sourceUrl },
+      { url: sourceUrl, tabId: senderTab },
       bytes,
       message?.priority === "visible" ? "visible" : "nearby",
-      { transportPath: "inline" },
+      { transportPath: "inline", documentState: currentDocumentState },
     ).then((action) => ({
       type: INLINE_RESPONSE_MESSAGE,
       version: PROTOCOL_VERSION,
@@ -436,7 +682,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
     })).finally(() => {
       nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
       adjustInitialCounter(documentState, "nativeRequestsInFlight", -1);
-      drainFallbackQueue();
+      drainAnalysisQueues();
     });
   }
   if (message?.type === FALLBACK_REQUEST_MESSAGE) {
@@ -450,10 +696,16 @@ browser.runtime.onMessage.addListener((message, sender) => {
       return undefined;
     }
     const priority = message?.priority === "visible" ? "visible" : "nearby";
-    const documentState =
-      priority === "visible"
-        ? initialDocumentStateForToken(message.documentToken)
-        : null;
+    const senderTab = senderTabId(sender);
+    const documentState = currentDocumentForSender(sender, message.documentToken);
+    if (!documentState || senderTab === null) {
+      return Promise.resolve({
+        type: FALLBACK_RESPONSE_MESSAGE,
+        version: PROTOCOL_VERSION,
+        sourceUrl,
+        action: TECHNICAL_ERROR_ACTION,
+      });
+    }
     return analyzeFallbackSource(sourceUrl, priority, documentState).then((action) => ({
       type: FALLBACK_RESPONSE_MESSAGE,
       version: PROTOCOL_VERSION,
@@ -471,6 +723,9 @@ browser.runtime.onMessage.addListener((message, sender) => {
   }
   if (message.type === "document-started") {
     const tabId = senderTabId(sender);
+    if (tabId === null) {
+      return;
+    }
     resetViewportTracking(tabId, message.documentToken);
     return;
   }
@@ -492,6 +747,19 @@ browser.runtime.onMessage.addListener((message, sender) => {
       scheduleViewportReady(state);
     }, VIEWPORT_CAPTURE_WINDOW_MS);
   }
+});
+
+browser.tabs.onRemoved?.addListener((tabId) => {
+  const state = currentDocumentStateForTab(tabId);
+  if (!state) {
+    return;
+  }
+  abortInterceptStreamsForDocument(state);
+  abortQueuedFallbackTasksForDocument(state);
+  clearDocumentTimers(state);
+  documentStatesByTab.delete(tabId);
+  documentStatesByToken.delete(state.documentToken);
+  postNativeDocumentRetired(tabId, state.documentToken);
 });
 
 const nextCandidateId = () => {
@@ -525,6 +793,10 @@ const requestNativeDecision = (
   priority = "background",
   context = {},
 ) => {
+  const documentState = context.documentState;
+  if (!isCurrentDocumentState(documentState) || documentState.tabId !== details.tabId) {
+    return Promise.resolve(TECHNICAL_ERROR_ACTION);
+  }
   connectDecisionPort();
   if (decisionPort === null) {
     return Promise.resolve(TECHNICAL_ERROR_ACTION);
@@ -574,6 +846,8 @@ const requestNativeDecision = (
         hashMillis: metric.hashMillis,
         encodeMillis,
         sentAtEpochMillis: Date.now(),
+        tabId: documentState.tabId,
+        documentToken: documentState.documentToken,
       });
     } catch {
       pendingNativeDecisions.delete(id);
@@ -621,7 +895,9 @@ const requestContentDecision = async (
     reportClientMediaMetric({ ...metric, outcome: "cache_hit", nativeRoundTripMillis: 0 });
     return cached;
   }
-  const pending = contentDecisionPromises.get(hash);
+  const documentToken = context.documentState?.documentToken || "unbound";
+  const pendingKey = `${hash}:${documentToken}`;
+  const pending = contentDecisionPromises.get(pendingKey);
   if (pending) {
     reportClientMediaMetric({ ...metric, outcome: "deduplicated", nativeRoundTripMillis: 0 });
     return pending;
@@ -637,22 +913,21 @@ const requestContentDecision = async (
       return action;
     })
     .finally(() => {
-      if (contentDecisionPromises.get(hash) === decisionPromise) {
-        contentDecisionPromises.delete(hash);
+      if (contentDecisionPromises.get(pendingKey) === decisionPromise) {
+        contentDecisionPromises.delete(pendingKey);
       }
     });
-  contentDecisionPromises.set(hash, decisionPromise);
+  contentDecisionPromises.set(pendingKey, decisionPromise);
   return decisionPromise;
 };
 
-const rememberFallbackDecision = (sourceUrl, action) => {
-  if (!fallbackDecisionCache.has(sourceUrl) && fallbackDecisionCache.size >= MAX_FALLBACK_DECISIONS) {
-    fallbackDecisionCache.delete(fallbackDecisionCache.keys().next().value);
+const fetchFallbackDecision = async (sourceUrl, priority, documentState) => {
+  if (!isCurrentDocumentState(documentState)) {
+    return TECHNICAL_ERROR_ACTION;
   }
-  fallbackDecisionCache.set(sourceUrl, action);
-};
-
-const fetchFallbackDecision = async (sourceUrl, priority) => {
+  if (!/^data:image\/(?:avif|gif|jpeg|jpg|png|svg\+xml|webp)(?:;base64)?,/iu.test(sourceUrl)) {
+    return TECHNICAL_ERROR_ACTION;
+  }
   const fetchStartedAt = performance.now();
   const controller = new AbortController();
   const fetchTimeout = setTimeout(() => controller.abort(), FALLBACK_FETCH_TIMEOUT_MS);
@@ -663,7 +938,7 @@ const fetchFallbackDecision = async (sourceUrl, priority) => {
       signal: controller.signal,
     });
     if (!response.ok || !response.body) {
-      return "retry";
+      return TECHNICAL_ERROR_ACTION;
     }
     const reader = response.body.getReader();
     const chunks = [];
@@ -678,25 +953,26 @@ const fetchFallbackDecision = async (sourceUrl, priority) => {
         totalBytes + value.byteLength > MAX_ANALYSIS_BYTES
       ) {
         await reader.cancel();
-        return "retry";
+        return TECHNICAL_ERROR_ACTION;
       }
       chunks.push(value);
       totalBytes += value.byteLength;
     }
     if (totalBytes === 0) {
-      return "retry";
+      return TECHNICAL_ERROR_ACTION;
     }
     return requestContentDecision(
-      { url: sourceUrl },
+      { url: sourceUrl, tabId: documentState.tabId },
       combineChunks(chunks, totalBytes),
       priority,
       {
         transportPath: "fallback",
         fetchMillis: performance.now() - fetchStartedAt,
+        documentState,
       },
     );
   } catch {
-    return "retry";
+    return TECHNICAL_ERROR_ACTION;
   } finally {
     clearTimeout(fetchTimeout);
   }
@@ -729,6 +1005,60 @@ const releaseFallbackDocumentStates = (task) => {
   task.documentStates.clear();
 };
 
+const enqueueInterceptTask = (task) => {
+  task.state = "queued";
+  if (task.priority === "visible") {
+    visibleInterceptAnalysisQueue.push(task);
+  } else {
+    nearbyInterceptAnalysisQueue.push(task);
+  }
+};
+
+const takeNextInterceptTask = () => {
+  if (
+    visibleInterceptAnalysisQueue.length > 0 &&
+    (nearbyInterceptAnalysisQueue.length === 0 ||
+      consecutiveVisibleIntercepts < MAX_CONSECUTIVE_VISIBLE_INTERCEPTS)
+  ) {
+    consecutiveVisibleIntercepts += 1;
+    return visibleInterceptAnalysisQueue.shift();
+  }
+  if (nearbyInterceptAnalysisQueue.length > 0) {
+    consecutiveVisibleIntercepts = 0;
+    return nearbyInterceptAnalysisQueue.shift();
+  }
+  consecutiveVisibleIntercepts = 0;
+  return visibleInterceptAnalysisQueue.shift();
+};
+
+const drainInterceptQueue = () => {
+  while (
+    nativeRequestsInFlight < MAX_NATIVE_IN_FLIGHT &&
+    (visibleInterceptAnalysisQueue.length > 0 || nearbyInterceptAnalysisQueue.length > 0)
+  ) {
+    const task = takeNextInterceptTask();
+    if (!task || task.isSettled()) {
+      continue;
+    }
+    if (!task.isCurrent()) {
+      task.complete(TECHNICAL_ERROR_ACTION);
+      continue;
+    }
+    task.state = "running";
+    nativeRequestsInFlight += 1;
+    adjustInitialCounter(task.initialDocumentState, "nativeRequestsInFlight", 1);
+    void task
+      .analyze()
+      .then((action) => task.complete(action))
+      .catch(() => task.complete(TECHNICAL_ERROR_ACTION))
+      .finally(() => {
+        nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
+        adjustInitialCounter(task.initialDocumentState, "nativeRequestsInFlight", -1);
+        drainAnalysisQueues();
+      });
+  }
+};
+
 const drainFallbackQueue = () => {
   while (
     activeFallbackAnalyses < MAX_ACTIVE_FALLBACK_ANALYSES &&
@@ -742,34 +1072,34 @@ const drainFallbackQueue = () => {
     task.state = "running";
     activeFallbackAnalyses += 1;
     nativeRequestsInFlight += 1;
-    void fetchFallbackDecision(task.sourceUrl, task.priority)
-      .then((action) => {
-        if (action !== "retry" && action !== TECHNICAL_ERROR_ACTION) {
-          rememberFallbackDecision(task.sourceUrl, action);
-        }
-        task.resolve(action);
-      })
+    void fetchFallbackDecision(task.sourceUrl, task.priority, task.documentState)
+      .then((action) => task.resolve(action))
       .catch(() => {
-        task.resolve("retry");
+        task.resolve(TECHNICAL_ERROR_ACTION);
       })
       .finally(() => {
-        if (fallbackDecisionPromises.get(task.sourceUrl) === task) {
-          fallbackDecisionPromises.delete(task.sourceUrl);
+        if (fallbackDecisionPromises.get(task.key) === task) {
+          fallbackDecisionPromises.delete(task.key);
         }
         activeFallbackAnalyses = Math.max(0, activeFallbackAnalyses - 1);
         nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
         releaseFallbackDocumentStates(task);
-        drainFallbackQueue();
+        drainAnalysisQueues();
       });
   }
 };
 
+const drainAnalysisQueues = () => {
+  drainInterceptQueue();
+  drainFallbackQueue();
+};
+
 const analyzeFallbackSource = (sourceUrl, priority, documentState = null) => {
-  const cached = fallbackDecisionCache.get(sourceUrl);
-  if (cached) {
-    return Promise.resolve(cached);
+  if (!isCurrentDocumentState(documentState)) {
+    return Promise.resolve(TECHNICAL_ERROR_ACTION);
   }
-  const existing = fallbackDecisionPromises.get(sourceUrl);
+  const key = `${documentState.documentToken}:${sourceUrl}`;
+  const existing = fallbackDecisionPromises.get(key);
   if (existing) {
     attachFallbackDocumentState(existing, documentState);
     if (priority === "visible") {
@@ -778,28 +1108,30 @@ const analyzeFallbackSource = (sourceUrl, priority, documentState = null) => {
     return existing.promise;
   }
   if (fallbackAnalysisQueue.length >= MAX_QUEUED_FALLBACK_ANALYSES) {
-    return Promise.resolve("retry");
+    return Promise.resolve(TECHNICAL_ERROR_ACTION);
   }
   let resolveTask;
   const promise = new Promise((resolve) => {
     resolveTask = resolve;
   });
   const task = {
+    key,
     sourceUrl,
     priority,
     state: "queued",
     promise,
     resolve: resolveTask,
+    documentState,
     documentStates: new Set(),
   };
   attachFallbackDocumentState(task, documentState);
-  fallbackDecisionPromises.set(sourceUrl, task);
+  fallbackDecisionPromises.set(key, task);
   if (priority === "visible") {
     fallbackAnalysisQueue.unshift(task);
   } else {
     fallbackAnalysisQueue.push(task);
   }
-  drainFallbackQueue();
+  drainAnalysisQueues();
   return promise;
 };
 
@@ -819,7 +1151,7 @@ const notifyPresentationDecision = (details, action) => {
       : browser.tabs.sendMessage(details.tabId, message);
   return response
     .then((response) => {
-      if (decisionPort !== null) {
+      if (diagnosticsEnabled && decisionPort !== null) {
         try {
           decisionPort.postMessage({
             type: "media-presentation-status",
@@ -827,6 +1159,9 @@ const notifyPresentationDecision = (details, action) => {
             action,
             frameId: details.frameId,
             matchedCount: response?.matchedCount ?? -1,
+            mediaMatches: response?.mediaMatches ?? -1,
+            cssMatches: response?.cssMatches ?? -1,
+            binding: response?.binding || "unknown",
           });
         } catch {
           // DEV presentation evidence never changes the fail-closed decision.
@@ -857,22 +1192,43 @@ const presentDecision = (
   });
 };
 
+const rejectInterceptBeforeFilter = (details) => {
+  const documentGeneration = currentDocumentStateForTab(details.tabId);
+  const initialDocumentState =
+    documentGeneration && !documentGeneration.captureWindowClosed
+      ? documentGeneration
+      : null;
+  reportClientMediaMetric({
+    transportPath: "intercept",
+    priority: "nearby",
+    outcome: TECHNICAL_ERROR_ACTION,
+  });
+  void presentDecision(
+    details,
+    TECHNICAL_ERROR_ACTION,
+    documentGeneration,
+    initialDocumentState,
+  );
+  return { cancel: true };
+};
+
 const interceptImageResponse = (details) => {
   if (!isSupportedSourceUrl(details.url)) {
     return { cancel: true };
   }
+  const sourceKey = priorityHintKey(details.url);
   if (
     typeof browser.webRequest.filterResponseData !== "function" ||
-    activeImageFilters >= MAX_ACTIVE_IMAGE_FILTERS
+    activeImageFilters >= MAX_ACTIVE_IMAGE_STREAMS
   ) {
-    return {};
+    return rejectInterceptBeforeFilter(details);
   }
 
   let filter;
   try {
     filter = browser.webRequest.filterResponseData(details.requestId);
   } catch {
-    return {};
+    return rejectInterceptBeforeFilter(details);
   }
   activeImageFilters += 1;
   let documentGeneration = currentDocumentStateForTab(details.tabId);
@@ -884,9 +1240,13 @@ const interceptImageResponse = (details) => {
   if (imageCounterAttached) {
     adjustInitialCounter(documentState, "activeImageFilters", 1);
   }
+  let streamRecord = null;
   const documentStatePromise = documentStateForDetails(details).then((resolvedState) => {
     if (resolvedState) {
       documentGeneration = resolvedState;
+      if (streamRecord) {
+        streamRecord.documentState = resolvedState;
+      }
       if (!imageCounterAttached && ownsActiveSlot && !resolvedState.captureWindowClosed) {
         documentState = resolvedState;
         imageCounterAttached = true;
@@ -899,10 +1259,21 @@ const interceptImageResponse = (details) => {
   const chunks = [];
   const captureStartedAt = performance.now();
   let totalBytes = 0;
+  let reservedBytes = 0;
   let overflow = false;
-  let finalized = false;
+  let captureComplete = false;
+  let streamSettled = false;
   let ownsActiveSlot = true;
   let captureTimeout = null;
+  let captureMillis = -1;
+
+  const releaseCaptureBudget = () => {
+    if (reservedBytes <= 0) {
+      return;
+    }
+    releaseInterceptCaptureBytes(reservedBytes);
+    reservedBytes = 0;
+  };
 
   const releaseActiveSlot = () => {
     if (ownsActiveSlot) {
@@ -923,103 +1294,150 @@ const interceptImageResponse = (details) => {
     }
   };
 
-  const disconnectStream = () => {
+  const writeStreamBytes = (bytes) => {
     try {
-      filter.disconnect();
+      filter.write(bytes);
+      return true;
     } catch {
-      closeStream();
+      return false;
     }
   };
 
-  const finalizeWithoutDecision = (disconnect = false) => {
-    if (finalized) {
+  const settleStream = (action, originalBytes = null) => {
+    if (streamSettled) {
       return;
     }
-    finalized = true;
+    streamSettled = true;
     if (captureTimeout !== null) {
       clearTimeout(captureTimeout);
       captureTimeout = null;
     }
-    if (disconnect) {
-      disconnectStream();
-    } else {
-      closeStream();
+    if (streamRecord?.task) {
+      removeQueuedInterceptTask(streamRecord.task);
+      streamRecord.task.state = "settled";
+      streamRecord.task = null;
     }
+    if (sourceKey !== null) {
+      documentGeneration?.priorityHints.delete(sourceKey);
+    }
+    activeInterceptStreams.delete(streamRecord);
+    const currentAction =
+      action === "allow" &&
+      originalBytes instanceof Uint8Array &&
+      documentGeneration &&
+      isCurrentDocumentState(documentGeneration)
+        ? "allow"
+        : action === "block"
+          ? "block"
+          : TECHNICAL_ERROR_ACTION;
+    const deliveredAction =
+      currentAction === "allow" && !writeStreamBytes(originalBytes)
+        ? TECHNICAL_ERROR_ACTION
+        : currentAction;
+    closeStream();
+    chunks.length = 0;
+    totalBytes = 0;
+    releaseCaptureBudget();
+    void presentDecision(details, deliveredAction, documentGeneration, documentState);
     releaseActiveSlot();
   };
+
+  streamRecord = {
+    documentState: documentGeneration,
+    task: null,
+    failClosed: () => settleStream(TECHNICAL_ERROR_ACTION),
+  };
+  activeInterceptStreams.add(streamRecord);
 
   filter.ondata = (event) => {
-    if (finalized) {
+    if (streamSettled || captureComplete) {
       return;
     }
-    const chunk = new Uint8Array(event.data);
-    const capturedChunk = overflow ? null : chunk.slice();
+    let chunk;
     try {
-      filter.write(event.data);
+      chunk = new Uint8Array(event.data);
     } catch {
-      finalizeWithoutDecision();
+      settleStream(TECHNICAL_ERROR_ACTION);
       return;
     }
-    if (!overflow) {
-      if (totalBytes + capturedChunk.byteLength > MAX_INTERCEPT_CAPTURE_BYTES) {
-        overflow = true;
-        chunks.length = 0;
-        totalBytes = 0;
-      } else {
-        chunks.push(capturedChunk);
-        totalBytes += capturedChunk.byteLength;
-      }
+    if (
+      overflow ||
+      chunk.byteLength === 0 ||
+      totalBytes + chunk.byteLength > MAX_INTERCEPT_CAPTURE_BYTES ||
+      !reserveInterceptCaptureBytes(chunk.byteLength)
+    ) {
+      overflow = true;
+      settleStream(TECHNICAL_ERROR_ACTION);
+      return;
+    }
+    reservedBytes += chunk.byteLength;
+    try {
+      chunks.push(chunk.slice());
+      totalBytes += chunk.byteLength;
+    } catch {
+      settleStream(TECHNICAL_ERROR_ACTION);
     }
   };
 
-  filter.onerror = () => finalizeWithoutDecision();
+  filter.onerror = () => settleStream(TECHNICAL_ERROR_ACTION);
   filter.onstop = () => {
-    if (finalized) {
+    if (streamSettled || captureComplete) {
       return;
     }
+    captureComplete = true;
+    captureMillis = performance.now() - captureStartedAt;
     if (captureTimeout !== null) {
       clearTimeout(captureTimeout);
       captureTimeout = null;
     }
-    finalized = true;
-    closeStream();
-    releaseActiveSlot();
     if (overflow || totalBytes === 0) {
+      settleStream(TECHNICAL_ERROR_ACTION);
       return;
     }
-    const bytes = combineChunks(chunks, totalBytes);
-    void documentStatePromise.then(() => {
-      if (!documentGeneration || nativeRequestsInFlight >= MAX_NATIVE_IN_FLIGHT) {
+    let bytes;
+    try {
+      bytes = chunks.length === 1 ? chunks[0] : combineChunks(chunks, totalBytes);
+    } catch {
+      settleStream(TECHNICAL_ERROR_ACTION);
+      return;
+    }
+    chunks.length = 0;
+    totalBytes = 0;
+    void documentStatePromise.then((resolvedState) => {
+      if (streamSettled) {
         return;
       }
-      const initialState =
-        documentGeneration && !documentGeneration.captureWindowClosed
-          ? documentGeneration
-          : null;
-      nativeRequestsInFlight += 1;
-      adjustInitialCounter(initialState, "nativeRequestsInFlight", 1);
-      requestContentDecision(details, bytes, "nearby", {
-        transportPath: "intercept",
-        captureMillis: performance.now() - captureStartedAt,
-      })
-        .then((action) =>
-          presentDecision(details, action, documentGeneration, initialState))
-        .catch(() =>
-          presentDecision(
-            details,
-            TECHNICAL_ERROR_ACTION,
-            documentGeneration,
-            initialState,
-          ))
-        .finally(() => {
-          nativeRequestsInFlight = Math.max(0, nativeRequestsInFlight - 1);
-          adjustInitialCounter(initialState, "nativeRequestsInFlight", -1);
-          drainFallbackQueue();
-        });
-    });
+      if (!resolvedState || !isCurrentDocumentState(resolvedState)) {
+        settleStream(TECHNICAL_ERROR_ACTION);
+        return;
+      }
+      documentGeneration = resolvedState;
+      documentState = resolvedState.captureWindowClosed ? null : resolvedState;
+      const priority = interceptPriorityFor(resolvedState, sourceKey);
+      const task = {
+        documentState: resolvedState,
+        sourceKey,
+        priority,
+        state: "new",
+        initialDocumentState: documentState,
+        isSettled: () => streamSettled,
+        isCurrent: () =>
+          Boolean(documentGeneration && isCurrentDocumentState(documentGeneration)),
+        analyze: () =>
+          requestContentDecision(details, bytes, task.priority, {
+            transportPath: "intercept",
+            captureMillis,
+            documentState: resolvedState,
+          }),
+        complete: (action) => settleStream(action, bytes),
+      };
+      streamRecord.task = task;
+      enqueueInterceptTask(task);
+      drainAnalysisQueues();
+    }).catch(() => settleStream(TECHNICAL_ERROR_ACTION));
   };
   captureTimeout = setTimeout(
-    () => finalizeWithoutDecision(true),
+    () => settleStream(TECHNICAL_ERROR_ACTION),
     RESPONSE_CAPTURE_TIMEOUT_MS,
   );
 

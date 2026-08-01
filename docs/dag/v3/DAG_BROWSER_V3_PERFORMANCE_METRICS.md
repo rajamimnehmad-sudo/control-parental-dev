@@ -32,10 +32,11 @@ falsificarla y el evento no participa en decisiones de contenido.
 Si falta una metrica, `success=false`, vence la barrera o la pagina se rompe, el recorrido cuenta
 como regresion. El registro de rendimiento nunca habilita una foto ni cambia `block`.
 
-## Recorrido sin cache para GeckoView
+## Recorrido controlado y sin cache para GeckoView
 
-DAG V3 usa GeckoView, no WebView; por eso `LOAD_NO_CACHE` no existe en este modulo. El recorrido
-fisico equivalente es:
+DAG V3 usa GeckoView, no WebView; por eso `LOAD_NO_CACHE` no existe en este modulo. Antes de sitios
+vivos se ejecuta `tools/dag_perf_lab/` para separar costo de DAG, red y pagina. El recorrido fisico
+equivalente es:
 
 1. detener el proceso;
 2. ejecutar `pm clear --cache-only com.contentfilter.dagbrowser.dev`;
@@ -43,18 +44,21 @@ fisico equivalente es:
    `pm clear com.contentfilter.dagbrowser.dev`, solamente sobre el paquete DEV;
 4. abrirlo en frio;
 5. agregar `codexperf` unico a la URL superior;
-6. registrar las tres metricas, decisiones visuales, memoria, temperatura y cualquier error.
+6. registrar las tres metricas, decisiones visuales, memoria, temperatura, crash/ANR y cualquier
+   error;
+7. repetir en frio y caliente. Una unica muestra sirve como piloto, no como porcentaje general.
 
 La limpieza de cache conserva datos y firma de la aplicacion. El fallback borra el perfil local de
 la aplicacion DEV, conserva APK y firma, y debe quedar explicitamente registrado en la evidencia.
 El parametro unico evita reutilizar el documento superior; los subrecursos quedan cubiertos por la
 limpieza del cache o del perfil.
 
-## Matriz fija
+## Matriz viva
 
-- <https://www.fravega.com/>
 - <https://www.mimo.com.ar/>
 - <https://www.cheeky.com.ar/>
+- una URL estable de categoria de Fravega. Si la portada responde su propia
+  pantalla de error, queda registrada como sitio roto y no como benchmark DAG.
 
 Los resultados se agregan a `docs/compatibility/results/dag-performance-history.md` y la evidencia
 detallada de cada gate queda en un archivo propio del candidato.

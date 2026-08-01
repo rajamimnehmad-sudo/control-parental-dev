@@ -1,115 +1,116 @@
 # DAG Browser V3 - transporte seguro de imagenes
 
-## Decision
+## Decision vigente
 
-DAG copia la respuesta HTTP(S) original mediante `webRequest.filterResponseData` mientras mantiene
-la barrera visual inyectada en `document_start`. Gecko puede terminar la descarga, pero la pagina no
-puede presentar el recurso hasta recibir una decision local `allow` o `block`. No se confia en un
-atributo de la pagina: los atributos de estado pertenecen al content script aislado y la hoja
-privilegiada sigue cerrada por defecto.
+DAG intercepta la respuesta original mediante
+`webRequest.filterResponseData`, conserva la barrera visual de
+`document_start` y analiza localmente los mismos bytes que Gecko iba a mostrar.
+No vuelve a descargar imagenes HTTP(S) desde Android, no usa una URL como
+permiso y no consulta un servicio remoto.
 
-Si Gecko entrega el recurso desde cache, el cuerpo supera el limite de captura o una libreria lo
-crea como `blob:`, la extension usa un fallback acotado de hasta 2 MiB. Ese camino puede hacer una
-lectura adicional con las credenciales de la misma sesion, pero conserva el mismo analizador local,
-los mismos limites y el fallo cerrado.
+Solo `allow` escribe la respuesta original. `block`, error, timeout o estado
+obsoleto cierran el stream sin escribir un formato sustituto. La superficie
+filtrada pertenece al content script y es sintetica, opaca y estatica.
 
-Referencias de plataforma:
+## Flujo
 
-- https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/webRequest/filterResponseData
-- https://mozilla.github.io/geckoview/consumer/docs/web-extensions
+1. El content script oculta raster, fondos y medios.
+2. El background abre un filtro para `image`/`imageset` y retiene el cuerpo.
+3. El cuerpo se limita por recurso y por presupuesto agregado.
+4. Background enlaza la solicitud al `tabId` y token exacto del documento
+   superior.
+5. SHA-256 permite deduplicar por contenido en memoria; la URL no autoriza.
+6. Los bytes se codifican Base64 y cruzan el canal nativo privilegiado.
+7. Android valida sobre, URL, tamaño, Base64, formato y dimensiones.
+8. El preprocesador genera RGB 224 x 224 y, solo cuando la politica lo exige,
+   vistas regionales acotadas.
+9. El unico ONNX local devuelve probabilidad binaria `allow/filter`.
+10. El lease se comprueba antes de cada etapa costosa y antes de responder.
+11. Background vuelve a comprobar que el documento siga vigente justo antes de
+    escribir un `allow`.
+12. Content aplica la decision solo a la fuente exacta conocida y reconcilia
+    cambios dinamicos/atributos hostiles.
 
-El API esta presente en el GeckoView 153 fijado por `app-dag-browser`; tambien fue comprobado en el
-codigo empaquetado de esa dependencia.
+## Presupuestos
 
-## Alternativas evaluadas
+| Recurso | Limite |
+| --- | ---: |
+| Cuerpo por imagen | 2 MiB |
+| Bytes HTTP retenidos entre todos los streams | 8 MiB |
+| Handles de respuesta activos | 64 |
+| Decisiones nativas JS simultaneas | 4 |
+| Fallbacks activos / esperando | 2 / 256 |
+| Hilos ONNX Android / cola | 2 / 8 |
+| Captura de respuesta | 5.000 ms |
+| Respuesta JS nativa | 2.500 ms |
+| Lease Android | 2.250 ms |
+| Cache de decisiones por hash | 512 |
+| Pistas de prioridad por documento | 512 |
 
-| Camino | Ventaja | Problema | Decision |
-| --- | --- | --- | --- |
-| Volver a descargar desde Android | Implementacion nativa directa | Duplica red, pierde cookies y puede analizar bytes distintos de los mostrados | Rechazado |
-| Capturar toda la pantalla | Tambien ve canvas y graficos generados | Agrega latencia, complica scroll e interaccion y puede perder cambios entre capturas | Segunda defensa futura |
-| Interceptar la respuesta original | Analiza exactamente los bytes que Gecko iba a usar y puede reemplazarlos antes de pintar | Requiere limites estrictos de memoria, cola y timeout | Elegido |
+Los 64 handles no equivalen a `64 x 2 MiB`: el presupuesto global de 8 MiB
+impide esa acumulacion. Presion de memoria, timeout o cupo agotado cierran
+seguro.
 
-## Flujo del benchmark bloqueante
+## Prioridad y fluidez
 
-1. La hoja inyectada en `document_start` mantiene todos los medios ocultos.
-2. La extension crea un filtro de respuesta para `image` e `imageset`.
-3. Copia hasta 512 KiB de la respuesta original mientras Gecko completa la descarga.
-4. Un recurso no capturado queda oculto y entra en el fallback visible-first de hasta 2 MiB.
-5. La extension envia bytes Base64 al Android local mediante el canal de fondo privilegiado.
-6. Android valida remitente, version, URL, longitud Base64, formato y dimensiones sin decodificar
-   el bitmap completo.
-7. Android reduce el lado mayor a 224 px durante la decodificacion, conserva la imagen completa con
-   relleno neutro y produce RGB888 acotado.
-8. El trabajo se limita a dos hilos y ocho elementos en espera.
-9. Como maximo hay 16 respuestas de imagen activas y 10 pedidos nativos simultaneos.
-10. Capturar una respuesta puede demorar como maximo 5 segundos y la decision nativa 2,5 segundos.
-11. Limite, cola llena o timeout significan bloqueo o reintento acotado sin exponer el recurso.
-12. El único artefacto
-    `tinyclip-bounded-finetune-r1-int8.onnx` y su cabeza binaria responden
-    `allow` o `block`; error, formato no soportado, salida inválida o analizador
-    ausente siempre responden `block`.
-13. `allow` muestra el recurso original y `block` lo muestra con desenfoque fuerte. Mientras no hay
-    decisión conserva espacio, permanece oculto y muestra `Analizando`. Un
-    rechazo muestra `Protegida por Glosh`; un fallo terminal sigue oculto y
-    muestra `Imagen no disponible`.
-14. Las decisiones exactas se deduplican por SHA-256 de los bytes y viven solo en memoria, con un
-    maximo de 256 entradas.
+- visible y cercano mantienen FIFO dentro de su clase;
+- una pista de viewport autenticada puede promover cercano a visible;
+- despues de cuatro visibles se da oportunidad al cercano para evitar hambre;
+- DAG conserva `loading=lazy` y `fetchpriority` elegidos por el sitio;
+- solo agrega `decoding=async` cuando el sitio no definio el atributo;
+- navegar o cerrar pestaña purga trabajo viejo antes de admitir la pagina nueva;
+- reconectar el puerto invalida generacion, documentos y cola anteriores;
+- telemetria por imagen, presentacion y viewport solo se emite cuando Android
+  negocia `diagnostics-config` para la variante DEV.
 
-Ningun byte se guarda en disco, se registra en logs o se envia a Supabase.
+Esto reduce competencia de red/CPU sin aumentar hilos ni relajar el filtro.
 
-## Limites contra imagenes maliciosas
+## Validacion nativa
 
-- cuerpo capturado en la respuesta original: maximo 512 KiB;
-- cuerpo analizado por fallback: maximo 2 MiB;
-- respuestas de imagen simultaneas: maximo 16;
-- mensajes simultaneos hacia el analizador: maximo 10;
-- respuesta lenta: maximo 5 segundos antes de bloquear;
-- URL: maximo 4096 caracteres y esquema HTTP(S);
-- formatos: JPEG, PNG, WebP y GIF;
-- ancho y alto: maximo 4096;
-- pixeles declarados: maximo 16.777.216;
-- identificadores y versiones deben coincidir en ambos extremos;
-- mensajes del contenido y del fondo tienen validaciones de remitente distintas.
+- URL HTTP(S), hasta 4.096 caracteres;
+- JPEG, PNG, WebP, AVIF y GIF estatico admitidos por contrato;
+- maximo 4.096 por lado y 16.777.216 pixeles;
+- entrada preparada exacta: RGB 224 x 224;
+- salida finita entre 0 y 1;
+- cualquier excepcion o salida invalida se transforma en bloqueo tecnico;
+- buffers fuente, preparados, regionales y normalizados se limpian.
 
-Estas reglas reducen mensajes excesivos, bombas de descompresion, colas infinitas y respuestas
-falsificadas.
+SVG de interfaz usa un validador separado, pequeno y estructural. `blob:` y
+`data:` confiables se enlazan al documento superior y atraviesan el mismo
+analizador; un iframe no puede crear autoridad con su propio token.
 
-## Alcance actual
+## Presentacion terminal
 
-El filtro funcional muestra raster HTTP(S), `data:` o `blob:` solamente tras atravesar la tuberia.
-Los fondos y pseudo-elementos con URL se descubren con un sondeo acotado y usan el mismo fallback.
-SVG pequenos y autocontenidos de interfaz pueden mostrarse; SVG complejos, video, audio, `object`,
-canvas y formatos no soportados permanecen cerrados.
+- `allow`: original exacto, sin blur ni reemplazo;
+- `block`: cero bytes del original y host `filtered` opaco/estatico;
+- error/timeout: cero bytes y host tecnico distinto;
+- un evento `error` del decoder nunca degrada un `block` autenticado;
+- un cambio de `src`, `srcset`, `data-src` o `poster` vuelve a espera y exige una
+  decision para la fuente nueva;
+- un host con varias imagenes conserva espera mientras alguna hermana sigue
+  pendiente, eleva las permitidas por encima de esa superficie y deja de cubrir
+  el host cuando todas estan resueltas y existe al menos una permitida.
 
-Una pagina hostil puede generar graficos mediante JavaScript sin descargar una imagen tradicional.
-Por eso la primera apertura no se declarara navegador general: se limitara al buscador y a destinos
-aprobados hasta agregar la segunda defensa de pagina completa. Este limite debe permanecer visible
-en las pruebas y en el producto; no se puede resolver honestamente solo con un clasificador de
-archivos.
+Una imagen sin geometria previa puede no reservar espacio al quedar vacia. Es
+un limite visual conocido, no una fuga.
 
-## Estado de gates
+## Modelo
 
-1. Transporte fisico con formatos pequenos, grandes, corruptos y lentos: completo.
-2. Latencia y memoria sin habilitar fotos: completo.
-3. Agregar reduccion local a la entrada exacta del modelo: completo, incluida evidencia fisica.
-4. Comparar candidatos con el mismo conjunto congelado: completo para el piloto
-   binario DEV. El candidato fijado tiene SHA-256
-   `2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee`.
-5. Habilitar `allow` y `blur`: completo en DEV con umbral `0.4`, cero falsos
-   permisos en 21 casos congelados y gate físico inicial aprobado. Production
-   sigue sin autorización.
+- artefacto:
+  `tinyclip-bounded-finetune-r1-int8.onnx`;
+- SHA-256:
+  `2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee`;
+- umbral global: `0.4`;
+- sin API, red, Supabase ni persistencia de pixeles.
 
-Evidencia de los dos primeros gates:
-`docs/compatibility/results/dag-browser-v3-image-transport-sm-a235m-2026-07-27.md`.
+El piloto habilita DEV, no Production ni cobertura universal. Cambiar backend
+CPU/XNNPACK/NNAPI requiere benchmark fisico contrabalanceado, salida numerica
+compatible y paridad sobre corpus congelado; una microprueba sintetica no basta.
 
-Contrato del tercer gate:
-`docs/dag/v3/DAG_BROWSER_V3_IMAGE_PREPROCESSOR.md`.
+## Evidencia
 
-Evidencia fisica del tercer gate y de la matriz fija instrumentada:
-`docs/compatibility/results/dag-browser-v3-image-preprocessor-sm-a235m-2026-07-27.md`.
-
-Contrato de datos del cuarto gate:
-`docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`.
-
-Las tres marcas comparables de la matriz fisica se definen en
-`docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
+- metricas: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`;
+- historial: `docs/compatibility/results/dag-performance-history.md`;
+- laboratorio controlado: `tools/dag_perf_lab/`;
+- contrato de datos:
+  `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`.

@@ -250,6 +250,91 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
+    fun `expired work stops before base64 decode and every image decoder`() {
+        val trace = DagMediaPipelineTrace()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { error("must not read bounds") },
+                preprocessor = DagImagePreprocessor { error("must not decode pixels") },
+                analyzer = DagImageAnalyzer { error("must not run inference") },
+                trace = trace,
+                workGuard = DagMediaWorkGuard { false },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.AnalysisExpiredReason, decision.reason)
+        assertEquals(0, trace.inferenceCount)
+    }
+
+    @Test
+    fun `deadline reached during decode erases pixels and skips inference`() {
+        var current = true
+        val prepared = preparedImage().also { it.rgb888.fill(91) }
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor =
+                    DagImagePreprocessor {
+                        current = false
+                        DagImagePreprocessResult.Ready(prepared)
+                    },
+                analyzer = DagImageAnalyzer { error("must not run expired inference") },
+                workGuard = DagMediaWorkGuard { current },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.AnalysisExpiredReason, decision.reason)
+        assertTrue(prepared.rgb888.all { it == 0.toByte() })
+    }
+
+    @Test
+    fun `deadline reached after full inference skips every regional inference`() {
+        var current = true
+        var inferenceCount = 0
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        inferenceCount += 1
+                        current = false
+                        DagImageAnalysisResult.Classified(0.35f)
+                    },
+                workGuard = DagMediaWorkGuard { current },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.AnalysisExpiredReason, decision.reason)
+        assertEquals(1, inferenceCount)
+    }
+
+    @Test
+    fun `decoded source bytes are erased after the decision`() {
+        var decodedBytes: ByteArray? = null
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader =
+                    DagImageBoundsReader { bytes ->
+                        decodedBytes = bytes
+                        DagImageBounds(320, 240, "image/jpeg")
+                    },
+                preprocessor =
+                    DagImagePreprocessor {
+                        DagImagePreprocessResult.Rejected("expected_test_stop")
+                    },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals("expected_test_stop", decision.reason)
+        assertTrue(requireNotNull(decodedBytes).all { it == 0.toByte() })
+    }
+
+    @Test
     fun `declared and decoded byte lengths must match`() {
         val decision =
             DagMediaBytesPolicy.decide(

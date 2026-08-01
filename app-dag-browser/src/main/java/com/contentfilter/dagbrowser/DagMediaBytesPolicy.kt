@@ -51,9 +51,11 @@ internal object DagMediaBytesPolicy {
         preprocessor: DagImagePreprocessor = AndroidDagImagePreprocessor,
         analyzer: DagImageAnalyzer = UnavailableDagImageAnalyzer,
         trace: DagMediaPipelineTrace? = null,
+        workGuard: DagMediaWorkGuard = AlwaysCurrentDagMediaWork,
     ): DagMediaDecision {
         if (!validEnvelope(payload)) return blocked(payload, InvalidPayloadReason)
-        return inspectImage(payload, boundsReader, preprocessor, analyzer, trace)
+        if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
+        return inspectImage(payload, boundsReader, preprocessor, analyzer, trace, workGuard)
     }
 
     private fun validEnvelope(payload: DagMediaBytesPayload): Boolean {
@@ -69,7 +71,9 @@ internal object DagMediaBytesPolicy {
         preprocessor: DagImagePreprocessor,
         analyzer: DagImageAnalyzer,
         trace: DagMediaPipelineTrace?,
+        workGuard: DagMediaWorkGuard,
     ): DagMediaDecision {
+        if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
         val bytes =
             runCatching {
                 trace.measure(DagMediaPipelineStage.Base64Decode) {
@@ -77,54 +81,66 @@ internal object DagMediaBytesPolicy {
                 }
             }
                 .getOrElse { return blocked(payload, InvalidPayloadReason) }
-        if (bytes.size != payload.declaredByteLength || bytes.size > MaxCaptureBytes) {
-            return blocked(payload, InvalidPayloadReason)
-        }
-        if (trace.measure(DagMediaPipelineStage.SafeVectorCheck) { DagSafeUiVectorPolicy.isSafe(bytes) }) {
-            return DagMediaDecision(
-                candidateId = payload.candidateId,
-                action = DagMediaAction.Allow,
-                reason = SafeUiVectorReason,
-            )
-        }
-        val bounds =
-            trace.measure(DagMediaPipelineStage.BoundsRead) { boundsReader.read(bytes) }
-                ?: return blocked(payload, UnsupportedImageReason)
-        if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) {
-            return blocked(payload, UnsupportedImageReason)
-        }
-        if (!DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height)) {
-            return blocked(payload, UnsafeDimensionsReason)
-        }
-        return when (
-            val result =
-                runCatching {
-                    trace.measure(DagMediaPipelineStage.Preprocess) { preprocessor.prepare(bytes) }
-                }
-                    .getOrElse {
-                        DagImagePreprocessResult.Rejected(
-                            AndroidDagImagePreprocessor.DecodeFailedReason,
-                        )
-                    }
-        ) {
-            is DagImagePreprocessResult.Ready -> {
-                val preparedImages = listOf(result.image) + result.regionalImages
-                trace?.preparedImageCount = preparedImages.size
-                trace?.regionalImageCount = result.regionalImages.size
-                val valid = preparedImages.all(DagImageDecodeContract::isValid)
-                try {
-                    if (!valid) {
-                        blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
-                    } else {
-                        decidePreparedImages(payload, preparedImages, analyzer, trace)
-                    }
-                } catch (_: Exception) {
-                    blocked(payload, DagOnDeviceImageAnalyzer.ModelExecutionFailedReason)
-                } finally {
-                    preparedImages.forEach { it.rgb888.fill(0) }
-                }
+        try {
+            if (bytes.size != payload.declaredByteLength || bytes.size > MaxCaptureBytes) {
+                return blocked(payload, InvalidPayloadReason)
             }
-            is DagImagePreprocessResult.Rejected -> blocked(payload, result.reason)
+            if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
+            val safeUiVector =
+                trace.measure(DagMediaPipelineStage.SafeVectorCheck) {
+                    DagSafeUiVectorPolicy.isSafe(bytes)
+                }
+            if (safeUiVector) {
+                if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
+                return DagMediaDecision(
+                    candidateId = payload.candidateId,
+                    action = DagMediaAction.Allow,
+                    reason = SafeUiVectorReason,
+                )
+            }
+            if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
+            val bounds =
+                trace.measure(DagMediaPipelineStage.BoundsRead) { boundsReader.read(bytes) }
+                    ?: return blocked(payload, UnsupportedImageReason)
+            if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) {
+                return blocked(payload, UnsupportedImageReason)
+            }
+            if (!DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height)) {
+                return blocked(payload, UnsafeDimensionsReason)
+            }
+            if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
+            return when (
+                val result =
+                    runCatching {
+                        trace.measure(DagMediaPipelineStage.Preprocess) { preprocessor.prepare(bytes) }
+                    }
+                        .getOrElse {
+                            DagImagePreprocessResult.Rejected(
+                                AndroidDagImagePreprocessor.DecodeFailedReason,
+                            )
+                        }
+            ) {
+                is DagImagePreprocessResult.Ready -> {
+                    val preparedImages = listOf(result.image) + result.regionalImages
+                    trace?.preparedImageCount = preparedImages.size
+                    trace?.regionalImageCount = result.regionalImages.size
+                    val valid = preparedImages.all(DagImageDecodeContract::isValid)
+                    try {
+                        if (!valid) {
+                            blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
+                        } else {
+                            decidePreparedImages(payload, preparedImages, analyzer, trace, workGuard)
+                        }
+                    } catch (_: Exception) {
+                        blocked(payload, DagOnDeviceImageAnalyzer.ModelExecutionFailedReason)
+                    } finally {
+                        preparedImages.forEach { it.rgb888.fill(0) }
+                    }
+                }
+                is DagImagePreprocessResult.Rejected -> blocked(payload, result.reason)
+            }
+        } finally {
+            bytes.fill(0)
         }
     }
 
@@ -133,7 +149,9 @@ internal object DagMediaBytesPolicy {
         preparedImages: List<DagPreparedImage>,
         analyzer: DagImageAnalyzer,
         trace: DagMediaPipelineTrace?,
+        workGuard: DagMediaWorkGuard,
     ): DagMediaDecision {
+        if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
         val fullProbability =
             when (
                 val analysis =
@@ -156,6 +174,8 @@ internal object DagMediaBytesPolicy {
             )
         }
 
+        if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
+
         val preparedRegionalImages = preparedImages.drop(1)
         val generatedUncertainRegions =
             if (
@@ -175,6 +195,9 @@ internal object DagMediaBytesPolicy {
             var maximumProbability = fullProbability
             var regionalFilterVotes = 0
             for (regionalImage in regionalImages) {
+                if (!workGuard.canContinue()) {
+                    return blocked(payload, AnalysisExpiredReason)
+                }
                 val regionalProbability =
                     when (val analysis = trace.measureInference { analyzer.analyze(regionalImage) }) {
                         is DagImageAnalysisResult.Classified ->
@@ -206,6 +229,7 @@ internal object DagMediaBytesPolicy {
                     )
                 }
             }
+            if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
             DagMediaDecision(
                 candidateId = payload.candidateId,
                 action = DagMediaAction.Allow,
@@ -244,6 +268,7 @@ internal object DagMediaBytesPolicy {
     const val UnsupportedImageReason = "unsupported_image"
     const val UnsafeDimensionsReason = "unsafe_dimensions"
     const val AnalyzerBusyReason = "analyzer_busy"
+    const val AnalysisExpiredReason = "analysis_expired"
 }
 
 private fun <T> DagMediaPipelineTrace?.measure(

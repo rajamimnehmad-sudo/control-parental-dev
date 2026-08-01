@@ -28,12 +28,12 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 56
-        versionName = "0.36.0"
+        versionCode = 58
+        versionName = "0.38.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
-            // The first physical gate targets the current 64-bit Samsung devices.
-            // Other ABIs are added only after the browser foundation passes.
+            // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
+            // ship as separate artifacts so every user does not pay the size of every runtime.
             abiFilters += "arm64-v8a"
         }
     }
@@ -93,4 +93,26 @@ dependencies {
 
     testImplementation(kotlin("test"))
     testImplementation("org.json:json:20250517")
+
+    androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.6.2")
+}
+
+val testDagProtectionJs =
+    tasks.register<Exec>("testDagProtectionJs") {
+        group = "verification"
+        description = "Runs the network-free DAG WebExtension security harness."
+        workingDir = projectDir
+        commandLine("node", "--test", "src/test/js/dag-protection.test.mjs")
+        inputs.files(
+            "src/main/assets/dag-protection/background.js",
+            "src/main/assets/dag-protection/barrier.js",
+            "src/main/assets/dag-protection/barrier.css",
+            "src/test/js/dag-protection.test.mjs",
+        )
+    }
+
+tasks.named("check") {
+    dependsOn(testDagProtectionJs)
 }

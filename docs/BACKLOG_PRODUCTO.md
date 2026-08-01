@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-07-30
+Ultima sincronizacion: 2026-08-01
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -44,18 +44,45 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Estado público verificado en el handoff: App Usuario DEV 279 y App Admin DEV
-  275, `1.0.1-dev`.
-- Candidatos actuales sin publicación: App Usuario 292, App Admin 283 y DAG
-  Browser V3 18. El navegador se distribuye como artefacto DEV separado y no
-  comparte el manifiesto público de Glosh.
-- El navegador actual es DAG Browser V3 fail-closed y no conserva fallbacks,
-  módulos ni documentación operativa de runtimes retirados.
+- Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
+  DEV 58. Son versiones de codigo; publicacion e instalacion se verifican por
+  separado en el handoff.
+- DAG 58 tiene gate automatico y fisico aprobados en el SM-A235M; esta instalado
+  y conserva el rol oficial de navegador. No fue publicado ni subido a GitHub.
+- El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
+  restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
 - FCM real y alertas de proteccion ya estan implementados y validados en DEV 202.
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-V3-PIPELINE-AUDIT-17 - Seguridad, cola y rendimiento reproducible
+
+- Estado: `Resuelto localmente; sin push ni publicacion`. Aprobado
+  explicitamente por el usuario. Prioridad: P0. Esfuerzo: XL. Riesgo: alto.
+- Candidato: DAG 58 (`0.38.0-dev`) y extension incorporada `1.28.0`.
+- Resultado tecnico: bytes originales retenidos hasta `allow`; cero bytes para
+  bloqueo/error; identidad exacta por documento; purga de trabajo viejo;
+  presupuestos 64 handles/8 MiB, JS 4, Android 2+8 y lease 2.250 ms;
+  prioridad visible sin forzar eager; placeholder terminal opaco y estatico;
+  lifecycle ONNX seguro; fixture local y benchmark de backend opt-in.
+- Validacion disponible: harness JS final 19 aprobadas/0 fallos/1 DOM opt-in
+  omitida; 147 unitarios Kotlin; Ktlint, Lint, compilacion/empaquetado de
+  `androidTest` y APK correctos; sintaxis JS/Python/Bash y `diff --check`.
+  APK 58 verificada por paquete, version, hash y firma.
+- Gate fisico: DAG 58 instalado; borrado exclusivo del perfil DEV ejecutado;
+  rol de navegador confirmado; Mimo, Fravega y Cheeky recorridos en frio; p95
+  de cuadro `10-15 ms`; sin crash, ANR, OOM ni temperatura anormal; miniatura
+  real de pestaña verificada. CPU quedo como backend: XNNPACK fue 84 % mas lento
+  en p50 secuencial y no equivalente; NNAPI rechazo el grafo.
+- Limitacion documentada: el fixture autofirmado fue rechazado correctamente
+  por TLS y no se conto. La primera matriz viva quedo diagnostica porque acumulo
+  20 pestañas; las cifras finales usan muestras sin esa acumulacion.
+- Portabilidad: runtime global, sin reglas por sitio o modelo; APK directo para
+  Android 10+ arm64, aproximadamente telefonos 2020 en adelante. Otras ABI
+  requieren artefactos separados para conservar tamaño y rendimiento.
+- Sin push, PR, Supabase, publicacion DEV ni Production.
 
 ### LOTE-DAG-V3-DIRECTED-VISUAL-MODEL-DATASET-05 - Datos dirigidos y candidato visual pequeño
 

@@ -27,6 +27,67 @@ internal object UnavailableDagImageAnalyzer : DagImageAnalyzer {
 }
 
 /**
+ * Prevents the ONNX session from closing while a worker is inside inference. Closing is
+ * non-blocking for the Activity: the final in-flight analysis closes the delegate exactly once.
+ */
+internal class DagLifecycleImageAnalyzer(
+    private val delegate: DagImageAnalyzer,
+) : DagImageAnalyzer,
+    Closeable {
+    private val lock = Any()
+    private var activeAnalyses = 0
+    private var closeRequested = false
+    private var delegateClosed = false
+
+    override fun analyze(image: DagPreparedImage): DagImageAnalysisResult {
+        val accepted =
+            synchronized(lock) {
+                if (closeRequested) {
+                    false
+                } else {
+                    activeAnalyses += 1
+                    true
+                }
+            }
+        if (!accepted) return DagImageAnalysisResult.Unavailable(AnalyzerClosedReason)
+
+        return try {
+            delegate.analyze(image)
+        } finally {
+            val closeable =
+                synchronized(lock) {
+                    activeAnalyses -= 1
+                    closeableIfReady()
+                }
+            closeDelegate(closeable)
+        }
+    }
+
+    override fun close() {
+        val closeable =
+            synchronized(lock) {
+                closeRequested = true
+                closeableIfReady()
+            }
+        closeDelegate(closeable)
+    }
+
+    private fun closeableIfReady(): Closeable? {
+        if (!closeRequested || activeAnalyses != 0 || delegateClosed) return null
+        delegateClosed = true
+        return delegate as? Closeable
+    }
+
+    private fun closeDelegate(closeable: Closeable?) {
+        if (closeable != null) runCatching(closeable::close)
+    }
+
+    internal companion object {
+        const val AnalyzerClosedReason = "analyzer_closed"
+    }
+}
+
+/**
  * Runs the single TinyCLIP image encoder and binary policy head entirely on device.
  *
  * The model never receives URLs, text, or persisted media. Its input is the bounded 224x224 RGB

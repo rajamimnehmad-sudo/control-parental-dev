@@ -29,9 +29,11 @@
   const FALLBACK_RESPONSE_MESSAGE = "media-fallback-response";
   const INLINE_REQUEST_MESSAGE = "media-inline-request";
   const INLINE_RESPONSE_MESSAGE = "media-inline-response";
+  const PRIORITY_HINT_MESSAGE = "media-priority-hint";
   const DECISION_ACTIONS = ["allow", "block", "error"];
   const PLAYABLE_MEDIA_SELECTOR = "video, audio";
   const FILTERED_ACCESSIBLE_DESCRIPTION = "Protegida por Glosh";
+  const ERROR_ACCESSIBLE_DESCRIPTION = "Imagen no disponible";
   const MAX_REMEMBERED_DECISIONS = 512;
   const FALLBACK_DELAY_MS = 80;
   const VISIBLE_FALLBACK_DELAY_MS = 0;
@@ -40,7 +42,6 @@
   const FALLBACK_RETRY_MAX_MS = 6_000;
   const MAX_FALLBACK_ATTEMPTS = 4;
   const FALLBACK_ROOT_MARGIN = "640px 0px";
-  const IMAGE_PREWARM_ROOT_MARGIN = "1200px 0px";
   const SOURCE_RECONCILE_DELAY_MS = 160;
   const SOURCE_MUTATION_ATTRIBUTES = new Set([
     "src",
@@ -51,6 +52,10 @@
     "data-original",
     "data-url",
     "poster",
+    "sizes",
+    "media",
+    "href",
+    "xlink:href",
   ]);
   const UI_VECTOR_ATTRIBUTE = "data-glosh-dag-ui-vector";
   const CSS_MEDIA_ATTRIBUTE = "data-glosh-dag-css-media";
@@ -65,6 +70,16 @@
   const SPONSORED_RESULT_ATTRIBUTE = "data-glosh-dag-sponsored-result";
   const MEDIA_HOST_ATTRIBUTE = "data-glosh-dag-media-host";
   const FUNCTIONAL_ICON_ATTRIBUTE = "data-glosh-dag-functional-icon";
+  const PROTECTED_PRESENTATION_ATTRIBUTES = new Set([
+    "data-glosh-dag-media",
+    UI_VECTOR_ATTRIBUTE,
+    CSS_MEDIA_ATTRIBUTE,
+    CSS_BEFORE_ATTRIBUTE,
+    CSS_AFTER_ATTRIBUTE,
+    BACKGROUND_PROBE_ATTRIBUTE,
+    MEDIA_HOST_ATTRIBUTE,
+    FUNCTIONAL_ICON_ATTRIBUTE,
+  ]);
   const PAGE_AD_HIDDEN_CLASS = "glosh-dag-page-ad-hidden";
   const PAGE_AD_SELECTOR = [
     "[data-ad]",
@@ -78,14 +93,6 @@
     "[id*='advert' i]",
     "[class*='sponsored' i]",
     "[id*='sponsored' i]",
-  ].join(",");
-  const APPROVED_PRESENTATION_SELECTOR = [
-    '[data-glosh-dag-media="allow"]',
-    '[data-glosh-dag-ui-vector="allow"]',
-    '[data-glosh-dag-css-media="allow"]',
-    '[data-glosh-dag-css-before="allow"]',
-    '[data-glosh-dag-css-after="allow"]',
-    `[${FUNCTIONAL_ICON_ATTRIBUTE}]`,
   ].join(",");
   const MAX_CSS_BACKGROUND_ELEMENTS = 512;
   const MAX_BACKGROUND_PROBE_ELEMENTS = 1_500;
@@ -125,6 +132,7 @@
   const fallbackAttemptsBySource = new Map();
   const fallbackObservedSources = new WeakMap();
   const fallbackNearElements = new WeakSet();
+  const reportedPriorityHints = new Map();
   const fallbackTimers = new WeakMap();
   const mediaHostsByElement = new WeakMap();
   const indexedSourcesByElement = new WeakMap();
@@ -143,6 +151,54 @@
   let sponsoredScanTimer = null;
   const performanceDocumentToken =
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
+
+  const sendMediaPriorityHint = (sourceUrl, priority) => {
+    if (window.top !== window || !["visible", "nearby"].includes(priority)) {
+      return;
+    }
+    let normalizedUrl;
+    try {
+      const url = new URL(sourceUrl, document.baseURI);
+      if (!["http:", "https:"].includes(url.protocol)) {
+        return;
+      }
+      url.hash = "";
+      normalizedUrl = url.href;
+    } catch {
+      return;
+    }
+    const previous = reportedPriorityHints.get(normalizedUrl);
+    if (previous === "visible" || previous === priority) {
+      return;
+    }
+    if (
+      !reportedPriorityHints.has(normalizedUrl) &&
+      reportedPriorityHints.size >= MAX_REMEMBERED_DECISIONS
+    ) {
+      reportedPriorityHints.delete(reportedPriorityHints.keys().next().value);
+    }
+    reportedPriorityHints.set(normalizedUrl, priority);
+    try {
+      void browser.runtime.sendMessage({
+        type: PRIORITY_HINT_MESSAGE,
+        version: 1,
+        documentToken: performanceDocumentToken,
+        sourceUrl: normalizedUrl,
+        priority,
+      }).catch(() => {
+        // Priority is advisory; losing a hint never weakens the fail-closed decision path.
+      });
+    } catch {
+      // Priority is advisory; losing a hint never weakens the fail-closed decision path.
+    }
+  };
+
+  const sendPriorityHintsForElement = (element) => {
+    const priority = isVisibleNow(element) ? "visible" : "nearby";
+    for (const sourceUrl of candidateSourcesFor(element)) {
+      sendMediaPriorityHint(sourceUrl, priority);
+    }
+  };
 
   const isVideoSiteDocument = () => {
     const hostname = location.hostname.toLowerCase();
@@ -429,7 +485,7 @@
     let current = element;
     for (let depth = 0; current instanceof Element && depth < 4; depth += 1) {
       if (current.getAttribute(MEDIA_HOST_ATTRIBUTE) === "waiting") {
-        removeAttributeIfPresent(current, MEDIA_HOST_ATTRIBUTE);
+        reconcileMediaHostState(current);
       }
       current = current.parentElement;
     }
@@ -458,8 +514,9 @@
   };
 
   const applyDecisionToSource = (sourceUrl) => {
-    applyDecisionToMediaSource(sourceUrl);
-    applyCssBackgroundsForSource(sourceUrl);
+    const mediaMatches = applyDecisionToMediaSource(sourceUrl);
+    const cssMatches = applyCssBackgroundsForSource(sourceUrl);
+    return { mediaMatches, cssMatches };
   };
 
   const hasLoadedPixels = (element) =>
@@ -501,7 +558,7 @@
       const protocol = sourceUrl ? new URL(sourceUrl).protocol : "";
       const supportedDataImage =
         protocol === "data:" &&
-        /^data:image\/(?:avif|gif|jpeg|jpg|png|webp);base64,/iu.test(sourceUrl);
+        /^data:image\/(?:avif|gif|jpeg|jpg|png|svg\+xml|webp)(?:;base64)?,/iu.test(sourceUrl);
       if (
         sourceUrl &&
         (["http:", "https:", "blob:"].includes(protocol) || supportedDataImage)
@@ -534,9 +591,6 @@
     }
     cssBackgroundRecords.set(element, visual);
   };
-
-  const isSafeCssUiVector = (element, sources) =>
-    sources.length > 0 && sources.every(isSvgSource) && hasSafeUiBounds(element);
 
   const functionalIconKind = (element, sources = []) => {
     const bounds = element.getBoundingClientRect();
@@ -654,18 +708,24 @@
     const record = cssBackgroundRecords.get(element);
     if (!record || !element.isConnected) {
       cssBackgroundRecords.delete(element);
+      removeAttributeIfPresent(element, CSS_MEDIA_ATTRIBUTE);
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
+      removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
       return false;
     }
     const { backgroundImage, sources } = record;
+    const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
+    const allSourcesAllowed =
+      sources.length > 0 && actions.every((action) => action === "allow");
     const functionalKind = functionalCssControlKind(element, record);
-    if (functionalKind) {
+    if (functionalKind && allSourcesAllowed) {
       setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, functionalKind);
       setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
       setAttributeIfChanged(element, CSS_MEDIA_ATTRIBUTE, "allow");
       clearWaitingMediaHostsAround(element);
       return true;
     }
-    if (sources.length === 0 || isSafeCssUiVector(element, sources)) {
+    if (sources.length === 0) {
       removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
       setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "allow") {
@@ -674,7 +734,6 @@
       clearWaitingMediaHostsAround(element);
       return true;
     }
-    const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
     if (actions.some((action) => action === "block")) {
       removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
       removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
@@ -692,7 +751,7 @@
       setAttributeIfChanged(element, CSS_MEDIA_ATTRIBUTE, "error");
       return true;
     }
-    if (actions.every((action) => action === "allow")) {
+    if (allSourcesAllowed) {
       removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
       setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
       if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "allow") {
@@ -714,11 +773,18 @@
     const record = config.records.get(element);
     if (!record || !element.isConnected) {
       config.records.delete(element);
+      removeAttributeIfPresent(element, config.attribute);
+      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
+      removeStylePropertyIfPresent(element, config.backgroundProperty);
+      removeStylePropertyIfPresent(element, config.contentProperty);
       return false;
     }
     const { backgroundImage, content, sources } = record;
+    const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
+    const allSourcesAllowed =
+      sources.length > 0 && actions.every((action) => action === "allow");
     const functionalKind = functionalCssControlKind(element, record);
-    if (functionalKind) {
+    if (functionalKind && allSourcesAllowed) {
       setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, functionalKind);
       setStylePropertyIfChanged(element, config.backgroundProperty, backgroundImage);
       setStylePropertyIfChanged(element, config.contentProperty, content);
@@ -726,11 +792,9 @@
       clearWaitingMediaHostsAround(element);
       return true;
     }
-    const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
     const shouldAllow =
       sources.length === 0 ||
-      isSafeCssUiVector(element, sources) ||
-      actions.every((action) => action === "allow");
+      allSourcesAllowed;
     const shouldBlock = actions.some((action) => action === "block");
     const shouldError =
       actions.some((action) => action === "error") ||
@@ -755,9 +819,10 @@
   };
 
   const applyCssBackgroundsForSource = (sourceUrl) => {
+    let matchedCount = 0;
     for (const [element, record] of cssBackgroundRecords.entries()) {
-      if (record.sources.includes(sourceUrl)) {
-        applyCssBackgroundDecision(element);
+      if (record.sources.includes(sourceUrl) && applyCssBackgroundDecision(element)) {
+        matchedCount += 1;
       }
     }
     for (const [pseudo, records] of [
@@ -765,11 +830,12 @@
       ["after", cssAfterRecords],
     ]) {
       for (const [element, record] of records.entries()) {
-        if (record.sources.includes(sourceUrl)) {
-          applyPseudoCssDecision(element, pseudo);
+        if (record.sources.includes(sourceUrl) && applyPseudoCssDecision(element, pseudo)) {
+          matchedCount += 1;
         }
       }
     }
+    return matchedCount;
   };
 
   const scheduleCssFallbackDecision = (sourceUrl, delayMs = FALLBACK_DELAY_MS) => {
@@ -840,6 +906,11 @@
       !backgroundImage ||
       backgroundImage === "none"
     ) {
+      if (element instanceof HTMLElement) {
+        cssBackgroundRecords.delete(element);
+        removeAttributeIfPresent(element, CSS_MEDIA_ATTRIBUTE);
+        removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
+      }
       return;
     }
     const sources = backgroundSourcesFromValue(backgroundImage);
@@ -870,6 +941,13 @@
     const hasBackground = backgroundImage && backgroundImage !== "none";
     const hasContent = content && !["none", "normal"].includes(content);
     if (!(element instanceof HTMLElement) || (!hasBackground && !hasContent)) {
+      if (element instanceof HTMLElement) {
+        const config = pseudoRecordConfig(pseudo);
+        config.records.delete(element);
+        removeAttributeIfPresent(element, config.attribute);
+        removeStylePropertyIfPresent(element, config.backgroundProperty);
+        removeStylePropertyIfPresent(element, config.contentProperty);
+      }
       return;
     }
     const config = pseudoRecordConfig(pseudo);
@@ -924,13 +1002,20 @@
     pendingBackgroundProbeRoots.add(normalizedRoot);
   };
 
-  function* backgroundProbeCandidates(root) {
-    if (root === document) {
-      yield* document.querySelectorAll("*");
-      return;
+  function* backgroundProbeCandidates(root, budget) {
+    const rootElement =
+      root === document ? document.documentElement : root instanceof Element ? root : null;
+    if (!rootElement || budget <= 0) return;
+    let visited = 0;
+    yield rootElement;
+    visited += 1;
+    const walker = document.createTreeWalker(rootElement, NodeFilter.SHOW_ELEMENT);
+    while (visited < budget) {
+      const element = walker.nextNode();
+      if (!element) break;
+      yield element;
+      visited += 1;
     }
-    yield root;
-    yield* root.querySelectorAll("*");
   }
 
   const inspectBackgroundElement = (element, discovered) => {
@@ -1009,17 +1094,19 @@
     const discovered = [];
     documentRoot.setAttribute(BACKGROUND_PROBE_ATTRIBUTE, "true");
     try {
-      let inspected = 0;
+      let visited = 0;
       for (const probeRoot of probeRoots) {
-        for (const element of backgroundProbeCandidates(probeRoot)) {
-          if (inspected >= MAX_BACKGROUND_PROBE_ELEMENTS) {
+        for (const element of backgroundProbeCandidates(
+          probeRoot,
+          MAX_BACKGROUND_PROBE_ELEMENTS - visited,
+        )) {
+          if (visited >= MAX_BACKGROUND_PROBE_ELEMENTS) {
             break;
           }
-          if (inspectBackgroundElement(element, discovered)) {
-            inspected += 1;
-          }
+          visited += 1;
+          inspectBackgroundElement(element, discovered);
         }
-        if (inspected >= MAX_BACKGROUND_PROBE_ELEMENTS) {
+        if (visited >= MAX_BACKGROUND_PROBE_ELEMENTS) {
           break;
         }
       }
@@ -1083,9 +1170,10 @@
     const documentRoot = document.documentElement;
     if (!documentRoot) return;
     const discovered = [];
+    const viewportElements = viewportBackgroundElements();
     documentRoot.setAttribute(BACKGROUND_PROBE_ATTRIBUTE, "true");
     try {
-      for (const element of viewportBackgroundElements()) {
+      for (const element of viewportElements) {
         inspectBackgroundElement(element, discovered);
       }
     } finally {
@@ -1356,17 +1444,18 @@
     isVisibleNow(element) ? VISIBLE_FALLBACK_DELAY_MS : NEARBY_FALLBACK_DELAY_MS;
 
   const observeFallbackDecision = (element, sourceUrl) => {
-    if (!hasLoadedPixels(element)) {
-      return;
-    }
     fallbackObservedSources.set(element, sourceUrl);
     if (fallbackObserver) {
       fallbackObserver.observe(element);
       if (isNearViewport(element)) {
         fallbackNearElements.add(element);
+        sendPriorityHintsForElement(element);
         scheduleFallbackDecision(element, sourceUrl, prioritizedFallbackDelay(element));
       }
     } else {
+      if (isNearViewport(element)) {
+        sendPriorityHintsForElement(element);
+      }
       scheduleFallbackDecision(element, sourceUrl);
     }
   };
@@ -1383,6 +1472,7 @@
               }
               if (entry.isIntersecting) {
                 fallbackNearElements.add(element);
+                sendPriorityHintsForElement(element);
                 scheduleFallbackDecision(
                   element,
                   sourceUrl,
@@ -1402,54 +1492,17 @@
         )
       : null;
 
-  const prepareImageForFastPresentation = (element) => {
+  const prepareImageForAsyncDecoding = (element) => {
     if (!(element instanceof HTMLImageElement)) {
       return;
     }
     if (!element.hasAttribute("decoding")) {
       setAttributeIfChanged(element, "decoding", "async");
     }
-    if (!element.hasAttribute("fetchpriority")) {
-      setAttributeIfChanged(element, "fetchpriority", "high");
-    }
-    if (element.getAttribute("loading") === "lazy") {
-      setAttributeIfChanged(element, "loading", "eager");
-    }
-  };
-
-  const imagePrewarmObserver =
-    typeof IntersectionObserver === "function"
-      ? new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              if (!entry.isIntersecting) {
-                continue;
-              }
-              prepareImageForFastPresentation(entry.target);
-              imagePrewarmObserver.unobserve(entry.target);
-            }
-          },
-          { rootMargin: IMAGE_PREWARM_ROOT_MARGIN },
-        )
-      : null;
-
-  const observeImagePrewarm = (element) => {
-    if (!(element instanceof HTMLImageElement) || element.complete) {
-      return;
-    }
-    if (imagePrewarmObserver) {
-      imagePrewarmObserver.observe(element);
-    } else if (isVisibleNow(element)) {
-      prepareImageForFastPresentation(element);
-    }
   };
 
   const reconcileMediaHostState = (host) => {
     if (!(host instanceof Element)) return;
-    if (host.matches(APPROVED_PRESENTATION_SELECTOR) || host.querySelector(APPROVED_PRESENTATION_SELECTOR)) {
-      removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
-      return;
-    }
     const trackedImages =
       Array.from(host.children)
         .filter((child) => child instanceof HTMLImageElement)
@@ -1466,10 +1519,12 @@
         })
         .map((child) => child.getAttribute("data-glosh-dag-media"));
     const hostState =
-      siblingStates.includes("allow")
+      siblingStates.includes("hidden")
+        ? "waiting"
+        : siblingStates.includes("allow")
           ? null
-          : siblingStates.includes("hidden")
-            ? "waiting"
+          : siblingStates.includes("block")
+            ? "filtered"
             : siblingStates.includes("error")
               ? "error"
               : null;
@@ -1492,7 +1547,6 @@
     const releaseTrackedMedia = (element) => {
       if (element instanceof HTMLImageElement) {
         releaseMediaHost(element);
-        imagePrewarmObserver?.unobserve(element);
       }
       removeElementFromSourceIndex(element);
       stopFallbackObservation(element);
@@ -1505,10 +1559,6 @@
 
   const updateMediaHostState = (element, presentationState) => {
     if (!(element instanceof HTMLImageElement)) return;
-    if (presentationState === "filtered") {
-      releaseMediaHost(element);
-      return;
-    }
     const previousHost = mediaHostsByElement.get(element);
     const host = element.parentElement;
     if (previousHost && previousHost !== host) {
@@ -1516,6 +1566,13 @@
       reconcileMediaHostState(previousHost);
     }
     if (!host) return;
+    if (
+      previousHost === host &&
+      ["filtered", "error"].includes(presentationState)
+    ) {
+      reconcileMediaHostState(host);
+      return;
+    }
     const mediaBounds = element.getBoundingClientRect();
     const hostBounds = host.getBoundingClientRect();
     const mediaArea = mediaBounds.width * mediaBounds.height;
@@ -1544,8 +1601,16 @@
         "aria-description",
         FILTERED_ACCESSIBLE_DESCRIPTION,
       );
+    } else if (action === "error") {
+      setAttributeIfChanged(
+        element,
+        "aria-description",
+        ERROR_ACCESSIBLE_DESCRIPTION,
+      );
     } else if (
-      element.getAttribute("aria-description") === FILTERED_ACCESSIBLE_DESCRIPTION
+      [FILTERED_ACCESSIBLE_DESCRIPTION, ERROR_ACCESSIBLE_DESCRIPTION].includes(
+        element.getAttribute("aria-description"),
+      )
     ) {
       removeAttributeIfPresent(element, "aria-description");
     }
@@ -1572,7 +1637,10 @@
     setAttributeIfChanged(element, "data-glosh-dag-media", "hidden");
     updateAccessibleMediaState(element, "hidden");
     updateMediaHostState(element, "waiting");
-    candidateSourcesFor(element);
+    const fallbackSource = candidateSourcesFor(element)[0];
+    if (fallbackSource) {
+      observeFallbackDecision(element, fallbackSource);
+    }
     const timer = setTimeout(() => {
       sourceReconcileTimers.delete(element);
       if (!element.isConnected) {
@@ -1589,7 +1657,7 @@
     if (!(element instanceof Element) || !element.matches(mediaSelector)) {
       return false;
     }
-    observeImagePrewarm(element);
+    prepareImageForAsyncDecoding(element);
     if (applyInlineUiVectorDecision(element)) {
       stopFallbackObservation(element);
       updateAccessibleMediaState(element, "allow");
@@ -1597,10 +1665,6 @@
       return true;
     }
     const candidateSources = candidateSourcesFor(element);
-    if (applyFunctionalImageIconDecision(element, candidateSources)) {
-      stopFallbackObservation(element);
-      return true;
-    }
     const activeSource = candidateSources[0];
     const sourceChangePending = pendingSourceChanges.has(element);
     const pendingSafetySource = sourceChangePending
@@ -1614,16 +1678,6 @@
         ? activeSource
         : null);
     const action = sourceUrl ? decisionsBySource.get(sourceUrl) : null;
-    if (sourceUrl && isSafeRemoteUiVector(element, sourceUrl)) {
-      analyzedSources.set(element, sourceUrl);
-      stopFallbackObservation(element);
-      setAttributeIfChanged(element, UI_VECTOR_ATTRIBUTE, "allow");
-      setAttributeIfChanged(element, "data-glosh-dag-media", "allow");
-      updateAccessibleMediaState(element, "allow");
-      updateMediaHostState(element, "allow");
-      clearWaitingMediaHostsAround(element);
-      return true;
-    }
     removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
     const failedSource = sourceChangePending
       ? candidateSources.find((candidate) => failedSources.has(candidate))
@@ -1652,6 +1706,12 @@
     }
     analyzedSources.set(element, sourceUrl);
     stopFallbackObservation(element);
+    if (action === "allow" && applyFunctionalImageIconDecision(element, candidateSources)) {
+      return true;
+    }
+    if (action === "allow" && isSafeRemoteUiVector(element, sourceUrl)) {
+      setAttributeIfChanged(element, UI_VECTOR_ATTRIBUTE, "allow");
+    }
     setAttributeIfChanged(element, "data-glosh-dag-media", action);
     updateAccessibleMediaState(element, action);
     updateMediaHostState(
@@ -1684,11 +1744,15 @@
       return undefined;
     }
     rememberDecision(sourceUrl, message.action);
-    const matchedCount = applyDecisionToMediaSource(sourceUrl);
+    const { mediaMatches, cssMatches } = applyDecisionToSource(sourceUrl);
+    const matchedCount = mediaMatches + cssMatches;
     return Promise.resolve({
       type: PRESENTATION_APPLIED_MESSAGE,
       version: 1,
       matchedCount,
+      mediaMatches,
+      cssMatches,
+      binding: matchedCount > 0 ? "applied" : "unbound",
     });
   });
 
@@ -1769,6 +1833,36 @@
     });
   };
 
+  const reconcileProtectedPresentationMutation = (element, attributeName) => {
+    if (!(element instanceof Element)) return;
+    if (attributeName === MEDIA_HOST_ATTRIBUTE) {
+      reconcileMediaHostState(element);
+      return;
+    }
+    if (attributeName === BACKGROUND_PROBE_ATTRIBUTE) {
+      if (element === document.documentElement && element.hasAttribute(attributeName)) {
+        removeAttributeIfPresent(element, attributeName);
+      }
+      return;
+    }
+    if (
+      ["data-glosh-dag-media", UI_VECTOR_ATTRIBUTE].includes(attributeName) ||
+      (attributeName === FUNCTIONAL_ICON_ATTRIBUTE && element.matches(mediaSelector))
+    ) {
+      applyKnownDecision(element);
+      return;
+    }
+    if ([CSS_MEDIA_ATTRIBUTE, FUNCTIONAL_ICON_ATTRIBUTE].includes(attributeName)) {
+      applyCssBackgroundDecision(element);
+    }
+    if ([CSS_BEFORE_ATTRIBUTE, FUNCTIONAL_ICON_ATTRIBUTE].includes(attributeName)) {
+      applyPseudoCssDecision(element, "before");
+    }
+    if ([CSS_AFTER_ATTRIBUTE, FUNCTIONAL_ICON_ATTRIBUTE].includes(attributeName)) {
+      applyPseudoCssDecision(element, "after");
+    }
+  };
+
   for (const eventName of ["play", "playing", "volumechange", "loadedmetadata"]) {
     document.addEventListener(
       eventName,
@@ -1788,6 +1882,29 @@
     },
     true,
   );
+  document.addEventListener(
+    "error",
+    (event) => {
+      const element = event.target;
+      if (!(element instanceof Element) || !element.matches(mediaSelector)) return;
+      pendingSourceChanges.delete(element);
+      clearSourceReconcileTimer(element);
+      stopFallbackObservation(element);
+      const sourceUrl = candidateSourcesFor(element)[0];
+      if (sourceUrl && decisionsBySource.get(sourceUrl) === "block") {
+        applyKnownDecision(element);
+        return;
+      }
+      if (sourceUrl) {
+        failedSources.add(sourceUrl);
+        rememberDecision(sourceUrl, "error");
+      }
+      setAttributeIfChanged(element, "data-glosh-dag-media", "error");
+      updateAccessibleMediaState(element, "error");
+      updateMediaHostState(element, "error");
+    },
+    true,
+  );
 
   markHidden(document);
   scanPageAdvertisements(document);
@@ -1801,11 +1918,18 @@
         releaseMediaHostsIn(node);
       }
       if (mutation.removedNodes.length > 0) {
+        mutation.target instanceof Element &&
+          mutation.target.closest("svg") &&
+          applyInlineUiVectorDecision(mutation.target.closest("svg"));
         scheduleCssBackgroundProbe(mutation.target);
         shouldReportPreviewEligibility = true;
       }
       for (const node of mutation.addedNodes) {
         markHidden(node);
+        if (node instanceof Element) {
+          const ownerSvg = node.matches("svg") ? node : node.closest("svg");
+          if (ownerSvg) applyInlineUiVectorDecision(ownerSvg);
+        }
         scanPageAdvertisements(node);
         scheduleCssBackgroundProbe(
           node instanceof Element ? node : mutation.target,
@@ -1815,6 +1939,11 @@
       }
       if (mutation.target instanceof Element && mutation.type === "attributes") {
         const attributeName = mutation.attributeName || "";
+        if (PROTECTED_PRESENTATION_ATTRIBUTES.has(attributeName)) {
+          reconcileProtectedPresentationMutation(mutation.target, attributeName);
+        }
+        const ownerSvg = mutation.target.closest("svg");
+        if (ownerSvg) applyInlineUiVectorDecision(ownerSvg);
         if (attributeName === "style") {
           const ownStyle = ownStyleSnapshots.get(mutation.target);
           const currentStyle = mutation.target.getAttribute("style") || "";
@@ -1830,6 +1959,13 @@
             applyKnownDecision(mutation.target);
           }
           stopPlayableMediaIn(mutation.target);
+        }
+        if (
+          mutation.target instanceof HTMLSourceElement &&
+          SOURCE_MUTATION_ATTRIBUTES.has(attributeName)
+        ) {
+          const pictureImage = mutation.target.closest("picture")?.querySelector("img");
+          if (pictureImage) protectSourceMutation(pictureImage);
         }
         if (["class", "style", "alt", "aria-label"].includes(attributeName)) {
           scheduleCssBackgroundProbe(mutation.target);
@@ -1865,6 +2001,10 @@
       "data-original",
       "data-url",
       "poster",
+      "sizes",
+      "media",
+      "href",
+      "xlink:href",
       "style",
       "alt",
       "aria-label",
@@ -1873,6 +2013,14 @@
       "data-advertisement",
       "autocomplete",
       "type",
+      "data-glosh-dag-media",
+      UI_VECTOR_ATTRIBUTE,
+      CSS_MEDIA_ATTRIBUTE,
+      CSS_BEFORE_ATTRIBUTE,
+      CSS_AFTER_ATTRIBUTE,
+      BACKGROUND_PROBE_ATTRIBUTE,
+      MEDIA_HOST_ATTRIBUTE,
+      FUNCTIONAL_ICON_ATTRIBUTE,
     ],
     childList: true,
     subtree: true,
