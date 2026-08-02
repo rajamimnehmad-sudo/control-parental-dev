@@ -28,9 +28,10 @@ const VIDEO_SITE_HOSTS = new Set([
 ]);
 const MAX_ANALYSIS_BYTES = 2 * 1024 * 1024;
 const MAX_INTERCEPT_CAPTURE_BYTES = MAX_ANALYSIS_BYTES;
-// A23 can keep many lightweight response handles open, but retained image bytes stay below the
-// previous 16 x 2 MiB theoretical ceiling. This admits ordinary icon bursts without unbounded RAM.
-const MAX_ACTIVE_IMAGE_STREAMS = 64;
+// Modern API 29+ arm64 devices can keep lightweight response handles open, while the independent
+// byte budget below remains the real memory ceiling. This admits current storefront bursts without
+// allowing retained image bytes to grow with the handle count.
+const MAX_ACTIVE_IMAGE_STREAMS = 128;
 const MAX_INTERCEPT_CAPTURE_BUDGET_BYTES = 8 * 1024 * 1024;
 const MAX_SOURCE_URL_LENGTH = 4_096;
 const MAX_INLINE_IMAGE_URL_LENGTH = 512 * 1024;
@@ -46,6 +47,7 @@ const NATIVE_DECISION_TIMEOUT_MS = 2_500;
 const VIEWPORT_SETTLE_MS = 250;
 const VIEWPORT_CAPTURE_WINDOW_MS = 750;
 const NATIVE_APP = "glosh.dag.protection";
+const INLINE_ANALYSIS_ORIGIN = "https://inline-media.glosh.local";
 const PROTOCOL_VERSION = 1;
 const PRESENTATION_DECISION_MESSAGE = "media-presentation-decision";
 const PRESENTATION_APPLIED_MESSAGE = "media-presentation-applied";
@@ -670,7 +672,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
     nativeRequestsInFlight += 1;
     adjustInitialCounter(documentState, "nativeRequestsInFlight", 1);
     return requestContentDecision(
-      { url: sourceUrl, tabId: senderTab },
+      { url: `${INLINE_ANALYSIS_ORIGIN}/blob`, tabId: senderTab },
       bytes,
       message?.priority === "visible" ? "visible" : "nearby",
       { transportPath: "inline", documentState: currentDocumentState },
@@ -962,7 +964,7 @@ const fetchFallbackDecision = async (sourceUrl, priority, documentState) => {
       return TECHNICAL_ERROR_ACTION;
     }
     return requestContentDecision(
-      { url: sourceUrl, tabId: documentState.tabId },
+      { url: `${INLINE_ANALYSIS_ORIGIN}/data`, tabId: documentState.tabId },
       combineChunks(chunks, totalBytes),
       priority,
       {

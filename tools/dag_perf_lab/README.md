@@ -84,3 +84,21 @@ python3 -m py_compile \
   tools/dag_perf_lab/summarize_run.py
 bash -n tools/dag_perf_lab/run_a23_fixture.sh
 ```
+
+## Matriz sobre sitios HTTPS vivos
+
+Después de intentar el fixture, una URL publica se mide sin reutilizar comandos
+manuales:
+
+```bash
+tools/dag_perf_lab/run_live_site.sh \
+  --serial R58T34V31AE \
+  --url https://www.example.com/ \
+  --label example \
+  --capture-screen
+```
+
+El runner exige serial, URL y etiqueta explicitos. No contiene dominios
+especiales, no borra datos y produce el mismo `summary.json` que el fixture.
+Una pagina viva puede cambiar entre corridas; por eso complementa al fixture y
+no lo reemplaza como comparacion determinista.

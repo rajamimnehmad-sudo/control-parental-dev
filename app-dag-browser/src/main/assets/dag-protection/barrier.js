@@ -1,9 +1,7 @@
 "use strict";
 
 (() => {
-  if (globalThis.__gloshDagBarrierInstalled === true) {
-    return;
-  }
+  if (globalThis.__gloshDagBarrierInstalled === true) return;
   Object.defineProperty(globalThis, "__gloshDagBarrierInstalled", {
     value: true,
     configurable: false,
@@ -11,263 +9,87 @@
     writable: false,
   });
 
-  const mediaSelector = [
-    "img",
-    "picture",
-    "video",
-    "audio",
-    "canvas",
-    "svg",
-    "image",
-    "input[type='image']",
-    "object",
-    "embed",
+  const PROTOCOL_VERSION = 1;
+  const NATIVE_APP = "glosh.dag.protection";
+  const MEDIA_SELECTOR = "img,image,input[type='image']";
+  const BLOCKED_MEDIA_SELECTOR = "video,audio,canvas,object,embed";
+  const SOURCE_ATTRIBUTES = new Set([
+    "src", "srcset", "data-src", "data-srcset", "data-lazy-src",
+    "data-original", "data-url", "sizes", "media", "href", "xlink:href",
+  ]);
+  const GENERATED_PROTOCOLS = new Set(["data:", "blob:"]);
+  const INITIALIZED_ATTRIBUTE = "data-glosh-dag-initialized";
+  const GENERATED_ATTRIBUTE_SELECTOR = [
+    "[data-glosh-dag-generated-background]",
+    "[data-glosh-dag-generated-before]",
+    "[data-glosh-dag-generated-after]",
   ].join(",");
-  const PRESENTATION_DECISION_MESSAGE = "media-presentation-decision";
-  const PRESENTATION_APPLIED_MESSAGE = "media-presentation-applied";
-  const FALLBACK_REQUEST_MESSAGE = "media-fallback-request";
-  const FALLBACK_RESPONSE_MESSAGE = "media-fallback-response";
-  const INLINE_REQUEST_MESSAGE = "media-inline-request";
-  const INLINE_RESPONSE_MESSAGE = "media-inline-response";
-  const PRIORITY_HINT_MESSAGE = "media-priority-hint";
-  const DECISION_ACTIONS = ["allow", "block", "error"];
-  const PLAYABLE_MEDIA_SELECTOR = "video, audio";
+  const MEDIA_HOST_ATTRIBUTE = "data-glosh-dag-media-host";
+  const PROTECTED_ATTRIBUTES = new Set([
+    "data-glosh-dag-media",
+    "data-glosh-dag-ui-vector",
+    "data-glosh-dag-generated-background",
+    "data-glosh-dag-generated-before",
+    "data-glosh-dag-generated-after",
+    INITIALIZED_ATTRIBUTE,
+    MEDIA_HOST_ATTRIBUTE,
+  ]);
+  const DECISION_ACTIONS = new Set(["allow", "block", "error"]);
+  const MAX_REMEMBERED_DECISIONS = 512;
+  const MAX_INLINE_ANALYSIS_BYTES = 2 * 1024 * 1024;
+  const MAX_INLINE_VECTOR_ELEMENTS = 256;
+  const GENERATED_SOURCE_PATTERN = /(?:data|blob):/iu;
+  const GENERATED_KINDS = ["element", "before", "after"];
   const FILTERED_ACCESSIBLE_DESCRIPTION = "Protegida por Glosh";
   const ERROR_ACCESSIBLE_DESCRIPTION = "Imagen no disponible";
-  const MAX_REMEMBERED_DECISIONS = 512;
-  const FALLBACK_DELAY_MS = 80;
-  const VISIBLE_FALLBACK_DELAY_MS = 0;
-  const NEARBY_FALLBACK_DELAY_MS = 120;
-  const FALLBACK_RETRY_BASE_MS = 600;
-  const FALLBACK_RETRY_MAX_MS = 6_000;
-  const MAX_FALLBACK_ATTEMPTS = 4;
-  const FALLBACK_ROOT_MARGIN = "640px 0px";
-  const SOURCE_RECONCILE_DELAY_MS = 160;
-  const SOURCE_MUTATION_ATTRIBUTES = new Set([
-    "src",
-    "srcset",
-    "data-src",
-    "data-srcset",
-    "data-lazy-src",
-    "data-original",
-    "data-url",
-    "poster",
-    "sizes",
-    "media",
-    "href",
-    "xlink:href",
-  ]);
-  const UI_VECTOR_ATTRIBUTE = "data-glosh-dag-ui-vector";
-  const CSS_MEDIA_ATTRIBUTE = "data-glosh-dag-css-media";
-  const CSS_MEDIA_VALUE_PROPERTY = "--glosh-dag-background-image";
-  const CSS_BEFORE_ATTRIBUTE = "data-glosh-dag-css-before";
-  const CSS_AFTER_ATTRIBUTE = "data-glosh-dag-css-after";
-  const CSS_BEFORE_VALUE_PROPERTY = "--glosh-dag-before-background-image";
-  const CSS_AFTER_VALUE_PROPERTY = "--glosh-dag-after-background-image";
-  const CSS_BEFORE_CONTENT_PROPERTY = "--glosh-dag-before-content";
-  const CSS_AFTER_CONTENT_PROPERTY = "--glosh-dag-after-content";
-  const BACKGROUND_PROBE_ATTRIBUTE = "data-glosh-dag-background-probe";
-  const SPONSORED_RESULT_ATTRIBUTE = "data-glosh-dag-sponsored-result";
-  const MEDIA_HOST_ATTRIBUTE = "data-glosh-dag-media-host";
-  const FUNCTIONAL_ICON_ATTRIBUTE = "data-glosh-dag-functional-icon";
-  const PROTECTED_PRESENTATION_ATTRIBUTES = new Set([
-    "data-glosh-dag-media",
-    UI_VECTOR_ATTRIBUTE,
-    CSS_MEDIA_ATTRIBUTE,
-    CSS_BEFORE_ATTRIBUTE,
-    CSS_AFTER_ATTRIBUTE,
-    BACKGROUND_PROBE_ATTRIBUTE,
-    MEDIA_HOST_ATTRIBUTE,
-    FUNCTIONAL_ICON_ATTRIBUTE,
-  ]);
-  const PAGE_AD_HIDDEN_CLASS = "glosh-dag-page-ad-hidden";
-  const PAGE_AD_SELECTOR = [
-    "[data-ad]",
-    "[data-ad-slot]",
-    "[data-advertisement]",
-    "[aria-label*='advert' i]",
-    "[aria-label*='sponsored' i]",
-    "[class*='ad-container' i]",
-    "[class*='ad-wrapper' i]",
-    "[class*='advert' i]",
-    "[id*='advert' i]",
-    "[class*='sponsored' i]",
-    "[id*='sponsored' i]",
-  ].join(",");
-  const MAX_CSS_BACKGROUND_ELEMENTS = 512;
-  const MAX_BACKGROUND_PROBE_ELEMENTS = 1_500;
-  const MAX_VIEWPORT_BACKGROUND_ELEMENTS = 128;
-  const MAX_VIEWPORT_INTERACTIVE_ELEMENTS = 96;
-  const MAX_CONTROL_VISUAL_DESCENDANTS = 8;
-  const INTERACTIVE_CONTROL_SELECTOR =
-    "button, [role='button'], [role='menuitem'], [role='link'], a";
-  const BACKGROUND_PROBE_DELAY_MS = 180;
-  const MIN_BACKGROUND_PROBE_INTERVAL_MS = 450;
-  const BACKGROUND_SCROLL_SETTLE_MS = 160;
-  const MAX_UI_VECTOR_RENDERED_WIDTH = 1_024;
-  const MAX_UI_VECTOR_RENDERED_HEIGHT = 160;
-  const MAX_UI_VECTOR_RENDERED_AREA = 96_000;
-  const MAX_INLINE_VECTOR_ELEMENTS = 256;
-  const MAX_FUNCTIONAL_ICON_SIZE = 72;
-  const MAX_FUNCTIONAL_IMAGE_SOURCE_SIZE = 256;
-  const FUNCTIONAL_ICON_SEMANTIC_PATTERN =
-    /\b(search|buscar|menu|nav|cart|bag|basket|carrito|account|profile|user|close|dismiss|next|previous|prev|arrow|chevron|favorite|favourite|favorito|wishlist|heart|share|filter|sort|zoom|home)\b/iu;
-  const FUNCTIONAL_ICON_SOURCE_PATTERN =
-    /(?:^|[/_.-])(icon|icons|sprite|sprites|search|menu|cart|bag|basket|account|profile|user|close|arrow|chevron|favorite|wishlist|heart|share|filter|sort|zoom|home)(?:[/_.-]|$)/iu;
-  const MAX_INLINE_ANALYSIS_BYTES = 2 * 1024 * 1024;
-  const BLOCKED_INLINE_VECTOR_ELEMENTS = new Set([
-    "audio",
-    "canvas",
-    "feimage",
-    "foreignobject",
-    "iframe",
-    "image",
-    "script",
-    "video",
-  ]);
-  const analyzedSources = new WeakMap();
-  const decisionsBySource = new Map();
-  const failedSources = new Set();
-  const fallbackPendingSources = new Set();
-  const fallbackAttemptsBySource = new Map();
-  const fallbackObservedSources = new WeakMap();
-  const fallbackNearElements = new WeakSet();
-  const reportedPriorityHints = new Map();
-  const fallbackTimers = new WeakMap();
-  const mediaHostsByElement = new WeakMap();
-  const indexedSourcesByElement = new WeakMap();
-  const mediaElementsBySource = new Map();
-  const pendingSourceChanges = new WeakSet();
-  const sourceReconcileTimers = new WeakMap();
-  const cssBackgroundRecords = new Map();
-  const cssBeforeRecords = new Map();
-  const cssAfterRecords = new Map();
-  const cssFallbackTimers = new Map();
-  const pendingBackgroundProbeRoots = new Set();
-  const ownStyleSnapshots = new WeakMap();
-  let backgroundProbeTimer = null;
-  let scrollBackgroundProbeTimer = null;
-  let lastBackgroundProbeAt = Number.NEGATIVE_INFINITY;
-  let sponsoredScanTimer = null;
   const performanceDocumentToken =
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
 
-  const sendMediaPriorityHint = (sourceUrl, priority) => {
-    if (window.top !== window || !["visible", "nearby"].includes(priority)) {
-      return;
-    }
-    let normalizedUrl;
-    try {
-      const url = new URL(sourceUrl, document.baseURI);
-      if (!["http:", "https:"].includes(url.protocol)) {
-        return;
-      }
-      url.hash = "";
-      normalizedUrl = url.href;
-    } catch {
-      return;
-    }
-    const previous = reportedPriorityHints.get(normalizedUrl);
-    if (previous === "visible" || previous === priority) {
-      return;
-    }
-    if (
-      !reportedPriorityHints.has(normalizedUrl) &&
-      reportedPriorityHints.size >= MAX_REMEMBERED_DECISIONS
-    ) {
-      reportedPriorityHints.delete(reportedPriorityHints.keys().next().value);
-    }
-    reportedPriorityHints.set(normalizedUrl, priority);
-    try {
-      void browser.runtime.sendMessage({
-        type: PRIORITY_HINT_MESSAGE,
-        version: 1,
-        documentToken: performanceDocumentToken,
-        sourceUrl: normalizedUrl,
-        priority,
-      }).catch(() => {
-        // Priority is advisory; losing a hint never weakens the fail-closed decision path.
-      });
-    } catch {
-      // Priority is advisory; losing a hint never weakens the fail-closed decision path.
-    }
-  };
+  const decisionsBySource = new Map();
+  const pendingSourceDecisions = new Map();
+  const elementsBySource = new Map();
+  const sourcesByElement = new WeakMap();
+  const trustedMediaStates = new WeakMap();
+  const hostByElement = new WeakMap();
+  const elementsByHost = new WeakMap();
+  const generatedRecords = new Map();
+  const generatedRuleTargets = [];
+  const pendingLayoutElements = new Set();
+  const pendingGeneratedLayout = new Map();
+  const generatedKeysByElement = new WeakMap();
+  const generatedIdsByElement = new WeakMap();
+  const priorityBySource = new Map();
+  const ownStyleSnapshots = new WeakMap();
+  let nativePort = null;
+  let previewEligibilityTimer = null;
+  let generatedRuleRefreshScheduled = false;
+  let layoutFlushScheduled = false;
+  let layoutFrameId = null;
+  let layoutTimerId = null;
+  let nextGeneratedId = 1;
+  let initialBarrierComplete = false;
 
-  const sendPriorityHintsForElement = (element) => {
-    const priority = isVisibleNow(element) ? "visible" : "nearby";
-    for (const sourceUrl of candidateSourcesFor(element)) {
-      sendMediaPriorityHint(sourceUrl, priority);
-    }
-  };
-
-  const isVideoSiteDocument = () => {
-    const hostname = location.hostname.toLowerCase();
-    return /(?:^|\.)youtube(?:-nocookie)?\.com$/u.test(hostname) ||
-      /(?:^|\.)youtu\.be$/u.test(hostname);
-  };
-
-  const isInsideVideoPlayer = (element) =>
-    element instanceof Element &&
-    (element.matches("video, audio") ||
-      element.closest("video, audio, [class*='player' i], [id*='player' i]") !== null);
-
-  const hidePageAdvertisement = (element) => {
-    if (
-      !(element instanceof HTMLElement) ||
-      element.classList.contains(PAGE_AD_HIDDEN_CLASS) ||
-      isInsideVideoPlayer(element)
-    ) {
-      return;
-    }
-    element.classList.add(PAGE_AD_HIDDEN_CLASS);
-  };
-
-  const scanPageAdvertisements = (root = document) => {
-    if (isVideoSiteDocument()) {
-      return;
-    }
-    if (root instanceof HTMLElement && root.matches(PAGE_AD_SELECTOR)) {
-      hidePageAdvertisement(root);
-    }
-    root.querySelectorAll?.(PAGE_AD_SELECTOR).forEach(hidePageAdvertisement);
-  };
+  const mediaPriorityObserver = typeof IntersectionObserver === "function"
+    ? new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || !(entry.target instanceof Element)) continue;
+          sendSourcePriority(
+            sourcesByElement.get(entry.target) || indexElement(entry.target),
+            "visible",
+          );
+          mediaPriorityObserver.unobserve(entry.target);
+        }
+      }, { rootMargin: "640px 0px" })
+    : null;
 
   const setAttributeIfChanged = (element, name, value) => {
-    if (element.getAttribute(name) !== value) {
-      element.setAttribute(name, value);
-    }
+    if (element.getAttribute(name) !== value) element.setAttribute(name, value);
   };
-
   const removeAttributeIfPresent = (element, name) => {
-    if (element.hasAttribute(name)) {
-      element.removeAttribute(name);
-    }
+    if (element.hasAttribute(name)) element.removeAttribute(name);
   };
-
-  const rememberOwnStyleMutation = (element) => {
-    ownStyleSnapshots.set(element, element.getAttribute("style") || "");
-  };
-
-  const setStylePropertyIfChanged = (element, property, value) => {
-    if (element.style.getPropertyValue(property) === value) {
-      return;
-    }
-    element.style.setProperty(property, value);
-    rememberOwnStyleMutation(element);
-  };
-
-  const removeStylePropertyIfPresent = (element, property) => {
-    if (!element.style.getPropertyValue(property)) {
-      return;
-    }
-    element.style.removeProperty(property);
-    rememberOwnStyleMutation(element);
-  };
-
   const normalizedSource = (rawSource) => {
-    if (!rawSource) {
-      return null;
-    }
+    if (typeof rawSource !== "string" || rawSource.length === 0) return null;
     try {
       const url = new URL(rawSource, document.baseURI);
       url.hash = "";
@@ -276,1799 +98,799 @@
       return null;
     }
   };
-
-  const sourcesFromSrcset = (srcset) =>
-    (srcset || "")
-      .split(",")
-      .map((candidate) => candidate.trim().split(/\s+/u)[0])
-      .map(normalizedSource)
-      .filter(Boolean);
-
-  const removeElementFromSourceIndex = (element) => {
-    const previousSources = indexedSourcesByElement.get(element) || [];
-    for (const sourceUrl of previousSources) {
-      const elements = mediaElementsBySource.get(sourceUrl);
-      elements?.delete(element);
-      if (elements?.size === 0) {
-        mediaElementsBySource.delete(sourceUrl);
-      }
-    }
-    indexedSourcesByElement.delete(element);
-  };
-
-  const updateElementSourceIndex = (element, sources) => {
-    const previousSources = indexedSourcesByElement.get(element) || [];
-    if (
-      previousSources.length === sources.length &&
-      previousSources.every((sourceUrl, index) => sourceUrl === sources[index])
-    ) {
-      return;
-    }
-    removeElementFromSourceIndex(element);
-    if (sources.length === 0) {
-      return;
-    }
-    indexedSourcesByElement.set(element, sources);
-    for (const sourceUrl of sources) {
-      let elements = mediaElementsBySource.get(sourceUrl);
-      if (!elements) {
-        elements = new Set();
-        mediaElementsBySource.set(sourceUrl, elements);
-      }
-      elements.add(element);
-    }
-  };
+  const sourcesFromSrcset = (value) =>
+    String(value || "").split(",")
+      .map((entry) => entry.trim().split(/\s+/u)[0])
+      .map(normalizedSource).filter(Boolean);
 
   const candidateSourcesFor = (element) => {
     const sources = [];
-    const addSource = (rawSource) => {
-      const sourceUrl = normalizedSource(rawSource);
-      if (sourceUrl && !sources.includes(sourceUrl)) {
-        sources.push(sourceUrl);
-      }
+    const add = (value) => {
+      const normalized = normalizedSource(value);
+      if (normalized && !sources.includes(normalized)) sources.push(normalized);
     };
     if (element instanceof HTMLImageElement) {
-      addSource(element.currentSrc);
-      addSource(element.getAttribute("src"));
-      sourcesFromSrcset(element.getAttribute("srcset")).forEach(addSource);
-      for (const attribute of ["data-src", "data-lazy-src", "data-original", "data-url"]) {
-        addSource(element.getAttribute(attribute));
+      add(element.currentSrc);
+      add(element.getAttribute("src"));
+      sourcesFromSrcset(element.getAttribute("srcset")).forEach(add);
+      for (const name of ["data-src", "data-lazy-src", "data-original", "data-url"]) {
+        add(element.getAttribute(name));
       }
-      sourcesFromSrcset(element.getAttribute("data-srcset")).forEach(addSource);
-    } else if (element instanceof HTMLVideoElement) {
-      addSource(element.poster);
-    } else if (element instanceof HTMLInputElement) {
-      addSource(element.getAttribute("src"));
+      sourcesFromSrcset(element.getAttribute("data-srcset")).forEach(add);
     } else if (element instanceof SVGImageElement) {
-      addSource(element.href?.baseVal || element.getAttribute("href"));
-    }
-    updateElementSourceIndex(element, sources);
-    return sources;
-  };
-
-  const stopPlayableMedia = (element) => {
-    if (!(element instanceof HTMLMediaElement)) {
-      return;
-    }
-    element.autoplay = false;
-    element.defaultMuted = true;
-    if (!element.muted) {
-      element.muted = true;
-    }
-    setAttributeIfChanged(element, "preload", "none");
-    setAttributeIfChanged(element, "aria-hidden", "true");
-    try {
-      element.pause();
-    } catch {
-      // A detached or not-yet-initialized media element is already fail-closed.
-    }
-    if (element.srcObject !== null) {
-      try {
-        element.srcObject = null;
-      } catch {
-        // Some page-owned streams expose a read-only assignment boundary.
-      }
-    }
-  };
-
-  const stopPlayableMediaIn = (root) => {
-    if (!(root instanceof Element) && root !== document) {
-      return;
-    }
-    if (root instanceof HTMLMediaElement) {
-      stopPlayableMedia(root);
-    }
-    root.querySelectorAll?.(PLAYABLE_MEDIA_SELECTOR).forEach(stopPlayableMedia);
-  };
-
-  const isSvgSource = (sourceUrl) => {
-    try {
-      return new URL(sourceUrl).pathname.toLowerCase().endsWith(".svg");
-    } catch {
-      return false;
-    }
-  };
-
-  const hasExternalCssUrl = (value) => {
-    const matches = String(value || "").matchAll(/url\(([^)]+)\)/giu);
-    for (const match of matches) {
-      const target = match[1].trim().replace(/^['"]|['"]$/gu, "");
-      if (!target.startsWith("#")) {
-        return true;
-      }
-    }
-    return false;
-  };
-
-  const hasSafeUiBounds = (element) => {
-    const bounds = element.getBoundingClientRect();
-    return (
-      Number.isFinite(bounds.width) &&
-      Number.isFinite(bounds.height) &&
-      bounds.width > 0 &&
-      bounds.height > 0 &&
-      bounds.width <= MAX_UI_VECTOR_RENDERED_WIDTH &&
-      bounds.height <= MAX_UI_VECTOR_RENDERED_HEIGHT &&
-      bounds.width * bounds.height <= MAX_UI_VECTOR_RENDERED_AREA
-    );
-  };
-
-  const isSafeInlineUiVector = (element) => {
-    if (!(element instanceof SVGSVGElement) || !hasSafeUiBounds(element)) {
-      return false;
-    }
-    const descendants = [element, ...element.querySelectorAll("*")];
-    if (descendants.length > MAX_INLINE_VECTOR_ELEMENTS) {
-      return false;
-    }
-    for (const descendant of descendants) {
-      const localName = descendant.localName?.toLowerCase() || "";
-      if (BLOCKED_INLINE_VECTOR_ELEMENTS.has(localName)) {
-        return false;
-      }
-      if (
-        localName === "style" &&
-        (hasExternalCssUrl(descendant.textContent) || /@import/iu.test(descendant.textContent || ""))
-      ) {
-        return false;
-      }
-      for (const attribute of descendant.attributes || []) {
-        const name = attribute.name.toLowerCase();
-        const value = attribute.value.trim();
-        if (name.startsWith("on") || hasExternalCssUrl(value)) {
-          return false;
-        }
-        if (
-          ["use", "feimage"].includes(localName) &&
-          ["href", "xlink:href"].includes(name) &&
-          value.length > 0 &&
-          !value.startsWith("#")
-        ) {
-          return false;
-        }
-      }
-    }
-    return true;
-  };
-
-  const isSafeRemoteUiVector = (element, sourceUrl) =>
-    element instanceof HTMLImageElement &&
-    element.complete &&
-    element.naturalWidth > 0 &&
-    element.naturalHeight > 0 &&
-    isSvgSource(sourceUrl) &&
-    hasSafeUiBounds(element);
-
-  const applyInlineUiVectorDecision = (element) => {
-    if (!(element instanceof SVGSVGElement)) {
-      return false;
-    }
-    if (isSafeInlineUiVector(element)) {
-      setAttributeIfChanged(element, UI_VECTOR_ATTRIBUTE, "allow");
-      clearWaitingMediaHostsAround(element);
-      return true;
-    }
-    removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
-    setAttributeIfChanged(element, "data-glosh-dag-media", "hidden");
-    return false;
-  };
-
-  const rememberDecision = (sourceUrl, action) => {
-    if (!decisionsBySource.has(sourceUrl) && decisionsBySource.size >= MAX_REMEMBERED_DECISIONS) {
-      decisionsBySource.delete(decisionsBySource.keys().next().value);
-    }
-    decisionsBySource.set(sourceUrl, action);
-    failedSources.delete(sourceUrl);
-  };
-
-  function clearWaitingMediaHostsAround(element) {
-    let current = element;
-    for (let depth = 0; current instanceof Element && depth < 4; depth += 1) {
-      if (current.getAttribute(MEDIA_HOST_ATTRIBUTE) === "waiting") {
-        reconcileMediaHostState(current);
-      }
-      current = current.parentElement;
-    }
-  }
-
-  const applyDecisionToMediaSource = (sourceUrl) => {
-    const indexedElements = mediaElementsBySource.get(sourceUrl);
-    const candidates =
-      indexedElements?.size > 0
-        ? [...indexedElements]
-        : [...document.querySelectorAll(mediaSelector)];
-    let matchedCount = 0;
-    for (const element of candidates) {
-      if (!element.isConnected) {
-        removeElementFromSourceIndex(element);
-        continue;
-      }
-      const stillReferencesDecisionSource =
-        candidateSourcesFor(element).includes(sourceUrl);
-      const appliedCurrentDecision = applyKnownDecision(element);
-      if (stillReferencesDecisionSource && appliedCurrentDecision) {
-        matchedCount += 1;
-      }
-    }
-    return matchedCount;
-  };
-
-  const applyDecisionToSource = (sourceUrl) => {
-    const mediaMatches = applyDecisionToMediaSource(sourceUrl);
-    const cssMatches = applyCssBackgroundsForSource(sourceUrl);
-    return { mediaMatches, cssMatches };
-  };
-
-  const hasLoadedPixels = (element) =>
-    element instanceof HTMLImageElement &&
-    element.complete &&
-    element.naturalWidth > 1 &&
-    element.naturalHeight > 1;
-
-  const isVisibleNow = (element) => {
-    const bounds = element.getBoundingClientRect();
-    return (
-      bounds.width > 0 &&
-      bounds.height > 0 &&
-      bounds.bottom > 0 &&
-      bounds.right > 0 &&
-      bounds.top < window.innerHeight &&
-      bounds.left < window.innerWidth
-    );
-  };
-
-  const isNearViewport = (element) => {
-    const bounds = element.getBoundingClientRect();
-    const margin = 640;
-    return (
-      bounds.width > 0 &&
-      bounds.height > 0 &&
-      bounds.bottom > -margin &&
-      bounds.right > 0 &&
-      bounds.top < window.innerHeight + margin &&
-      bounds.left < window.innerWidth
-    );
-  };
-
-  const backgroundSourcesFromValue = (backgroundImage) => {
-    const sources = [];
-    const matches = String(backgroundImage || "").matchAll(/url\(([^)]+)\)/giu);
-    for (const match of matches) {
-      const sourceUrl = normalizedSource(match[1].trim().replace(/^['"]|['"]$/gu, ""));
-      const protocol = sourceUrl ? new URL(sourceUrl).protocol : "";
-      const supportedDataImage =
-        protocol === "data:" &&
-        /^data:image\/(?:avif|gif|jpeg|jpg|png|svg\+xml|webp)(?:;base64)?,/iu.test(sourceUrl);
-      if (
-        sourceUrl &&
-        (["http:", "https:", "blob:"].includes(protocol) || supportedDataImage)
-      ) {
-        if (!sources.includes(sourceUrl)) {
-          sources.push(sourceUrl);
-        }
-      }
+      add(element.href?.baseVal || element.getAttribute("href"));
+    } else if (element instanceof HTMLInputElement) {
+      add(element.getAttribute("src"));
     }
     return sources;
   };
 
-  const forgetDisconnectedCssBackgrounds = () => {
-    for (const records of [cssBackgroundRecords, cssBeforeRecords, cssAfterRecords]) {
-      for (const element of records.keys()) {
-        if (!element.isConnected) {
-          records.delete(element);
-        }
+  const unindexElement = (element) => {
+    for (const source of sourcesByElement.get(element) || []) {
+      const elements = elementsBySource.get(source);
+      elements?.delete(element);
+      if (elements?.size === 0) {
+        elementsBySource.delete(source);
+        priorityBySource.delete(source);
       }
     }
+    sourcesByElement.delete(element);
   };
 
-  const rememberCssBackground = (element, visual) => {
-    forgetDisconnectedCssBackgrounds();
-    if (
-      !cssBackgroundRecords.has(element) &&
-      cssBackgroundRecords.size >= MAX_CSS_BACKGROUND_ELEMENTS
-    ) {
-      cssBackgroundRecords.delete(cssBackgroundRecords.keys().next().value);
-    }
-    cssBackgroundRecords.set(element, visual);
-  };
-
-  const functionalIconKind = (element, sources = []) => {
-    const bounds = element.getBoundingClientRect();
-    if (
-      !Number.isFinite(bounds.width) ||
-      !Number.isFinite(bounds.height) ||
-      bounds.width <= 0 ||
-      bounds.height <= 0 ||
-      bounds.width > MAX_FUNCTIONAL_ICON_SIZE ||
-      bounds.height > MAX_FUNCTIONAL_ICON_SIZE
-    ) {
-      return null;
-    }
-    const link = element.closest("a, button, [role='button'], [role='link'], [role='menuitem']");
-    if (!link) {
-      return null;
-    }
-    const semantics = [
-      element.id,
-      element.className,
-      element.getAttribute("aria-label"),
-      element.getAttribute("title"),
-      link?.id,
-      link?.className,
-      link?.getAttribute("aria-label"),
-      link?.getAttribute("title"),
-      link?.getAttribute("href"),
-    ]
-      .filter((value) => typeof value === "string")
-      .join(" ");
-    const semanticMatch = semantics.match(FUNCTIONAL_ICON_SEMANTIC_PATTERN);
-    const sourceHasIconSignal = sources.some((source) => {
-      try {
-        return FUNCTIONAL_ICON_SOURCE_PATTERN.test(new URL(source).pathname);
-      } catch {
-        return false;
-      }
-    });
-    return semanticMatch && sourceHasIconSignal ? semanticMatch[1].toLowerCase() : null;
-  };
-
-  const functionalCssControlKind = (element, record) => {
-    const bounds = element.getBoundingClientRect();
-    if (
-      !Number.isFinite(bounds.width) ||
-      !Number.isFinite(bounds.height) ||
-      bounds.width <= 0 ||
-      bounds.height <= 0 ||
-      bounds.width > MAX_FUNCTIONAL_ICON_SIZE ||
-      bounds.height > MAX_FUNCTIONAL_ICON_SIZE
-    ) {
-      return null;
-    }
-    const control =
-      element.closest("a, button, [role='button'], [role='link'], [role='menuitem']") ||
-      element.querySelector("a, button, [role='button'], [role='link'], [role='menuitem']");
-    if (!control) {
-      return null;
-    }
-    const vectorVisual =
-      (record.sources.length > 0 && record.sources.every(isSvgSource)) ||
-      /url\(["']?data:image\/svg\+xml/iu.test(record.backgroundImage);
-    const backgroundPosition = String(record.backgroundPosition || "").trim();
-    const clippedSprite =
-      String(record.backgroundRepeat || "").includes("no-repeat") &&
-      backgroundPosition.length > 0 &&
-      !["0% 0%", "0px 0px", "left top"].includes(backgroundPosition.toLowerCase());
-    return vectorVisual || clippedSprite ? "control" : null;
-  };
-
-  const applyFunctionalImageIconDecision = (element, sources) => {
-    if (!(element instanceof HTMLImageElement) || !element.complete) {
-      return false;
-    }
-    if (
-      element.naturalWidth <= 0 ||
-      element.naturalHeight <= 0 ||
-      element.naturalWidth > MAX_FUNCTIONAL_IMAGE_SOURCE_SIZE ||
-      element.naturalHeight > MAX_FUNCTIONAL_IMAGE_SOURCE_SIZE
-    ) {
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      return false;
-    }
-    const kind = functionalIconKind(element, sources);
-    if (!kind) {
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      return false;
-    }
-    setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, kind);
-    setAttributeIfChanged(element, "data-glosh-dag-media", "allow");
-    updateAccessibleMediaState(element, "allow");
-    updateMediaHostState(element, "allow");
-    clearWaitingMediaHostsAround(element);
-    return true;
-  };
-
-  const pseudoRecordConfig = (pseudo) => {
-    if (pseudo === "before") {
-      return {
-        records: cssBeforeRecords,
-        attribute: CSS_BEFORE_ATTRIBUTE,
-        backgroundProperty: CSS_BEFORE_VALUE_PROPERTY,
-        contentProperty: CSS_BEFORE_CONTENT_PROPERTY,
-      };
-    }
-    return {
-      records: cssAfterRecords,
-      attribute: CSS_AFTER_ATTRIBUTE,
-      backgroundProperty: CSS_AFTER_VALUE_PROPERTY,
-      contentProperty: CSS_AFTER_CONTENT_PROPERTY,
-    };
-  };
-
-  const applyCssBackgroundDecision = (element) => {
-    const record = cssBackgroundRecords.get(element);
-    if (!record || !element.isConnected) {
-      cssBackgroundRecords.delete(element);
-      removeAttributeIfPresent(element, CSS_MEDIA_ATTRIBUTE);
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-      return false;
-    }
-    const { backgroundImage, sources } = record;
-    const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
-    const allSourcesAllowed =
-      sources.length > 0 && actions.every((action) => action === "allow");
-    const functionalKind = functionalCssControlKind(element, record);
-    if (functionalKind && allSourcesAllowed) {
-      setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, functionalKind);
-      setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
-      setAttributeIfChanged(element, CSS_MEDIA_ATTRIBUTE, "allow");
-      clearWaitingMediaHostsAround(element);
-      return true;
-    }
-    if (sources.length === 0) {
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
-      if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "allow") {
-        element.setAttribute(CSS_MEDIA_ATTRIBUTE, "allow");
-      }
-      clearWaitingMediaHostsAround(element);
-      return true;
-    }
-    if (actions.some((action) => action === "block")) {
-      removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "block") {
-        element.setAttribute(CSS_MEDIA_ATTRIBUTE, "block");
-      }
-      return true;
-    }
-    if (
-      actions.some((action) => action === "error") ||
-      sources.some((sourceUrl) => failedSources.has(sourceUrl))
-    ) {
-      removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      setAttributeIfChanged(element, CSS_MEDIA_ATTRIBUTE, "error");
-      return true;
-    }
-    if (allSourcesAllowed) {
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      setStylePropertyIfChanged(element, CSS_MEDIA_VALUE_PROPERTY, backgroundImage);
-      if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "allow") {
-        element.setAttribute(CSS_MEDIA_ATTRIBUTE, "allow");
-      }
-      clearWaitingMediaHostsAround(element);
-      return true;
-    }
-    removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-    removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-    if (element.getAttribute(CSS_MEDIA_ATTRIBUTE) !== "hidden") {
-      element.setAttribute(CSS_MEDIA_ATTRIBUTE, "hidden");
-    }
-    return false;
-  };
-
-  const applyPseudoCssDecision = (element, pseudo) => {
-    const config = pseudoRecordConfig(pseudo);
-    const record = config.records.get(element);
-    if (!record || !element.isConnected) {
-      config.records.delete(element);
-      removeAttributeIfPresent(element, config.attribute);
-      removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-      removeStylePropertyIfPresent(element, config.backgroundProperty);
-      removeStylePropertyIfPresent(element, config.contentProperty);
-      return false;
-    }
-    const { backgroundImage, content, sources } = record;
-    const actions = sources.map((sourceUrl) => decisionsBySource.get(sourceUrl));
-    const allSourcesAllowed =
-      sources.length > 0 && actions.every((action) => action === "allow");
-    const functionalKind = functionalCssControlKind(element, record);
-    if (functionalKind && allSourcesAllowed) {
-      setAttributeIfChanged(element, FUNCTIONAL_ICON_ATTRIBUTE, functionalKind);
-      setStylePropertyIfChanged(element, config.backgroundProperty, backgroundImage);
-      setStylePropertyIfChanged(element, config.contentProperty, content);
-      setAttributeIfChanged(element, config.attribute, "allow");
-      clearWaitingMediaHostsAround(element);
-      return true;
-    }
-    const shouldAllow =
-      sources.length === 0 ||
-      allSourcesAllowed;
-    const shouldBlock = actions.some((action) => action === "block");
-    const shouldError =
-      actions.some((action) => action === "error") ||
-      sources.some((sourceUrl) => failedSources.has(sourceUrl));
-    if (shouldAllow) {
-      setStylePropertyIfChanged(element, config.backgroundProperty, backgroundImage);
-      setStylePropertyIfChanged(element, config.contentProperty, content);
-      if (element.getAttribute(config.attribute) !== "allow") {
-        element.setAttribute(config.attribute, "allow");
-      }
-      clearWaitingMediaHostsAround(element);
-      return true;
-    }
-    for (const property of [config.backgroundProperty, config.contentProperty]) {
-      removeStylePropertyIfPresent(element, property);
-    }
-    const state = shouldBlock ? "block" : shouldError ? "error" : "hidden";
-    if (element.getAttribute(config.attribute) !== state) {
-      element.setAttribute(config.attribute, state);
-    }
-    return shouldBlock;
-  };
-
-  const applyCssBackgroundsForSource = (sourceUrl) => {
-    let matchedCount = 0;
-    for (const [element, record] of cssBackgroundRecords.entries()) {
-      if (record.sources.includes(sourceUrl) && applyCssBackgroundDecision(element)) {
-        matchedCount += 1;
-      }
-    }
-    for (const [pseudo, records] of [
-      ["before", cssBeforeRecords],
-      ["after", cssAfterRecords],
-    ]) {
-      for (const [element, record] of records.entries()) {
-        if (record.sources.includes(sourceUrl) && applyPseudoCssDecision(element, pseudo)) {
-          matchedCount += 1;
-        }
-      }
-    }
-    return matchedCount;
-  };
-
-  const scheduleCssFallbackDecision = (sourceUrl, delayMs = FALLBACK_DELAY_MS) => {
-    if (
-      decisionsBySource.has(sourceUrl) ||
-      fallbackPendingSources.has(sourceUrl) ||
-      cssFallbackTimers.has(sourceUrl)
-    ) {
-      return;
-    }
-    const timer = setTimeout(() => {
-      cssFallbackTimers.delete(sourceUrl);
-      requestCssFallbackDecision(sourceUrl);
-    }, delayMs);
-    cssFallbackTimers.set(sourceUrl, timer);
-  };
-
-  const requestCssFallbackDecision = (sourceUrl) => {
-    if (decisionsBySource.has(sourceUrl) || fallbackPendingSources.has(sourceUrl)) {
-      return;
-    }
-    const recordEntry = [
-      ...cssBackgroundRecords.entries(),
-      ...cssBeforeRecords.entries(),
-      ...cssAfterRecords.entries(),
-    ].find(([, record]) => record.sources.includes(sourceUrl));
-    if (!recordEntry) {
-      return;
-    }
-    const [element] = recordEntry;
-    fallbackPendingSources.add(sourceUrl);
-    requestSourceDecision(
-      sourceUrl,
-      isVisibleNow(element) ? "visible" : "nearby",
-    )
-      .then((response) => {
-        fallbackPendingSources.delete(sourceUrl);
-        if (
-          [FALLBACK_RESPONSE_MESSAGE, INLINE_RESPONSE_MESSAGE].includes(response?.type) &&
-          response?.version === 1 &&
-          normalizedSource(response.sourceUrl) === sourceUrl &&
-          DECISION_ACTIONS.includes(response.action)
-        ) {
-          fallbackAttemptsBySource.delete(sourceUrl);
-          rememberDecision(sourceUrl, response.action);
-          applyCssBackgroundsForSource(sourceUrl);
-          return;
-        }
-        const retryDelay = retryDelayOrMarkError(sourceUrl);
-        if (retryDelay !== null) scheduleCssFallbackDecision(sourceUrl, retryDelay);
-      })
-      .catch(() => {
-        fallbackPendingSources.delete(sourceUrl);
-        const retryDelay = retryDelayOrMarkError(sourceUrl);
-        if (retryDelay !== null) scheduleCssFallbackDecision(sourceUrl, retryDelay);
-      });
-  };
-
-  const recordCssBackground = (
-    element,
-    backgroundImage,
-    backgroundPosition,
-    backgroundSize,
-    backgroundRepeat,
-  ) => {
-    if (
-      !(element instanceof HTMLElement) ||
-      !backgroundImage ||
-      backgroundImage === "none"
-    ) {
-      if (element instanceof HTMLElement) {
-        cssBackgroundRecords.delete(element);
-        removeAttributeIfPresent(element, CSS_MEDIA_ATTRIBUTE);
-        removeStylePropertyIfPresent(element, CSS_MEDIA_VALUE_PROPERTY);
-      }
-      return;
-    }
-    const sources = backgroundSourcesFromValue(backgroundImage);
-    rememberCssBackground(element, {
-      backgroundImage,
-      backgroundPosition,
-      backgroundSize,
-      backgroundRepeat,
-      sources,
-    });
-    if (applyCssBackgroundDecision(element)) {
-      return;
-    }
-    for (const sourceUrl of sources) {
-      scheduleCssFallbackDecision(sourceUrl);
-    }
-  };
-
-  const recordPseudoCssVisual = (
-    element,
-    pseudo,
-    backgroundImage,
-    backgroundPosition,
-    backgroundSize,
-    backgroundRepeat,
-    content,
-  ) => {
-    const hasBackground = backgroundImage && backgroundImage !== "none";
-    const hasContent = content && !["none", "normal"].includes(content);
-    if (!(element instanceof HTMLElement) || (!hasBackground && !hasContent)) {
-      if (element instanceof HTMLElement) {
-        const config = pseudoRecordConfig(pseudo);
-        config.records.delete(element);
-        removeAttributeIfPresent(element, config.attribute);
-        removeStylePropertyIfPresent(element, config.backgroundProperty);
-        removeStylePropertyIfPresent(element, config.contentProperty);
-      }
-      return;
-    }
-    const config = pseudoRecordConfig(pseudo);
-    forgetDisconnectedCssBackgrounds();
-    if (!config.records.has(element) && config.records.size >= MAX_CSS_BACKGROUND_ELEMENTS) {
-      config.records.delete(config.records.keys().next().value);
-    }
-    const normalizedBackground = hasBackground ? backgroundImage : "none";
-    const normalizedContent = hasContent ? content : "\"\"";
-    const sources = backgroundSourcesFromValue(
-      `${normalizedBackground} ${normalizedContent}`,
-    );
-    config.records.set(element, {
-      backgroundImage: normalizedBackground,
-      backgroundPosition,
-      backgroundSize,
-      backgroundRepeat,
-      content: normalizedContent,
-      sources,
-    });
-    if (applyPseudoCssDecision(element, pseudo)) {
-      return;
-    }
-    for (const sourceUrl of sources) {
-      scheduleCssFallbackDecision(sourceUrl);
-    }
-  };
-
-  const rememberBackgroundProbeRoot = (root) => {
-    const normalizedRoot =
-      root === document || root === document.documentElement
-        ? document
-        : root instanceof Element && root.isConnected
-          ? root
-          : null;
-    if (!normalizedRoot || pendingBackgroundProbeRoots.has(document)) {
-      return;
-    }
-    if (normalizedRoot === document) {
-      pendingBackgroundProbeRoots.clear();
-      pendingBackgroundProbeRoots.add(document);
-      return;
-    }
-    for (const existing of pendingBackgroundProbeRoots) {
-      if (existing instanceof Element && existing.contains(normalizedRoot)) {
-        return;
-      }
-      if (existing instanceof Element && normalizedRoot.contains(existing)) {
-        pendingBackgroundProbeRoots.delete(existing);
-      }
-    }
-    pendingBackgroundProbeRoots.add(normalizedRoot);
-  };
-
-  function* backgroundProbeCandidates(root, budget) {
-    const rootElement =
-      root === document ? document.documentElement : root instanceof Element ? root : null;
-    if (!rootElement || budget <= 0) return;
-    let visited = 0;
-    yield rootElement;
-    visited += 1;
-    const walker = document.createTreeWalker(rootElement, NodeFilter.SHOW_ELEMENT);
-    while (visited < budget) {
-      const element = walker.nextNode();
-      if (!element) break;
-      yield element;
-      visited += 1;
-    }
-  }
-
-  const inspectBackgroundElement = (element, discovered) => {
-    if (!(element instanceof HTMLElement) || !isNearViewport(element)) {
-      return false;
-    }
-    const elementStyle = getComputedStyle(element);
-    const backgroundImage = elementStyle.backgroundImage;
-    if (backgroundImage && backgroundImage !== "none") {
-      discovered.push({
-        element,
-        backgroundImage,
-        backgroundPosition: elementStyle.backgroundPosition,
-        backgroundSize: elementStyle.backgroundSize,
-        backgroundRepeat: elementStyle.backgroundRepeat,
-        pseudo: null,
-        content: "normal",
-      });
-    }
-    for (const pseudo of ["before", "after"]) {
-      const style = getComputedStyle(element, `::${pseudo}`);
-      if (
-        (style.backgroundImage && style.backgroundImage !== "none") ||
-        (style.content && !["none", "normal"].includes(style.content))
-      ) {
-        discovered.push({
-          element,
-          backgroundImage: style.backgroundImage,
-          backgroundPosition: style.backgroundPosition,
-          backgroundSize: style.backgroundSize,
-          backgroundRepeat: style.backgroundRepeat,
-          pseudo,
-          content: style.content,
-        });
-      }
-    }
-    return true;
-  };
-
-  const applyDiscoveredBackgrounds = (discovered) => {
-    for (const record of discovered) {
-      if (record.pseudo) {
-        recordPseudoCssVisual(
-          record.element,
-          record.pseudo,
-          record.backgroundImage,
-          record.backgroundPosition,
-          record.backgroundSize,
-          record.backgroundRepeat,
-          record.content,
-        );
-      } else {
-        recordCssBackground(
-          record.element,
-          record.backgroundImage,
-          record.backgroundPosition,
-          record.backgroundSize,
-          record.backgroundRepeat,
-        );
-      }
-    }
-  };
-
-  const probeCssBackgrounds = () => {
-    backgroundProbeTimer = null;
-    lastBackgroundProbeAt = performance.now();
-    const documentRoot = document.documentElement;
-    if (!documentRoot) {
-      return;
-    }
-    const probeRoots =
-      pendingBackgroundProbeRoots.size > 0
-        ? [...pendingBackgroundProbeRoots]
-        : [document];
-    pendingBackgroundProbeRoots.clear();
-    const discovered = [];
-    documentRoot.setAttribute(BACKGROUND_PROBE_ATTRIBUTE, "true");
-    try {
-      let visited = 0;
-      for (const probeRoot of probeRoots) {
-        for (const element of backgroundProbeCandidates(
-          probeRoot,
-          MAX_BACKGROUND_PROBE_ELEMENTS - visited,
-        )) {
-          if (visited >= MAX_BACKGROUND_PROBE_ELEMENTS) {
-            break;
-          }
-          visited += 1;
-          inspectBackgroundElement(element, discovered);
-        }
-        if (visited >= MAX_BACKGROUND_PROBE_ELEMENTS) {
-          break;
-        }
-      }
-    } finally {
-      documentRoot.removeAttribute(BACKGROUND_PROBE_ATTRIBUTE);
-    }
-    applyDiscoveredBackgrounds(discovered);
-  };
-
-  const viewportBackgroundElements = () => {
-    const elements = new Set();
-    let interactiveElements = 0;
-    for (const control of document.querySelectorAll(INTERACTIVE_CONTROL_SELECTOR)) {
-      if (
-        interactiveElements >= MAX_VIEWPORT_INTERACTIVE_ELEMENTS ||
-        elements.size >= MAX_VIEWPORT_BACKGROUND_ELEMENTS
-      ) {
-        break;
-      }
-      if (!isVisibleNow(control)) {
-        continue;
-      }
-      const pending = [{ element: control, depth: 0 }];
-      let descendants = 0;
-      while (
-        pending.length > 0 &&
-        descendants < MAX_CONTROL_VISUAL_DESCENDANTS &&
-        elements.size < MAX_VIEWPORT_BACKGROUND_ELEMENTS
-      ) {
-        const candidate = pending.shift();
-        elements.add(candidate.element);
-        descendants += 1;
-        if (candidate.depth >= 2) {
-          continue;
-        }
-        for (const child of candidate.element.children) {
-          pending.push({ element: child, depth: candidate.depth + 1 });
-        }
-      }
-      interactiveElements += 1;
-    }
-    const xPositions = [0.12, 0.5, 0.88].map((ratio) => window.innerWidth * ratio);
-    const verticalStep = Math.max(120, Math.floor(window.innerHeight / 8));
-    for (let y = 1; y < window.innerHeight; y += verticalStep) {
-      for (const x of xPositions) {
-        let candidate = document.elementFromPoint(x, y);
-        for (let depth = 0; candidate && depth < 4; depth += 1) {
-          elements.add(candidate);
-          if (elements.size >= MAX_VIEWPORT_BACKGROUND_ELEMENTS) {
-            return elements;
-          }
-          candidate = candidate.parentElement;
-        }
-      }
-    }
-    return elements;
-  };
-
-  const probeVisibleCssBackgrounds = () => {
-    lastBackgroundProbeAt = performance.now();
-    const documentRoot = document.documentElement;
-    if (!documentRoot) return;
-    const discovered = [];
-    const viewportElements = viewportBackgroundElements();
-    documentRoot.setAttribute(BACKGROUND_PROBE_ATTRIBUTE, "true");
-    try {
-      for (const element of viewportElements) {
-        inspectBackgroundElement(element, discovered);
-      }
-    } finally {
-      documentRoot.removeAttribute(BACKGROUND_PROBE_ATTRIBUTE);
-    }
-    applyDiscoveredBackgrounds(discovered);
-  };
-
-  const scheduleCssBackgroundProbe = (
-    root = document,
-    delayMs = BACKGROUND_PROBE_DELAY_MS,
-  ) => {
-    rememberBackgroundProbeRoot(root);
-    if (backgroundProbeTimer !== null) {
-      return;
-    }
-    const elapsed = performance.now() - lastBackgroundProbeAt;
-    const remainingThrottle = Math.max(0, MIN_BACKGROUND_PROBE_INTERVAL_MS - elapsed);
-    backgroundProbeTimer = setTimeout(
-      probeCssBackgrounds,
-      Math.max(delayMs, remainingThrottle),
-    );
-  };
-
-  const scheduleScrollBackgroundProbe = () => {
-    if (scrollBackgroundProbeTimer !== null) {
-      clearTimeout(scrollBackgroundProbeTimer);
-    }
-    const elapsed = performance.now() - lastBackgroundProbeAt;
-    const remainingThrottle = Math.max(0, MIN_BACKGROUND_PROBE_INTERVAL_MS - elapsed);
-    scrollBackgroundProbeTimer = setTimeout(() => {
-      scrollBackgroundProbeTimer = null;
-      probeVisibleCssBackgrounds();
-    }, Math.max(BACKGROUND_SCROLL_SETTLE_MS, remainingThrottle));
-  };
-
-  const isGoogleSearchDocument = () =>
-    window.top === window &&
-    /(^|\.)google\./iu.test(location.hostname) &&
-    location.pathname === "/search";
-
-  const markSponsoredGoogleResults = () => {
-    if (!isGoogleSearchDocument()) {
-      return;
-    }
-    const knownAdContainers = [
-      "[data-text-ad]",
-      "[data-pla-slot]",
-      "[data-ta-slot]",
-      "#tads",
-      "#taw",
-      "[aria-label='Anuncios']",
-      "[aria-label='Sponsored products']",
-      "[aria-label='Productos patrocinados']",
-      ".uEierd",
-    ].join(",");
-    const knownContainers = [...document.querySelectorAll(knownAdContainers)];
-    knownContainers.forEach((container) => {
-      setAttributeIfChanged(container, SPONSORED_RESULT_ATTRIBUTE, "true");
-    });
-    const collapseSponsoredResults =
-      /^(ocultar resultados patrocinados|hide sponsored results)\b/iu;
-    document.querySelectorAll("button, [role='button'], a").forEach((control) => {
-      if (
-        collapseSponsoredResults.test(control.textContent?.trim() || "") &&
-        control.getAttribute(SPONSORED_RESULT_ATTRIBUTE) !== "collapsed"
-      ) {
-        setAttributeIfChanged(control, SPONSORED_RESULT_ATTRIBUTE, "collapsed");
-        (control.closest("button, [role='button'], a") || control).click();
-      }
-    });
-    const sponsoredLabel = /^(patrocinado|sponsored)$/iu;
-    knownContainers.forEach((container) => {
-      container.querySelectorAll("span, div").forEach((label) => {
-        if (sponsoredLabel.test(label.textContent?.trim() || "")) {
-          setAttributeIfChanged(container, SPONSORED_RESULT_ATTRIBUTE, "true");
-        }
-      });
-    });
-  };
-
-  const markExplicitAdvertisementFrames = () => {
-    const explicitAdvertisementFrames = [
-      "iframe[title='Advertisement' i]",
-      "iframe[aria-label='Advertisement' i]",
-      "iframe[name^='google_ads_iframe']",
-    ].join(",");
-    document.querySelectorAll(explicitAdvertisementFrames).forEach((frame) => {
-      setAttributeIfChanged(frame, SPONSORED_RESULT_ATTRIBUTE, "true");
-      let ancestor = frame.parentElement;
-      for (let depth = 0; ancestor && depth < 4; depth += 1) {
-        const bounds = ancestor.getBoundingClientRect();
-        const position = getComputedStyle(ancestor).position;
-        const isLargeOverlay =
-          ["fixed", "sticky"].includes(position) &&
-          bounds.width >= window.innerWidth * 0.6 &&
-          bounds.height >= window.innerHeight * 0.3;
-        if (isLargeOverlay) {
-          setAttributeIfChanged(ancestor, SPONSORED_RESULT_ATTRIBUTE, "true");
-          break;
-        }
-        ancestor = ancestor.parentElement;
-      }
-    });
-  };
-
-  const scanSponsoredContent = () => {
-    sponsoredScanTimer = null;
-    markExplicitAdvertisementFrames();
-    markSponsoredGoogleResults();
-  };
-
-  const scheduleSponsoredScan = (delayMs = 120) => {
-    if (sponsoredScanTimer !== null) {
-      return;
-    }
-    sponsoredScanTimer = setTimeout(scanSponsoredContent, delayMs);
-  };
-
-  const stopFallbackObservation = (element) => {
-    fallbackNearElements.delete(element);
-    fallbackObservedSources.delete(element);
-    fallbackObserver?.unobserve(element);
-    const scheduled = fallbackTimers.get(element);
-    if (scheduled) {
-      clearTimeout(scheduled.timer);
-      fallbackTimers.delete(element);
-    }
-  };
-
-  const rememberFallbackAttempt = (sourceUrl) => {
-    if (
-      !fallbackAttemptsBySource.has(sourceUrl) &&
-      fallbackAttemptsBySource.size >= MAX_REMEMBERED_DECISIONS
-    ) {
-      fallbackAttemptsBySource.delete(fallbackAttemptsBySource.keys().next().value);
-    }
-    const attempt = (fallbackAttemptsBySource.get(sourceUrl) || 0) + 1;
-    fallbackAttemptsBySource.set(sourceUrl, attempt);
-    return attempt;
-  };
-
-  const retryDelayOrMarkError = (sourceUrl) => {
-    const attempt = rememberFallbackAttempt(sourceUrl);
-    if (attempt >= MAX_FALLBACK_ATTEMPTS) {
-      if (!failedSources.has(sourceUrl) && failedSources.size >= MAX_REMEMBERED_DECISIONS) {
-        failedSources.delete(failedSources.values().next().value);
-      }
-      failedSources.add(sourceUrl);
-      fallbackAttemptsBySource.delete(sourceUrl);
-      applyDecisionToSource(sourceUrl);
-      return null;
-    }
-    return Math.min(
-      FALLBACK_RETRY_MAX_MS,
-      FALLBACK_RETRY_BASE_MS * 2 ** Math.min(attempt - 1, 4),
-    );
-  };
-
-  const encodeBase64 = (bytes) => {
-    let binary = "";
-    const chunkSize = 0x8000;
-    for (let offset = 0; offset < bytes.byteLength; offset += chunkSize) {
-      binary += String.fromCharCode(...bytes.subarray(offset, offset + chunkSize));
-    }
-    return btoa(binary);
-  };
-
-  const requestSourceDecision = async (sourceUrl, priority) => {
-    if (new URL(sourceUrl).protocol !== "blob:") {
-      return browser.runtime.sendMessage({
-        type: FALLBACK_REQUEST_MESSAGE,
-        version: 1,
-        documentToken: performanceDocumentToken,
-        sourceUrl,
-        priority,
-      });
-    }
-    const response = await fetch(sourceUrl, {
-      credentials: "include",
-      cache: "no-store",
-    });
-    if (!response.ok) {
-      throw new Error("blob_fetch_failed");
-    }
-    const bytes = new Uint8Array(await response.arrayBuffer());
-    if (bytes.byteLength === 0 || bytes.byteLength > MAX_INLINE_ANALYSIS_BYTES) {
-      throw new Error("blob_size_invalid");
-    }
-    return browser.runtime.sendMessage({
-      type: INLINE_REQUEST_MESSAGE,
-      version: 1,
-      documentToken: performanceDocumentToken,
-      sourceUrl,
-      priority,
-      byteLength: bytes.byteLength,
-      bytesBase64: encodeBase64(bytes),
-    });
-  };
-
-  const requestFallbackDecision = (element, sourceUrl) => {
-    if (
-      decisionsBySource.has(sourceUrl) ||
-      fallbackPendingSources.has(sourceUrl) ||
-      !hasLoadedPixels(element) ||
-      !candidateSourcesFor(element).includes(sourceUrl)
-    ) {
-      return;
-    }
-    fallbackPendingSources.add(sourceUrl);
-    requestSourceDecision(
-      sourceUrl,
-      isVisibleNow(element) ? "visible" : "nearby",
-    )
-      .then((response) => {
-        fallbackPendingSources.delete(sourceUrl);
-        if (
-          [FALLBACK_RESPONSE_MESSAGE, INLINE_RESPONSE_MESSAGE].includes(response?.type) &&
-          response?.version === 1 &&
-          normalizedSource(response.sourceUrl) === sourceUrl &&
-          DECISION_ACTIONS.includes(response.action)
-        ) {
-          fallbackAttemptsBySource.delete(sourceUrl);
-          rememberDecision(sourceUrl, response.action);
-          applyDecisionToSource(sourceUrl);
-          return;
-        }
-        const retryDelay = retryDelayOrMarkError(sourceUrl);
-        if (retryDelay !== null) scheduleFallbackDecision(element, sourceUrl, retryDelay);
-      })
-      .catch(() => {
-        fallbackPendingSources.delete(sourceUrl);
-        const retryDelay = retryDelayOrMarkError(sourceUrl);
-        if (retryDelay !== null) scheduleFallbackDecision(element, sourceUrl, retryDelay);
-      });
-  };
-
-  const scheduleFallbackDecision = (
-    element,
-    sourceUrl,
-    delayMs = FALLBACK_DELAY_MS,
-  ) => {
-    if (
-      !hasLoadedPixels(element) ||
-      decisionsBySource.has(sourceUrl) ||
-      fallbackPendingSources.has(sourceUrl) ||
-      !candidateSourcesFor(element).includes(sourceUrl) ||
-      (fallbackObserver && !fallbackNearElements.has(element))
-    ) {
-      return;
-    }
-    const scheduled = fallbackTimers.get(element);
-    const dueAt = performance.now() + delayMs;
-    if (scheduled?.sourceUrl === sourceUrl && scheduled.dueAt <= dueAt) {
-      return;
-    }
-    if (scheduled) {
-      clearTimeout(scheduled.timer);
-    }
-    const timer = setTimeout(() => {
-      fallbackTimers.delete(element);
-      requestFallbackDecision(element, sourceUrl);
-    }, delayMs);
-    fallbackTimers.set(element, { sourceUrl, timer, dueAt });
-  };
-
-  const prioritizedFallbackDelay = (element) =>
-    isVisibleNow(element) ? VISIBLE_FALLBACK_DELAY_MS : NEARBY_FALLBACK_DELAY_MS;
-
-  const observeFallbackDecision = (element, sourceUrl) => {
-    fallbackObservedSources.set(element, sourceUrl);
-    if (fallbackObserver) {
-      fallbackObserver.observe(element);
-      if (isNearViewport(element)) {
-        fallbackNearElements.add(element);
-        sendPriorityHintsForElement(element);
-        scheduleFallbackDecision(element, sourceUrl, prioritizedFallbackDelay(element));
-      }
-    } else {
-      if (isNearViewport(element)) {
-        sendPriorityHintsForElement(element);
-      }
-      scheduleFallbackDecision(element, sourceUrl);
-    }
-  };
-
-  const fallbackObserver =
-    typeof IntersectionObserver === "function"
-      ? new IntersectionObserver(
-          (entries) => {
-            for (const entry of entries) {
-              const element = entry.target;
-              const sourceUrl = fallbackObservedSources.get(element);
-              if (!sourceUrl) {
-                continue;
-              }
-              if (entry.isIntersecting) {
-                fallbackNearElements.add(element);
-                sendPriorityHintsForElement(element);
-                scheduleFallbackDecision(
-                  element,
-                  sourceUrl,
-                  prioritizedFallbackDelay(element),
-                );
-              } else {
-                fallbackNearElements.delete(element);
-                const scheduled = fallbackTimers.get(element);
-                if (scheduled) {
-                  clearTimeout(scheduled.timer);
-                  fallbackTimers.delete(element);
-                }
-              }
-            }
-          },
-          { rootMargin: FALLBACK_ROOT_MARGIN },
-        )
-      : null;
-
-  const prepareImageForAsyncDecoding = (element) => {
-    if (!(element instanceof HTMLImageElement)) {
-      return;
-    }
-    if (!element.hasAttribute("decoding")) {
-      setAttributeIfChanged(element, "decoding", "async");
-    }
-  };
-
-  const reconcileMediaHostState = (host) => {
-    if (!(host instanceof Element)) return;
-    const trackedImages =
-      Array.from(host.children)
-        .filter((child) => child instanceof HTMLImageElement)
-        .filter((child) => mediaHostsByElement.get(child) === host && child.isConnected);
-    if (trackedImages.length === 0) {
-      removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
-      return;
-    }
-    const siblingStates =
-      trackedImages
-        .filter((child) => {
-          const bounds = child.getBoundingClientRect();
-          return bounds.width >= 1 && bounds.height >= 1;
-        })
-        .map((child) => child.getAttribute("data-glosh-dag-media"));
-    const hostState =
-      siblingStates.includes("hidden")
-        ? "waiting"
-        : siblingStates.includes("allow")
-          ? null
-          : siblingStates.includes("block")
-            ? "filtered"
-            : siblingStates.includes("error")
-              ? "error"
-              : null;
-    if (hostState === null) {
-      removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
-    } else {
-      setAttributeIfChanged(host, MEDIA_HOST_ATTRIBUTE, hostState);
-    }
-  };
-
-  const releaseMediaHost = (element) => {
-    if (!(element instanceof HTMLImageElement)) return;
-    const previousHost = mediaHostsByElement.get(element);
-    mediaHostsByElement.delete(element);
-    reconcileMediaHostState(previousHost);
-  };
-
-  const releaseMediaHostsIn = (root) => {
-    if (!(root instanceof Element)) return;
-    const releaseTrackedMedia = (element) => {
-      if (element instanceof HTMLImageElement) {
-        releaseMediaHost(element);
-      }
-      removeElementFromSourceIndex(element);
-      stopFallbackObservation(element);
-    };
-    if (root.matches(mediaSelector)) {
-      releaseTrackedMedia(root);
-    }
-    root.querySelectorAll(mediaSelector).forEach(releaseTrackedMedia);
-  };
-
-  const updateMediaHostState = (element, presentationState) => {
-    if (!(element instanceof HTMLImageElement)) return;
-    const previousHost = mediaHostsByElement.get(element);
-    const host = element.parentElement;
-    if (previousHost && previousHost !== host) {
-      mediaHostsByElement.delete(element);
-      reconcileMediaHostState(previousHost);
-    }
+  const detachHost = (element) => {
+    const host = hostByElement.get(element);
     if (!host) return;
-    if (
-      previousHost === host &&
-      ["filtered", "error"].includes(presentationState)
-    ) {
-      reconcileMediaHostState(host);
-      return;
-    }
-    const mediaBounds = element.getBoundingClientRect();
-    const hostBounds = host.getBoundingClientRect();
-    const mediaArea = mediaBounds.width * mediaBounds.height;
-    const hostArea = hostBounds.width * hostBounds.height;
-    if (
-      mediaBounds.width < 48 ||
-      mediaBounds.height < 48 ||
-      hostArea <= 0 ||
-      hostArea > mediaArea * 2.5
-    ) {
-      mediaHostsByElement.delete(element);
-      reconcileMediaHostState(host);
-      return;
-    }
-    mediaHostsByElement.set(element, host);
-    reconcileMediaHostState(host);
+    elementsByHost.get(host)?.delete(element);
+    hostByElement.delete(element);
+    reconcileHost(host);
   };
 
-  const updateAccessibleMediaState = (element, action) => {
-    if (!(element instanceof Element)) {
-      return;
+  const indexElement = (element) => {
+    unindexElement(element);
+    const sources = candidateSourcesFor(element);
+    sourcesByElement.set(element, sources);
+    for (const source of sources) {
+      let elements = elementsBySource.get(source);
+      if (!elements) {
+        elements = new Set();
+        elementsBySource.set(source, elements);
+      }
+      elements.add(element);
     }
+    return sources;
+  };
+
+  const updateAccessibleState = (element, action) => {
     if (action === "block") {
-      setAttributeIfChanged(
-        element,
-        "aria-description",
-        FILTERED_ACCESSIBLE_DESCRIPTION,
-      );
+      setAttributeIfChanged(element, "aria-description", FILTERED_ACCESSIBLE_DESCRIPTION);
     } else if (action === "error") {
-      setAttributeIfChanged(
-        element,
-        "aria-description",
-        ERROR_ACCESSIBLE_DESCRIPTION,
-      );
-    } else if (
-      [FILTERED_ACCESSIBLE_DESCRIPTION, ERROR_ACCESSIBLE_DESCRIPTION].includes(
-        element.getAttribute("aria-description"),
-      )
-    ) {
+      setAttributeIfChanged(element, "aria-description", ERROR_ACCESSIBLE_DESCRIPTION);
+    } else if ([FILTERED_ACCESSIBLE_DESCRIPTION, ERROR_ACCESSIBLE_DESCRIPTION]
+      .includes(element.getAttribute("aria-description"))) {
       removeAttributeIfPresent(element, "aria-description");
     }
   };
 
-  const clearSourceReconcileTimer = (element) => {
-    const timer = sourceReconcileTimers.get(element);
-    if (timer !== undefined) {
-      clearTimeout(timer);
-      sourceReconcileTimers.delete(element);
+  const reconcileHost = (host) => {
+    if (!(host instanceof Element)) return;
+    const tracked = [...(elementsByHost.get(host) || [])]
+      .filter((element) => element.isConnected && hostByElement.get(element) === host);
+    if (tracked.length === 0) {
+      removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
+      return;
+    }
+    const states = tracked.map((element) => element.getAttribute("data-glosh-dag-media"));
+    const state = states.includes("hidden")
+      ? "waiting"
+      : states.includes("block")
+        ? "filtered"
+        : states.includes("error")
+          ? "error"
+          : null;
+    if (state) setAttributeIfChanged(host, MEDIA_HOST_ATTRIBUTE, state);
+    else removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
+  };
+
+  const attachHost = (element, bounds) => {
+    if (!(element instanceof HTMLImageElement)) return;
+    const previous = hostByElement.get(element);
+    const host = element.parentElement;
+    if (previous && previous !== host) {
+      elementsByHost.get(previous)?.delete(element);
+      reconcileHost(previous);
+    }
+    if (!host || bounds.width < 32 || bounds.height < 32) {
+      if (previous) detachHost(element);
+      return;
+    }
+    let elements = elementsByHost.get(host);
+    if (!elements) {
+      elements = new Set();
+      elementsByHost.set(host, elements);
+    }
+    elements.add(element);
+    hostByElement.set(element, host);
+    reconcileHost(host);
+  };
+
+  const setMediaState = (element, action) => {
+    trustedMediaStates.set(element, action);
+    setAttributeIfChanged(element, "data-glosh-dag-media", action);
+    updateAccessibleState(element, action);
+    reconcileHost(hostByElement.get(element));
+  };
+
+  const rememberDecision = (source, action) => {
+    if (!decisionsBySource.has(source) && decisionsBySource.size >= MAX_REMEMBERED_DECISIONS) {
+      decisionsBySource.delete(decisionsBySource.keys().next().value);
+    }
+    decisionsBySource.set(source, action);
+  };
+
+  const activeDecision = (sources) => {
+    const active = sources[0];
+    return active ? decisionsBySource.get(active) : null;
+  };
+
+  const sendSourcePriority = (sources, priority) => {
+    if (window.top !== window) return;
+    for (const source of sources) {
+      if (!/^https?:/iu.test(source) || priorityBySource.get(source) === "visible") continue;
+      if (priorityBySource.get(source) === priority) continue;
+      priorityBySource.set(source, priority);
+      browser.runtime.sendMessage({
+        type: "media-priority-hint",
+        version: PROTOCOL_VERSION,
+        documentToken: performanceDocumentToken,
+        sourceUrl: source,
+        priority,
+      }).catch(() => {});
     }
   };
 
-  const protectSourceMutation = (element) => {
-    if (!(element instanceof Element) || !element.matches(mediaSelector)) {
-      return;
+  const sendPriorityHint = (sources, bounds) => {
+    const visible = bounds.bottom > 0 && bounds.top < innerHeight && bounds.right > 0 && bounds.left < innerWidth;
+    sendSourcePriority(sources, visible ? "visible" : "nearby");
+  };
+
+  const encodeBase64 = (bytes) => {
+    let binary = "";
+    for (let offset = 0; offset < bytes.byteLength; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
     }
-    pendingSourceChanges.add(element);
-    clearSourceReconcileTimer(element);
-    analyzedSources.delete(element);
-    stopFallbackObservation(element);
-    removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
-    removeAttributeIfPresent(element, FUNCTIONAL_ICON_ATTRIBUTE);
-    setAttributeIfChanged(element, "data-glosh-dag-media", "hidden");
-    updateAccessibleMediaState(element, "hidden");
-    updateMediaHostState(element, "waiting");
-    const fallbackSource = candidateSourcesFor(element)[0];
-    if (fallbackSource) {
-      observeFallbackDecision(element, fallbackSource);
-    }
-    const timer = setTimeout(() => {
-      sourceReconcileTimers.delete(element);
-      if (!element.isConnected) {
-        pendingSourceChanges.delete(element);
-        return;
+    return btoa(binary);
+  };
+
+  const requestSourceDecision = (source, priority) => {
+    if (pendingSourceDecisions.has(source)) return pendingSourceDecisions.get(source);
+    const promise = (async () => {
+      const protocol = new URL(source).protocol;
+      if (protocol !== "blob:") {
+        return browser.runtime.sendMessage({
+          type: "media-fallback-request",
+          version: PROTOCOL_VERSION,
+          documentToken: performanceDocumentToken,
+          sourceUrl: source,
+          priority,
+        });
       }
-      pendingSourceChanges.delete(element);
-      applyKnownDecision(element);
-    }, SOURCE_RECONCILE_DELAY_MS);
-    sourceReconcileTimers.set(element, timer);
+      const response = await fetch(source, { credentials: "include", cache: "no-store" });
+      if (!response.ok) throw new Error("blob_fetch_failed");
+      const bytes = new Uint8Array(await response.arrayBuffer());
+      if (bytes.byteLength === 0 || bytes.byteLength > MAX_INLINE_ANALYSIS_BYTES) {
+        throw new Error("blob_size_invalid");
+      }
+      return browser.runtime.sendMessage({
+        type: "media-inline-request",
+        version: PROTOCOL_VERSION,
+        documentToken: performanceDocumentToken,
+        sourceUrl: source,
+        priority,
+        byteLength: bytes.byteLength,
+        bytesBase64: encodeBase64(bytes),
+      });
+    })().finally(() => pendingSourceDecisions.delete(source));
+    pendingSourceDecisions.set(source, promise);
+    return promise;
+  };
+
+  const beginGeneratedAnalysis = (source, element, bounds) => {
+    if (
+      !element.isConnected ||
+      decisionsBySource.has(source) ||
+      pendingSourceDecisions.has(source)
+    ) return;
+    const priority = bounds.bottom > 0 && bounds.top < innerHeight ? "visible" : "nearby";
+    requestSourceDecision(source, priority)
+      .then((response) => {
+        if (
+          response?.version === PROTOCOL_VERSION &&
+          normalizedSource(response.sourceUrl) === source &&
+          DECISION_ACTIONS.has(response.action)
+        ) {
+          rememberDecision(source, response.action);
+        } else {
+          rememberDecision(source, "error");
+        }
+      })
+      .catch(() => rememberDecision(source, "error"))
+      .finally(() => applyDecisionToSource(source));
+  };
+
+  const flushLayoutWork = () => {
+    if (!layoutFlushScheduled) return;
+    layoutFlushScheduled = false;
+    if (layoutFrameId !== null) cancelAnimationFrame(layoutFrameId);
+    if (layoutTimerId !== null) clearTimeout(layoutTimerId);
+    layoutFrameId = null;
+    layoutTimerId = null;
+
+    const mediaElements = [...pendingLayoutElements].filter((element) => element.isConnected);
+    const generatedEntries = [...pendingGeneratedLayout.entries()]
+      .filter(([, element]) => element.isConnected);
+    pendingLayoutElements.clear();
+    pendingGeneratedLayout.clear();
+
+    const boundsByElement = new Map();
+    const boundsFor = (element) => {
+      let bounds = boundsByElement.get(element);
+      if (!bounds) {
+        bounds = element.getBoundingClientRect();
+        boundsByElement.set(element, bounds);
+      }
+      return bounds;
+    };
+    mediaElements.forEach(boundsFor);
+    generatedEntries.forEach(([, element]) => boundsFor(element));
+
+    for (const element of mediaElements) {
+      const bounds = boundsFor(element);
+      attachHost(element, bounds);
+      sendPriorityHint(sourcesByElement.get(element) || indexElement(element), bounds);
+    }
+    for (const [source, element] of generatedEntries) {
+      beginGeneratedAnalysis(source, element, boundsFor(element));
+    }
+  };
+
+  const scheduleLayoutFlush = () => {
+    if (layoutFlushScheduled) return;
+    layoutFlushScheduled = true;
+    layoutFrameId = requestAnimationFrame(flushLayoutWork);
+    layoutTimerId = setTimeout(flushLayoutWork, 48);
+  };
+
+  const analyzeGeneratedSource = (source, element) => {
+    if (decisionsBySource.has(source) || pendingSourceDecisions.has(source)) return;
+    const scheduled = pendingGeneratedLayout.get(source);
+    if (!scheduled?.isConnected) pendingGeneratedLayout.set(source, element);
+    scheduleLayoutFlush();
   };
 
   const applyKnownDecision = (element) => {
-    if (!(element instanceof Element) || !element.matches(mediaSelector)) {
-      return false;
+    if (!(element instanceof Element) || !element.matches(MEDIA_SELECTOR)) return;
+    if (element instanceof HTMLImageElement && !element.hasAttribute("decoding")) {
+      setAttributeIfChanged(element, "decoding", "async");
     }
-    prepareImageForAsyncDecoding(element);
-    if (applyInlineUiVectorDecision(element)) {
-      stopFallbackObservation(element);
-      updateAccessibleMediaState(element, "allow");
-      updateMediaHostState(element, "allow");
-      return true;
-    }
-    const candidateSources = candidateSourcesFor(element);
-    const activeSource = candidateSources[0];
-    const sourceChangePending = pendingSourceChanges.has(element);
-    const pendingSafetySource = sourceChangePending
-      ? candidateSources.find((candidate) =>
-          ["block", "error"].includes(decisionsBySource.get(candidate)),
-        )
-      : null;
-    const sourceUrl =
-      pendingSafetySource ||
-      (!sourceChangePending && activeSource && decisionsBySource.has(activeSource)
-        ? activeSource
-        : null);
-    const action = sourceUrl ? decisionsBySource.get(sourceUrl) : null;
-    removeAttributeIfPresent(element, UI_VECTOR_ATTRIBUTE);
-    const failedSource = sourceChangePending
-      ? candidateSources.find((candidate) => failedSources.has(candidate))
-      : activeSource && failedSources.has(activeSource)
-        ? activeSource
-        : null;
-    if (failedSource) {
-      analyzedSources.set(element, failedSource);
-      stopFallbackObservation(element);
-      setAttributeIfChanged(element, "data-glosh-dag-media", "error");
-      updateAccessibleMediaState(element, "error");
-      updateMediaHostState(element, "error");
-      return true;
-    }
-    if (!sourceUrl || !action) {
-      if (!sourceUrl || analyzedSources.get(element) !== sourceUrl) {
-        setAttributeIfChanged(element, "data-glosh-dag-media", "hidden");
+    const sources = indexElement(element);
+    const action = activeDecision(sources);
+    setMediaState(element, action || "hidden");
+    const generated = sources.find((source) => GENERATED_PROTOCOLS.has(new URL(source).protocol));
+    if (!action && generated) analyzeGeneratedSource(generated, element);
+  };
+
+  const reconcileMediaAfterLayout = (element) => {
+    if (!(element instanceof Element) || !element.matches(MEDIA_SELECTOR)) return;
+    pendingLayoutElements.add(element);
+    scheduleLayoutFlush();
+  };
+
+  const safeInlineSvg = (svg) => {
+    if (!(svg instanceof SVGSVGElement)) return false;
+    const descendants = [svg, ...svg.querySelectorAll("*")];
+    if (descendants.length > MAX_INLINE_VECTOR_ELEMENTS) return false;
+    const blockedNames = new Set([
+      "audio", "canvas", "feimage", "foreignobject", "iframe", "image", "script", "style", "video",
+    ]);
+    for (const child of descendants) {
+      if (blockedNames.has(child.localName?.toLowerCase() || "")) return false;
+      for (const attribute of child.attributes || []) {
+        const name = attribute.name.toLowerCase();
+        const value = attribute.value;
+        if (
+          name.startsWith("on") ||
+          /url\(\s*['"]?(?:https?|data|blob):/iu.test(value) ||
+          (["href", "xlink:href"].includes(name) && value.length > 0 && !value.startsWith("#"))
+        ) return false;
       }
-      updateAccessibleMediaState(element, "hidden");
-      updateMediaHostState(element, "waiting");
-      const fallbackSource = candidateSourcesFor(element)[0];
-      if (fallbackSource) {
-        observeFallbackDecision(element, fallbackSource);
-      }
-      return false;
-    }
-    analyzedSources.set(element, sourceUrl);
-    stopFallbackObservation(element);
-    if (action === "allow" && applyFunctionalImageIconDecision(element, candidateSources)) {
-      return true;
-    }
-    if (action === "allow" && isSafeRemoteUiVector(element, sourceUrl)) {
-      setAttributeIfChanged(element, UI_VECTOR_ATTRIBUTE, "allow");
-    }
-    setAttributeIfChanged(element, "data-glosh-dag-media", action);
-    updateAccessibleMediaState(element, action);
-    updateMediaHostState(
-      element,
-      action === "block" ? "filtered" : action === "error" ? "error" : "allow",
-    );
-    if (action === "allow") {
-      clearWaitingMediaHostsAround(element);
     }
     return true;
   };
 
+  const protectInlineSvg = (root) => {
+    const vectors = [];
+    if (root instanceof SVGSVGElement) vectors.push(root);
+    root.querySelectorAll?.("svg").forEach((svg) => vectors.push(svg));
+    for (const svg of vectors) {
+      if (safeInlineSvg(svg)) setAttributeIfChanged(svg, "data-glosh-dag-ui-vector", "allow");
+      else removeAttributeIfPresent(svg, "data-glosh-dag-ui-vector");
+    }
+  };
+
+  const stopBlockedMedia = (root) => {
+    const blocked = [];
+    if (root instanceof Element && root.matches(BLOCKED_MEDIA_SELECTOR)) blocked.push(root);
+    root.querySelectorAll?.(BLOCKED_MEDIA_SELECTOR).forEach((element) => blocked.push(element));
+    for (const element of blocked) {
+      if (element instanceof HTMLMediaElement) {
+        element.autoplay = false;
+        element.muted = true;
+        element.preload = "none";
+        try { element.pause(); } catch {}
+      }
+      setAttributeIfChanged(element, "aria-hidden", "true");
+    }
+  };
+
+  const generatedSourcesFromStyle = (value) => {
+    const sources = [];
+    for (const match of String(value || "").matchAll(/url\(([^)]+)\)/giu)) {
+      const source = normalizedSource(match[1].trim().replace(/^['"]|['"]$/gu, ""));
+      if (source && GENERATED_PROTOCOLS.has(new URL(source).protocol) && !sources.includes(source)) {
+        sources.push(source);
+      }
+    }
+    return sources;
+  };
+
+  const generatedConfig = (kind) => kind === "before"
+    ? { attribute: "data-glosh-dag-generated-before", property: "--glosh-dag-generated-before-background" }
+    : kind === "after"
+      ? { attribute: "data-glosh-dag-generated-after", property: "--glosh-dag-generated-after-background" }
+      : { attribute: "data-glosh-dag-generated-background", property: "--glosh-dag-generated-background" };
+
+  const generatedKey = (element, kind, create) => {
+    let id = generatedIdsByElement.get(element);
+    if (!id) {
+      if (!create) return null;
+      id = nextGeneratedId;
+      nextGeneratedId += 1;
+      generatedIdsByElement.set(element, id);
+    }
+    const key = `${kind}:${id}`;
+    let keys = generatedKeysByElement.get(element);
+    if (!keys) {
+      keys = new Set();
+      generatedKeysByElement.set(element, keys);
+    }
+    keys.add(key);
+    return key;
+  };
+
+  const forgetGeneratedRecord = (element, kind, key) => {
+    const config = generatedConfig(kind);
+    removeAttributeIfPresent(element, config.attribute);
+    removeOwnStyleProperty(element, config.property);
+    generatedRecords.delete(key);
+    const keys = generatedKeysByElement.get(element);
+    keys?.delete(key);
+    if (keys?.size === 0) generatedKeysByElement.delete(element);
+  };
+
+  const setOwnStyleProperty = (element, property, value) => {
+    if (element.style.getPropertyValue(property) === value) return;
+    element.style.setProperty(property, value);
+    ownStyleSnapshots.set(element, element.getAttribute("style") || "");
+  };
+
+  const removeOwnStyleProperty = (element, property) => {
+    if (!element.style.getPropertyValue(property)) return;
+    element.style.removeProperty(property);
+    ownStyleSnapshots.set(element, element.getAttribute("style") || "");
+  };
+
+  const applyGeneratedRecord = (record) => {
+    if (!record.element.isConnected) {
+      forgetGeneratedRecord(record.element, record.kind, record.key);
+      return;
+    }
+    const actions = record.sources.map((source) => decisionsBySource.get(source));
+    const action = actions.some((value) => value === "block")
+      ? "block"
+      : actions.some((value) => value === "error")
+        ? "error"
+        : actions.length > 0 && actions.every((value) => value === "allow")
+          ? "allow"
+          : "hidden";
+    const config = generatedConfig(record.kind);
+    setAttributeIfChanged(record.element, config.attribute, action);
+    if (action === "allow") setOwnStyleProperty(record.element, config.property, record.value);
+    else removeOwnStyleProperty(record.element, config.property);
+    for (const source of record.sources) {
+      if (!decisionsBySource.has(source)) analyzeGeneratedSource(source, record.element);
+    }
+  };
+
+  const inspectGeneratedStyle = (element, kind = "element") => {
+    if (!(element instanceof HTMLElement)) return;
+    let style;
+    try { style = getComputedStyle(element, kind === "element" ? null : `::${kind}`); } catch { return; }
+    const value = style.backgroundImage;
+    const sources = generatedSourcesFromStyle(value);
+    if (sources.length === 0) {
+      const key = generatedKey(element, kind, false);
+      if (!key) return;
+      const previous = generatedRecords.get(key);
+      if (previous) forgetGeneratedRecord(element, kind, key);
+      return;
+    }
+    const key = generatedKey(element, kind, true);
+    const record = { key, element, kind, value, sources };
+    generatedRecords.set(key, record);
+    applyGeneratedRecord(record);
+  };
+
+  const generatedKindsForRule = (selector) => {
+    const kinds = [];
+    if (/::before/iu.test(selector)) kinds.push("before");
+    if (/::after/iu.test(selector)) kinds.push("after");
+    if (kinds.length === 0) kinds.push("element");
+    return kinds;
+  };
+
+  const collectGeneratedRuleTargets = (rules) => {
+    for (const rule of rules || []) {
+      if (rule.cssRules) collectGeneratedRuleTargets(rule.cssRules);
+      if (
+        typeof rule.selectorText !== "string" ||
+        !GENERATED_SOURCE_PATTERN.test(rule.cssText || "")
+      ) continue;
+      const selector = rule.selectorText.replace(/::(?:before|after)/giu, "");
+      try {
+        document.querySelector(selector);
+        generatedRuleTargets.push({ selector, kinds: generatedKindsForRule(rule.selectorText) });
+      } catch {
+        // An invalid or engine-specific selector cannot become a trusted visual target.
+      }
+    }
+  };
+
+  const refreshGeneratedRuleIndex = () => {
+    generatedRuleTargets.length = 0;
+    for (const sheet of document.styleSheets) {
+      try {
+        collectGeneratedRuleTargets(sheet.cssRules);
+      } catch {
+        // Cross-origin stylesheets stay page-native; HTTP(S) assets remain network-gated.
+      }
+    }
+  };
+
+  const generatedKindsForElement = (element) => {
+    const kinds = new Set();
+    if (GENERATED_SOURCE_PATTERN.test(element.getAttribute("style") || "")) {
+      GENERATED_KINDS.forEach((kind) => kinds.add(kind));
+    }
+    for (const target of generatedRuleTargets) {
+      try {
+        if (element.matches(target.selector)) target.kinds.forEach((kind) => kinds.add(kind));
+      } catch {}
+    }
+    return kinds;
+  };
+
+  const inspectGeneratedElement = (element) => {
+    if (!(element instanceof HTMLElement)) return;
+    const kinds = generatedKindsForElement(element);
+    for (const kind of GENERATED_KINDS) {
+      const key = generatedKey(element, kind, false);
+      if (kinds.has(kind) || (key && generatedRecords.has(key))) {
+        inspectGeneratedStyle(element, kind);
+      }
+    }
+  };
+
+  const inspectGeneratedTargets = (root) => {
+    const rootElement = root === document ? document.documentElement : root instanceof Element ? root : null;
+    if (!rootElement) return;
+    const candidates = new Set();
+    const addCandidate = (element) => {
+      if (element instanceof HTMLElement) candidates.add(element);
+    };
+    addCandidate(rootElement);
+    rootElement.querySelectorAll("[style]").forEach((element) => {
+      if (GENERATED_SOURCE_PATTERN.test(element.getAttribute("style") || "")) addCandidate(element);
+    });
+    for (const target of generatedRuleTargets) {
+      try {
+        if (rootElement.matches(target.selector)) addCandidate(rootElement);
+        rootElement.querySelectorAll(target.selector).forEach(addCandidate);
+      } catch {}
+    }
+    candidates.forEach(inspectGeneratedElement);
+  };
+
+  const scheduleGeneratedRuleRefresh = () => {
+    if (generatedRuleRefreshScheduled) return;
+    generatedRuleRefreshScheduled = true;
+    queueMicrotask(() => {
+      generatedRuleRefreshScheduled = false;
+      refreshGeneratedRuleIndex();
+      inspectGeneratedTargets(document);
+    });
+  };
+
+  const registerTree = (root) => {
+    if (!(root instanceof Element) && root !== document) return;
+    if (initialBarrierComplete && root === document.documentElement) {
+      setAttributeIfChanged(root, INITIALIZED_ATTRIBUTE, "true");
+    }
+    if (root instanceof Element && root.matches(MEDIA_SELECTOR)) {
+      applyKnownDecision(root);
+      reconcileMediaAfterLayout(root);
+      mediaPriorityObserver?.observe(root);
+    }
+    root.querySelectorAll?.(MEDIA_SELECTOR).forEach((element) => {
+      applyKnownDecision(element);
+      reconcileMediaAfterLayout(element);
+      mediaPriorityObserver?.observe(element);
+    });
+    protectInlineSvg(root);
+    stopBlockedMedia(root);
+  };
+
+  const unregisterElement = (element) => {
+    pendingLayoutElements.delete(element);
+    mediaPriorityObserver?.unobserve(element);
+    if (element.matches(MEDIA_SELECTOR)) {
+      unindexElement(element);
+      detachHost(element);
+      trustedMediaStates.delete(element);
+    }
+    for (const key of generatedKeysByElement.get(element) || []) {
+      generatedRecords.delete(key);
+    }
+    generatedKeysByElement.delete(element);
+    ownStyleSnapshots.delete(element);
+    for (const [source, candidate] of pendingGeneratedLayout) {
+      if (candidate === element) pendingGeneratedLayout.delete(source);
+    }
+  };
+
+  const unregisterTree = (root) => {
+    if (!(root instanceof Element)) return;
+    if (root.matches(`${MEDIA_SELECTOR},${GENERATED_ATTRIBUTE_SELECTOR}`)) unregisterElement(root);
+    root.querySelectorAll(`${MEDIA_SELECTOR},${GENERATED_ATTRIBUTE_SELECTOR}`).forEach(unregisterElement);
+  };
+
+  const applyDecisionToSource = (source) => {
+    for (const element of [...(elementsBySource.get(source) || [])]) {
+      if (element.isConnected) applyKnownDecision(element);
+      else unindexElement(element);
+    }
+    for (const record of generatedRecords.values()) {
+      if (record.sources.includes(source)) applyGeneratedRecord(record);
+    }
+  };
+
   browser.runtime.onMessage.addListener((message) => {
-    if (message?.type === "document-token-request" && message?.version === 1) {
+    if (message?.type === "document-token-request" && message?.version === PROTOCOL_VERSION) {
       return Promise.resolve({
         type: "document-token-response",
-        version: 1,
+        version: PROTOCOL_VERSION,
         documentToken: performanceDocumentToken,
       });
     }
     if (
-      message?.type !== PRESENTATION_DECISION_MESSAGE ||
-      message?.version !== 1 ||
-      !DECISION_ACTIONS.includes(message?.action)
-    ) {
-      return undefined;
-    }
-    const sourceUrl = normalizedSource(message.sourceUrl);
-    if (!sourceUrl || !["http:", "https:"].includes(new URL(sourceUrl).protocol)) {
-      return undefined;
-    }
-    rememberDecision(sourceUrl, message.action);
-    const { mediaMatches, cssMatches } = applyDecisionToSource(sourceUrl);
-    const matchedCount = mediaMatches + cssMatches;
+      message?.type !== "media-presentation-decision" ||
+      message?.version !== PROTOCOL_VERSION ||
+      !DECISION_ACTIONS.has(message.action)
+    ) return undefined;
+    const source = normalizedSource(message.sourceUrl);
+    if (!source) return undefined;
+    rememberDecision(source, message.action);
+    const mediaMatches = elementsBySource.get(source)?.size || 0;
+    const cssMatches = [...generatedRecords.values()].filter((record) => record.sources.includes(source)).length;
+    applyDecisionToSource(source);
     return Promise.resolve({
-      type: PRESENTATION_APPLIED_MESSAGE,
-      version: 1,
-      matchedCount,
+      type: "media-presentation-applied",
+      version: PROTOCOL_VERSION,
+      matchedCount: mediaMatches + cssMatches,
       mediaMatches,
       cssMatches,
-      binding: matchedCount > 0 ? "applied" : "unbound",
+      binding: mediaMatches + cssMatches > 0 ? "applied" : "unbound",
     });
   });
 
-  let nativeDecisionPort = null;
-  try {
-    nativeDecisionPort = browser.runtime.connectNative("glosh.dag.protection");
-    if (window.top === window) {
-      nativeDecisionPort.postMessage({
-        type: "barrier-ready",
-        version: 1,
-        url: location.href,
-        documentToken: performanceDocumentToken,
-      });
-    }
-  } catch {
-    // Without the authenticated native channel, media remains hidden.
-  }
-
-  let previewEligibilityTimer = null;
-  let lastPreviewRestriction = null;
   const sensitivePreviewSelector = [
-    'input[type="password"]',
-    'input[autocomplete="current-password" i]',
-    'input[autocomplete="new-password" i]',
-    'input[autocomplete^="cc-" i]',
-    'iframe[src*="recaptcha" i]',
-    'iframe[src*="hcaptcha" i]',
-    'iframe[src*="challenges.cloudflare.com" i]',
-    "[data-sitekey]",
+    'input[type="password"]', 'input[autocomplete="current-password" i]',
+    'input[autocomplete="new-password" i]', 'input[autocomplete^="cc-" i]',
+    'iframe[src*="recaptcha" i]', 'iframe[src*="hcaptcha" i]',
+    'iframe[src*="challenges.cloudflare.com" i]', "[data-sitekey]",
   ].join(",");
-  const hasSensitivePreviewContent = () =>
-    Array.from(document.querySelectorAll(sensitivePreviewSelector)).some(isVisibleNow);
-
   const reportPreviewEligibility = () => {
-    if (window.top !== window || nativeDecisionPort === null) {
-      return;
-    }
-    const restricted = hasSensitivePreviewContent();
-    if (restricted === lastPreviewRestriction) {
-      return;
-    }
-    lastPreviewRestriction = restricted;
+    if (window.top !== window || nativePort === null) return;
+    const restricted = [...document.querySelectorAll(sensitivePreviewSelector)].some((element) => {
+      const bounds = element.getBoundingClientRect();
+      return bounds.width > 0 && bounds.height > 0;
+    });
     try {
-      nativeDecisionPort.postMessage({
+      nativePort.postMessage({
         type: "tab-preview-eligibility",
-        version: 1,
+        version: PROTOCOL_VERSION,
         documentToken: performanceDocumentToken,
         restricted,
       });
-    } catch {
-      // Missing preview eligibility keeps the native thumbnail fail-closed.
-    }
+    } catch {}
   };
-
   const schedulePreviewEligibilityReport = () => {
-    if (window.top !== window) {
-      return;
-    }
-    if (previewEligibilityTimer !== null) {
-      clearTimeout(previewEligibilityTimer);
-    }
-    previewEligibilityTimer = setTimeout(() => {
-      previewEligibilityTimer = null;
-      reportPreviewEligibility();
-    }, 180);
+    clearTimeout(previewEligibilityTimer);
+    previewEligibilityTimer = setTimeout(reportPreviewEligibility, 180);
   };
 
-  const markHidden = (root) => {
-    if (!(root instanceof Element) && root !== document) {
-      return;
-    }
-    if (root instanceof Element && root.matches(mediaSelector)) {
-      applyKnownDecision(root);
-    }
-    stopPlayableMediaIn(root);
-    root.querySelectorAll?.(mediaSelector).forEach((element) => {
-      applyKnownDecision(element);
-    });
-  };
-
-  const reconcileProtectedPresentationMutation = (element, attributeName) => {
-    if (!(element instanceof Element)) return;
-    if (attributeName === MEDIA_HOST_ATTRIBUTE) {
-      reconcileMediaHostState(element);
-      return;
-    }
-    if (attributeName === BACKGROUND_PROBE_ATTRIBUTE) {
-      if (element === document.documentElement && element.hasAttribute(attributeName)) {
-        removeAttributeIfPresent(element, attributeName);
-      }
-      return;
-    }
-    if (
-      ["data-glosh-dag-media", UI_VECTOR_ATTRIBUTE].includes(attributeName) ||
-      (attributeName === FUNCTIONAL_ICON_ATTRIBUTE && element.matches(mediaSelector))
-    ) {
-      applyKnownDecision(element);
-      return;
-    }
-    if ([CSS_MEDIA_ATTRIBUTE, FUNCTIONAL_ICON_ATTRIBUTE].includes(attributeName)) {
-      applyCssBackgroundDecision(element);
-    }
-    if ([CSS_BEFORE_ATTRIBUTE, FUNCTIONAL_ICON_ATTRIBUTE].includes(attributeName)) {
-      applyPseudoCssDecision(element, "before");
-    }
-    if ([CSS_AFTER_ATTRIBUTE, FUNCTIONAL_ICON_ATTRIBUTE].includes(attributeName)) {
-      applyPseudoCssDecision(element, "after");
-    }
-  };
-
-  for (const eventName of ["play", "playing", "volumechange", "loadedmetadata"]) {
-    document.addEventListener(
-      eventName,
-      (event) => stopPlayableMedia(event.target),
-      true,
-    );
+  try {
+    nativePort = browser.runtime.connectNative(NATIVE_APP);
+  } catch {
+    nativePort = null;
   }
 
-  document.addEventListener(
-    "load",
-    (event) => {
-      if (event.target instanceof Element && event.target.matches(mediaSelector)) {
-        pendingSourceChanges.delete(event.target);
-        clearSourceReconcileTimer(event.target);
-      }
-      applyKnownDecision(event.target);
-    },
-    true,
-  );
-  document.addEventListener(
-    "error",
-    (event) => {
-      const element = event.target;
-      if (!(element instanceof Element) || !element.matches(mediaSelector)) return;
-      pendingSourceChanges.delete(element);
-      clearSourceReconcileTimer(element);
-      stopFallbackObservation(element);
-      const sourceUrl = candidateSourcesFor(element)[0];
-      if (sourceUrl && decisionsBySource.get(sourceUrl) === "block") {
-        applyKnownDecision(element);
-        return;
-      }
-      if (sourceUrl) {
-        failedSources.add(sourceUrl);
-        rememberDecision(sourceUrl, "error");
-      }
-      setAttributeIfChanged(element, "data-glosh-dag-media", "error");
-      updateAccessibleMediaState(element, "error");
-      updateMediaHostState(element, "error");
-    },
-    true,
-  );
+  const reportBarrierReady = () => {
+    if (window.top !== window || nativePort === null) return;
+    try {
+      nativePort.postMessage({
+        type: "barrier-ready",
+        version: PROTOCOL_VERSION,
+        url: location.href,
+        documentToken: performanceDocumentToken,
+      });
+    } catch {}
+  };
 
-  markHidden(document);
-  scanPageAdvertisements(document);
-  scheduleCssBackgroundProbe(document, 0);
-  scheduleSponsoredScan(0);
+  document.addEventListener("play", (event) => stopBlockedMedia(event.target), true);
+  document.addEventListener("error", (event) => {
+    const element = event.target;
+    if (!(element instanceof Element) || !element.matches(MEDIA_SELECTOR)) return;
+    const sources = indexElement(element);
+    const decision = activeDecision(sources);
+    setMediaState(element, decision === "block" ? "block" : decision || "error");
+  }, true);
+  document.addEventListener("load", (event) => {
+    const element = event.target;
+    if (element instanceof Element && element.matches(MEDIA_SELECTOR)) applyKnownDecision(element);
+    if (element instanceof HTMLLinkElement && element.rel.includes("stylesheet")) {
+      scheduleGeneratedRuleRefresh();
+    }
+  }, true);
+
+  registerTree(document);
   const observer = new MutationObserver((mutations) => {
-    let shouldScanSponsoredContent = false;
-    let shouldReportPreviewEligibility = false;
+    let previewChanged = false;
     for (const mutation of mutations) {
-      for (const node of mutation.removedNodes) {
-        releaseMediaHostsIn(node);
+      if (mutation.type === "childList" && mutation.target instanceof HTMLStyleElement) {
+        scheduleGeneratedRuleRefresh();
       }
-      if (mutation.removedNodes.length > 0) {
-        mutation.target instanceof Element &&
-          mutation.target.closest("svg") &&
-          applyInlineUiVectorDecision(mutation.target.closest("svg"));
-        scheduleCssBackgroundProbe(mutation.target);
-        shouldReportPreviewEligibility = true;
-      }
+      for (const node of mutation.removedNodes) unregisterTree(node);
       for (const node of mutation.addedNodes) {
-        markHidden(node);
+        registerTree(node);
         if (node instanceof Element) {
-          const ownerSvg = node.matches("svg") ? node : node.closest("svg");
-          if (ownerSvg) applyInlineUiVectorDecision(ownerSvg);
+          inspectGeneratedTargets(node);
+          if (
+            node instanceof HTMLStyleElement ||
+            (node instanceof HTMLLinkElement && node.rel.includes("stylesheet"))
+          ) scheduleGeneratedRuleRefresh();
         }
-        scanPageAdvertisements(node);
-        scheduleCssBackgroundProbe(
-          node instanceof Element ? node : mutation.target,
-        );
-        shouldScanSponsoredContent = true;
-        shouldReportPreviewEligibility = true;
+        previewChanged = true;
       }
-      if (mutation.target instanceof Element && mutation.type === "attributes") {
-        const attributeName = mutation.attributeName || "";
-        if (PROTECTED_PRESENTATION_ATTRIBUTES.has(attributeName)) {
-          reconcileProtectedPresentationMutation(mutation.target, attributeName);
-        }
-        const ownerSvg = mutation.target.closest("svg");
-        if (ownerSvg) applyInlineUiVectorDecision(ownerSvg);
-        if (attributeName === "style") {
-          const ownStyle = ownStyleSnapshots.get(mutation.target);
-          const currentStyle = mutation.target.getAttribute("style") || "";
-          if (ownStyle !== undefined && ownStyle === currentStyle) {
-            continue;
-          }
-          ownStyleSnapshots.delete(mutation.target);
-        }
-        if (mutation.target.matches(mediaSelector)) {
-          if (SOURCE_MUTATION_ATTRIBUTES.has(attributeName)) {
-            protectSourceMutation(mutation.target);
+      if (mutation.type === "attributes" && mutation.target instanceof Element) {
+        const name = mutation.attributeName || "";
+        if (PROTECTED_ATTRIBUTES.has(name)) {
+          if (name === INITIALIZED_ATTRIBUTE) {
+            if (initialBarrierComplete) {
+              setAttributeIfChanged(mutation.target, name, "true");
+            } else {
+              removeAttributeIfPresent(mutation.target, name);
+            }
+          } else if (name === MEDIA_HOST_ATTRIBUTE) {
+            reconcileHost(mutation.target);
+          } else if (name === "data-glosh-dag-media") {
+            const trustedState = trustedMediaStates.get(mutation.target);
+            if (trustedState) {
+              setAttributeIfChanged(mutation.target, name, trustedState);
+            } else {
+              applyKnownDecision(mutation.target);
+            }
+          } else if (name === "data-glosh-dag-ui-vector") {
+            if (mutation.target instanceof SVGSVGElement) protectInlineSvg(mutation.target);
+            else removeAttributeIfPresent(mutation.target, name);
           } else {
-            applyKnownDecision(mutation.target);
+            const kind = name.endsWith("-before")
+              ? "before"
+              : name.endsWith("-after")
+                ? "after"
+                : "element";
+            const record = [...generatedRecords.values()]
+              .find((candidate) => candidate.element === mutation.target && candidate.kind === kind);
+            if (record) applyGeneratedRecord(record);
+            else removeAttributeIfPresent(mutation.target, name);
           }
-          stopPlayableMediaIn(mutation.target);
+          continue;
+        }
+        if (mutation.target.matches(MEDIA_SELECTOR) && SOURCE_ATTRIBUTES.has(name)) {
+          setMediaState(mutation.target, "hidden");
+          applyKnownDecision(mutation.target);
+          reconcileMediaAfterLayout(mutation.target);
         }
         if (
-          mutation.target instanceof HTMLSourceElement &&
-          SOURCE_MUTATION_ATTRIBUTES.has(attributeName)
-        ) {
-          const pictureImage = mutation.target.closest("picture")?.querySelector("img");
-          if (pictureImage) protectSourceMutation(pictureImage);
+          (mutation.target instanceof HTMLStyleElement && name === "media") ||
+          (
+            mutation.target instanceof HTMLLinkElement &&
+            mutation.target.rel.includes("stylesheet") &&
+            ["href", "media", "disabled"].includes(name)
+          )
+        ) scheduleGeneratedRuleRefresh();
+        if (["class", "style"].includes(name)) {
+          if (name === "style") {
+            const expectedStyle = ownStyleSnapshots.get(mutation.target);
+            const currentStyle = mutation.target.getAttribute("style") || "";
+            if (expectedStyle !== undefined && expectedStyle === currentStyle) {
+              ownStyleSnapshots.delete(mutation.target);
+              continue;
+            }
+            ownStyleSnapshots.delete(mutation.target);
+          }
+          inspectGeneratedElement(mutation.target);
         }
-        if (["class", "style", "alt", "aria-label"].includes(attributeName)) {
-          scheduleCssBackgroundProbe(mutation.target);
-        }
-        if (["class", "aria-label"].includes(attributeName)) {
-          shouldScanSponsoredContent = true;
-          scanPageAdvertisements(mutation.target);
-        }
-        if (["data-ad", "data-ad-slot", "data-advertisement"].includes(attributeName)) {
-          scanPageAdvertisements(mutation.target);
-        }
-        if (["autocomplete", "type", "src", "aria-label"].includes(attributeName)) {
-          shouldReportPreviewEligibility = true;
-        }
+        if (["type", "autocomplete", "src"].includes(name)) previewChanged = true;
       }
     }
-    if (shouldScanSponsoredContent) {
-      scheduleSponsoredScan();
-    }
-    if (shouldReportPreviewEligibility) {
-      schedulePreviewEligibilityReport();
-    }
+    if (previewChanged) schedulePreviewEligibilityReport();
   });
   observer.observe(document, {
+    subtree: true,
+    childList: true,
     attributes: true,
     attributeFilter: [
+      ...SOURCE_ATTRIBUTES,
+      ...PROTECTED_ATTRIBUTES,
       "class",
-      "src",
-      "srcset",
-      "data-src",
-      "data-srcset",
-      "data-lazy-src",
-      "data-original",
-      "data-url",
-      "poster",
-      "sizes",
-      "media",
-      "href",
-      "xlink:href",
       "style",
-      "alt",
-      "aria-label",
-      "data-ad",
-      "data-ad-slot",
-      "data-advertisement",
-      "autocomplete",
       "type",
-      "data-glosh-dag-media",
-      UI_VECTOR_ATTRIBUTE,
-      CSS_MEDIA_ATTRIBUTE,
-      CSS_BEFORE_ATTRIBUTE,
-      CSS_AFTER_ATTRIBUTE,
-      BACKGROUND_PROBE_ATTRIBUTE,
-      MEDIA_HOST_ATTRIBUTE,
-      FUNCTIONAL_ICON_ATTRIBUTE,
+      "autocomplete",
+      "disabled",
     ],
-    childList: true,
-    subtree: true,
   });
-  window.addEventListener(
-    "scroll",
-    scheduleScrollBackgroundProbe,
-    { passive: true },
-  );
 
   if (window.top === window) {
-    let documentLoadedReported = false;
-    const reportDocumentState = (type) => {
-      browser.runtime
-        .sendMessage({
-          type,
-          version: 1,
-          documentToken: performanceDocumentToken,
-        })
-        .catch(() => {
-          // Missing performance evidence never weakens the media barrier.
-        });
-    };
-    const reportDocumentLoaded = () => {
-      if (documentLoadedReported) return;
-      documentLoadedReported = true;
-      reportDocumentState("document-loaded");
-    };
-    reportDocumentState("document-started");
-    window.addEventListener(
-      "DOMContentLoaded",
-      () => {
-        schedulePreviewEligibilityReport();
-        reportDocumentLoaded();
-      },
-      { once: true },
-    );
-    window.addEventListener(
-      "load",
-      () => {
-        markHidden(document);
-        scanPageAdvertisements(document);
-        scheduleCssBackgroundProbe(document, 0);
-        scheduleSponsoredScan(0);
-        schedulePreviewEligibilityReport();
-        reportDocumentLoaded();
-      },
-      { once: true },
-    );
+    browser.runtime.sendMessage({
+      type: "document-started",
+      version: PROTOCOL_VERSION,
+      documentToken: performanceDocumentToken,
+    }).catch(() => {});
+  }
+
+  const openInitialBarrier = () => {
+    registerTree(document);
+    refreshGeneratedRuleIndex();
+    inspectGeneratedTargets(document);
+    initialBarrierComplete = true;
+    document.documentElement?.setAttribute(INITIALIZED_ATTRIBUTE, "true");
+    reportBarrierReady();
+  };
+
+  const completeDocument = () => {
+    schedulePreviewEligibilityReport();
+    if (window.top === window) {
+      browser.runtime.sendMessage({
+        type: "document-loaded",
+        version: PROTOCOL_VERSION,
+        documentToken: performanceDocumentToken,
+      }).catch(() => {});
+    }
+  };
+  openInitialBarrier();
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", completeDocument, { once: true });
+  } else {
+    completeDocument();
   }
 })();

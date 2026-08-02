@@ -14,8 +14,10 @@ filtrada pertenece al content script y es sintetica, opaca y estatica.
 
 ## Flujo
 
-1. El content script oculta raster, fondos y medios.
-2. El background abre un filtro para `image`/`imageset` y retiene el cuerpo.
+1. El content script indexa solamente `img`, `image` e `input[type=image]` y
+   aplica un estado visual cerrado hasta conocer la decision.
+2. El background abre un filtro para `image`/`imageset`, incluidos fondos CSS
+   HTTP(S), y retiene el cuerpo antes de que Gecko pueda pintarlo.
 3. El cuerpo se limita por recurso y por presupuesto agregado.
 4. Background enlaza la solicitud al `tabId` y token exacto del documento
    superior.
@@ -29,7 +31,35 @@ filtrada pertenece al content script y es sintetica, opaca y estatica.
 11. Background vuelve a comprobar que el documento siga vigente justo antes de
     escribir un `allow`.
 12. Content aplica la decision solo a la fuente exacta conocida y reconcilia
-    cambios dinamicos/atributos hostiles.
+    cambios dinamicos, nodos retirados y atributos hostiles.
+
+## Arquitectura de presentacion
+
+La autoridad para raster HTTP(S) es el stream de red, no una reconstruccion del
+DOM. Una pagina conserva su CSS, pseudo-elementos, iconos, fondos, listas,
+bordes y lazy loading originales. La capa de presentacion no borra
+`background-image`, `content`, `list-style-image` ni `border-image` de toda la
+pagina y no intenta recrearlos despues.
+
+El trabajo queda dividido en dos scripts sin autoridad compartida:
+
+- `barrier.js` mantiene el indice fuente-elemento, los estados
+  `hidden/allow/block/error`, SVG de interfaz pasivo y el fallback acotado para
+  visuales generados `data:`/`blob:` que no atraviesan `webRequest`;
+- `ads.js` oculta anuncios con semantica explicita. No analiza imagenes, no
+  altera decisiones de GloshIA y no ejecuta barridos al desplazar.
+
+El `MutationObserver` procesa solo altas, bajas y atributos relevantes. Al
+retirar un subarbol libera indices, hosts y registros generados; no conserva
+referencias fuertes a imagenes viejas de una pagina infinita. Los atributos de
+estado, incluido el cierre de la barrera inicial, se revalidan ante intentos de
+la pagina de falsificarlos.
+
+La barrera nativa se abre apenas quedan instalados el filtro de respuesta y el
+observador protegido; no espera `DOMContentLoaded`. Los nodos que el parser o
+la pagina agregan despues se cierran en el `MutationObserver`, antes del
+siguiente render. `DOMContentLoaded` se conserva solo como metrica de ciclo de
+pagina y no como permiso para mostrar estructura.
 
 ## Presupuestos
 
@@ -37,7 +67,7 @@ filtrada pertenece al content script y es sintetica, opaca y estatica.
 | --- | ---: |
 | Cuerpo por imagen | 2 MiB |
 | Bytes HTTP retenidos entre todos los streams | 8 MiB |
-| Handles de respuesta activos | 64 |
+| Handles de respuesta activos | 128 |
 | Decisiones nativas JS simultaneas | 4 |
 | Fallbacks activos / esperando | 2 / 256 |
 | Hilos ONNX Android / cola | 2 / 8 |
@@ -47,7 +77,7 @@ filtrada pertenece al content script y es sintetica, opaca y estatica.
 | Cache de decisiones por hash | 512 |
 | Pistas de prioridad por documento | 512 |
 
-Los 64 handles no equivalen a `64 x 2 MiB`: el presupuesto global de 8 MiB
+Los 128 handles no equivalen a `128 x 2 MiB`: el presupuesto global de 8 MiB
 impide esa acumulacion. Presion de memoria, timeout o cupo agotado cierran
 seguro.
 
@@ -55,9 +85,17 @@ seguro.
 
 - visible y cercano mantienen FIFO dentro de su clase;
 - una pista de viewport autenticada puede promover cercano a visible;
+- un `IntersectionObserver` acotado a los nodos visuales indexados anticipa
+  hasta 640 px del desplazamiento sin instalar un listener de scroll;
 - despues de cuatro visibles se da oportunidad al cercano para evitar hambre;
 - DAG conserva `loading=lazy` y `fetchpriority` elegidos por el sitio;
 - solo agrega `decoding=async` cuando el sitio no definio el atributo;
+- desplazar la pagina no dispara consultas globales del DOM ni
+  `getComputedStyle`;
+- lecturas de geometria y escrituras de prioridad se agrupan en una sola fase
+  por cuadro, con respaldo temporal para pestañas en segundo plano;
+- los fondos HTTP(S) siguen el render nativo del sitio y quedan protegidos por
+  sus bytes retenidos; la inspeccion de estilo se reserva a `data:`/`blob:`;
 - navegar o cerrar pestaña purga trabajo viejo antes de admitir la pagina nueva;
 - reconectar el puerto invalida generacion, documentos y cola anteriores;
 - telemetria por imagen, presentacion y viewport solo se emite cuando Android
@@ -76,8 +114,10 @@ Esto reduce competencia de red/CPU sin aumentar hilos ni relajar el filtro.
 - buffers fuente, preparados, regionales y normalizados se limpian.
 
 SVG de interfaz usa un validador separado, pequeno y estructural. `blob:` y
-`data:` confiables se enlazan al documento superior y atraviesan el mismo
-analizador; un iframe no puede crear autoridad con su propio token.
+`data:` confiables se enlazan al documento superior, entregan sus bytes por el
+canal autenticado y usan una identidad HTTPS interna solo dentro del sobre
+nativo; esa identidad nunca autoriza contenido ni genera una solicitud de red.
+Un iframe no puede crear autoridad con su propio token.
 
 ## Presentacion terminal
 

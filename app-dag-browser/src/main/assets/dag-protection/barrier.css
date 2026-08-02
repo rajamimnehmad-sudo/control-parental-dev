@@ -1,169 +1,94 @@
 /*
- * This stylesheet is injected at document_start. Media remains hidden while
- * pending or when a trusted decision cannot be presented. Rejected images
- * receive an opaque static surface only after the native analyzer decides.
+ * DAG's HTTP(S) response gate owns raster safety. This stylesheet only paints
+ * explicit media states and generated-media boundaries. It must never rewrite
+ * the page-wide background, pseudo-element, list or border systems.
  */
-img,
+
+html:not([data-glosh-dag-initialized]) *,
+html:not([data-glosh-dag-initialized]) *::before,
+html:not([data-glosh-dag-initialized]) *::after {
+  background-image: none !important;
+}
+
 video,
 audio,
 canvas,
-svg,
-image,
-input[type="image"],
 object,
-embed {
+embed,
+svg:not([data-glosh-dag-ui-vector="allow"]) {
   visibility: hidden !important;
   opacity: 0 !important;
-  background: #dce7ee !important;
+}
+
+img:not([data-glosh-dag-media="allow"]),
+image:not([data-glosh-dag-media="allow"]),
+input[type="image"]:not([data-glosh-dag-media="allow"]) {
+  visibility: hidden !important;
+  opacity: 0 !important;
 }
 
 img[data-glosh-dag-media="allow"],
 image[data-glosh-dag-media="allow"],
-input[type="image"][data-glosh-dag-media="allow"] {
-  visibility: visible !important;
-  opacity: 1 !important;
-  filter: none !important;
-  background: initial !important;
-}
-
-img[data-glosh-dag-ui-vector="allow"],
+input[type="image"][data-glosh-dag-media="allow"],
 svg[data-glosh-dag-ui-vector="allow"] {
   visibility: visible !important;
   opacity: 1 !important;
   filter: none !important;
-  background: initial !important;
 }
 
-img[data-glosh-dag-media="block"],
-image[data-glosh-dag-media="block"],
-input[type="image"][data-glosh-dag-media="block"] {
-  visibility: hidden !important;
-  opacity: 0 !important;
-  filter: none !important;
-  background: transparent !important;
-}
-
-img[data-glosh-dag-media="error"],
-image[data-glosh-dag-media="error"],
-input[type="image"][data-glosh-dag-media="error"] {
-  visibility: hidden !important;
-  opacity: 0 !important;
-}
-
-html:not([data-glosh-dag-background-probe]),
-html:not([data-glosh-dag-background-probe])::before,
-html:not([data-glosh-dag-background-probe])::after,
-html:not([data-glosh-dag-background-probe]) *,
-html:not([data-glosh-dag-background-probe]) *::before,
-html:not([data-glosh-dag-background-probe]) *::after {
+[data-glosh-dag-generated-background="hidden"],
+[data-glosh-dag-generated-background="block"],
+[data-glosh-dag-generated-background="error"] {
   background-image: none !important;
 }
 
-html[data-glosh-dag-background-probe] body,
-html[data-glosh-dag-background-probe] body * {
-  visibility: hidden !important;
-  opacity: 0 !important;
+[data-glosh-dag-generated-background="allow"] {
+  background-image: var(--glosh-dag-generated-background) !important;
 }
 
-[data-glosh-dag-sponsored-result="true"] {
-  display: none !important;
-}
-
-.glosh-dag-page-ad-hidden {
-  display: none !important;
-}
-
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-media="allow"],
-html:not([data-glosh-dag-background-probe])[data-glosh-dag-css-media="allow"] {
-  background-image: var(--glosh-dag-background-image) !important;
-}
-
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-media="hidden"],
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-media="error"],
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-media="block"],
-html:not([data-glosh-dag-background-probe])[data-glosh-dag-css-media="hidden"],
-html:not([data-glosh-dag-background-probe])[data-glosh-dag-css-media="error"],
-html:not([data-glosh-dag-background-probe])[data-glosh-dag-css-media="block"] {
-  background-image: none !important;
-  background-color: #dce7ee !important;
-}
-
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-before="allow"]::before {
-  content: var(--glosh-dag-before-content) !important;
-  background-image: var(--glosh-dag-before-background-image) !important;
-}
-
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-after="allow"]::after {
-  content: var(--glosh-dag-after-content) !important;
-  background-image: var(--glosh-dag-after-background-image) !important;
-}
-
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-before="hidden"]::before,
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-before="block"]::before,
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-after="hidden"]::after,
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-css-after="block"]::after {
-  content: none !important;
+[data-glosh-dag-generated-before="hidden"]::before,
+[data-glosh-dag-generated-before="block"]::before,
+[data-glosh-dag-generated-before="error"]::before {
   background-image: none !important;
 }
 
-*,
-*::before,
-*::after {
-  border-image-source: none !important;
-  list-style-image: none !important;
+[data-glosh-dag-generated-before="allow"]::before {
+  background-image: var(--glosh-dag-generated-before-background) !important;
 }
 
-html:not([data-glosh-dag-background-probe]) *::before,
-html:not([data-glosh-dag-background-probe]) *::after {
-  content: none !important;
+[data-glosh-dag-generated-after="hidden"]::after,
+[data-glosh-dag-generated-after="block"]::after,
+[data-glosh-dag-generated-after="error"]::after {
+  background-image: none !important;
+}
+
+[data-glosh-dag-generated-after="allow"]::after {
+  background-image: var(--glosh-dag-generated-after-background) !important;
 }
 
 @keyframes glosh-dag-waiting {
-  0% {
-    background-position: 100% 0;
-  }
-  100% {
-    background-position: -100% 0;
-  }
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
 }
 
-html:not([data-glosh-dag-background-probe]) [data-glosh-dag-media-host] {
+[data-glosh-dag-media-host] {
   position: relative !important;
   isolation: isolate !important;
 }
 
-html:not([data-glosh-dag-background-probe]) [data-glosh-dag-media-host]::after {
+[data-glosh-dag-media-host]::after {
   box-sizing: border-box !important;
   content: "" !important;
   position: absolute !important;
   inset: 0 !important;
   z-index: 1 !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  min-width: 48px !important;
-  min-height: 48px !important;
-  border: 1px solid rgba(42, 86, 112, 0.2) !important;
-  border-radius: 8px !important;
-  color: #173247 !important;
-  background: #dce7ee !important;
-  font: 600 12px/1.25 sans-serif !important;
-  letter-spacing: 0.01em !important;
-  text-align: center !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+  border-radius: inherit !important;
   pointer-events: none !important;
 }
 
-html:not([data-glosh-dag-background-probe]) [data-glosh-dag-media-host] :is(
+[data-glosh-dag-media-host] > :is(
   a,
   button,
   input:not([type="image"]),
@@ -171,50 +96,38 @@ html:not([data-glosh-dag-background-probe]) [data-glosh-dag-media-host] :is(
   [role="button"],
   [role="link"],
   [data-glosh-dag-media="allow"],
-  [data-glosh-dag-ui-vector="allow"],
-  [data-glosh-dag-css-media="allow"],
-  [data-glosh-dag-css-before="allow"],
-  [data-glosh-dag-css-after="allow"],
-  [data-glosh-dag-functional-icon]
+  [data-glosh-dag-ui-vector="allow"]
 ) {
   position: relative !important;
   z-index: 2 !important;
 }
 
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-media-host="waiting"]::after {
-  content: "" !important;
-  background:
-    linear-gradient(100deg, #dce7ee 25%, #edf4f7 45%, #dce7ee 65%) !important;
+[data-glosh-dag-media-host="waiting"]::after {
+  background: linear-gradient(100deg, #e3eaee 25%, #f4f7f8 45%, #e3eaee 65%) !important;
   background-size: 220% 100% !important;
-  animation: glosh-dag-waiting 1.3s linear infinite !important;
+  animation: glosh-dag-waiting 1.2s linear infinite !important;
 }
 
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-media-host="filtered"]::after {
-  content: "" !important;
+[data-glosh-dag-media-host="filtered"]::after {
   background:
-    radial-gradient(circle at 24% 32%, #eef3f5 0 12%, transparent 13%),
-    radial-gradient(circle at 72% 62%, #bac9d1 0 18%, transparent 19%),
-    linear-gradient(135deg, #d9e2e7 0%, #b8c8d1 48%, #e5ecef 100%) !important;
-  background-size: 180% 180%, 160% 160%, 100% 100% !important;
+    radial-gradient(circle at 24% 32%, #edf2f4 0 12%, transparent 13%),
+    radial-gradient(circle at 72% 62%, #becbd2 0 18%, transparent 19%),
+    linear-gradient(135deg, #dce5e9 0%, #bdcbd2 48%, #e8edef 100%) !important;
   animation: none !important;
-  border-color: rgba(42, 86, 112, 0.16) !important;
 }
 
-html:not([data-glosh-dag-background-probe])
-  [data-glosh-dag-media-host="error"]::after {
-  content: "" !important;
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.45), transparent 55%),
-    #e8e0dc !important;
+[data-glosh-dag-media-host="error"]::after {
+  background: #ebe6e2 !important;
   animation: none !important;
-  border-color: rgba(128, 76, 38, 0.25) !important;
+}
+
+[data-glosh-dag-sponsored-result="true"],
+.glosh-dag-page-ad-hidden {
+  display: none !important;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  html:not([data-glosh-dag-background-probe])
-    [data-glosh-dag-media-host="waiting"]::after {
+  [data-glosh-dag-media-host="waiting"]::after {
     animation: none !important;
   }
 }

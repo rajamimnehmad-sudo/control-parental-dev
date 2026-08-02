@@ -67,6 +67,34 @@ const waitFor = async (predicate, label) => {
   throw new Error(`Timed out waiting for ${label}`);
 };
 
+const fetchDataUrl = async (source) => {
+  if (typeof source !== "string" || !source.startsWith("data:image/")) {
+    throw new Error("network_disabled_in_dag_protection_test");
+  }
+  const separator = source.indexOf(",");
+  const metadata = source.slice(0, separator);
+  const payload = source.slice(separator + 1);
+  const bytes = metadata.endsWith(";base64")
+    ? Uint8Array.from(Buffer.from(payload, "base64"))
+    : new TextEncoder().encode(decodeURIComponent(payload));
+  let delivered = false;
+  return {
+    ok: true,
+    body: {
+      getReader() {
+        return {
+          async read() {
+            if (delivered) return { done: true, value: undefined };
+            delivered = true;
+            return { done: false, value: bytes };
+          },
+          async cancel() {},
+        };
+      },
+    },
+  };
+};
+
 const createBackgroundHarness = async () => {
   const source = await readFile(backgroundPath, "utf8");
   const clock = fakeClock();
@@ -150,9 +178,7 @@ const createBackgroundHarness = async () => {
     clearTimeout: clock.clearTimeout,
     console,
     crypto: webcrypto,
-    fetch: async () => {
-      throw new Error("network_disabled_in_dag_protection_test");
-    },
+    fetch: fetchDataUrl,
     performance: { now: clock.now },
     setTimeout: clock.setTimeout,
   });
@@ -457,12 +483,12 @@ for (const outcome of ["block", "error", "timeout"]) {
   });
 }
 
-test("a burst of 48 small responses is admitted beyond the former seventeenth cutoff", async () => {
+test("a burst of 96 small responses is admitted without increasing the byte budget", async () => {
   const harness = await createBackgroundHarness();
   const entries = [];
   harness.startDocument(19, "document_a4");
 
-  for (let index = 0; index < 48; index += 1) {
+  for (let index = 0; index < 96; index += 1) {
     const requestId = `small-burst-${index}`;
     const originalBytes = Uint8Array.from([
       0x89,
@@ -503,7 +529,7 @@ test("a burst of 48 small responses is admitted beyond the former seventeenth cu
   await harness.flush();
 
   assert.equal(entries.every(({ filter }) => filter.closed), true);
-  assert.equal(responded.size, 48, "all unique small resources should reach native analysis");
+  assert.equal(responded.size, 96, "all unique small resources should reach native analysis");
   entries.forEach(({ filter, originalBytes }, index) => {
     assert.deepEqual(
       bytesWritten(filter),
@@ -752,8 +778,11 @@ test("visible and nearby intercept queues preserve FIFO order inside each priori
       url: entry.url,
       marker: entry.marker,
     });
+    // Response-stop callbacks resolve asynchronously. Admit each synthetic
+    // response before creating the next one so the assertion measures the
+    // production queue's FIFO policy, not Promise scheduling in the harness.
+    await harness.flush();
   }
-  await harness.flush();
   blockers.forEach((request) => harness.respondToNative(request, "allow", "model_allow"));
   const requests = await harness.waitForNativeRequestCount(8);
   assert.deepEqual(
@@ -841,8 +870,33 @@ test("a trusted subframe inline image is bound to its current top-level document
   const nativeRequest = await harness.nextNativeRequest();
   assert.equal(nativeRequest.tabId, tabId);
   assert.equal(nativeRequest.documentToken, topDocumentToken);
+  assert.equal(nativeRequest.sourceUrl, "https://inline-media.glosh.local/blob");
   harness.respondToNative(nativeRequest, "allow", "model_allow");
   const response = await responses[0];
+  assert.equal(response?.action, "allow");
+});
+
+test("a generated data image uses a bounded queue and an internal native identity", async () => {
+  const harness = await createBackgroundHarness();
+  const tabId = 57;
+  const documentToken = "document_b4";
+  const bytes = Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x02]);
+  const sourceUrl = `data:image/png;base64,${Buffer.from(bytes).toString("base64")}`;
+  harness.startDocument(tabId, documentToken);
+
+  const responses = harness.sendRuntimeMessage({
+    type: "media-fallback-request",
+    version: 1,
+    documentToken,
+    sourceUrl,
+    priority: "visible",
+  }, { tabId, frameId: 0 });
+  const nativeRequest = await harness.nextNativeRequest();
+  assert.equal(nativeRequest.sourceUrl, "https://inline-media.glosh.local/data");
+  assert.equal(nativeRequest.byteLength, bytes.byteLength);
+  harness.respondToNative(nativeRequest, "allow", "model_allow");
+  const response = await responses[0];
+  assert.equal(response?.sourceUrl, sourceUrl);
   assert.equal(response?.action, "allow");
 });
 
@@ -878,7 +932,7 @@ test("inline capacity is checked before decoding an untrusted Base64 body", asyn
   await harness.flush();
 });
 
-test("the barrier preserves site lazy loading and only requests asynchronous decoding", async () => {
+test("the targeted barrier preserves native loading and never installs a permanent page-wide rewrite", async () => {
   const script = await readFile(barrierPath, "utf8");
   const style = await readFile(barrierCssPath, "utf8");
   assert.equal(
@@ -890,37 +944,41 @@ test("the barrier preserves site lazy loading and only requests asynchronous dec
     false,
   );
   assert.match(script, /setAttributeIfChanged\(element, "decoding", "async"\)/u);
-  assert.match(script, /PRIORITY_HINT_MESSAGE = "media-priority-hint"/u);
-  assert.match(script, /FALLBACK_ROOT_MARGIN = "640px 0px"/u);
-  assert.match(script, /decisionsBySource\.get\(sourceUrl\) === "block"/u);
-  assert.doesNotMatch(script, /APPROVED_PRESENTATION_SELECTOR/u);
-  assert.match(script, /reconcileMediaHostState\(current\)/u);
-  assert.match(script, /attributeName === MEDIA_HOST_ATTRIBUTE/u);
+  assert.match(script, /type: "media-priority-hint"/u);
+  assert.match(script, /new IntersectionObserver/u);
+  assert.match(script, /rootMargin: "640px 0px"/u);
+  assert.match(script, /mediaPriorityObserver\?\.observe/u);
+  assert.match(script, /GENERATED_PROTOCOLS = new Set\(\["data:", "blob:"\]\)/u);
+  assert.match(script, /const reconcileHost = \(host\) => \{/u);
+  assert.match(script, /const flushLayoutWork = \(\) => \{/u);
+  assert.match(script, /mediaElements\.forEach\(boundsFor\);/u);
+  assert.match(script, /attachHost\(element, bounds\);\n      sendPriorityHint\([^\n]+, bounds\);/u);
+  assert.match(script, /setTimeout\(flushLayoutWork, 48\)/u);
+  const mediaStateStart = script.indexOf("const setMediaState = (element, action) => {");
+  const mediaStateEnd = script.indexOf("const rememberDecision", mediaStateStart);
+  assert.notEqual(mediaStateStart, -1);
+  assert.notEqual(mediaStateEnd, -1);
+  assert.equal(script.slice(mediaStateStart, mediaStateEnd).includes("attachHost("), false);
+  assert.doesNotMatch(script, /scheduleScrollBackgroundProbe/u);
+  assert.doesNotMatch(script, /MAX_BACKGROUND_PROBE_ELEMENTS/u);
   assert.match(style, /data-glosh-dag-media-host="filtered"/u);
-  assert.match(
-    style,
-    /html:not\(\[data-glosh-dag-background-probe\]\) \[data-glosh-dag-media-host\]::after/u,
-  );
+  assert.match(style, /img:not\(\[data-glosh-dag-media="allow"\]\)/u);
+  assert.match(style, /\[data-glosh-dag-media-host\]::after/u);
+  assert.doesNotMatch(style, /^\*,/mu);
+  assert.doesNotMatch(style, /list-style-image: none/u);
+  assert.doesNotMatch(style, /content: none !important/u);
   assert.match(style, /prefers-reduced-motion: reduce/u);
   assert.equal(style.includes("Imagen no disponible"), false);
   assert.equal(style.includes("blur(28px)"), false);
 });
 
-test("the media host reconciler preserves pending siblings without covering trusted allows", async () => {
+test("the media host reconciler keeps pending block and error states distinct", async () => {
   const script = await readFile(barrierPath, "utf8");
   const style = await readFile(barrierCssPath, "utf8");
-  const reconcilerStart = script.indexOf("const reconcileMediaHostState = (host) => {");
-  const reconcilerEnd = script.indexOf("const releaseMediaHost = (element) => {", reconcilerStart);
+  const reconcilerStart = script.indexOf("const reconcileHost = (host) => {");
+  const reconcilerEnd = script.indexOf("const attachHost = (element, bounds) => {", reconcilerStart);
   const reconciler = script.slice(reconcilerStart, reconcilerEnd);
-  const errorHandlerStart = script.indexOf('document.addEventListener(\n    "error",');
-  const errorHandlerEnd = script.indexOf("markHidden(document);", errorHandlerStart);
-  const errorHandler = script.slice(errorHandlerStart, errorHandlerEnd);
-  const waitingClearStart = script.indexOf("function clearWaitingMediaHostsAround(element) {");
-  const waitingClearEnd = script.indexOf("const applyDecisionToMediaSource", waitingClearStart);
-  const waitingClear = script.slice(waitingClearStart, waitingClearEnd);
-  const trustedLiftStart = style.indexOf(
-    "html:not([data-glosh-dag-background-probe]) [data-glosh-dag-media-host] :is(",
-  );
+  const trustedLiftStart = style.indexOf("[data-glosh-dag-media-host] > :is(");
   const trustedLiftEnd = style.indexOf("\n) {", trustedLiftStart);
   const trustedLiftRuleEnd = style.indexOf("\n}", trustedLiftEnd);
   const trustedLiftRule = style.slice(trustedLiftStart, trustedLiftRuleEnd);
@@ -928,35 +986,21 @@ test("the media host reconciler preserves pending siblings without covering trus
   assert.notEqual(reconcilerStart, -1);
   assert.notEqual(reconcilerEnd, -1);
   assert.ok(
-    reconciler.indexOf('siblingStates.includes("hidden")') <
-      reconciler.indexOf('siblingStates.includes("allow")'),
+    reconciler.indexOf('states.includes("hidden")') <
+      reconciler.indexOf('states.includes("block")'),
     "a trusted allow must not clear another tracked image that is still pending",
   );
   assert.ok(
-    reconciler.indexOf('siblingStates.includes("allow")') <
-      reconciler.indexOf('siblingStates.includes("block")'),
-    "once every sibling is resolved, an allowed sibling must not remain covered",
+    reconciler.indexOf('states.includes("block")') <
+      reconciler.indexOf('states.includes("error")'),
+    "a model filter must remain distinct from a technical error",
   );
-  assert.match(
-    errorHandler,
-    /const sourceUrl = candidateSourcesFor\(element\)\[0\];[\s\S]*decisionsBySource\.get\(sourceUrl\) === "block"/u,
-  );
-  assert.doesNotMatch(errorHandler, /candidateSourcesFor\(element\)\.some/u);
-  assert.match(waitingClear, /reconcileMediaHostState\(current\)/u);
-  assert.doesNotMatch(
-    waitingClear,
-    /removeAttributeIfPresent\(current, MEDIA_HOST_ATTRIBUTE\)/u,
-  );
-  assert.match(
-    style,
-    /html:not\(\[data-glosh-dag-background-probe\]\)\s+\[data-glosh-dag-media-host="filtered"\]::after/u,
-  );
+  assert.match(style, /\[data-glosh-dag-media-host="filtered"\]::after/u);
   assert.notEqual(trustedLiftStart, -1);
   assert.notEqual(trustedLiftEnd, -1);
   for (const selector of [
     '[data-glosh-dag-media="allow"]',
     '[data-glosh-dag-ui-vector="allow"]',
-    '[data-glosh-dag-css-media="allow"]',
   ]) {
     assert.equal(trustedLiftRule.includes(selector), true);
   }
@@ -1005,12 +1049,12 @@ test("capture reservations release on allow error timeout and navigation", async
   }
 });
 
-test("the sixty-fifth active stream fails closed with a technical result", async () => {
+test("the one hundred twenty-ninth active stream fails closed with a technical result", async () => {
   const harness = await createBackgroundHarness();
   const admittedFilters = [];
   harness.startDocument(37, "document_ad");
 
-  for (let index = 0; index < 64; index += 1) {
+  for (let index = 0; index < 128; index += 1) {
     const requestId = `stream-ceiling-${index}`;
     const result = harness.beforeRequest({
       requestId,
@@ -1023,9 +1067,9 @@ test("the sixty-fifth active stream fails closed with a technical result", async
     admittedFilters.push(harness.filterFor(requestId));
   }
 
-  const rejectedUrl = "https://assets.invalid/stream-64.png";
+  const rejectedUrl = "https://assets.invalid/stream-128.png";
   const rejected = harness.beforeRequest({
-    requestId: "stream-ceiling-64",
+    requestId: "stream-ceiling-128",
     tabId: 37,
     frameId: 0,
     type: "image",
@@ -1033,7 +1077,7 @@ test("the sixty-fifth active stream fails closed with a technical result", async
   });
   assert.equal(rejected.cancel, true);
   assert.deepEqual(Reflect.ownKeys(rejected), ["cancel"]);
-  assert.equal(harness.filterFor("stream-ceiling-64"), undefined);
+  assert.equal(harness.filterFor("stream-ceiling-128"), undefined);
   await harness.flush();
   assert.equal(
     harness.tabMessages.some(
@@ -1051,14 +1095,18 @@ const browserFixture = `<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'none'; media-src 'none'; object-src 'none'; connect-src 'none'; frame-src 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src data:; media-src 'none'; object-src 'none'; connect-src 'none'; frame-src 'none'">
     <link rel="stylesheet" href="barrier.css">
     <style>
       .test-visual { display: block; width: 120px; height: 120px; }
+      .generated-rule {
+        background-image: url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+      }
     </style>
     <script>
       window.__dagRuntimeListeners = [];
       window.__dagRuntimeRequests = [];
+      window.__dagFallbackActions = new Map();
       window.browser = {
         runtime: {
           id: "dag-protection@glosh.local",
@@ -1081,7 +1129,7 @@ const browserFixture = `<!doctype html>
                 type: "media-fallback-response",
                 version: 1,
                 sourceUrl: message.sourceUrl,
-                action: "error",
+                action: window.__dagFallbackActions.get(message.sourceUrl) || "error",
               });
             }
             return Promise.resolve(undefined);
@@ -1120,6 +1168,14 @@ const browserFixture = `<!doctype html>
         };
         const sandbox = document.getElementById("sandbox");
 
+        document.documentElement.setAttribute("data-glosh-dag-initialized", "forged");
+        await wait(20);
+        record(
+          "page cannot forge completion of the initial visual barrier",
+          document.documentElement.getAttribute("data-glosh-dag-initialized") === "true",
+          document.documentElement.getAttribute("data-glosh-dag-initialized"),
+        );
+
         const forgedMedia = document.createElement("img");
         forgedMedia.className = "test-visual";
         forgedMedia.src = "https://assets.invalid/forged-media.jpg";
@@ -1146,12 +1202,36 @@ const browserFixture = `<!doctype html>
           forgedVector.getAttribute("data-glosh-dag-ui-vector"),
         );
 
+        const svgNamespace = "http://www.w3.org/2000/svg";
+        const safeVector = document.createElementNS(svgNamespace, "svg");
+        safeVector.setAttribute("viewBox", "0 0 24 24");
+        safeVector.append(document.createElementNS(svgNamespace, "path"));
+        sandbox.append(safeVector);
+        const unsafeVector = document.createElementNS(svgNamespace, "svg");
+        unsafeVector.setAttribute("viewBox", "0 0 24 24");
+        const externalUse = document.createElementNS(svgNamespace, "use");
+        externalUse.setAttribute("href", "https://assets.invalid/sprite.svg#photo");
+        unsafeVector.append(externalUse);
+        sandbox.append(unsafeVector);
+        await wait(20);
+        record(
+          "passive inline vectors remain visible while external vector imports stay closed",
+          safeVector.getAttribute("data-glosh-dag-ui-vector") === "allow" &&
+            getComputedStyle(safeVector).visibility === "visible" &&
+            !unsafeVector.hasAttribute("data-glosh-dag-ui-vector") &&
+            getComputedStyle(unsafeVector).visibility === "hidden",
+          JSON.stringify({
+            safe: safeVector.getAttribute("data-glosh-dag-ui-vector"),
+            unsafe: unsafeVector.getAttribute("data-glosh-dag-ui-vector"),
+          }),
+        );
+
         const forgedBackground = document.createElement("div");
         forgedBackground.className = "test-visual";
         sandbox.append(forgedBackground);
-        forgedBackground.setAttribute("data-glosh-dag-css-media", "allow");
+        forgedBackground.setAttribute("data-glosh-dag-generated-background", "allow");
         forgedBackground.style.setProperty(
-          "--glosh-dag-background-image",
+          "--glosh-dag-generated-background",
           'url("https://assets.invalid/forged-background.jpg")',
         );
         await wait(20);
@@ -1171,13 +1251,13 @@ const browserFixture = `<!doctype html>
         await wait(20);
         const restoredBackground = getComputedStyle(cssBackground).backgroundImage;
         record(
-          "intercepted css background is counted and reconciled",
-          response?.matchedCount === 1 &&
-            cssBackground.getAttribute("data-glosh-dag-css-media") === "allow" &&
+          "ordinary http css remains page native while its bytes stay network gated",
+          response?.matchedCount === 0 &&
+            !cssBackground.hasAttribute("data-glosh-dag-generated-background") &&
             restoredBackground.includes("intercepted-background.jpg"),
           JSON.stringify({
             matchedCount: response?.matchedCount,
-            state: cssBackground.getAttribute("data-glosh-dag-css-media"),
+            state: cssBackground.getAttribute("data-glosh-dag-generated-background"),
             backgroundImage: restoredBackground,
           }),
         );
@@ -1190,7 +1270,7 @@ const browserFixture = `<!doctype html>
         blockedImage.src = blockedSource;
         filteredHost.append(blockedImage);
         sandbox.append(filteredHost);
-        await wait(20);
+        await wait(60);
         const blockResponse = await present(blockedSource, "block");
         blockedImage.dispatchEvent(new Event("error"));
         await wait(20);
@@ -1258,7 +1338,7 @@ const browserFixture = `<!doctype html>
         allowedSister.setAttribute("data-src", allowedSisterSource);
         mixedHost.append(pendingImage, iconControl, allowedSister);
         sandbox.append(mixedHost);
-        await wait(20);
+        await wait(60);
         const waitingBeforeIcon = mixedHost.getAttribute("data-glosh-dag-media-host");
         await present(iconSource, "allow");
         await present(allowedSisterSource, "allow");
@@ -1278,6 +1358,64 @@ const browserFixture = `<!doctype html>
             allowedZIndex: getComputedStyle(allowedSister).zIndex,
             animationName: getComputedStyle(mixedHost, "::after").animationName,
           }),
+        );
+
+        const generatedSource =
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ" +
+          "AAAADUlEQVR42mNk+M/wHwAF/gL+RrgD6wAAAABJRU5ErkJggg==";
+        window.__dagFallbackActions.set(generatedSource, "allow");
+        const generatedBackground = document.createElement("div");
+        generatedBackground.className = "test-visual";
+        generatedBackground.style.backgroundImage = 'url("' + generatedSource + '")';
+        sandbox.append(generatedBackground);
+        await wait(80);
+        record(
+          "generated raster backgrounds use the bounded fallback and restore only after allow",
+          generatedBackground.getAttribute("data-glosh-dag-generated-background") === "allow" &&
+            getComputedStyle(generatedBackground).backgroundImage.includes("data:image/png") &&
+            window.__dagRuntimeRequests.some((message) =>
+              message?.type === "media-fallback-request" &&
+              message?.sourceUrl === generatedSource),
+          JSON.stringify({
+            state: generatedBackground.getAttribute("data-glosh-dag-generated-background"),
+            backgroundImage: getComputedStyle(generatedBackground).backgroundImage,
+          }),
+        );
+
+        const generatedRuleSource =
+          "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwC" +
+          "AAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+        window.__dagFallbackActions.set(generatedRuleSource, "allow");
+        const generatedRuleBackground = document.createElement("div");
+        generatedRuleBackground.className = "test-visual generated-rule";
+        sandbox.append(generatedRuleBackground);
+        await wait(80);
+        record(
+          "generated raster backgrounds declared by css rules use the indexed fallback",
+          generatedRuleBackground.getAttribute("data-glosh-dag-generated-background") === "allow" &&
+            getComputedStyle(generatedRuleBackground).backgroundImage.includes("data:image/png") &&
+            window.__dagRuntimeRequests.some((message) =>
+              message?.type === "media-fallback-request" &&
+              message?.sourceUrl === generatedRuleSource),
+          JSON.stringify({
+            state: generatedRuleBackground.getAttribute("data-glosh-dag-generated-background"),
+            backgroundImage: getComputedStyle(generatedRuleBackground).backgroundImage,
+          }),
+        );
+
+        const removedSource = "https://assets.invalid/removed-photo.jpg";
+        const removedImage = document.createElement("img");
+        removedImage.className = "test-visual";
+        removedImage.setAttribute("data-src", removedSource);
+        sandbox.append(removedImage);
+        await wait(20);
+        removedImage.remove();
+        await wait(20);
+        const removedResponse = await present(removedSource, "allow");
+        record(
+          "removed media releases its source binding",
+          removedResponse?.matchedCount === 0 && removedResponse?.binding === "unbound",
+          JSON.stringify(removedResponse),
         );
 
         const forgedHost = document.createElement("div");
@@ -1322,7 +1460,7 @@ const findChrome = () => {
   return candidates.find((candidate) => existsSync(candidate));
 };
 
-test("real DOM keeps forged attributes closed and counts CSS presentation matches", {
+test("real DOM keeps forged attributes closed and leaves ordinary CSS to the network gate", {
   skip: process.env.DAG_PROTECTION_DOM_TEST !== "1" &&
     "set DAG_PROTECTION_DOM_TEST=1 for the external Chrome harness",
 }, async () => {

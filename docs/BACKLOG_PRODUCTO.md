@@ -827,6 +827,7 @@ Flujo de una entrada:
 | DAG-V3-TAB-HIBERNATION-09 | Implementado en DAG 45; matriz física de 10 correcta, 50 pendiente | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
 | DAG-V3-MEDIA-PRESENTATION-11 | Reforzado localmente en DAG 34 y revalidado con DAG 36 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
+| DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Resuelto localmente y validado fisicamente en DAG 59 | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
 | DAG-V3-FILTERED-OVERLAY-13 | Resuelto localmente y validado físicamente en DAG 33 | P2 | Mostrar fotos filtradas sólo difuminadas, sin escudo ni rastreo final de contenedor | S | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |

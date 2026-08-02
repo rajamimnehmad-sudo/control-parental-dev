@@ -11,10 +11,10 @@ versiones historicas.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- `main` local queda 24 commits por delante de `origin/main` con el commit de
+- `main` local queda 25 commits por delante de `origin/main` con el commit de
   cierre de este lote.
 - No se hizo push, PR, publicacion DEV ni Production.
-- El lote DAG 58 queda integrado en un unico commit local de cierre. No se hizo
+- El lote DAG 59 queda integrado en un unico commit local de cierre. No se hizo
   push y no se debe publicar sin una autorizacion separada.
 - Los worktrees separados son historicos o auxiliares: no compilar ni instalar
   una entrega final desde ellos.
@@ -26,15 +26,15 @@ Declaraciones de version actuales en el codigo:
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Sin cambios |
 | App Admin | 290 | 1.0.1-dev | Sin cambios |
-| DAG Browser | 58 | 0.38.0-dev | Gate local y fisico aprobados en SM-A235M |
+| DAG Browser | 59 | 0.39.0-dev | Reconstruccion global y gate fisico aprobados en SM-A235M |
 
-DAG 58 esta instalado en el SM-A235M `R58T34V31AE`, conserva el rol oficial de
-navegador y quedo en su Inicio seguro con una pestaña. El perfil DEV anterior
-fue borrado una sola vez con autorizacion explicita; no se tocaron otras apps.
+DAG 59 esta instalado en el SM-A235M `R58T34V31AE` y conserva el rol oficial de
+navegador. El perfil DEV anterior fue borrado una sola vez con autorizacion
+explicita durante DAG 58; este lote se instalo in-place y no toco otras apps.
 
-## DAG Browser 58 - candidato local
+## DAG Browser 59 - candidato local
 
-DAG 58 concentra la auditoria profesional de seguridad, fluidez y medicion. No
+DAG 59 reconstruye desde la raiz la barrera y presentacion multimedia. No
 incluye reglas por Cheeky, Mimo, Fravega, modelo de telefono ni ningun otro
 sitio. Un contrato automatico falla si se introduce una excepcion para esos
 comercios o modelos fisicos conocidos.
@@ -58,12 +58,17 @@ Cambios generales:
   inferencias y conserva como maximo ocho tareas esperando;
 - el presupuesto nativo vence a los 2.250 ms y se vuelve a comprobar antes de
   Base64, bounds, preprocesamiento, cada inferencia y la decision final;
-- se admiten hasta 64 handles de respuesta, pero los bytes retenidos tienen un
+- se admiten hasta 128 handles de respuesta, pero los bytes retenidos tienen un
   presupuesto global de 8 MiB y un limite de 2 MiB por recurso;
 - visible y cercano conservan FIFO, con promocion autenticada y una cuota que
   evita hambre del trabajo cercano;
 - DAG no fuerza `loading=eager` ni `fetchpriority=high`; conserva lazy loading
   del sitio y solicita solamente `decoding=async` cuando falta;
+- la barrera indexa solo medios reales, agrupa geometria por cuadro y anticipa
+  640 px mediante `IntersectionObserver`, sin listener de scroll ni barridos
+  globales;
+- CSS, pseudo-elementos, iconos, fondos, listas y bordes ordinarios permanecen
+  bajo el render nativo; anuncios se presentan desde un script aislado;
 - una foto filtrada termina en una superficie opaca, estatica, sin texto ni
   icono. No usa los pixeles rechazados ni un blur costoso durante scroll;
 - espera, filtro y error tecnico son estados visuales distintos. Un error del
@@ -78,7 +83,7 @@ Cambios generales:
 - buffers originales, RGB y normalizados se limpian cuando dejan de usarse;
 - el cierre de Activity no cierra ONNX mientras exista una inferencia activa.
 
-La extension incorporada pasa de `1.27.0` a `1.28.0`. DAG usa
+La extension incorporada pasa de `1.28.0` a `1.29.0`. DAG usa
 `ensureBuiltIn(ExtensionLocation, ExtensionId)`: un perfil existente conserva
 la extension si esa version ya esta instalada y recibe la nueva cuando cambia.
 Esto evita reinstalacion innecesaria en cada apertura y evita que una
@@ -95,17 +100,17 @@ El modelo visual no cambio:
 ## Validacion ya ejecutada
 
 - sintaxis de `background.js` y `barrier.js`: correcta;
-- harness WebExtension final: 19 pruebas aprobadas, cero fallos y una prueba
-  DOM externa omitida por ser opt-in; la omitida no se cuenta como aprobada;
-- 147 pruebas unitarias Kotlin aprobadas, cero fallos y cero omitidas;
+- harness WebExtension final: 21 pruebas aprobadas, incluidas seguridad de
+  rafaga/FIFO y una pagina DOM real en Chrome, cero fallos u omitidas;
+- 146 pruebas unitarias Kotlin aprobadas, cero fallos y cero omitidas;
 - `ktlintCheck` y `lintDevDebug`: correctos;
 - compilacion y empaquetado de `androidTest`: correctos;
 - `assembleDevDebug`: correcto;
 - sintaxis Python del fixture/resumidor y Bash del runner Android: correcta;
 - `git diff --check`: correcto;
-- auditoria estatica de cola, semaforo, lifecycle, contrato de documento y
-  benchmark ONNX: sin otro error claro.
-- instalacion y borrado exclusivo del perfil DEV de DAG: correctos;
+- auditoria estatica de cola, contadores de quietud, lifecycle y contrato de
+  documento: sin otro error claro;
+- instalacion in-place exclusiva de DAG: correcta;
 - rol oficial de navegador, version instalada y estado final: correctos;
 - matriz fisica limpia en Mimo, Fravega y Cheeky: sin crash, ANR, OOM,
   temperatura anormal ni salida inesperada;
@@ -117,28 +122,26 @@ El modelo visual no cambio:
 Artefacto local construido desde `main`:
 
 - paquete: `com.contentfilter.dagbrowser.dev`;
-- version: `58` / `0.38.0-dev`;
-- tamaño: `121375543` bytes;
+- version: `59` / `0.39.0-dev`;
+- tamaño: `121370189` bytes;
 - SHA-256:
-  `1246fb68e45ce5af422b48a417641456b22ae5291098e27737dc5411369a1444`;
+  `a04beb690d61e43b80f15727117adbf4215779c4723299d5c3b79c013a4c087a`;
 - firma verificada, certificado SHA-256:
   `d51bc0dabd280ce1b0f098ae168eb57758faeba301156cde835737835f8a8832`.
 
 El gate fisico autorizado quedo ejecutado. La evidencia completa esta en
-`docs/compatibility/results/dag-browser-v58-physical-gate-sm-a235m-2026-08-01.md`.
-Las muestras limpias dieron:
+`docs/compatibility/results/dag-browser-v59-media-pipeline-rebuild-sm-a235m-2026-08-01.md`.
+Las muestras frias finales dieron:
 
-- Mimo: `4.238 / 3.536 / 683 ms`, cuadros tardios `1,77 %`, p95 `15 ms`;
-- Fravega portada: `11.774 / 16.232 / 1.099 ms`, cuadros tardios `1,16 %`,
-  p95 `12 ms`;
-- Cheeky: actividad dinamica sin quietud completa / `2.231 ms` visible,
-  cuadros tardios `1,17 %`, p95 `10 ms`.
+- Mimo: `4.934 / 4.632 / 703 ms`, cuadros tardios `2,17 %`, p95 `12 ms`;
+- Fravega: `7.726 / 18.787 / 732 ms`, cuadros tardios `3,28 %`, p95 `26 ms`;
+- Cheeky: `16.031 / actividad continua / 2.239 ms`, cuadros tardios `0,79 %`,
+  p95 `12 ms`.
 
-El orden de cada trio es `pagina / fotos visibles / estructura visible`. Una
-primera matriz de 18 recorridos quedo solo como diagnostico porque los intents
-externos acumularon 20 pestañas; no se usan sus porcentajes como mejora final.
-La estabilidad bajo esa presion fue correcta y las pestañas se cerraron desde
-el propio organizador.
+El orden de cada trio es `pagina / fotos visibles / estructura visible`.
+Fravega necesito una ventana de 55 s para demostrar quietud: el contador no
+estaba trabado, el sitio seguia agregando recursos. Las variantes intermedias
+quedan como diagnostico y sus porcentajes no se presentan como mejora general.
 
 El fixture HTTPS local sigue limitado: la hoja autofirmada fue rechazada por
 Gecko y DAG cerro la pagina de forma segura. No se instalo una CA ni se relajo
