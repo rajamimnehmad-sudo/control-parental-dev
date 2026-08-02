@@ -28,6 +28,8 @@ class MediaBarrierContractTest {
     @Test
     fun `raster response has one bounded native authority`() {
         assertContains(background, "filterResponseData")
+        assertContains(background, "RASTER_IMAGE_MIME_PATTERN.test(contentType)")
+        assertContains(background, "alreadyIntercepted")
         assertContains(background, "MAX_IMAGE_BYTES = 2 * 1024 * 1024")
         assertContains(background, "MAX_CAPTURED_BYTES = 8 * 1024 * 1024")
         assertContains(background, "MAX_NATIVE_IN_FLIGHT = 2")
@@ -47,14 +49,22 @@ class MediaBarrierContractTest {
     }
 
     @Test
-    fun `DOM and CSS never participate in image decisions`() {
+    fun `inline and changing image sources close before stable reveal`() {
         assertContains(barrier, "barrier-ready")
-        assertFalse(barrier.contains("MutationObserver"))
-        assertFalse(barrier.contains("data-glosh-dag-media"))
-        assertFalse(barrier.contains("srcset"))
-        assertFalse(css.contains("img"))
-        assertFalse(css.contains("image"))
-        assertFalse(css.contains("svg"))
+        assertContains(barrier, "IMAGE_STABILITY_MS = 350")
+        assertContains(barrier, "MutationObserver")
+        assertContains(barrier, "attributeFilter: [\"src\", \"srcset\", \"sizes\"]")
+        assertContains(barrier, "imageSource(image) === source")
+        assertFalse(barrier.contains(".src ="))
+        assertFalse(barrier.contains(".srcset ="))
+        assertContains(css, "img[src^=\"data:\" i]")
+        assertContains(css, "img[src^=\"blob:\" i]")
+        assertContains(css, "img[srcset*=\"data:image\" i]")
+        assertContains(css, "picture:has(source[srcset*=\"data:image\" i]) img")
+        assertContains(css, "svg image[href^=\"data:\" i]")
+        assertContains(css, "background-image: none !important")
+        assertContains(css, "img:not([data-glosh-dag-stable=\"true\"])")
+        assertFalse(css.contains("[src^=\"http"))
     }
 
     @Test

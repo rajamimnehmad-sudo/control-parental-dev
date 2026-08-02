@@ -206,6 +206,38 @@ test("raster opened as a top-level page still crosses the same native gate", asy
   assert.deepEqual([...filter.writes[0]], [...original]);
 });
 
+test("raster fetched as data crosses the same native gate before page code sees bytes", async () => {
+  const harness = await createHarness();
+  const details = {
+    requestId: "fetched-raster",
+    type: "xmlhttprequest",
+    url: "https://cdn.example.test/preview?id=42",
+    documentUrl: "https://images.example.test/",
+  };
+  const original = Uint8Array.from([0xff, 0xd8, 9, 8, 7, 0xff, 0xd9]);
+  assert.equal(Object.keys(harness.before(details)).length, 0);
+  const headerResult = harness.headers({
+    ...details,
+    responseHeaders: [{ name: "Content-Type", value: "image/jpeg" }],
+  });
+  assert.equal(Object.keys(headerResult).length, 0);
+  const filter = harness.filters.get(details.requestId);
+  assert.ok(filter);
+  filter.ondata({ data: original.buffer });
+  filter.onstop();
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "fetched raster native request");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "block",
+    reason: "model_filter",
+  });
+  await waitFor(() => filter.closed, "fetched raster close");
+  assert.deepEqual([...filter.writes[0].slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
 test("trusted content decision cache avoids a second inference", async () => {
   const harness = await createHarness();
   const original = Uint8Array.from([0xff, 0xd8, 3, 3, 3, 0xff, 0xd9]);
@@ -268,13 +300,24 @@ test("video and advertisement policy remains isolated", async () => {
   }).cancel, true);
 });
 
-test("page bridge and CSS never mutate or target images", async () => {
+test("first paint closes inline and changing image sources before stable reveal", async () => {
   const barrier = await readAsset("barrier.js");
   const css = await readAsset("barrier.css");
   new vm.Script(barrier);
   assert.match(barrier, /barrier-ready/u);
-  assert.doesNotMatch(barrier, /MutationObserver|data-glosh-dag-media|srcset/u);
-  assert.doesNotMatch(css, /\bimg\b|\bimage\b|\bsvg\b|object-position/u);
+  assert.match(barrier, /IMAGE_STABILITY_MS = 350/u);
+  assert.match(barrier, /MutationObserver/u);
+  assert.match(barrier, /attributeFilter: \["src", "srcset", "sizes"\]/u);
+  assert.match(barrier, /imageSource\(image\) === source/u);
+  assert.doesNotMatch(barrier, /\.src\s*=|\.srcset\s*=|cheeky|google\.com/iu);
+  assert.match(css, /img\[src\^="data:" i\]/u);
+  assert.match(css, /img\[src\^="blob:" i\]/u);
+  assert.match(css, /img\[srcset\*="data:image" i\]/u);
+  assert.match(css, /picture:has\(source\[srcset\*="data:image" i\]\) img/u);
+  assert.match(css, /svg image\[href\^="data:" i\]/u);
+  assert.match(css, /background-image: none !important/u);
+  assert.match(css, /img:not\(\[data-glosh-dag-stable="true"\]\)/u);
+  assert.doesNotMatch(css, /\[src\^="https?:"|object-position/u);
 });
 
 test("active extension has bounded work and no site or device exceptions", async () => {

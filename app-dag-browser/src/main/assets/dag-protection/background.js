@@ -237,8 +237,8 @@ const combineChunks = (chunks, totalBytes) => {
   return combined;
 };
 
-const interceptImage = (details) => {
-  if (SAFE_UI_URL_PATTERN.test(details.url)) return {};
+const interceptImage = (details, trustSafeUiUrl = true) => {
+  if (trustSafeUiUrl && SAFE_UI_URL_PATTERN.test(details.url)) return {};
   if (
     typeof browser.webRequest.filterResponseData !== "function" ||
     activeStreams >= MAX_ACTIVE_STREAMS
@@ -361,9 +361,11 @@ browser.webRequest.onHeadersReceived.addListener(
     if (ANALYZED_RESOURCE_TYPES.has(details.type) && !SAFE_UI_URL_PATTERN.test(details.url)) {
       responseMimeByRequest.set(details.requestId, contentType);
     }
-    if (details.type === "main_frame" && RASTER_IMAGE_MIME_PATTERN.test(contentType)) {
+    const alreadyIntercepted =
+      ANALYZED_RESOURCE_TYPES.has(details.type) && !SAFE_UI_URL_PATTERN.test(details.url);
+    if (RASTER_IMAGE_MIME_PATTERN.test(contentType) && !alreadyIntercepted) {
       responseMimeByRequest.set(details.requestId, contentType);
-      return interceptImage(details);
+      return interceptImage(details, false);
     }
     return BLOCKED_MEDIA_MIME_PATTERN.test(contentType) ? { cancel: true } : {};
   },

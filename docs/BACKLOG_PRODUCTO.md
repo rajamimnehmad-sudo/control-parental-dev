@@ -45,12 +45,14 @@ Flujo de una entrada:
 ## Ancla tecnica actual
 
 - Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
-  DEV 66. Son versiones de codigo; publicacion e instalacion se verifican por
+  DEV 67. Son versiones de codigo; publicacion e instalacion se verifican por
   separado en el handoff.
-- DAG 66 conecta GloshIA local como una unica compuerta de respuesta previa al
-  render sobre la base compatible de DAG 65. No usa observadores multimedia,
-  remapeo DOM ni excepciones por sitio. Esta validado localmente en SM-S908E,
-  no es publicable ni fue subido a GitHub.
+- DAG 67 conserva una unica compuerta GloshIA y agrega una espera visual de
+  350 ms para que una resolucion provisoria no se muestre antes de una fuente
+  definitiva filtrada. El observador solo atiende imagenes nuevas y cambios de
+  `src`/`srcset`/`sizes`; no remapea decisiones, no trabaja al desplazar y no
+  contiene excepciones por sitio. Esta validado localmente en SM-S908E, no fue
+  publicado ni subido a GitHub.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -58,6 +60,25 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-V3-FIRST-PAINT-21 - Estabilidad antes de revelar raster
+
+- Estado: `Resuelto localmente y validado fisicamente; sin push ni publicacion`.
+  Aprobado por el usuario al reportar la fuga breve en Google Imagenes.
+  Prioridad: P0. Esfuerzo: M. Riesgo: alto.
+- Causa: una tarjeta podia usar primero una miniatura provisoria permitida y
+  reemplazarla inmediatamente por una resolucion definitiva filtrada. Ambas
+  decisiones eran validas para bytes distintos, pero la primera quedaba
+  visible durante un cuadro.
+- Resultado: DAG 67 y extension 1.36.0 cierran `data:`/`blob:` desde el primer
+  pintado, interceptan MIME raster aunque llegue por `fetch`/XHR y revelan un
+  `img` solo tras 350 ms sin cambios de fuente. No hay dominios especiales,
+  reescritura de fuentes, consultas adicionales ni reanalisis durante scroll.
+- Validacion: 12 pruebas WebExtension, 147 Kotlin, Ktlint, Lint y APK; 40
+  cuadros de Google Imagenes sin pixeles previos de tarjetas bloqueadas; smoke
+  fisico de Mimo, Cheeky y Fravega sin crash, ANR ni OOM.
+- Costo: una foto nueva puede aparecer hasta 350 ms despues de quedar estable.
+  El fixture HTTPS determinista conserva su limitacion de certificado.
 
 ### DAG-V3-GLOSHIA-SINGLE-GATE-20 - Compuerta local unica antes del render
 
@@ -868,7 +889,8 @@ Flujo de una entrada:
 | DAG-V3-TAB-HIBERNATION-09 | Implementado en DAG 45; matriz física de 10 correcta, 50 pendiente | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
 | DAG-V3-MEDIA-PRESENTATION-11 | Reforzado localmente en DAG 34 y revalidado con DAG 36 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
-| DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Reconstruccion cerrada localmente con compuerta unica DAG 66; limites inline pendientes | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
+| DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Reconstruccion cerrada localmente con compuerta unica DAG 67 y primer pintado estable | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
+| DAG-V3-FIRST-PAINT-21 | Resuelto localmente y validado fisicamente en DAG 67 | P0 | Evitar que una resolucion provisoria aparezca antes de la decision sobre la fuente definitiva | M | Alto |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
 | DAG-V3-FILTERED-OVERLAY-13 | Resuelto localmente y validado físicamente en DAG 33 | P2 | Mostrar fotos filtradas sólo difuminadas, sin escudo ni rastreo final de contenedor | S | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |

@@ -1,4 +1,38 @@
-/* Images and page graphics remain entirely owned by Gecko in this DEV baseline. */
+/*
+ * HTTP(S) raster bytes remain entirely owned by the response gate. Inline image
+ * sources cannot reach WebRequest, so they stay neutral from the first paint.
+ */
+img[src^="data:" i],
+img[src^="blob:" i],
+img[srcset*="data:image" i],
+img[srcset*="blob:" i],
+picture:has(source[srcset*="data:image" i]) img,
+picture:has(source[srcset*="blob:" i]) img,
+svg image[href^="data:" i],
+svg image[href^="blob:" i],
+svg image[xlink\:href^="data:" i],
+svg image[xlink\:href^="blob:" i] {
+  visibility: hidden !important;
+}
+
+[style*="data:image" i],
+[style*="blob:" i] {
+  background-image: none !important;
+}
+
+img:not([data-glosh-dag-stable="true"]) {
+  visibility: hidden !important;
+}
+
+img[src$=".svg" i],
+img[src*=".svg?" i],
+img[src*=".svg#" i],
+img[src$=".ico" i],
+img[src*=".ico?" i],
+img[src*=".ico#" i] {
+  visibility: visible !important;
+}
+
 video,
 audio,
 canvas,
