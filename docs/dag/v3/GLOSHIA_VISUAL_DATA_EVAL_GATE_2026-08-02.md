@@ -1,9 +1,9 @@
 # GloshIA Visual — DATA-EVAL-GATE-07
 
-Fecha: 2026-08-02  
-Baseline: `main` / `141b519`, DAG 87 (`0.67.0-dev`)  
-Modelo: `tinyclip-bounded-finetune-r1-int8.onnx`  
-SHA-256: `2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee`  
+Fecha: 2026-08-02
+Baseline: `main` / `141b519`, DAG 87 (`0.67.0-dev`)
+Modelo: `tinyclip-bounded-finetune-r1-int8.onnx`
+SHA-256: `2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee`
 Runtime de laboratorio: `onnxruntime-web 1.27.0`; el resultado es benchmark de Mac, no Android.
 
 ## Resultado del gate
