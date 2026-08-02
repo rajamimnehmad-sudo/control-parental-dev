@@ -16,7 +16,8 @@ internal object DagGeckoRuntime {
                     GeckoRuntimeSettings
                         .Builder()
                         .preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_LIGHT)
-                        .build(),
+                        .build()
+                        .setParallelMarkingEnabled(true),
                 ).also { instance = it }
         }
 }

@@ -22,9 +22,16 @@
     "[aria-label='Productos patrocinados']",
   ].join(",");
   const SPONSORED_LABEL = /^(?:patrocinado|sponsored)$/iu;
+  const SEARCH_QUERY_KEYS = ["q", "query", "search", "keyword", "keywords", "term", "k"];
 
   const isVideoSite = () =>
     /(?:^|\.)(?:youtube(?:-nocookie)?\.com|youtu\.be)$/iu.test(location.hostname);
+
+  const isSearchResultsDocument = () => {
+    if (/(?:^|\/)search(?:\/|$)/iu.test(location.pathname)) return true;
+    const parameters = new URLSearchParams(location.search);
+    return SEARCH_QUERY_KEYS.some((key) => parameters.has(key));
+  };
 
   const hideExplicitAd = (element) => {
     if (!(element instanceof HTMLElement)) return;
@@ -38,14 +45,28 @@
   };
 
   const scanExactSponsoredLabels = (root) => {
-    if (isVideoSite() || (!(root instanceof Element) && root !== document)) return;
-    const candidates = [];
-    if (root instanceof HTMLElement) candidates.push(root);
-    root.querySelectorAll?.("span,div").forEach((element) => candidates.push(element));
-    for (const label of candidates) {
-      if (!SPONSORED_LABEL.test(label.textContent?.trim() || "")) continue;
-      const result = label.closest("[data-snhf], [data-rpos], article, li");
+    if (
+      isVideoSite() ||
+      !isSearchResultsDocument() ||
+      (!(root instanceof Element) && root !== document)
+    ) return;
+    const markLabel = (label) => {
+      const result = label?.closest?.("[data-snhf], [data-rpos], article, li");
       if (result instanceof HTMLElement) result.setAttribute(SPONSORED_ATTRIBUTE, "true");
+    };
+    if (
+      root instanceof HTMLElement &&
+      root.matches("span,div") &&
+      SPONSORED_LABEL.test(root.textContent?.trim() || "")
+    ) markLabel(root);
+
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let textNode = walker.nextNode();
+    while (textNode !== null) {
+      if (SPONSORED_LABEL.test(textNode.nodeValue?.trim() || "")) {
+        markLabel(textNode.parentElement);
+      }
+      textNode = walker.nextNode();
     }
   };
 
@@ -53,19 +74,6 @@
     scanExplicitAds(root);
     scanExactSponsoredLabels(root);
   };
-
-  const observer = new MutationObserver((mutations) => {
-    for (const mutation of mutations) {
-      for (const node of mutation.addedNodes) scan(node);
-      if (mutation.type === "attributes") scan(mutation.target);
-    }
-  });
-  observer.observe(document, {
-    subtree: true,
-    childList: true,
-    attributes: true,
-    attributeFilter: ["data-ad", "data-ad-slot", "data-advertisement", "aria-label"],
-  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => scan(document), { once: true });

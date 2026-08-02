@@ -76,6 +76,7 @@ class DagBrowserActivity : Activity() {
     private lateinit var goButton: ImageButton
     private lateinit var tabButton: TextView
     private lateinit var menuButton: ImageButton
+    private lateinit var pageLoadProgress: ProgressBar
     private lateinit var safetyOverlay: View
     private lateinit var safetyCard: View
     private lateinit var safetyIcon: ImageView
@@ -272,6 +273,7 @@ class DagBrowserActivity : Activity() {
         goButton = findViewById(R.id.go_button)
         tabButton = findViewById(R.id.tab_button)
         menuButton = findViewById(R.id.menu_button)
+        pageLoadProgress = findViewById(R.id.page_load_progress)
         safetyOverlay = findViewById(R.id.safety_overlay)
         safetyCard = findViewById(R.id.safety_card)
         safetyIcon = findViewById(R.id.safety_icon)
@@ -490,6 +492,7 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     url: String,
                 ) {
+                    tab.loadProgress = MinimumPageLoadProgress
                     val keepCurrentPageVisible =
                         tab.keepCurrentPageVisibleDuringReload &&
                             DagLoadTransitionPolicy.targetsSameDocument(tab.url, url)
@@ -506,6 +509,7 @@ class DagBrowserActivity : Activity() {
                     schedulePersistTabs()
                     refreshTabSwitcher()
                     if (url == InitialBlankPage) {
+                        tab.loadProgress = 0
                         tab.title = ""
                         cancelBarrierTimeout(tab)
                         tab.waitingForBarrier = false
@@ -520,11 +524,20 @@ class DagBrowserActivity : Activity() {
                     }
                 }
 
+                override fun onProgressChange(
+                    session: GeckoSession,
+                    progress: Int,
+                ) {
+                    tab.loadProgress = progress.coerceIn(MinimumPageLoadProgress, 100)
+                    if (tab === activeTab) renderPageLoadProgress(tab)
+                }
+
                 override fun onPageStop(
                     session: GeckoSession,
                     success: Boolean,
                 ) {
                     swipeRefresh.isRefreshing = false
+                    finishPageLoadProgress(tab)
                     if (tab === activeTab) {
                         recordPerformanceMetric(
                             metric = DagPerformanceMetric.PageAnalysisReady,
@@ -1440,6 +1453,7 @@ class DagBrowserActivity : Activity() {
                     tab.waitingForBarrier = false
                     tab.keepCurrentPageVisibleDuringReload = false
                     tab.displayState = TabDisplayState.Closed
+                    tab.loadProgress = 0
                     tab.barrierTimeout = null
                     if (tab === activeTab) renderActiveTab()
                 }
@@ -1604,10 +1618,11 @@ class DagBrowserActivity : Activity() {
             if (currentDecision.action == DagMediaAction.Block) {
                 currentDecision.copy(
                     replacementBytesBase64 =
-                        DagBlockedImagePlaceholder.renderBase64(
-                            currentDecision.imageWidth,
-                            currentDecision.imageHeight,
-                        ),
+                        currentDecision.replacementBytesBase64
+                            ?: DagBlockedImagePlaceholder.renderBase64(
+                                currentDecision.imageWidth,
+                                currentDecision.imageHeight,
+                            ),
                 )
             } else {
                 currentDecision
@@ -1626,6 +1641,7 @@ class DagBrowserActivity : Activity() {
                     "base64_ms=${trace.metric(DagMediaPipelineStage.Base64Decode)} " +
                     "vector_ms=${trace.metric(DagMediaPipelineStage.SafeVectorCheck)} " +
                     "bounds_ms=${trace.metric(DagMediaPipelineStage.BoundsRead)} " +
+                    "sprite_ms=${trace.metric(DagMediaPipelineStage.SafeSpriteCheck)} " +
                     "preprocess_ms=${trace.metric(DagMediaPipelineStage.Preprocess)} " +
                     "inference_ms=${trace.metric(DagMediaPipelineStage.Inference)} " +
                     "inferences=${trace.inferenceCount} prepared=${trace.preparedImageCount} " +
@@ -1672,6 +1688,7 @@ class DagBrowserActivity : Activity() {
         tab.keepCurrentPageVisibleDuringReload = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Closed
+        tab.loadProgress = 0
         if (tab === activeTab) renderActiveTab()
     }
 
@@ -1681,6 +1698,7 @@ class DagBrowserActivity : Activity() {
         tab.keepCurrentPageVisibleDuringReload = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Blocked
+        tab.loadProgress = 0
         if (tab === activeTab) renderActiveTab()
     }
 
@@ -1835,6 +1853,7 @@ class DagBrowserActivity : Activity() {
         tab.canGoBack = false
         tab.needsRestore = tab.url != InitialBlankPage && restorableUrl(tab.url) != null
         tab.displayState = TabDisplayState.Ready
+        tab.loadProgress = 0
         tab.pdfDocumentReady = false
         tab.previewDocumentToken = null
         tab.previewEligibilityToken = null
@@ -1887,6 +1906,7 @@ class DagBrowserActivity : Activity() {
         tab.canGoBack = false
         tab.needsRestore = tab.url != InitialBlankPage
         tab.displayState = TabDisplayState.Ready
+        tab.loadProgress = 0
         handler.post {
             if (!tabs.contains(tab) || isFinishing || isDestroyed) {
                 tab.recovering = false
@@ -1906,6 +1926,7 @@ class DagBrowserActivity : Activity() {
 
     private fun renderActiveTab() {
         val tab = activeTab ?: return
+        renderPageLoadProgress(tab)
         setNavigationControlsEnabled(extensionReady)
         updateAddressActionButton()
         updateTabButton()
@@ -1918,13 +1939,9 @@ class DagBrowserActivity : Activity() {
         when (tab.displayState) {
             TabDisplayState.Ready -> showReady()
             TabDisplayState.Loading -> {
+                updateLoadingShimmer(enabled = false)
                 geckoView.visibility = View.INVISIBLE
-                showOverlay(
-                    title = "",
-                    detail = "",
-                    spinning = false,
-                    shimmer = true,
-                )
+                safetyOverlay.visibility = View.GONE
             }
             TabDisplayState.Visible -> {
                 updateLoadingShimmer(enabled = false)
@@ -1956,6 +1973,26 @@ class DagBrowserActivity : Activity() {
                 )
             }
         }
+    }
+
+    private fun renderPageLoadProgress(tab: BrowserTab) {
+        val visible = tab.url != InitialBlankPage && tab.loadProgress in 1..100
+        pageLoadProgress.visibility = if (visible) View.VISIBLE else View.GONE
+        if (visible) pageLoadProgress.setProgress(tab.loadProgress, true)
+    }
+
+    private fun finishPageLoadProgress(tab: BrowserTab) {
+        tab.loadProgress = 100
+        if (tab === activeTab) renderPageLoadProgress(tab)
+        handler.postDelayed(
+            {
+                if (tabs.contains(tab) && tab.loadProgress == 100) {
+                    tab.loadProgress = 0
+                    if (tab === activeTab) renderPageLoadProgress(tab)
+                }
+            },
+            PageLoadProgressCompletionDelayMillis,
+        )
     }
 
     private fun updateTabButton() {
@@ -3012,6 +3049,7 @@ class DagBrowserActivity : Activity() {
         var contentScrollY: Int = 0,
         var lastActivatedSequence: Long = 0,
         var pdfDocumentReady: Boolean = false,
+        var loadProgress: Int = 0,
         val previewKey: String,
     )
 
@@ -3041,6 +3079,8 @@ class DagBrowserActivity : Activity() {
         const val MediaDecisionMessage = "media-decision"
         const val ViewportImagesReadyMessage = "viewport-images-ready"
         const val ProtectionProtocolVersion = 1
+        const val MinimumPageLoadProgress = 5
+        const val PageLoadProgressCompletionDelayMillis = 160L
         const val MaxMediaCandidateIdLength = 80
         const val MediaAnalysisThreads = 2
         const val MediaAnalysisQueueCapacity = 8

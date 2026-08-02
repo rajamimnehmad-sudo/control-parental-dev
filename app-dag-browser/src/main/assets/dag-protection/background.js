@@ -143,9 +143,10 @@ const connectNative = () => {
       const allow = message.action === "allow" &&
         ["model_allow", "safe_ui_vector"].includes(message.reason);
       const modelBlock = message.action === "block" && message.reason === "model_filter";
+      const safeUiSprite = message.action === "block" && message.reason === "safe_ui_sprite";
       pending.resolve({
         action: allow ? "allow" : "block",
-        cacheable: allow || modelBlock,
+        cacheable: allow || modelBlock || safeUiSprite,
         replacement: allow ? null : replacementBytes(message.replacementBytesBase64),
       });
     });

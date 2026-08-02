@@ -10,7 +10,7 @@ el runtime actual desde versiones o worktrees historicos.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- Tras el cierre de DAG 68, `main` queda 30 commits por delante de
+- Tras el cierre local de DAG 86, `main` queda 31 commits por delante de
   `origin/main`.
 - No se hizo push, PR, publicacion DEV ni Production.
 - Los APK finales se construyen solo desde `main` local integrado.
@@ -20,16 +20,16 @@ el runtime actual desde versiones o worktrees historicos.
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Sin cambios |
 | App Admin | 290 | 1.0.1-dev | Sin cambios |
-| DAG Browser | 68 | 0.48.0-dev | APK final local; no publicado |
+| DAG Browser | 86 | 0.66.0-dev | Instalado y validado localmente; no publicado |
 
-El comportamiento final se valido in-place en el SM-S908E `R5CT717BZTZ` antes
-del incremento de version. El APK canonico DAG 68 conserva ese mismo codigo,
-pero su instalacion final quedo pendiente porque el telefono se desconecto. No
-se borro el perfil ni se tocaron otras apps.
+El APK canonico DAG 86 esta instalado en el SM-S908E `R5CT717BZTZ`; Android
+confirma `versionCode=86`, `versionName=0.66.0-dev` y DAG como navegador
+predeterminado. Se conservaron perfil, cache y pestañas para no alterar los
+datos del usuario ni favorecer artificialmente la medicion.
 
 ## DAG Browser vigente
 
-DAG 68 usa una unica compuerta GloshIA previa al render. Los bytes raster se
+DAG 86 usa una unica compuerta GloshIA previa al render. Los bytes raster se
 capturan una vez y solo `model_allow` devuelve el original exacto. Filtro,
 error, timeout, saturacion, animacion o entrada invalida producen un PNG neutro
 sin pixeles rechazados. SVG e iconos vectoriales seguros quedan fuera de la
@@ -50,7 +50,16 @@ La presentacion vigente es global:
 
 En un refresh del mismo documento DAG mantiene visible la pagina ya protegida
 mientras espera la nueva barrera. Primera carga, URL distinta o fallo siguen
-cerrados por la cobertura total. Extension incorporada: `1.36.6`.
+cerrados por la cobertura total. Extension incorporada: `1.47.0`.
+
+La interfaz sustituye la transicion azul por fondo blanco y una barra fina de
+progreso. Los sprites PNG pasivos, extremos, transparentes y de pocos colores
+pueden sanitizarse sin liberar fotografias ni crear excepciones por comercio.
+El bloqueo de anuncios por red sigue vigente, pero ya no existe un
+`MutationObserver` global que recorra cada cambio de todas las paginas: los
+selectores explicitos se revisan una vez y la busqueda textual exacta se limita
+a documentos con ruta o parametros de buscador. Gecko activa marcado paralelo
+del recolector mediante su ajuste oficial de rendimiento.
 
 Limites vigentes: 2 MiB por recurso, 8 MiB capturados, 32 streams, cola de 24,
 dos inferencias nativas y cache efimera de 512 hashes. Video, audio, canvas,
@@ -58,25 +67,43 @@ object y embed permanecen bloqueados por contratos separados.
 
 ## Validacion y artefacto
 
-- 12 pruebas WebExtension y 148 unitarias Kotlin aprobadas.
+- 13 pruebas WebExtension y 154 unitarias Kotlin aprobadas.
 - Ktlint, Lint, build y `git diff --check` correctos.
+- En Mimo, la interaccion temprana del menu paso de `26,7 fps` en la base y
+  `21,8 fps` en un candidato descartado a `47,8-48,6 fps` en dos repeticiones
+  DAG 86. Chrome dio `62,5 fps` en la misma accion y equipo; queda una brecha
+  inicial de Gecko y algun cuadro largo aislado.
+- Ya asentado, el carrusel de Mimo midio `55,2-56,2 fps`; menu y expansion de
+  categoria midieron aproximadamente `50,2-54,5 fps`. No hubo inferencias de
+  GloshIA durante esas interacciones.
+- Fravega fue visible en `1.657 ms`, termino pagina en `6.949 ms` y fotos
+  iniciales en `7.722 ms`; frente a DAG 78 observado, pagina termino 13,5 % y
+  fotos 21,2 % antes, con visibilidad equivalente (`+0,8 %`).
+- Cheeky fue visible en `2.024 ms` y termino pagina en `4.577 ms`; el evento de
+  fotos fue prematuro y no se usa como resultado. Frente a DAG 78 observado,
+  visibilidad fue 10,5 % mas lenta y fin de pagina 11 % mas rapido.
+- Google busqueda se recorrio despues de retirar el observador; no mostro
+  rotulos `Patrocinado` ni crashes. Los resultados comerciales sin ese rotulo
+  no se clasificaron como anuncios por su apariencia.
+- Sin crash, ANR ni OOM en Mimo, Cheeky o Fravega. El fixture HTTPS
+  autofirmado sigue bloqueado por TLS y no se conto.
 - Google Imagenes: el usuario confirmo el raster en `0 ms` sin escape de
   contenido rechazado y el refresh sin apagado general.
 - Antes del arreglo, dos rafagas reprodujeron tres cuadros negros consecutivos;
   la segunda toma cronometrada estimo aproximadamente 1,2 segundos de cobertura
   total. La causa era el estado Android `Loading`, no GloshIA.
-- La matriz Mimo, Cheeky y Fravega de DAG 67 sigue siendo la ultima matriz
-  completa; DAG 68 no cambia pesos, umbrales ni compuerta de bytes.
+- DAG 86 no cambia pesos, umbrales ni la compuerta de bytes de DAG 68; la
+  matriz nueva evalua presentacion, carga e interaccion dinamica.
 
 APK local:
 
 - ruta: `app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk`;
-- tamaño: `121360633` bytes;
+- tamaño: `121372369` bytes;
 - SHA-256:
-  `2a81e6477b5c8170297b5b7e464cf3448fac6c5de5c5711970a7b028e0436a55`.
+  `ea3003d434d2effcb63c9a77c28b7065249c3574bb7376e117ab07f4770b3a10`.
 
 Evidencia completa:
-`docs/compatibility/results/dag-browser-v68-zero-delay-refresh-sm-s908e-2026-08-02.md`.
+`docs/compatibility/results/dag-browser-v86-dynamic-pages-sm-s908e-2026-08-02.md`.
 Contrato vigente: `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PIPELINE.md`.
 
 ## Metricas
@@ -91,7 +118,7 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
 
 ## Estado de GloshIA visual
 
-- Hay un unico modelo local; DAG 68 no cambia sus pesos ni umbrales.
+- Hay un unico modelo local; DAG 86 no cambia sus pesos ni umbrales.
 - El laboratorio de 1.000 miniaturas y la ronda humana son evaluacion, no un
   entrenamiento autorizado.
 - La calibracion preliminar y el experimento privado R1 quedaron `NO-GO` para

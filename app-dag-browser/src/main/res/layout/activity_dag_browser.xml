@@ -108,10 +108,24 @@
             android:src="@drawable/ic_dag_more" />
         </LinearLayout>
 
+        <ProgressBar
+            android:id="@+id/page_load_progress"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="2dp"
+            android:indeterminate="false"
+            android:max="100"
+            android:maxHeight="2dp"
+            android:minHeight="2dp"
+            android:progressBackgroundTint="@android:color/transparent"
+            android:progressTint="@color/dag_blue"
+            android:visibility="gone" />
+
         <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
             android:id="@+id/swipe_refresh"
             android:layout_width="match_parent"
             android:layout_height="0dp"
+            android:background="@color/dag_surface"
             android:layout_weight="1">
 
         <FrameLayout

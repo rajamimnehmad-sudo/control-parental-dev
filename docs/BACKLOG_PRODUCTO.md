@@ -45,9 +45,9 @@ Flujo de una entrada:
 ## Ancla tecnica actual
 
 - Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
-  DEV 68. Son versiones de codigo; publicacion e instalacion se verifican por
+  DEV 86. Son versiones de codigo; publicacion e instalacion se verifican por
   separado en el handoff.
-- DAG 68 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
+- DAG 86 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
   sin espera artificial y no reoculta una imagen ya segura durante rotaciones
   de fuente. El refresh del mismo documento conserva visible la pagina
   protegida; primera carga, URL distinta o fallo mantienen cobertura total.
@@ -59,6 +59,31 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-DYNAMIC-PAGES-PERFORMANCE-79 - Fluidez inicial sin observacion global
+
+- Estado: `Resuelto localmente y validado fisicamente; sin push ni publicacion`.
+  Aprobado por el usuario al pedir corregir el menu y carrusel tempranos de
+  Mimo con una solucion global. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Causa: el script de anuncios mantenia un `MutationObserver` sobre todo el
+  documento y recorria cada subarbol agregado, incluso en tiendas sin anuncios.
+  El costo coincidia con la construccion inicial de menus y carruseles. GloshIA
+  no ejecutaba inferencias durante la interaccion asentada y bajar la prioridad
+  de sus hilos empeoro la prueba, por lo que ese candidato se retiro.
+- Resultado: DAG 86 y extension 1.47.0 conservan bloqueo de red y una inspeccion
+  inicial de selectores explicitos; el texto exacto `Patrocinado`/`Sponsored`
+  solo se busca en documentos con forma generica de resultados. No hay reglas
+  por Mimo, comercio o telefono. Gecko usa marcado paralelo oficial y el resto
+  de la barrera multimedia no cambia.
+- Evidencia: el menu temprano de Mimo paso de 26,7 fps a 47,8-48,6 fps en dos
+  repeticiones; Chrome midio 62,5 fps en la misma accion. El carrusel asentado
+  quedo en 55,2-56,2 fps. Fravega mantuvo tiempo visible equivalente y mejoro
+  los tiempos observados de cierre; Cheeky tuvo visibilidad 10,5 % mas lenta y
+  cierre 11 % mas rapido. No se extrapolan porcentajes de una muestra.
+- Validacion: 13 pruebas WebExtension, 154 Kotlin, Ktlint, Lint y APK; matriz
+  fisica Mimo/Cheeky/Fravega en SM-S908E Android 16, sin crash, ANR ni OOM.
+  Perfil, cache y 18 pestañas se conservaron. El fixture autofirmado no se
+  conto. Evidencia detallada en compatibilidad.
 
 ### DAG-V3-ZERO-DELAY-REFRESH-22 - Raster inmediato y refresh continuo
 

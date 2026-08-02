@@ -55,7 +55,21 @@ class DagBrowserManifestContractTest {
 
         assertContains(runtime, "GeckoRuntimeSettings")
         assertContains(runtime, ".preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_LIGHT)")
+        assertContains(runtime, ".setParallelMarkingEnabled(true)")
         assertFalse(runtime.contains("COLOR_SCHEME_DARK"))
         assertFalse(runtime.contains("COLOR_SCHEME_SYSTEM"))
+    }
+
+    @Test
+    fun `thin page progress replaces the blue loading transition`() {
+        val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
+        val layout = File("src/main/res/layout/activity_dag_browser.xml").readText()
+
+        assertContains(layout, "android:id=\"@+id/page_load_progress\"")
+        assertContains(layout, "android:layout_height=\"2dp\"")
+        assertContains(layout, "android:background=\"@color/dag_surface\"")
+        assertContains(activity, "override fun onProgressChange(")
+        assertContains(activity, "finishPageLoadProgress(tab)")
+        assertFalse(activity.contains("shimmer = true"))
     }
 }

@@ -155,6 +155,32 @@ test("filtered raster receives a neutral PNG without rejected pixels", async () 
   assert.notDeepEqual([...filter.writes[0]], [...original]);
 });
 
+test("sanitized passive sprite is cached and preserves replacement bytes", async () => {
+  const harness = await createHarness();
+  const original = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2]);
+  const sanitized = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 9, 8]);
+  const first = imageDetails("sprite-a", "https://cdn.example.test/ui-strip.png");
+  deliver(harness, first, original, "image/png");
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "sprite native request");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "block",
+    reason: "safe_ui_sprite",
+    replacementBytesBase64: btoa(String.fromCharCode(...sanitized)),
+  });
+  await waitFor(() => harness.filters.get(first.requestId).closed, "sprite close");
+  assert.deepEqual([...harness.filters.get(first.requestId).writes[0]], [...sanitized]);
+
+  const second = imageDetails("sprite-b", "https://cdn.example.test/ui-strip.png?copy=1");
+  deliver(harness, second, original, "image/png");
+  await waitFor(() => harness.filters.get(second.requestId).closed, "cached sprite close");
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
+  assert.deepEqual([...harness.filters.get(second.requestId).writes[0]], [...sanitized]);
+});
+
 test("SVG and icon URLs never enter the response gate", async () => {
   const harness = await createHarness();
   const result = harness.before(imageDetails("icon", "https://cdn.example.test/heart.svg?v=2"));
@@ -324,9 +350,15 @@ test("first paint closes inline and changing image sources before stable reveal"
 
 test("active extension has bounded work and no site or device exceptions", async () => {
   const background = await readAsset("background.js");
+  const ads = await readAsset("ads.js");
   assert.match(background, /MAX_IMAGE_BYTES = 2 \* 1024 \* 1024/u);
   assert.match(background, /MAX_CAPTURED_BYTES = 8 \* 1024 \* 1024/u);
   assert.match(background, /MAX_NATIVE_IN_FLIGHT = 2/u);
   assert.match(background, /MAX_QUEUED_ANALYSES = 24/u);
+  assert.match(ads, /NodeFilter\.SHOW_TEXT/u);
+  assert.match(ads, /SEARCH_QUERY_KEYS/u);
+  assert.match(ads, /isSearchResultsDocument/u);
+  assert.doesNotMatch(ads, /MutationObserver/u);
+  assert.doesNotMatch(ads, /querySelectorAll\?\.\("span,div"\)/u);
   assert.doesNotMatch(background, /cheeky|mimo|fravega|sm-a235|sm-s908/iu);
 });

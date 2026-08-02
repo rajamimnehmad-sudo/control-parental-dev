@@ -4,6 +4,7 @@ internal enum class DagMediaPipelineStage {
     Base64Decode,
     SafeVectorCheck,
     BoundsRead,
+    SafeSpriteCheck,
     Preprocess,
     Inference,
 }

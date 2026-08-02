@@ -37,6 +37,11 @@ class MediaBarrierContractTest {
         assertContains(background, "media-bytes")
         assertContains(background, "model_allow")
         assertContains(background, "model_filter")
+        assertContains(background, "safe_ui_sprite")
+        assertContains(
+            File("src/main/java/com/contentfilter/dagbrowser/DagSafeUiSpritePolicy.kt").readText(),
+            "AndroidDagSafeUiSpriteInspector",
+        )
     }
 
     @Test
@@ -77,6 +82,12 @@ class MediaBarrierContractTest {
         assertContains(background, "BLOCKED_MEDIA_MIME_PATTERN")
         assertContains(manifest, "\"ads.js\"")
         assertContains(ads, "EXPLICIT_AD_SELECTOR")
+        assertContains(ads, "SEARCH_QUERY_KEYS")
+        assertContains(ads, "isSearchResultsDocument")
+        assertContains(ads, "NodeFilter.SHOW_TEXT")
+        assertFalse(ads.contains("MutationObserver"))
+        assertFalse(ads.contains("querySelectorAll?.(\"span,div\")"))
+        assertFalse(css.contains("[data-ad-slot]"))
         assertContains(css, "glosh-dag-page-ad-hidden")
     }
 

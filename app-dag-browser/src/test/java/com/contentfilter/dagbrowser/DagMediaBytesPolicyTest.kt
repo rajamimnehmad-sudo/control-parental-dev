@@ -9,6 +9,48 @@ import kotlin.test.assertTrue
 
 class DagMediaBytesPolicyTest {
     @Test
+    fun `sanitized passive sprite preserves geometry without photo inference`() {
+        val replacement = Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3, 4))
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(6_144, 64, "image/png") },
+                safeUiSpriteInspector =
+                    DagSafeUiSpriteInspector { _, _ ->
+                        DagSafeUiSpriteResult.Sanitized(replacement)
+                    },
+                preprocessor = DagImagePreprocessor { error("must not preprocess a UI sprite") },
+                analyzer = DagImageAnalyzer { error("must not classify a UI sprite") },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.SafeUiSpriteReason, decision.reason)
+        assertEquals(replacement, decision.replacementBytesBase64)
+        assertEquals(6_144, decision.imageWidth)
+        assertEquals(64, decision.imageHeight)
+    }
+
+    @Test
+    fun `ordinary unsafe geometry cannot use the sprite path`() {
+        var spriteInspections = 0
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(5_000, 5_000, "image/png") },
+                safeUiSpriteInspector =
+                    DagSafeUiSpriteInspector { _, _ ->
+                        spriteInspections += 1
+                        DagSafeUiSpriteResult.NotSafe
+                    },
+                preprocessor = DagImagePreprocessor { error("must not preprocess unsafe geometry") },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.UnsafeDimensionsReason, decision.reason)
+        assertEquals(1, spriteInspections)
+    }
+
+    @Test
     fun `DEV compatibility mode releases exact bytes without decoding or classifying`() {
         val bytes = byteArrayOf(0x01, 0x02, 0x03, 0x04)
         val decision =

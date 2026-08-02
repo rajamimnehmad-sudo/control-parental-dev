@@ -56,6 +56,7 @@ internal object DagMediaBytesPolicy {
     fun decide(
         payload: DagMediaBytesPayload,
         boundsReader: DagImageBoundsReader = AndroidImageBoundsReader,
+        safeUiSpriteInspector: DagSafeUiSpriteInspector = AndroidDagSafeUiSpriteInspector,
         preprocessor: DagImagePreprocessor = AndroidDagImagePreprocessor,
         analyzer: DagImageAnalyzer = UnavailableDagImageAnalyzer,
         classificationMode: DagMediaClassificationMode = DagMediaClassificationMode.Enabled,
@@ -67,6 +68,7 @@ internal object DagMediaBytesPolicy {
         return inspectImage(
             payload,
             boundsReader,
+            safeUiSpriteInspector,
             preprocessor,
             analyzer,
             classificationMode,
@@ -85,6 +87,7 @@ internal object DagMediaBytesPolicy {
     private fun inspectImage(
         payload: DagMediaBytesPayload,
         boundsReader: DagImageBoundsReader,
+        safeUiSpriteInspector: DagSafeUiSpriteInspector,
         preprocessor: DagImagePreprocessor,
         analyzer: DagImageAnalyzer,
         classificationMode: DagMediaClassificationMode,
@@ -133,6 +136,21 @@ internal object DagMediaBytesPolicy {
                 return blocked(payload, UnsupportedImageReason)
             }
             if (!DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height)) {
+                val safeUiSprite =
+                    trace.measure(DagMediaPipelineStage.SafeSpriteCheck) {
+                        safeUiSpriteInspector.inspect(analysisBytes, bounds)
+                    }
+                if (safeUiSprite is DagSafeUiSpriteResult.Sanitized) {
+                    if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
+                    return DagMediaDecision(
+                        candidateId = payload.candidateId,
+                        action = DagMediaAction.Block,
+                        reason = SafeUiSpriteReason,
+                        imageWidth = bounds.width,
+                        imageHeight = bounds.height,
+                        replacementBytesBase64 = safeUiSprite.pngBase64,
+                    )
+                }
                 return blocked(payload, UnsafeDimensionsReason)
             }
             if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
@@ -320,6 +338,7 @@ internal object DagMediaBytesPolicy {
     private const val MaxBase64Length = ((MaxCaptureBytes + 2) / 3) * 4
     const val InvalidPayloadReason = "invalid_payload"
     const val SafeUiVectorReason = "safe_ui_vector"
+    const val SafeUiSpriteReason = "safe_ui_sprite"
     const val UnsupportedImageReason = "unsupported_image"
     const val UnsafeDimensionsReason = "unsafe_dimensions"
     const val AnalyzerBusyReason = "analyzer_busy"
