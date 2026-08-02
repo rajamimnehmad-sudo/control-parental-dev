@@ -18,7 +18,9 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -131,6 +133,9 @@ class DagBrowserActivity : Activity() {
     private var pendingNewSessionGesture: PendingNewSessionGesture? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
     private var loadingShimmerAnimator: ObjectAnimator? = null
+    private var browserChromeHidden = false
+    private var lastContentScrollY = 0
+    private var tabButtonDownY = 0f
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
     private val messageDelegate =
@@ -305,6 +310,24 @@ class DagBrowserActivity : Activity() {
         }
         addressInput.setOnFocusChangeListener { _, _ -> updateAddressActionButton() }
         tabButton.setOnClickListener { showTabSwitcher() }
+        tabButton.setOnTouchListener { view, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    tabButtonDownY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (event.rawY - tabButtonDownY > TabSwitcherSwipeThresholdPx) {
+                        showTabSwitcher()
+                    } else {
+                        view.performClick()
+                    }
+                    true
+                }
+                MotionEvent.ACTION_CANCEL -> true
+                else -> true
+            }
+        }
         menuButton.setOnClickListener { showBrowserMenu() }
         tabSwitcher.setListener(
             object : DagTabSwitcherView.Listener {
@@ -575,6 +598,7 @@ class DagBrowserActivity : Activity() {
                     scrollY: Int,
                 ) {
                     tab.contentScrollY = scrollY.coerceAtLeast(0)
+                    updateBrowserChromeForScroll(tab.contentScrollY)
                 }
             }
     }
@@ -1341,6 +1365,7 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showReady() {
+        showBrowserChrome(animated = false)
         geckoView.visibility = View.INVISIBLE
         setNavigationControlsEnabled(true)
         showOverlay(
@@ -1362,6 +1387,46 @@ class DagBrowserActivity : Activity() {
         }
         beginProtectedLoad(tab, startNewPerformanceNavigation = true)
         tab.session.loadUri(safeUrl)
+    }
+
+    private fun updateBrowserChromeForScroll(scrollY: Int) {
+        val delta = scrollY - lastContentScrollY
+        lastContentScrollY = scrollY
+        if (tabSwitcher.isOpen() || addressInput.hasFocus()) return
+        when {
+            scrollY <= 0 -> showBrowserChrome()
+            delta > BrowserChromeScrollThresholdPx -> hideBrowserChrome()
+            delta < -BrowserChromeScrollThresholdPx -> showBrowserChrome()
+        }
+    }
+
+    private fun hideBrowserChrome() {
+        if (browserChromeHidden || browserToolbar.height <= 0) return
+        browserChromeHidden = true
+        val toolbarHeight = browserToolbar.height.toFloat()
+        val offset = -(toolbarHeight + pageLoadProgress.height).toFloat()
+        browserToolbar.animate()
+            .translationY(-toolbarHeight)
+            .setDuration(BrowserChromeAnimationMillis)
+            .start()
+        pageLoadProgress.animate()
+            .translationY(-toolbarHeight)
+            .setDuration(BrowserChromeAnimationMillis)
+            .start()
+        swipeRefresh.animate()
+            .translationY(offset)
+            .setDuration(BrowserChromeAnimationMillis)
+            .start()
+    }
+
+    private fun showBrowserChrome(animated: Boolean = true) {
+        lastContentScrollY = 0
+        if (!browserChromeHidden && browserToolbar.translationY == 0f) return
+        browserChromeHidden = false
+        val duration = if (animated) BrowserChromeAnimationMillis else 0L
+        browserToolbar.animate().translationY(0f).setDuration(duration).start()
+        pageLoadProgress.animate().translationY(0f).setDuration(duration).start()
+        swipeRefresh.animate().translationY(0f).setDuration(duration).start()
     }
 
     private fun shouldShowReloadAction(): Boolean {
@@ -2346,9 +2411,14 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showBrowserMenu() {
-        PopupMenu(this, menuButton).apply {
+        PopupMenu(this, menuButton, Gravity.END).apply {
             inflate(R.menu.dag_browser_menu)
             menu.findItem(R.id.menu_default_browser)?.isVisible = !isDefaultBrowser()
+            runCatching {
+                javaClass
+                    .getMethod("setForceShowIcon", Boolean::class.javaPrimitiveType)
+                    .invoke(this, true)
+            }
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.menu_reload -> {
@@ -2402,7 +2472,7 @@ class DagBrowserActivity : Activity() {
                     else -> false
                 }
             }
-        }.show()
+        }.also { popup -> popup.show() }
     }
 
     private fun showAboutDag() {
@@ -2517,6 +2587,7 @@ class DagBrowserActivity : Activity() {
                         DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                             .format(Date(entry.visitedAtMillis)),
                     url = entry.url,
+                    thumbnail = tabs.firstOrNull { it.url == entry.url }?.thumbnail,
                 )
             }
         showPageListScreen(
@@ -2599,7 +2670,7 @@ class DagBrowserActivity : Activity() {
 
     private fun showDownloads() {
         downloadsScreen?.dismiss()
-        val dialog = Dialog(this)
+        val dialog = Dialog(this, R.style.Theme_DagBrowser_Fullscreen)
         downloadsScreen = dialog
         dialog.setContentView(R.layout.view_dag_downloads)
         val list = dialog.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.downloads_list)
@@ -2622,6 +2693,7 @@ class DagBrowserActivity : Activity() {
             if (downloadsScreen === dialog) downloadsScreen = null
         }
         dialog.show()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.window?.setLayout(
             android.view.WindowManager.LayoutParams.MATCH_PARENT,
             android.view.WindowManager.LayoutParams.MATCH_PARENT,
@@ -3081,6 +3153,9 @@ class DagBrowserActivity : Activity() {
     )
 
     private companion object {
+        const val BrowserChromeAnimationMillis = 180L
+        const val BrowserChromeScrollThresholdPx = 8
+        const val TabSwitcherSwipeThresholdPx = 36f
         const val ExtensionLocation = "resource://android/assets/dag-protection/"
         const val ExtensionId = "dag-protection@glosh.local"
         const val NativeApp = "glosh.dag.protection"
