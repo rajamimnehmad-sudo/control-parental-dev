@@ -32,6 +32,7 @@ const createHarness = async () => {
   const headersReceived = eventChannel();
   const nativeMessages = eventChannel();
   const nativeDisconnects = eventChannel();
+  const runtimeMessages = eventChannel();
   const postedNative = [];
   const filters = new Map();
   const nativePort = {
@@ -43,6 +44,7 @@ const createHarness = async () => {
   };
   const browser = {
     runtime: {
+      onMessage: runtimeMessages,
       connectNative() {
         return nativePort;
       },
@@ -89,6 +91,9 @@ const createHarness = async () => {
     headers: headersReceived.listeners[0],
     filters,
     postedNative,
+    decideInline(message, sender = { url: "https://search.example.test/?q=shoes" }) {
+      return runtimeMessages.listeners[0](message, sender);
+    },
     answer(message) {
       for (const listener of nativeMessages.listeners) listener(message);
     },
@@ -179,6 +184,38 @@ test("sanitized passive sprite is cached and preserves replacement bytes", async
   await waitFor(() => harness.filters.get(second.requestId).closed, "cached sprite close");
   assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
   assert.deepEqual([...harness.filters.get(second.requestId).writes[0]], [...sanitized]);
+});
+
+test("bounded inline raster crosses the same native gate and fails closed", async () => {
+  const harness = await createHarness();
+  const original = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2]);
+  const allowed = harness.decideInline({
+    type: "inline-raster-decision",
+    version: 1,
+    dataUrl: `data:image/png;base64,${btoa(String.fromCharCode(...original))}`,
+  });
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "inline native request");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  assert.equal((await allowed).action, "allow");
+
+  assert.equal((await harness.decideInline({
+    type: "inline-raster-decision",
+    version: 1,
+    dataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
+  })).action, "block");
+  assert.equal((await harness.decideInline({
+    type: "inline-raster-decision",
+    version: 1,
+    dataUrl: `data:image/png;base64,${"A".repeat(66 * 1024)}`,
+  })).action, "block");
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
 });
 
 test("SVG and icon URLs never enter the response gate", async () => {
@@ -337,6 +374,10 @@ test("first paint closes inline and changing image sources before stable reveal"
   assert.match(barrier, /imageSource\(image\) === source/u);
   assert.match(barrier, /image\.hasAttribute\(STABLE_IMAGE_ATTRIBUTE\)/u);
   assert.match(barrier, /hasInlineImageSource\(record\.target\)/u);
+  assert.match(barrier, /MAX_INLINE_IMAGES_PER_DOCUMENT = 16/u);
+  assert.match(barrier, /inlineImageIsBounded/u);
+  assert.match(barrier, /inline-raster-decision/u);
+  assert.match(barrier, /pendingImages\.get\(image\) !== request/u);
   assert.doesNotMatch(barrier, /\.src\s*=|\.srcset\s*=|cheeky|google\.com/iu);
   assert.match(css, /img\[src\^="data:" i\]/u);
   assert.match(css, /img\[src\^="blob:" i\]/u);
@@ -355,6 +396,8 @@ test("active extension has bounded work and no site or device exceptions", async
   assert.match(background, /MAX_CAPTURED_BYTES = 8 \* 1024 \* 1024/u);
   assert.match(background, /MAX_NATIVE_IN_FLIGHT = 2/u);
   assert.match(background, /MAX_QUEUED_ANALYSES = 24/u);
+  assert.match(background, /MAX_INLINE_IMAGE_BYTES = 48 \* 1024/u);
+  assert.match(background, /decodeInlineRaster/u);
   assert.match(ads, /NodeFilter\.SHOW_TEXT/u);
   assert.match(ads, /SEARCH_QUERY_KEYS/u);
   assert.match(ads, /isSearchResultsDocument/u);

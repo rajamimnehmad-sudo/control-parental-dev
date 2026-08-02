@@ -45,9 +45,9 @@ Flujo de una entrada:
 ## Ancla tecnica actual
 
 - Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
-  DEV 86. Son versiones de codigo; publicacion e instalacion se verifican por
+  DEV 87. Son versiones de codigo; publicacion e instalacion se verifican por
   separado en el handoff.
-- DAG 86 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
+- DAG 87 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
   sin espera artificial y no reoculta una imagen ya segura durante rotaciones
   de fuente. El refresh del mismo documento conserva visible la pagina
   protegida; primera carga, URL distinta o fallo mantienen cobertura total.
@@ -59,6 +59,30 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-INLINE-SAFE-ICONS-87 - Iconos raster inline bajo la compuerta unica
+
+- Estado: `Resuelto localmente y validado fisicamente; sin push ni publicacion`.
+  Aprobado explicitamente por el usuario. Prioridad: P1. Esfuerzo: M. Riesgo:
+  medio.
+- Causa: la barrera cerraba de forma permanente todo `data:`/`blob:` porque no
+  atraviesa `webRequest`. Google entrega favicons y miniaturas rapidas como
+  `data:image`, por lo que quedaban huecos aunque los raster HTTP(S) permitidos
+  funcionaran.
+- Resultado: extension 1.48.0 envia a la misma decision local solo raster
+  `data:image` visibles y acotados: hasta 48 KiB, 128 px naturales, 96 px
+  renderizados y 16 fuentes unicas por documento. Deduplica por contenido y
+  verifica que elemento y fuente sigan vigentes antes de revelar. `blob:`, SVG
+  inline, formatos invalidos, excesos, cambio de fuente y cualquier decision
+  distinta de `model_allow` permanecen cerrados. No se reescriben fuentes ni
+  existen excepciones por Google, comercio o telefono.
+- Evidencia: DAG 86 reprodujo el favicon ausente en A23; DAG 87 mostro Fravega,
+  Moov, Sporting y miniaturas de filtros rapidos. Mimo, Cheeky y Fravega se
+  recorrieron sin crash, ANR ni OOM; Mimo abrio el menu completo. Fravega no
+  completo quietud de fotos en 20 s y no se registra como exito de esa metrica.
+- Validacion: 14 pruebas WebExtension, 154 Kotlin, Ktlint, Lint y APK. Fixture
+  HTTPS autofirmado rechazado por TLS y no contado. DAG 86/commit `3c1da59`
+  queda como rollback exacto.
 
 ### DAG-DYNAMIC-PAGES-PERFORMANCE-79 - Fluidez inicial sin observacion global
 

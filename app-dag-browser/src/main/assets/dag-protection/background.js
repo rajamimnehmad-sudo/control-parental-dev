@@ -25,6 +25,8 @@ const MAX_QUEUED_ANALYSES = 24;
 const MAX_NATIVE_IN_FLIGHT = 2;
 const MAX_CACHED_DECISIONS = 512;
 const MAX_REPLACEMENT_BYTES = 256 * 1024;
+const MAX_INLINE_IMAGE_BYTES = 48 * 1024;
+const MAX_INLINE_DATA_URL_LENGTH = 66 * 1024;
 const CAPTURE_TIMEOUT_MS = 5_000;
 const NATIVE_TIMEOUT_MS = 2_250;
 const VIEWPORT_QUIET_MS = 250;
@@ -48,6 +50,18 @@ const decodeBase64 = (value) => {
   return Uint8Array.from(binary, (character) => character.charCodeAt(0));
 };
 const blockedPlaceholder = decodeBase64(BLOCKED_PLACEHOLDER_BASE64);
+
+const decodeInlineRaster = (value) => {
+  if (typeof value !== "string" || value.length > MAX_INLINE_DATA_URL_LENGTH) return null;
+  const match = /^data:image\/(?:avif|gif|jpeg|png|webp);base64,([a-z\d+/=\s]+)$/iu.exec(value);
+  if (match === null) return null;
+  try {
+    const bytes = decodeBase64(match[1].replaceAll(/\s/gu, ""));
+    return bytes.byteLength > 0 && bytes.byteLength <= MAX_INLINE_IMAGE_BYTES ? bytes : null;
+  } catch {
+    return null;
+  }
+};
 
 const hostMatches = (hostname, candidate) =>
   hostname === candidate || hostname.endsWith(`.${candidate}`);
@@ -228,6 +242,28 @@ const drainAnalysisQueue = () => {
   }
 };
 
+const decideInlineRaster = async (message, sender) => {
+  const pageUrl = sender?.url || "";
+  if (!/^https?:\/\//iu.test(pageUrl)) return { action: "block" };
+  const bytes = decodeInlineRaster(message?.dataUrl);
+  if (!(bytes instanceof Uint8Array)) return { action: "block" };
+  if (analysisQueue.length >= MAX_QUEUED_ANALYSES) {
+    bytes.fill(0);
+    return { action: "block" };
+  }
+  return new Promise((resolve) => {
+    analysisQueue.push({
+      details: { url: pageUrl },
+      bytes,
+      settle: (decision) => {
+        bytes.fill(0);
+        resolve({ action: decision.action === "allow" ? "allow" : "block" });
+      },
+    });
+    drainAnalysisQueue();
+  });
+};
+
 const combineChunks = (chunks, totalBytes) => {
   const combined = new Uint8Array(totalBytes);
   let offset = 0;
@@ -342,6 +378,13 @@ const interceptImage = (details, trustSafeUiUrl = true) => {
 };
 
 connectNative();
+
+browser.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type !== "inline-raster-decision" || message?.version !== PROTOCOL_VERSION) {
+    return undefined;
+  }
+  return decideInlineRaster(message, sender);
+});
 
 browser.webRequest.onBeforeRequest.addListener(
   (details) => {

@@ -13,6 +13,10 @@
   const NATIVE_APP = "glosh.dag.protection";
   const IMAGE_STABILITY_MS = 0;
   const STABLE_IMAGE_ATTRIBUTE = "data-glosh-dag-stable";
+  const MAX_INLINE_DATA_URL_LENGTH = 66 * 1024;
+  const MAX_INLINE_IMAGES_PER_DOCUMENT = 16;
+  const MAX_INLINE_NATURAL_EDGE = 128;
+  const MAX_INLINE_RENDERED_EDGE = 96;
   const documentToken =
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
   const sensitivePreviewSelector = [
@@ -27,7 +31,9 @@
   ].join(",");
 
   let nativePort = null;
+  let inlineImagesSubmitted = 0;
   const pendingImages = new WeakMap();
+  const inlineDecisions = new Map();
   try {
     nativePort = browser.runtime.connectNative(NATIVE_APP);
   } catch {
@@ -58,15 +64,68 @@
     );
   };
 
+  const inlineDataSource = (image) => {
+    const current = image.currentSrc || "";
+    if (current.startsWith("data:image/")) return current;
+    const source = image.getAttribute("src") || "";
+    return source.startsWith("data:image/") ? source : "";
+  };
+
   const resetImage = (image) => {
     const pending = pendingImages.get(image);
-    if (pending !== undefined) clearTimeout(pending.timeout);
+    if (pending?.timeout !== undefined) clearTimeout(pending.timeout);
     pendingImages.delete(image);
     image.removeAttribute(STABLE_IMAGE_ATTRIBUTE);
   };
 
+  const inlineImageIsBounded = (image, source) => {
+    if (
+      source.length === 0 ||
+      source.length > MAX_INLINE_DATA_URL_LENGTH ||
+      image.naturalWidth <= 0 ||
+      image.naturalHeight <= 0 ||
+      image.naturalWidth > MAX_INLINE_NATURAL_EDGE ||
+      image.naturalHeight > MAX_INLINE_NATURAL_EDGE
+    ) return false;
+    const bounds = image.getBoundingClientRect();
+    return bounds.width > 0 && bounds.height > 0 &&
+      bounds.width <= MAX_INLINE_RENDERED_EDGE && bounds.height <= MAX_INLINE_RENDERED_EDGE;
+  };
+
+  const inspectInlineImage = (image) => {
+    const source = inlineDataSource(image);
+    resetImage(image);
+    if (!inlineImageIsBounded(image, source)) return;
+    let decision = inlineDecisions.get(source);
+    if (decision === undefined) {
+      if (inlineImagesSubmitted >= MAX_INLINE_IMAGES_PER_DOCUMENT) return;
+      inlineImagesSubmitted += 1;
+      decision = browser.runtime.sendMessage({
+        type: "inline-raster-decision",
+        version: PROTOCOL_VERSION,
+        dataUrl: source,
+      }).catch(() => ({ action: "block" }));
+      inlineDecisions.set(source, decision);
+    }
+    const request = { source, decision };
+    pendingImages.set(image, request);
+    void decision.then((result) => {
+      if (
+        pendingImages.get(image) !== request ||
+        !image.isConnected ||
+        inlineDataSource(image) !== source
+      ) return;
+      pendingImages.delete(image);
+      if (result?.action === "allow") image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
+    });
+  };
+
   const stabilizeImage = (image) => {
     if (image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) return;
+    if (inlineDataSource(image).length > 0) {
+      inspectInlineImage(image);
+      return;
+    }
     resetImage(image);
     const source = imageSource(image);
     if (
@@ -104,7 +163,8 @@
     for (const record of records) {
       if (record.type === "attributes" && record.target instanceof HTMLImageElement) {
         if (hasInlineImageSource(record.target)) {
-          resetImage(record.target);
+          if (record.target.complete) inspectInlineImage(record.target);
+          else resetImage(record.target);
           continue;
         }
         if (record.target.complete) stabilizeImage(record.target);

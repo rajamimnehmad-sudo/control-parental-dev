@@ -10,7 +10,7 @@ el runtime actual desde versiones o worktrees historicos.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- Tras el cierre local de DAG 86, `main` queda 31 commits por delante de
+- Tras el cierre local de DAG 87, `main` queda 32 commits por delante de
   `origin/main`.
 - No se hizo push, PR, publicacion DEV ni Production.
 - Los APK finales se construyen solo desde `main` local integrado.
@@ -20,16 +20,16 @@ el runtime actual desde versiones o worktrees historicos.
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Sin cambios |
 | App Admin | 290 | 1.0.1-dev | Sin cambios |
-| DAG Browser | 86 | 0.66.0-dev | Instalado y validado localmente; no publicado |
+| DAG Browser | 87 | 0.67.0-dev | Instalado y validado localmente; no publicado |
 
-El APK canonico DAG 86 esta instalado en el SM-S908E `R5CT717BZTZ`; Android
-confirma `versionCode=86`, `versionName=0.66.0-dev` y DAG como navegador
-predeterminado. Se conservaron perfil, cache y pestañas para no alterar los
-datos del usuario ni favorecer artificialmente la medicion.
+El APK canonico DAG 87 esta instalado en el SM-A235M `R58T34V31AE`; Android
+confirma `versionCode=87`, `versionName=0.67.0-dev` y DAG como navegador
+predeterminado. El equipo tenia DAG 67 y se actualizo primero al rollback 86 y
+luego al candidato 87, siempre conservando datos.
 
 ## DAG Browser vigente
 
-DAG 86 usa una unica compuerta GloshIA previa al render. Los bytes raster se
+DAG 87 usa una unica compuerta GloshIA previa al render. Los bytes raster se
 capturan una vez y solo `model_allow` devuelve el original exacto. Filtro,
 error, timeout, saturacion, animacion o entrada invalida producen un PNG neutro
 sin pixeles rechazados. SVG e iconos vectoriales seguros quedan fuera de la
@@ -50,7 +50,15 @@ La presentacion vigente es global:
 
 En un refresh del mismo documento DAG mantiene visible la pagina ya protegida
 mientras espera la nueva barrera. Primera carga, URL distinta o fallo siguen
-cerrados por la cobertura total. Extension incorporada: `1.47.0`.
+cerrados por la cobertura total. Extension incorporada: `1.48.0`.
+
+Los `data:image` raster visibles que parecen controles o iconos ya no quedan
+ocultos para siempre: si pesan hasta 48 KiB, tienen bordes naturales de hasta
+128 px, se muestran en hasta 96 px y entran dentro de un maximo de 16 fuentes
+unicas por documento, atraviesan la misma compuerta local. Solo `model_allow`
+los revela. Rechazo, SVG inline, `blob:`, exceso, formato invalido, timeout o
+fuente cambiada permanecen cerrados. La decision se deduplica por contenido y
+no hay reglas por Google, comercio o telefono.
 
 La interfaz sustituye la transicion azul por fondo blanco y una barra fina de
 progreso. Los sprites PNG pasivos, extremos, transparentes y de pocos colores
@@ -67,7 +75,7 @@ object y embed permanecen bloqueados por contratos separados.
 
 ## Validacion y artefacto
 
-- 13 pruebas WebExtension y 154 unitarias Kotlin aprobadas.
+- 14 pruebas WebExtension y 154 unitarias Kotlin aprobadas.
 - Ktlint, Lint, build y `git diff --check` correctos.
 - En Mimo, la interaccion temprana del menu paso de `26,7 fps` en la base y
   `21,8 fps` en un candidato descartado a `47,8-48,6 fps` en dos repeticiones
@@ -87,6 +95,12 @@ object y embed permanecen bloqueados por contratos separados.
   no se clasificaron como anuncios por su apariencia.
 - Sin crash, ANR ni OOM en Mimo, Cheeky o Fravega. El fixture HTTPS
   autofirmado sigue bloqueado por TLS y no se conto.
+- En el A23, DAG 86 reprodujo el hueco del favicon de Fravega. DAG 87 mostro
+  los favicons de Fravega, Moov y Sporting y las miniaturas de filtros rapidos
+  de Google, todos despues de la decision local.
+- Matriz DAG 87/A23: Mimo `2.975 / 3.068 / 273 ms`, Cheeky
+  `10.299 / 11.262 / 2.803 ms` y Fravega `20.024 / no completo en 20 s /
+  1.187 ms`. Mimo abrio su menu completo; no se observó una regresion general.
 - Google Imagenes: el usuario confirmo el raster en `0 ms` sin escape de
   contenido rechazado y el refresh sin apagado general.
 - Antes del arreglo, dos rafagas reprodujeron tres cuadros negros consecutivos;
@@ -98,12 +112,12 @@ object y embed permanecen bloqueados por contratos separados.
 APK local:
 
 - ruta: `app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk`;
-- tamaño: `121372369` bytes;
+- tamaño: `121373233` bytes;
 - SHA-256:
-  `ea3003d434d2effcb63c9a77c28b7065249c3574bb7376e117ab07f4770b3a10`.
+  `c61e8320033bf24f0e9f80e4e268b2f9e3accc2c7b75770b4fb827c695a808c0`.
 
 Evidencia completa:
-`docs/compatibility/results/dag-browser-v86-dynamic-pages-sm-s908e-2026-08-02.md`.
+`docs/compatibility/results/dag-browser-v87-inline-icons-sm-a235m-2026-08-02.md`.
 Contrato vigente: `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PIPELINE.md`.
 
 ## Metricas
@@ -118,7 +132,7 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
 
 ## Estado de GloshIA visual
 
-- Hay un unico modelo local; DAG 86 no cambia sus pesos ni umbrales.
+- Hay un unico modelo local; DAG 87 no cambia sus pesos ni umbrales.
 - El laboratorio de 1.000 miniaturas y la ronda humana son evaluacion, no un
   entrenamiento autorizado.
 - La calibracion preliminar y el experimento privado R1 quedaron `NO-GO` para

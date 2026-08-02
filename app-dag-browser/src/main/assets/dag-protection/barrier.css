@@ -1,12 +1,13 @@
 /*
- * HTTP(S) raster bytes remain entirely owned by the response gate. Inline image
- * sources cannot reach WebRequest, so they stay neutral from the first paint.
+ * HTTP(S) raster bytes remain entirely owned by the response gate. Inline
+ * sources start neutral; only a bounded data raster approved by the same local
+ * gate receives the stable attribute. Blob and unsupported inline media stay closed.
  */
-img[src^="data:" i],
+img[src^="data:" i]:not([data-glosh-dag-stable="true"]),
 img[src^="blob:" i],
-img[srcset*="data:image" i],
+img[srcset*="data:image" i]:not([data-glosh-dag-stable="true"]),
 img[srcset*="blob:" i],
-picture:has(source[srcset*="data:image" i]) img,
+picture:has(source[srcset*="data:image" i]) img:not([data-glosh-dag-stable="true"]),
 picture:has(source[srcset*="blob:" i]) img,
 svg image[href^="data:" i],
 svg image[href^="blob:" i],
