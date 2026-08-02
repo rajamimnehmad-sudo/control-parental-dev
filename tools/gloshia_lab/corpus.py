@@ -444,7 +444,12 @@ def repair_currentness(
     return {"repaired": len(invalid), "remaining": len(valid), "backup": str(backup_dir)}
 
 
-def _assign_splits(rows: list[dict[str, Any]]) -> None:
+def _assign_splits(rows: list[dict[str, Any]], include_sealed: bool = True) -> None:
+    if not include_sealed:
+        for row in rows:
+            row["split"] = "directed_review"
+            row["sealed"] = False
+        return
     by_category: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         by_category.setdefault(row["category"], []).append(row)
@@ -505,6 +510,7 @@ def build_corpus(
     query_plan_path: Path,
     output_dir: Path,
     target_override: int | None = None,
+    include_sealed: bool = True,
     progress: Any = print,
 ) -> dict[str, Any]:
     plan = json.loads(query_plan_path.read_text(encoding="utf-8"))
@@ -710,7 +716,7 @@ def build_corpus(
             "the checkpoint was preserved for a safe resume"
         )
 
-    _assign_splits(rows)
+    _assign_splits(rows, include_sealed=include_sealed)
     _write_jsonl(manifest_path, rows)
     partial_path.unlink(missing_ok=True)
     failures_path.unlink(missing_ok=True)
@@ -728,6 +734,7 @@ def build_corpus(
         "query_plan": str(query_plan_path),
         "training_authorized": False,
         "sealed_split_opened": False,
+        "review_only": not include_sealed,
     }
     _write_json(output_dir / "summary.json", summary)
     return summary

@@ -177,11 +177,21 @@ def parser() -> argparse.ArgumentParser:
     corpus.add_argument("output", type=Path)
     corpus.add_argument("--target", type=int)
     corpus.add_argument("--query-plan", type=Path, default=TOOL_DIR / "queries.json")
+    corpus.add_argument(
+        "--no-sealed",
+        action="store_true",
+        help="assign every downloaded sample to directed_review; never create a final_sealed split",
+    )
     corpus.set_defaults(
         handler=lambda args: (
             print(
                 json.dumps(
-                    build_corpus(args.query_plan, args.output, args.target),
+                    build_corpus(
+                        args.query_plan,
+                        args.output,
+                        args.target,
+                        include_sealed=not args.no_sealed,
+                    ),
                     indent=2,
                     ensure_ascii=False,
                 )

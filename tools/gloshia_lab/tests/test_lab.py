@@ -34,7 +34,7 @@ from tools.gloshia_lab.metrics import (
     evaluation_report,
     experimental_calibration_action,
 )
-from tools.gloshia_lab.server import ReviewServer
+from tools.gloshia_lab.server import ReviewServer, review_queue_name
 
 
 class ModelPolicyTest(unittest.TestCase):
@@ -457,6 +457,31 @@ class MetricsTest(unittest.TestCase):
 
 
 class ReviewServerTest(unittest.TestCase):
+    def test_review_queue_preparation_is_separate_and_deterministic(self) -> None:
+        rows = [
+            {
+                "sample_id": "sample:filter",
+                "category": "groups_families",
+                "model_prediction": {"action": "filter", "maximum_probability": 0.52},
+            },
+            {
+                "sample_id": "sample:borderline",
+                "category": "current_mixed",
+                "model_prediction": {"action": "allow", "maximum_probability": 0.50},
+            },
+            {
+                "sample_id": "sample:reviewed",
+                "category": "men_covered",
+                "model_prediction": {"action": "filter", "maximum_probability": 0.80},
+            },
+        ]
+        self.assertEqual("possible_false_filter", review_queue_name(rows[0], {}))
+        self.assertEqual("borderline", review_queue_name(rows[1], {}))
+        self.assertEqual(
+            "disagreement",
+            review_queue_name(rows[2], {"sample:reviewed": {"action": "allow"}}),
+        )
+
     def test_lan_mode_requires_token_then_uses_private_session_cookie(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             corpus = Path(temporary)

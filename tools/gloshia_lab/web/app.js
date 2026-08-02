@@ -34,6 +34,7 @@ const elements = {
   action: document.querySelector("#action"),
   human: document.querySelector("#human"),
   relation: document.querySelector("#relation"),
+  reviewQueue: document.querySelector("#review-queue"),
   origin: document.querySelector("#origin"),
   allowButton: document.querySelector("#allow-button"),
   allowStamp: document.querySelector("#allow-stamp"),
@@ -414,6 +415,7 @@ async function loadItems() {
     category: elements.category.value,
     human: elements.human.value,
     relation: elements.relation.value,
+    review_queue: elements.reviewQueue.value,
     origin: elements.origin.value,
     limit: "600",
   });
@@ -507,7 +509,7 @@ elements.export.addEventListener("click", () => {
   window.location.href = "/api/export";
 });
 
-for (const select of [elements.scope, elements.action, elements.relation, elements.human, elements.category, elements.origin]) {
+for (const select of [elements.scope, elements.reviewQueue, elements.action, elements.relation, elements.human, elements.category, elements.origin]) {
   select.addEventListener("change", reload);
 }
 

@@ -39,6 +39,60 @@ REASONS = {
     "uncertain_reason",
 }
 
+REVIEW_QUEUE_OPTIONS = {
+    "possible_filter",
+    "disagreement",
+    "borderline",
+    "doubt",
+    "possible_false_filter",
+    "random",
+    "rest",
+}
+
+
+def review_queue_name(row: dict[str, Any], reviews: dict[str, dict[str, Any]]) -> str:
+    """Assign a deterministic, non-overlapping preparation queue."""
+    review = reviews.get(row["sample_id"])
+    prediction = row.get("model_prediction") or {}
+    if review:
+        action = review.get("action")
+        if action == "doubt":
+            return "doubt"
+        if action in {"allow", "filter"} and action != prediction.get("action"):
+            return "disagreement"
+        return "rest"
+    if prediction.get("error"):
+        return "rest"
+    model_action = prediction.get("action")
+    score = float(prediction.get("maximum_probability") or 0.0)
+    category = str(row.get("category") or "")
+    context_category = any(
+        marker in category
+        for marker in (
+            "men",
+            "covered",
+            "group",
+            "family",
+            "school",
+            "community",
+            "small",
+            "partial",
+            "public",
+            "sports",
+            "activewear",
+        )
+    )
+    if model_action == "filter" and (context_category or score < 0.55):
+        return "possible_false_filter"
+    if 0.40 <= score <= 0.60:
+        return "borderline"
+    if model_action == "filter":
+        return "possible_filter"
+    # Stable sampling gives a repeatable ten-percent control queue.
+    if int.from_bytes(row["sample_id"].encode("utf-8"), "big") % 10 == 0:
+        return "random"
+    return "rest"
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -259,6 +313,13 @@ class ReviewHandler(BaseHTTPRequestHandler):
             human = query.get("human", [""])[0]
             relation = query.get("relation", [""])[0]
             origin = query.get("origin", [""])[0]
+            review_queue = query.get("review_queue", [""])[0]
+            if review_queue in REVIEW_QUEUE_OPTIONS:
+                rows = [
+                    row
+                    for row in rows
+                    if review_queue_name(row, reviews) == review_queue
+                ]
             if action:
                 rows = [
                     row

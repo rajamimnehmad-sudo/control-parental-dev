@@ -118,11 +118,19 @@ para teléfono y computadora:
 - `Anterior` y `Siguiente` permiten navegar sin decidir;
 - permite filtrar desacuerdos, falsos permisos, falsos filtros, dudas,
   categorías y origen;
+- prepara colas no superpuestas para `posibles filter`, `desacuerdos`,
+  `casos fronterizos`, `dudas`, `posibles falsos filtros`, `muestra aleatoria`
+  y `resto`; son colas de trabajo, no etiquetas humanas;
 - exporta/importa JSON y `Comenzar nuevamente` crea un respaldo local antes de
   reiniciar las decisiones;
 - los botones y las flechas del teclado permiten revisar sin gestos;
 - el resultado, score, split y estrato del modelo siguen ausentes de la API
   hasta que la decisión humana ya quedó guardada.
+
+La cola `posibles falsos filtros` prioriza predicciones `filter` con contexto
+de grupos, deporte, comunidad, sujetos pequeños o recortes, además de scores
+menores a 0.55. `Casos fronterizos` usa scores entre 0.40 y 0.60. Estas reglas
+no cambian el modelo ni sus umbrales: sólo ordenan la revisión humana.
 
 Por defecto el servidor permanece limitado a `127.0.0.1`. Para una revisión
 temporal desde un teléfono conectado a la misma Wi-Fi puede iniciarse con
