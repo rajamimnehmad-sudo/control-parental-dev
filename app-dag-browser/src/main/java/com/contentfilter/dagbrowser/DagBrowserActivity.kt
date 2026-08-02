@@ -2418,7 +2418,7 @@ class DagBrowserActivity : Activity() {
                     packageManager.getPackageInfo(packageName, 0)
                 }
             }.getOrNull()
-        val detail =
+        val dagVersionDetail =
             if (packageInfo?.versionName.isNullOrBlank()) {
                 getString(R.string.about_version_unavailable)
             } else {
@@ -2428,6 +2428,17 @@ class DagBrowserActivity : Activity() {
                     packageInfo.longVersionCode,
                 )
             }
+        val detail =
+            getString(
+                R.string.about_visual_model_detail,
+                dagVersionDetail,
+                DagVisualModelInfo.PublicName,
+                DagVisualModelInfo.FunctionalVersion,
+                DagVisualModelInfo.ModelAssetPath,
+                DagVisualModelInfo.ShortSha256,
+                DagVisualModelInfo.Runtime,
+                DagVisualModelInfo.PolicyVersion,
+            )
         AlertDialog.Builder(this)
             .setTitle(R.string.about_dag)
             .setMessage(detail)

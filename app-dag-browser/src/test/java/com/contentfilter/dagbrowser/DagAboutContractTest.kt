@@ -16,5 +16,10 @@ class DagAboutContractTest {
         assertContains(activity, "packageManager.getPackageInfo")
         assertContains(activity, "packageInfo.versionName")
         assertContains(activity, "packageInfo.longVersionCode")
+        assertContains(activity, "DagVisualModelInfo.PublicName")
+        assertContains(activity, "DagVisualModelInfo.FunctionalVersion")
+        assertContains(activity, "DagVisualModelInfo.ShortSha256")
+        assertContains(activity, "DagVisualModelInfo.Runtime")
+        assertContains(activity, "DagVisualModelInfo.PolicyVersion")
     }
 }

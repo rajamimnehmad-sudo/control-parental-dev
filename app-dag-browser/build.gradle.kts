@@ -28,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 87
-        versionName = "0.67.0"
+        versionCode = 88
+        versionName = "0.68.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must

@@ -31,6 +31,18 @@
     <string name="about_dag">Acerca de DAG</string>
     <string name="about_version_detail">Versión %1$s (%2$d)</string>
     <string name="about_version_unavailable">No se pudo consultar la versión instalada.</string>
+    <string name="about_visual_model_detail">DAG
+%1$s
+
+%2$s
+Modelo %3$s
+Procesamiento local en el teléfono
+
+Detalles técnicos
+Modelo: %4$s
+Hash: %5$s
+Runtime: %6$s
+Política: %7$s</string>
     <string name="clear_browsing_data_title">¿Borrar datos de navegación?</string>
     <string name="clear_browsing_data_detail">Se borrarán caché, cookies e inicios de sesión de las páginas. La configuración de Glosh no se modifica.</string>
     <string name="cancel">Cancelar</string>

@@ -183,7 +183,7 @@ internal class DagOnDeviceImageAnalyzer private constructor(
             }
         }
 
-        const val ModelAssetPath = "dag-model/tinyclip-bounded-finetune-r1-int8.onnx"
+        const val ModelAssetPath = DagVisualModelInfo.ModelAssetPath
         const val ModelInputName = "pixel_values"
         const val FilterThreshold = 0.4f
         const val UncertainRegionalReviewFloor = 0.3f

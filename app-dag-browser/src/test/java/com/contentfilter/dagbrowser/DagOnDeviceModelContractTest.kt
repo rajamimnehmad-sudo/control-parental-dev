@@ -12,7 +12,12 @@ class DagOnDeviceModelContractTest {
         val model = File("src/main/assets/${DagOnDeviceImageAnalyzer.ModelAssetPath}")
 
         assertTrue(model.isFile)
-        assertEquals(ExpectedModelSha256, model.sha256())
+        assertEquals("GloshIA Visual", DagVisualModelInfo.PublicName)
+        assertEquals("R1", DagVisualModelInfo.FunctionalVersion)
+        assertEquals("ONNX Runtime Android 1.27.0", DagVisualModelInfo.Runtime)
+        assertEquals("dag-36", DagVisualModelInfo.PolicyVersion)
+        assertEquals(ExpectedModelSha256, DagVisualModelInfo.ModelSha256)
+        assertEquals(DagVisualModelInfo.ModelSha256, model.sha256())
         assertTrue(model.length() in 8_000_000L..9_000_000L)
         assertEquals(0.4f, DagOnDeviceImageAnalyzer.FilterThreshold)
         assertEquals(0.3f, DagOnDeviceImageAnalyzer.UncertainRegionalReviewFloor)
