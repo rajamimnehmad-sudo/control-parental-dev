@@ -11,11 +11,4 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:windowLightNavigationBar">false</item>
     </style>
-
-    <style name="Theme.DagBrowser.Fullscreen" parent="android:style/Theme.Material.Light.NoActionBar">
-        <item name="android:windowIsFloating">false</item>
-        <item name="android:windowNoTitle">true</item>
-        <item name="android:windowBackground">@color/dag_background</item>
-        <item name="android:colorAccent">@color/dag_blue</item>
-    </style>
 </resources>
