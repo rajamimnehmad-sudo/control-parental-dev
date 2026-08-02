@@ -75,6 +75,7 @@ const pendingNativeDecisions = new Map();
 const fallbackDecisionPromises = new Map();
 const contentDecisionPromises = new Map();
 const contentDecisionCache = new Map();
+const mediaDimensionsBySource = new Map();
 const fallbackAnalysisQueue = [];
 const visibleInterceptAnalysisQueue = [];
 const nearbyInterceptAnalysisQueue = [];
@@ -82,6 +83,22 @@ const activeInterceptStreams = new Set();
 const documentStatesByTab = new Map();
 const documentStatesByToken = new Map();
 let consecutiveVisibleIntercepts = 0;
+
+const rememberMediaDimensions = (sourceUrl, width, height) => {
+  if (
+    typeof sourceUrl !== "string" ||
+    !Number.isInteger(width) ||
+    !Number.isInteger(height) ||
+    width <= 0 ||
+    height <= 0 ||
+    width > 32_768 ||
+    height > 32_768
+  ) return;
+  if (!mediaDimensionsBySource.has(sourceUrl) && mediaDimensionsBySource.size >= MAX_CONTENT_DECISIONS) {
+    mediaDimensionsBySource.delete(mediaDimensionsBySource.keys().next().value);
+  }
+  mediaDimensionsBySource.set(sourceUrl, { width, height });
+};
 
 const reserveInterceptCaptureBytes = (byteLength) => {
   if (
@@ -275,11 +292,16 @@ const connectDecisionPort = () => {
       clearTimeout(pending.timeout);
       const action =
         message.action === "allow" &&
-          ["model_allow", "safe_ui_vector"].includes(message.reason)
+          ["model_allow", "safe_ui_vector", "classifier_bypassed_dev"].includes(message.reason)
           ? "allow"
           : message.action === "block" && message.reason === "model_filter"
             ? "block"
             : TECHNICAL_ERROR_ACTION;
+      rememberMediaDimensions(
+        pending.sourceUrl,
+        message.imageWidth,
+        message.imageHeight,
+      );
       reportClientMediaMetric({
         ...pending.metric,
         outcome: action,
@@ -830,7 +852,13 @@ const requestNativeDecision = (
       });
       resolve(TECHNICAL_ERROR_ACTION);
     }, NATIVE_DECISION_TIMEOUT_MS);
-    pendingNativeDecisions.set(id, { resolve, timeout, startedAt, metric });
+    pendingNativeDecisions.set(id, {
+      resolve,
+      timeout,
+      startedAt,
+      metric,
+      sourceUrl: details.url,
+    });
     try {
       decisionPort.postMessage({
         type: "media-bytes",
@@ -1147,6 +1175,11 @@ const notifyPresentationDecision = (details, action) => {
     sourceUrl: details.url,
     action,
   };
+  const dimensions = mediaDimensionsBySource.get(details.url);
+  if (dimensions) {
+    message.imageWidth = dimensions.width;
+    message.imageHeight = dimensions.height;
+  }
   const response =
     Number.isInteger(details.frameId) && details.frameId >= 0
       ? browser.tabs.sendMessage(details.tabId, message, { frameId: details.frameId })

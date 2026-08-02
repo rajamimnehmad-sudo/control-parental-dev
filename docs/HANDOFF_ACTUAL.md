@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-08-01
+Fecha de corte: 2026-08-02
 
 Este archivo es la verdad tecnica vigente. El historial de producto vive en
 `docs/BACKLOG_PRODUCTO.md`; las mediciones anteriores viven en
@@ -11,10 +11,10 @@ versiones historicas.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- `main` local queda 25 commits por delante de `origin/main` con el commit de
+- `main` local queda 26 commits por delante de `origin/main` con el commit de
   cierre de este lote.
 - No se hizo push, PR, publicacion DEV ni Production.
-- El lote DAG 59 queda integrado en un unico commit local de cierre. No se hizo
+- El lote DAG 64 queda integrado en un unico commit local de cierre. No se hizo
   push y no se debe publicar sin una autorizacion separada.
 - Los worktrees separados son historicos o auxiliares: no compilar ni instalar
   una entrega final desde ellos.
@@ -26,13 +26,40 @@ Declaraciones de version actuales en el codigo:
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Sin cambios |
 | App Admin | 290 | 1.0.1-dev | Sin cambios |
-| DAG Browser | 59 | 0.39.0-dev | Reconstruccion global y gate fisico aprobados en SM-A235M |
+| DAG Browser | 64 | 0.44.0-dev | Base multimedia sin GloshIA validada en SM-S908E; no publicable |
 
-DAG 59 esta instalado en el SM-A235M `R58T34V31AE` y conserva el rol oficial de
-navegador. El perfil DEV anterior fue borrado una sola vez con autorizacion
-explicita durante DAG 58; este lote se instalo in-place y no toco otras apps.
+DAG 64 esta instalado en el SM-S908E `R5CT717BZTZ`. Se instalo in-place, sin
+borrar el perfil y sin tocar otras apps.
 
-## DAG Browser 59 - candidato local
+## DAG Browser 64 - base multimedia separada
+
+DAG 64 valida primero el navegador sin clasificacion visual. En la variante
+DEV, `GLOSHIA_VISUAL_ENABLED=false`: las respuestas capturadas con un sobre de
+transporte valido vuelven sin modificar a Gecko y no pasan por bounds,
+preprocesamiento ni inferencia. Esta variante muestra todas las fotos y no se
+puede publicar como filtro.
+
+La separacion encontro la causa raiz de los huecos: Android autorizaba con
+`classifier_bypassed_dev`, pero la extension no autenticaba ese motivo y lo
+convertia en `error`. El contrato ya reconoce el motivo DEV y conserva el mismo
+recorrido exacto de bytes usado por `model_allow`.
+
+La presentacion se aplica ahora sobre cada elemento multimedia, nunca sobre su
+contenedor. Una foto no puede ocultar logos, iconos, corazones, botones ni una
+imagen hermana. SVG pasivos comprimidos o con recursos internos seguros se
+admiten sin relajar el rechazo de scripts, entidades o referencias externas.
+
+Validacion: 23 pruebas WebExtension aprobadas, una DOM opcional omitida; 151
+unitarias Kotlin aprobadas; Ktlint, Lint y APK correctos. Mimo, Cheeky y
+Fravega quedaron visualmente completos en el SM-S908E, sin reglas por sitio.
+Evidencia:
+`docs/compatibility/results/dag-browser-v64-media-baseline-sm-s908e-2026-08-02.md`.
+
+El siguiente gate es volver a conectar GloshIA mediante el modo de
+clasificacion ya separado y repetir la matriz. Hasta entonces DAG 64 es una
+base de compatibilidad local, no un candidato de publicacion.
+
+## DAG Browser 59 - base previa
 
 DAG 59 reconstruye desde la raiz la barrera y presentacion multimedia. No
 incluye reglas por Cheeky, Mimo, Fravega, modelo de telefono ni ningun otro
@@ -167,8 +194,9 @@ Definicion completa:
 
 ## Estado de GloshIA visual
 
-- DAG usa un unico modelo visual local; este lote optimiza transporte, cola y
-  presentacion, no reentrena pesos ni cambia umbrales.
+- DAG conserva un unico modelo visual local y no cambia pesos ni umbrales. DAG
+  64 DEV lo mantiene desconectado deliberadamente para validar transporte y
+  presentacion; no ejecuta inferencia y por eso no ofrece filtrado visual.
 - El laboratorio local de 1.000 miniaturas y la ronda humana permanecen como
   evaluacion, no como entrenamiento autorizado.
 - La calibracion preliminar y el experimento privado R1 quedaron `NO-GO` para

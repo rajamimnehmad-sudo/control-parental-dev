@@ -1,11 +1,41 @@
 package com.contentfilter.dagbrowser
 
+import java.io.ByteArrayOutputStream
 import java.util.Base64
+import java.util.zip.GZIPOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 class DagMediaBytesPolicyTest {
+    @Test
+    fun `DEV compatibility mode releases exact bytes without decoding or classifying`() {
+        val bytes = byteArrayOf(0x01, 0x02, 0x03, 0x04)
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(bytes),
+                boundsReader = DagImageBoundsReader { error("must not decode") },
+                preprocessor = DagImagePreprocessor { error("must not preprocess") },
+                analyzer = DagImageAnalyzer { error("must not classify") },
+                classificationMode = DagMediaClassificationMode.DisabledForDevCompatibility,
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagMediaBytesPolicy.DevClassifierBypassReason, decision.reason)
+    }
+
+    @Test
+    fun `DEV compatibility mode still rejects an invalid transport envelope`() {
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(0x01)).copy(sourceUrl = "file:///private.jpg"),
+                classificationMode = DagMediaClassificationMode.DisabledForDevCompatibility,
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.InvalidPayloadReason, decision.reason)
+    }
+
     @Test
     fun `bounded supported image reaches unavailable analyzer and stays blocked`() {
         val decision =
@@ -376,6 +406,50 @@ class DagMediaBytesPolicyTest {
 
         assertEquals(DagMediaAction.Allow, decision.action)
         assertEquals(DagMediaBytesPolicy.SafeUiVectorReason, decision.reason)
+    }
+
+    @Test
+    fun `gzip encoded passive ui vector is inspected and released safely`() {
+        val svg =
+            """
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+              <path d="M4 12h16M12 4v16"/>
+            </svg>
+            """.trimIndent().toByteArray()
+        val compressed =
+            ByteArrayOutputStream().use { output ->
+                GZIPOutputStream(output).use { it.write(svg) }
+                output.toByteArray()
+            }
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(compressed),
+                boundsReader = DagImageBoundsReader { error("must not decode vector as raster") },
+                preprocessor = DagImagePreprocessor { error("must not preprocess safe vector") },
+                analyzer = DagImageAnalyzer { error("must not classify safe vector") },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagMediaBytesPolicy.SafeUiVectorReason, decision.reason)
+    }
+
+    @Test
+    fun `oversized gzip expansion fails closed before image decoding`() {
+        val compressed =
+            ByteArrayOutputStream().use { output ->
+                GZIPOutputStream(output).use {
+                    it.write(ByteArray(DagMediaBytesPolicy.MaxCaptureBytes + 1))
+                }
+                output.toByteArray()
+            }
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(compressed),
+                boundsReader = DagImageBoundsReader { error("oversized content must not decode") },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.UnsupportedImageReason, decision.reason)
     }
 
     @Test

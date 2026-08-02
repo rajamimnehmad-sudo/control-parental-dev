@@ -254,7 +254,7 @@ const createBackgroundHarness = async () => {
         `${expectedCount} native media requests`,
       );
     },
-    respondToNative(request, action, reason) {
+    respondToNative(request, action, reason, dimensions = {}) {
       for (const listener of nativeMessages.listeners) {
         listener({
           type: "media-decision",
@@ -262,6 +262,7 @@ const createBackgroundHarness = async () => {
           candidateId: request.candidateId,
           action,
           reason,
+          ...dimensions,
         });
       }
     },
@@ -332,6 +333,8 @@ const exerciseIntercept = async (outcome) => {
     harness.advanceBy(2_500);
   } else if (outcome === "allow") {
     harness.respondToNative(nativeRequest, "allow", "model_allow");
+  } else if (outcome === "dev_allow") {
+    harness.respondToNative(nativeRequest, "allow", "classifier_bypassed_dev");
   } else if (outcome === "block") {
     harness.respondToNative(nativeRequest, "block", "model_filter");
   } else {
@@ -357,6 +360,11 @@ test("intercepted bytes stay withheld until an authenticated allow", async () =>
       afterDecision: [result.originalBytes],
     },
   );
+});
+
+test("DEV classifier bypass authenticates the same exact byte release path", async () => {
+  const result = await exerciseIntercept("dev_allow");
+  assert.deepEqual(result.afterDecision, [result.originalBytes]);
 });
 
 test("per-image diagnostics cross the native bridge only after the DEV handshake", async () => {
@@ -482,6 +490,30 @@ for (const outcome of ["block", "error", "timeout"]) {
     );
   });
 }
+
+test("a model block preserves only bounded dimensions for the exact presentation target", async () => {
+  const harness = await createBackgroundHarness();
+  const sourceUrl = "https://assets.invalid/filtered-banner.jpg";
+  harness.startDocument(17, "document_a5");
+  stopInterceptedImage(harness, {
+    requestId: "filtered-banner-dimensions",
+    tabId: 17,
+    url: sourceUrl,
+    marker: 79,
+  });
+  const request = await harness.nextNativeRequest();
+  harness.respondToNative(request, "block", "model_filter", {
+    imageWidth: 1440,
+    imageHeight: 900,
+  });
+  await harness.flush();
+
+  const presentation = harness.tabMessages.findLast(
+    ({ message }) => message?.sourceUrl === sourceUrl && message?.action === "block",
+  )?.message;
+  assert.equal(presentation?.imageWidth, 1440);
+  assert.equal(presentation?.imageHeight, 900);
+});
 
 test("a burst of 96 small responses is admitted without increasing the byte budget", async () => {
   const harness = await createBackgroundHarness();
@@ -949,21 +981,18 @@ test("the targeted barrier preserves native loading and never installs a permane
   assert.match(script, /rootMargin: "640px 0px"/u);
   assert.match(script, /mediaPriorityObserver\?\.observe/u);
   assert.match(script, /GENERATED_PROTOCOLS = new Set\(\["data:", "blob:"\]\)/u);
-  assert.match(script, /const reconcileHost = \(host\) => \{/u);
   assert.match(script, /const flushLayoutWork = \(\) => \{/u);
   assert.match(script, /mediaElements\.forEach\(boundsFor\);/u);
-  assert.match(script, /attachHost\(element, bounds\);\n      sendPriorityHint\([^\n]+, bounds\);/u);
+  assert.match(script, /sendPriorityHint\([^\n]+, bounds\);/u);
   assert.match(script, /setTimeout\(flushLayoutWork, 48\)/u);
-  const mediaStateStart = script.indexOf("const setMediaState = (element, action) => {");
-  const mediaStateEnd = script.indexOf("const rememberDecision", mediaStateStart);
-  assert.notEqual(mediaStateStart, -1);
-  assert.notEqual(mediaStateEnd, -1);
-  assert.equal(script.slice(mediaStateStart, mediaStateEnd).includes("attachHost("), false);
+  assert.doesNotMatch(script, /data-glosh-dag-media-host/u);
+  assert.doesNotMatch(script, /attachHost|reconcileHost|hostByElement/u);
   assert.doesNotMatch(script, /scheduleScrollBackgroundProbe/u);
   assert.doesNotMatch(script, /MAX_BACKGROUND_PROBE_ELEMENTS/u);
-  assert.match(style, /data-glosh-dag-media-host="filtered"/u);
   assert.match(style, /img:not\(\[data-glosh-dag-media="allow"\]\)/u);
-  assert.match(style, /\[data-glosh-dag-media-host\]::after/u);
+  assert.match(style, /img\[data-glosh-dag-media="hidden"\]/u);
+  assert.match(style, /img\[data-glosh-dag-media="block"\]/u);
+  assert.match(style, /object-position: 99999px 99999px !important/u);
   assert.doesNotMatch(style, /^\*,/mu);
   assert.doesNotMatch(style, /list-style-image: none/u);
   assert.doesNotMatch(style, /content: none !important/u);
@@ -972,39 +1001,37 @@ test("the targeted barrier preserves native loading and never installs a permane
   assert.equal(style.includes("blur(28px)"), false);
 });
 
-test("the media host reconciler keeps pending block and error states distinct", async () => {
+test("each media state is presented on the exact element without rewriting its container", async () => {
   const script = await readFile(barrierPath, "utf8");
   const style = await readFile(barrierCssPath, "utf8");
-  const reconcilerStart = script.indexOf("const reconcileHost = (host) => {");
-  const reconcilerEnd = script.indexOf("const attachHost = (element, bounds) => {", reconcilerStart);
-  const reconciler = script.slice(reconcilerStart, reconcilerEnd);
-  const trustedLiftStart = style.indexOf("[data-glosh-dag-media-host] > :is(");
-  const trustedLiftEnd = style.indexOf("\n) {", trustedLiftStart);
-  const trustedLiftRuleEnd = style.indexOf("\n}", trustedLiftEnd);
-  const trustedLiftRule = style.slice(trustedLiftStart, trustedLiftRuleEnd);
+  assert.doesNotMatch(script, /parentElement/u);
+  assert.doesNotMatch(script, /MEDIA_HOST_ATTRIBUTE|elementsByHost|hostByElement/u);
+  assert.match(style, /data-glosh-dag-media="block"[\s\S]*?opacity: 1 !important/u);
+  const allowRule = style.slice(
+    style.indexOf('img[data-glosh-dag-media="allow"]'),
+    style.indexOf("}", style.indexOf('img[data-glosh-dag-media="allow"]')),
+  );
+  assert.doesNotMatch(allowRule, /opacity:/u);
+  assert.match(style, /img\[data-glosh-dag-media="error"\]/u);
+  assert.doesNotMatch(style, /data-glosh-dag-media-host/u);
+  assert.doesNotMatch(style, /z-index: 2 !important/u);
+});
 
-  assert.notEqual(reconcilerStart, -1);
-  assert.notEqual(reconcilerEnd, -1);
-  assert.ok(
-    reconciler.indexOf('states.includes("hidden")') <
-      reconciler.indexOf('states.includes("block")'),
-    "a trusted allow must not clear another tracked image that is still pending",
+test("late DOM insertion only releases a source with an explicit remembered decision", async () => {
+  const script = await readFile(barrierPath, "utf8");
+  const decisionStart = script.indexOf("const activeDecision = (sources) => {");
+  const decisionEnd = script.indexOf("const sendSourcePriority", decisionStart);
+  const applyStart = script.indexOf("const applyKnownDecision = (element) => {");
+  const applyEnd = script.indexOf("const reconcileMediaAfterLayout", applyStart);
+  const apply = script.slice(applyStart, applyEnd);
+
+  assert.notEqual(decisionStart, -1);
+  assert.match(script.slice(decisionStart, decisionEnd), /for \(const source of sources\)/u);
+  assert.match(
+    apply,
+    /setMediaState\(element, action \|\| "hidden", activeDimensions\(sources\)\)/u,
   );
-  assert.ok(
-    reconciler.indexOf('states.includes("block")') <
-      reconciler.indexOf('states.includes("error")'),
-    "a model filter must remain distinct from a technical error",
-  );
-  assert.match(style, /\[data-glosh-dag-media-host="filtered"\]::after/u);
-  assert.notEqual(trustedLiftStart, -1);
-  assert.notEqual(trustedLiftEnd, -1);
-  for (const selector of [
-    '[data-glosh-dag-media="allow"]',
-    '[data-glosh-dag-ui-vector="allow"]',
-  ]) {
-    assert.equal(trustedLiftRule.includes(selector), true);
-  }
-  assert.match(trustedLiftRule, /z-index: 2 !important/u);
+  assert.doesNotMatch(apply, /element\.complete|naturalWidth|naturalHeight/u);
 });
 
 test("capture reservations release on allow error timeout and navigation", async () => {

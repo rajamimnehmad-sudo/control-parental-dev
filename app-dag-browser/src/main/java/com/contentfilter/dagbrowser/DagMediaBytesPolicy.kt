@@ -1,8 +1,11 @@
 package com.contentfilter.dagbrowser
 
 import android.graphics.BitmapFactory
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.util.Base64
+import java.util.zip.GZIPInputStream
 
 internal data class DagMediaBytesPayload(
     val candidateId: String,
@@ -19,6 +22,11 @@ internal data class DagImageBounds(
 
 internal fun interface DagImageBoundsReader {
     fun read(bytes: ByteArray): DagImageBounds?
+}
+
+internal enum class DagMediaClassificationMode {
+    Enabled,
+    DisabledForDevCompatibility,
 }
 
 internal object AndroidImageBoundsReader : DagImageBoundsReader {
@@ -50,12 +58,21 @@ internal object DagMediaBytesPolicy {
         boundsReader: DagImageBoundsReader = AndroidImageBoundsReader,
         preprocessor: DagImagePreprocessor = AndroidDagImagePreprocessor,
         analyzer: DagImageAnalyzer = UnavailableDagImageAnalyzer,
+        classificationMode: DagMediaClassificationMode = DagMediaClassificationMode.Enabled,
         trace: DagMediaPipelineTrace? = null,
         workGuard: DagMediaWorkGuard = AlwaysCurrentDagMediaWork,
     ): DagMediaDecision {
         if (!validEnvelope(payload)) return blocked(payload, InvalidPayloadReason)
         if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
-        return inspectImage(payload, boundsReader, preprocessor, analyzer, trace, workGuard)
+        return inspectImage(
+            payload,
+            boundsReader,
+            preprocessor,
+            analyzer,
+            classificationMode,
+            trace,
+            workGuard,
+        )
     }
 
     private fun validEnvelope(payload: DagMediaBytesPayload): Boolean {
@@ -70,6 +87,7 @@ internal object DagMediaBytesPolicy {
         boundsReader: DagImageBoundsReader,
         preprocessor: DagImagePreprocessor,
         analyzer: DagImageAnalyzer,
+        classificationMode: DagMediaClassificationMode,
         trace: DagMediaPipelineTrace?,
         workGuard: DagMediaWorkGuard,
     ): DagMediaDecision {
@@ -81,14 +99,23 @@ internal object DagMediaBytesPolicy {
                 }
             }
                 .getOrElse { return blocked(payload, InvalidPayloadReason) }
+        var analysisBytes = bytes
         try {
             if (bytes.size != payload.declaredByteLength || bytes.size > MaxCaptureBytes) {
                 return blocked(payload, InvalidPayloadReason)
             }
+            if (classificationMode == DagMediaClassificationMode.DisabledForDevCompatibility) {
+                return DagMediaDecision(
+                    candidateId = payload.candidateId,
+                    action = DagMediaAction.Allow,
+                    reason = DevClassifierBypassReason,
+                )
+            }
+            analysisBytes = decodeTransportBytes(bytes) ?: return blocked(payload, UnsupportedImageReason)
             if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
             val safeUiVector =
                 trace.measure(DagMediaPipelineStage.SafeVectorCheck) {
-                    DagSafeUiVectorPolicy.isSafe(bytes)
+                    DagSafeUiVectorPolicy.isSafe(analysisBytes)
                 }
             if (safeUiVector) {
                 if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
@@ -100,7 +127,7 @@ internal object DagMediaBytesPolicy {
             }
             if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
             val bounds =
-                trace.measure(DagMediaPipelineStage.BoundsRead) { boundsReader.read(bytes) }
+                trace.measure(DagMediaPipelineStage.BoundsRead) { boundsReader.read(analysisBytes) }
                     ?: return blocked(payload, UnsupportedImageReason)
             if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) {
                 return blocked(payload, UnsupportedImageReason)
@@ -112,7 +139,9 @@ internal object DagMediaBytesPolicy {
             return when (
                 val result =
                     runCatching {
-                        trace.measure(DagMediaPipelineStage.Preprocess) { preprocessor.prepare(bytes) }
+                        trace.measure(DagMediaPipelineStage.Preprocess) {
+                            preprocessor.prepare(analysisBytes)
+                        }
                     }
                         .getOrElse {
                             DagImagePreprocessResult.Rejected(
@@ -138,10 +167,34 @@ internal object DagMediaBytesPolicy {
                     }
                 }
                 is DagImagePreprocessResult.Rejected -> blocked(payload, result.reason)
-            }
+            }.copy(imageWidth = bounds.width, imageHeight = bounds.height)
         } finally {
+            if (analysisBytes !== bytes) analysisBytes.fill(0)
             bytes.fill(0)
         }
+    }
+
+    private fun decodeTransportBytes(bytes: ByteArray): ByteArray? {
+        val isGzip =
+            bytes.size >= 2 &&
+                bytes[0] == GzipMagicFirst &&
+                bytes[1] == GzipMagicSecond
+        if (!isGzip) return bytes
+        return runCatching {
+            GZIPInputStream(ByteArrayInputStream(bytes)).use { input ->
+                val output = ByteArrayOutputStream(minOf(bytes.size * 2, MaxCaptureBytes))
+                val buffer = ByteArray(16 * 1024)
+                var decodedBytes = 0
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    decodedBytes += count
+                    if (decodedBytes > MaxCaptureBytes) return null
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray().takeIf(ByteArray::isNotEmpty)
+            }
+        }.getOrNull()
     }
 
     private fun decidePreparedImages(
@@ -262,6 +315,8 @@ internal object DagMediaBytesPolicy {
     private const val MaxCandidateIdLength = 80
     private const val MaxUrlLength = 4_096
     const val MaxCaptureBytes = 2 * 1024 * 1024
+    private const val GzipMagicFirst: Byte = 0x1f
+    private const val GzipMagicSecond: Byte = -117
     private const val MaxBase64Length = ((MaxCaptureBytes + 2) / 3) * 4
     const val InvalidPayloadReason = "invalid_payload"
     const val SafeUiVectorReason = "safe_ui_vector"
@@ -269,6 +324,7 @@ internal object DagMediaBytesPolicy {
     const val UnsafeDimensionsReason = "unsafe_dimensions"
     const val AnalyzerBusyReason = "analyzer_busy"
     const val AnalysisExpiredReason = "analysis_expired"
+    const val DevClassifierBypassReason = "classifier_bypassed_dev"
 }
 
 private fun <T> DagMediaPipelineTrace?.measure(

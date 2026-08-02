@@ -108,7 +108,10 @@ class MediaBarrierContractTest {
         assertContains(barrier, "mediaElements.forEach(boundsFor)")
         assertContains(barrier, "setTimeout(flushLayoutWork, 48)")
         assertContains(barrier, "SOURCE_ATTRIBUTES")
-        assertContains(barrier, "setMediaState(element, action || \"hidden\")")
+        assertContains(
+            barrier,
+            "setMediaState(element, action || \"hidden\", activeDimensions(sources))",
+        )
         assertContains(barrier, "data-glosh-dag-media")
         assertContains(barrier, "unregisterTree")
         assertContains(barrier, "mutation.removedNodes")
@@ -152,13 +155,17 @@ class MediaBarrierContractTest {
 
     @Test
     fun `waiting filter error and allow remain visibly distinct without rejected pixels`() {
-        assertContains(css, "data-glosh-dag-media-host=\"waiting\"")
-        assertContains(css, "data-glosh-dag-media-host=\"filtered\"")
-        assertContains(css, "data-glosh-dag-media-host=\"error\"")
+        assertContains(css, "data-glosh-dag-media=\"hidden\"")
+        assertContains(css, "data-glosh-dag-media=\"block\"")
+        assertContains(css, "data-glosh-dag-media=\"error\"")
         assertContains(css, "@keyframes glosh-dag-waiting")
         assertContains(css, "prefers-reduced-motion: reduce")
         assertContains(barrier, "FILTERED_ACCESSIBLE_DESCRIPTION")
         assertContains(barrier, "ERROR_ACCESSIBLE_DESCRIPTION")
+        assertFalse(barrier.contains("data-glosh-dag-media-host"))
+        assertContains(css, "object-position: 99999px 99999px !important")
+        assertContains(css, "opacity: 1 !important")
+        assertFalse(css.contains("opacity: 0 !important"))
         assertFalse(css.contains("blur(28px)"))
         assertFalse(css.contains("Protegida por Glosh"))
     }

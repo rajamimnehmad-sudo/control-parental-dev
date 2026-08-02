@@ -47,8 +47,9 @@ Flujo de una entrada:
 - Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
   DEV 58. Son versiones de codigo; publicacion e instalacion se verifican por
   separado en el handoff.
-- DAG 58 tiene gate automatico y fisico aprobados en el SM-A235M; esta instalado
-  y conserva el rol oficial de navegador. No fue publicado ni subido a GitHub.
+- DAG 64 es la base local de compatibilidad multimedia validada en el SM-S908E.
+  GloshIA esta desconectada solo en DEV para aislar el navegador; no es
+  publicable ni fue subida a GitHub.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -827,7 +828,7 @@ Flujo de una entrada:
 | DAG-V3-TAB-HIBERNATION-09 | Implementado en DAG 45; matriz física de 10 correcta, 50 pendiente | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
 | DAG-V3-MEDIA-PRESENTATION-11 | Reforzado localmente en DAG 34 y revalidado con DAG 36 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
-| DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Resuelto localmente y validado fisicamente en DAG 59 | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
+| DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Base web sin clasificador validada en DAG 64; reconexion GloshIA pendiente | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
 | DAG-V3-FILTERED-OVERLAY-13 | Resuelto localmente y validado físicamente en DAG 33 | P2 | Mostrar fotos filtradas sólo difuminadas, sin escudo ni rastreo final de contenedor | S | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |

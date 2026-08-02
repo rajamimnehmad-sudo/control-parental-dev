@@ -1632,6 +1632,12 @@ class DagBrowserActivity : Activity() {
             DagMediaBytesPolicy.decide(
                 payload = bytesPayload,
                 analyzer = imageAnalyzer,
+                classificationMode =
+                    if (BuildConfig.GLOSHIA_VISUAL_ENABLED) {
+                        DagMediaClassificationMode.Enabled
+                    } else {
+                        DagMediaClassificationMode.DisabledForDevCompatibility
+                    },
                 trace = trace,
                 workGuard = lease,
             )
@@ -1719,6 +1725,10 @@ class DagBrowserActivity : Activity() {
             .put("candidateId", decision.candidateId)
             .put("action", decision.action.wireValue)
             .put("reason", decision.reason)
+            .apply {
+                decision.imageWidth?.let { put("imageWidth", it) }
+                decision.imageHeight?.let { put("imageHeight", it) }
+            }
     }
 
     private fun showClosedPage(tab: BrowserTab) {

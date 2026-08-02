@@ -24,7 +24,6 @@
     "[data-glosh-dag-generated-before]",
     "[data-glosh-dag-generated-after]",
   ].join(",");
-  const MEDIA_HOST_ATTRIBUTE = "data-glosh-dag-media-host";
   const PROTECTED_ATTRIBUTES = new Set([
     "data-glosh-dag-media",
     "data-glosh-dag-ui-vector",
@@ -32,7 +31,6 @@
     "data-glosh-dag-generated-before",
     "data-glosh-dag-generated-after",
     INITIALIZED_ATTRIBUTE,
-    MEDIA_HOST_ATTRIBUTE,
   ]);
   const DECISION_ACTIONS = new Set(["allow", "block", "error"]);
   const MAX_REMEMBERED_DECISIONS = 512;
@@ -46,12 +44,11 @@
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
 
   const decisionsBySource = new Map();
+  const dimensionsBySource = new Map();
   const pendingSourceDecisions = new Map();
   const elementsBySource = new Map();
   const sourcesByElement = new WeakMap();
   const trustedMediaStates = new WeakMap();
-  const hostByElement = new WeakMap();
-  const elementsByHost = new WeakMap();
   const generatedRecords = new Map();
   const generatedRuleTargets = [];
   const pendingLayoutElements = new Set();
@@ -60,6 +57,7 @@
   const generatedIdsByElement = new WeakMap();
   const priorityBySource = new Map();
   const ownStyleSnapshots = new WeakMap();
+  const presentationStylesByElement = new WeakMap();
   let nativePort = null;
   let previewEligibilityTimer = null;
   let generatedRuleRefreshScheduled = false;
@@ -137,14 +135,6 @@
     sourcesByElement.delete(element);
   };
 
-  const detachHost = (element) => {
-    const host = hostByElement.get(element);
-    if (!host) return;
-    elementsByHost.get(host)?.delete(element);
-    hostByElement.delete(element);
-    reconcileHost(host);
-  };
-
   const indexElement = (element) => {
     unindexElement(element);
     const sources = candidateSourcesFor(element);
@@ -171,65 +161,115 @@
     }
   };
 
-  const reconcileHost = (host) => {
-    if (!(host instanceof Element)) return;
-    const tracked = [...(elementsByHost.get(host) || [])]
-      .filter((element) => element.isConnected && hostByElement.get(element) === host);
-    if (tracked.length === 0) {
-      removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
-      return;
-    }
-    const states = tracked.map((element) => element.getAttribute("data-glosh-dag-media"));
-    const state = states.includes("hidden")
-      ? "waiting"
-      : states.includes("block")
-        ? "filtered"
-        : states.includes("error")
-          ? "error"
-          : null;
-    if (state) setAttributeIfChanged(host, MEDIA_HOST_ATTRIBUTE, state);
-    else removeAttributeIfPresent(host, MEDIA_HOST_ATTRIBUTE);
+  const PRESENTATION_PROPERTIES = [
+    "background",
+    "aspect-ratio",
+    "box-shadow",
+    "color",
+    "object-position",
+    "opacity",
+    "text-indent",
+    "height",
+    "width",
+  ];
+  const BLOCK_PRESENTATION = {
+    background: "linear-gradient(135deg, #dce5e9 0%, #bdcbd2 48%, #e8edef 100%)",
+    "box-shadow": "inset 0 0 0 9999px rgb(207 218 224 / 38%)",
+    color: "transparent",
+    "object-position": "99999px 99999px",
+    opacity: "1",
+    "text-indent": "-99999px",
+  };
+  const ERROR_PRESENTATION = {
+    ...BLOCK_PRESENTATION,
+    background: "#ebe6e2",
+    "box-shadow": "inset 0 0 0 9999px #ebe6e2",
+  };
+  const HIDDEN_PRESENTATION = {
+    color: "transparent",
+    "object-position": "99999px 99999px",
+    "text-indent": "-99999px",
   };
 
-  const attachHost = (element, bounds) => {
-    if (!(element instanceof HTMLImageElement)) return;
-    const previous = hostByElement.get(element);
-    const host = element.parentElement;
-    if (previous && previous !== host) {
-      elementsByHost.get(previous)?.delete(element);
-      reconcileHost(previous);
+  const restorePresentationStyle = (element) => {
+    const snapshot = presentationStylesByElement.get(element);
+    if (!snapshot) return;
+    for (const property of PRESENTATION_PROPERTIES) {
+      const original = snapshot.get(property);
+      if (original?.value) {
+        element.style.setProperty(property, original.value, original.priority);
+      } else {
+        element.style.removeProperty(property);
+      }
     }
-    if (!host || bounds.width < 32 || bounds.height < 32) {
-      if (previous) detachHost(element);
-      return;
-    }
-    let elements = elementsByHost.get(host);
-    if (!elements) {
-      elements = new Set();
-      elementsByHost.set(host, elements);
-    }
-    elements.add(element);
-    hostByElement.set(element, host);
-    reconcileHost(host);
+    presentationStylesByElement.delete(element);
+    ownStyleSnapshots.set(element, element.getAttribute("style") || "");
   };
 
-  const setMediaState = (element, action) => {
+  const applyPresentationStyle = (element, action, dimensions = null) => {
+    if (!(element instanceof HTMLImageElement) && !(element instanceof HTMLInputElement)) return;
+    restorePresentationStyle(element);
+    if (action === "allow") return;
+    const values = action === "block"
+      ? { ...BLOCK_PRESENTATION }
+      : action === "error"
+        ? { ...ERROR_PRESENTATION }
+        : { ...HIDDEN_PRESENTATION };
+    if (dimensions && ["block", "error"].includes(action)) {
+      values["aspect-ratio"] = `${dimensions.width} / ${dimensions.height}`;
+      values.width = "100%";
+      values.height = "auto";
+    }
+    const snapshot = new Map();
+    for (const property of PRESENTATION_PROPERTIES) {
+      snapshot.set(property, {
+        value: element.style.getPropertyValue(property),
+        priority: element.style.getPropertyPriority(property),
+      });
+    }
+    presentationStylesByElement.set(element, snapshot);
+    for (const [property, value] of Object.entries(values)) {
+      element.style.setProperty(property, value, "important");
+    }
+    ownStyleSnapshots.set(element, element.getAttribute("style") || "");
+  };
+
+  const setMediaState = (element, action, dimensions = null) => {
+    const previousAction = trustedMediaStates.get(element);
     trustedMediaStates.set(element, action);
     setAttributeIfChanged(element, "data-glosh-dag-media", action);
+    const addsMissingDimensions =
+      dimensions !== null && !element.style.getPropertyValue("aspect-ratio");
+    if (previousAction !== action || addsMissingDimensions) {
+      applyPresentationStyle(element, action, dimensions);
+    }
     updateAccessibleState(element, action);
-    reconcileHost(hostByElement.get(element));
   };
 
-  const rememberDecision = (source, action) => {
+  const rememberDecision = (source, action, dimensions = null) => {
     if (!decisionsBySource.has(source) && decisionsBySource.size >= MAX_REMEMBERED_DECISIONS) {
-      decisionsBySource.delete(decisionsBySource.keys().next().value);
+      const oldest = decisionsBySource.keys().next().value;
+      decisionsBySource.delete(oldest);
+      dimensionsBySource.delete(oldest);
     }
     decisionsBySource.set(source, action);
+    if (dimensions) dimensionsBySource.set(source, dimensions);
   };
 
   const activeDecision = (sources) => {
-    const active = sources[0];
-    return active ? decisionsBySource.get(active) : null;
+    for (const source of sources) {
+      const decision = decisionsBySource.get(source);
+      if (decision) return decision;
+    }
+    return null;
+  };
+
+  const activeDimensions = (sources) => {
+    for (const source of sources) {
+      const dimensions = dimensionsBySource.get(source);
+      if (dimensions) return dimensions;
+    }
+    return null;
   };
 
   const sendSourcePriority = (sources, priority) => {
@@ -345,7 +385,6 @@
 
     for (const element of mediaElements) {
       const bounds = boundsFor(element);
-      attachHost(element, bounds);
       sendPriorityHint(sourcesByElement.get(element) || indexElement(element), bounds);
     }
     for (const [source, element] of generatedEntries) {
@@ -374,7 +413,7 @@
     }
     const sources = indexElement(element);
     const action = activeDecision(sources);
-    setMediaState(element, action || "hidden");
+    setMediaState(element, action || "hidden", activeDimensions(sources));
     const generated = sources.find((source) => GENERATED_PROTOCOLS.has(new URL(source).protocol));
     if (!action && generated) analyzeGeneratedSource(generated, element);
   };
@@ -643,8 +682,8 @@
     pendingLayoutElements.delete(element);
     mediaPriorityObserver?.unobserve(element);
     if (element.matches(MEDIA_SELECTOR)) {
+      restorePresentationStyle(element);
       unindexElement(element);
-      detachHost(element);
       trustedMediaStates.delete(element);
     }
     for (const key of generatedKeysByElement.get(element) || []) {
@@ -688,7 +727,14 @@
     ) return undefined;
     const source = normalizedSource(message.sourceUrl);
     if (!source) return undefined;
-    rememberDecision(source, message.action);
+    const dimensions =
+      Number.isInteger(message.imageWidth) &&
+      Number.isInteger(message.imageHeight) &&
+      message.imageWidth > 0 &&
+      message.imageHeight > 0
+        ? { width: message.imageWidth, height: message.imageHeight }
+        : null;
+    rememberDecision(source, message.action, dimensions);
     const mediaMatches = elementsBySource.get(source)?.size || 0;
     const cssMatches = [...generatedRecords.values()].filter((record) => record.sources.includes(source)).length;
     applyDecisionToSource(source);
@@ -790,8 +836,6 @@
             } else {
               removeAttributeIfPresent(mutation.target, name);
             }
-          } else if (name === MEDIA_HOST_ATTRIBUTE) {
-            reconcileHost(mutation.target);
           } else if (name === "data-glosh-dag-media") {
             const trustedState = trustedMediaStates.get(mutation.target);
             if (trustedState) {

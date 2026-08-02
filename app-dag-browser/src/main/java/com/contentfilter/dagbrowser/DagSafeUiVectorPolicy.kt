@@ -56,13 +56,28 @@ internal object DagSafeUiVectorPolicy {
             runCatching {
                 val factory = DocumentBuilderFactory.newInstance()
                 factory.isNamespaceAware = true
-                factory.isXIncludeAware = false
                 factory.setExpandEntityReferences(false)
-                factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true)
-                factory.setFeature("http://xml.org/sax/features/external-general-entities", false)
-                factory.setFeature("http://xml.org/sax/features/external-parameter-entities", false)
-                factory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalDTD", "")
-                factory.setAttribute("http://javax.xml.XMLConstants/property/accessExternalSchema", "")
+                runCatching { factory.isXIncludeAware = false }
+                factory.setFeatureWhenSupported(
+                    "http://apache.org/xml/features/disallow-doctype-decl",
+                    true,
+                )
+                factory.setFeatureWhenSupported(
+                    "http://xml.org/sax/features/external-general-entities",
+                    false,
+                )
+                factory.setFeatureWhenSupported(
+                    "http://xml.org/sax/features/external-parameter-entities",
+                    false,
+                )
+                factory.setAttributeWhenSupported(
+                    "http://javax.xml.XMLConstants/property/accessExternalDTD",
+                    "",
+                )
+                factory.setAttributeWhenSupported(
+                    "http://javax.xml.XMLConstants/property/accessExternalSchema",
+                    "",
+                )
                 factory.newDocumentBuilder().parse(ByteArrayInputStream(bytes))
             }.getOrNull() ?: return false
         val root = document.documentElement ?: return false
@@ -131,6 +146,20 @@ internal object DagSafeUiVectorPolicy {
     private fun parseLength(value: String): Double? {
         val match = Regex("""^\s*(\d+(?:\.\d+)?)\s*(?:px)?\s*$""").matchEntire(value)
         return match?.groupValues?.get(1)?.toDoubleOrNull()
+    }
+
+    private fun DocumentBuilderFactory.setFeatureWhenSupported(
+        name: String,
+        value: Boolean,
+    ) {
+        runCatching { setFeature(name, value) }
+    }
+
+    private fun DocumentBuilderFactory.setAttributeWhenSupported(
+        name: String,
+        value: String,
+    ) {
+        runCatching { setAttribute(name, value) }
     }
 
     private fun parseViewBox(value: String): Pair<Double, Double>? {

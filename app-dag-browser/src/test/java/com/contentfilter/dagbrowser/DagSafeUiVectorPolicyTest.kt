@@ -20,6 +20,25 @@ class DagSafeUiVectorPolicyTest {
     }
 
     @Test
+    fun `passive logo with an internal clip path is allowed`() {
+        assertTrue(
+            safe(
+                """
+                <svg width="145" height="20" viewBox="0 0 145 20" fill="none"
+                  xmlns="http://www.w3.org/2000/svg">
+                  <g clip-path="url(#clip0)">
+                    <path d="M0 0h145v20H0z" fill="#3B3E3D"/>
+                  </g>
+                  <defs>
+                    <clipPath id="clip0"><rect width="145" height="20" fill="white"/></clipPath>
+                  </defs>
+                </svg>
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `small vector with active content stays blocked`() {
         assertFalse(
             safe(

@@ -16,6 +16,8 @@ internal data class DagMediaDecision(
     val action: DagMediaAction,
     val reason: String,
     val filterProbability: Float? = null,
+    val imageWidth: Int? = null,
+    val imageHeight: Int? = null,
 )
 
 internal enum class DagMediaAction(
