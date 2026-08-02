@@ -11,10 +11,10 @@ versiones historicas.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- `main` local queda 26 commits por delante de `origin/main` con el commit de
+- `main` local queda 27 commits por delante de `origin/main` con el commit de
   cierre de este lote.
 - No se hizo push, PR, publicacion DEV ni Production.
-- El lote DAG 64 queda integrado en un unico commit local de cierre. No se hizo
+- El lote DAG 65 queda integrado en un unico commit local de cierre. No se hizo
   push y no se debe publicar sin una autorizacion separada.
 - Los worktrees separados son historicos o auxiliares: no compilar ni instalar
   una entrega final desde ellos.
@@ -26,10 +26,42 @@ Declaraciones de version actuales en el codigo:
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Sin cambios |
 | App Admin | 290 | 1.0.1-dev | Sin cambios |
-| DAG Browser | 64 | 0.44.0-dev | Base multimedia sin GloshIA validada en SM-S908E; no publicable |
+| DAG Browser | 65 | 0.45.0-dev | Carga directa de imagenes sin GloshIA validada en SM-S908E; no publicable |
 
-DAG 64 esta instalado en el SM-S908E `R5CT717BZTZ`. Se instalo in-place, sin
+DAG 65 esta instalado en el SM-S908E `R5CT717BZTZ`. Se instalo in-place, sin
 borrar el perfil y sin tocar otras apps.
+
+## DAG Browser 65 - base multimedia simple
+
+DAG 65 elimina del recorrido activo de una imagen toda la infraestructura de
+clasificacion mientras GloshIA esta desconectada. Gecko descarga y presenta
+directamente `image` e `imageset`: la extension no captura la respuesta, no la
+convierte a Base64, no solicita una decision nativa, no remapea su URL y no
+escribe estados en el DOM. El CSS tampoco selecciona `img`, `image` ni `svg`.
+
+La causa raiz del fallo intermitente de iconos era el recorrido residual de DAG
+64: aun despues de autorizar los bytes, la extension debia volver a asociar la
+URL con el elemento exacto. Una recarga o reemplazo dinamico podia ocurrir entre
+ambos pasos y dejar el elemento nuevo en estado oculto. La correccion elimina
+esa asociacion del modo sin clasificador, en vez de agregar excepciones por
+sitio.
+
+El codigo activo de red, puente y presentacion multimedia bajo de 2.563 a 156
+lineas. En DEV tampoco se crea la sesion ONNX al abrir DAG. Se conservan de
+forma aislada el bloqueo de video/audio/object, anuncios y el puente minimo de
+estado de pagina y miniaturas. El modelo, su preprocesador y sus pruebas quedan
+guardados para una futura reconexion, pero no participan en la navegacion.
+
+Validacion automatica: 9 pruebas WebExtension, 144 unitarias Kotlin, Ktlint,
+Lint y APK aprobados. Validacion fisica en el SM-S908E: Cheeky completo en cinco
+de cinco recargas consecutivas; Mimo y Fravega completos; interfaz de YouTube
+visible con contenido multimedia bloqueado; organizador de pestañas operativo;
+sin crash, ANR ni OOM. Evidencia:
+`docs/compatibility/results/dag-browser-v65-simple-media-baseline-sm-s908e-2026-08-02.md`.
+
+DAG 65 muestra todas las imagenes y no es publicable como filtro. El siguiente
+trabajo visual no debe reactivar el pipeline retirado: debe conectar GloshIA
+como una unica compuerta aislada y medible sobre esta base.
 
 ## DAG Browser 64 - base multimedia separada
 

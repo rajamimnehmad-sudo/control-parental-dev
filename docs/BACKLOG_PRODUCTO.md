@@ -47,9 +47,9 @@ Flujo de una entrada:
 - Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
   DEV 58. Son versiones de codigo; publicacion e instalacion se verifican por
   separado en el handoff.
-- DAG 64 es la base local de compatibilidad multimedia validada en el SM-S908E.
-  GloshIA esta desconectada solo en DEV para aislar el navegador; no es
-  publicable ni fue subida a GitHub.
+- DAG 65 es la base local de compatibilidad multimedia validada en el SM-S908E.
+  Con GloshIA desconectada, Gecko carga imagenes directamente y DAG no las
+  intercepta ni modifica. No es publicable ni fue subida a GitHub.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -57,6 +57,26 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-V3-MEDIA-BASELINE-CLEAN-19 - Carga directa sin pipeline residual
+
+- Estado: `Resuelto localmente; sin push ni publicacion`. Aprobado por el
+  usuario al pedir rehacer la presentacion sin GloshIA y eliminar la
+  sobreingenieria. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
+- Resultado: DAG 65 y extension 1.34.0 dejan las imagenes comunes enteramente
+  a cargo de Gecko. Se retiraron del recorrido activo captura de respuestas,
+  Base64, hash, mensajeria nativa, decision duplicada, remapeo de fuentes,
+  observadores y estados DOM/CSS de imagenes. El modelo ONNX no se inicializa
+  en esta variante.
+- Alcance conservado: anuncios y video/audio/object continúan bloqueados; el
+  puente minimo de carga y privacidad de miniaturas permanece. No hay reglas
+  por dominio, comercio o modelo de telefono.
+- Validacion: 9 pruebas WebExtension, 144 unitarias Kotlin, Ktlint, Lint y APK;
+  Cheeky 5/5 recargas, Mimo, Fravega, YouTube y pestañas en SM-S908E sin crash,
+  ANR ni OOM.
+- Limite: esta base permite todas las fotos y no puede publicarse como filtro.
+  La futura integracion de GloshIA debe ser una unica compuerta nueva, aislada
+  y medible; no restaurar el pipeline retirado.
 
 ### DAG-V3-PIPELINE-AUDIT-17 - Seguridad, cola y rendimiento reproducible
 

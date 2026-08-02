@@ -252,7 +252,12 @@ class DagBrowserActivity : Activity() {
         tabThumbnailStore = DagTabThumbnailStore(applicationContext)
         historyPersistence = DagHistoryPersistence(applicationContext)
         favoritesPersistence = DagFavoritesPersistence(applicationContext)
-        imageAnalyzer = DagLifecycleImageAnalyzer(DagOnDeviceImageAnalyzer.create(applicationContext))
+        imageAnalyzer =
+            if (BuildConfig.GLOSHIA_VISUAL_ENABLED) {
+                DagLifecycleImageAnalyzer(DagOnDeviceImageAnalyzer.create(applicationContext))
+            } else {
+                UnavailableDagImageAnalyzer
+            }
         bindViews()
         configureControls()
         registerModernBackCallback()

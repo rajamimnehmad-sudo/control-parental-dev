@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "Glosh DAG Protection",
-  "version": "1.33.0",
-  "description": "Fail-closed media interception and page-ad filtering barrier bundled with DAG Browser.",
+  "version": "1.34.0",
+  "description": "Minimal DEV page bridge with direct Gecko image loading and isolated media blocking.",
   "browser_specific_settings": {
     "gecko": {
       "id": "dag-protection@glosh.local"

@@ -1,113 +1,13 @@
-/*
- * DAG's HTTP(S) response gate owns raster safety. This stylesheet only paints
- * explicit media states and generated-media boundaries. It must never rewrite
- * the page-wide background, pseudo-element, list or border systems.
- */
-
-html:not([data-glosh-dag-initialized]) *,
-html:not([data-glosh-dag-initialized]) *::before,
-html:not([data-glosh-dag-initialized]) *::after {
-  background-image: none !important;
-}
-
+/* Images and page graphics remain entirely owned by Gecko in this DEV baseline. */
 video,
 audio,
 canvas,
 object,
-embed,
-svg:not([data-glosh-dag-ui-vector="allow"]) {
+embed {
   visibility: hidden !important;
-}
-
-image:not([data-glosh-dag-media="allow"]) {
-  visibility: hidden !important;
-}
-
-img:not([data-glosh-dag-media="allow"]),
-input[type="image"]:not([data-glosh-dag-media="allow"]) {
-  visibility: visible !important;
-  object-position: 99999px 99999px !important;
-  color: transparent !important;
-  text-indent: -99999px !important;
-}
-
-img[data-glosh-dag-media="allow"],
-image[data-glosh-dag-media="allow"],
-input[type="image"][data-glosh-dag-media="allow"],
-svg[data-glosh-dag-ui-vector="allow"] {
-  visibility: visible !important;
-  filter: none !important;
-}
-
-[data-glosh-dag-generated-background="hidden"],
-[data-glosh-dag-generated-background="block"],
-[data-glosh-dag-generated-background="error"] {
-  background-image: none !important;
-}
-
-[data-glosh-dag-generated-background="allow"] {
-  background-image: var(--glosh-dag-generated-background) !important;
-}
-
-[data-glosh-dag-generated-before="hidden"]::before,
-[data-glosh-dag-generated-before="block"]::before,
-[data-glosh-dag-generated-before="error"]::before {
-  background-image: none !important;
-}
-
-[data-glosh-dag-generated-before="allow"]::before {
-  background-image: var(--glosh-dag-generated-before-background) !important;
-}
-
-[data-glosh-dag-generated-after="hidden"]::after,
-[data-glosh-dag-generated-after="block"]::after,
-[data-glosh-dag-generated-after="error"]::after {
-  background-image: none !important;
-}
-
-[data-glosh-dag-generated-after="allow"]::after {
-  background-image: var(--glosh-dag-generated-after-background) !important;
-}
-
-@keyframes glosh-dag-waiting {
-  0% { background-position: 100% 0; }
-  100% { background-position: -100% 0; }
-}
-
-img[data-glosh-dag-media="hidden"],
-input[type="image"][data-glosh-dag-media="hidden"] {
-  background: linear-gradient(100deg, #e3eaee 25%, #f4f7f8 45%, #e3eaee 65%) !important;
-  background-size: 220% 100% !important;
-  animation: glosh-dag-waiting 1.2s linear infinite !important;
-}
-
-img[data-glosh-dag-media="block"],
-input[type="image"][data-glosh-dag-media="block"] {
-  opacity: 1 !important;
-  background:
-    radial-gradient(circle at 24% 32%, #edf2f4 0 12%, transparent 13%),
-    radial-gradient(circle at 72% 62%, #becbd2 0 18%, transparent 19%),
-    linear-gradient(135deg, #dce5e9 0%, #bdcbd2 48%, #e8edef 100%) !important;
-  box-shadow: inset 0 0 0 9999px rgb(207 218 224 / 38%) !important;
-  animation: none !important;
-}
-
-img[data-glosh-dag-media="error"],
-input[type="image"][data-glosh-dag-media="error"] {
-  opacity: 1 !important;
-  background: #ebe6e2 !important;
-  box-shadow: inset 0 0 0 9999px #ebe6e2 !important;
-  animation: none !important;
 }
 
 [data-glosh-dag-sponsored-result="true"],
 .glosh-dag-page-ad-hidden {
   display: none !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  img[data-glosh-dag-media="hidden"],
-  input[type="image"][data-glosh-dag-media="hidden"] {
-    animation: none !important;
-  }
 }
