@@ -45,14 +45,13 @@ Flujo de una entrada:
 ## Ancla tecnica actual
 
 - Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
-  DEV 67. Son versiones de codigo; publicacion e instalacion se verifican por
+  DEV 68. Son versiones de codigo; publicacion e instalacion se verifican por
   separado en el handoff.
-- DAG 67 conserva una unica compuerta GloshIA y agrega una espera visual de
-  350 ms para que una resolucion provisoria no se muestre antes de una fuente
-  definitiva filtrada. El observador solo atiende imagenes nuevas y cambios de
-  `src`/`srcset`/`sizes`; no remapea decisiones, no trabaja al desplazar y no
-  contiene excepciones por sitio. Esta validado localmente en SM-S908E, no fue
-  publicado ni subido a GitHub.
+- DAG 68 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
+  sin espera artificial y no reoculta una imagen ya segura durante rotaciones
+  de fuente. El refresh del mismo documento conserva visible la pagina
+  protegida; primera carga, URL distinta o fallo mantienen cobertura total.
+  Esta validado localmente en SM-S908E, no fue publicado ni subido a GitHub.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -60,6 +59,26 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-V3-ZERO-DELAY-REFRESH-22 - Raster inmediato y refresh continuo
+
+- Estado: `Resuelto localmente y validado fisicamente; sin push ni publicacion`.
+  Aprobado por el usuario durante la calibracion de `0 ms` y el diagnostico del
+  destello de refresh. Prioridad: P0. Esfuerzo: M. Riesgo: alto.
+- Causa: el margen DOM de 350 ms retrasaba fotos que ya habian atravesado la
+  compuerta, y `reloadActivePage()` ocultaba todo GeckoView hasta
+  `barrier-ready`, aunque cada raster nuevo ya nacia cerrado.
+- Resultado: DAG 68 y extension 1.36.6 usan `0 ms`; HTTP(S) estable permanece
+  visible durante cambios de fuente, inline `data:`/`blob:` se cierra de nuevo,
+  y el refresh del mismo documento conserva la pagina protegida. Una URL
+  distinta sigue activando cobertura completa.
+- Validacion: 12 pruebas WebExtension, 148 Kotlin, Ktlint, Lint y APK. En
+  SM-S908E el usuario confirmo filtrado inmediato sin escape rechazado y refresh
+  sin apagado general. Antes del arreglo, dos rafagas reprodujeron el estado
+  negro y una medicion cronometrada estimo aproximadamente 1,2 segundos.
+- Presentacion pendiente: un bloqueo normal usa placeholder gris; espera,
+  timeout o error pueden usar superficie negra fail-closed. Unificarlos es una
+  mejora visual futura, no dos criterios distintos del modelo.
 
 ### DAG-V3-FIRST-PAINT-21 - Estabilidad antes de revelar raster
 
@@ -891,6 +910,7 @@ Flujo de una entrada:
 | DAG-V3-MEDIA-PRESENTATION-11 | Reforzado localmente en DAG 34 y revalidado con DAG 36 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
 | DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Reconstruccion cerrada localmente con compuerta unica DAG 67 y primer pintado estable | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
 | DAG-V3-FIRST-PAINT-21 | Resuelto localmente y validado fisicamente en DAG 67 | P0 | Evitar que una resolucion provisoria aparezca antes de la decision sobre la fuente definitiva | M | Alto |
+| DAG-V3-ZERO-DELAY-REFRESH-22 | Resuelto localmente y validado fisicamente en DAG 68 | P0 | Mostrar raster ya decidido sin espera y refrescar el mismo documento sin apagar la pagina protegida | M | Alto |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
 | DAG-V3-FILTERED-OVERLAY-13 | Resuelto localmente y validado físicamente en DAG 33 | P2 | Mostrar fotos filtradas sólo difuminadas, sin escudo ni rastreo final de contenedor | S | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |

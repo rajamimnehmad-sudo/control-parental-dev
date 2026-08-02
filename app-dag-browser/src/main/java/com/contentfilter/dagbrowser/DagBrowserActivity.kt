@@ -490,6 +490,9 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     url: String,
                 ) {
+                    val keepCurrentPageVisible =
+                        tab.keepCurrentPageVisibleDuringReload &&
+                            DagLoadTransitionPolicy.targetsSameDocument(tab.url, url)
                     swipeRefresh.isRefreshing = false
                     tab.downloadGesture = null
                     tab.pdfDocumentReady = false
@@ -510,7 +513,10 @@ class DagBrowserActivity : Activity() {
                         if (tab === activeTab) renderActiveTab()
                     } else {
                         if (tab === activeTab) addressInput.setText(url)
-                        beginProtectedLoad(tab)
+                        beginProtectedLoad(
+                            tab = tab,
+                            keepCurrentPageVisible = keepCurrentPageVisible,
+                        )
                     }
                 }
 
@@ -1359,7 +1365,11 @@ class DagBrowserActivity : Activity() {
     private fun reloadActivePage() {
         val tab = activeTab ?: return
         if (!extensionReady || tab.url == InitialBlankPage || !tab.session.isOpen) return
-        beginProtectedLoad(tab, startNewPerformanceNavigation = true)
+        beginProtectedLoad(
+            tab = tab,
+            startNewPerformanceNavigation = true,
+            keepCurrentPageVisible = tab.displayState == TabDisplayState.Visible,
+        )
         tab.session.reload()
     }
 
@@ -1374,7 +1384,8 @@ class DagBrowserActivity : Activity() {
                 targetsCurrentWindow =
                     request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_CURRENT,
                 pageVisible = tab.displayState == TabDisplayState.Visible,
-                barrierAlreadyWaiting = tab.waitingForBarrier,
+                barrierAlreadyWaiting =
+                    tab.waitingForBarrier && !tab.keepCurrentPageVisibleDuringReload,
             )
         ) {
             beginProtectedLoad(tab, startNewPerformanceNavigation = true)
@@ -1384,6 +1395,7 @@ class DagBrowserActivity : Activity() {
     private fun beginProtectedLoad(
         tab: BrowserTab,
         startNewPerformanceNavigation: Boolean = false,
+        keepCurrentPageVisible: Boolean = false,
     ) {
         if (tab.displayState != TabDisplayState.Loading) {
             markTabThumbnailStale(tab)
@@ -1392,13 +1404,18 @@ class DagBrowserActivity : Activity() {
             recordPerformanceEvent(performanceTracker.begin())
         }
         tab.waitingForBarrier = true
-        tab.displayState = TabDisplayState.Loading
+        tab.keepCurrentPageVisibleDuringReload =
+            keepCurrentPageVisible && tab.displayState == TabDisplayState.Visible
+        if (!tab.keepCurrentPageVisibleDuringReload) {
+            tab.displayState = TabDisplayState.Loading
+        }
         scheduleBarrierTimeout(tab)
         if (tab === activeTab) renderActiveTab()
     }
 
     private fun completeProtectedLoad(tab: BrowserTab) {
         tab.waitingForBarrier = false
+        tab.keepCurrentPageVisibleDuringReload = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Visible
         recordHistory(tab)
@@ -1421,6 +1438,7 @@ class DagBrowserActivity : Activity() {
             Runnable {
                 if (tab.waitingForBarrier && tabs.contains(tab)) {
                     tab.waitingForBarrier = false
+                    tab.keepCurrentPageVisibleDuringReload = false
                     tab.displayState = TabDisplayState.Closed
                     tab.barrierTimeout = null
                     if (tab === activeTab) renderActiveTab()
@@ -1651,6 +1669,7 @@ class DagBrowserActivity : Activity() {
     private fun showClosedPage(tab: BrowserTab) {
         invalidateTabThumbnail(tab)
         tab.waitingForBarrier = false
+        tab.keepCurrentPageVisibleDuringReload = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Closed
         if (tab === activeTab) renderActiveTab()
@@ -1659,6 +1678,7 @@ class DagBrowserActivity : Activity() {
     private fun showBlockedNavigation(tab: BrowserTab) {
         invalidateTabThumbnail(tab)
         tab.waitingForBarrier = false
+        tab.keepCurrentPageVisibleDuringReload = false
         cancelBarrierTimeout(tab)
         tab.displayState = TabDisplayState.Blocked
         if (tab === activeTab) renderActiveTab()
@@ -2975,6 +2995,7 @@ class DagBrowserActivity : Activity() {
         var title: String = "",
         var canGoBack: Boolean = false,
         var waitingForBarrier: Boolean = false,
+        var keepCurrentPageVisibleDuringReload: Boolean = false,
         var displayState: TabDisplayState = TabDisplayState.Ready,
         var barrierTimeout: Runnable? = null,
         var needsRestore: Boolean = false,

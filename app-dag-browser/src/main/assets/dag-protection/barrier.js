@@ -11,7 +11,7 @@
 
   const PROTOCOL_VERSION = 1;
   const NATIVE_APP = "glosh.dag.protection";
-  const IMAGE_STABILITY_MS = 350;
+  const IMAGE_STABILITY_MS = 0;
   const STABLE_IMAGE_ATTRIBUTE = "data-glosh-dag-stable";
   const documentToken =
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
@@ -47,6 +47,17 @@
 
   const imageSource = (image) => image.currentSrc || image.src || "";
 
+  const hasInlineImageSource = (image) => {
+    const source = image.getAttribute("src") || "";
+    const sourceSet = image.getAttribute("srcset") || "";
+    return (
+      source.startsWith("data:") ||
+      source.startsWith("blob:") ||
+      sourceSet.includes("data:image") ||
+      sourceSet.includes("blob:")
+    );
+  };
+
   const resetImage = (image) => {
     const pending = pendingImages.get(image);
     if (pending !== undefined) clearTimeout(pending.timeout);
@@ -55,6 +66,7 @@
   };
 
   const stabilizeImage = (image) => {
+    if (image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) return;
     resetImage(image);
     const source = imageSource(image);
     if (
@@ -91,7 +103,10 @@
   const imageObserver = new MutationObserver((records) => {
     for (const record of records) {
       if (record.type === "attributes" && record.target instanceof HTMLImageElement) {
-        resetImage(record.target);
+        if (hasInlineImageSource(record.target)) {
+          resetImage(record.target);
+          continue;
+        }
         if (record.target.complete) stabilizeImage(record.target);
         continue;
       }

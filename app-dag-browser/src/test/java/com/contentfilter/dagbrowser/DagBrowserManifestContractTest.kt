@@ -45,6 +45,8 @@ class DagBrowserManifestContractTest {
         assertContains(activity, "R.drawable.ic_dag_reload")
         assertContains(activity, "addressInput.setOnFocusChangeListener")
         assertContains(activity, "R.id.menu_reload")
+        assertContains(activity, "keepCurrentPageVisible = tab.displayState == TabDisplayState.Visible")
+        assertContains(activity, "tab.keepCurrentPageVisibleDuringReload &&")
     }
 
     @Test

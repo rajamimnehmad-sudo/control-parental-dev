@@ -51,10 +51,12 @@ class MediaBarrierContractTest {
     @Test
     fun `inline and changing image sources close before stable reveal`() {
         assertContains(barrier, "barrier-ready")
-        assertContains(barrier, "IMAGE_STABILITY_MS = 350")
+        assertContains(barrier, "IMAGE_STABILITY_MS = 0")
         assertContains(barrier, "MutationObserver")
         assertContains(barrier, "attributeFilter: [\"src\", \"srcset\", \"sizes\"]")
         assertContains(barrier, "imageSource(image) === source")
+        assertContains(barrier, "image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)")
+        assertContains(barrier, "hasInlineImageSource(record.target)")
         assertFalse(barrier.contains(".src ="))
         assertFalse(barrier.contains(".srcset ="))
         assertContains(css, "img[src^=\"data:\" i]")

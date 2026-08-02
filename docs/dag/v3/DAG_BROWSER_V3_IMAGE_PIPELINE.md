@@ -34,10 +34,13 @@ object y embed permanecen bloqueados por contratos separados.
 que aun no alcanzaron estabilidad.
 
 Una pagina puede cargar varias resoluciones sucesivas de una misma tarjeta.
-Aunque cada respuesta tenga una decision valida, una miniatura provisoria
-permitida no debe verse antes de una fuente definitiva filtrada. `barrier.js`
-espera 350 ms sin cambios en `src`, `srcset` o `sizes` antes de marcar un `img`
-como estable. Un cambio reinicia la espera.
+Cada respuesta HTTP(S) atraviesa la compuerta antes de llegar a Gecko, por lo
+que `barrier.js` marca un `img` completo como estable sin espera artificial
+(`0 ms`). Una imagen HTTP(S) ya estable permanece visible cuando la pagina
+cambia `src`, `srcset` o `sizes`: los nuevos bytes siguen retenidos por la
+compuerta y Gecko conserva el recurso anterior hasta recibir el original
+permitido o el placeholder filtrado. Las fuentes inline `data:`/`blob:` se
+ocultan de nuevo porque no atraviesan `webRequest`.
 
 El observador:
 
@@ -48,8 +51,11 @@ El observador:
 - no contiene dominios, comercios o telefonos especiales;
 - deja SVG e iconos vectoriales seguros fuera de la espera.
 
-La espera puede retrasar hasta 350 ms la aparicion de un raster. No suma
-inferencias, solicitudes, Base64 ni trabajo por cuadro de desplazamiento.
+Al refrescar el mismo documento, DAG conserva visible la version ya protegida
+mientras espera el nuevo `barrier-ready`. Una URL distinta, un primer ingreso o
+un fallo de barrera siguen usando cobertura total. Esto elimina el apagado de
+aproximadamente 1,2 segundos medido en Google Imagenes sin relajar la compuerta
+de raster.
 
 ## Limites y fallo seguro
 
@@ -70,6 +76,6 @@ requiere HTTPS con certificado confiable; nunca se relaja TLS para probar.
 
 - estado tecnico: `docs/HANDOFF_ACTUAL.md`;
 - metricas: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`;
-- resultado DAG 67:
-  `docs/compatibility/results/dag-browser-v67-first-paint-stability-sm-s908e-2026-08-02.md`;
+- resultado DAG 68:
+  `docs/compatibility/results/dag-browser-v68-zero-delay-refresh-sm-s908e-2026-08-02.md`;
 - historial: `docs/compatibility/results/dag-performance-history.md`.

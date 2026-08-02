@@ -10,7 +10,7 @@ el runtime actual desde versiones o worktrees historicos.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- Tras el cierre de DAG 67, `main` queda 29 commits por delante de
+- Tras el cierre de DAG 68, `main` queda 30 commits por delante de
   `origin/main`.
 - No se hizo push, PR, publicacion DEV ni Production.
 - Los APK finales se construyen solo desde `main` local integrado.
@@ -20,34 +20,37 @@ el runtime actual desde versiones o worktrees historicos.
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Sin cambios |
 | App Admin | 290 | 1.0.1-dev | Sin cambios |
-| DAG Browser | 67 | 0.47.0-dev | Validado en SM-S908E; no publicado |
+| DAG Browser | 68 | 0.48.0-dev | APK final local; no publicado |
 
-DAG 67 esta instalado in-place en el SM-S908E `R5CT717BZTZ`, sin borrar el
-perfil ni tocar otras apps.
+El comportamiento final se valido in-place en el SM-S908E `R5CT717BZTZ` antes
+del incremento de version. El APK canonico DAG 68 conserva ese mismo codigo,
+pero su instalacion final quedo pendiente porque el telefono se desconecto. No
+se borro el perfil ni se tocaron otras apps.
 
 ## DAG Browser vigente
 
-DAG 67 usa una unica compuerta GloshIA previa al render. Los bytes raster se
+DAG 68 usa una unica compuerta GloshIA previa al render. Los bytes raster se
 capturan una vez y solo `model_allow` devuelve el original exacto. Filtro,
 error, timeout, saturacion, animacion o entrada invalida producen un PNG neutro
 sin pixeles rechazados. SVG e iconos vectoriales seguros quedan fuera de la
 espera visual.
 
-El destello de Google Imagenes provenia de recursos sucesivos: una miniatura
-provisoria permitida podia aparecer antes de que la pagina eligiera otra
-resolucion filtrada. La correccion es global:
+La presentacion vigente es global:
 
 - `data:` y `blob:` quedan neutrales desde `document_start`;
 - cualquier respuesta con MIME raster cruza la compuerta, incluso por
   `fetch`/XHR;
-- un `img` se revela despues de 350 ms sin cambios en `src`, `srcset` o
-  `sizes`;
+- un `img` HTTP(S) completo se revela sin espera artificial (`0 ms`);
+- una imagen HTTP(S) ya estable no se vuelve a ocultar cuando el sitio rota su
+  fuente; los nuevos bytes siguen retenidos antes del render;
+- una fuente inline `data:`/`blob:` se vuelve a cerrar porque no atraviesa
+  `webRequest`;
 - el observador no reescribe fuentes, no decide contenido, no trabaja durante
   scroll y no contiene excepciones por sitio o telefono.
 
-La espera de 350 ms no agrega red ni inferencias. Es el margen fisicamente
-validado para evitar el destello; reducirlo requiere un benchmark separado.
-Extension incorporada: `1.36.0`.
+En un refresh del mismo documento DAG mantiene visible la pagina ya protegida
+mientras espera la nueva barrera. Primera carga, URL distinta o fallo siguen
+cerrados por la cobertura total. Extension incorporada: `1.36.6`.
 
 Limites vigentes: 2 MiB por recurso, 8 MiB capturados, 32 streams, cola de 24,
 dos inferencias nativas y cache efimera de 512 hashes. Video, audio, canvas,
@@ -55,23 +58,25 @@ object y embed permanecen bloqueados por contratos separados.
 
 ## Validacion y artefacto
 
-- 12 pruebas WebExtension y 147 unitarias Kotlin aprobadas.
+- 12 pruebas WebExtension y 148 unitarias Kotlin aprobadas.
 - Ktlint, Lint, build y `git diff --check` correctos.
-- Google Imagenes: 40 cuadros de una carga limpia sin pixeles previos en
-  tarjetas filtradas; una foto permitida aparecio y permanecio.
-- Mimo, Cheeky y Fravega conservaron estructura, controles e imagenes segun la
-  decision de GloshIA.
-- Logcat sin crash, ANR ni OOM.
+- Google Imagenes: el usuario confirmo el raster en `0 ms` sin escape de
+  contenido rechazado y el refresh sin apagado general.
+- Antes del arreglo, dos rafagas reprodujeron tres cuadros negros consecutivos;
+  la segunda toma cronometrada estimo aproximadamente 1,2 segundos de cobertura
+  total. La causa era el estado Android `Loading`, no GloshIA.
+- La matriz Mimo, Cheeky y Fravega de DAG 67 sigue siendo la ultima matriz
+  completa; DAG 68 no cambia pesos, umbrales ni compuerta de bytes.
 
 APK local:
 
 - ruta: `app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk`;
-- tamaño: `121359549` bytes;
+- tamaño: `121360633` bytes;
 - SHA-256:
-  `8477abc6f539aacef1423c6736d35defc736e26bc17c82cb707de70bbf2c7e8d`.
+  `2a81e6477b5c8170297b5b7e464cf3448fac6c5de5c5711970a7b028e0436a55`.
 
 Evidencia completa:
-`docs/compatibility/results/dag-browser-v67-first-paint-stability-sm-s908e-2026-08-02.md`.
+`docs/compatibility/results/dag-browser-v68-zero-delay-refresh-sm-s908e-2026-08-02.md`.
 Contrato vigente: `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PIPELINE.md`.
 
 ## Metricas
@@ -86,7 +91,7 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
 
 ## Estado de GloshIA visual
 
-- Hay un unico modelo local; DAG 67 no cambia sus pesos ni umbrales.
+- Hay un unico modelo local; DAG 68 no cambia sus pesos ni umbrales.
 - El laboratorio de 1.000 miniaturas y la ronda humana son evaluacion, no un
   entrenamiento autorizado.
 - La calibracion preliminar y el experimento privado R1 quedaron `NO-GO` para

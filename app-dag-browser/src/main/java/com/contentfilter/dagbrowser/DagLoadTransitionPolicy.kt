@@ -9,6 +9,11 @@ internal object DagLoadTransitionPolicy {
         barrierAlreadyWaiting: Boolean,
     ): Boolean {
         if (!targetsCurrentWindow || !pageVisible || barrierAlreadyWaiting) return false
-        return currentUrl.substringBefore('#') != targetUrl.substringBefore('#')
+        return !targetsSameDocument(currentUrl, targetUrl)
     }
+
+    fun targetsSameDocument(
+        currentUrl: String,
+        targetUrl: String,
+    ): Boolean = currentUrl.substringBefore('#') == targetUrl.substringBefore('#')
 }

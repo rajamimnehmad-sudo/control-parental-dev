@@ -32,6 +32,22 @@ class DagLoadTransitionPolicyTest {
     }
 
     @Test
+    fun `reload target is recognized as the same protected document`() {
+        assertTrue(
+            DagLoadTransitionPolicy.targetsSameDocument(
+                currentUrl = "https://example.com/page#old",
+                targetUrl = "https://example.com/page#new",
+            ),
+        )
+        assertFalse(
+            DagLoadTransitionPolicy.targetsSameDocument(
+                currentUrl = "https://example.com/page?version=1",
+                targetUrl = "https://example.com/page?version=2",
+            ),
+        )
+    }
+
+    @Test
     fun `new windows and an existing barrier are not covered twice`() {
         assertFalse(
             DagLoadTransitionPolicy.shouldCover(

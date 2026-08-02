@@ -305,10 +305,12 @@ test("first paint closes inline and changing image sources before stable reveal"
   const css = await readAsset("barrier.css");
   new vm.Script(barrier);
   assert.match(barrier, /barrier-ready/u);
-  assert.match(barrier, /IMAGE_STABILITY_MS = 350/u);
+  assert.match(barrier, /IMAGE_STABILITY_MS = 0/u);
   assert.match(barrier, /MutationObserver/u);
   assert.match(barrier, /attributeFilter: \["src", "srcset", "sizes"\]/u);
   assert.match(barrier, /imageSource\(image\) === source/u);
+  assert.match(barrier, /image\.hasAttribute\(STABLE_IMAGE_ATTRIBUTE\)/u);
+  assert.match(barrier, /hasInlineImageSource\(record\.target\)/u);
   assert.doesNotMatch(barrier, /\.src\s*=|\.srcset\s*=|cheeky|google\.com/iu);
   assert.match(css, /img\[src\^="data:" i\]/u);
   assert.match(css, /img\[src\^="blob:" i\]/u);
