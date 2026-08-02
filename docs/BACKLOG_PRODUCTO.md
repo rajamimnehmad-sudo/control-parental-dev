@@ -401,6 +401,16 @@ Flujo de una entrada:
   cambiaron dos decisiones cada una. Quedó `NO-GO`, fuera de APK y sin abrir el
   examen sellado. Próximo lote: más ejemplos independientes y revisados; no
   ajustar nuevamente sobre las mismas 100 decisiones.
+- `GLOSHIA-VISUAL-CANDIDATE-TRAIN-08` (2026-08-02): autorizado como experimento
+  local privado con las 322 decisiones binarias actuales; se excluyeron 8
+  `doubt` y `final_sealed`, y se fijaron splits agrupados `203/47/72` con
+  contaminación cero por ID, SHA-256, hash perceptual, grupo y URL. El mejor
+  R2 redujo validation a `5/39` falsos filtros y frozen_test a `6/62`, pero
+  agregó `1/10` falso permiso donde R1 tenía `0/10`; su INT8 pasa ONNX checker
+  pero no abre con ORT Python local 1.19.2. Resultado obligatorio `NO-GO`:
+  R1 se conserva, no se abrió `final_sealed`, no se cambió Android/DAG y no se
+  solicita `GLOSHIA-VISUAL-R2-ANDROID-CANARY-09`. Evidencia completa:
+  `docs/dag/v3/GLOSHIA_VISUAL_CANDIDATE_TRAIN_08_2026-08-02.md`.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 

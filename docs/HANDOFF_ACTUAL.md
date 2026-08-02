@@ -133,12 +133,14 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
 ## Estado de GloshIA visual
 
 - Hay un unico modelo local; DAG 87 no cambia sus pesos ni umbrales.
-- El laboratorio de 1.000 miniaturas y la ronda humana son evaluacion, no un
-  entrenamiento autorizado.
-- La calibracion preliminar y el experimento privado R1 quedaron `NO-GO` para
-  reemplazar el modelo Android; el examen final sigue sellado.
-- El piloto DEV no demuestra cobertura universal ni elimina falsos permisos o
-  falsos filtros.
+- El experimento local autorizado `GLOSHIA-VISUAL-CANDIDATE-TRAIN-08` produjo
+  R2 Candidate 01 con 203 train, 47 validation y 72 frozen_test, agrupados sin
+  cruces de hashes ni clusters.
+- R2 mejoró validation y redujo falsos filtros en frozen_test, pero introdujo
+  un falso permiso nuevo (`1/10` frente a `0/10` de R1) y la cuantización no
+  pudo abrirse con el ORT Python local. Resultado `NO-GO`; R1 permanece intacto.
+- `final_sealed` sigue cerrado. No se autoriza canary Android hasta que un
+  candidato posterior pase seguridad, cuantización y rendimiento.
 
 Documentos vigentes:
 
@@ -146,6 +148,7 @@ Documentos vigentes:
 - `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PIPELINE.md`;
 - `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`;
 - `docs/dag/v3/GLOSHIA_LAB_CALIBRATION_2026-07-31.md`;
+- `docs/dag/v3/GLOSHIA_VISUAL_CANDIDATE_TRAIN_08_2026-08-02.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes
