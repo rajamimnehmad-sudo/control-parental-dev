@@ -141,6 +141,15 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   pudo abrirse con el ORT Python local. Resultado `NO-GO`; R1 permanece intacto.
 - `final_sealed` sigue cerrado. No se autoriza canary Android hasta que un
   candidato posterior pase seguridad, cuantización y rendimiento.
+- `GLOSHIA-VISUAL-R2-HARD-NEGATIVE-REPAIR-09` (2026-08-02): se preparó un
+  lote privado de 50 imágenes públicas independientes, 25/25 en estratos de
+  muestreo filter-like/allow-like. Todas están pendientes de revisión humana
+  ciega; los estratos no son etiquetas. R1 fue puntuado sin alterar el modelo
+  y produjo 24 allow y 26 filter, pero todavía no hay matriz ni falsos
+  permisos/filtros porque no se inventaron decisiones. El servidor local es
+  `http://127.0.0.1:8770/`; `final_sealed` sigue cerrado. No se entrenó ni se
+  crearon pesos, splits o candidatos nuevos. Evidencia:
+  `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`.
 
 Documentos vigentes:
 
@@ -149,6 +158,7 @@ Documentos vigentes:
 - `docs/dag/v3/DAG_BROWSER_V3_MODEL_DATASET_CONTRACT.md`;
 - `docs/dag/v3/GLOSHIA_LAB_CALIBRATION_2026-07-31.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_CANDIDATE_TRAIN_08_2026-08-02.md`;
+- `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

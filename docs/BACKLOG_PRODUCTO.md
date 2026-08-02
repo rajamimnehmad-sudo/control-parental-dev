@@ -411,6 +411,16 @@ Flujo de una entrada:
   R1 se conserva, no se abrió `final_sealed`, no se cambió Android/DAG y no se
   solicita `GLOSHIA-VISUAL-R2-ANDROID-CANARY-09`. Evidencia completa:
   `docs/dag/v3/GLOSHIA_VISUAL_CANDIDATE_TRAIN_08_2026-08-02.md`.
+- `GLOSHIA-VISUAL-R2-HARD-NEGATIVE-REPAIR-09` (2026-08-02): autorizado para
+  reparar el falso permiso nuevo de R2 mediante un lote independiente, sin
+  crear excepciones por imagen o sitio. Se adquirieron 50 imágenes públicas
+  privadas para evaluación interna, 25/25 en estratos de muestreo, con hashes y
+  deduplicación contra manifiestos históricos. Quedaron 50 pendientes de
+  revisión ciega en `http://127.0.0.1:8770/`; no se inventaron etiquetas, no se
+  entrenó, no se abrió `final_sealed` y R1 permanece oficial. Estado: bloqueado
+  en gate humano hasta obtener decisiones `allow`/`filter`/`doubt` reales.
+  Esfuerzo: M. Riesgo: medio-alto. Evidencia:
+  `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
