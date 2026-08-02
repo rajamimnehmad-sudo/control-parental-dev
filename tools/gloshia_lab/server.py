@@ -9,6 +9,7 @@ import mimetypes
 import re
 import secrets
 import socket
+import shutil
 import threading
 from datetime import datetime, timezone
 from http import HTTPStatus
@@ -34,9 +35,8 @@ REASONS = {
     "underwear_or_swimwear",
     "explicit_or_nudity",
     "sexualized_pose",
-    "safe_male_or_child",
-    "safe_product_or_logo",
     "other",
+    "uncertain_reason",
 }
 
 
@@ -73,7 +73,7 @@ class ReviewServer(ThreadingHTTPServer):
         self.include_sealed = include_sealed
         self.rows = joined_rows(self.corpus_dir, include_sealed=include_sealed)
         self.by_id = {row["sample_id"]: row for row in self.rows}
-        self.queue = build_review_queue(self.rows)
+        self.queue = build_review_queue(self.rows, maximum=max(500, len(self.rows)))
         self.queue_ids = {row["sample_id"] for row in self.queue}
         self.review_lock = threading.Lock()
         self.access_token = access_token
@@ -242,6 +242,9 @@ class ReviewHandler(BaseHTTPRequestHandler):
                         sample_id not in reviews for sample_id in self.server.queue_ids
                     ),
                     "reviewed_total": len(reviews),
+                    "review_target": len(self.server.rows),
+                    "categories": sorted({row.get("category") for row in self.server.rows if row.get("category")}),
+                    "origins": sorted({row.get("catalog") for row in self.server.rows if row.get("catalog")}),
                     "sealed_unlocked": self.server.include_sealed,
                 }
             )
@@ -253,6 +256,9 @@ class ReviewHandler(BaseHTTPRequestHandler):
             reviews = read_reviews(self.server.corpus_dir / "reviews.json")
             action = query.get("action", [""])[0]
             category = query.get("category", [""])[0]
+            human = query.get("human", [""])[0]
+            relation = query.get("relation", [""])[0]
+            origin = query.get("origin", [""])[0]
             if action:
                 rows = [
                     row
@@ -266,11 +272,35 @@ class ReviewHandler(BaseHTTPRequestHandler):
                     for row in rows
                     if row["sample_id"] in reviews and row.get("category") == category
                 ]
+            if human:
+                rows = [
+                    row
+                    for row in rows
+                    if (reviews.get(row["sample_id"]) or {}).get("action") == human
+                ]
+            if origin:
+                rows = [row for row in rows if row.get("catalog") == origin]
+            if relation:
+                def is_relation(row: dict[str, Any]) -> bool:
+                    review = reviews.get(row["sample_id"]) or {}
+                    prediction = row.get("model_prediction") or {}
+                    expected = review.get("action")
+                    actual = prediction.get("action")
+                    if relation == "disagreement":
+                        return expected in {"allow", "filter"} and expected != actual
+                    if relation == "false_allow":
+                        return expected == "filter" and actual == "allow"
+                    if relation == "false_filter":
+                        return expected == "allow" and actual == "filter"
+                    if relation == "doubt":
+                        return expected == "doubt"
+                    return True
+                rows = [row for row in rows if is_relation(row)]
             try:
                 requested_limit = int(query.get("limit", ["200"])[0])
             except ValueError:
                 requested_limit = 200
-            limit = min(250, max(1, requested_limit))
+            limit = min(600, max(1, requested_limit))
             payload = []
             for row in rows[:limit]:
                 review = reviews.get(row["sample_id"])
@@ -304,7 +334,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
         if not self._trusted_host(require_origin=True) or not self._authenticated():
             self.send_error(HTTPStatus.FORBIDDEN)
             return
-        if urlparse(self.path).path != "/api/review":
+        endpoint = urlparse(self.path).path
+        if endpoint not in {"/api/review", "/api/restart", "/api/import"}:
             self.send_error(HTTPStatus.NOT_FOUND)
             return
         if self.headers.get("Content-Type", "").split(";")[0] != "application/json":
@@ -312,9 +343,47 @@ class ReviewHandler(BaseHTTPRequestHandler):
             return
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            if length <= 0 or length > 16_384:
+            if length <= 0 or length > 512_000:
                 raise ValueError("invalid body size")
             payload = json.loads(self.rfile.read(length))
+            if endpoint == "/api/restart":
+                reviews_path = self.server.corpus_dir / "reviews.json"
+                with self.server.review_lock:
+                    if reviews_path.exists():
+                        backup = reviews_path.with_name(
+                            f"reviews.backup-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+                        )
+                        shutil.copy2(reviews_path, backup)
+                    write_reviews(reviews_path, {})
+                self._json({"ok": True, "reviewed_total": 0})
+                return
+            if endpoint == "/api/import":
+                imported = payload.get("reviews")
+                if not isinstance(imported, dict):
+                    raise ValueError("invalid review export")
+                validated: dict[str, dict[str, Any]] = {}
+                for sample_id, review in imported.items():
+                    if (
+                        not isinstance(sample_id, str)
+                        or not SAFE_ID.fullmatch(sample_id)
+                        or sample_id not in self.server.by_id
+                        or not isinstance(review, dict)
+                        or review.get("action") not in ACTIONS
+                        or not isinstance(review.get("reasons", []), list)
+                        or any(reason not in REASONS for reason in review.get("reasons", []))
+                    ):
+                        raise ValueError("invalid review export")
+                    validated[sample_id] = review
+                reviews_path = self.server.corpus_dir / "reviews.json"
+                with self.server.review_lock:
+                    if reviews_path.exists():
+                        backup = reviews_path.with_name(
+                            f"reviews.backup-{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}.json"
+                        )
+                        shutil.copy2(reviews_path, backup)
+                    write_reviews(reviews_path, validated)
+                self._json({"ok": True, "reviewed_total": len(validated)})
+                return
             sample_id = payload.get("sample_id")
             action = payload.get("action")
             reasons = payload.get("reasons", [])

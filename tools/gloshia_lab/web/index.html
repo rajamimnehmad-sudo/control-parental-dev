@@ -96,6 +96,8 @@
 
       <div class="secondary-actions">
         <button id="undo" class="undo-button" type="button" disabled>Deshacer última</button>
+        <button id="previous" class="undo-button" type="button">Anterior</button>
+        <button id="next" class="undo-button" type="button">Siguiente</button>
         <span class="shortcut-hint">Teclado: ← filtrar · → permitir · ↑ dudosa</span>
       </div>
 
@@ -118,18 +120,39 @@
             </select>
           </label>
           <label>
+            Comparación
+            <select id="relation">
+              <option value="">Todas</option>
+              <option value="disagreement">Desacuerdos</option>
+              <option value="false_allow">Falsos permisos</option>
+              <option value="false_filter">Falsos filtros</option>
+              <option value="doubt">Dudas</option>
+            </select>
+          </label>
+          <label>
+            Decisión humana
+            <select id="human">
+              <option value="">Todas y pendientes</option>
+              <option value="allow">Allow</option>
+              <option value="filter">Filter</option>
+              <option value="doubt">Doubt</option>
+            </select>
+          </label>
+          <label>
             Estrato ya revisado
             <select id="category">
               <option value="">Todos y pendientes</option>
-              <option>boundary_current</option>
-              <option>safe_hard</option>
-              <option>collage_group</option>
-              <option>children_normal</option>
-              <option>sensitive_control</option>
             </select>
+          </label>
+          <label>
+            Origen
+            <select id="origin"><option value="">Todos</option></select>
           </label>
           <button id="reload" type="button">Actualizar</button>
           <button id="export" type="button">Exportar revisión</button>
+          <button id="import" type="button">Importar revisión</button>
+          <button id="restart" type="button" class="danger-button">Comenzar nuevamente</button>
+          <input id="import-file" type="file" accept="application/json,.json" hidden>
         </div>
       </details>
     </main>

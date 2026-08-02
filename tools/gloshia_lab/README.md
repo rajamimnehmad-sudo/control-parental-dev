@@ -107,7 +107,7 @@ El reporte elige parámetros solamente con revisiones `main_eval` y muestra por
 separado el resultado en `difficult`. No abre `final_sealed`, no modifica DAG y
 no convierte un candidato de laboratorio en política aprobada.
 
-La interfaz comienza con una ronda acotada a 100 decisiones y está preparada
+La interfaz permite revisar la cola completa de evaluables y está preparada
 para teléfono y computadora:
 
 - deslizar a la derecha significa `Permitir`;
@@ -115,6 +115,11 @@ para teléfono y computadora:
 - `Dudosa` queda como botón separado;
 - después de guardar muestra si la decisión coincide con GloshIA;
 - `Deshacer última` elimina por completo la última revisión accidental;
+- `Anterior` y `Siguiente` permiten navegar sin decidir;
+- permite filtrar desacuerdos, falsos permisos, falsos filtros, dudas,
+  categorías y origen;
+- exporta/importa JSON y `Comenzar nuevamente` crea un respaldo local antes de
+  reiniciar las decisiones;
 - los botones y las flechas del teclado permiten revisar sin gestos;
 - el resultado, score, split y estrato del modelo siguen ausentes de la API
   hasta que la decisión humana ya quedó guardada.

@@ -328,7 +328,9 @@ async function main() {
   const limit = args.limit ? Number.parseInt(args.limit, 10) : Number.MAX_SAFE_INTEGER;
   if (!Number.isInteger(limit) || limit <= 0) throw new Error("--limit must be positive");
   const rows = readJsonl(manifestPath).filter(
-    (row) => args.includeSealed || row.split !== "final_sealed",
+    (row) =>
+      (args.includeSealed || row.split !== "final_sealed") &&
+      row.usage_state !== "excluded",
   );
   const outputRows = [];
   for (const row of rows.slice(0, limit)) {

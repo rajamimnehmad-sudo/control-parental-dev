@@ -1,4 +1,3 @@
-const ROUND_TARGET = 100;
 const SWIPE_RATIO = 0.20;
 const SWIPE_MINIMUM = 72;
 
@@ -13,9 +12,8 @@ const reasonOptions = [
   ["underwear_or_swimwear", "Ropa interior o de baño"],
   ["explicit_or_nudity", "Desnudez o explícita"],
   ["sexualized_pose", "Pose sexualizada"],
-  ["safe_male_or_child", "Hombre o menor permitido"],
-  ["safe_product_or_logo", "Producto o logo permitido"],
   ["other", "Otro"],
+  ["uncertain_reason", "Motivo incierto"],
 ];
 
 const actionLabels = {
@@ -34,6 +32,9 @@ const categoryLabels = {
 
 const elements = {
   action: document.querySelector("#action"),
+  human: document.querySelector("#human"),
+  relation: document.querySelector("#relation"),
+  origin: document.querySelector("#origin"),
   allowButton: document.querySelector("#allow-button"),
   allowStamp: document.querySelector("#allow-stamp"),
   card: document.querySelector("#swipe-card"),
@@ -59,6 +60,11 @@ const elements = {
   reasonList: document.querySelector("#reason-list"),
   reasonPicker: document.querySelector("#reason-picker"),
   reload: document.querySelector("#reload"),
+  previous: document.querySelector("#previous"),
+  next: document.querySelector("#next"),
+  importButton: document.querySelector("#import"),
+  importFile: document.querySelector("#import-file"),
+  restart: document.querySelector("#restart"),
   revealedResult: document.querySelector("#revealed-result"),
   sampleId: document.querySelector("#sample-id"),
   scope: document.querySelector("#scope"),
@@ -124,12 +130,24 @@ function setSelectedReasons(values = []) {
 }
 
 function updateProgress() {
-  const completed = Math.min(status.reviewed_total ?? 0, ROUND_TARGET);
-  const percentage = Math.round((completed / ROUND_TARGET) * 100);
-  elements.progressLabel.textContent = `${completed} de ${ROUND_TARGET} revisadas`;
+  const target = status.review_target ?? status.corpus_rows ?? 0;
+  const completed = Math.min(status.reviewed_total ?? 0, target);
+  const percentage = target ? Math.round((completed / target) * 100) : 0;
+  elements.progressLabel.textContent = `${completed} de ${target} revisadas`;
   elements.progressPercent.textContent = `${percentage}%`;
   elements.progressBar.style.width = `${percentage}%`;
   elements.sealed.textContent = status.sealed_unlocked ? "Final abierto" : "Final sellado";
+}
+
+function populateSelect(select, values, emptyLabel) {
+  const current = select.value;
+  select.replaceChildren(new Option(emptyLabel, ""));
+  for (const value of values ?? []) {
+    select.append(new Option(categoryLabel(value), value));
+  }
+  if ([...select.options].some((option) => option.value === current)) {
+    select.value = current;
+  }
 }
 
 function setDecisionEnabled(enabled) {
@@ -186,7 +204,7 @@ function renderCurrent() {
   elements.image.removeAttribute("src");
 
   const item = items[currentIndex];
-  if (!item || (status.reviewed_total ?? 0) >= ROUND_TARGET) {
+  if (!item || ((status.reviewed_total ?? 0) >= (status.review_target ?? 0) && elements.scope.value === "queue")) {
     elements.card.hidden = true;
     elements.empty.hidden = false;
     elements.empty.querySelector("h2").textContent = "Ronda terminada";
@@ -198,10 +216,7 @@ function renderCurrent() {
 
   elements.empty.hidden = true;
   elements.card.hidden = false;
-  elements.cardPosition.textContent = `Foto ${Math.min(
-    (status.reviewed_total ?? 0) + 1,
-    ROUND_TARGET,
-  )} de ${ROUND_TARGET}`;
+  elements.cardPosition.textContent = `Foto ${currentIndex + 1} de ${items.length}`;
   elements.sampleId.textContent = item.sample_id;
   setSelectedReasons(item.human_decision?.reasons);
   revealModel(item);
@@ -382,21 +397,25 @@ function pointerEnd(event) {
 
 async function loadStatus() {
   status = await fetchJson("/api/status");
+  populateSelect(elements.category, status.categories, "Todos y pendientes");
+  populateSelect(elements.origin, status.origins, "Todos");
   updateProgress();
 }
 
 async function loadItems() {
-  if ((status.reviewed_total ?? 0) >= ROUND_TARGET) {
+  if ((status.reviewed_total ?? 0) >= (status.review_target ?? 0) && elements.scope.value === "queue") {
     items = [];
     renderCurrent();
     return;
   }
-  const remaining = Math.max(1, ROUND_TARGET - (status.reviewed_total ?? 0));
   const parameters = new URLSearchParams({
     scope: elements.scope.value,
     action: elements.action.value,
     category: elements.category.value,
-    limit: String(Math.min(remaining, 100)),
+    human: elements.human.value,
+    relation: elements.relation.value,
+    origin: elements.origin.value,
+    limit: "600",
   });
   const payload = await fetchJson(`/api/items?${parameters}`);
   items = payload.items;
@@ -405,6 +424,35 @@ async function loadItems() {
     items.findIndex((item) => !item.human_decision),
   );
   renderCurrent();
+}
+
+function moveCurrent(delta) {
+  if (!items.length) return;
+  currentIndex = Math.max(0, Math.min(items.length - 1, currentIndex + delta));
+  hideFeedback();
+  renderCurrent();
+}
+
+async function restartReview() {
+  if (!window.confirm("Se hará una copia local y se borrarán las decisiones actuales. ¿Continuar?")) return;
+  await fetchJson("/api/restart", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "Origin": window.location.origin},
+    body: "{}",
+  });
+  lastDecision = null;
+  await reload();
+}
+
+async function importReview(file) {
+  const payload = JSON.parse(await file.text());
+  await fetchJson("/api/import", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "Origin": window.location.origin},
+    body: JSON.stringify(payload),
+  });
+  lastDecision = null;
+  await reload();
 }
 
 async function reload() {
@@ -445,12 +493,21 @@ elements.allowButton.addEventListener("click", () => decide("allow", "right"));
 elements.filterButton.addEventListener("click", () => decide("filter", "left"));
 elements.doubtButton.addEventListener("click", () => decide("doubt", "left"));
 elements.undo.addEventListener("click", undoLastDecision);
+elements.previous.addEventListener("click", () => moveCurrent(-1));
+elements.next.addEventListener("click", () => moveCurrent(1));
 elements.reload.addEventListener("click", reload);
+elements.restart.addEventListener("click", () => restartReview().catch((error) => showFeedback("mismatch", "No se pudo reiniciar", error.message)));
+elements.importButton.addEventListener("click", () => elements.importFile.click());
+elements.importFile.addEventListener("change", () => {
+  const [file] = elements.importFile.files ?? [];
+  if (file) importReview(file).catch((error) => showFeedback("mismatch", "No se pudo importar", error.message));
+  elements.importFile.value = "";
+});
 elements.export.addEventListener("click", () => {
   window.location.href = "/api/export";
 });
 
-for (const select of [elements.scope, elements.action, elements.category]) {
+for (const select of [elements.scope, elements.action, elements.relation, elements.human, elements.category, elements.origin]) {
   select.addEventListener("change", reload);
 }
 

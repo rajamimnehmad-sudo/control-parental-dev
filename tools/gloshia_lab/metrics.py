@@ -36,6 +36,113 @@ def read_reviews(path: Path) -> dict[str, dict[str, Any]]:
     return reviews if isinstance(reviews, dict) else {}
 
 
+def _ratio(numerator: int, denominator: int) -> float | None:
+    return round(numerator / denominator, 6) if denominator else None
+
+
+def _f1(precision: float | None, recall: float | None) -> float | None:
+    if precision is None or recall is None or precision + recall == 0:
+        return None
+    return round(2 * precision * recall / (precision + recall), 6)
+
+
+def _confusion_metrics(matrix: Counter) -> dict[str, Any]:
+    true_filter = matrix["filter_as_filter"]
+    false_allow = matrix["filter_as_allow"]
+    false_filter = matrix["allow_as_filter"]
+    true_allow = matrix["allow_as_allow"]
+    expected_filter = true_filter + false_allow
+    expected_allow = true_allow + false_filter
+    predicted_filter = true_filter + false_filter
+    predicted_allow = true_allow + false_allow
+    total = expected_filter + expected_allow
+    filter_precision = _ratio(true_filter, predicted_filter)
+    filter_recall = _ratio(true_filter, expected_filter)
+    allow_precision = _ratio(true_allow, predicted_allow)
+    allow_recall = _ratio(true_allow, expected_allow)
+    return {
+        "reviewed": total,
+        "true_filter": true_filter,
+        "false_allow": false_allow,
+        "false_filter": false_filter,
+        "true_allow": true_allow,
+        "accuracy": _ratio(true_filter + true_allow, total),
+        "balanced_accuracy": (
+            round((filter_recall + allow_recall) / 2, 6)
+            if filter_recall is not None and allow_recall is not None
+            else None
+        ),
+        "filter_precision": filter_precision,
+        "filter_recall": filter_recall,
+        "filter_f1": _f1(filter_precision, filter_recall),
+        "allow_precision": allow_precision,
+        "allow_recall": allow_recall,
+        "allow_f1": _f1(allow_precision, allow_recall),
+        "macro_f1": (
+            round(
+                (_f1(filter_precision, filter_recall) or 0)
+                + (_f1(allow_precision, allow_recall) or 0),
+                6,
+            )
+            / 2
+            if total
+            else None
+        ),
+    }
+
+
+def _average_precision(rows: list[dict[str, Any]]) -> float | None:
+    """Average precision for filter, using the model's probability of filtering."""
+    if len(rows) < 20:
+        return None
+    positives = sum(row["human_action"] == "filter" for row in rows)
+    if positives == 0 or positives == len(rows):
+        return None
+    ordered = sorted(
+        rows,
+        key=lambda row: float(row["model_prediction"].get("maximum_probability", 0.0)),
+        reverse=True,
+    )
+    hits = 0
+    area = 0.0
+    for index, row in enumerate(ordered, start=1):
+        if row["human_action"] == "filter":
+            hits += 1
+            area += hits / index
+    return round(area / positives, 6)
+
+
+def _resolution_bucket(row: dict[str, Any]) -> str:
+    edge = min(int(row.get("width") or 0), int(row.get("height") or 0))
+    if edge < 320:
+        return "small_edge_<320"
+    if edge < 720:
+        return "medium_edge_320_719"
+    return "large_edge_>=720"
+
+
+def _orientation(row: dict[str, Any]) -> str:
+    width = int(row.get("width") or 0)
+    height = int(row.get("height") or 0)
+    if width == height:
+        return "square"
+    return "portrait" if height > width else "landscape"
+
+
+def _stratum_value(row: dict[str, Any], key: str) -> str:
+    if key == "resolution":
+        return _resolution_bucket(row)
+    if key == "orientation":
+        return _orientation(row)
+    if key == "origin":
+        return str(row.get("catalog") or "unknown")
+    review = row.get("human_decision") or {}
+    attributes = review.get("attributes") if isinstance(review, dict) else None
+    if isinstance(attributes, dict) and attributes.get(key):
+        return str(attributes[key])
+    return "unannotated"
+
+
 def joined_rows(corpus_dir: Path, include_sealed: bool = False) -> list[dict[str, Any]]:
     manifest = read_jsonl(corpus_dir / "manifest.jsonl")
     predictions = {
@@ -44,6 +151,8 @@ def joined_rows(corpus_dir: Path, include_sealed: bool = False) -> list[dict[str
     reviews = read_reviews(corpus_dir / "reviews.json")
     rows = []
     for item in manifest:
+        if item.get("usage_state") == "excluded":
+            continue
         if item.get("split") == "final_sealed" and not include_sealed:
             continue
         rows.append(
@@ -112,6 +221,11 @@ def evaluation_report(corpus_dir: Path, include_sealed: bool = False) -> dict[st
         for row in valid
         if (row.get("human_decision") or {}).get("action") in {"allow", "filter"}
     ]
+    doubts = [
+        row
+        for row in valid
+        if (row.get("human_decision") or {}).get("action") == "doubt"
+    ]
     matrix = Counter()
     false_allows: list[str] = []
     false_filters: list[str] = []
@@ -131,24 +245,85 @@ def evaluation_report(corpus_dir: Path, include_sealed: bool = False) -> dict[st
             return None
         return latencies[min(len(latencies) - 1, int(len(latencies) * fraction))]
 
-    by_category: dict[str, dict[str, int]] = {}
+    by_category: dict[str, dict[str, Any]] = {}
     for category in sorted({row["category"] for row in valid}):
         category_rows = [row for row in valid if row["category"] == category]
-        by_category[category] = dict(
-            Counter(row["model_prediction"]["action"] for row in category_rows)
+        category_matrix = Counter(
+            f"{row['human_decision']['action']}_as_{row['model_prediction']['action']}"
+            for row in category_rows
+            if (row.get("human_decision") or {}).get("action") in {"allow", "filter"}
         )
+        by_category[category] = {
+            "samples": len(category_rows),
+            "model_decisions": dict(
+                Counter(row["model_prediction"]["action"] for row in category_rows)
+            ),
+            "human_decisive": sum(
+                (row.get("human_decision") or {}).get("action") in {"allow", "filter"}
+                for row in category_rows
+            ),
+            "human_doubt": sum(
+                (row.get("human_decision") or {}).get("action") == "doubt"
+                for row in category_rows
+            ),
+            "confusion_matrix": dict(category_matrix),
+            **_confusion_metrics(category_matrix),
+        }
 
-    allows = matrix["allow_as_allow"]
-    filters = matrix["filter_as_filter"]
-    false_allow_count = matrix["filter_as_allow"]
-    false_filter_count = matrix["allow_as_filter"]
-    expected_filter = filters + false_allow_count
-    expected_allow = allows + false_filter_count
     hashes = [row.get("sha256") for row in full_manifest if row.get("sha256")]
     source_clusters = Counter(
         row.get("source_cluster") or "unknown" for row in full_manifest
     )
     creators = Counter(row.get("creator") or "unknown" for row in full_manifest)
+    decisive_rows = [
+        {
+            **row,
+            "human_action": row["human_decision"]["action"],
+        }
+        for row in reviewed
+    ]
+    stratified: dict[str, dict[str, Any]] = {}
+    for dimension in (
+        "category",
+        "resolution",
+        "orientation",
+        "origin",
+        "age_band",
+        "people_count",
+        "subject_scale",
+        "body_coverage",
+        "clothing_context",
+        "medium",
+    ):
+        groups: dict[str, list[dict[str, Any]]] = defaultdict(list)
+        for row in valid:
+            groups[_stratum_value(row, dimension)].append(row)
+        stratified[dimension] = {}
+        for label, group in sorted(groups.items()):
+            group_decisive = [
+                {
+                    **row,
+                    "human_action": row["human_decision"]["action"],
+                }
+                for row in group
+                if (row.get("human_decision") or {}).get("action") in {"allow", "filter"}
+            ]
+            group_matrix = Counter(
+                f"{row['human_action']}_as_{row['model_prediction']['action']}"
+                for row in group_decisive
+            )
+            stratified[dimension][label] = {
+                "samples": len(group),
+                "reviewed_decisive": len(group_decisive),
+                "reviewed_doubt": sum(
+                    (row.get("human_decision") or {}).get("action") == "doubt"
+                    for row in group
+                ),
+                "confusion_matrix": dict(group_matrix),
+                **_confusion_metrics(group_matrix),
+            }
+
+    metrics = _confusion_metrics(matrix)
     return {
         "schema_version": "gloshia-lab-evaluation-report-v1",
         "scope": "sealed_opened" if include_sealed else "sealed_excluded",
@@ -156,23 +331,34 @@ def evaluation_report(corpus_dir: Path, include_sealed: bool = False) -> dict[st
         "predicted": len(predicted),
         "valid_predictions": len(valid),
         "reviewed_reference": len(reviewed),
+        "reviewed_doubt": len(doubts),
         "pending_review": len(valid) - len(reviewed),
         "decisions": dict(Counter(row["model_prediction"]["action"] for row in valid)),
         "by_category": by_category,
+        "by_stratum": stratified,
         "latency_ms": {
+            "mean": round(statistics.mean(latencies), 3) if latencies else None,
             "median": round(statistics.median(latencies), 3) if latencies else None,
+            "p90": percentile(0.90),
             "p95": percentile(0.95),
             "maximum": max(latencies) if latencies else None,
         },
+        "inference_count": {
+            "mean": round(
+                statistics.mean(row["model_prediction"].get("inference_count", 0) for row in valid),
+                3,
+            )
+            if valid
+            else None,
+            "distribution": dict(
+                Counter(str(row["model_prediction"].get("inference_count", 0)) for row in valid)
+            ),
+        },
         "confusion_matrix": dict(matrix),
-        "filter_recall": round(filters / expected_filter, 6) if expected_filter else None,
-        "allow_recall": round(allows / expected_allow, 6) if expected_allow else None,
-        "false_allow_rate": (
-            round(false_allow_count / expected_filter, 6) if expected_filter else None
-        ),
-        "false_filter_rate": (
-            round(false_filter_count / expected_allow, 6) if expected_allow else None
-        ),
+        **metrics,
+        "false_allow_rate": _ratio(matrix["filter_as_allow"], metrics["true_filter"] + metrics["false_allow"]),
+        "false_filter_rate": _ratio(matrix["allow_as_filter"], metrics["true_allow"] + metrics["false_filter"]),
+        "pr_auc_filter": _average_precision(decisive_rows),
         "false_allow_ids": false_allows[:100],
         "false_filter_ids": false_filters[:100],
         "corpus_quality": {
@@ -198,6 +384,12 @@ def evaluation_report(corpus_dir: Path, include_sealed: bool = False) -> dict[st
             "largest_source_cluster": max(source_clusters.values(), default=0),
             "largest_creator_group": max(creators.values(), default=0),
             "training_authorized": False,
+            "usage_states": dict(
+                Counter(row.get("usage_state") or "internal_evaluation_ok" for row in full_manifest)
+            ),
+            "training_rights_status": dict(
+                Counter(row.get("training_rights_status") or "training_rights_uncertain" for row in full_manifest)
+            ),
         },
         "important_limit": (
             "Metrics against human truth are provisional until the requested review queue "
