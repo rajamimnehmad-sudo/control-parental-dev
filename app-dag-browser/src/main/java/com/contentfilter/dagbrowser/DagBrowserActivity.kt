@@ -132,9 +132,6 @@ class DagBrowserActivity : Activity() {
     private var pendingNewSessionGesture: PendingNewSessionGesture? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
     private var loadingShimmerAnimator: ObjectAnimator? = null
-    private var browserChromeHidden = false
-    private var lastContentScrollY = 0
-    private var accumulatedChromeScroll = 0
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
     private val messageDelegate =
@@ -579,7 +576,6 @@ class DagBrowserActivity : Activity() {
                     scrollY: Int,
                 ) {
                     tab.contentScrollY = scrollY.coerceAtLeast(0)
-                    updateBrowserChromeForScroll(tab.contentScrollY)
                 }
             }
     }
@@ -1346,7 +1342,6 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showReady() {
-        showBrowserChrome(animated = false)
         geckoView.visibility = View.INVISIBLE
         setNavigationControlsEnabled(true)
         showOverlay(
@@ -1368,57 +1363,6 @@ class DagBrowserActivity : Activity() {
         }
         beginProtectedLoad(tab, startNewPerformanceNavigation = true)
         tab.session.loadUri(safeUrl)
-    }
-
-    private fun updateBrowserChromeForScroll(scrollY: Int) {
-        val delta = scrollY - lastContentScrollY
-        lastContentScrollY = scrollY
-        if (tabSwitcher.isOpen() || addressInput.hasFocus()) return
-        if (delta == 0) return
-        if (accumulatedChromeScroll != 0 &&
-            (delta > 0) != (accumulatedChromeScroll > 0)
-        ) {
-            accumulatedChromeScroll = 0
-        }
-        accumulatedChromeScroll += delta
-        when {
-            scrollY <= dp(BrowserChromeTopRevealDp) -> showBrowserChrome()
-            accumulatedChromeScroll >= dp(BrowserChromeHideDistanceDp) -> hideBrowserChrome()
-            accumulatedChromeScroll <= -dp(BrowserChromeShowDistanceDp) -> showBrowserChrome()
-        }
-    }
-
-    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
-
-    private fun hideBrowserChrome() {
-        if (browserChromeHidden || browserToolbar.height <= 0) return
-        browserChromeHidden = true
-        accumulatedChromeScroll = 0
-        val toolbarHeight = browserToolbar.height.toFloat()
-        browserToolbar.animate()
-            .translationY(-toolbarHeight)
-            .alpha(0f)
-            .setDuration(BrowserChromeAnimationMillis)
-            .withEndAction { browserToolbar.visibility = View.GONE }
-            .start()
-    }
-
-    private fun showBrowserChrome(animated: Boolean = true) {
-        accumulatedChromeScroll = 0
-        if (!browserChromeHidden && browserToolbar.visibility == View.VISIBLE) return
-        browserChromeHidden = false
-        val duration = if (animated) BrowserChromeAnimationMillis else 0L
-        browserToolbar.animate().cancel()
-        browserToolbar.visibility = View.VISIBLE
-        if (animated) {
-            browserToolbar.alpha = 0f
-            browserToolbar.translationY = -browserToolbar.height.toFloat()
-        }
-        browserToolbar.animate()
-            .translationY(0f)
-            .alpha(1f)
-            .setDuration(duration)
-            .start()
     }
 
     private fun shouldShowReloadAction(): Boolean {
@@ -3145,10 +3089,6 @@ class DagBrowserActivity : Activity() {
     )
 
     private companion object {
-        const val BrowserChromeAnimationMillis = 180L
-        const val BrowserChromeTopRevealDp = 2
-        const val BrowserChromeHideDistanceDp = 48
-        const val BrowserChromeShowDistanceDp = 32
         const val ExtensionLocation = "resource://android/assets/dag-protection/"
         const val ExtensionId = "dag-protection@glosh.local"
         const val NativeApp = "glosh.dag.protection"
