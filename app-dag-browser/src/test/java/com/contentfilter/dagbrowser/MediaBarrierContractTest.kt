@@ -14,26 +14,43 @@ class MediaBarrierContractTest {
     private val css by lazy { extensionRoot.resolve("barrier.css").readText() }
 
     @Test
-    fun `extension starts before content in every frame and updates in place`() {
+    fun `extension starts before content and updates in place`() {
         val activity =
             File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
 
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
-        assertContains(manifest, "\"match_about_blank\": true")
-        assertContains(manifest, "\"nativeMessagingFromContent\"")
+        assertContains(manifest, "\"nativeMessaging\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
         assertFalse(activity.contains(".installBuiltIn(ExtensionLocation)"))
     }
 
     @Test
-    fun `ordinary images remain owned by Gecko without an extension response gate`() {
-        assertFalse(background.contains("filterResponseData"))
-        assertFalse(background.contains("INTERCEPTED_RESOURCE_TYPES"))
-        assertFalse(background.contains("connectNative"))
-        assertFalse(background.contains("bytesBase64"))
-        assertFalse(barrier.contains("data-glosh-dag-media"))
+    fun `raster response has one bounded native authority`() {
+        assertContains(background, "filterResponseData")
+        assertContains(background, "MAX_IMAGE_BYTES = 2 * 1024 * 1024")
+        assertContains(background, "MAX_CAPTURED_BYTES = 8 * 1024 * 1024")
+        assertContains(background, "MAX_NATIVE_IN_FLIGHT = 2")
+        assertContains(background, "MAX_QUEUED_ANALYSES = 24")
+        assertContains(background, "media-bytes")
+        assertContains(background, "model_allow")
+        assertContains(background, "model_filter")
+    }
+
+    @Test
+    fun `filtered response never releases rejected pixels`() {
+        assertContains(background, "BLOCKED_PLACEHOLDER_BASE64")
+        assertContains(background, "blockedPlaceholder")
+        assertContains(background, "action === \"allow\"")
+        assertFalse(background.contains("filter.write(event.data)"))
+        assertFalse(background.contains("blur("))
+    }
+
+    @Test
+    fun `DOM and CSS never participate in image decisions`() {
+        assertContains(barrier, "barrier-ready")
         assertFalse(barrier.contains("MutationObserver"))
+        assertFalse(barrier.contains("data-glosh-dag-media"))
         assertFalse(barrier.contains("srcset"))
         assertFalse(css.contains("img"))
         assertFalse(css.contains("image"))
@@ -41,44 +58,24 @@ class MediaBarrierContractTest {
     }
 
     @Test
-    fun `minimal bridge only reports readiness and sensitive preview state`() {
-        assertContains(barrier, "barrier-ready")
-        assertContains(barrier, "tab-preview-eligibility")
-        assertContains(barrier, "connectNative")
-        assertContains(barrier, "DOMContentLoaded")
-        assertFalse(barrier.contains("querySelectorAll"))
-        assertFalse(barrier.contains("requestAnimationFrame"))
-        assertFalse(barrier.contains("IntersectionObserver"))
-    }
-
-    @Test
-    fun `video and advertisement protection stay isolated`() {
+    fun `vector UI video and advertisements stay isolated`() {
+        assertContains(background, "SAFE_UI_MIME_PATTERN")
+        assertContains(background, "SAFE_UI_URL_PATTERN")
         assertContains(background, "BLOCKED_RESOURCE_TYPES")
         assertContains(background, "BLOCKED_MEDIA_MIME_PATTERN")
-        assertContains(css, "video")
-        assertContains(css, "audio")
-        assertContains(css, "canvas")
         assertContains(manifest, "\"ads.js\"")
         assertContains(ads, "EXPLICIT_AD_SELECTOR")
-        assertContains(ads, "SPONSORED_LABEL")
         assertContains(css, "glosh-dag-page-ad-hidden")
     }
 
     @Test
-    fun `active protection contains no store or device exceptions`() {
+    fun `active protection has no store device or document remapping exceptions`() {
         val activeProtection = "$background\n$barrier\n$css"
         listOf("cheeky", "mimo", "fravega", "sm-a235", "sm-s908").forEach { forbidden ->
             assertFalse(activeProtection.contains(forbidden, ignoreCase = true))
         }
-    }
-
-    @Test
-    fun `disabled visual classification does not initialize the onnx analyzer`() {
-        val activity =
-            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
-
-        assertContains(activity, "if (BuildConfig.GLOSHIA_VISUAL_ENABLED)")
-        assertContains(activity, "DagOnDeviceImageAnalyzer.create(applicationContext)")
-        assertContains(activity, "UnavailableDagImageAnalyzer")
+        assertFalse(background.contains("media-document-current"))
+        assertFalse(background.contains("media-document-retired"))
+        assertFalse(background.contains("media-presentation"))
     }
 }

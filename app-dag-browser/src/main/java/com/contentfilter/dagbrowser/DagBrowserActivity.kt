@@ -100,7 +100,6 @@ class DagBrowserActivity : Activity() {
     private val mediaAnalysisSequence = AtomicLong(0L)
     private val mediaAnalysisLifecycleGeneration = AtomicLong(0L)
     private val mediaAnalysisAccepting = AtomicBoolean(true)
-    private val mediaDocumentRegistry = DagMediaDocumentRegistry()
     private val mediaAnalysisQueue = DagBoundedMediaTaskQueue(MediaAnalysisQueueCapacity)
 
     @Volatile
@@ -200,43 +199,13 @@ class DagBrowserActivity : Activity() {
                                         return
                                     }
                                     when (payload.optString("type")) {
-                                        MediaDocumentCurrentMessage -> updateCurrentMediaDocument(payload)
-                                        MediaDocumentRetiredMessage -> retireMediaDocument(payload)
                                         MediaBytesMessage -> mediaBytesDecisionFromPort(payload, sourcePort)
-                                        MediaPresentationStatusMessage -> {
-                                            if (packageName.endsWith(".dev")) {
-                                                Log.i(
-                                                    MediaTransportLogTag,
-                                                    "presentation action=${payload.optString("action")} " +
-                                                        "frame=${payload.optInt("frameId", -1)} " +
-                                                        "matched=${payload.optInt("matchedCount", -1)} " +
-                                                        "media=${payload.optInt("mediaMatches", -1)} " +
-                                                        "css=${payload.optInt("cssMatches", -1)} " +
-                                                        "binding=${safePipelineValue(
-                                                            payload.optString("binding"),
-                                                            PresentationBindings,
-                                                        )}",
-                                                )
-                                            }
-                                        }
-                                        MediaClientMetricMessage -> logClientMediaMetric(payload)
                                         ViewportImagesReadyMessage ->
                                             recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)
                                     }
                                 }
                             },
                         )
-                        handler.post {
-                            if (activeMediaDecisionPort !== port) return@post
-                            runCatching {
-                                port.postMessage(
-                                    JSONObject()
-                                        .put("type", MediaDiagnosticsConfigMessage)
-                                        .put("version", ProtectionProtocolVersion)
-                                        .put("enabled", packageName.endsWith(".dev")),
-                                )
-                            }
-                        }
                     }
                     else -> port.disconnect()
                 }
@@ -1491,31 +1460,8 @@ class DagBrowserActivity : Activity() {
         // port cannot deliver messages until its delegate is installed immediately after this call.
         activeMediaDecisionPort = null
         mediaAnalysisLifecycleGeneration.incrementAndGet()
-        mediaDocumentRegistry.clear()
         mediaAnalysisQueue.discardMatching { true }
         activeMediaDecisionPort = port
-    }
-
-    private fun updateCurrentMediaDocument(payload: JSONObject) {
-        val tabId = payload.optInt("tabId", -1)
-        val documentToken = payload.optString("documentToken")
-        if (tabId < 0 || !PreviewDocumentTokenPattern.matches(documentToken)) return
-        mediaDocumentRegistry.markCurrent(tabId, documentToken)
-        mediaAnalysisQueue.discardMatching { task ->
-            task.documentIdentity?.let { identity ->
-                identity.tabId == tabId && identity.documentToken != documentToken
-            } == true
-        }
-    }
-
-    private fun retireMediaDocument(payload: JSONObject) {
-        val tabId = payload.optInt("tabId", -1)
-        val documentToken = payload.optString("documentToken")
-        if (tabId < 0 || !PreviewDocumentTokenPattern.matches(documentToken)) return
-        if (!mediaDocumentRegistry.retire(tabId, documentToken)) return
-        mediaAnalysisQueue.discardMatching { task ->
-            task.documentIdentity == DagMediaDocumentIdentity(tabId, documentToken)
-        }
     }
 
     private fun mediaBytesDecisionFromPort(
@@ -1524,8 +1470,6 @@ class DagBrowserActivity : Activity() {
     ) {
         val candidateId = payload.optString("candidateId").take(MaxMediaCandidateIdLength)
         val priority = DagMediaAnalysisPriority.fromWire(payload.optString("priority"))
-        val mediaTabId = payload.optInt("tabId", -1)
-        val documentToken = payload.optString("documentToken")
         if (!mediaAnalysisAccepting.get() || activeMediaDecisionPort !== port) return
         val generation = mediaAnalysisLifecycleGeneration.get()
         val completeDecision: (DagMediaDecision) -> Unit = completeDecision@{ decision ->
@@ -1542,14 +1486,6 @@ class DagBrowserActivity : Activity() {
                     runCatching { port.postMessage(decisionPayload(decision)) }
                 }
             }
-        }
-        if (
-            mediaTabId < 0 ||
-            !PreviewDocumentTokenPattern.matches(documentToken) ||
-            !mediaDocumentRegistry.isCurrent(mediaTabId, documentToken)
-        ) {
-            completeDecision(expiredMediaDecision(candidateId))
-            return
         }
         val remainingMillis =
             DagMediaAnalysisDeadline.remainingMillis(
@@ -1570,9 +1506,7 @@ class DagBrowserActivity : Activity() {
                 currentGeneration = mediaAnalysisLifecycleGeneration::get,
                 elapsedRealtime = SystemClock::elapsedRealtime,
                 acceptingWork = mediaAnalysisAccepting::get,
-                documentCurrent = {
-                    mediaDocumentRegistry.isCurrent(mediaTabId, documentToken)
-                },
+                documentCurrent = { true },
             )
         if (!lease.canContinue() || activeMediaDecisionPort !== port) {
             completeDecision(expiredMediaDecision(candidateId))
@@ -1583,7 +1517,7 @@ class DagBrowserActivity : Activity() {
                 DagPrioritizedMediaTask(
                     priority = priority,
                     sequence = mediaAnalysisSequence.getAndIncrement(),
-                    documentIdentity = DagMediaDocumentIdentity(mediaTabId, documentToken),
+                    documentIdentity = null,
                     onDiscard = {
                         completeDecision(expiredMediaDecision(candidateId))
                     },
@@ -1648,6 +1582,18 @@ class DagBrowserActivity : Activity() {
             )
         val currentDecision =
             if (lease.canContinue()) decision else expiredMediaDecision(bytesPayload.candidateId)
+        val deliverableDecision =
+            if (currentDecision.action == DagMediaAction.Block) {
+                currentDecision.copy(
+                    replacementBytesBase64 =
+                        DagBlockedImagePlaceholder.renderBase64(
+                            currentDecision.imageWidth,
+                            currentDecision.imageHeight,
+                        ),
+                )
+            } else {
+                currentDecision
+            }
         if (packageName.endsWith(".dev")) {
             val score =
                 currentDecision.filterProbability?.let {
@@ -1655,14 +1601,10 @@ class DagBrowserActivity : Activity() {
                 }.orEmpty()
             Log.i(
                 MediaTransportLogTag,
-                "pipeline path=${safePipelineValue(payload.optString("transportPath"), PipelinePaths)} " +
+                "pipeline path=intercept " +
                     "priority=${priority.name.lowercase(Locale.US)} " +
                     "bytes=${bytesPayload.declaredByteLength} " +
                     "bridge_ms=${bridgeElapsedMillis(payload)} queue_ms=$queueWaitMillis " +
-                    "capture_ms=${payloadMetric(payload, "captureMillis")} " +
-                    "fetch_ms=${payloadMetric(payload, "fetchMillis")} " +
-                    "hash_ms=${payloadMetric(payload, "hashMillis")} " +
-                    "encode_ms=${payloadMetric(payload, "encodeMillis")} " +
                     "base64_ms=${trace.metric(DagMediaPipelineStage.Base64Decode)} " +
                     "vector_ms=${trace.metric(DagMediaPipelineStage.SafeVectorCheck)} " +
                     "bounds_ms=${trace.metric(DagMediaPipelineStage.BoundsRead)} " +
@@ -1673,7 +1615,7 @@ class DagBrowserActivity : Activity() {
                     "native_ms=${SystemClock.elapsedRealtime() - startedAt}",
             )
         }
-        return currentDecision
+        return deliverableDecision
     }
 
     private fun expiredMediaDecision(candidateId: String) =
@@ -1683,45 +1625,14 @@ class DagBrowserActivity : Activity() {
             reason = DagMediaBytesPolicy.AnalysisExpiredReason,
         )
 
-    private fun logClientMediaMetric(payload: JSONObject) {
-        if (!packageName.endsWith(".dev")) return
-        Log.i(
-            MediaTransportLogTag,
-            "client path=${safePipelineValue(payload.optString("transportPath"), PipelinePaths)} " +
-                "priority=${safePipelineValue(payload.optString("priority"), PipelinePriorities)} " +
-                "outcome=${safePipelineValue(payload.optString("outcome"), PipelineOutcomes)} " +
-                "bytes=${payload.optInt("byteLength", -1).coerceIn(-1, DagMediaBytesPolicy.MaxCaptureBytes)} " +
-                "hash_ms=${payloadMetric(payload, "hashMillis")} " +
-                "encode_ms=${payloadMetric(payload, "encodeMillis")} " +
-                "native_roundtrip_ms=${payloadMetric(payload, "nativeRoundTripMillis")}",
-        )
-    }
-
     private fun bridgeElapsedMillis(payload: JSONObject): Long {
         val sentAt = payload.optLong("sentAtEpochMillis", -1L)
         if (sentAt <= 0L) return -1L
         return (System.currentTimeMillis() - sentAt).takeIf { it in 0..MaxPipelineMetricMillis } ?: -1L
     }
 
-    private fun payloadMetric(
-        payload: JSONObject,
-        name: String,
-    ): String {
-        val value = payload.optDouble(name, -1.0)
-        return if (value.isFinite() && value in 0.0..MaxPipelineMetricMillis.toDouble()) {
-            String.format(Locale.US, "%.2f", value)
-        } else {
-            "-1"
-        }
-    }
-
     private fun DagMediaPipelineTrace.metric(stage: DagMediaPipelineStage): String =
         String.format(Locale.US, "%.2f", elapsedMillis(stage))
-
-    private fun safePipelineValue(
-        value: String,
-        allowed: Set<String>,
-    ): String = value.takeIf(allowed::contains) ?: "unknown"
 
     private fun decisionPayload(decision: DagMediaDecision): JSONObject {
         return JSONObject()
@@ -1733,6 +1644,7 @@ class DagBrowserActivity : Activity() {
             .apply {
                 decision.imageWidth?.let { put("imageWidth", it) }
                 decision.imageHeight?.let { put("imageHeight", it) }
+                decision.replacementBytesBase64?.let { put("replacementBytesBase64", it) }
             }
     }
 
@@ -2992,7 +2904,6 @@ class DagBrowserActivity : Activity() {
         mediaAnalysisAccepting.set(false)
         mediaAnalysisLifecycleGeneration.incrementAndGet()
         activeMediaDecisionPort = null
-        mediaDocumentRegistry.clear()
         mediaAnalysisQueue.discardMatching { true }
         dismissActiveChoicePrompt()
         updateLoadingShimmer(enabled = false)
@@ -3107,11 +3018,6 @@ class DagBrowserActivity : Activity() {
         const val PreviewEligibilityMessage = "tab-preview-eligibility"
         const val MediaBytesMessage = "media-bytes"
         const val MediaDecisionMessage = "media-decision"
-        const val MediaDocumentCurrentMessage = "media-document-current"
-        const val MediaDocumentRetiredMessage = "media-document-retired"
-        const val MediaDiagnosticsConfigMessage = "diagnostics-config"
-        const val MediaPresentationStatusMessage = "media-presentation-status"
-        const val MediaClientMetricMessage = "media-client-metric"
         const val ViewportImagesReadyMessage = "viewport-images-ready"
         const val ProtectionProtocolVersion = 1
         const val MaxMediaCandidateIdLength = 80
@@ -3121,10 +3027,6 @@ class DagBrowserActivity : Activity() {
         const val MediaAnalysisAllowedFutureSkewMillis = 250L
         const val MediaTransportLogTag = "DagMediaTransport"
         const val MaxPipelineMetricMillis = 60_000L
-        val PipelinePaths = setOf("intercept", "fallback", "inline")
-        val PipelinePriorities = setOf("visible", "nearby", "background")
-        val PipelineOutcomes = setOf("allow", "block", "error", "timeout", "cache_hit", "deduplicated")
-        val PresentationBindings = setOf("applied", "deferred", "unbound", "stale")
         const val PerformanceLogTag = "DagPerformance"
         const val BackNavigationLogTag = "DagBackNavigation"
         const val TabPreviewLogTag = "DagTabPreview"

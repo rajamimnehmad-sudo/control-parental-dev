@@ -28,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 65
-        versionName = "0.45.0"
+        versionCode = 66
+        versionName = "0.46.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -56,7 +56,7 @@ android {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "false")
+            buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
         }
     }
 

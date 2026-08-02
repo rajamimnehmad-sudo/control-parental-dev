@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-08-01
+Ultima sincronizacion: 2026-08-02
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -45,11 +45,12 @@ Flujo de una entrada:
 ## Ancla tecnica actual
 
 - Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
-  DEV 58. Son versiones de codigo; publicacion e instalacion se verifican por
+  DEV 66. Son versiones de codigo; publicacion e instalacion se verifican por
   separado en el handoff.
-- DAG 65 es la base local de compatibilidad multimedia validada en el SM-S908E.
-  Con GloshIA desconectada, Gecko carga imagenes directamente y DAG no las
-  intercepta ni modifica. No es publicable ni fue subida a GitHub.
+- DAG 66 conecta GloshIA local como una unica compuerta de respuesta previa al
+  render sobre la base compatible de DAG 65. No usa observadores multimedia,
+  remapeo DOM ni excepciones por sitio. Esta validado localmente en SM-S908E,
+  no es publicable ni fue subido a GitHub.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -57,6 +58,25 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-V3-GLOSHIA-SINGLE-GATE-20 - Compuerta local unica antes del render
+
+- Estado: `Resuelto localmente y validado fisicamente; sin push ni publicacion`.
+  Aprobado por el usuario al pedir volver a enchufar GloshIA sobre la base
+  simple. Prioridad: P0. Esfuerzo: L. Riesgo: alto.
+- Resultado: DAG 66 y extension 1.35.2 retienen cada respuesta raster de red una
+  vez, envian un unico `media-bytes` al modelo local y solo liberan los bytes
+  originales ante `model_allow`. Bloqueo y fallo usan reemplazo neutro; SVG e
+  iconos vectoriales seguros siguen directos.
+- Simplificacion: no hay observadores multimedia, estados de imagen en DOM,
+  enlace URL-elemento, barridos ni reglas por comercio o telefono. Se retiraron
+  mensajes Android de presentacion/diagnostico que pertenecian al pipeline
+  anterior.
+- Validacion: 11 pruebas WebExtension, 147 Kotlin, Ktlint, Lint y APK; Mimo,
+  Cheeky, Fravega y dos imagenes directas recorridos en SM-S908E sin crash, ANR
+  ni OOM. Evidencia en el resultado de compatibilidad DAG 66.
+- Limite: animaciones fallan cerradas; `canvas` sigue oculto y falta demostrar
+  cobertura equivalente de `data:`/`blob:`. El candidato es solo DEV local.
 
 ### DAG-V3-MEDIA-BASELINE-CLEAN-19 - Carga directa sin pipeline residual
 
@@ -848,7 +868,7 @@ Flujo de una entrada:
 | DAG-V3-TAB-HIBERNATION-09 | Implementado en DAG 45; matriz física de 10 correcta, 50 pendiente | P1 | Hibernar sesiones antiguas para sostener hasta 50 pestañas sin presupuestar sólo miniaturas | L | Alto |
 | DAG-V3-FRAME-STABILITY-10 | Resuelto y validado físicamente en DAG 29 | P1 | Evitar recorridos DOM y reanálisis globales durante scroll y cambios dinámicos | M | Alto |
 | DAG-V3-MEDIA-PRESENTATION-11 | Reforzado localmente en DAG 34 y revalidado con DAG 36 | P1 | Reconciliar fuentes rotativas y mostrar brillo barrido sin leyendas residuales | S | Medio |
-| DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Base web sin clasificador validada en DAG 64; reconexion GloshIA pendiente | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
+| DAG-V3-MEDIA-PIPELINE-REBUILD-18 | Reconstruccion cerrada localmente con compuerta unica DAG 66; limites inline pendientes | P0 | Reconstruir desde la raiz la barrera y presentacion multimedia global, sin parches por sitio ni barridos durante scroll | XL | Muy alto |
 | DAG-V3-REGIONAL-FP-12 | Resuelto localmente y validado físicamente en DAG 32 | P0 | Evitar que una única región apenas dudosa bloquee toda una imagen panorámica sin debilitar señales fuertes | S | Alto |
 | DAG-V3-FILTERED-OVERLAY-13 | Resuelto localmente y validado físicamente en DAG 33 | P2 | Mostrar fotos filtradas sólo difuminadas, sin escudo ni rastreo final de contenedor | S | Medio |
 | DAG-WEB-INTERACTION-02 | Publicado DEV 271; mejora parcial, seguimiento abierto | P1 | Evitar recorridos profundos ante cambios de atributos en paginas permitidas | M | Medio |

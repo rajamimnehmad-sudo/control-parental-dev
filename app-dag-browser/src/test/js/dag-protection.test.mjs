@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { webcrypto } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -16,114 +17,271 @@ const eventChannel = () => ({
   },
 });
 
-const createBackgroundHarness = async () => {
+const waitFor = async (predicate, label) => {
+  const deadline = Date.now() + 1_000;
+  while (Date.now() < deadline) {
+    const value = predicate();
+    if (value) return value;
+    await new Promise((resolvePromise) => setImmediate(resolvePromise));
+  }
+  throw new Error(`Timed out waiting for ${label}`);
+};
+
+const createHarness = async () => {
   const beforeRequest = eventChannel();
   const headersReceived = eventChannel();
+  const nativeMessages = eventChannel();
+  const nativeDisconnects = eventChannel();
+  const postedNative = [];
+  const filters = new Map();
+  const nativePort = {
+    onMessage: nativeMessages,
+    onDisconnect: nativeDisconnects,
+    postMessage(message) {
+      postedNative.push(message);
+    },
+  };
   const browser = {
+    runtime: {
+      connectNative() {
+        return nativePort;
+      },
+    },
     webRequest: {
       onBeforeRequest: beforeRequest,
       onHeadersReceived: headersReceived,
+      filterResponseData(requestId) {
+        const filter = {
+          writes: [],
+          closed: false,
+          ondata: null,
+          onerror: null,
+          onstop: null,
+          write(data) {
+            this.writes.push(Uint8Array.from(data));
+          },
+          close() {
+            this.closed = true;
+          },
+        };
+        filters.set(requestId, filter);
+        return filter;
+      },
     },
   };
   const source = await readAsset("background.js");
-  vm.runInNewContext(source, { browser, URL }, { filename: "background.js" });
-  assert.equal(beforeRequest.listeners.length, 1);
-  assert.equal(headersReceived.listeners.length, 1);
+  vm.runInNewContext(source, {
+    URL,
+    Uint32Array,
+    Uint8Array,
+    ArrayBuffer,
+    atob,
+    btoa,
+    browser,
+    clearTimeout,
+    crypto: webcrypto,
+    Date,
+    Promise,
+    setTimeout,
+  }, { filename: "background.js" });
   return {
     before: beforeRequest.listeners[0],
     headers: headersReceived.listeners[0],
+    filters,
+    postedNative,
+    answer(message) {
+      for (const listener of nativeMessages.listeners) listener(message);
+    },
+    disconnect() {
+      for (const listener of nativeDisconnects.listeners) listener();
+    },
   };
 };
 
-test("ordinary image requests stay entirely owned by Gecko", async () => {
-  const harness = await createBackgroundHarness();
-  const result = harness.before({
-    type: "image",
-    url: "https://cdn.example.test/header/heart.svg",
-    documentUrl: "https://shop.example.test/",
+const imageDetails = (requestId, url = `https://cdn.example.test/${requestId}.jpg`) => ({
+  requestId,
+  type: "image",
+  url,
+  documentUrl: "https://shop.example.test/",
+});
+
+const deliver = (harness, details, bytes, mime = "image/jpeg") => {
+  const result = harness.before(details);
+  harness.headers({ ...details, responseHeaders: [{ name: "Content-Type", value: mime }] });
+  const filter = harness.filters.get(details.requestId);
+  assert.ok(filter);
+  filter.ondata({ data: Uint8Array.from(bytes).buffer });
+  filter.onstop();
+  return result;
+};
+
+test("allowed raster crosses one native gate and keeps exact bytes", async () => {
+  const harness = await createHarness();
+  const details = imageDetails("allow");
+  const original = Uint8Array.from([0xff, 0xd8, 1, 2, 3, 0xff, 0xd9]);
+  assert.equal(Object.keys(deliver(harness, details, original)).length, 0);
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "native request");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
   });
+  const filter = harness.filters.get(details.requestId);
+  await waitFor(() => filter.closed, "allowed stream close");
+  assert.deepEqual([...filter.writes[0]], [...original]);
+  assert.equal(filter.writes.length, 1);
+});
 
+test("filtered raster receives a neutral PNG without rejected pixels", async () => {
+  const harness = await createHarness();
+  const details = imageDetails("block");
+  const original = Uint8Array.from([0xff, 0xd8, 9, 8, 7, 0xff, 0xd9]);
+  deliver(harness, details, original);
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "native request");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "block",
+    reason: "model_filter",
+  });
+  const filter = harness.filters.get(details.requestId);
+  await waitFor(() => filter.closed, "blocked stream close");
+  assert.deepEqual([...filter.writes[0].slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.notDeepEqual([...filter.writes[0]], [...original]);
+});
+
+test("SVG and icon URLs never enter the response gate", async () => {
+  const harness = await createHarness();
+  const result = harness.before(imageDetails("icon", "https://cdn.example.test/heart.svg?v=2"));
   assert.equal(Object.keys(result).length, 0);
-  const source = await readAsset("background.js");
-  assert.doesNotMatch(source, /filterResponseData|connectNative|media-presentation/u);
+  assert.equal(harness.filters.size, 0);
+  assert.equal(harness.postedNative.length, 0);
 });
 
-test("responsive image sets are not intercepted", async () => {
-  const harness = await createBackgroundHarness();
-  assert.equal(Object.keys(harness.before({
-    type: "imageset",
-    url: "https://cdn.example.test/product-2x.webp",
-  })).length, 0);
+test("vector MIME discovered after request start passes exact bytes without inference", async () => {
+  const harness = await createHarness();
+  const details = imageDetails("vector", "https://cdn.example.test/asset?id=2");
+  const original = new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'/>");
+  deliver(harness, details, original, "image/svg+xml");
+  const filter = harness.filters.get(details.requestId);
+  await waitFor(() => filter.closed, "vector stream close");
+  assert.deepEqual([...filter.writes[0]], [...original]);
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 0);
 });
 
-test("video and object responses remain blocked", async () => {
-  const harness = await createBackgroundHarness();
-  assert.equal(harness.before({ type: "media", url: "https://media.example.test/a.mp4" }).cancel, true);
-  assert.equal(harness.before({ type: "object", url: "https://media.example.test/a.swf" }).cancel, true);
-  assert.equal(harness.headers({
-    responseHeaders: [{ name: "Content-Type", value: "video/mp4" }],
-  }).cancel, true);
-  assert.equal(harness.headers({
-    responseHeaders: [{ name: "content-type", value: "image/webp" }],
-  }).cancel, undefined);
-});
-
-test("known ad subresources are blocked without blocking navigation", async () => {
-  const harness = await createBackgroundHarness();
-  assert.equal(harness.before({
-    type: "script",
-    url: "https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js",
-    documentUrl: "https://news.example.test/",
-  }).cancel, true);
-  assert.equal(harness.before({
+test("raster opened as a top-level page still crosses the same native gate", async () => {
+  const harness = await createHarness();
+  const details = {
+    requestId: "top-level-raster",
     type: "main_frame",
-    url: "https://doubleclick.net/",
-  }).cancel, undefined);
+    url: "https://cdn.example.test/photo.jpg",
+  };
+  const original = Uint8Array.from([0xff, 0xd8, 5, 6, 7, 0xff, 0xd9]);
+  assert.equal(Object.keys(harness.before(details)).length, 0);
+  assert.equal(harness.filters.size, 0);
+  const headerResult = harness.headers({
+    ...details,
+    responseHeaders: [{ name: "Content-Type", value: "image/jpeg" }],
+  });
+  assert.equal(Object.keys(headerResult).length, 0);
+  const filter = harness.filters.get(details.requestId);
+  assert.ok(filter);
+  filter.ondata({ data: original.buffer });
+  filter.onstop();
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "top-level native request");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  await waitFor(() => filter.closed, "top-level raster close");
+  assert.deepEqual([...filter.writes[0]], [...original]);
 });
 
-test("video sites keep their page resources while media remains blocked", async () => {
-  const harness = await createBackgroundHarness();
+test("trusted content decision cache avoids a second inference", async () => {
+  const harness = await createHarness();
+  const original = Uint8Array.from([0xff, 0xd8, 3, 3, 3, 0xff, 0xd9]);
+  const first = imageDetails("cache-a");
+  deliver(harness, first, original);
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "first native request");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  await waitFor(() => harness.filters.get(first.requestId).closed, "first close");
+
+  const second = imageDetails("cache-b");
+  deliver(harness, second, original);
+  await waitFor(() => harness.filters.get(second.requestId).closed, "cached close");
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
+  assert.deepEqual([...harness.filters.get(second.requestId).writes[0]], [...original]);
+});
+
+test("disconnect and malformed decisions fail closed", async () => {
+  const harness = await createHarness();
+  const details = imageDetails("disconnect");
+  deliver(harness, details, [0xff, 0xd8, 4, 0xff, 0xd9]);
+  await waitFor(() => harness.postedNative.some((message) => message.type === "media-bytes"),
+    "native request");
+  harness.disconnect();
+  const filter = harness.filters.get(details.requestId);
+  await waitFor(() => filter.closed, "failed stream close");
+  assert.deepEqual([...filter.writes[0].slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+});
+
+test("oversized image closes with the safe placeholder before native work", async () => {
+  const harness = await createHarness();
+  const details = imageDetails("oversized");
+  harness.before(details);
+  const filter = harness.filters.get(details.requestId);
+  filter.ondata({ data: new Uint8Array(2 * 1024 * 1024 + 1).buffer });
+  await waitFor(() => filter.closed, "oversized close");
+  assert.deepEqual([...filter.writes[0].slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 0);
+});
+
+test("video and advertisement policy remains isolated", async () => {
+  const harness = await createHarness();
+  assert.equal(harness.before({ type: "media", url: "https://media.example.test/a.mp4" }).cancel, true);
   assert.equal(harness.before({
     type: "script",
     url: "https://pagead2.googlesyndication.com/pagead/id",
-    documentUrl: "https://www.youtube.com/watch?v=test",
-  }).cancel, undefined);
-  assert.equal(harness.before({
-    type: "media",
-    url: "https://r1---sn.googlevideo.com/videoplayback",
-    documentUrl: "https://www.youtube.com/watch?v=test",
+    documentUrl: "https://news.example.test/",
+  }).cancel, true);
+  assert.equal(harness.headers({
+    type: "xmlhttprequest",
+    requestId: "video-header",
+    url: "https://media.example.test/a",
+    responseHeaders: [{ name: "content-type", value: "video/mp4" }],
   }).cancel, true);
 });
 
-test("page bridge stays minimal and never mutates image state", async () => {
+test("page bridge and CSS never mutate or target images", async () => {
   const barrier = await readAsset("barrier.js");
+  const css = await readAsset("barrier.css");
   new vm.Script(barrier);
   assert.match(barrier, /barrier-ready/u);
-  assert.match(barrier, /tab-preview-eligibility/u);
-  assert.doesNotMatch(barrier, /MutationObserver|data-glosh-dag-media|querySelectorAll|srcset/u);
+  assert.doesNotMatch(barrier, /MutationObserver|data-glosh-dag-media|srcset/u);
+  assert.doesNotMatch(css, /\bimg\b|\bimage\b|\bsvg\b|object-position/u);
 });
 
-test("presentation css never targets images svg or page backgrounds", async () => {
-  const css = await readAsset("barrier.css");
-  assert.match(css, /video,/u);
-  assert.match(css, /glosh-dag-page-ad-hidden/u);
-  assert.doesNotMatch(css, /\bimg\b|\bimage\b|\bsvg\b|background-image|object-position/u);
-});
-
-test("active extension has no store or device exceptions", async () => {
-  const source = [
-    await readAsset("background.js"),
-    await readAsset("barrier.js"),
-    await readAsset("barrier.css"),
-  ].join("\n");
-  assert.doesNotMatch(source, /cheeky|mimo|fravega|sm-a235|sm-s908/iu);
-});
-
-test("manifest keeps the bridge at document start in every frame", async () => {
-  const manifest = JSON.parse(await readAsset("manifest.json"));
-  const content = manifest.content_scripts[0];
-  assert.equal(content.run_at, "document_start");
-  assert.equal(content.all_frames, true);
-  assert.equal(content.match_about_blank, true);
-  assert.deepEqual(content.js, ["barrier.js", "ads.js"]);
+test("active extension has bounded work and no site or device exceptions", async () => {
+  const background = await readAsset("background.js");
+  assert.match(background, /MAX_IMAGE_BYTES = 2 \* 1024 \* 1024/u);
+  assert.match(background, /MAX_CAPTURED_BYTES = 8 \* 1024 \* 1024/u);
+  assert.match(background, /MAX_NATIVE_IN_FLIGHT = 2/u);
+  assert.match(background, /MAX_QUEUED_ANALYSES = 24/u);
+  assert.doesNotMatch(background, /cheeky|mimo|fravega|sm-a235|sm-s908/iu);
 });

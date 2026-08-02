@@ -1,8 +1,8 @@
 {
   "manifest_version": 2,
   "name": "Glosh DAG Protection",
-  "version": "1.34.0",
-  "description": "Minimal DEV page bridge with direct Gecko image loading and isolated media blocking.",
+  "version": "1.35.2",
+  "description": "Single on-device GloshIA response gate with isolated page and video protection.",
   "browser_specific_settings": {
     "gecko": {
       "id": "dag-protection@glosh.local"

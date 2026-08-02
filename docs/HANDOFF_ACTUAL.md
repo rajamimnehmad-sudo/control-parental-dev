@@ -11,10 +11,10 @@ versiones historicas.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- `main` local queda 27 commits por delante de `origin/main` con el commit de
+- `main` local queda 28 commits por delante de `origin/main` con el commit de
   cierre de este lote.
 - No se hizo push, PR, publicacion DEV ni Production.
-- El lote DAG 65 queda integrado en un unico commit local de cierre. No se hizo
+- El lote DAG 66 queda integrado en un unico commit local de cierre. No se hizo
   push y no se debe publicar sin una autorizacion separada.
 - Los worktrees separados son historicos o auxiliares: no compilar ni instalar
   una entrega final desde ellos.
@@ -26,10 +26,39 @@ Declaraciones de version actuales en el codigo:
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Sin cambios |
 | App Admin | 290 | 1.0.1-dev | Sin cambios |
-| DAG Browser | 65 | 0.45.0-dev | Carga directa de imagenes sin GloshIA validada en SM-S908E; no publicable |
+| DAG Browser | 66 | 0.46.0-dev | GloshIA local conectada como compuerta unica y validada en SM-S908E; no publicada |
 
-DAG 65 esta instalado en el SM-S908E `R5CT717BZTZ`. Se instalo in-place, sin
+DAG 66 esta instalado en el SM-S908E `R5CT717BZTZ`. Se instalo in-place, sin
 borrar el perfil y sin tocar otras apps.
+
+## DAG Browser 66 - GloshIA como compuerta unica
+
+DAG 66 conecta el modelo local conservado en DAG 65 mediante una sola
+intercepcion de respuesta antes del render. Los bytes raster se capturan una
+vez, reciben una unica decision nativa y solo `model_allow` devuelve el original
+exacto a Gecko. Un bloqueo confiable produce un PNG neutro proporcional sin
+pixeles rechazados; error, timeout, saturacion, animacion o entrada invalida
+fallan cerrados.
+
+No se restauro la presentacion anterior: no hay observadores multimedia,
+estados DOM de imagen, remapeo URL-elemento ni CSS sobre `img`, `image` o `svg`.
+SVG e iconos vectoriales seguros siguen directos. Las imagenes abiertas como
+pagina principal pasan por la misma compuerta. El trabajo queda acotado a 2 MiB
+por recurso, 8 MiB capturados, 32 streams, 24 esperas, dos decisiones nativas y
+512 decisiones efimeras por hash de contenido. La extension es `1.35.2`.
+
+Validacion: 11 pruebas WebExtension, 147 unitarias Kotlin, Ktlint, Lint, APK y
+`diff --check` aprobados. En el SM-S908E el arranque limpio de Mimo mostro la
+pagina en 374 ms y resolvio la ventana inicial en 1.805 ms; Cheeky en
+1.801/3.670 ms; Fravega en 834/8.943 ms por su rafaga amplia de recursos. Una
+imagen directa permitida conservo el original y una conocida como filtrable se
+reemplazo en 48 ms nativos. No hubo crash, ANR ni OOM. Evidencia:
+`docs/compatibility/results/dag-browser-v66-gloshia-single-gate-sm-s908e-2026-08-02.md`.
+
+Limites vigentes: animaciones fallan cerradas; `canvas` sigue oculto; no se
+demostro cobertura equivalente para medios puramente `data:` o `blob:`. El
+fixture HTTP local fue rechazado por la politica HTTPS y no se relajo. DAG 66
+es candidato DEV local: no autoriza push, publicacion ni Production.
 
 ## DAG Browser 65 - base multimedia simple
 
@@ -227,8 +256,8 @@ Definicion completa:
 ## Estado de GloshIA visual
 
 - DAG conserva un unico modelo visual local y no cambia pesos ni umbrales. DAG
-  64 DEV lo mantiene desconectado deliberadamente para validar transporte y
-  presentacion; no ejecuta inferencia y por eso no ofrece filtrado visual.
+  66 DEV lo ejecuta como una compuerta unica previa al render, sin restaurar la
+  presentacion DOM retirada en DAG 65.
 - El laboratorio local de 1.000 miniaturas y la ronda humana permanecen como
   evaluacion, no como entrenamiento autorizado.
 - La calibracion preliminar y el experimento privado R1 quedaron `NO-GO` para
