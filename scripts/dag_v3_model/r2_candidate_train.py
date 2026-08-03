@@ -25,6 +25,33 @@ from pilot_tinyclip_candidate import MODEL_ID, _dag_letterbox_image  # noqa: E40
 from r2_candidate_evaluate import classification_metrics  # noqa: E402
 
 
+def _checkpoint_components(checkpoint: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], Any, Any]:
+    """Read the original semantic checkpoint or a prior fine-tuned checkpoint."""
+    if "state_dict" not in checkpoint:
+        return (
+            checkpoint["vision_model"],
+            checkpoint["visual_projection"],
+            checkpoint["classifier_coef"],
+            checkpoint["classifier_intercept"],
+        )
+    state = checkpoint["state_dict"]
+    vision = {
+        key.removeprefix("vision_model."): value
+        for key, value in state.items()
+        if key.startswith("vision_model.")
+    }
+    projection = {
+        key.removeprefix("visual_projection."): value
+        for key, value in state.items()
+        if key.startswith("visual_projection.")
+    }
+    coefficient = state.get("classifier.weight")
+    intercept = state.get("classifier.bias")
+    if not vision or not projection or coefficient is None or intercept is None:
+        raise ValueError("initial checkpoint is missing TinyCLIP policy components")
+    return vision, projection, coefficient, intercept
+
+
 def _load_split(path: Path, image_root: Path) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     payload = json.loads(path.read_text(encoding="utf-8"))
     records = payload.get("records", [])
@@ -131,18 +158,19 @@ def main() -> int:
 
     train, validation = _load_split(args.split, args.image_root)
     initial = torch.load(args.initial_checkpoint, map_location="cpu", weights_only=False)
+    vision_state, projection_state, classifier_coef, classifier_intercept = _checkpoint_components(initial)
     base = AutoModel.from_pretrained(MODEL_ID)
-    base.vision_model.load_state_dict(initial["vision_model"])
-    base.visual_projection.load_state_dict(initial["visual_projection"])
+    base.vision_model.load_state_dict(vision_state)
+    base.visual_projection.load_state_dict(projection_state)
 
     class Policy(nn.Module):
         def __init__(self) -> None:
             super().__init__()
             self.vision_model = base.vision_model
             self.visual_projection = base.visual_projection
-            self.classifier = nn.Linear(int(initial["classifier_coef"].shape[1]), 1)
-            self.classifier.weight.data.copy_(torch.as_tensor(initial["classifier_coef"], dtype=torch.float32))
-            self.classifier.bias.data.copy_(torch.as_tensor(initial["classifier_intercept"], dtype=torch.float32))
+            self.classifier = nn.Linear(int(classifier_coef.shape[1]), 1)
+            self.classifier.weight.data.copy_(torch.as_tensor(classifier_coef, dtype=torch.float32))
+            self.classifier.bias.data.copy_(torch.as_tensor(classifier_intercept, dtype=torch.float32))
 
         def forward(self, pixels: Any) -> Any:
             pooled = self.vision_model(pixel_values=pixels).pooler_output

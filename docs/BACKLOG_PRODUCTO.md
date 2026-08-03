@@ -437,12 +437,15 @@ Flujo de una entrada:
   Esfuerzo: M. Riesgo: medio-alto. Evidencia:
   `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`.
 - `GLOSHIA-VISUAL-R2.1-HARD-NEGATIVE-TRAIN-10` (2026-08-03): ejecutado hasta
-  el gate de datos. La ronda tiene 49 binarias y 1 `doubt`, pero `0/50` tiene
-  `training_authorized=true` o `training_rights_clear`; todas son privadas para
-  evaluación interna con derechos inciertos. El split builder rechaza el lote
-  y no inicia entrenamiento. Estado: `NO-GO / Bloqueado por datos`; R1 queda
-  oficial. Dependencia para reanudar: autorización explícita de entrenamiento
-  o corpus con derechos claros. Esfuerzo: M. Riesgo: alto.
+  el gate de datos. El propietario autorizó las 49 binarias exclusivamente como
+  `owner_authorized_private_experiment`; se mantuvo `training_rights_uncertain`
+  y no se declaró `training_rights_clear`. Quedaron 252 train, 47 validation y
+  72 frozen_test, sin contaminación y con la duda fuera. R2.1 FP32 redujo los
+  falsos filtros de 44/101 a 12/101 sin falsos permisos nuevos, pero el ONNX
+  INT8 no abrió con ONNX Runtime CPU local por `ConvInteger`. Estado obligatorio:
+  `NO-GO`; R1 oficial, `final_sealed`, Android y DAG intactos. No se solicita
+  canary ni integración. Evidencia: `docs/dag/v3/GLOSHIA_VISUAL_R2_1_HARD_NEGATIVE_TRAIN_10_2026-08-03.md`.
+  Esfuerzo: L. Riesgo: alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 

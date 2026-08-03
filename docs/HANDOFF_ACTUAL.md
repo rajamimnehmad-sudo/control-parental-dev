@@ -148,23 +148,22 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   candidato posterior pase seguridad, cuantización y rendimiento.
 - `GLOSHIA-VISUAL-R2-HARD-NEGATIVE-REPAIR-09` (2026-08-02): se preparó un
   lote privado de 50 imágenes públicas independientes, 25/25 en estratos de
-  muestreo filter-like/allow-like. Todas están pendientes de revisión humana
-  ciega; los estratos no son etiquetas. La revisión terminó con 26 filter, 23
+  muestreo filter-like/allow-like. Los estratos no son etiquetas. La revisión
+  terminó con 26 filter, 23
   allow y 1 doubt. Sobre las 49 binarias, R1 tuvo 8/26 falsos permisos y 7/23
   falsos filtros, balanced accuracy 69,40% y PR-AUC 79,46%; en el estrato
-  filter-like hubo 7/18 falsos permisos. El servidor local es
-  `http://127.0.0.1:8770/`; `final_sealed` sigue cerrado. Todavía no se
-  entrenó ni se crearon pesos o splits nuevos; sigue pendiente el gate de
-  contaminación antes del piloto R2.1. Evidencia:
+  filter-like hubo 7/18 falsos permisos. El servidor local fue
+  `http://127.0.0.1:8770/`; `final_sealed` sigue cerrado. Evidencia:
   `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`.
 - `GLOSHIA-VISUAL-R2.1-HARD-NEGATIVE-TRAIN-10` (2026-08-03): la ronda nueva
-  quedó auditada, pero `0/50` muestras tienen autorización de entrenamiento y
-  `0/50` tienen derechos claros; son sólo `internal_evaluation_ok` con derechos
-  inciertos. El preparador de splits falla cerrado y no se entrenó R2.1. Estado:
-  `NO-GO / BLOQUEADO POR DATOS`; R1, `final_sealed`, Android y DAG permanecen
-  intactos. Se requiere autorización explícita de entrenamiento o un lote con
-  derechos claros antes de continuar. Evidencia:
-  `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`.
+  quedó autorizada por el propietario para un experimento privado local:
+  `owner_authorized_private_experiment`. Las 49 binarias pasaron a train y se
+  mantuvieron validation (47) y frozen_test (72) independientes; no se declaró
+  `training_rights_clear`. R2.1 FP32 redujo los falsos filtros de 44/101 a
+  12/101 y no agregó falsos permisos, pero su exportación INT8 no abrió con
+  ONNX Runtime CPU local por `ConvInteger`; por el gate obligatorio el resultado
+  es `NO-GO`. R1, `final_sealed`, Android y DAG permanecen intactos. Evidencia:
+  `docs/dag/v3/GLOSHIA_VISUAL_R2_1_HARD_NEGATIVE_TRAIN_10_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -174,6 +173,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_LAB_CALIBRATION_2026-07-31.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_CANDIDATE_TRAIN_08_2026-08-02.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`;
+- `docs/dag/v3/GLOSHIA_VISUAL_R2_1_HARD_NEGATIVE_TRAIN_10_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

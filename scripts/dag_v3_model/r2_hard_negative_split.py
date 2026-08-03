@@ -1,19 +1,15 @@
 #!/usr/bin/env python3
 """Build a grouped R2.1 repair split without opening the sealed examination.
 
-The previous R2 train/validation rows remain usable for development.  The
-previous R2 frozen test stays outside the new split, except for the explicitly
-authorized original false-permission case, which is included in training as a
-diagnostic repair example.  A deterministic subset of the newly reviewed
-binary batch becomes the new frozen_test; doubt never enters a split.
+The 49 newly reviewed binary rows are all training-only under the owner's
+private authorization.  The historical validation and frozen_test remain
+separate and are never loaded by training; doubt never enters a split.
 """
 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
-from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -43,20 +39,17 @@ def _target(action: str) -> int:
     return 1 if action == "filter" else 0
 
 
-def _legacy_records(split_path: Path) -> tuple[list[dict[str, Any]], list[str]]:
+def _legacy_records(split_path: Path) -> list[dict[str, Any]]:
     payload = _read_json(split_path)
     records: list[dict[str, Any]] = []
-    legacy_holdout: list[str] = []
     for raw in payload.get("records", []):
         action = raw.get("human_action")
         if action not in BINARY:
             continue
         sample_id = raw["sample_id"]
-        if raw.get("split") == "frozen_test":
-            legacy_holdout.append(sample_id)
-            continue
         historical_split = raw.get("split")
-        split = "train" if historical_split in {"train", "frozen_test"} else "validation"
+        if historical_split not in SPLITS:
+            continue
         records.append(
             {
                 "sample_id": sample_id,
@@ -72,21 +65,26 @@ def _legacy_records(split_path: Path) -> tuple[list[dict[str, Any]], list[str]]:
                 "group_key": f"legacy:{raw.get('group_key') or sample_id}",
                 "human_action": action,
                 "target": _target(action),
-                "split": split,
+                "split": historical_split,
                 "source_kind": "legacy_r2_development",
             }
         )
-    return records, sorted(legacy_holdout)
+    return records
 
 
-def _new_records(manifest_path: Path, reviews_path: Path) -> list[dict[str, Any]]:
+def _new_records(
+    manifest_path: Path,
+    reviews_path: Path,
+    owner_authorized_private_experiment: bool = False,
+) -> list[dict[str, Any]]:
     reviews = _read_json(reviews_path).get("reviews", {})
     records: list[dict[str, Any]] = []
     for raw in _read_jsonl(manifest_path):
         action = reviews.get(raw.get("sample_id"), {}).get("action")
         if action not in BINARY:
             continue
-        if raw.get("training_authorized") is not True or raw.get("training_rights_status") != "training_rights_clear":
+        rights_clear = raw.get("training_authorized") is True and raw.get("training_rights_status") == "training_rights_clear"
+        if not rights_clear and not owner_authorized_private_experiment:
             raise ValueError(
                 f"training authorization is not clear for new sample: {raw.get('sample_id')}"
             )
@@ -106,8 +104,13 @@ def _new_records(manifest_path: Path, reviews_path: Path) -> list[dict[str, Any]
                 "group_key": f"new:{group}",
                 "human_action": action,
                 "target": _target(action),
-                "split": None,
+                "split": "train",
                 "source_kind": "new_hard_negative_repair",
+                "training_authorization": (
+                    "owner_authorized_private_experiment"
+                    if owner_authorized_private_experiment and not rights_clear
+                    else "training_rights_clear"
+                ),
             }
         )
     return records
@@ -118,47 +121,6 @@ def _check_unique(records: Iterable[dict[str, Any]]) -> None:
         values = [row[field] for row in records]
         if len(values) != len(set(values)):
             raise ValueError(f"duplicate {field}")
-
-
-def _pick_groups(groups: list[list[dict[str, Any]]], target_count: int) -> set[str]:
-    selected: set[str] = set()
-    count = 0
-    for group in groups:
-        if count + len(group) <= target_count:
-            selected.add(group[0]["group_key"])
-            count += len(group)
-    return selected
-
-
-def _assign_new(records: list[dict[str, Any]], seed: int) -> dict[str, str]:
-    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
-    for row in records:
-        grouped[row["group_key"]].append(row)
-    by_target: dict[int, list[list[dict[str, Any]]]] = {0: [], 1: []}
-    for group in grouped.values():
-        by_target[1 if sum(row["target"] for row in group) >= len(group) / 2 else 0].append(group)
-    for target_groups in by_target.values():
-        target_groups.sort(
-            key=lambda group: hashlib.sha256(
-                f"{seed}:{group[0]['group_key']}".encode("utf-8")
-            ).hexdigest()
-        )
-    test_groups: set[str] = set()
-    validation_groups: set[str] = set()
-    for target, target_groups in by_target.items():
-        total = sum(len(group) for group in target_groups)
-        test_groups |= _pick_groups(target_groups, round(total * 0.30))
-        remaining = [group for group in target_groups if group[0]["group_key"] not in test_groups]
-        validation_groups |= _pick_groups(remaining, round(total * 0.16))
-    assignment: dict[str, str] = {}
-    for row in records:
-        if row["group_key"] in test_groups:
-            assignment[row["sample_id"]] = "frozen_test"
-        elif row["group_key"] in validation_groups:
-            assignment[row["sample_id"]] = "validation"
-        else:
-            assignment[row["sample_id"]] = "train"
-    return assignment
 
 
 def verify_no_contamination(records: list[dict[str, Any]]) -> dict[str, Any]:
@@ -182,24 +144,36 @@ def verify_no_contamination(records: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def build_split(legacy_path: Path, new_manifest: Path, new_reviews: Path, output: Path, seed: int) -> dict[str, Any]:
-    legacy, legacy_holdout = _legacy_records(legacy_path)
-    new = _new_records(new_manifest, new_reviews)
+def build_split(
+    legacy_path: Path,
+    new_manifest: Path,
+    new_reviews: Path,
+    output: Path,
+    seed: int,
+    owner_authorized_private_experiment: bool = False,
+) -> dict[str, Any]:
+    legacy = _legacy_records(legacy_path)
+    new = _new_records(new_manifest, new_reviews, owner_authorized_private_experiment)
     if len(new) != 49:
         raise ValueError(f"expected 49 binary new rows, found {len(new)}")
     _check_unique([*legacy, *new])
-    new_assignment = _assign_new(new, seed)
     for row in new:
-        row["split"] = new_assignment[row["sample_id"]]
+        row["split"] = "train"
     records = sorted([*legacy, *new], key=lambda row: row["sample_id"])
     contamination = verify_no_contamination(records)
     payload = {
         "schema_version": SCHEMA,
-        "ticket": "GLOSHIA-VISUAL-R2-HARD-NEGATIVE-REPAIR-09",
+        "ticket": "GLOSHIA-VISUAL-R2.1-HARD-NEGATIVE-TRAIN-10",
         "status": "private_experimental_only",
         "seed": seed,
+        "assignment_policy": "historical_validation_and_frozen_test_preserved; new_binary_batch_train_only",
         "excluded": ["doubt", "unreviewed", "duplicates", "final_sealed"],
-        "legacy_frozen_holdout_outside_new_split": legacy_holdout,
+        "authorization_mode": (
+            "owner_authorized_private_experiment"
+            if owner_authorized_private_experiment
+            else "manifest_rights_clear"
+        ),
+        "training_rights_clear_declared": False,
         "new_batch_binary_rows": len(new),
         "contamination_check": contamination,
         "records": records,
@@ -216,8 +190,20 @@ def main() -> int:
     parser.add_argument("--new-reviews", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--seed", type=int, default=20260803)
+    parser.add_argument(
+        "--owner-authorized-private-experiment",
+        action="store_true",
+        help="allow internal-only training under explicit owner authorization without changing rights metadata",
+    )
     args = parser.parse_args()
-    payload = build_split(args.legacy_split, args.new_manifest, args.new_reviews, args.output, args.seed)
+    payload = build_split(
+        args.legacy_split,
+        args.new_manifest,
+        args.new_reviews,
+        args.output,
+        args.seed,
+        args.owner_authorized_private_experiment,
+    )
     print(json.dumps(payload["contamination_check"], indent=2))
     return 0
 
