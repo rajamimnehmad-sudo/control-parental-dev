@@ -164,6 +164,14 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   ONNX Runtime CPU local por `ConvInteger`; por el gate obligatorio el resultado
   es `NO-GO`. R1, `final_sealed`, Android y DAG permanecen intactos. Evidencia:
   `docs/dag/v3/GLOSHIA_VISUAL_R2_1_HARD_NEGATIVE_TRAIN_10_2026-08-03.md`.
+- `GLOSHIA-VISUAL-R2.1-ANDROID-EXPORT-GATE-11` (2026-08-03): se probaron
+  QDQ INT8, QLinearOps INT8, FP16 y FP32 optimizado desde el FP32 congelado,
+  con calibración sólo en train. QDQ/QLinearOps abren en ORT Python pero
+  agregan falsos permisos; FP16 produce no finitos; FP32 optimizado conserva
+  decisiones pero aumenta aproximadamente 24,5 MB y no tuvo ejecución directa
+  en Android. Resultado `NO-GO`; R1, `final_sealed`, Android y DAG permanecen
+  intactos. Evidencia:
+  `docs/dag/v3/GLOSHIA_VISUAL_R2_1_ANDROID_EXPORT_GATE_11_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -174,6 +182,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_VISUAL_CANDIDATE_TRAIN_08_2026-08-02.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_1_HARD_NEGATIVE_TRAIN_10_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_VISUAL_R2_1_ANDROID_EXPORT_GATE_11_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

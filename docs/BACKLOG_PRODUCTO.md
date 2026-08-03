@@ -446,6 +446,14 @@ Flujo de una entrada:
   `NO-GO`; R1 oficial, `final_sealed`, Android y DAG intactos. No se solicita
   canary ni integración. Evidencia: `docs/dag/v3/GLOSHIA_VISUAL_R2_1_HARD_NEGATIVE_TRAIN_10_2026-08-03.md`.
   Esfuerzo: L. Riesgo: alto.
+- `GLOSHIA-VISUAL-R2.1-ANDROID-EXPORT-GATE-11` (2026-08-03): se probaron
+  exportaciones QDQ INT8, QLinearOps INT8, FP16 y FP32 optimizado sin cambiar
+  pesos ni splits. QDQ/QLinearOps abren en ORT Python pero introducen falsos
+  permisos; FP16 produce no finitos; FP32 optimizado es equivalente al FP32 de
+  referencia, pero aumenta aproximadamente 24,5 MB y no tuvo sesión directa en
+  Android. Estado: `NO-GO`; R1 continúa oficial y no se solicita canary.
+  Evidencia: `docs/dag/v3/GLOSHIA_VISUAL_R2_1_ANDROID_EXPORT_GATE_11_2026-08-03.md`.
+  Esfuerzo: L. Riesgo: alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
