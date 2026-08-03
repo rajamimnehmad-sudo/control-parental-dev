@@ -265,6 +265,14 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   11/24. Resultado obligatorio `NO-GO`; el examen queda consumido, R1 sigue
   oficial y no se toco Android. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_4_REGION_AWARE_TRAINING_GATE_20_2026-08-03.md`.
+- `GLOSHIA-R3-MULTI-SIGNAL-DATA-CONTRACT-21` (2026-08-03): se recuperaron 176
+  revisiones historicas utilizables como etiquetas parciales para diez motivos.
+  Las 77 decisiones `allow` aportan negativos; en las 99 decisiones de filtro
+  solo los motivos marcados son positivos y los omitidos permanecen
+  desconocidos. Escote/pecho, hombro/axila y codo alcanzan el piso piloto; las
+  otras siete senales todavia no. Estado: `GO` para reetiquetado focalizado y
+  `NO-GO` para entrenar. R1 continua oficial. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_MULTISIGNAL_DATA_CONTRACT_21_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -285,6 +293,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_R2_2_REVERSIBLE_CANARY_18_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_3_REGIONAL_SAFETY_REPAIR_19_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_4_REGION_AWARE_TRAINING_GATE_20_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R3_MULTISIGNAL_DATA_CONTRACT_21_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

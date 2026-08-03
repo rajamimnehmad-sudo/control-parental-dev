@@ -560,6 +560,17 @@ Flujo de una entrada:
   `docs/dag/v3/GLOSHIA_R2_4_REGION_AWARE_TRAINING_GATE_20_2026-08-03.md`.
   Esfuerzo: L. Riesgo: alto.
 
+- `GLOSHIA-R3-MULTI-SIGNAL-DATA-CONTRACT-21` (2026-08-03): se definieron diez
+  senales alineadas con los motivos historicos y se convirtieron 176 revisiones
+  del propietario sin inventar negativos: los motivos omitidos en fotos
+  filtradas quedan `unknown`. Solo escote/pecho, hombro/axila y codo alcanzan el
+  piso piloto de 25 positivos y 50 negativos. Estado: `GO` para
+  `GLOSHIA-R3-FOCUSED-RELABEL-22`; `NO-GO` para entrenar R3 todavia. Las fotos
+  quedan autorizadas para experimento privado, no para republicacion automatica.
+  R1 continua oficial y no se toco DAG. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_MULTISIGNAL_DATA_CONTRACT_21_2026-08-03.md`.
+  Esfuerzo: M. Riesgo: medio.
+
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
 - Estado: `Resuelto como candidato DEV y validado físicamente; sin publicación`.

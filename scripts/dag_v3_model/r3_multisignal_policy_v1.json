@@ -1,0 +1,47 @@
+{
+  "schema_version": "gloshia-r3-multisignal-policy-v1",
+  "scope": {
+    "model": "single_local_visual_model",
+    "age_rule": "female_visual_presentation_approximately_6_or_older_or_age_uncertain",
+    "tiny_or_distant_subject": "allow_unless_an_independently_visible_critical_signal_is_clear",
+    "training_authorization": "owner_authorized_private_experiment",
+    "publication_reuse": "not_automatically_authorized"
+  },
+  "actions": {
+    "allow": "allow",
+    "blur": "filter",
+    "block": "filter",
+    "filter": "filter",
+    "exclude": "exclude"
+  },
+  "signals": [
+    "explicit_or_nudity",
+    "underwear_or_swimwear",
+    "transparent_clothing",
+    "neckline_or_chest",
+    "abdomen_visible",
+    "shoulder_or_armpit",
+    "elbow_uncovered",
+    "knee_uncovered",
+    "tight_clothing",
+    "sexualized_pose"
+  ],
+  "reason_map": {
+    "explicit_or_nudity": "explicit_or_nudity",
+    "underwear_or_swimwear": "underwear_or_swimwear",
+    "transparent_clothing": "transparent_clothing",
+    "neckline_or_chest": "neckline_or_chest",
+    "abdomen_visible": "abdomen_visible",
+    "shoulder_or_armpit": "shoulder_or_armpit",
+    "elbow_uncovered": "elbow_uncovered",
+    "knee_uncovered": "knee_uncovered",
+    "tight_clothing": "tight_clothing",
+    "sexualized_pose": "sexualized_pose"
+  },
+  "partial_label_rules": {
+    "allow_action": "all_signals_negative",
+    "filter_action_marked_reason": "mapped_signal_positive",
+    "filter_action_unmarked_reason": "signal_unknown_not_negative",
+    "unmapped_reason": "preserve_for_owner_review"
+  }
+}
