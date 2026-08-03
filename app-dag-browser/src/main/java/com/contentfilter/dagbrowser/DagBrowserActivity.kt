@@ -99,6 +99,9 @@ class DagBrowserActivity : Activity() {
     private val tabs = mutableListOf<BrowserTab>()
     private val thumbnailExecutor = Executors.newSingleThreadExecutor()
     private val downloadExecutor = Executors.newSingleThreadExecutor()
+    private val dagUpdateClient by lazy {
+        DagDevUpdateClient(applicationContext, BuildConfig.DAG_UPDATE_MANIFEST_URL)
+    }
     private val mediaAnalysisSequence = AtomicLong(0L)
     private val mediaAnalysisLifecycleGeneration = AtomicLong(0L)
     private val mediaAnalysisAccepting = AtomicBoolean(true)
@@ -126,6 +129,8 @@ class DagBrowserActivity : Activity() {
     private var nextInlinePdfRequest = 1L
     private var inlinePdfStage: InlinePdfStage? = null
     private var downloadDialog: AlertDialog? = null
+    private var updateProgressDialog: AlertDialog? = null
+    private var pendingDagUpdateApk: File? = null
     private var downloadsScreen: Dialog? = null
     private var pageListScreen: Dialog? = null
     private var activeChoicePrompt: ActiveChoicePrompt? = null
@@ -2401,6 +2406,10 @@ class DagBrowserActivity : Activity() {
                         confirmClearBrowsingData()
                         true
                     }
+                    R.id.menu_updates -> {
+                        checkForDagUpdate()
+                        true
+                    }
                     R.id.menu_about -> {
                         showAboutDag()
                         true
@@ -2409,6 +2418,98 @@ class DagBrowserActivity : Activity() {
                 }
             }
         }.also { popup -> popup.show() }
+    }
+
+    private fun checkForDagUpdate() {
+        Toast.makeText(this, R.string.checking_for_updates, Toast.LENGTH_SHORT).show()
+        downloadExecutor.execute {
+            val result = dagUpdateClient.check(BuildConfig.VERSION_CODE.toLong())
+            handler.post {
+                if (isFinishing || isDestroyed) return@post
+                when (result) {
+                    is DagDevUpdateCheckResult.Available -> showDagUpdateAvailable(result.manifest)
+                    DagDevUpdateCheckResult.UpToDate ->
+                        Toast.makeText(this, R.string.dag_is_up_to_date, Toast.LENGTH_SHORT).show()
+                    DagDevUpdateCheckResult.Unavailable ->
+                        Toast.makeText(this, R.string.dag_update_unavailable, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun showDagUpdateAvailable(manifest: DagDevUpdateManifest) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dag_update_available)
+            .setMessage(
+                getString(
+                    R.string.dag_update_detail,
+                    manifest.versionName,
+                    manifest.versionCode,
+                    manifest.releaseNotes.ifBlank { getString(R.string.dag_update_available) },
+                ),
+            )
+            .setPositiveButton(R.string.download_update) { _, _ -> downloadDagUpdate(manifest) }
+            .setNegativeButton(R.string.later, null)
+            .show()
+    }
+
+    private fun downloadDagUpdate(manifest: DagDevUpdateManifest) {
+        val progress =
+            ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                isIndeterminate = false
+                max = 100
+                progress = 0
+                setPadding(48, 24, 48, 12)
+            }
+        updateProgressDialog =
+            AlertDialog.Builder(this)
+                .setTitle(R.string.downloading_update)
+                .setView(progress)
+                .setCancelable(false)
+                .show()
+        downloadExecutor.execute {
+            val result =
+                dagUpdateClient.download(manifest) { percent ->
+                    handler.post { progress.progress = percent }
+                }
+            handler.post {
+                updateProgressDialog?.dismiss()
+                updateProgressDialog = null
+                if (isFinishing || isDestroyed) return@post
+                when (result) {
+                    is DagDevUpdateDownloadResult.Ready -> {
+                        pendingDagUpdateApk = result.apk
+                        requestDagUpdateInstallation()
+                    }
+                    DagDevUpdateDownloadResult.Failed ->
+                        Toast.makeText(this, R.string.update_download_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
+    private fun requestDagUpdateInstallation() {
+        if (dagUpdateClient.canRequestPackageInstalls()) {
+            installPendingDagUpdate()
+            return
+        }
+        AlertDialog.Builder(this)
+            .setTitle(R.string.install_update)
+            .setMessage(R.string.allow_dag_installation)
+            .setPositiveButton(R.string.allow_installation) { _, _ ->
+                dagUpdateClient.openInstallPermissionSettings()
+            }
+            .setNegativeButton(R.string.later, null)
+            .show()
+    }
+
+    private fun installPendingDagUpdate() {
+        val apk = pendingDagUpdateApk ?: return
+        if (dagUpdateClient.install(apk)) {
+            pendingDagUpdateApk = null
+        } else {
+            Toast.makeText(this, R.string.update_package_invalid, Toast.LENGTH_LONG).show()
+        }
     }
 
     private fun showAboutDag() {
@@ -2947,6 +3048,9 @@ class DagBrowserActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
+        if (pendingDagUpdateApk != null && dagUpdateClient.canRequestPackageInstalls()) {
+            installPendingDagUpdate()
+        }
         tabs.filter { it.thumbnail == null }.forEach(::restoreTabThumbnail)
         activeTab?.let { setTabActivity(it, active = true) }
     }
@@ -2989,6 +3093,8 @@ class DagBrowserActivity : Activity() {
             backInvokedCallback = null
         }
         activeDownload?.let(::cancelDownload)
+        updateProgressDialog?.dismiss()
+        updateProgressDialog = null
         pendingInlinePdfRequest = null
         inlinePdfStage?.let(::cancelInlinePdfStage)
         handler.removeCallbacksAndMessages(null)

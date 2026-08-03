@@ -14,6 +14,9 @@ el runtime actual desde versiones o worktrees historicos.
   no hizo push.
 - App Usuario 307, App Admin 290 y DAG 95 estan publicadas en DEV. Production
   no fue modificada.
+- DAG 96 (`0.69.0-dev`) esta validado localmente como canary reversible de
+  GloshIA R3 y pendiente de publicacion DEV. R1 permanece empaquetado como
+  fallback de apertura; no se ejecutan dos modelos por fotografia.
 - Los APK finales se construyen solo desde `main` local integrado.
 - Las apps Usuario/Admin no fueron modificadas. Supabase Storage DEV recibio
   unicamente la APK y el manifiesto de DAG 95.
@@ -23,6 +26,7 @@ el runtime actual desde versiones o worktrees historicos.
 | App Usuario | 307 | 1.0.1-dev | Publicada en DEV |
 | App Admin | 290 | 1.0.1-dev | Publicada en DEV |
 | DAG Browser | 95 | 0.68.1-dev | Publicada en DEV; instalada en SM-A235M |
+| DAG Browser candidata | 96 | 0.69.0-dev | Canary R3 local; publicación DEV pendiente |
 
 El APK canonico DAG 95 esta instalado en el SM-A235M `R58T34V31AE`; Android
 confirma `versionCode=95` y `versionName=0.68.1-dev`. El S22 puede obtenerlo

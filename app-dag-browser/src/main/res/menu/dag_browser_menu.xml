@@ -45,6 +45,10 @@
         android:icon="@drawable/ic_dag_delete"
         android:title="@string/clear_browsing_data" />
     <item
+        android:id="@+id/menu_updates"
+        android:icon="@drawable/ic_dag_download"
+        android:title="@string/check_for_updates" />
+    <item
         android:id="@+id/menu_about"
         android:icon="@drawable/ic_dag_shield"
         android:title="@string/about_dag" />
