@@ -249,7 +249,10 @@ async function decide(action, direction) {
   try {
     const payload = await fetchJson("/api/review", {
       method: "POST",
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Origin": window.location.origin,
+      },
       body: JSON.stringify({
         sample_id: item.sample_id,
         action,
@@ -313,7 +316,10 @@ async function undoLastDecision() {
   try {
     await fetchJson("/api/review", {
       method: "DELETE",
-      headers: {"Content-Type": "application/json"},
+      headers: {
+        "Content-Type": "application/json",
+        "Origin": window.location.origin,
+      },
       body: JSON.stringify({sample_id: lastDecision.sample_id}),
     });
     const item = items[lastDecision.index];
