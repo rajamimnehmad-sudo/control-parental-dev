@@ -238,6 +238,15 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   Estado: `GO` de exportación y compatibilidad; canary productivo aún pendiente.
   R1 y DAG 95 continúan oficiales. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`.
+- `GLOSHIA-R2.2-REVERSIBLE-CANARY-18` (2026-08-03): el candidato selectivo se
+  ejecuto en el S22 sobre 40 imagenes reales mediante la decodificacion,
+  preprocesamiento, regiones y politica exactos de DAG. R1 y R2.2 acertaron
+  34/40; R2.2 redujo falsos filtros de 4 a 3, pero aumento falsos permisos de 2
+  a 3 y bajo el recall de `filter` de 83,33 % a 75,00 %. La politica p95 fue
+  comparable (181,42 ms frente a 184,96 ms) y no hubo errores, pero el gate de
+  seguridad obliga `NO-GO`. El APK, modelo e imagenes de laboratorio fueron
+  retirados; R1 y DAG 95 siguen oficiales. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_2_REVERSIBLE_CANARY_18_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -255,6 +264,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_2_TARGETED_REPAIR_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R2_2_REVERSIBLE_CANARY_18_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

@@ -523,6 +523,15 @@ Flujo de una entrada:
   reemplazo oficial ni publicación automática. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`.
   Esfuerzo: M. Riesgo: medio-alto.
+- `GLOSHIA-R2.2-REVERSIBLE-CANARY-18` (2026-08-03): se compararon R1 y R2.2
+  con 40 imagenes reales dentro del pipeline completo de DAG en el S22. Ambos
+  acertaron 34/40. R2.2 redujo falsos filtros de 4 a 3, pero agrego un falso
+  permiso (3 frente a 2 de R1) y redujo el recall de seguridad a 75 %. Estado:
+  `NO-GO`; el candidato no se integra. El canary fue retirado y R1 continua
+  oficial. Un eventual R2.3 necesita datos y holdout nuevos; no se autoriza
+  calibrar con este examen consumido ni usar dos modelos en DAG. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_2_REVERSIBLE_CANARY_18_2026-08-03.md`.
+  Esfuerzo: M. Riesgo: alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
