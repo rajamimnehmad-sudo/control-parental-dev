@@ -198,6 +198,16 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   sido confirmada. R1, `final_sealed`, Android productivo y DAG permanecen
   intactos. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_1_ORT_ANDROID_HARNESS_12_2026-08-03.md`.
+- `GLOSHIA-R2.1-ANDROID-CROSS-DEVICE-GATE-13` (2026-08-03): el mismo APK,
+  candidato y examen congelado se ejecutaron en el Samsung S22 Ultra
+  (SM-S908E, Android 16). Las 119 probabilidades y decisiones del candidato
+  fueron idénticas a las del A23: 0/18 falsos permisos, 11/101 falsos filtros y
+  el mismo desacuerdo favorable frente a FP32. La latencia observada fue p50
+  47,75 ms y p95 63,89 ms. Resultado: `GO` de compatibilidad entre dispositivos
+  y `HOLD` para integración o apertura de `final_sealed` hasta congelar el
+  criterio final de aceptación. El harness fue retirado del S22; R1 y DAG
+  permanecen intactos. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_1_ANDROID_CROSS_DEVICE_GATE_13_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -210,6 +220,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_1_HARD_NEGATIVE_TRAIN_10_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_1_ANDROID_EXPORT_GATE_11_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_1_ORT_ANDROID_HARNESS_12_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R2_1_ANDROID_CROSS_DEVICE_GATE_13_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

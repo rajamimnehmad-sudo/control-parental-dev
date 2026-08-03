@@ -480,6 +480,17 @@ Flujo de una entrada:
   no se integra ni se solicita canary. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_1_ORT_ANDROID_HARNESS_12_2026-08-03.md`.
   Esfuerzo: M. Riesgo: medio-alto.
+- `GLOSHIA-R2.1-ANDROID-CROSS-DEVICE-GATE-13` (2026-08-03): se repitió el
+  examen congelado exacto en el Samsung S22 Ultra con Android 16. El candidato
+  reprodujo exactamente las 119 probabilidades y decisiones obtenidas en el
+  A23: 0/18 falsos permisos, 11/101 falsos filtros y un único desacuerdo frente
+  a FP32 sobre una imagen humana `allow`. Latencia observada p50 47,75 ms y p95
+  63,89 ms. Estado: `GO` de compatibilidad en dos dispositivos, `HOLD` para
+  abrir `final_sealed` o integrar hasta aprobar por separado el criterio final
+  orientado a seguridad. R1 continúa oficial; harness y temporales retirados.
+  Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_1_ANDROID_CROSS_DEVICE_GATE_13_2026-08-03.md`.
+  Esfuerzo: M. Riesgo: medio-alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
