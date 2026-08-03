@@ -176,7 +176,43 @@ def _sanitized_row(
     }
 
 
-def build_batch(output_dir: Path, known_manifests: Iterable[Path]) -> dict[str, Any]:
+def _validated_plan(path: Path) -> tuple[dict[str, int], dict[str, tuple[str, ...]]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    raw_targets = payload.get("targets")
+    raw_queries = payload.get("queries")
+    if not isinstance(raw_targets, dict) or not isinstance(raw_queries, dict):
+        raise ValueError("query plan must contain targets and queries objects")
+    if not 1 <= len(raw_targets) <= 4 or set(raw_targets) != set(raw_queries):
+        raise ValueError("query plan strata must match and contain between one and four entries")
+    targets: dict[str, int] = {}
+    queries: dict[str, tuple[str, ...]] = {}
+    for category, raw_target in raw_targets.items():
+        if not isinstance(category, str) or not category or not isinstance(raw_target, int):
+            raise ValueError("query plan targets are invalid")
+        raw_bucket = raw_queries[category]
+        if not 1 <= raw_target <= 60 or not isinstance(raw_bucket, list) or not 1 <= len(raw_bucket) <= 24:
+            raise ValueError("query plan target or query count exceeds the bounded limits")
+        bucket = tuple(str(query).strip() for query in raw_bucket)
+        if any(not query or len(query) > 160 for query in bucket):
+            raise ValueError("query plan contains an invalid query")
+        targets[category] = raw_target
+        queries[category] = bucket
+    if sum(targets.values()) > 120:
+        raise ValueError("query plan total exceeds 120 images")
+    return targets, queries
+
+
+def build_batch(
+    output_dir: Path,
+    known_manifests: Iterable[Path],
+    *,
+    targets: dict[str, int] | None = None,
+    queries: dict[str, tuple[str, ...]] | None = None,
+) -> dict[str, Any]:
+    targets = dict(targets or TARGETS)
+    queries = dict(queries or QUERIES)
+    if set(targets) != set(queries):
+        raise ValueError("targets and queries must use the same strata")
     output_dir = output_dir.resolve()
     partial_path = output_dir / "manifest.partial.jsonl"
     if output_dir.exists():
@@ -205,9 +241,9 @@ def build_batch(output_dir: Path, known_manifests: Iterable[Path]) -> dict[str, 
     failures: Counter[str] = Counter()
     inventory_counts: Counter[str] = Counter()
 
-    for category, target in TARGETS.items():
+    for category, target in targets.items():
         candidates: list[dict[str, Any]] = []
-        for query in QUERIES[category]:
+        for query in queries[category]:
             try:
                 bucket = inventory_query(query, pages=2, page_size=30)
                 candidates.extend(bucket)
@@ -275,7 +311,7 @@ def build_batch(output_dir: Path, known_manifests: Iterable[Path]) -> dict[str, 
                 failures[type(error).__name__ + ":" + str(error)[:80]] += 1
 
     counts = Counter(row["category"] for row in selected)
-    if counts != Counter(TARGETS):
+    if counts != Counter(targets):
         (output_dir / "summary.partial.json").write_text(
             json.dumps(
                 {
@@ -283,7 +319,7 @@ def build_batch(output_dir: Path, known_manifests: Iterable[Path]) -> dict[str, 
                     "status": "incomplete_resumable",
                     "downloaded": len(selected),
                     "categories": dict(counts),
-                    "target": TARGETS,
+                    "target": targets,
                     "failures": dict(failures),
                 },
                 indent=2,
@@ -291,7 +327,7 @@ def build_batch(output_dir: Path, known_manifests: Iterable[Path]) -> dict[str, 
             + "\n",
             encoding="utf-8",
         )
-        raise ValueError(f"batch incomplete: {dict(counts)} expected {TARGETS}")
+        raise ValueError(f"batch incomplete: {dict(counts)} expected {targets}")
     selected.sort(key=lambda row: row["sample_id"])
     (output_dir / "manifest.jsonl").write_text(
         "\n".join(json.dumps(row, ensure_ascii=False, sort_keys=True) for row in selected) + "\n",
@@ -306,7 +342,7 @@ def build_batch(output_dir: Path, known_manifests: Iterable[Path]) -> dict[str, 
         "schema_version": SCHEMA_VERSION,
         "status": "needs_human_review",
         "created_at": _utc_now(),
-        "target": sum(TARGETS.values()),
+        "target": sum(targets.values()),
         "downloaded": len(selected),
         "categories": dict(counts),
         "bytes": sum(row["bytes"] for row in selected),
@@ -345,8 +381,19 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--known-manifest", action="append", type=Path, default=[])
+    parser.add_argument(
+        "--query-plan",
+        type=Path,
+        help="optional bounded JSON query plan; defaults preserve the original R2.1 batch",
+    )
     args = parser.parse_args()
-    summary = build_batch(args.output, args.known_manifest)
+    targets, queries = _validated_plan(args.query_plan) if args.query_plan else (TARGETS, QUERIES)
+    summary = build_batch(
+        args.output,
+        args.known_manifest,
+        targets=targets,
+        queries=queries,
+    )
     print(json.dumps(summary, indent=2))
     return 0
 

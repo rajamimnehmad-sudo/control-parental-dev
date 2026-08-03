@@ -217,6 +217,18 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   oficial. El examen queda consumido y no puede usarse para entrenamiento,
   calibración ni un nuevo gate desconocido. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_2026-08-03.md`.
+- `GLOSHIA-VISUAL-R2.2-TARGETED-REPAIR-15` y
+  `GLOSHIA-R2.2-ANDROID-HARNESS-16` (2026-08-03): la auditoría confirmó que
+  cuatro falsos permisos R2.1 eran equipos femeninos de ciclismo ocultos bajo
+  la categoría genérica de grupos. R2.2 B, entrenada con 44 preetiquetas
+  binarias nuevas y seis dudas excluidas, corrigió las cuatro escenas. En un
+  holdout ciego nuevo de 40 muestras mantuvo 1 falso permiso como R1 y redujo
+  falsos filtros de 5 a 3, con accuracy 90 % frente a 85 % de R1. El INT8
+  exacto abrió en A23 y tuvo 0 falsos permisos sobre 119 tensores, pero agregó
+  un falso filtro frente a FP32; el gate previo exigía equivalencia cero.
+  Resultado: `NO-GO` técnico para integración; R1 y DAG 95 siguen oficiales.
+  Evidencia:
+  `docs/dag/v3/GLOSHIA_VISUAL_R2_2_TARGETED_REPAIR_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -232,6 +244,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_R2_1_ANDROID_CROSS_DEVICE_GATE_13_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_FREEZE_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_VISUAL_R2_2_TARGETED_REPAIR_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

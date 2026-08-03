@@ -502,6 +502,18 @@ Flujo de una entrada:
   recortes y pose sugerente, más un holdout final nuevo. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_2026-08-03.md`.
   Esfuerzo: M. Riesgo: alto.
+- `GLOSHIA-VISUAL-R2.2-TARGETED-REPAIR-15` y
+  `GLOSHIA-R2.2-ANDROID-HARNESS-16` (2026-08-03): se corrigió la lectura del
+  patrón dominante de R2.1 —equipos femeninos de ciclismo con sujetos pequeños—
+  mediante 50 imágenes nuevas, 44 preetiquetas binarias y seis dudas excluidas.
+  En un holdout ciego nuevo, R2.2 B obtuvo 90 % de accuracy, 1 falso permiso y
+  3 falsos filtros; R1 obtuvo 85 %, 1 y 5 respectivamente. Android ejecutó el
+  INT8 exacto con salidas finitas y cero falsos permisos en 119 tensores, pero
+  produjo un desacuerdo `allow→filter` frente a FP32. Estado: `NO-GO` técnico
+  bajo el gate de equivalencia cero; próximo ticket limitado a exportación
+  INT8, sin reentrenar ni tocar DAG. Evidencia:
+  `docs/dag/v3/GLOSHIA_VISUAL_R2_2_TARGETED_REPAIR_2026-08-03.md`.
+  Esfuerzo: L. Riesgo: alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 

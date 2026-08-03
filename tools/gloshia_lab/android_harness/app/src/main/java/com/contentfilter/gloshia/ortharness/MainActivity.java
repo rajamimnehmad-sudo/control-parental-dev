@@ -31,14 +31,14 @@ import java.util.Locale;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "GloshiaOrtHarness";
-    private static final String CANDIDATE_NAME = "r2.1-candidate-02-int8.onnx";
+    private static final String CANDIDATE_NAME = "r2.2-candidate-b-int8.onnx";
     private static final String R1_NAME = "r1-official.onnx";
     private static final String INPUT_NAME = "pixel_values";
     private static final long[] INPUT_SHAPE = {1, 3, 224, 224};
     private static final int INPUT_FLOATS = 3 * 224 * 224;
     private static final int SYNTHETIC_RUNS = 30;
     private static final String CANDIDATE_SHA256 =
-            "c212d005db271bebfb3fb80aade4c056334e0f4f07f2f1543976050f8c8afa3c";
+            "9aa424cfefbd5b6bbbf9470e6ff38df846b15c2e793b72e36608039e66af7852";
     private static final String R1_SHA256 =
             "2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee";
 
@@ -58,8 +58,8 @@ public final class MainActivity extends Activity {
     private void runHarness() {
         JSONObject report = new JSONObject();
         try {
-            report.put("schema_version", "gloshia-r2.1-ort-android-harness-v1");
-            report.put("ticket", "GLOSHIA-R2.1-ORT-ANDROID-HARNESS-12");
+            report.put("schema_version", "gloshia-r2.2-ort-android-harness-v1");
+            report.put("ticket", "GLOSHIA-R2.2-ANDROID-HARNESS-16");
             report.put("device", new JSONObject()
                     .put("model", Build.MODEL)
                     .put("manufacturer", Build.MANUFACTURER)
