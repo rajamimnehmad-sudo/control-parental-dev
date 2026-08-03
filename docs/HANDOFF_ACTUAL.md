@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-08-02
+Fecha de corte: 2026-08-03
 
 Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
@@ -23,11 +23,33 @@ el runtime actual desde versiones o worktrees historicos.
 | App Admin | 290 | 1.0.1-dev | Publicada en DEV |
 | DAG Browser | 92 | 0.68.0-dev | Publicada en DEV; instalada en SM-S908E |
 
+DAG 94 (`0.69.0-dev`) es una candidata local validada e instalada en el A23
+SM-A235M. No fue publicada y no reemplaza todavia a DAG 92 como version DEV
+oficial.
+
 El APK canonico DAG 92 esta instalado en el SM-S908E `R5CT717BZTZ`; Android
 confirma `versionCode=92` y `versionName=0.68.0-dev`. La actualizacion conservó
 los datos del perfil DEV.
 
 ## DAG Browser vigente
+
+### Candidata local DAG 94
+
+`DAG-MIMO-LONG-RUN-ROOT-CAUSE-94` corrigio la realimentacion entre el observador
+de imagenes y paginas dinamicas. Cada elemento recuerda la fuente exacta ya
+resuelta: cambios de presentacion para la misma fuente no vuelven a ocultarla,
+analizarla ni modificarla; un cambio real de fuente invalida el estado y cruza
+otra vez la compuerta. No hay excepciones por sitio y GloshIA R1 no cambio.
+
+En el A23, DAG 92 quedaba cerca de 100 % de CPU despues de 160 interacciones y
+continuaba asi en reposo. DAG 94 quedo en 2 %; entre 80 y 160 interacciones el
+RSS se aplano en aproximadamente 298-308 MiB y bajo a 279 MiB al reposar. Mimo
+y Cheeky pasaron el recorrido. Fravega revelo un pendiente previo: 107 recursos
+permitidos, 3 animaciones bloqueadas y 2 filtros del modelo pueden reutilizar
+cuadros negros; no se modifico esa politica en este ticket.
+
+Extension local: `1.49.0`. Evidencia:
+`docs/compatibility/results/dag-browser-v94-long-run-root-cause-sm-a235m-2026-08-03.md`.
 
 DAG 92 usa una unica compuerta GloshIA previa al render. Los bytes raster se
 capturan una vez y solo `model_allow` devuelve el original exacto. Filtro,

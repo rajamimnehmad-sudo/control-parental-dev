@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-08-02
+Ultima sincronizacion: 2026-08-03
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -59,6 +59,24 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-MIMO-LONG-RUN-ROOT-CAUSE-94 - Presentacion idempotente en paginas dinamicas
+
+- Estado: `Resuelto localmente y validado fisicamente; sin push ni publicacion`.
+  Prioridad: P0. Esfuerzo: L. Riesgo: alto.
+- Causa: el observador de imagenes podia volver a procesar la misma fuente ante
+  mutaciones de presentacion y realimentarse con el layout dinamico. En DAG 92,
+  Mimo quedaba cerca de 100 % de CPU aun despues de reposar.
+- Resultado: DAG 94 y extension 1.49.0 deduplican por elemento y fuente exacta.
+  La misma fuente ya resuelta no vuelve a modificarse; una fuente realmente
+  nueva conserva el recorrido fail-closed. Sin reglas por Mimo o telefono y sin
+  cambios en GloshIA.
+- Validacion: tras 160 interacciones, CPU 2 % y RSS 308 MiB; en reposo, CPU 2 %
+  y RSS 279 MiB. La memoria se aplano entre 80 y 160. Mimo y Cheeky funcionales.
+  Fravega expuso un pendiente previo de animaciones y falsos filtros, separado
+  de este ticket. Quince pruebas WebExtension, unitarias Android, Ktlint, Lint y
+  build aprobados. Evidencia en
+  `docs/compatibility/results/dag-browser-v94-long-run-root-cause-sm-a235m-2026-08-03.md`.
 
 ### DAG-UX-STABLE-92 - Interfaz del navegador sin saltos
 
