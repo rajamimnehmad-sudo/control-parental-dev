@@ -454,6 +454,15 @@ Flujo de una entrada:
   Android. Estado: `NO-GO`; R1 continúa oficial y no se solicita canary.
   Evidencia: `docs/dag/v3/GLOSHIA_VISUAL_R2_1_ANDROID_EXPORT_GATE_11_2026-08-03.md`.
   Esfuerzo: L. Riesgo: alto.
+- `GLOSHIA-R2.1-ORT-ANDROID-HARNESS-12` (2026-08-03): se ejecutó en un
+  harness aislado el INT8 dinámico exacto con ORT Android 1.27.0 CPU en el
+  Samsung A23. `ConvInteger` abrió y ejecutó; no hubo NaN/Inf ni falsos
+  permisos humanos nuevos. En 119 muestras hubo 1 desacuerdo de decisión con
+  el FP32 de referencia y 11/101 falsos filtros del candidato. Con tolerancia
+  de equivalencia fijada en cero, el gate queda `NO-GO`; R1 continúa oficial,
+  no se integra ni se solicita canary. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_1_ORT_ANDROID_HARNESS_12_2026-08-03.md`.
+  Esfuerzo: M. Riesgo: medio-alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 

@@ -172,6 +172,17 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   en Android. Resultado `NO-GO`; R1, `final_sealed`, Android y DAG permanecen
   intactos. Evidencia:
   `docs/dag/v3/GLOSHIA_VISUAL_R2_1_ANDROID_EXPORT_GATE_11_2026-08-03.md`.
+- `GLOSHIA-R2.1-ORT-ANDROID-HARNESS-12` (2026-08-03): el candidato INT8
+  dinámico exacto de EXPORT-GATE-11 abrió y ejecutó `ConvInteger` directamente
+  con ORT Android 1.27.0 CPU en el Samsung A23 (SM-A235M, Android 14), con
+  salidas finitas y cierre de sesión correcto. Sobre los mismos 119 tensores
+  congelados tuvo 0/18 falsos permisos, 11/101 falsos filtros y un desacuerdo
+  de decisión frente a FP32 (1/119, en dirección de falso filtro de FP32 a
+  allow). La tolerancia de equivalencia quedó fijada en cero, por lo que el
+  resultado es `NO-GO` para canary aunque la compatibilidad de ConvInteger haya
+  sido confirmada. R1, `final_sealed`, Android productivo y DAG permanecen
+  intactos. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_1_ORT_ANDROID_HARNESS_12_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -183,6 +194,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_1_HARD_NEGATIVE_TRAIN_10_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_1_ANDROID_EXPORT_GATE_11_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R2_1_ORT_ANDROID_HARNESS_12_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes
