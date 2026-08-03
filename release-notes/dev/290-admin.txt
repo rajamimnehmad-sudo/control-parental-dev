@@ -1,0 +1,2 @@
+App Admin organiza mejor sus Ajustes, solicitudes y datos de contacto, e incorpora una ayuda segura adaptada a la administracion del sistema.
+Tambien renueva los iconos y mejora la claridad general de la interfaz sin cambiar reglas, usuarios ni protecciones existentes.
