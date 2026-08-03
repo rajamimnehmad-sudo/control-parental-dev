@@ -10,6 +10,102 @@ const testRoot = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(testRoot, "../../main/assets/dag-protection");
 const readAsset = (name) => readFile(join(extensionRoot, name), "utf8");
 
+const createBarrierHarness = async () => {
+  const source = await readAsset("barrier.js");
+  const listeners = new Map();
+  let observerCallback = null;
+  let inlineRequests = 0;
+  class Element {
+    querySelectorAll() {
+      return [];
+    }
+    matches() {
+      return false;
+    }
+  }
+  class HTMLImageElement extends Element {
+    constructor(sourceUrl) {
+      super();
+      this.attributes = new Map([["src", sourceUrl]]);
+      this.currentSrc = sourceUrl;
+      this.src = sourceUrl;
+      this.complete = true;
+      this.naturalWidth = 32;
+      this.naturalHeight = 32;
+      this.isConnected = true;
+      this.removeCalls = 0;
+    }
+    getAttribute(name) {
+      return this.attributes.get(name) || "";
+    }
+    hasAttribute(name) {
+      return this.attributes.has(name);
+    }
+    setAttribute(name, value) {
+      this.attributes.set(name, value);
+    }
+    removeAttribute(name) {
+      this.removeCalls += 1;
+      this.attributes.delete(name);
+    }
+    getBoundingClientRect() {
+      return { width: 32, height: 32 };
+    }
+  }
+  class MutationObserver {
+    constructor(callback) {
+      observerCallback = callback;
+    }
+    observe() {}
+  }
+  const document = {
+    images: [],
+    readyState: "loading",
+    addEventListener(type, listener) {
+      listeners.set(type, listener);
+    },
+    querySelector() {
+      return null;
+    },
+  };
+  const window = {};
+  window.top = window;
+  const browser = {
+    runtime: {
+      connectNative() {
+        return { postMessage() {} };
+      },
+      sendMessage() {
+        inlineRequests += 1;
+        return Promise.resolve({ action: "allow" });
+      },
+    },
+  };
+  vm.runInNewContext(source, {
+    browser,
+    clearTimeout,
+    crypto: webcrypto,
+    document,
+    Element,
+    HTMLImageElement,
+    location: { href: "https://shop.example.test/" },
+    Map,
+    MutationObserver,
+    Promise,
+    setTimeout,
+    Uint32Array,
+    WeakMap,
+    window,
+  }, { filename: "barrier.js" });
+  return {
+    HTMLImageElement,
+    notify(records) {
+      observerCallback(records);
+    },
+    inlineRequests: () => inlineRequests,
+  };
+};
+
 const eventChannel = () => ({
   listeners: [],
   addListener(listener) {
@@ -378,6 +474,10 @@ test("first paint closes inline and changing image sources before stable reveal"
   assert.match(barrier, /inlineImageIsBounded/u);
   assert.match(barrier, /inline-raster-decision/u);
   assert.match(barrier, /pendingImages\.get\(image\) !== request/u);
+  assert.match(barrier, /resolvedInlineImages\.get\(image\)/u);
+  assert.match(barrier, /resolved\?\.source === source/u);
+  assert.match(barrier, /pendingImages\.get\(image\)\?\.source === source/u);
+  assert.match(barrier, /stableImageSources\.get\(image\) === source/u);
   assert.doesNotMatch(barrier, /\.src\s*=|\.srcset\s*=|cheeky|google\.com/iu);
   assert.match(css, /img\[src\^="data:" i\]/u);
   assert.match(css, /img\[src\^="blob:" i\]/u);
@@ -387,6 +487,31 @@ test("first paint closes inline and changing image sources before stable reveal"
   assert.match(css, /background-image: none !important/u);
   assert.match(css, /img:not\(\[data-glosh-dag-stable="true"\]\)/u);
   assert.doesNotMatch(css, /\[src\^="https?:"|object-position/u);
+});
+
+test("resolved image sources remain idempotent across presentation mutations", async () => {
+  const harness = await createBarrierHarness();
+  const firstSource = "data:image/png;base64,AA==";
+  const image = new harness.HTMLImageElement(firstSource);
+  harness.notify([{ type: "attributes", target: image, addedNodes: [] }]);
+  await new Promise((resolvePromise) => setImmediate(resolvePromise));
+  assert.equal(harness.inlineRequests(), 1);
+  assert.equal(image.hasAttribute("data-glosh-dag-stable"), true);
+  const removalsAfterDecision = image.removeCalls;
+
+  harness.notify([{ type: "attributes", target: image, addedNodes: [] }]);
+  await new Promise((resolvePromise) => setImmediate(resolvePromise));
+  assert.equal(harness.inlineRequests(), 1);
+  assert.equal(image.removeCalls, removalsAfterDecision);
+  assert.equal(image.hasAttribute("data-glosh-dag-stable"), true);
+
+  const secondSource = "data:image/png;base64,AQ==";
+  image.attributes.set("src", secondSource);
+  image.currentSrc = secondSource;
+  image.src = secondSource;
+  harness.notify([{ type: "attributes", target: image, addedNodes: [] }]);
+  await new Promise((resolvePromise) => setImmediate(resolvePromise));
+  assert.equal(harness.inlineRequests(), 2);
 });
 
 test("active extension has bounded work and no site or device exceptions", async () => {
