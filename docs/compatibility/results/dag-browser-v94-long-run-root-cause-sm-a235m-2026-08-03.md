@@ -4,7 +4,7 @@ Ticket: `DAG-MIMO-LONG-RUN-ROOT-CAUSE-94`
 Dispositivo: Samsung SM-A235M (A23), Android 14  
 APK: DEV local, `versionCode=94`, `versionName=0.69.0-dev`  
 Extension: `1.49.0`  
-Publicacion: ninguna
+Publicacion: DEV verificada; Production intacta
 
 ## Problema reproducido
 
@@ -78,6 +78,6 @@ de 10 %.
 - Sin crash, ANR u OOM durante la matriz.
 - Sin archivos, temporizadores, flags o scripts diagnosticos en el resultado.
 
-Resultado: `GO local` para la correccion de degradacion prolongada. Sin push ni
-publicacion DEV. El tratamiento de animaciones y falsos filtros de Fravega no
+Resultado: `GO DEV` para la correccion de degradacion prolongada. Sin push. El
+tratamiento de animaciones y falsos filtros de Fravega no
 forma parte de este gate.

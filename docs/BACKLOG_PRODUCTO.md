@@ -44,14 +44,14 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Versiones DEV publicadas: App Usuario 307, App Admin 290 y DAG Browser 92.
+- Versiones DEV publicadas: App Usuario 307, App Admin 290 y DAG Browser 94.
   Publicacion, hashes e instalacion se verifican en el handoff.
-- DAG 92 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
+- DAG 94 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
   sin espera artificial y no reoculta una imagen ya segura durante rotaciones
   de fuente. El refresh del mismo documento conserva visible la pagina
   protegida; primera carga, URL distinta o fallo mantienen cobertura total.
-  Esta respaldado en GitHub y publicado en DEV. DAG 92 esta instalado en
-  SM-S908E; la barra superior fija evita saltos durante el desplazamiento.
+  Esta publicado en DEV e instalado en SM-A235M; el push de los commits locales
+  queda pendiente. La barra superior fija evita saltos durante el desplazamiento.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -62,7 +62,7 @@ Flujo de una entrada:
 
 ### DAG-MIMO-LONG-RUN-ROOT-CAUSE-94 - Presentacion idempotente en paginas dinamicas
 
-- Estado: `Resuelto localmente y validado fisicamente; sin push ni publicacion`.
+- Estado: `Resuelto, validado fisicamente y publicado en DEV; sin push`.
   Prioridad: P0. Esfuerzo: L. Riesgo: alto.
 - Causa: el observador de imagenes podia volver a procesar la misma fuente ante
   mutaciones de presentacion y realimentarse con el layout dinamico. En DAG 92,
