@@ -247,6 +247,15 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   seguridad obliga `NO-GO`. El APK, modelo e imagenes de laboratorio fueron
   retirados; R1 y DAG 95 siguen oficiales. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_2_REVERSIBLE_CANARY_18_2026-08-03.md`.
+- `GLOSHIA-R2.3-REGIONAL-SAFETY-REPAIR-19` (2026-08-03): se adquirieron 57
+  escenas grupales independientes y, antes de entrenar, se fijo que personas
+  diminutas o lejanas tipo "buscar a Wally" no deben provocar filtrado. Las
+  preetiquetas quedaron 41 `allow`, 14 `filter` y 2 `doubt`. R2.3 B mantuvo
+  0/10 falsos permisos en frozen_test, pero subio falsos filtros de 11 a 12.
+  En un holdout regional nuevo repitio exactamente a R2.2: 2/4 falsos permisos
+  y 2/10 falsos filtros, con balanced accuracy 65 %. Resultado `NO-GO`; no se
+  exporto a Android ni se toco DAG. R1 sigue oficial. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_3_REGIONAL_SAFETY_REPAIR_19_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -265,6 +274,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_2_TARGETED_REPAIR_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_2_REVERSIBLE_CANARY_18_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R2_3_REGIONAL_SAFETY_REPAIR_19_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

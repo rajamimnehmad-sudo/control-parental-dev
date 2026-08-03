@@ -533,6 +533,20 @@ Flujo de una entrada:
   `docs/dag/v3/GLOSHIA_R2_2_REVERSIBLE_CANARY_18_2026-08-03.md`.
   Esfuerzo: M. Riesgo: alto.
 
+- `GLOSHIA-R2.3-REGIONAL-SAFETY-REPAIR-19` (2026-08-03): se preparo un lote
+  independiente de 57 escenas grupales. Se incorporo antes de entrenar el
+  criterio de producto de permitir personas diminutas o lejanas, tipo "buscar
+  a Wally". Quedaron 41 `allow`, 14 `filter` y 2 `doubt`; las preetiquetas no
+  equivalen a doble revision humana. R2.3 B fue congelado antes de abrir un
+  holdout regional nuevo de 14 casos. Alli repitio las decisiones de R2.2:
+  2/4 falsos permisos y 2/10 falsos filtros. Ademas agrego un falso filtro en
+  frozen_test. Estado: `NO-GO`; no se exporta, no se prueba en Android y R1
+  continua oficial. Un eventual siguiente ticket debe evaluar entrenamiento
+  del mismo modelo unico con imagen completa y recortes regionales, usando
+  datos y holdout nuevos. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_3_REGIONAL_SAFETY_REPAIR_19_2026-08-03.md`.
+  Esfuerzo: L. Riesgo: alto.
+
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
 - Estado: `Resuelto como candidato DEV y validado físicamente; sin publicación`.
