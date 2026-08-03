@@ -54,9 +54,10 @@ class AdminRequestsViewModel
         private val lastRefreshedAtEpochMillis = MutableStateFlow<Long?>(null)
         private val selectedDeviceId = MutableStateFlow<String?>(null)
         private val pendingActionIds = MutableStateFlow<Set<String>>(emptySet())
-        private val hiddenHistoryIds = MutableStateFlow(
-            preferences.getStringSet(HiddenHistoryIdsKey, emptySet()).orEmpty(),
-        )
+        private val hiddenHistoryIds =
+            MutableStateFlow(
+                preferences.getStringSet(HiddenHistoryIdsKey, emptySet()).orEmpty(),
+            )
         private val installedApps = MutableStateFlow<List<RemoteInstalledAppDto>>(emptyList())
         private val refreshState =
             combine(syncMessage, isLoading, lastRefreshedAtEpochMillis) { message, loading, refreshedAt ->

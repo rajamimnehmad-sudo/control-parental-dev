@@ -24,8 +24,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.contentfilter.core.ui.ProductGlyph
-import com.contentfilter.core.ui.ProductIcon
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -34,6 +32,8 @@ import com.contentfilter.core.network.remote.RemoteAnnouncement
 import com.contentfilter.core.network.remote.RemoteAnnouncementRepository
 import com.contentfilter.core.network.remote.RemoteResult
 import com.contentfilter.core.ui.PremiumFeedbackBanner
+import com.contentfilter.core.ui.ProductGlyph
+import com.contentfilter.core.ui.ProductIcon
 import com.contentfilter.core.ui.ProductListRow
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers

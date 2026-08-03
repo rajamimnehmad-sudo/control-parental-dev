@@ -236,7 +236,10 @@ internal fun AdminFeedbackSettingsRoute(viewModel: AdminFeedbackViewModel = hilt
                 Text(if (state.saving) "Enviando…" else "Enviar valoración")
             }
             if (state.ratingAvailableAtEpochMillis > System.currentTimeMillis()) {
-                Text(ratingAvailabilityText(state.ratingAvailableAtEpochMillis), style = MaterialTheme.typography.bodySmall)
+                Text(
+                    ratingAvailabilityText(state.ratingAvailableAtEpochMillis),
+                    style = MaterialTheme.typography.bodySmall,
+                )
             } else {
                 Text(ratingAvailabilityText(0L), style = MaterialTheme.typography.bodySmall)
             }

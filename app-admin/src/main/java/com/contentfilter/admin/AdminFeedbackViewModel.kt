@@ -48,21 +48,26 @@ class AdminFeedbackViewModel
             viewModelScope.launch {
                 val deviceId = activationRepository.currentActivation()?.deviceId
                 val result =
-                    if (deviceId == null) Result.failure(IllegalStateException())
-                    else feedbackRepository.submitRating(deviceId, stars, comment, BuildConfig.VERSION_CODE)
+                    if (deviceId == null) {
+                        Result.failure(IllegalStateException())
+                    } else {
+                        feedbackRepository.submitRating(deviceId, stars, comment, BuildConfig.VERSION_CODE)
+                    }
                 if (result.isSuccess) {
                     val availableAt = System.currentTimeMillis() + RatingCooldownMillis
                     preferences.edit().putLong(RatingAvailableAtKey, availableAt).apply()
-                    mutableState.value = mutableState.value.copy(
-                        saving = false,
-                        message = "Gracias. Tu valoración fue enviada.",
-                        ratingAvailableAtEpochMillis = availableAt,
-                    )
+                    mutableState.value =
+                        mutableState.value.copy(
+                            saving = false,
+                            message = "Gracias. Tu valoración fue enviada.",
+                            ratingAvailableAtEpochMillis = availableAt,
+                        )
                 } else {
-                    mutableState.value = mutableState.value.copy(
-                        saving = false,
-                        message = ratingFailureMessage(result),
-                    )
+                    mutableState.value =
+                        mutableState.value.copy(
+                            saving = false,
+                            message = ratingFailureMessage(result),
+                        )
                     if (result.exceptionOrNull()?.message?.contains("7 days", ignoreCase = true) == true) {
                         loadRatingAvailability()
                     }
@@ -83,11 +88,12 @@ class AdminFeedbackViewModel
             viewModelScope.launch {
                 val deviceId = activationRepository.currentActivation()?.deviceId ?: return@launch
                 feedbackRepository.getAdminContact(deviceId).onSuccess { contact ->
-                    mutableState.value = mutableState.value.copy(
-                        contactEmail = contact.contactEmail,
-                        phoneE164 = contact.phoneE164,
-                        contactLoaded = true,
-                    )
+                    mutableState.value =
+                        mutableState.value.copy(
+                            contactEmail = contact.contactEmail,
+                            phoneE164 = contact.phoneE164,
+                            contactLoaded = true,
+                        )
                 }.onFailure {
                     mutableState.value = mutableState.value.copy(contactLoaded = true)
                 }
@@ -98,9 +104,10 @@ class AdminFeedbackViewModel
             viewModelScope.launch {
                 val deviceId = activationRepository.currentActivation()?.deviceId ?: return@launch
                 feedbackRepository.getRatingAvailability(deviceId).onSuccess { availability ->
-                    mutableState.value = mutableState.value.copy(
-                        ratingAvailableAtEpochMillis = availability.nextAvailableAtEpochMillis ?: 0L,
-                    )
+                    mutableState.value =
+                        mutableState.value.copy(
+                            ratingAvailableAtEpochMillis = availability.nextAvailableAtEpochMillis ?: 0L,
+                        )
                 }
             }
         }
@@ -118,10 +125,11 @@ class AdminFeedbackViewModel
             viewModelScope.launch {
                 val deviceId = activationRepository.currentActivation()?.deviceId
                 val result = if (deviceId == null) Result.failure(IllegalStateException()) else action(deviceId)
-                mutableState.value = mutableState.value.copy(
-                    saving = false,
-                    message = if (result.isSuccess) successMessage else contactFailureMessage(result),
-                )
+                mutableState.value =
+                    mutableState.value.copy(
+                        saving = false,
+                        message = if (result.isSuccess) successMessage else contactFailureMessage(result),
+                    )
             }
         }
 

@@ -17,8 +17,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -157,7 +157,9 @@ fun AdminRequestsRoute(
                     onDismissRequest = { confirmClearHistory = false },
                     title = { Text("Borrar historial") },
                     text = {
-                        Text("Se ocultará el historial de este usuario en esta aplicación. Las solicitudes remotas no se borran.")
+                        Text(
+                            "Se ocultará el historial de este usuario en esta aplicación. Las solicitudes remotas no se borran.",
+                        )
                     },
                     confirmButton = {
                         TextButton(
