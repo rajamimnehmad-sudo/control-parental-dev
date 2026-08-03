@@ -491,6 +491,17 @@ Flujo de una entrada:
   Evidencia:
   `docs/dag/v3/GLOSHIA_R2_1_ANDROID_CROSS_DEVICE_GATE_13_2026-08-03.md`.
   Esfuerzo: M. Riesgo: medio-alto.
+- `GLOSHIA-R2.1-FINAL-SEALED-GATE-14` (2026-08-03): el examen final de 108
+  muestras se abrió una vez después de congelar artefacto, umbral, membresía y
+  criterios. La revisión produjo 77 allow, 30 filter y 1 doubt. R2.1 mejoró los
+  falsos filtros de 24 a 8 y accuracy de 73,83 % a 85,05 %, pero duplicó falsos
+  permisos de 4 a 8 y bajó recall de filter de 86,67 % a 73,33 %. Estado:
+  `NO-GO`; R1 continúa oficial y R2.1 no entra en canary. El examen queda
+  consumido y excluido de entrenamiento o calibración futura. Próximo trabajo:
+  datos nuevos independientes centrados en grupos, escenas mixtas, ilustración,
+  recortes y pose sugerente, más un holdout final nuevo. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_2026-08-03.md`.
+  Esfuerzo: M. Riesgo: alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 

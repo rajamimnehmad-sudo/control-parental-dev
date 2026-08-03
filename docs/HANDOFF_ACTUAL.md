@@ -208,6 +208,15 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   criterio final de aceptación. El harness fue retirado del S22; R1 y DAG
   permanecen intactos. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_1_ANDROID_CROSS_DEVICE_GATE_13_2026-08-03.md`.
+- `GLOSHIA-R2.1-FINAL-SEALED-GATE-14` (2026-08-03): después de congelar el
+  candidato, umbral, membresía y gates en el commit `0f18c86`, se abrió una
+  única vez el examen final de 108 muestras. Hubo 77 allow, 30 filter y 1 doubt.
+  R2.1 redujo falsos filtros de 24/77 a 8/77 y subió accuracy de 73,83 % a
+  85,05 %, pero aumentó falsos permisos de 4/30 a 8/30 y redujo recall de
+  `filter` de 86,67 % a 73,33 %. Resultado obligatorio: `NO-GO`; R1 continúa
+  oficial. El examen queda consumido y no puede usarse para entrenamiento,
+  calibración ni un nuevo gate desconocido. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -221,6 +230,8 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_1_ANDROID_EXPORT_GATE_11_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_1_ORT_ANDROID_HARNESS_12_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_1_ANDROID_CROSS_DEVICE_GATE_13_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_FREEZE_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes
