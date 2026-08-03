@@ -44,14 +44,12 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Versiones DEV publicadas: App Usuario 307, App Admin 290 y DAG Browser 94.
+- Versiones DEV publicadas: App Usuario 307, App Admin 290 y DAG Browser 95.
   Publicacion, hashes e instalacion se verifican en el handoff.
-- DAG 94 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
-  sin espera artificial y no reoculta una imagen ya segura durante rotaciones
-  de fuente. El refresh del mismo documento conserva visible la pagina
-  protegida; primera carga, URL distinta o fallo mantienen cobertura total.
-  Esta publicado en DEV e instalado en SM-A235M; el push de los commits locales
-  queda pendiente. La barra superior fija evita saltos durante el desplazamiento.
+- DAG 95 es el rollback publicado de DAG 94: restaura el comportamiento
+  comprobado de DAG 92 con `versionCode` superior para permitir la actualizacion
+  Android. Esta publicado en DEV e instalado en SM-A235M; el push de los commits
+  locales queda pendiente. GloshIA R1 no cambio.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -62,12 +60,12 @@ Flujo de una entrada:
 
 ### DAG-MIMO-LONG-RUN-ROOT-CAUSE-94 - Presentacion idempotente en paginas dinamicas
 
-- Estado: `Resuelto, validado fisicamente y publicado en DEV; sin push`.
+- Estado: `Revertido por indicacion del usuario; reemplazado por DAG 95`.
   Prioridad: P0. Esfuerzo: L. Riesgo: alto.
 - Causa: el observador de imagenes podia volver a procesar la misma fuente ante
   mutaciones de presentacion y realimentarse con el layout dinamico. En DAG 92,
   Mimo quedaba cerca de 100 % de CPU aun despues de reposar.
-- Resultado: DAG 94 y extension 1.49.0 deduplican por elemento y fuente exacta.
+- Resultado historico: DAG 94 y extension 1.49.0 deduplicaban por elemento y fuente exacta.
   La misma fuente ya resuelta no vuelve a modificarse; una fuente realmente
   nueva conserva el recorrido fail-closed. Sin reglas por Mimo o telefono y sin
   cambios en GloshIA.
@@ -75,7 +73,8 @@ Flujo de una entrada:
   y RSS 279 MiB. La memoria se aplano entre 80 y 160. Mimo y Cheeky funcionales.
   Fravega expuso un pendiente previo de animaciones y falsos filtros, separado
   de este ticket. Quince pruebas WebExtension, unitarias Android, Ktlint, Lint y
-  build aprobados. Evidencia en
+  build aprobados. El usuario informo que el resultado no funciono como esperaba;
+  el cambio fue revertido por completo y no es base vigente. Evidencia historica en
   `docs/compatibility/results/dag-browser-v94-long-run-root-cause-sm-a235m-2026-08-03.md`.
 
 ### DAG-UX-STABLE-92 - Interfaz del navegador sin saltos

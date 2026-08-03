@@ -1,5 +1,11 @@
 # DAG 94 - causa raiz de degradacion prolongada
 
+> **REVERTIDO / NO VIGENTE (2026-08-03).** El usuario informo que el cambio no
+> resolvio el comportamiento esperado. El commit funcional fue revertido por
+> completo y DAG 95 restauro el pipeline de DAG 92. Este documento se conserva
+> exclusivamente como evidencia historica; su `GO DEV` ya no es una recomendacion
+> vigente.
+
 Ticket: `DAG-MIMO-LONG-RUN-ROOT-CAUSE-94`  
 Dispositivo: Samsung SM-A235M (A23), Android 14  
 APK: DEV local, `versionCode=94`, `versionName=0.69.0-dev`  
@@ -78,6 +84,7 @@ de 10 %.
 - Sin crash, ANR u OOM durante la matriz.
 - Sin archivos, temporizadores, flags o scripts diagnosticos en el resultado.
 
-Resultado: `GO DEV` para la correccion de degradacion prolongada. Sin push. El
+Resultado historico original: `GO DEV`, posteriormente retirado por validacion
+del usuario y reemplazado por DAG 95. Sin push. El
 tratamiento de animaciones y falsos filtros de Fravega no
 forma parte de este gate.

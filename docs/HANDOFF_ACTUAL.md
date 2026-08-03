@@ -10,45 +10,41 @@ el runtime actual desde versiones o worktrees historicos.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- `main` local integra DAG 94 y queda por delante de `origin/main`; este lote
+- `main` local integra DAG 95 y queda por delante de `origin/main`; este lote
   no hizo push.
-- App Usuario 307, App Admin 290 y DAG 94 estan publicadas en DEV. Production
+- App Usuario 307, App Admin 290 y DAG 95 estan publicadas en DEV. Production
   no fue modificada.
 - Los APK finales se construyen solo desde `main` local integrado.
 - Las apps Usuario/Admin no fueron modificadas. Supabase Storage DEV recibio
-  unicamente la APK y el manifiesto de DAG 94.
+  unicamente la APK y el manifiesto de DAG 95.
 
 | Aplicacion | versionCode | versionName DEV | Estado |
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Publicada en DEV |
 | App Admin | 290 | 1.0.1-dev | Publicada en DEV |
-| DAG Browser | 94 | 0.69.0-dev | Publicada en DEV; instalada en SM-A235M |
+| DAG Browser | 95 | 0.68.1-dev | Publicada en DEV; instalada en SM-A235M |
 
-El APK canonico DAG 94 esta instalado en el SM-A235M `R58T34V31AE`; Android
-confirma `versionCode=94` y `versionName=0.69.0-dev`. El S22 puede obtenerlo
+El APK canonico DAG 95 esta instalado en el SM-A235M `R58T34V31AE`; Android
+confirma `versionCode=95` y `versionName=0.68.1-dev`. El S22 puede obtenerlo
 desde Actualizaciones de App Usuario.
 
 ## DAG Browser vigente
 
-### DAG 94 publicado en DEV
+### DAG 95 publicado en DEV: rollback confirmado
 
-`DAG-MIMO-LONG-RUN-ROOT-CAUSE-94` corrigio la realimentacion entre el observador
-de imagenes y paginas dinamicas. Cada elemento recuerda la fuente exacta ya
-resuelta: cambios de presentacion para la misma fuente no vuelven a ocultarla,
-analizarla ni modificarla; un cambio real de fuente invalida el estado y cruza
-otra vez la compuerta. No hay excepciones por sitio y GloshIA R1 no cambio.
+DAG 95 revierte completamente el cambio funcional de DAG 94 y restaura el
+pipeline de imagenes de DAG 92, ultimo punto aceptado por el usuario. Android no
+permite instalar un `versionCode` menor sobre 94; por eso el rollback se publica
+como 95 aunque su comportamiento vuelva a 92. GloshIA R1, sus pesos, umbrales y
+decisiones no cambiaron.
 
-En el A23, DAG 92 quedaba cerca de 100 % de CPU despues de 160 interacciones y
-continuaba asi en reposo. DAG 94 quedo en 2 %; entre 80 y 160 interacciones el
-RSS se aplano en aproximadamente 298-308 MiB y bajo a 279 MiB al reposar. Mimo
-y Cheeky pasaron el recorrido. Fravega revelo un pendiente previo: 107 recursos
-permitidos, 3 animaciones bloqueadas y 2 filtros del modelo pueden reutilizar
-cuadros negros; no se modifico esa politica en este ticket.
+DAG 94 queda retirado como version vigente. Su informe se conserva solamente
+como evidencia historica y esta marcado `REVERTIDO`: la mejora de laboratorio
+no resolvio el comportamiento observado por el usuario. Extension incorporada
+en DAG 95: `1.50.0`. Evidencia actual:
+`docs/compatibility/results/dag-browser-v95-rollback-sm-a235m-2026-08-03.md`.
 
-Extension incorporada: `1.49.0`. Evidencia:
-`docs/compatibility/results/dag-browser-v94-long-run-root-cause-sm-a235m-2026-08-03.md`.
-
-DAG 94 usa una unica compuerta GloshIA previa al render. Los bytes raster se
+DAG 95 usa una unica compuerta GloshIA previa al render. Los bytes raster se
 capturan una vez y solo `model_allow` devuelve el original exacto. Filtro,
 error, timeout, saturacion, animacion o entrada invalida producen un PNG neutro
 sin pixeles rechazados. SVG e iconos vectoriales seguros quedan fuera de la
@@ -69,7 +65,7 @@ La presentacion vigente es global:
 
 En un refresh del mismo documento DAG mantiene visible la pagina ya protegida
 mientras espera la nueva barrera. Primera carga, URL distinta o fallo siguen
-cerrados por la cobertura total. Extension incorporada: `1.49.0`.
+cerrados por la cobertura total. Extension incorporada: `1.50.0`.
 
 Los `data:image` raster visibles que parecen controles o iconos ya no quedan
 ocultos para siempre: si pesan hasta 48 KiB, tienen bordes naturales de hasta
@@ -82,7 +78,7 @@ no hay reglas por Google, comercio o telefono.
 La interfaz sustituye la transicion azul por fondo blanco y una barra fina de
 progreso. Los sprites PNG pasivos, extremos, transparentes y de pocos colores
 pueden sanitizarse sin liberar fotografias ni crear excepciones por comercio.
-La interfaz de DAG 94 conserva el boton de nueva pagina blanco, miniaturas
+La interfaz de DAG 95 conserva el boton de nueva pagina blanco, miniaturas
 visibles en pestañas e historial, iconos en el menu y Descargas en pantalla
 completa. La barra superior queda fija durante el desplazamiento: se retiro el
 ocultamiento que cambiaba la altura util y producia un salto visible.
@@ -98,7 +94,7 @@ object y embed permanecen bloqueados por contratos separados.
 
 ## Validacion y artefacto
 
-- 15 pruebas WebExtension y 154 unitarias Kotlin aprobadas; DAG 94 repitio
+- 14 pruebas WebExtension y las unitarias Kotlin aprobadas; DAG 95 repitio
   Ktlint, Lint y build.
 - Ktlint, Lint, build y `git diff --check` correctos.
 - En Mimo, la interaccion temprana del menu paso de `26,7 fps` en la base y
@@ -136,12 +132,12 @@ object y embed permanecen bloqueados por contratos separados.
 APK local:
 
 - ruta: `app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk`;
-- tamaño: `121377373` bytes;
+- tamaño: `121377265` bytes;
 - SHA-256:
-  `e1391cc0fb1599ef8a84a59263db7208c38ba401be5dceafb8753aabd2f911d9`.
+  `b3308326d9af8bf84e808f319739344f51db04603e55bfd60c39724a389d6b8e`.
 
 Evidencia completa:
-`docs/compatibility/results/dag-browser-v94-long-run-root-cause-sm-a235m-2026-08-03.md`.
+`docs/compatibility/results/dag-browser-v95-rollback-sm-a235m-2026-08-03.md`.
 Contrato vigente: `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PIPELINE.md`.
 
 ## Metricas
@@ -156,7 +152,7 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
 
 ## Estado de GloshIA visual
 
-- Hay un unico modelo local; DAG 94 no cambia sus pesos ni umbrales.
+- Hay un unico modelo local; DAG 95 no cambia sus pesos ni umbrales.
 - El experimento local autorizado `GLOSHIA-VISUAL-CANDIDATE-TRAIN-08` produjo
   R2 Candidate 01 con 203 train, 47 validation y 72 frozen_test, agrupados sin
   cruces de hashes ni clusters.
