@@ -8,8 +8,8 @@
   },
   "scripts": {
     "dev": "next dev",
-    "build": "opennextjs-cloudflare build && node scripts/prepare-sites-dist.mjs",
-    "build:sites": "opennextjs-cloudflare build && node scripts/prepare-sites-dist.mjs",
+    "build": "next build && opennextjs-cloudflare build --skipNextBuild && node scripts/prepare-sites-dist.mjs",
+    "build:sites": "pnpm build",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit"
   },
