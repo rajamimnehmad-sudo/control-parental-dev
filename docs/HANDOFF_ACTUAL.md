@@ -149,11 +149,21 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
 - `GLOSHIA-VISUAL-R2-HARD-NEGATIVE-REPAIR-09` (2026-08-02): se preparó un
   lote privado de 50 imágenes públicas independientes, 25/25 en estratos de
   muestreo filter-like/allow-like. Todas están pendientes de revisión humana
-  ciega; los estratos no son etiquetas. R1 fue puntuado sin alterar el modelo
-  y produjo 24 allow y 26 filter, pero todavía no hay matriz ni falsos
-  permisos/filtros porque no se inventaron decisiones. El servidor local es
-  `http://127.0.0.1:8770/`; `final_sealed` sigue cerrado. No se entrenó ni se
-  crearon pesos, splits o candidatos nuevos. Evidencia:
+  ciega; los estratos no son etiquetas. La revisión terminó con 26 filter, 23
+  allow y 1 doubt. Sobre las 49 binarias, R1 tuvo 8/26 falsos permisos y 7/23
+  falsos filtros, balanced accuracy 69,40% y PR-AUC 79,46%; en el estrato
+  filter-like hubo 7/18 falsos permisos. El servidor local es
+  `http://127.0.0.1:8770/`; `final_sealed` sigue cerrado. Todavía no se
+  entrenó ni se crearon pesos o splits nuevos; sigue pendiente el gate de
+  contaminación antes del piloto R2.1. Evidencia:
+  `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`.
+- `GLOSHIA-VISUAL-R2.1-HARD-NEGATIVE-TRAIN-10` (2026-08-03): la ronda nueva
+  quedó auditada, pero `0/50` muestras tienen autorización de entrenamiento y
+  `0/50` tienen derechos claros; son sólo `internal_evaluation_ok` con derechos
+  inciertos. El preparador de splits falla cerrado y no se entrenó R2.1. Estado:
+  `NO-GO / BLOQUEADO POR DATOS`; R1, `final_sealed`, Android y DAG permanecen
+  intactos. Se requiere autorización explícita de entrenamiento o un lote con
+  derechos claros antes de continuar. Evidencia:
   `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`.
 
 Documentos vigentes:

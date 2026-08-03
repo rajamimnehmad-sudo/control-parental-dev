@@ -57,7 +57,9 @@ muestreo: no son etiquetas humanas y no se usan como verdad.
 
 ## Revisión humana
 
-El lote está en revisión ciega, con 0 de 50 decisiones. La interfaz local es:
+La revisión ciega quedó completa: 50 de 50 decisiones, con 26 `filter`, 23
+`allow` y 1 `doubt`. La duda permanece fuera de toda matriz binaria. La interfaz
+local es:
 
 `http://127.0.0.1:8770/`
 
@@ -67,7 +69,7 @@ La predicción no se entrega antes de la decisión; después la interfaz muestra
 predicción, probabilidad y coincidencia/desacuerdo. El servidor escucha sólo en
 loopback, no usa API ni Supabase y confirma que el examen sellado sigue cerrado.
 
-## Medición provisional
+## Medición sobre la ronda completa
 
 R1 fue ejecutado con el mismo runner y el mismo ONNX oficial sobre las 50
 imágenes, sin usar la salida como etiqueta humana:
@@ -78,13 +80,50 @@ imágenes, sin usar la salida como etiqueta humana:
 - máximo: 304,172 ms.
 - media: 131,285 ms.
 - media de inferencias: 2,22 por imagen.
-- Matriz de confusión y falsos permisos/filtros: aún no disponibles, porque
-  no hay decisiones humanas binarias.
+- Sobre las 49 decisiones binarias: matriz `allow_as_allow=16`,
+  `allow_as_filter=7`, `filter_as_allow=8`, `filter_as_filter=18`.
+- Accuracy: `34/49 = 69,39%`; balanced accuracy: `69,40%`.
+- Falsos permisos: `8/26 = 30,77%` de las imágenes filtrables.
+- Falsos filtros: `7/23 = 30,43%` de las imágenes permitibles.
+- Precisión filter: `18/25 = 72,00%`; recall filter: `18/26 = 69,23%`.
+- Precisión allow: `16/23 = 69,57%`; recall allow: `16/23 = 69,57%`.
+- F1 filter: `70,59%`; F1 allow: `68,09%`; PR-AUC filter: `79,46%`.
+- El estrato `hard_negative_filter_like` concentró `7/18` falsos permisos y
+  `2/7` falsos filtros; el estrato `hard_negative_allow_like` tuvo `1/8`
+  falsos permisos y `5/16` falsos filtros.
+- En verticales el resultado fue especialmente débil: `5/11` falsos permisos
+  y `6/12` falsos filtros, balanced accuracy `52,27%`.
 
-No se crearon splits de entrenamiento ni `frozen_test`; hacerlo antes de la
-revisión introduciría decisiones inventadas. El siguiente paso autorizado es
-completar la revisión humana, manteniendo `doubt` separado, y recién después
-formar splits agrupados y ejecutar el gate contra R1.
+El resultado confirma que las imágenes difíciles aportan información y que el
+falso permiso de R2 no debe repararse con una excepción por muestra. También
+confirma que los estratos de adquisición no eran etiquetas: la matriz usa
+exclusivamente las decisiones humanas.
+
+Todavía no se crearon los nuevos splits de entrenamiento ni `frozen_test`. El
+siguiente paso autorizado es formar splits agrupados con las 49 binarias,
+mantener la duda fuera, comprobar contaminación y ejecutar un piloto de R2.1
+sin mirar el nuevo `frozen_test` para seleccionar configuración.
+
+## Gate de autorización de entrenamiento
+
+La auditoría del manifiesto muestra `0/50` filas con
+`training_authorized=true` y `0/50` con `training_rights_clear`. Las 50 están
+marcadas `internal_evaluation_ok` y `training_rights_uncertain`, por lo que se
+pueden medir en privado pero no se pueden incorporar al entrenamiento bajo el
+contrato de este ticket. La duda tampoco puede entrar por ser `allow` o
+`filter`.
+
+El preparador de splits falla cerrado al encontrar la primera fila binaria sin
+autorización; no generó splits ni permitió iniciar entrenamiento. El falso
+permiso original autorizado para diagnóstico (`wikimedia:167902476`) permanece
+fuera de esta corrida hasta que exista un split autorizado coherente.
+
+Resultado de este ticket en el estado actual: `NO-GO / BLOQUEADO POR DATOS`, no
+por una medición negativa de R2.1. R1 permanece oficial e intacto; no se abrió
+`final_sealed`, no se cambiaron pesos, umbrales, Android ni DAG. Para continuar
+se necesita autorizar explícitamente el uso de las 49 binarias (o entregar un
+subconjunto con derechos/autorización claros) y mantener la separación del
+holdout.
 
 ## Archivos de implementación
 

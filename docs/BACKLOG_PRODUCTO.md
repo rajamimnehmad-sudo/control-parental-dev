@@ -429,11 +429,20 @@ Flujo de una entrada:
   crear excepciones por imagen o sitio. Se adquirieron 50 imágenes públicas
   privadas para evaluación interna, 25/25 en estratos de muestreo, con hashes y
   deduplicación contra manifiestos históricos. Quedaron 50 pendientes de
-  revisión ciega en `http://127.0.0.1:8770/`; no se inventaron etiquetas, no se
-  entrenó, no se abrió `final_sealed` y R1 permanece oficial. Estado: bloqueado
-  en gate humano hasta obtener decisiones `allow`/`filter`/`doubt` reales.
+  revisión ciega en `http://127.0.0.1:8770/`; se obtuvieron 26 `filter`, 23
+  `allow` y 1 `doubt`. Sobre 49 binarias, R1 tuvo 8/26 falsos permisos y 7/23
+  falsos filtros. No se inventaron etiquetas, no se entrenó, no se abrió
+  `final_sealed` y R1 permanece oficial. Estado: gate humano completado;
+  pendiente crear splits agrupados y comprobar contaminación antes del piloto.
   Esfuerzo: M. Riesgo: medio-alto. Evidencia:
   `docs/dag/v3/GLOSHIA_VISUAL_R2_HARD_NEGATIVE_REPAIR_09_2026-08-02.md`.
+- `GLOSHIA-VISUAL-R2.1-HARD-NEGATIVE-TRAIN-10` (2026-08-03): ejecutado hasta
+  el gate de datos. La ronda tiene 49 binarias y 1 `doubt`, pero `0/50` tiene
+  `training_authorized=true` o `training_rights_clear`; todas son privadas para
+  evaluación interna con derechos inciertos. El split builder rechaza el lote
+  y no inicia entrenamiento. Estado: `NO-GO / Bloqueado por datos`; R1 queda
+  oficial. Dependencia para reanudar: autorización explícita de entrenamiento
+  o corpus con derechos claros. Esfuerzo: M. Riesgo: alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
