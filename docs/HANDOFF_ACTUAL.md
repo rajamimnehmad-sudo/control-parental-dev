@@ -229,6 +229,15 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   Resultado: `NO-GO` técnico para integración; R1 y DAG 95 siguen oficiales.
   Evidencia:
   `docs/dag/v3/GLOSHIA_VISUAL_R2_2_TARGETED_REPAIR_2026-08-03.md`.
+- `GLOSHIA-R2.2-EXPORT-EQUIVALENCE-17` (2026-08-03): sin reentrenar ni mover
+  el umbral, se dejó en FP32 únicamente el `k_proj` del primer bloque y se
+  mantuvo el resto de la cuantización dinámica. El artefacto selectivo pesa
+  8.950.584 bytes, se reproduce byte por byte y pasó 119/119 decisiones frente
+  a FP32 en A23 y S22, con 0 falsos permisos y salidas finitas. Latencia p50:
+  323,62 ms en A23 y 35,65 ms en S22, comparable con R1 en las mismas sesiones.
+  Estado: `GO` de exportación y compatibilidad; canary productivo aún pendiente.
+  R1 y DAG 95 continúan oficiales. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -245,6 +254,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_FREEZE_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_1_FINAL_SEALED_GATE_14_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_VISUAL_R2_2_TARGETED_REPAIR_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

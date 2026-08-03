@@ -115,3 +115,8 @@ producto antes de volver a medir; nunca se aceptará un desacuerdo
 Artefactos privados:
 `.codex-tmp/gloshia-r22-sports-repair-20260803/` y
 `.codex-tmp/gloshia-r22-blind-holdout-20260803/`.
+
+Actualización posterior: `GLOSHIA-R2.2-EXPORT-EQUIVALENCE-17` resolvió el
+desacuerdo mediante una exportación selectiva reproducible y pasó 119/119
+decisiones tanto en A23 como en S22. Ver
+`docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`.

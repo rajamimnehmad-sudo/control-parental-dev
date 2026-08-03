@@ -514,6 +514,15 @@ Flujo de una entrada:
   INT8, sin reentrenar ni tocar DAG. Evidencia:
   `docs/dag/v3/GLOSHIA_VISUAL_R2_2_TARGETED_REPAIR_2026-08-03.md`.
   Esfuerzo: L. Riesgo: alto.
+- `GLOSHIA-R2.2-EXPORT-EQUIVALENCE-17` (2026-08-03): se mantuvo en FP32 una
+  sola operación sensible del primer bloque y se cuantizó el resto sin cambiar
+  pesos, preprocesamiento ni umbral. El archivo de 8.950.584 bytes es
+  reproducible por SHA-256 y obtuvo equivalencia 119/119 en A23 y S22, cero
+  falsos permisos y rendimiento comparable con R1. Estado: `GO` de exportación
+  y compatibilidad; próximo paso `GLOSHIA-R2.2-REVERSIBLE-CANARY-18`, sin
+  reemplazo oficial ni publicación automática. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`.
+  Esfuerzo: M. Riesgo: medio-alto.
 
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
