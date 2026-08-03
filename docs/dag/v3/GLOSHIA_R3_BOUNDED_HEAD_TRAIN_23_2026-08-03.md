@@ -49,7 +49,7 @@ test, sin agregar falsos permisos en ninguno de los dos examenes.
 
 ## Artefactos
 
-- FP32: 33.200.637 bytes, SHA-256
+- FP32: 33.236.705 bytes, SHA-256
   `70f3c92134e05a7d5cbae47c8cf75c48503a54f3e59b2a0a9876d35d775406f5`.
 - INT8 selectivo: 8.950.584 bytes, SHA-256
   `1f1e03ad089609d03036ae93a789589446bab54302859e4b6e64d662bd3eeeb7`.
@@ -68,4 +68,3 @@ dos examenes y aprende las tres correcciones del propietario. Queda aprobado
 como candidata de laboratorio, no como modelo productivo. R1 sigue oficial
 hasta que el INT8 conserve las decisiones FP32 en Android, no agregue falsos
 permisos y mantenga latencia y memoria comparables.
-

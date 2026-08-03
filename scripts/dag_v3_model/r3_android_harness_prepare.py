@@ -39,8 +39,10 @@ def main() -> int:
     parser.add_argument("--split", required=True, type=Path)
     parser.add_argument("--fp32", required=True, type=Path)
     parser.add_argument("--int8", required=True, type=Path)
+    parser.add_argument("--candidate-name", default="r3-head-01-selective-int8.onnx")
     parser.add_argument("--r1", required=True, type=Path)
     parser.add_argument("--threshold", required=True, type=float)
+    parser.add_argument("--fp32-threshold", type=float)
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args()
 
@@ -55,6 +57,7 @@ def main() -> int:
     session = ort.InferenceSession(str(args.fp32), providers=["CPUExecutionProvider"])
     args.output_dir.mkdir(parents=True, exist_ok=True)
     tensor_path = args.output_dir / "evaluation-inputs.bin"
+    fp32_threshold = args.fp32_threshold if args.fp32_threshold is not None else args.threshold
     samples = []
     with tensor_path.open("wb") as tensor_file:
         for record in records:
@@ -63,14 +66,15 @@ def main() -> int:
                 raise ValueError("unexpected preprocessed tensor contract")
             tensor_file.write(pixels.astype("<f4", copy=False).tobytes())
             probability = float(session.run(["filter_probability"], {"pixel_values": pixels})[0][0, 0])
-            samples.append(sample_metadata(record, probability, args.threshold))
+            samples.append(sample_metadata(record, probability, fp32_threshold))
 
-    candidate_name = "r3-head-01-selective-int8.onnx"
+    candidate_name = args.candidate_name
     shutil.copyfile(args.int8, args.output_dir / candidate_name)
     shutil.copyfile(args.r1, args.output_dir / "r1-official.onnx")
     metadata = {
         "schema_version": "gloshia-r3-head-01-android-evaluation-v1",
-        "threshold": args.threshold,
+        "fp32_threshold": fp32_threshold,
+        "candidate_threshold": args.threshold,
         "samples": samples,
         "final_sealed_opened": False,
     }
@@ -105,4 +109,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

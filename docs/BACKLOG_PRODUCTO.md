@@ -591,11 +591,12 @@ Flujo de una entrada:
   `docs/dag/v3/GLOSHIA_R3_BOUNDED_HEAD_TRAIN_23_2026-08-03.md`.
   Esfuerzo: L. Riesgo: alto.
 
-- `GLOSHIA-R3-ANDROID-EQUIVALENCE-24` (2026-08-03): preparación terminada sin
-  teléfono. Harness aislado parametrizado, APK compilada y 119 tensores
-  congelados listos. Pendiente ejecutar en A23 o S22 y exigir equivalencia de
-  decisiones contra FP32, cero falsos permisos y rendimiento comparable con
-  R1. No integrar en DAG antes del `GO`. Evidencia:
+- `GLOSHIA-R3-ANDROID-EQUIVALENCE-24` (2026-08-03): matriz de 119 tensores
+  ejecutada en S22. La opción híbrida de 10,47 MB obtuvo 0 falsos permisos y
+  redujo falsos filtros de 42 a 10, con p50 186,25 ms frente a 188,18 ms de
+  R1. Tiene una diferencia conservadora frente a FP32, por lo que queda
+  `CONDITIONAL-GO` y requiere repetición en A23 antes de canary. No integrar en
+  DAG todavía. Evidencia:
   `docs/dag/v3/GLOSHIA_R3_ANDROID_EQUIVALENCE_24_PREP_2026-08-03.md`.
   Esfuerzo restante: S. Riesgo: medio.
 

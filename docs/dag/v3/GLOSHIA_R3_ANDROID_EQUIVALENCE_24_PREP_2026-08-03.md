@@ -2,7 +2,7 @@
 
 Fecha: 2026-08-03  
 Ticket: `GLOSHIA-R3-ANDROID-EQUIVALENCE-24`  
-Estado: preparado; pendiente teléfono Android conectado.
+Estado: ejecutado en S22; candidata híbrida pendiente confirmación A23.
 
 ## Preparado sin teléfono
 
@@ -30,6 +30,25 @@ En A23 o S22 se debe comprobar:
 4. cero falsos permisos;
 5. latencia p50/p95, memoria y temperatura comparables con R1.
 
-El APK de laboratorio debe retirarse al terminar. No se integra el modelo en
-DAG hasta superar este gate.
+## Resultado S22
 
+Dispositivo: Samsung SM-S908E, Android 16, API 36.
+
+Se probaron tres exportaciones:
+
+1. INT8 dinámico de 8,95 MB: `NO-GO`; produjo dos diferencias y un falso
+   permiso.
+2. FP32 de 33,24 MB: decisiones exactas y cero falsos permisos, pero p50
+   340,94 ms frente a 215,39 ms de R1; `NO-GO` por latencia y tamaño.
+3. Híbrido Conv-FP32/MatMul-INT8 de 10.469.698 bytes, umbral móvil 0,40:
+   cero falsos permisos, 10 falsos filtros frente a 42 de R1, p50 186,25 ms
+   frente a 188,18 ms y PSS pico 106.031 KB frente a 105.615 KB.
+
+El híbrido conserva todas las decisiones de seguridad, reduce falsos filtros
+76,2 % y es ligeramente más rápido. Tiene una diferencia frente a FP32 en
+dirección conservadora (`allow` convertido en `filter`). Por el gate estricto
+de equivalencia el resultado automático es `NO-GO`; por calidad de producto
+queda `CONDITIONAL-GO` para repetir en A23 y luego realizar canary reversible.
+
+El APK de laboratorio fue desinstalado y las cuatro carpetas temporales fueron
+retiradas del S22. DAG y R1 no se modificaron.
