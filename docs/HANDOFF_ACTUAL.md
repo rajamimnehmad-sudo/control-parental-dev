@@ -10,26 +10,26 @@ el runtime actual desde versiones o worktrees historicos.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- Tras el cierre local de DAG 87, `main` queda 32 commits por delante de
-  `origin/main`.
-- No se hizo push, PR, publicacion DEV ni Production.
+- `main` fue respaldada en `origin/main` despues de integrar DAG 92 y las
+  versiones Android vigentes.
+- App Usuario 307, App Admin 290 y DAG 92 estan publicadas en DEV. Production
+  no fue modificada.
 - Los APK finales se construyen solo desde `main` local integrado.
 - Supabase y las apps Usuario/Admin no fueron modificados en este lote.
 
 | Aplicacion | versionCode | versionName DEV | Estado |
 | --- | ---: | --- | --- |
-| App Usuario | 307 | 1.0.1-dev | Sin cambios |
-| App Admin | 290 | 1.0.1-dev | Sin cambios |
-| DAG Browser | 87 | 0.67.0-dev | Instalado y validado localmente; no publicado |
+| App Usuario | 307 | 1.0.1-dev | Publicada en DEV |
+| App Admin | 290 | 1.0.1-dev | Publicada en DEV |
+| DAG Browser | 92 | 0.68.0-dev | Publicada en DEV; instalada en SM-S908E |
 
-El APK canonico DAG 87 esta instalado en el SM-A235M `R58T34V31AE`; Android
-confirma `versionCode=87`, `versionName=0.67.0-dev` y DAG como navegador
-predeterminado. El equipo tenia DAG 67 y se actualizo primero al rollback 86 y
-luego al candidato 87, siempre conservando datos.
+El APK canonico DAG 92 esta instalado en el SM-S908E `R5CT717BZTZ`; Android
+confirma `versionCode=92` y `versionName=0.68.0-dev`. La actualizacion conservó
+los datos del perfil DEV.
 
 ## DAG Browser vigente
 
-DAG 87 usa una unica compuerta GloshIA previa al render. Los bytes raster se
+DAG 92 usa una unica compuerta GloshIA previa al render. Los bytes raster se
 capturan una vez y solo `model_allow` devuelve el original exacto. Filtro,
 error, timeout, saturacion, animacion o entrada invalida producen un PNG neutro
 sin pixeles rechazados. SVG e iconos vectoriales seguros quedan fuera de la
@@ -63,6 +63,10 @@ no hay reglas por Google, comercio o telefono.
 La interfaz sustituye la transicion azul por fondo blanco y una barra fina de
 progreso. Los sprites PNG pasivos, extremos, transparentes y de pocos colores
 pueden sanitizarse sin liberar fotografias ni crear excepciones por comercio.
+La interfaz de DAG 92 agrega un boton de nueva pagina blanco, miniaturas
+visibles en pestañas e historial, iconos en el menu y Descargas en pantalla
+completa. La barra superior queda fija durante el desplazamiento: se retiro el
+ocultamiento que cambiaba la altura util y producia un salto visible.
 El bloqueo de anuncios por red sigue vigente, pero ya no existe un
 `MutationObserver` global que recorra cada cambio de todas las paginas: los
 selectores explicitos se revisan una vez y la busqueda textual exacta se limita
@@ -75,7 +79,8 @@ object y embed permanecen bloqueados por contratos separados.
 
 ## Validacion y artefacto
 
-- 14 pruebas WebExtension y 154 unitarias Kotlin aprobadas.
+- 14 pruebas WebExtension y 154 unitarias Kotlin aprobadas; el lote de interfaz
+  DAG 92 repitio las 154 unitarias, Ktlint, Lint y build.
 - Ktlint, Lint, build y `git diff --check` correctos.
 - En Mimo, la interaccion temprana del menu paso de `26,7 fps` en la base y
   `21,8 fps` en un candidato descartado a `47,8-48,6 fps` en dos repeticiones
@@ -112,9 +117,9 @@ object y embed permanecen bloqueados por contratos separados.
 APK local:
 
 - ruta: `app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk`;
-- tamaño: `121373233` bytes;
+- tamaño: `121377265` bytes;
 - SHA-256:
-  `c61e8320033bf24f0e9f80e4e268b2f9e3accc2c7b75770b4fb827c695a808c0`.
+  `3c692dae5f841570119f9c0d0da932bfad32863d9afba09ae91be4a755a27dfd`.
 
 Evidencia completa:
 `docs/compatibility/results/dag-browser-v87-inline-icons-sm-a235m-2026-08-02.md`.
@@ -132,7 +137,7 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
 
 ## Estado de GloshIA visual
 
-- Hay un unico modelo local; DAG 87 no cambia sus pesos ni umbrales.
+- Hay un unico modelo local; DAG 92 no cambia sus pesos ni umbrales.
 - El experimento local autorizado `GLOSHIA-VISUAL-CANDIDATE-TRAIN-08` produjo
   R2 Candidate 01 con 203 train, 47 validation y 72 frozen_test, agrupados sin
   cruces de hashes ni clusters.

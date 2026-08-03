@@ -44,14 +44,14 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Declaraciones locales: App Usuario DEV 307, App Admin DEV 290 y DAG Browser
-  DEV 87. Son versiones de codigo; publicacion e instalacion se verifican por
-  separado en el handoff.
-- DAG 87 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
+- Versiones DEV publicadas: App Usuario 307, App Admin 290 y DAG Browser 92.
+  Publicacion, hashes e instalacion se verifican en el handoff.
+- DAG 92 conserva una unica compuerta GloshIA, revela raster HTTP(S) completo
   sin espera artificial y no reoculta una imagen ya segura durante rotaciones
   de fuente. El refresh del mismo documento conserva visible la pagina
   protegida; primera carga, URL distinta o fallo mantienen cobertura total.
-  Esta validado localmente en SM-S908E, no fue publicado ni subido a GitHub.
+  Esta respaldado en GitHub y publicado en DEV. DAG 92 esta instalado en
+  SM-S908E; la barra superior fija evita saltos durante el desplazamiento.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
@@ -59,6 +59,19 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-UX-STABLE-92 - Interfaz del navegador sin saltos
+
+- Estado: `Resuelto, respaldado y publicado en DEV`. Aprobado y confirmado por
+  el usuario. Prioridad: P1. Esfuerzo: M. Riesgo: medio.
+- Resultado: boton de nueva pagina blanco, miniaturas visibles en pestañas e
+  historial, menu con iconos y Descargas en pantalla completa. El gesto para
+  volver al navegador vive en el organizador de pestañas, no en el contador.
+- Causa del salto corregida: el ocultamiento automatico cambiaba la altura util
+  de GeckoView durante el scroll. Se retiro esa mutacion y la barra queda fija.
+- Validacion: 154 unitarias Kotlin, Ktlint, Lint y APK desde `main`; instalacion
+  confirmada como `versionCode=92` en SM-S908E. GloshIA R1, sus pesos y sus
+  umbrales permanecen intactos.
 
 ### DAG-INLINE-SAFE-ICONS-87 - Iconos raster inline bajo la compuerta unica
 
