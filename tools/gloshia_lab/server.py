@@ -369,8 +369,8 @@ class ReviewHandler(BaseHTTPRequestHandler):
                     {
                         "sample_id": row["sample_id"],
                         "image_url": f"/image/{quote(row['sample_id'], safe='')}",
-                        "category": row["category"] if review else None,
-                        "split": row["split"] if review else None,
+                        "category": row.get("category") if review else None,
+                        "split": row.get("split") if review else None,
                         "model_prediction": row.get("model_prediction") if review else None,
                         "human_decision": review,
                     }

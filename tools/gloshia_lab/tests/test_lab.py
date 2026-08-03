@@ -523,7 +523,6 @@ class ReviewServerTest(unittest.TestCase):
             manifest = {
                 "sample_id": "sample:one",
                 "category": "boundary_current",
-                "split": "main_eval",
                 "local_path": "images/sample.jpg",
                 "sha256": "1" * 64,
             }
@@ -597,7 +596,7 @@ class ReviewServerTest(unittest.TestCase):
                 )["items"][0]
                 self.assertEqual("filter", after["model_prediction"]["action"])
                 self.assertEqual("boundary_current", after["category"])
-                self.assertEqual("main_eval", after["split"])
+                self.assertIsNone(after["split"])
                 status = json.loads(urlopen(f"{base}/api/status", timeout=2).read())
                 self.assertEqual(1, status["reviewed_total"])
                 self.assertEqual(0, status["queue_remaining"])
