@@ -1,0 +1,2 @@
+DAG mejora la estabilidad de páginas dinámicas durante uso prolongado: evita volver a procesar una imagen cuando su contenido no cambió, reduciendo consumo acumulado de CPU y memoria.
+GloshIA Visual, sus criterios y el filtrado previo a mostrar cada fuente nueva permanecen sin cambios.
