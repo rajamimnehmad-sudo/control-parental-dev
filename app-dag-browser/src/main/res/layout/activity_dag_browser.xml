@@ -26,11 +26,11 @@
                 android:id="@+id/new_page_button"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:background="@drawable/dag_toolbar_icon_background"
+                android:background="@android:color/transparent"
                 android:contentDescription="@string/new_page"
                 android:enabled="false"
                 android:padding="9dp"
-                android:src="@drawable/ic_dag_add" />
+                android:src="@drawable/ic_dag_add_white" />
 
             <RelativeLayout
                 android:id="@+id/address_bar"
@@ -51,7 +51,7 @@
                     android:layout_centerVertical="true"
                     android:background="?android:attr/selectableItemBackgroundBorderless"
                     android:contentDescription="@string/security_status"
-                    android:padding="7dp"
+                    android:padding="8dp"
                     android:src="@drawable/ic_dag_shield" />
 
                 <EditText

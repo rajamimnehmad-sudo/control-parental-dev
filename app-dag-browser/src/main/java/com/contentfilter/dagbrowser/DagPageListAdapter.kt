@@ -1,9 +1,11 @@
 package com.contentfilter.dagbrowser
 
+import android.graphics.Bitmap
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
@@ -13,6 +15,7 @@ internal data class DagPageListItem(
     val host: String,
     val detail: String,
     val url: String,
+    val thumbnail: Bitmap? = null,
 )
 
 internal class DagPageListAdapter(
@@ -67,12 +70,18 @@ internal class DagPageListAdapter(
         private val title: TextView = view.findViewById(R.id.page_entry_title)
         private val host: TextView = view.findViewById(R.id.page_entry_host)
         private val detail: TextView = view.findViewById(R.id.page_entry_detail)
+        private val icon: ImageView = view.findViewById(R.id.page_entry_icon)
         private val delete: ImageButton = view.findViewById(R.id.page_entry_delete)
 
         fun bind(item: DagPageListItem) {
             title.text = item.title
             host.text = item.host
             detail.text = item.detail
+            if (item.thumbnail == null) {
+                icon.setImageResource(R.drawable.ic_dag_browser)
+            } else {
+                icon.setImageBitmap(item.thumbnail)
+            }
             itemView.setOnClickListener { onOpen(item) }
             if (onDelete == null) {
                 delete.visibility = View.GONE

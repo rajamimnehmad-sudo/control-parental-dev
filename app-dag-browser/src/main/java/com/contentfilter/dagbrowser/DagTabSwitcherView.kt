@@ -6,6 +6,7 @@ import android.graphics.Rect
 import android.graphics.drawable.GradientDrawable
 import android.util.AttributeSet
 import android.view.LayoutInflater
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -51,6 +52,7 @@ internal class DagTabSwitcherView
         private val recycler: RecyclerView
         private val adapter = TabAdapter()
         private var listener: Listener? = null
+        private var headerDownY = 0f
 
         init {
             LayoutInflater.from(context).inflate(R.layout.view_dag_tab_switcher, this, true)
@@ -68,6 +70,24 @@ internal class DagTabSwitcherView
             }
             findViewById<View>(R.id.tab_switcher_done).setOnClickListener {
                 listener?.onSwitcherClosed()
+            }
+            findViewById<View>(R.id.tab_switcher_header).setOnTouchListener { view, event ->
+                when (event.actionMasked) {
+                    MotionEvent.ACTION_DOWN -> {
+                        headerDownY = event.y
+                        true
+                    }
+                    MotionEvent.ACTION_UP -> {
+                        if (event.y - headerDownY >= dp(48)) {
+                            listener?.onSwitcherClosed()
+                        } else {
+                            view.performClick()
+                        }
+                        true
+                    }
+                    MotionEvent.ACTION_CANCEL -> true
+                    else -> true
+                }
             }
             closeAll.setOnClickListener {
                 listener?.onCloseAllTabs()

@@ -18,6 +18,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.util.Log
+import android.view.Gravity
 import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
@@ -2346,9 +2347,14 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showBrowserMenu() {
-        PopupMenu(this, menuButton).apply {
+        PopupMenu(this, menuButton, Gravity.END).apply {
             inflate(R.menu.dag_browser_menu)
             menu.findItem(R.id.menu_default_browser)?.isVisible = !isDefaultBrowser()
+            runCatching {
+                javaClass
+                    .getMethod("setForceShowIcon", Boolean::class.javaPrimitiveType)
+                    .invoke(this, true)
+            }
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.menu_reload -> {
@@ -2402,7 +2408,7 @@ class DagBrowserActivity : Activity() {
                     else -> false
                 }
             }
-        }.show()
+        }.also { popup -> popup.show() }
     }
 
     private fun showAboutDag() {
@@ -2517,6 +2523,7 @@ class DagBrowserActivity : Activity() {
                         DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT)
                             .format(Date(entry.visitedAtMillis)),
                     url = entry.url,
+                    thumbnail = tabs.firstOrNull { it.url == entry.url }?.thumbnail,
                 )
             }
         showPageListScreen(
@@ -2599,7 +2606,7 @@ class DagBrowserActivity : Activity() {
 
     private fun showDownloads() {
         downloadsScreen?.dismiss()
-        val dialog = Dialog(this)
+        val dialog = Dialog(this, R.style.Theme_DagBrowser_Fullscreen)
         downloadsScreen = dialog
         dialog.setContentView(R.layout.view_dag_downloads)
         val list = dialog.findViewById<androidx.recyclerview.widget.RecyclerView>(R.id.downloads_list)
@@ -2622,6 +2629,7 @@ class DagBrowserActivity : Activity() {
             if (downloadsScreen === dialog) downloadsScreen = null
         }
         dialog.show()
+        dialog.window?.setBackgroundDrawableResource(android.R.color.transparent)
         dialog.window?.setLayout(
             android.view.WindowManager.LayoutParams.MATCH_PARENT,
             android.view.WindowManager.LayoutParams.MATCH_PARENT,
