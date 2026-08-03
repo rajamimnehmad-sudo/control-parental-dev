@@ -273,6 +273,14 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   otras siete senales todavia no. Estado: `GO` para reetiquetado focalizado y
   `NO-GO` para entrenar. R1 continua oficial. Evidencia:
   `docs/dag/v3/GLOSHIA_R3_MULTISIGNAL_DATA_CONTRACT_21_2026-08-03.md`.
+- `GLOSHIA-R3-FOCUSED-RELABEL-22` (2026-08-03): se completaron 88/88
+  revisiones focalizadas y se resolvieron todas sus senales desconocidas. El
+  propietario corrigio las revisiones 17, 36 y 83 a `allow`; el cierre queda
+  en 85 `filter` y 3 `allow`. Las tres correcciones deben conservarse para
+  reducir filtros de mas. La exportacion privada fue verificada, el enlace
+  vencido y las 88 fotos temporales retiradas de Supabase. Estado: `GO` para
+  preparar una candidata R3 balanceada y `NO-GO` para reemplazar R1. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_FOCUSED_RELABEL_22_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -294,6 +302,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_R2_3_REGIONAL_SAFETY_REPAIR_19_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_4_REGION_AWARE_TRAINING_GATE_20_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R3_MULTISIGNAL_DATA_CONTRACT_21_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R3_FOCUSED_RELABEL_22_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

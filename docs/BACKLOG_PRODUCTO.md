@@ -571,6 +571,16 @@ Flujo de una entrada:
   `docs/dag/v3/GLOSHIA_R3_MULTISIGNAL_DATA_CONTRACT_21_2026-08-03.md`.
   Esfuerzo: M. Riesgo: medio.
 
+- `GLOSHIA-R3-FOCUSED-RELABEL-22` (2026-08-03): revision humana completa de
+  88 fotos reconstruidas. Resultado final: 85 `filter` y 3 `allow` (numeros
+  17, 36 y 83), con todas las senales focalizadas resueltas. Las excepciones
+  `allow` se preservan expresamente para reducir falsos filtros. Las fotos
+  temporales y el acceso remoto fueron retirados tras verificar la exportacion.
+  Estado: resuelto; `GO` para entrenamiento R3 balanceado, pero R1 continua
+  oficial hasta superar todos los gates. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_FOCUSED_RELABEL_22_2026-08-03.md`.
+  Esfuerzo: M. Riesgo: medio.
+
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
 - Estado: `Resuelto como candidato DEV y validado físicamente; sin publicación`.
