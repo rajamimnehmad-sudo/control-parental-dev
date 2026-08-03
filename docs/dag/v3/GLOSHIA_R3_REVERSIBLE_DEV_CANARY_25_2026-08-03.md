@@ -2,7 +2,7 @@
 
 Fecha: 2026-08-03  
 Ticket: `GLOSHIA-R3-REVERSIBLE-DEV-CANARY-25`  
-Estado: candidato local validado; publicación DEV pendiente.
+Estado: publicado y verificado en DEV; Production intacta.
 
 ## Decisión
 
@@ -72,6 +72,11 @@ APK local DAG 96:
 - tamaño: `129.970.709` bytes;
 - SHA-256:
   `ffa03d731ba57e94dd2e2ff169b51504f9a337df3d41ca92bc5439fff1c477e7`.
+
+La descarga pública repitió exactamente `129.970.709` bytes y el mismo
+SHA-256. El manifiesto remoto anuncia `versionCode 96`, `0.69.0-dev` y la URL
+inmutable `app-dag-browser-dev-96-debug.apk`. El manifiesto DAG 95 fue archivado
+antes del reemplazo.
 
 ## Rollback
 

@@ -10,31 +10,39 @@ el runtime actual desde versiones o worktrees historicos.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- `main` local integra DAG 95 y queda por delante de `origin/main`; este lote
-  no hizo push.
-- App Usuario 307, App Admin 290 y DAG 95 estan publicadas en DEV. Production
+- `main` y `origin/main` integran el código exacto de DAG 96.
+- App Usuario 307, App Admin 290 y DAG 96 estan publicadas en DEV. Production
   no fue modificada.
-- DAG 96 (`0.69.0-dev`) esta validado localmente como canary reversible de
-  GloshIA R3 y pendiente de publicacion DEV. R1 permanece empaquetado como
-  fallback de apertura; no se ejecutan dos modelos por fotografia.
+- DAG 96 (`0.69.0-dev`) es el canary DEV reversible de GloshIA R3. R1
+  permanece empaquetado como fallback de apertura; no se ejecutan dos modelos
+  por fotografia.
 - Los APK finales se construyen solo desde `main` local integrado.
 - Las apps Usuario/Admin no fueron modificadas. Supabase Storage DEV recibio
-  unicamente la APK y el manifiesto de DAG 95.
+  unicamente la APK y el manifiesto de DAG 96.
 
 | Aplicacion | versionCode | versionName DEV | Estado |
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Publicada en DEV |
 | App Admin | 290 | 1.0.1-dev | Publicada en DEV |
-| DAG Browser | 95 | 0.68.1-dev | Publicada en DEV; instalada en SM-A235M |
-| DAG Browser candidata | 96 | 0.69.0-dev | Canary R3 local; publicación DEV pendiente |
+| DAG Browser | 96 | 0.69.0-dev | Canary R3 publicado y verificado en DEV |
 
-El APK canonico DAG 95 esta instalado en el SM-A235M `R58T34V31AE`; Android
-confirma `versionCode=95` y `versionName=0.68.1-dev`. El S22 puede obtenerlo
-desde Actualizaciones de App Usuario.
+El SM-A235M `R58T34V31AE` conserva DAG 95 porque el propietario omitio la
+repeticion A23. DAG 96 puede obtenerse desde Actualizaciones de App Usuario y,
+una vez instalado, las versiones siguientes tambien desde el menu propio de
+DAG. No se registra una instalacion fisica de DAG 96 en este cierre.
 
 ## DAG Browser vigente
 
-### DAG 95 publicado en DEV: rollback confirmado
+### DAG 96 publicado en DEV: canary reversible de GloshIA R3
+
+DAG 96 conserva sin cambios el pipeline de navegador y la extension `1.50.0`
+de DAG 95. Cambia solamente el modelo activo a R3 hibrida, mantiene el umbral
+`0,40` y conserva R1 como fallback si ORT no puede abrir R3. Tambien agrega la
+actualizacion manual propia con verificacion de HTTPS, SHA-256, package name y
+firma. Evidencia:
+`docs/dag/v3/GLOSHIA_R3_REVERSIBLE_DEV_CANARY_25_2026-08-03.md`.
+
+### Base heredada de DAG 95: rollback confirmado
 
 DAG 95 revierte completamente el cambio funcional de DAG 94 y restaura el
 pipeline de imagenes de DAG 92, ultimo punto aceptado por el usuario. Android no
@@ -48,7 +56,7 @@ no resolvio el comportamiento observado por el usuario. Extension incorporada
 en DAG 95: `1.50.0`. Evidencia actual:
 `docs/compatibility/results/dag-browser-v95-rollback-sm-a235m-2026-08-03.md`.
 
-DAG 95 usa una unica compuerta GloshIA previa al render. Los bytes raster se
+DAG 96 conserva la unica compuerta GloshIA previa al render. Los bytes raster se
 capturan una vez y solo `model_allow` devuelve el original exacto. Filtro,
 error, timeout, saturacion, animacion o entrada invalida producen un PNG neutro
 sin pixeles rechazados. SVG e iconos vectoriales seguros quedan fuera de la

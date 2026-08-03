@@ -44,15 +44,15 @@ Flujo de una entrada:
 
 ## Ancla tecnica actual
 
-- Versiones DEV publicadas: App Usuario 307, App Admin 290 y DAG Browser 95.
+- Versiones DEV publicadas: App Usuario 307, App Admin 290 y DAG Browser 96.
   Publicacion, hashes e instalacion se verifican en el handoff.
-- DAG 96 queda como candidata local para canary DEV: activa R3 híbrida, conserva
+- DAG 96 es el canary DEV publicado: activa R3 híbrida, conserva
   R1 como fallback de apertura y agrega actualización manual desde el propio
-  DAG usando el mismo manifiesto de App Usuario. Publicación DEV pendiente.
-- DAG 95 es el rollback publicado de DAG 94: restaura el comportamiento
+  DAG usando el mismo manifiesto de App Usuario. Production permanece intacta.
+- DAG 95 es la base rollback anterior de DAG 94: restaura el comportamiento
   comprobado de DAG 92 con `versionCode` superior para permitir la actualizacion
-  Android. Esta publicado en DEV e instalado en SM-A235M; el push de los commits
-  locales queda pendiente. GloshIA R1 no cambio.
+  Android. Permanece instalado en SM-A235M, pero el manifiesto DEV ya anuncia
+  DAG 96 y el codigo esta respaldado en GitHub.
 - El navegador actual es un unico DAG Browser V3 GeckoView fail-closed. No
   restaurar DAG 1, DAG 2 ni lineas paralelas desde worktrees historicos.
 - Baseline de recuperacion Web: `stable/dev-191-web-protection` (no representa la ultima version publicada).
