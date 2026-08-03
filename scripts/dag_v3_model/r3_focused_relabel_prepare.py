@@ -158,7 +158,7 @@ def _download(url: str, destination: Path) -> None:
                 body = response.read(MAX_DOWNLOAD_BYTES + 1)
             break
         except HTTPError as error:
-            if error.code not in {429, 503} or attempt == 4:
+            if error.code not in {429, 500, 502, 503, 504} or attempt == 4:
                 raise
             retry_after = error.headers.get("Retry-After") if error.headers else None
             delay = float(retry_after) if retry_after and retry_after.isdigit() else 5.0 * (attempt + 1)

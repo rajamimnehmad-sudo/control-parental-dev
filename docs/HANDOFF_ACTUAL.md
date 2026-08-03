@@ -281,6 +281,13 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   vencido y las 88 fotos temporales retiradas de Supabase. Estado: `GO` para
   preparar una candidata R3 balanceada y `NO-GO` para reemplazar R1. Evidencia:
   `docs/dag/v3/GLOSHIA_R3_FOCUSED_RELABEL_22_2026-08-03.md`.
+- `GLOSHIA-R3-BOUNDED-HEAD-TRAIN-23` (2026-08-03): se entreno `R3 Head 01`
+  con 407 muestras, preservando como `allow` las revisiones 17, 36 y 83. En
+  validation redujo falsos filtros de 19 a 3 y en frozen test de 25 a 6, con
+  cero falsos permisos en ambos. El INT8 selectivo mide 8.950.584 bytes; queda
+  pendiente equivalencia y rendimiento en Android. Estado: `GO` de laboratorio,
+  R1 continua oficial. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_BOUNDED_HEAD_TRAIN_23_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -303,6 +310,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_R2_4_REGION_AWARE_TRAINING_GATE_20_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R3_MULTISIGNAL_DATA_CONTRACT_21_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R3_FOCUSED_RELABEL_22_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R3_BOUNDED_HEAD_TRAIN_23_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes

@@ -581,6 +581,16 @@ Flujo de una entrada:
   `docs/dag/v3/GLOSHIA_R3_FOCUSED_RELABEL_22_2026-08-03.md`.
   Esfuerzo: M. Riesgo: medio.
 
+- `GLOSHIA-R3-BOUNDED-HEAD-TRAIN-23` (2026-08-03): candidata unica con la
+  representacion TinyCLIP congelada y una cabeza ponderada. Aprende como
+  `allow` las revisiones 17, 36 y 83. Frente a R1 reduce falsos filtros de
+  19 a 3 en validation y de 25 a 6 en frozen test, manteniendo cero falsos
+  permisos. INT8 selectivo: 8.950.584 bytes. Estado: `GO` de laboratorio;
+  pendiente gate Android de equivalencia, latencia y memoria antes de tocar
+  DAG. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_BOUNDED_HEAD_TRAIN_23_2026-08-03.md`.
+  Esfuerzo: L. Riesgo: alto.
+
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
 - Estado: `Resuelto como candidato DEV y validado físicamente; sin publicación`.
