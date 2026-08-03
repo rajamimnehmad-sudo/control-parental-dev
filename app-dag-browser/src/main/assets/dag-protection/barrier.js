@@ -33,8 +33,6 @@
   let nativePort = null;
   let inlineImagesSubmitted = 0;
   const pendingImages = new WeakMap();
-  const stableImageSources = new WeakMap();
-  const resolvedInlineImages = new WeakMap();
   const inlineDecisions = new Map();
   try {
     nativePort = browser.runtime.connectNative(NATIVE_APP);
@@ -77,8 +75,6 @@
     const pending = pendingImages.get(image);
     if (pending?.timeout !== undefined) clearTimeout(pending.timeout);
     pendingImages.delete(image);
-    stableImageSources.delete(image);
-    resolvedInlineImages.delete(image);
     image.removeAttribute(STABLE_IMAGE_ATTRIBUTE);
   };
 
@@ -98,12 +94,6 @@
 
   const inspectInlineImage = (image) => {
     const source = inlineDataSource(image);
-    const resolved = resolvedInlineImages.get(image);
-    if (resolved?.source === source) {
-      if (resolved.allow) image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
-      return;
-    }
-    if (pendingImages.get(image)?.source === source) return;
     resetImage(image);
     if (!inlineImageIsBounded(image, source)) return;
     let decision = inlineDecisions.get(source);
@@ -126,24 +116,18 @@
         inlineDataSource(image) !== source
       ) return;
       pendingImages.delete(image);
-      const allow = result?.action === "allow";
-      resolvedInlineImages.set(image, { source, allow });
-      if (allow) image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
+      if (result?.action === "allow") image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
     });
   };
 
   const stabilizeImage = (image) => {
+    if (image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) return;
     if (inlineDataSource(image).length > 0) {
       inspectInlineImage(image);
       return;
     }
-    const source = imageSource(image);
-    if (
-      image.hasAttribute(STABLE_IMAGE_ATTRIBUTE) &&
-      stableImageSources.get(image) === source
-    ) return;
-    if (pendingImages.get(image)?.source === source) return;
     resetImage(image);
+    const source = imageSource(image);
     if (
       source.length === 0 ||
       source.startsWith("data:") ||
@@ -157,7 +141,6 @@
         image.naturalWidth > 0 &&
         imageSource(image) === source
       ) {
-        stableImageSources.set(image, source);
         image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
       }
     }, IMAGE_STABILITY_MS);
