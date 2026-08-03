@@ -31,14 +31,11 @@ import java.util.Locale;
 
 public final class MainActivity extends Activity {
     private static final String TAG = "GloshiaOrtHarness";
-    private static final String CANDIDATE_NAME = "r2.2-candidate-b-selective-k-int8.onnx";
     private static final String R1_NAME = "r1-official.onnx";
     private static final String INPUT_NAME = "pixel_values";
     private static final long[] INPUT_SHAPE = {1, 3, 224, 224};
     private static final int INPUT_FLOATS = 3 * 224 * 224;
     private static final int SYNTHETIC_RUNS = 30;
-    private static final String CANDIDATE_SHA256 =
-            "7e8826f72df12ca76f21b929c3c798c967ea381b558116fd45b27bb71d461bdb";
     private static final String R1_SHA256 =
             "2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee";
 
@@ -58,8 +55,12 @@ public final class MainActivity extends Activity {
     private void runHarness() {
         JSONObject report = new JSONObject();
         try {
-            report.put("schema_version", "gloshia-r2.2-export-equivalence-v1");
-            report.put("ticket", "GLOSHIA-R2.2-EXPORT-EQUIVALENCE-17");
+            JSONObject config = new JSONObject(readText(new File(getFilesDir(), "harness-config.json")));
+            String candidateName = config.getString("candidate_name");
+            String candidateSha256 = config.getString("candidate_sha256");
+            double candidateThreshold = config.getDouble("threshold");
+            report.put("schema_version", config.getString("schema_version"));
+            report.put("ticket", config.getString("ticket"));
             report.put("device", new JSONObject()
                     .put("model", Build.MODEL)
                     .put("manufacturer", Build.MANUFACTURER)
@@ -71,11 +72,11 @@ public final class MainActivity extends Activity {
                     .put("input_shape", new JSONArray(INPUT_SHAPE))
                     .put("input_type", "float32")
                     .put("output_name", "filter_probability")
-                    .put("threshold", 0.4));
+                    .put("threshold", candidateThreshold));
 
-            File candidate = new File(getFilesDir(), CANDIDATE_NAME);
+            File candidate = new File(getFilesDir(), candidateName);
             File r1 = new File(getFilesDir(), R1_NAME);
-            report.put("candidate", fileIdentity(candidate, CANDIDATE_SHA256));
+            report.put("candidate", fileIdentity(candidate, candidateSha256));
             report.put("r1", fileIdentity(r1, R1_SHA256));
 
             JSONObject candidateSmoke = runModel(candidate, null, null, true);
@@ -96,8 +97,8 @@ public final class MainActivity extends Activity {
             if (metadataFile.isFile() && tensorFile.isFile()) {
                 JSONObject metadata = new JSONObject(readText(metadataFile));
                 JSONArray samples = metadata.getJSONArray("samples");
-                JSONObject candidateEvaluation = evaluateFrozen(candidate, tensorFile, samples);
-                JSONObject r1Evaluation = evaluateFrozen(r1, tensorFile, samples);
+                JSONObject candidateEvaluation = evaluateFrozen(candidate, tensorFile, samples, candidateThreshold);
+                JSONObject r1Evaluation = evaluateFrozen(r1, tensorFile, samples, 0.4);
                 report.put("candidate_evaluation", candidateEvaluation);
                 report.put("r1_evaluation", r1Evaluation);
                 report.put("evaluation_metadata_sha256", sha256(metadataFile));
@@ -166,7 +167,7 @@ public final class MainActivity extends Activity {
         return result;
     }
 
-    private JSONObject evaluateFrozen(File model, File tensorFile, JSONArray samples) throws Exception {
+    private JSONObject evaluateFrozen(File model, File tensorFile, JSONArray samples, double threshold) throws Exception {
         JSONObject result = new JSONObject();
         List<Double> timings = new ArrayList<>();
         int allowAsAllow = 0;
@@ -201,7 +202,7 @@ public final class MainActivity extends Activity {
                 peakPss = Math.max(peakPss, memory().optLong("total_pss_kb", 0));
                 JSONObject sample = samples.getJSONObject(index);
                 String human = sample.getString("human_action");
-                String action = probability >= 0.4 ? "filter" : "allow";
+                String action = probability >= threshold ? "filter" : "allow";
                 String expected = sample.getString("fp32_action");
                 double probabilityDelta = Math.abs(probability - sample.getDouble("fp32_probability"));
                 totalProbabilityDelta += probabilityDelta;

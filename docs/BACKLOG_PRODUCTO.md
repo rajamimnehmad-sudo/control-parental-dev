@@ -591,6 +591,14 @@ Flujo de una entrada:
   `docs/dag/v3/GLOSHIA_R3_BOUNDED_HEAD_TRAIN_23_2026-08-03.md`.
   Esfuerzo: L. Riesgo: alto.
 
+- `GLOSHIA-R3-ANDROID-EQUIVALENCE-24` (2026-08-03): preparación terminada sin
+  teléfono. Harness aislado parametrizado, APK compilada y 119 tensores
+  congelados listos. Pendiente ejecutar en A23 o S22 y exigir equivalencia de
+  decisiones contra FP32, cero falsos permisos y rendimiento comparable con
+  R1. No integrar en DAG antes del `GO`. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_ANDROID_EQUIVALENCE_24_PREP_2026-08-03.md`.
+  Esfuerzo restante: S. Riesgo: medio.
+
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
 - Estado: `Resuelto como candidato DEV y validado físicamente; sin publicación`.

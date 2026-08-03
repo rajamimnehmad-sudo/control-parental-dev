@@ -288,6 +288,12 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   pendiente equivalencia y rendimiento en Android. Estado: `GO` de laboratorio,
   R1 continua oficial. Evidencia:
   `docs/dag/v3/GLOSHIA_R3_BOUNDED_HEAD_TRAIN_23_2026-08-03.md`.
+- `GLOSHIA-R3-ANDROID-EQUIVALENCE-24` preparado (2026-08-03): el harness
+  aislado acepta configuración por candidata, se generaron los 119 tensores
+  congelados y se compiló el APK de laboratorio. Falta conectar A23 o S22 para
+  medir equivalencia, falsos permisos, latencia y memoria. No se tocó DAG.
+  Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_ANDROID_EQUIVALENCE_24_PREP_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -311,6 +317,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_R3_MULTISIGNAL_DATA_CONTRACT_21_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R3_FOCUSED_RELABEL_22_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R3_BOUNDED_HEAD_TRAIN_23_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R3_ANDROID_EQUIVALENCE_24_PREP_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes
