@@ -3,6 +3,10 @@
 Reglas permanentes para trabajar con Codex en este proyecto.
 
 - Antes de cualquier ticket, leer `START_HERE.md`.
+- La unica carpeta canonica del proyecto es
+  `/Users/yejielnehmad/Developer/content-filter`, fuera de iCloud. No crear
+  repositorios, worktrees, datasets, APKs ni builds del proyecto dentro de
+  `Documents`, `Desktop`, `Mobile Documents` o iCloud Drive.
 - Usar `docs/AREAS.md` para identificar el area exacta afectada.
 - Abrir solo los archivos necesarios de esa area.
 - No revisar todo el repo salvo que el ticket diga explicitamente: "revisar todo el repo".
@@ -23,6 +27,10 @@ Reglas permanentes para trabajar con Codex en este proyecto.
 - Verificar licencia, procedencia, mantenimiento, seguridad y compatibilidad comercial de modelos, pesos, datasets y dependencias antes de incorporarlos. No asumir que un artefacto publicado en Hugging Face, GitHub u otro catalogo permite uso comercial.
 - Antes de una operacion costosa o larga, ejecutar una prueba pequena y medible. Escalar solamente si pasa criterios definidos. Fijar limites de costo, tokens, reintentos, tiempo, almacenamiento y concurrencia; nunca dejar procesos sin limite.
 - Reutilizar scripts, caches y artefactos verificables. Evitar repetir investigaciones, builds globales o recorridos completos cuando una prueba dirigida aporta evidencia suficiente.
+- `.codex-tmp` no se considera basura en bloque. Antes de limpiarlo, comprobar
+  las rutas referenciadas por splits e informes. El corpus vigente, las
+  revisiones humanas y los artefactos que reproducen el modelo Android oficial
+  deben preservarse fuera de Git pero dentro de la carpeta canonica.
 - La Mac de desarrollo M2 con 8 GB de RAM sirve para programacion, preparacion por lotes, metadatos, deduplicacion, pruebas pequenas, exportacion y validacion. No cargar datasets completos en RAM, no ejecutar varios procesos pesados simultaneos y no planificar entrenamiento visual grande localmente.
 - Codex local o cloud coordina, programa, ejecuta pruebas y analiza resultados, pero no se considera una GPU de entrenamiento ni se presupone hardware acelerado no documentado.
 - Supabase se usa para Postgres, Storage privado, auditoria, colas livianas, metadatos, registro y distribucion de artefactos. No ejecutar entrenamiento pesado dentro de Edge Functions ni asumir GPU incluida en la suscripcion.

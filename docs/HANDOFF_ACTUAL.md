@@ -20,6 +20,27 @@ el runtime actual desde versiones o worktrees historicos.
 - Las apps Usuario/Admin no fueron modificadas. Supabase Storage DEV recibio
   unicamente la APK y el manifiesto de DAG 96.
 
+### Almacenamiento local e iCloud
+
+- La unica copia canonica esta en
+  `/Users/yejielnehmad/Developer/content-filter`, fuera de iCloud Drive.
+- No existe una copia del proyecto bajo `Documents` ni bajo
+  `Library/Mobile Documents/com~apple~CloudDocs`. Codex conserva unicamente su
+  carpeta de trabajo vacia en `Documents/Codex`; no contiene codigo, APKs ni
+  datos del proyecto.
+- La limpieza del 2026-08-03 redujo la carpeta canonica de aproximadamente
+  `9,4 GB` a `1,4 GB`. Builds, caches, dependencias reinstalables y candidatos
+  R2 descartados se movieron a
+  `~/.Trash/content-filter-cleanup-20260803` (`6,4 GB`), recuperables hasta
+  vaciar la Papelera.
+- Se preservaron siete conjuntos privados necesarios para continuar GloshIA:
+  corpus actual de 1.000, revision balanceada, hard negatives usados por R3,
+  revision historica referenciada, etiquetas multisenal, revision enfocada y
+  candidato R3. El split R3 conserva `526/526` imagenes disponibles.
+- Los builds locales fueron retirados; la proxima compilacion los regenera. La
+  APK DAG 96 publicada, GitHub, Supabase y los modelos R3/R1 versionados no se
+  modificaron.
+
 | Aplicacion | versionCode | versionName DEV | Estado |
 | --- | ---: | --- | --- |
 | App Usuario | 307 | 1.0.1-dev | Publicada en DEV |
