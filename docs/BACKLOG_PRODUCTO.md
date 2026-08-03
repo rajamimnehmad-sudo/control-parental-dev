@@ -547,6 +547,19 @@ Flujo de una entrada:
   `docs/dag/v3/GLOSHIA_R2_3_REGIONAL_SAFETY_REPAIR_19_2026-08-03.md`.
   Esfuerzo: L. Riesgo: alto.
 
+- `GLOSHIA-R2.4-REGION-AWARE-TRAINING-GATE-20` (2026-08-03): el mismo modelo
+  TinyCLIP se entreno con conjuntos de imagen completa y regiones alineadas con
+  la politica de DAG, manteniendo a personas diminutas tipo "Wally" como
+  `allow`. La unica candidata sin permisos nuevos en validation y frozen_test
+  redujo falsos filtros, pero en un holdout nuevo de 40 casos agrego 2/16 falsos
+  permisos donde R1 tuvo 0/16. Tambien redujo falsos filtros de 14/24 a 11/24.
+  Estado: `NO-GO`; no se integra ni se prueba en Android. El holdout queda
+  consumido y sus preetiquetas de Codex siguen pendientes de auditoria del
+  propietario. Proximo paso recomendado: gate de datos R3 multisenal dentro de
+  un unico modelo local, no otro ajuste binario con este examen. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_4_REGION_AWARE_TRAINING_GATE_20_2026-08-03.md`.
+  Esfuerzo: L. Riesgo: alto.
+
 ### LOTE-DAG-GLOSH-UX-SECURITY-06 - Activación clara y cierre de rutas alternativas
 
 - Estado: `Resuelto como candidato DEV y validado físicamente; sin publicación`.

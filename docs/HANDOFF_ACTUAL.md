@@ -256,6 +256,15 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   y 2/10 falsos filtros, con balanced accuracy 65 %. Resultado `NO-GO`; no se
   exporto a Android ni se toco DAG. R1 sigue oficial. Evidencia:
   `docs/dag/v3/GLOSHIA_R2_3_REGIONAL_SAFETY_REPAIR_19_2026-08-03.md`.
+- `GLOSHIA-R2.4-REGION-AWARE-TRAINING-GATE-20` (2026-08-03): se alineo el
+  entrenamiento del mismo TinyCLIP con la topologia y los umbrales regionales
+  de DAG. La candidata A mantuvo 0 falsos permisos y redujo falsos
+  filtros de 20 a 16 en validation y de 24 a 18 en frozen_test. Luego se abrio
+  un holdout nuevo de 40 casos binarios, deduplicado y sin series repetidas:
+  R1 obtuvo 0/16 falsos permisos y 14/24 falsos filtros; R2.4 obtuvo 2/16 y
+  11/24. Resultado obligatorio `NO-GO`; el examen queda consumido, R1 sigue
+  oficial y no se toco Android. Evidencia:
+  `docs/dag/v3/GLOSHIA_R2_4_REGION_AWARE_TRAINING_GATE_20_2026-08-03.md`.
 
 Documentos vigentes:
 
@@ -275,6 +284,7 @@ Documentos vigentes:
 - `docs/dag/v3/GLOSHIA_R2_2_EXPORT_EQUIVALENCE_17_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_2_REVERSIBLE_CANARY_18_2026-08-03.md`;
 - `docs/dag/v3/GLOSHIA_R2_3_REGIONAL_SAFETY_REPAIR_19_2026-08-03.md`;
+- `docs/dag/v3/GLOSHIA_R2_4_REGION_AWARE_TRAINING_GATE_20_2026-08-03.md`;
 - `docs/compatibility/results/dag-performance-history.md`.
 
 ## Decisiones de producto vigentes
