@@ -98,10 +98,38 @@ function wait(milliseconds) {
 
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
+  const body = await response.text();
   if (!response.ok) {
     throw new Error("No se pudo guardar. Probá nuevamente.");
   }
-  return response.json();
+  if (!body.trim()) {
+    const error = new Error("El servidor no confirmó la operación.");
+    error.code = "empty_json_response";
+    throw error;
+  }
+  try {
+    return JSON.parse(body);
+  } catch {
+    throw new Error("El servidor devolvió una respuesta inválida.");
+  }
+}
+
+async function saveReview(payload) {
+  const options = {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Origin": window.location.origin,
+    },
+    body: JSON.stringify(payload),
+  };
+  try {
+    return await fetchJson("/api/review", options);
+  } catch (error) {
+    if (error.code !== "empty_json_response") throw error;
+    await wait(150);
+    return fetchJson("/api/review", options);
+  }
 }
 
 function renderReasonOptions() {
@@ -247,17 +275,10 @@ async function decide(action, direction) {
   elements.card.classList.add(direction === "right" ? "exit-right" : "exit-left");
 
   try {
-    const payload = await fetchJson("/api/review", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Origin": window.location.origin,
-      },
-      body: JSON.stringify({
-        sample_id: item.sample_id,
-        action,
-        reasons: action === "allow" ? [] : selectedReasons(),
-      }),
+    const payload = await saveReview({
+      sample_id: item.sample_id,
+      action,
+      reasons: action === "allow" ? [] : selectedReasons(),
     });
     const decidedIndex = currentIndex;
     item.human_decision = payload.review;

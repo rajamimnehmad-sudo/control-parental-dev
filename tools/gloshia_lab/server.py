@@ -239,6 +239,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
             attachment_name=attachment_name,
         )
         self.wfile.write(body)
+        self.wfile.flush()
 
     def _file(self, path: Path, content_type: str | None = None) -> None:
         try:
