@@ -127,7 +127,7 @@ Flujo de una entrada:
 
 ### GLOSHIA-R3-TRAIN-28 - Propuesta de candidata con pool independiente
 
-- Estado: `Propuesto; requiere autorización separada para descargar y entrenar`. Prioridad: P0. Riesgo: alto.
+- Estado: `Ejecutado localmente; NO-GO`. Prioridad: P0. Riesgo: alto.
 - Crear aproximadamente 400 muestras nuevas con derechos de entrenamiento
   verificables, separadas de los 295 elementos del gate 27 y de las 54 imágenes
   piloto. El gate 27 queda congelado como examen externo.
@@ -142,6 +142,20 @@ Flujo de una entrada:
 - No autoriza todavía cambiar DAG 107, Android, APK, Supabase, Production,
   publicar, hacer push ni exportar para canary. Evidencia:
   `docs/dag/v3/GLOSHIA_R3_TRAIN_28_PROPOSAL_2026-08-04.md`.
+
+### GLOSHIA-R3-TRAIN-28 - Cierre NO-GO
+
+- Estado: `NO-GO; R3 permanece oficial`. No se congeló ni exportó una candidata.
+- Se revisaron 193 muestras nuevas: 190 binarias y 3 `doubt`. La separación
+  produjo 133 train, 28 validation y 29 frozen_test; la prueba de contaminación
+  pasó. Openverse no entregó imágenes utilizables por 502 y Wikimedia fue
+  limitado por 429, por lo que el pool efectivo quedó en Open Images V7.
+- Tres ensayos locales CPU conservaron 1/7 falsos permisos en validation, pero
+  el mejor sólo empató los 2/21 falsos filtros de R3 y tuvo menor PR-AUC. Los
+  demás aumentaron falsos filtros o redujeron balanced accuracy.
+- No se evaluó ningún candidato sobre frozen_test, no se abrió `final_sealed`,
+  no se cambió R3, DAG 107, Android, APK, umbral o política. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_TRAIN_28_NO_GO_2026-08-04.md`.
 
 ### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
 
