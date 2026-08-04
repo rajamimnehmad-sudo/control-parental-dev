@@ -28,9 +28,11 @@ TOOL_DIR = Path(__file__).resolve().parent
 DEFAULT_MODEL = (
     ROOT
     / "app-dag-browser/src/main/assets/dag-model/"
-    "tinyclip-bounded-finetune-r1-int8.onnx"
+    "tinyclip-r3-head-hybrid-int8.onnx"
 )
-EXPECTED_MODEL_SHA256 = "2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee"
+EXPECTED_MODEL_NAME = "GloshIA Visual R3"
+EXPECTED_MODEL_SHA256 = "0aaa1700182623173c41d233bd0e072cce2b2880aca14430d9f9af43fa2c44a8"
+HISTORICAL_R1_MODEL_SHA256 = "2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee"
 
 
 def sha256_file(path: Path) -> str:
@@ -64,7 +66,7 @@ def score_command(args: argparse.Namespace) -> int:
     digest = sha256_file(args.model)
     if digest != EXPECTED_MODEL_SHA256:
         raise ValueError(
-            "refusing to score with a model that differs from the DAG artefact"
+            "refusing to score with a model that differs from the official R3 artefact"
         )
     output = args.output or corpus_dir / "predictions.jsonl"
     if args.diagnostic_regions and args.output is None:
@@ -103,7 +105,9 @@ def verify_command(args: argparse.Namespace) -> int:
     payload = {
         "ok": not errors,
         "model": str(args.model),
+        "model_name": EXPECTED_MODEL_NAME,
         "model_sha256": digest,
+        "historical_r1_sha256": HISTORICAL_R1_MODEL_SHA256,
         "policy": "dag-36",
         "query_target": target,
         "node": find_node(),

@@ -1,7 +1,7 @@
 # GLOSHIA-R3-COMMERCIAL-HARD-NEGATIVES-26 — Diagnóstico piloto
 
 Fecha: 2026-08-04  
-Estado: diagnóstico y revisión humana pendiente; no autorizado entrenamiento  
+Estado: diagnóstico y revisión humana completados; no autorizado entrenamiento
 Baseline: `main` / `0fbf003`; DAG 107 confirmado en S22  
 Examen sellado: no abierto
 
@@ -69,14 +69,41 @@ región ≥0,45, 2/40 con alguna región ≥0,50 y 1/40 con alguna región ≥0,
 Esto sugiere que la composición regional puede participar en algunos casos,
 pero no demuestra todavía la causa de los tres banners de Mimo.
 
-R1 y R3 cambiaron de acción en 9/40 muestras. Esas nueve pasan primero a la
-cola `desacuerdos`; las colas restantes son `posibles falsos filtros` 5,
-`muestra aleatoria` 3 y `resto` 23. `doubt` permanece vacío hasta que el
-propietario decida explícitamente.
+R1 y R3 cambiaron de acción en 9/40 muestras. Esas nueve pasaron primero a la
+cola `desacuerdos`; las colas restantes fueron `posibles falsos filtros` 5,
+`muestra aleatoria` 3 y `resto` 23.
 
-No se calculó matriz de confusión, precisión, recall, balanced accuracy, F1 ni
-PR-AUC: todavía hay 0/40 decisiones humanas. Las decisiones automáticas no se
-presentan antes de la revisión.
+## Resultado de la revisión humana
+
+Se revisaron 40/40 muestras: 36 `allow`, 3 `filter` y 1 `doubt`. La duda quedó
+fuera de toda métrica binaria. Sobre las 39 decisiones binarias, R1 y R3
+obtuvieron exactamente la misma matriz:
+
+| Modelo | filter correcto | falso permiso | falso filtro | allow correcto |
+|---|---:|---:|---:|---:|
+| R1 | 3/3 | 0/3 | 6/36 | 30/36 |
+| R3 | 3/3 | 0/3 | 6/36 | 30/36 |
+
+Resultado binario para ambos modelos: accuracy `33/39 (84,62 %)`, balanced
+accuracy `55/60 (91,67 %)`, precisión de filter `3/9 (33,33 %)`, recall de
+filter `3/3 (100 %)`, precisión de allow `30/30 (100 %)`, recall de allow
+`30/36 (83,33 %)`. F1 de filter: `6/12 (50,00 %)`. PR-AUC no se usa como
+criterio decisivo porque sólo hay `3/39` positivos humanos en este piloto.
+
+El desglose muestra el desplazamiento del error, no una mejora global:
+
+| Categoría | Binarias | R1 falsos filtros | R3 falsos filtros | R3 falsos permisos |
+|---|---:|---:|---:|---:|
+| `commercial_banner_people` | 15 | 2/15 | 0/15 | 0/15 |
+| `promotional_text_graphic` | 4 | 2/4 | 0/4 | 0/4 |
+| `retail_catalog_fashion` | 19 | 2/19 | 6/19 | 0/19 |
+| `payment_commerce_control` | 1 | 0/1 | 0/1 | 0/1 |
+
+Las seis imágenes que R3 filtra de más están en `retail_catalog_fashion`;
+varias corresponden a maniquíes o escenas de catálogo permitibles. Por tanto,
+este lote no demuestra que R3 sea mejor que R1: demuestra que R3 reduce
+algunos filtros excesivos comerciales, pero conserva el mismo riesgo total y
+lo concentra en catálogos de moda.
 
 ## Revisión
 
@@ -98,14 +125,14 @@ trazas regionales, `review-queues.json`, `diagnostic-report.json`,
 
 ## Decisión y siguiente paso
 
-Estado actual: `GO` sólo para revisión humana y diagnóstico de datos;
-`NO-GO` para entrenamiento. No hay base honesta para afirmar que R3 tiene
-falsos filtros en las 40 muestras hasta recibir las etiquetas del propietario.
+Estado actual: `GO` para cerrar el diagnóstico; `NO-GO` para entrenamiento o
+reemplazo de modelo. El resultado no autoriza bajar el umbral, crear
+excepciones por sitio ni modificar DAG.
 
-Siguiente paso recomendado: completar las 40 decisiones binarias o `doubt`,
-concentrándose primero en `desacuerdos`, `posibles falsos filtros` y una
-muestra aleatoria. Después generar la matriz de confusión R1/R3, el desglose
-por categoría y la traza global/regional. Recién si aparecen suficientes
-falsos filtros comerciales confirmados, proponer un ticket de entrenamiento
-con un holdout independiente. No ajustar umbrales ni abrir `final_sealed` en
-esta fase.
+Siguiente paso recomendado: preparar un lote independiente y balanceado de
+casos modernos de catálogo/maniquí y ejemplos realmente filtrables, agrupado
+por campaña, producto y serie. Este lote actual tiene sólo `3/39` positivos
+humanos y no debe reutilizarse como examen independiente ni alimentar un
+entrenamiento sin autorización explícita. Después de esa nueva revisión se
+podrá proponer un ticket de entrenamiento con holdout independiente. No
+ajustar umbrales ni abrir `final_sealed` en esta fase.

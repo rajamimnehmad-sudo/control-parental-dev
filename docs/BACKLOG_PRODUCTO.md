@@ -84,25 +84,46 @@ Flujo de una entrada:
 
 ### GLOSHIA-R3-COMMERCIAL-HARD-NEGATIVES-26 - Banners seguros filtrados de mas
 
-- Estado: `En progreso diagnóstico; entrenamiento no autorizado`. Prioridad: P0.
+- Estado: `Diagnóstico humano completado; entrenamiento no autorizado`. Prioridad: P0.
   Esfuerzo: M. Riesgo: alto.
 - Evidencia: R3 filtro incorrectamente un banner con bebe vestido, otro con
   niño vestido y un banner Mercado/Pagos. Los tres son `allow`.
 - Diagnóstico ejecutado: se prepararon 40 imágenes evaluables de Wikimedia
   Commons, 26 clusters, con procedencia y hashes; 25 candidatos quedaron en
   cuarentena por actualidad primaria no demostrada y 1 variante por pHash
-  canónico. R1 y R3 se midieron sobre las mismas 40, sin etiquetas humanas aún:
-  R1 30 allow/10 filter, R3 31 allow/9 filter. La web local de revisión está
-  en `http://127.0.0.1:8774/`; las predicciones permanecen ocultas hasta la
-  decisión humana.
-- Próximo alcance recomendado: revisar primero desacuerdos y posibles falsos
-  filtros, completar allow/filter/doubt y recién después decidir si hay
-  suficientes falsos filtros comerciales para un ticket de entrenamiento.
-  Deduplicar por campaña y similitud; no usar excepciones por sitio, URL o
-  dominio.
+  canónico. La revisión terminó con 36 allow, 3 filter y 1 doubt. Sobre las 39
+  binarias, R1 y R3 tuvieron 0 falsos permisos y 6 falsos filtros cada uno;
+  R3 concentró los seis falsos filtros en `retail_catalog_fashion`, incluidos
+  maniquíes/catálogos permitibles. La web local está en `http://127.0.0.1:8774/`
+  y `final_sealed` sigue cerrado.
+- Próximo alcance recomendado: lote independiente y balanceado de catálogos,
+  maniquíes y casos modernos realmente filtrables, agrupado por campaña,
+  producto y similitud. No reutilizar estas 39 binarias como examen
+  independiente, no bajar el umbral y no crear excepciones por sitio, URL o
+  dominio. Entrenamiento continúa no autorizado.
 - Gate: no bajar el umbral global, no crear excepciones por Mimo/URL/dominio y
   no reemplazar R3 si aparece cualquier falso permiso crítico nuevo.
 - Evidencia: `docs/dag/v3/GLOSHIA_R3_COMMERCIAL_HARD_NEGATIVES_26_DIAGNOSTIC_2026-08-04.md`.
+
+### GLOSHIA-R3-BALANCED-CORPUS-REVIEW-GATE-27 - Revisión equilibrada antes de entrenar
+
+- Estado: `Completado; GO condicionado para proponer TRAIN-28, NO-GO para entrenar este lote directamente`. Prioridad: P0. Riesgo: alto.
+- Se revisaron 295 muestras privadas locales: 194 `allow`, 91 `filter` y 10
+  `doubt`. Las dudas permanecen separadas. El lote combina 241 imágenes de Open
+  Images V7 y 54 del piloto previo, con 295 SHA-256 únicos; se excluyeron 9
+  duplicados o contaminaciones frente a históricos.
+- R3, sobre 285 binarias, obtuvo 13 falsos permisos, 32 falsos filtros,
+  balanced accuracy 84,61 %, macro F1 82,71 % y PR-AUC 0,835803. Los errores se
+  concentran en personas comerciales, ropa moderna y sujetos parciales o
+  pequeños; los banners comerciales seguros no produjeron errores en este lote
+  de 9 muestras.
+- Las 295 muestras son `internal_evaluation_ok` y
+  `training_rights_uncertain`; ninguna es `training_rights_clear`. Todo el
+  lote quedó en `directed_review`, por lo que TRAIN-28 debe crear un pool de
+  entrenamiento autorizado y splits independientes antes de entrenar.
+- No se abrió `final_sealed`, no se entrenó, no se cambiaron pesos, umbrales,
+  política, DAG ni Android. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_BALANCED_CORPUS_REVIEW_GATE_27_2026-08-04.md`.
 
 ### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
 

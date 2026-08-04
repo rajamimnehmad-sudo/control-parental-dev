@@ -88,8 +88,23 @@ sigue siendo la version DEV remota.
 
 Pendiente GloshIA separado: R3 filtra incorrectamente tres banners comerciales
 seguros observados en Mimo (bebe vestido, niño vestido y banner Mercado/Pagos).
-Son hard negatives generales para una candidata posterior; no crear reglas por
-Mimo, dominio, URL o edad y no bajar directamente el umbral global.
+El piloto humano de 40 muestras ya terminó: 39 binarias y 1 `doubt`; R1 y R3
+tuvieron 0 falsos permisos y 6 falsos filtros, con accuracy 33/39 (84,62 %) y
+balanced accuracy 55/60 (91,67 %) en ambos. Los seis falsos filtros de R3 se
+concentraron en `retail_catalog_fashion`, incluidos maniquíes/catálogos
+permitibles; no hay mejora global demostrada. Son hard negatives generales para
+una candidata posterior; no crear reglas por Mimo, dominio, URL o edad y no
+bajar directamente el umbral global.
+
+El gate `GLOSHIA-R3-BALANCED-CORPUS-REVIEW-GATE-27` terminó la revisión de 295
+muestras: 194 allow, 91 filter y 10 doubt. Sobre 285 binarias, R3 obtuvo 13
+falsos permisos y 32 falsos filtros, balanced accuracy 84,61 % y PR-AUC
+0,835803. El lote sirve para justificar la preparación de TRAIN-28, pero no
+para entrenar todavía: quedó en `directed_review`, sin splits independientes,
+con `training_rights_uncertain` y sin autorización de entrenamiento. La
+recomendación es `GO` condicionado para proponer TRAIN-28 y `NO-GO` para usar
+este lote directamente. `final_sealed` sigue cerrado.
+Evidencia: `docs/dag/v3/GLOSHIA_R3_BALANCED_CORPUS_REVIEW_GATE_27_2026-08-04.md`.
 
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
@@ -372,13 +387,13 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   histórico para consultas modernas; 25 candidatos quedaron en cuarentena por
   actualidad primaria no demostrada y 1 variante se excluyó por pHash canónico.
   Quedaron 40 muestras evaluables de Wikimedia Commons, 26 clusters, todas
-  `internal_evaluation_ok` pero `training_rights_uncertain`. R1 y R3 corrieron
-  con el pipeline real: R1 30 allow/10 filter y R3 31 allow/9 filter; hubo 9
-  cambios de acción, todavía sin decisiones humanas. Las trazas regionales de
-  R3 hallaron 2/40 muestras con alguna región ≥0,50 y 1/40 ≥0,70. No hay aún
-  matriz de confusión ni falsos permisos/filtros confiables. Estado: `GO` para
-  revisión humana y `NO-GO` para entrenamiento; `final_sealed` permanece
-  cerrado. Evidencia:
+  `internal_evaluation_ok` pero `training_rights_uncertain`. La revisión humana
+  terminó con 36 allow, 3 filter y 1 doubt. Sobre las 39 binarias, R1 y R3
+  tuvieron la misma matriz: 0 falsos permisos y 6 falsos filtros; el error de
+  R3 se concentró en catálogos de moda/maniquíes. Estado: `GO` para cerrar el
+  diagnóstico y `NO-GO` para entrenamiento; `final_sealed` permanece cerrado.
+  El siguiente paso requiere un lote independiente y balanceado, no reutilizar
+  este examen como evaluación y no ajustar umbrales. Evidencia:
   `docs/dag/v3/GLOSHIA_R3_COMMERCIAL_HARD_NEGATIVES_26_DIAGNOSTIC_2026-08-04.md`.
 
 Documentos vigentes:
