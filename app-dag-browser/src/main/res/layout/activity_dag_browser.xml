@@ -139,6 +139,14 @@
             android:background="@color/dag_background"
             android:visibility="invisible" />
 
+        <ImageView
+            android:id="@+id/navigation_snapshot"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@null"
+            android:scaleType="fitXY"
+            android:visibility="gone" />
+
         <FrameLayout
             android:id="@+id/safety_overlay"
             android:layout_width="match_parent"

@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-08-03
+Ultima sincronizacion: 2026-08-04
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -49,9 +49,10 @@ Flujo de una entrada:
 - DAG 96 es el canary DEV publicado: activa R3 híbrida, conserva
   R1 como fallback de apertura y agrega actualización manual desde el propio
   DAG usando el mismo manifiesto de App Usuario. Production permanece intacta.
-- DAG 97 es el candidato local posterior: restaura exactamente el navegador de
-  DAG 95, conserva solamente R3 con fallback R1 y retira el autoactualizador de
-  DAG 96. Esta instalado y validado en SM-S908E, sin publicacion remota.
+- DAG 107 es el punto seguro local confirmado: conserva el navegador de DAG 95,
+  R3 con fallback R1 y el retiro del autoactualizador. Agrega una captura
+  efimera durante navegaciones y una terminacion segura alternativa cuando
+  Gecko omite el primer dibujo. Esta instalado en SM-S908E, sin publicacion.
 - DAG 95 es la base rollback anterior de DAG 94: restaura el comportamiento
   comprobado de DAG 92 con `versionCode` superior para permitir la actualizacion
   Android. Permanece instalado en SM-A235M, pero el manifiesto DEV ya anuncia
@@ -64,9 +65,39 @@ Flujo de una entrada:
 
 ## Ultimos tickets trabajados
 
+### DAG-SAFE-NAVIGATION-107 - Transicion protegida sin destellos ni cierre falso
+
+- Estado: `Resuelto y confirmado localmente; pendiente publicacion separada`.
+  Prioridad: P0. Esfuerzo: M. Riesgo: medio.
+- Causa: algunas paginas dinamicas no emiten `onFirstContentfulPaint`; esperar
+  exclusivamente esa señal cerraba la pagina aunque la barrera y el analisis
+  visual hubieran terminado. Las navegaciones tambien exponian un fondo blanco
+  entre el documento protegido anterior y el nuevo.
+- Resultado general: captura efimera de la pestaña activa ya protegida durante
+  la transicion; revelado nuevo solamente tras barrera y primer dibujo o cola
+  visual protegida quieta. Cada imagen conserva su gate fail-closed. Sin reglas
+  por sitio, sin persistir capturas y sin cambiar GloshIA R3.
+- Validacion: unitarios, Ktlint, Lint y APK correctos; DAG 107 instalado en
+  SM-S908E. El propietario confirmo transiciones mejores, busqueda desde DAG
+  sin el destello previo y Mimo funcional. Evidencia:
+  `docs/compatibility/results/dag-browser-v107-safe-navigation-sm-s908e-2026-08-04.md`.
+
+### GLOSHIA-R3-COMMERCIAL-HARD-NEGATIVES-26 - Banners seguros filtrados de mas
+
+- Estado: `Propuesto; no autorizado para entrenamiento`. Prioridad: P0.
+  Esfuerzo: M. Riesgo: alto.
+- Evidencia: R3 filtro incorrectamente un banner con bebe vestido, otro con
+  niño vestido y un banner Mercado/Pagos. Los tres son `allow`.
+- Alcance recomendado: incorporarlos junto con ejemplos independientes de
+  banners comerciales, personas vestidas, texto promocional, logos y fondos
+  graficos; deduplicar por campaña y similitud; entrenar una candidata y
+  compararla contra R3 en el mismo examen.
+- Gate: no bajar el umbral global, no crear excepciones por Mimo/URL/dominio y
+  no reemplazar R3 si aparece cualquier falso permiso crítico nuevo.
+
 ### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
 
-- Estado: `Validado localmente; pendiente de confirmacion/publicacion`.
+- Estado: `Resuelto como base de DAG 107; no publicar por separado`.
   Prioridad: P0. Esfuerzo: M. Riesgo: medio.
 - Resultado: navegador, extension `1.50.0`, carga, pestanas, iconos,
   presentacion y navegacion coinciden con DAG 95. El unico cambio funcional es
@@ -77,8 +108,7 @@ Flujo de una entrada:
   visual faltante; controles Google seguros `19 allow / 0 filter`; sin crash ni
   ANR. Evidencia en
   `docs/compatibility/results/dag-browser-v97-browser95-r3-sm-s908e-2026-08-03.md`.
-- Pendiente: confirmacion del propietario y autorizacion separada para push o
-  publicacion DEV. Production no se toca.
+- Cierre: su base queda incorporada en DAG 107. Production no se toca.
 
 ### DAG-MIMO-LONG-RUN-ROOT-CAUSE-94 - Presentacion idempotente en paginas dinamicas
 

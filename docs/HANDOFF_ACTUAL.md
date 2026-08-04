@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-08-03
+Fecha de corte: 2026-08-04
 
 Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
@@ -10,16 +10,19 @@ el runtime actual desde versiones o worktrees historicos.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- `origin/main` conserva DAG 96 publicado. `main` local prepara DAG 97 como
-  candidato: navegador exacto de DAG 95 con GloshIA R3.
+- `origin/main` conserva DAG 96 publicado. `main` local contiene DAG 107 como
+  punto seguro confirmado: navegador de DAG 95, GloshIA R3 y transiciones de
+  navegacion sin destellos ni cierres falsos por una señal Gecko ausente.
 - App Usuario 307, App Admin 290 y DAG 96 estan publicadas en DEV. Production
   no fue modificada.
 - DAG 96 (`0.69.0-dev`) es el canary DEV reversible de GloshIA R3. R1
   permanece empaquetado como fallback de apertura; no se ejecutan dos modelos
   por fotografia.
-- DAG 97 (`0.69.1-dev`) esta instalado y validado localmente en SM-S908E. Retira
-  todo el autoactualizador de DAG 96 y deja como unica diferencia frente a DAG
-  95 el modelo R3 con fallback R1. Todavia no fue publicado.
+- DAG 107 (`0.69.11-dev`) esta instalado y confirmado por el propietario en
+  SM-S908E. Conserva el retiro del autoactualizador y agrega una captura
+  efimera de la pagina protegida durante navegaciones, mas una terminacion de
+  carga que acepta el primer dibujo de Gecko o la cola visual protegida quieta.
+  Todavia no fue publicado.
 - Los APK finales se construyen solo desde `main` local integrado.
 - Las apps Usuario/Admin no fueron modificadas. Supabase Storage DEV recibio
   unicamente la APK y el manifiesto de DAG 96.
@@ -51,9 +54,9 @@ el runtime actual desde versiones o worktrees historicos.
 | App Admin | 290 | 1.0.1-dev | Publicada en DEV |
 | DAG Browser | 96 | 0.69.0-dev | Canary R3 publicado y verificado en DEV |
 
-Candidato local: DAG Browser 97 (`0.69.1-dev`), instalado en SM-S908E y no
-publicado. Evidencia:
-`docs/compatibility/results/dag-browser-v97-browser95-r3-sm-s908e-2026-08-03.md`.
+Candidato local confirmado: DAG Browser 107 (`0.69.11-dev`), instalado en
+SM-S908E y no publicado. Evidencia:
+`docs/compatibility/results/dag-browser-v107-safe-navigation-sm-s908e-2026-08-04.md`.
 
 El SM-A235M `R58T34V31AE` conserva DAG 95 porque el propietario omitio la
 repeticion A23. DAG 96 puede obtenerse desde Actualizaciones de App Usuario y,
@@ -62,17 +65,31 @@ DAG. No se registra una instalacion fisica de DAG 96 en este cierre.
 
 ## DAG Browser vigente
 
-### DAG 97 local: DAG 95 exacto con GloshIA R3
+### DAG 107 local confirmado: DAG 95, GloshIA R3 y navegacion estable
 
-DAG 97 toma el navegador de DAG 95 sin cambios y aplica solamente R3 como
-modelo activo, con R1 como fallback si R3 no abre. Se retiraron el cliente de
-autoactualizacion, permisos, menu y recursos agregados por DAG 96. La extension
-permanece en `1.50.0`; no cambiaron pipeline, politica, umbrales, presentacion,
-pestanas, iconos ni navegacion. En SM-S908E Mimo completo `78 / 464 / 915 ms`,
-Cheeky recupero su hero y controles, y Fravega recupero todas las miniaturas de
-categorias observadas. Google permitio 19/19 controles de hombres con traje y
-aplico 20 filtros sobre 34 decisiones en ropa de verano. Sin crash ni ANR.
-DAG 97 es candidato local; DAG 96 sigue siendo la version DEV remota.
+DAG 107 parte del navegador de DAG 95 y conserva R3 como modelo activo, con R1
+como fallback si R3 no abre. El autoactualizador, permisos y recursos agregados
+por DAG 96 permanecen retirados. La extension sigue en `1.50.0`; no cambiaron
+pesos, umbral, politica ni decisiones de GloshIA.
+
+La transicion conserva en memoria una captura de la pestaña activa ya
+protegida y la muestra hasta que la pagina nueva queda segura. La captura se
+invalida al cambiar de pestaña, navegar, pasar a segundo plano o liberar
+memoria; no se persiste. La pagina nueva se revela solo con barrera confirmada
+y una de dos señales: primer dibujo de Gecko o cola de imagenes protegidas
+quieta. Esto evita el cierre incorrecto observado en Mimo cuando Gecko omite
+`onFirstContentfulPaint`, sin liberar imagenes pendientes: cada raster mantiene
+su compuerta individual fail-closed.
+
+El propietario confirmo en SM-S908E que las transiciones mejoraron, la busqueda
+desde DAG dejo de producir el destello previo y Mimo abre y funciona. Ktlint,
+unitarios, Lint y build aprobaron. DAG 107 es el punto seguro local; DAG 96
+sigue siendo la version DEV remota.
+
+Pendiente GloshIA separado: R3 filtra incorrectamente tres banners comerciales
+seguros observados en Mimo (bebe vestido, niño vestido y banner Mercado/Pagos).
+Son hard negatives generales para una candidata posterior; no crear reglas por
+Mimo, dominio, URL o edad y no bajar directamente el umbral global.
 
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
@@ -185,12 +202,12 @@ object y embed permanecen bloqueados por contratos separados.
 APK local:
 
 - ruta: `app-dag-browser/build/outputs/apk/dev/debug/DagBrowser-dev-debug.apk`;
-- tamaño: `121377265` bytes;
+- tamaño: `129945445` bytes;
 - SHA-256:
-  `b3308326d9af8bf84e808f319739344f51db04603e55bfd60c39724a389d6b8e`.
+  `0bdfb98cee3b3d7693f8a6d110321f75578209427ce46d835ece2cee6a0b2c9e`.
 
-Evidencia completa:
-`docs/compatibility/results/dag-browser-v95-rollback-sm-a235m-2026-08-03.md`.
+Evidencia del punto local vigente:
+`docs/compatibility/results/dag-browser-v107-safe-navigation-sm-s908e-2026-08-04.md`.
 Contrato vigente: `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PIPELINE.md`.
 
 ## Metricas

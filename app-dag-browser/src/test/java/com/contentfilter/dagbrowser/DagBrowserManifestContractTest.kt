@@ -66,10 +66,17 @@ class DagBrowserManifestContractTest {
         val layout = File("src/main/res/layout/activity_dag_browser.xml").readText()
 
         assertContains(layout, "android:id=\"@+id/page_load_progress\"")
+        assertContains(layout, "android:id=\"@+id/navigation_snapshot\"")
         assertContains(layout, "android:layout_height=\"2dp\"")
         assertContains(layout, "android:background=\"@color/dag_surface\"")
         assertContains(activity, "override fun onProgressChange(")
         assertContains(activity, "finishPageLoadProgress(tab)")
+        assertContains(activity, "geckoView.postOnAnimation(::clearNavigationSnapshot)")
+        assertContains(activity, "showNavigationSnapshot(tab)\n        beginProtectedLoad(tab")
+        assertContains(activity, "tab.barrierReadyForNavigation = false")
+        assertContains(activity, "tab.protectedContentReadyForNavigation = false")
+        assertContains(activity, "!tab.barrierReadyForNavigation || !tab.protectedContentReadyForNavigation")
+        assertContains(activity, "ViewportImagesReadyMessage -> {")
         assertFalse(activity.contains("shimmer = true"))
     }
 }
