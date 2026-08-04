@@ -125,6 +125,24 @@ Flujo de una entrada:
   política, DAG ni Android. Evidencia:
   `docs/dag/v3/GLOSHIA_R3_BALANCED_CORPUS_REVIEW_GATE_27_2026-08-04.md`.
 
+### GLOSHIA-R3-TRAIN-28 - Propuesta de candidata con pool independiente
+
+- Estado: `Propuesto; requiere autorización separada para descargar y entrenar`. Prioridad: P0. Riesgo: alto.
+- Crear aproximadamente 400 muestras nuevas con derechos de entrenamiento
+  verificables, separadas de los 295 elementos del gate 27 y de las 54 imágenes
+  piloto. El gate 27 queda congelado como examen externo.
+- Mantener un único modelo, la arquitectura TinyCLIP vigente y el contrato RGB
+  224x224/letterbox/normalización/salida binaria. Separar train, validation y
+  frozen_test por serie, campaña, producto, origen y cluster perceptual.
+- Entrenar primero un piloto local de 30 minutos, con como máximo tres ensayos
+  cortos y selección únicamente por validation. No abrir `final_sealed`.
+- Gate: cero falsos permisos críticos nuevos frente a R3, reducción clara de
+  falsos filtros, ONNX CPU Android válido y latencia/tamaño razonables. En
+  cualquier fallo, R3 permanece oficial.
+- No autoriza todavía cambiar DAG 107, Android, APK, Supabase, Production,
+  publicar, hacer push ni exportar para canary. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_TRAIN_28_PROPOSAL_2026-08-04.md`.
+
 ### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
 
 - Estado: `Resuelto como base de DAG 107; no publicar por separado`.

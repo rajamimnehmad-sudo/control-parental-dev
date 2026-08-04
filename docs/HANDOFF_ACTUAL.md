@@ -106,6 +106,12 @@ recomendación es `GO` condicionado para proponer TRAIN-28 y `NO-GO` para usar
 este lote directamente. `final_sealed` sigue cerrado.
 Evidencia: `docs/dag/v3/GLOSHIA_R3_BALANCED_CORPUS_REVIEW_GATE_27_2026-08-04.md`.
 
+La propuesta siguiente es `GLOSHIA-R3-TRAIN-28`: pool nuevo aproximado de 400
+muestras con derechos de entrenamiento verificables, splits agrupados y el
+examen gate 27 congelado como referencia externa. Todavía no está autorizado
+descargar, entrenar ni exportar esa candidata.
+Evidencia: `docs/dag/v3/GLOSHIA_R3_TRAIN_28_PROPOSAL_2026-08-04.md`.
+
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
 DAG 96 conserva sin cambios el pipeline de navegador y la extension `1.50.0`
