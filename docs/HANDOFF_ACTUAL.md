@@ -367,6 +367,19 @@ Definicion: `docs/dag/v3/DAG_BROWSER_V3_PERFORMANCE_METRICS.md`.
   temporales fueron retirados del S22. No se tocó DAG.
   Evidencia:
   `docs/dag/v3/GLOSHIA_R3_ANDROID_EQUIVALENCE_24_PREP_2026-08-03.md`.
+- `GLOSHIA-R3-COMMERCIAL-HARD-NEGATIVES-26` (2026-08-04): se ejecutó el
+  diagnóstico de datos sin entrenar. La búsqueda pública devolvió material
+  histórico para consultas modernas; 25 candidatos quedaron en cuarentena por
+  actualidad primaria no demostrada y 1 variante se excluyó por pHash canónico.
+  Quedaron 40 muestras evaluables de Wikimedia Commons, 26 clusters, todas
+  `internal_evaluation_ok` pero `training_rights_uncertain`. R1 y R3 corrieron
+  con el pipeline real: R1 30 allow/10 filter y R3 31 allow/9 filter; hubo 9
+  cambios de acción, todavía sin decisiones humanas. Las trazas regionales de
+  R3 hallaron 2/40 muestras con alguna región ≥0,50 y 1/40 ≥0,70. No hay aún
+  matriz de confusión ni falsos permisos/filtros confiables. Estado: `GO` para
+  revisión humana y `NO-GO` para entrenamiento; `final_sealed` permanece
+  cerrado. Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_COMMERCIAL_HARD_NEGATIVES_26_DIAGNOSTIC_2026-08-04.md`.
 
 Documentos vigentes:
 

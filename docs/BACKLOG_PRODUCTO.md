@@ -84,16 +84,25 @@ Flujo de una entrada:
 
 ### GLOSHIA-R3-COMMERCIAL-HARD-NEGATIVES-26 - Banners seguros filtrados de mas
 
-- Estado: `Propuesto; no autorizado para entrenamiento`. Prioridad: P0.
+- Estado: `En progreso diagnóstico; entrenamiento no autorizado`. Prioridad: P0.
   Esfuerzo: M. Riesgo: alto.
 - Evidencia: R3 filtro incorrectamente un banner con bebe vestido, otro con
   niño vestido y un banner Mercado/Pagos. Los tres son `allow`.
-- Alcance recomendado: incorporarlos junto con ejemplos independientes de
-  banners comerciales, personas vestidas, texto promocional, logos y fondos
-  graficos; deduplicar por campaña y similitud; entrenar una candidata y
-  compararla contra R3 en el mismo examen.
+- Diagnóstico ejecutado: se prepararon 40 imágenes evaluables de Wikimedia
+  Commons, 26 clusters, con procedencia y hashes; 25 candidatos quedaron en
+  cuarentena por actualidad primaria no demostrada y 1 variante por pHash
+  canónico. R1 y R3 se midieron sobre las mismas 40, sin etiquetas humanas aún:
+  R1 30 allow/10 filter, R3 31 allow/9 filter. La web local de revisión está
+  en `http://127.0.0.1:8774/`; las predicciones permanecen ocultas hasta la
+  decisión humana.
+- Próximo alcance recomendado: revisar primero desacuerdos y posibles falsos
+  filtros, completar allow/filter/doubt y recién después decidir si hay
+  suficientes falsos filtros comerciales para un ticket de entrenamiento.
+  Deduplicar por campaña y similitud; no usar excepciones por sitio, URL o
+  dominio.
 - Gate: no bajar el umbral global, no crear excepciones por Mimo/URL/dominio y
   no reemplazar R3 si aparece cualquier falso permiso crítico nuevo.
+- Evidencia: `docs/dag/v3/GLOSHIA_R3_COMMERCIAL_HARD_NEGATIVES_26_DIAGNOSTIC_2026-08-04.md`.
 
 ### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
 

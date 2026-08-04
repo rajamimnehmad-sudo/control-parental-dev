@@ -335,8 +335,8 @@ def _near_duplicate(
     known_dhashes: Iterable[int],
     known_phashes: Iterable[int],
 ) -> bool:
-    return any((dhash ^ item).bit_count() <= 8 for item in known_dhashes) or any(
-        (phash ^ item).bit_count() <= 12 for item in known_phashes
+    return any(bin(dhash ^ item).count("1") <= 8 for item in known_dhashes) or any(
+        bin(phash ^ item).count("1") <= 12 for item in known_phashes
     )
 
 
