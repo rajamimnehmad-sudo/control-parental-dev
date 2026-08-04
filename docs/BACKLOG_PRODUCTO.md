@@ -49,6 +49,9 @@ Flujo de una entrada:
 - DAG 96 es el canary DEV publicado: activa R3 híbrida, conserva
   R1 como fallback de apertura y agrega actualización manual desde el propio
   DAG usando el mismo manifiesto de App Usuario. Production permanece intacta.
+- DAG 97 es el candidato local posterior: restaura exactamente el navegador de
+  DAG 95, conserva solamente R3 con fallback R1 y retira el autoactualizador de
+  DAG 96. Esta instalado y validado en SM-S908E, sin publicacion remota.
 - DAG 95 es la base rollback anterior de DAG 94: restaura el comportamiento
   comprobado de DAG 92 con `versionCode` superior para permitir la actualizacion
   Android. Permanece instalado en SM-A235M, pero el manifiesto DEV ya anuncia
@@ -60,6 +63,22 @@ Flujo de una entrada:
 - Los detalles, hashes, commits y evidencias vigentes viven unicamente en `docs/HANDOFF_ACTUAL.md` y `docs/BASELINES.md`.
 
 ## Ultimos tickets trabajados
+
+### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
+
+- Estado: `Validado localmente; pendiente de confirmacion/publicacion`.
+  Prioridad: P0. Esfuerzo: M. Riesgo: medio.
+- Resultado: navegador, extension `1.50.0`, carga, pestanas, iconos,
+  presentacion y navegacion coinciden con DAG 95. El unico cambio funcional es
+  GloshIA R3 con R1 como fallback de apertura. Se retiro por completo el
+  autoactualizador incorporado en DAG 96.
+- Validacion: tests, Ktlint, Lint y build correctos; instalacion fisica en
+  SM-S908E. Mimo `78 / 464 / 915 ms`; Cheeky y Fravega recuperaron contenido
+  visual faltante; controles Google seguros `19 allow / 0 filter`; sin crash ni
+  ANR. Evidencia en
+  `docs/compatibility/results/dag-browser-v97-browser95-r3-sm-s908e-2026-08-03.md`.
+- Pendiente: confirmacion del propietario y autorizacion separada para push o
+  publicacion DEV. Production no se toca.
 
 ### DAG-MIMO-LONG-RUN-ROOT-CAUSE-94 - Presentacion idempotente en paginas dinamicas
 

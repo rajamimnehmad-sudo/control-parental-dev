@@ -7,18 +7,9 @@ plugins {
 fun envValue(name: String): String {
     val fromEnvironment = providers.environmentVariable(name).orNull
     if (!fromEnvironment.isNullOrBlank()) return fromEnvironment
-    val envFile =
-        listOf(rootProject.file(".env"), rootProject.file("../.env"))
-            .firstOrNull { it.exists() }
-            ?: return ""
-    return envFile
-        .readLines()
-        .firstOrNull { it.startsWith("$name=") }
-        ?.substringAfter("=")
-        ?.trim()
-        ?.trim('"')
-        ?.trim('\'')
-        .orEmpty()
+    val envFile = rootProject.file(".env")
+    if (!envFile.exists()) return ""
+    return envFile.readLines().firstOrNull { it.startsWith("$name=") }?.substringAfter("=")?.trim().orEmpty()
 }
 
 val devSigningStorePath = providers.environmentVariable("ANDROID_DEV_KEYSTORE_PATH").orNull
@@ -37,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 96
-        versionName = "0.69.0"
+        versionCode = 97
+        versionName = "0.69.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -66,13 +57,6 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
-            val dagUpdateManifestUrl =
-                envValue("SUPABASE_URL")
-                    .trimEnd('/')
-                    .takeIf(String::isNotBlank)
-                    ?.plus("/storage/v1/object/public/dev-updates/app-dag-browser-dev-manifest.json")
-                    .orEmpty()
-            buildConfigField("String", "DAG_UPDATE_MANIFEST_URL", "\"$dagUpdateManifestUrl\"")
         }
     }
 

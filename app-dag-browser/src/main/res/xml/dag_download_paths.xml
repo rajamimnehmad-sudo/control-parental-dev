@@ -3,7 +3,4 @@
     <files-path
         name="downloads"
         path="downloads/" />
-    <cache-path
-        name="updates"
-        path="dag-updates/" />
 </paths>

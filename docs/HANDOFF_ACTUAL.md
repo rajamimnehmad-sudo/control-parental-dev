@@ -10,12 +10,16 @@ el runtime actual desde versiones o worktrees historicos.
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
 - Rama de trabajo: `main` local.
-- `main` y `origin/main` integran el código exacto de DAG 96.
+- `origin/main` conserva DAG 96 publicado. `main` local prepara DAG 97 como
+  candidato: navegador exacto de DAG 95 con GloshIA R3.
 - App Usuario 307, App Admin 290 y DAG 96 estan publicadas en DEV. Production
   no fue modificada.
 - DAG 96 (`0.69.0-dev`) es el canary DEV reversible de GloshIA R3. R1
   permanece empaquetado como fallback de apertura; no se ejecutan dos modelos
   por fotografia.
+- DAG 97 (`0.69.1-dev`) esta instalado y validado localmente en SM-S908E. Retira
+  todo el autoactualizador de DAG 96 y deja como unica diferencia frente a DAG
+  95 el modelo R3 con fallback R1. Todavia no fue publicado.
 - Los APK finales se construyen solo desde `main` local integrado.
 - Las apps Usuario/Admin no fueron modificadas. Supabase Storage DEV recibio
   unicamente la APK y el manifiesto de DAG 96.
@@ -47,12 +51,28 @@ el runtime actual desde versiones o worktrees historicos.
 | App Admin | 290 | 1.0.1-dev | Publicada en DEV |
 | DAG Browser | 96 | 0.69.0-dev | Canary R3 publicado y verificado en DEV |
 
+Candidato local: DAG Browser 97 (`0.69.1-dev`), instalado en SM-S908E y no
+publicado. Evidencia:
+`docs/compatibility/results/dag-browser-v97-browser95-r3-sm-s908e-2026-08-03.md`.
+
 El SM-A235M `R58T34V31AE` conserva DAG 95 porque el propietario omitio la
 repeticion A23. DAG 96 puede obtenerse desde Actualizaciones de App Usuario y,
 una vez instalado, las versiones siguientes tambien desde el menu propio de
 DAG. No se registra una instalacion fisica de DAG 96 en este cierre.
 
 ## DAG Browser vigente
+
+### DAG 97 local: DAG 95 exacto con GloshIA R3
+
+DAG 97 toma el navegador de DAG 95 sin cambios y aplica solamente R3 como
+modelo activo, con R1 como fallback si R3 no abre. Se retiraron el cliente de
+autoactualizacion, permisos, menu y recursos agregados por DAG 96. La extension
+permanece en `1.50.0`; no cambiaron pipeline, politica, umbrales, presentacion,
+pestanas, iconos ni navegacion. En SM-S908E Mimo completo `78 / 464 / 915 ms`,
+Cheeky recupero su hero y controles, y Fravega recupero todas las miniaturas de
+categorias observadas. Google permitio 19/19 controles de hombres con traje y
+aplico 20 filtros sobre 34 decisiones en ropa de verano. Sin crash ni ANR.
+DAG 97 es candidato local; DAG 96 sigue siendo la version DEV remota.
 
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
