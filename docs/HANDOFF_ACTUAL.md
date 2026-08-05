@@ -118,6 +118,19 @@ validation; no se abrió el frozen_test de candidato, no se exportó ONNX y R3
 permanece oficial. Evidencia:
 `docs/dag/v3/GLOSHIA_R3_TRAIN_28_NO_GO_2026-08-04.md`.
 
+El piloto privado `GLOSHIA-R3-HARD-NEGATIVE-REPAIR-PILOT-29` terminó con
+234 binarias nuevas de round29, 36 hard cases ponderados y splits
+`367/28/29` train/validation/frozen_test sin contaminación. El mejor candidato
+visual FP32 redujo los falsos filtros de R3 de `3/15` a `1/15` en frozen_test,
+con balanced accuracy `93,10 %` frente a `86,43 %` y PR-AUC `0,957952` frente a
+`0,943326`, manteniendo `1/14` falsos permisos. Sin embargo, FP32 pesa
+33.220.815 bytes frente a 10.469.698 de R3; INT8 dinámico falla con
+`ConvInteger`, QDQ/QLinearOps agregan falsos permisos y las variantes híbridas
+cambian decisiones fronterizas. Resultado obligatorio: `NO-GO` para canary o
+reemplazo; R3 permanece oficial, `final_sealed` sigue cerrado y no se modificó
+DAG 107. Evidencia:
+`docs/dag/v3/GLOSHIA_R3_HARD_NEGATIVE_REPAIR_29_2026-08-05.md`.
+
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
 DAG 96 conserva sin cambios el pipeline de navegador y la extension `1.50.0`

@@ -157,6 +157,23 @@ Flujo de una entrada:
   no se cambió R3, DAG 107, Android, APK, umbral o política. Evidencia:
   `docs/dag/v3/GLOSHIA_R3_TRAIN_28_NO_GO_2026-08-04.md`.
 
+### GLOSHIA-R3-HARD-NEGATIVE-REPAIR-PILOT-29 - Candidata visual con casos difíciles
+
+- Estado: `NO-GO para integración; R3 permanece oficial`. Prioridad: P0. Riesgo: alto.
+- Se usaron 234 decisiones binarias autorizadas sólo para experimento privado,
+  con derechos de entrenamiento todavía inciertos. La separación conservó
+  validation/frozen_test históricos y pasó contaminación: 367 train, 28
+  validation y 29 frozen_test.
+- Pilot 01 FP32 mejoró frozen_test de 3/15 a 1/15 falsos filtros y mantuvo
+  1/14 falsos permisos; balanced accuracy subió de 86,43 % a 93,10 % y
+  PR-AUC de 0,943326 a 0,957952.
+- No hay exportación apta para Android: FP32 pesa 33,2 MB; INT8 dinámico falla
+  con ConvInteger; QDQ/QLinearOps agregan falsos permisos; híbridos cambian
+  decisiones frente a FP32. No integrar, no cambiar umbral ni abrir
+  excepciones por sitio o género.
+- Evidencia:
+  `docs/dag/v3/GLOSHIA_R3_HARD_NEGATIVE_REPAIR_29_2026-08-05.md`.
+
 ### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
 
 - Estado: `Resuelto como base de DAG 107; no publicar por separado`.

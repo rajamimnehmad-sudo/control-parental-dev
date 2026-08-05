@@ -41,8 +41,12 @@ class TinyClipPolicy(nn.Module):
         self.register_buffer("classifier_intercept", torch.as_tensor(intercept, dtype=torch.float32))
 
     def forward(self, pixel_values: torch.Tensor) -> torch.Tensor:
-        output = self.vision_model(pixel_values=pixel_values, return_dict=False)
-        projected = self.visual_projection(output[1])
+        try:
+            output = self.vision_model(pixel_values=pixel_values, return_dict=False)
+        except TypeError:
+            output = self.vision_model(pixel_values=pixel_values)
+        pooled = output.pooler_output if hasattr(output, "pooler_output") else output[1]
+        projected = self.visual_projection(pooled)
         normalized = F.normalize(projected, dim=1)
         logits = normalized @ self.classifier_coefficient.t()
         return torch.sigmoid(logits + self.classifier_intercept)
