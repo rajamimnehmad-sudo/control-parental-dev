@@ -214,6 +214,19 @@ a `2/21` y de `2/15` a `0/15`. Es `GO` condicionado para un harness Android
 aislado; no está integrado ni aprobado para DAG. Evidencia:
 `docs/dag/v3/GLOSHIA_R3_ROUND30_HYBRID_EXPORT_GATE_2026-08-05.md`.
 
+El ticket `GLOSHIA-R3.2-DIRECTED-REPAIR-TRAIN-10` terminó `NO-GO`. El split
+privado agrupado quedó en `642/28/29` train/validation/frozen_test, con seed
+`3201`; la contaminación detectada por pHash 0 y URL compartida fue excluida
+y la prueba final pasó. El ensayo 03 redujo validation de `2/21` a `1/21`
+falsos filtros manteniendo `1/7` falsos permisos, pero en `frozen_test` empató
+exactamente a R3.1: `1/14` falsos permisos, `0/15` falsos filtros, balanced
+accuracy `96,43 %` y PR-AUC `0,963054`. Su FP32 abre en ORT CPU pero pesa
+`33.220.815` bytes; su INT8 dinámico pesa `8.735.126` bytes, contiene
+`ConvInteger` y falla con `NOT_IMPLEMENTED` en ORT CPU. R3.1 continúa oficial,
+`final_sealed` cerrado y no se modificaron DAG, Android, APK, umbral, política,
+Supabase, Production ni GitHub. Evidencia:
+`docs/dag/v3/GLOSHIA_R3_2_DIRECTED_REPAIR_TRAIN_2026-08-05.md`.
+
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
 DAG 96 conserva sin cambios el pipeline de navegador y la extension `1.50.0`

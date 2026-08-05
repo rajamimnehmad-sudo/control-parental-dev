@@ -273,6 +273,24 @@ Flujo de una entrada:
 - Antes de integrar hay que ejecutar ORT Android 1.27.0 CPU en S22 y A23:
   apertura, inferencias repetidas, salidas finitas, decisiones frente a FP32,
   p50/p95, memoria y estabilidad. No abrir `final_sealed` ni modificar DAG
+
+### GLOSHIA-R3.2-DIRECTED-REPAIR-TRAIN-10 - Reparación dirigida de falsos filtros
+
+- Estado: `NO-GO; R3.1 permanece oficial`. Prioridad: P0. Esfuerzo: M. Riesgo:
+  alto.
+- El experimento privado usó seed `3201` y split agrupado `642/28/29`
+  train/validation/frozen_test. Se excluyó un cluster contaminante por pHash 0
+  y URL compartida con evaluación externa; la prueba final de contaminación
+  pasó. `final_sealed` permaneció cerrado.
+- El mejor ensayo redujo validation de `2/21` a `1/21` falsos filtros sin
+  aumentar los `1/7` falsos permisos, pero empató R3.1 en frozen_test: `1/14`
+  falsos permisos, `0/15` falsos filtros, balanced accuracy `96,43 %` y PR-AUC
+  `0,963054`. El empate no supera el gate.
+- El FP32 abre en ORT CPU pero pesa 33.220.815 bytes; el INT8 dinámico pesa
+  8.735.126 bytes y falla por `ConvInteger` no implementado en ORT CPU. No hay
+  candidato apto para Android. No integrar, no cambiar umbral/política y no
+  crear excepciones por sitio, URL, género o campaña.
+- Evidencia: `docs/dag/v3/GLOSHIA_R3_2_DIRECTED_REPAIR_TRAIN_2026-08-05.md`.
   107 durante el harness.
 - Criterio: cero falsos permisos nuevos, sin degradación crítica, tamaño y
   latencia comparables, y cierre correcto de sesión. Si falla, R3 permanece
