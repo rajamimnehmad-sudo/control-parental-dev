@@ -125,7 +125,7 @@ internal object DagNavigationPolicy {
     private fun isLabFixture(uri: URI): Boolean =
         BuildConfig.GLOSHIA_LAB_FIXTURE &&
             uri.scheme.equals("http", ignoreCase = true) &&
-            uri.host.equals("localhost", ignoreCase = true) &&
+            (uri.host.equals("localhost", ignoreCase = true) || uri.host == "127.0.0.1") &&
             uri.path.startsWith("/fixture/")
 
     private fun hasStrictSafeSearch(rawQuery: String?): Boolean =

@@ -227,6 +227,7 @@ class DagBrowserActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (BuildConfig.GLOSHIA_LAB_FIXTURE) Log.i("DagLabHarness", "activity_onCreate")
         setContentView(R.layout.activity_dag_browser)
         pendingExternalUrl = safeExternalUrl(intent)
         applySystemBarInsets()
@@ -236,7 +237,13 @@ class DagBrowserActivity : Activity() {
         favoritesPersistence = DagFavoritesPersistence(applicationContext)
         imageAnalyzer =
             if (BuildConfig.GLOSHIA_VISUAL_ENABLED) {
-                DagLifecycleImageAnalyzer(DagOnDeviceImageAnalyzer.create(applicationContext))
+                DagLifecycleImageAnalyzer(
+                    DagOnDeviceImageAnalyzer.create(applicationContext).also {
+                        if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
+                            Log.i("DagLabHarness", "analyzer_ready")
+                        }
+                    },
+                )
             } else {
                 UnavailableDagImageAnalyzer
             }
@@ -2839,6 +2846,10 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun maybeOfferDefaultBrowserSetup() {
+        if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
+            Log.i("DagLabHarness", "default_browser_prompt_skipped")
+            return
+        }
         if (isDefaultBrowser()) return
         val preferences = getSharedPreferences(BrowserSetupPreferences, MODE_PRIVATE)
         if (preferences.getBoolean(DefaultBrowserPromptShownKey, false)) return

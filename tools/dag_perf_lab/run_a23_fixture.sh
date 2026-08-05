@@ -195,7 +195,7 @@ reverse_added="1"
   echo "settle_seconds=$settle"
   echo "swipes=$swipes"
   echo "lab=$lab"
-  echo "fixture_url=$scheme://localhost:$port/fixture/?run=$run_id"
+  echo "fixture_url=$scheme://$([[ \"$lab\" == \"1\" ]] && echo 127.0.0.1 || echo localhost):$port/fixture/?run=$run_id"
   "$adb_bin" -s "$serial" shell getprop ro.build.version.release | tr -d '\r' | sed 's/^/android=/'
   "$adb_bin" -s "$serial" shell dumpsys package "$package_name" | sed -n 's/^[[:space:]]*versionCode=/versionCode=/p; s/^[[:space:]]*versionName=/versionName=/p' | head -2
 } >"$output_dir/run-metadata.txt"
@@ -232,6 +232,9 @@ fi
 "$adb_bin" -s "$serial" shell dumpsys gfxinfo "$package_name" reset >"$output_dir/gfxinfo-reset.txt" 2>&1 || true
 
 fixture_url="$scheme://localhost:$port/fixture/?run=$run_id"
+if [[ "$lab" == "1" ]]; then
+  fixture_url="$scheme://127.0.0.1:$port/fixture/?run=$run_id"
+fi
 "$adb_bin" -s "$serial" shell am start -W \
   -a android.intent.action.VIEW \
   -d "$fixture_url" \
@@ -266,7 +269,11 @@ if (( remaining > 0 )); then sleep "$remaining"; fi
 if [[ -s "$output_dir/fixture-events.jsonl" ]]; then
   "$adb_bin" -s "$serial" exec-out screencap -p >"$output_dir/fixture-screen.png" 2>/dev/null || true
 else
-  echo "Fixture emitted no event. A fresh DAG profile may require a one-time Gecko certificate exception." >&2
+  if [[ "$lab" == "1" ]]; then
+    echo "Fixture emitted no event. The isolated lab activity did not report readiness; inspect logcat and activity state." >&2
+  else
+    echo "Fixture emitted no event. A fresh DAG profile may require a one-time Gecko certificate exception." >&2
+  fi
   echo "No screenshot was captured, preventing accidental capture of a non-fixture page." >&2
 fi
 

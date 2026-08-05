@@ -28,8 +28,11 @@ el runtime actual desde versiones o worktrees historicos.
   `docs/compatibility/results/dag-browser-v109-performance-gloshia-2026-08-05.md`.
 - Se preparó un flavor aislado `lab` (versionCode `110`) para medir el fixture
   determinista por HTTP de loopback sin alterar TLS ni navegación del flavor
-  DEV. No se instaló ni publicó; su estado está en
-  `docs/compatibility/results/dag-browser-v110-lab-fixture-harness-2026-08-05.md`.
+  DEV. Android envía la Activity a Home durante el lanzamiento, por lo que no
+  hay métricas físicas válidas de la página; esto no afecta al modelo. El test
+  directo en el S22 abrió R3.1 y ejecutó `22/22` inferencias sin errores: en la
+  repetición final p50 `30,92 ms`, p95 `33,75 ms`, PSS `114.405 KiB`. No se publicó. Su estado está
+  en `docs/compatibility/results/dag-browser-v110-lab-fixture-harness-2026-08-05.md`.
 
 ## Repositorio y flujo vigente
 

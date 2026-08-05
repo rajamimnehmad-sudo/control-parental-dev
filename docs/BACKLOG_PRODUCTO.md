@@ -65,16 +65,17 @@ final queda en DAG 109 / extensión 1.51.0.
 
 ### DAG-PERF-LAB-FIXTURE-HARNESS - Fixture determinista en flavor aislado
 
-- Estado: `En progreso local`.
+- Estado: `Medición de modelo cerrada; fixture UI pendiente`.
 - Prioridad: P1. Tipo: laboratorio de rendimiento. Esfuerzo: S.
 - El fixture HTTPS autofirmado no es aceptado por GeckoView en el runtime DEV.
   Se preparó un flavor separado `com.contentfilter.dagbrowser.lab` que solo
-  permite `http://localhost/fixture/` y no cambia el APK DEV ni la política
-  publicada.
-- Aceptación pendiente: instalarlo en el S22, ejecutar una corrida fría y una
-  caliente, y registrar `page_visible`, `viewport_images_ready`,
-  `page_analysis_ready`, p50/p95, memoria, jank, prioridades y ausencia de
-  crash/ANR.
+  permite loopback HTTP del fixture (`localhost`/`127.0.0.1`) y no cambia el
+  APK DEV ni la política publicada.
+- El test directo `GloshiaLabDeviceModelSmokeTest` abrió R3.1 en el S22 y
+  ejecutó `22/22` inferencias sin fallos ni salidas no finitas: en la repetición
+  final p50 `30,92 ms`, p95 `33,75 ms` y PSS `114.405 KiB`. La Activity de UI sigue siendo enviada a
+  Home por Android; por eso no se reportan métricas de página, viewport ni
+  prioridades visuales.
 - Evidencia: `docs/compatibility/results/dag-browser-v110-lab-fixture-harness-2026-08-05.md`.
 
 Flujo de una entrada:
