@@ -149,6 +149,15 @@ intacto en DAG 107, sin APK, Android, umbral, política, Supabase, publicación
 ni push. Informe reproducible:
 `.codex-tmp/gloshia-r3-round30-binary-candidate-20260805/round30-binary-candidate-report.json`.
 
+Un seguimiento de exportación encontró una candidata híbrida INT8 compacta del
+mismo piloto: `9.668.603` bytes, SHA-256
+`c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48`. Abre en
+ORT CPU local y, contra el R3 oficial actual, mantiene los falsos permisos en
+`1/7` validation y `1/14` frozen_test mientras reduce falsos filtros de `3/21`
+a `2/21` y de `2/15` a `0/15`. Es `GO` condicionado para un harness Android
+aislado; no está integrado ni aprobado para DAG. Evidencia:
+`docs/dag/v3/GLOSHIA_R3_ROUND30_HYBRID_EXPORT_GATE_2026-08-05.md`.
+
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
 DAG 96 conserva sin cambios el pipeline de navegador y la extension `1.50.0`

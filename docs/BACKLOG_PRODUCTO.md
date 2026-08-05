@@ -198,6 +198,22 @@ Flujo de una entrada:
   margen de decisión más estable; no ajustar el umbral ni crear excepciones
   por sitio, URL, género o campaña.
 
+### GLOSHIA-R3-ROUND30-HYBRID-ANDROID-GATE - Validación en teléfonos
+
+- Estado: `GO condicionado; pendiente harness Android aislado`. Prioridad: P0.
+  Esfuerzo: M. Riesgo: alto.
+- La híbrida INT8 del piloto 03 pesa 9.668.603 bytes, abre en ORT CPU local y
+  conserva el contrato de R3. Frente al R3 oficial mantiene `1/7` y `1/14`
+  falsos permisos y reduce falsos filtros a `2/21` y `0/15` en validation y
+  frozen_test.
+- Antes de integrar hay que ejecutar ORT Android 1.27.0 CPU en S22 y A23:
+  apertura, inferencias repetidas, salidas finitas, decisiones frente a FP32,
+  p50/p95, memoria y estabilidad. No abrir `final_sealed` ni modificar DAG
+  107 durante el harness.
+- Criterio: cero falsos permisos nuevos, sin degradación crítica, tamaño y
+  latencia comparables, y cierre correcto de sesión. Si falla, R3 permanece
+  oficial.
+
 ### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
 
 - Estado: `Resuelto como base de DAG 107; no publicar por separado`.
