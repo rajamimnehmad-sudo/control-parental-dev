@@ -34,6 +34,17 @@ el runtime actual desde versiones o worktrees historicos.
   repetición final p50 `30,92 ms`, p95 `33,75 ms`, PSS `114.405 KiB`. No se publicó. Su estado está
   en `docs/compatibility/results/dag-browser-v110-lab-fixture-harness-2026-08-05.md`.
 
+Se corrigió la fuente de verdad del laboratorio Python: estaba fijada al hash
+histórico de R3 (`0aaa…`) aunque DAG usa R3.1 (`c8b64…`). Se reejecutaron los
+mismos exámenes de gate 27 y round 30 con R3.1, sin sobrescribir los informes
+históricos y sin abrir `final_sealed`. En las 536 decisiones binarias
+combinadas, R3.1 obtuvo 26 falsos permisos, 56 falsos filtros, balanced
+accuracy `84,98 %` y PR-AUC `89,22 %`. El R3 histórico tuvo 27, 67, `83,15 %`
+y `82,14 %`, respectivamente. Es una mejora de baseline, no una autorización
+para entrenar o integrar otra candidata.
+Informe reproducible:
+`docs/dag/v3/GLOSHIA_R3_1_BASELINE_REVALIDATION_2026-08-05.md`.
+
 ## Repositorio y flujo vigente
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.

@@ -30,8 +30,8 @@ DEFAULT_MODEL = (
     / "app-dag-browser/src/main/assets/dag-model/"
     "tinyclip-r3-head-hybrid-int8.onnx"
 )
-EXPECTED_MODEL_NAME = "GloshIA Visual R3"
-EXPECTED_MODEL_SHA256 = "0aaa1700182623173c41d233bd0e072cce2b2880aca14430d9f9af43fa2c44a8"
+EXPECTED_MODEL_NAME = "GloshIA Visual R3.1"
+EXPECTED_MODEL_SHA256 = "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48"
 HISTORICAL_R1_MODEL_SHA256 = "2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee"
 
 
@@ -66,7 +66,7 @@ def score_command(args: argparse.Namespace) -> int:
     digest = sha256_file(args.model)
     if digest != EXPECTED_MODEL_SHA256:
         raise ValueError(
-            "refusing to score with a model that differs from the official R3 artefact"
+            "refusing to score with a model that differs from the official R3.1 artefact"
         )
     output = args.output or corpus_dir / "predictions.jsonl"
     if args.diagnostic_regions and args.output is None:
@@ -118,7 +118,11 @@ def verify_command(args: argparse.Namespace) -> int:
 
 
 def report_command(args: argparse.Namespace) -> int:
-    report = evaluation_report(args.corpus, include_sealed=args.include_sealed)
+    report = evaluation_report(
+        args.corpus,
+        include_sealed=args.include_sealed,
+        predictions_path=args.predictions,
+    )
     output = args.output or args.corpus / "evaluation-report.json"
     output.write_text(
         json.dumps(report, indent=2, ensure_ascii=False, sort_keys=True) + "\n",
@@ -231,6 +235,7 @@ def parser() -> argparse.ArgumentParser:
     report = subcommands.add_parser("report")
     report.add_argument("corpus", type=Path)
     report.add_argument("--output", type=Path)
+    report.add_argument("--predictions", type=Path)
     report.add_argument("--include-sealed", action="store_true")
     report.set_defaults(handler=report_command)
 

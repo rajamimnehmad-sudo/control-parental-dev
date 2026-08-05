@@ -143,10 +143,15 @@ def _stratum_value(row: dict[str, Any], key: str) -> str:
     return "unannotated"
 
 
-def joined_rows(corpus_dir: Path, include_sealed: bool = False) -> list[dict[str, Any]]:
+def joined_rows(
+    corpus_dir: Path,
+    include_sealed: bool = False,
+    predictions_path: Path | None = None,
+) -> list[dict[str, Any]]:
     manifest = read_jsonl(corpus_dir / "manifest.jsonl")
     predictions = {
-        row["sample_id"]: row for row in read_jsonl(corpus_dir / "predictions.jsonl")
+        row["sample_id"]: row
+        for row in read_jsonl(predictions_path or corpus_dir / "predictions.jsonl")
     }
     reviews = read_reviews(corpus_dir / "reviews.json")
     rows = []
@@ -211,9 +216,25 @@ def build_review_queue(
     return selected
 
 
-def evaluation_report(corpus_dir: Path, include_sealed: bool = False) -> dict[str, Any]:
+def evaluation_report(
+    corpus_dir: Path,
+    include_sealed: bool = False,
+    predictions_path: Path | None = None,
+) -> dict[str, Any]:
     full_manifest = read_jsonl(corpus_dir / "manifest.jsonl")
-    rows = joined_rows(corpus_dir, include_sealed=include_sealed)
+    prediction_rows = read_jsonl(predictions_path or corpus_dir / "predictions.jsonl")
+    model_hashes = sorted(
+        {
+            row.get("model_sha256")
+            for row in prediction_rows
+            if row.get("model_sha256")
+        }
+    )
+    rows = joined_rows(
+        corpus_dir,
+        include_sealed=include_sealed,
+        predictions_path=predictions_path,
+    )
     predicted = [row for row in rows if row.get("model_prediction")]
     valid = [row for row in predicted if not row["model_prediction"].get("error")]
     reviewed = [
@@ -326,6 +347,8 @@ def evaluation_report(corpus_dir: Path, include_sealed: bool = False) -> dict[st
     metrics = _confusion_metrics(matrix)
     return {
         "schema_version": "gloshia-lab-evaluation-report-v1",
+        "model_sha256": model_hashes[0] if len(model_hashes) == 1 else None,
+        "model_sha256_values": model_hashes,
         "scope": "sealed_opened" if include_sealed else "sealed_excluded",
         "corpus_rows": len(rows),
         "predicted": len(predicted),

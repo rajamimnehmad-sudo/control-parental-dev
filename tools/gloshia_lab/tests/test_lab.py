@@ -22,6 +22,7 @@ from tools.gloshia_lab.corpus import (
     repair_currentness,
     _source_cluster,
 )
+from tools.gloshia_lab import cli
 from tools.gloshia_lab.model import (
     PADDING_COLOR,
     TARGET_SIZE,
@@ -38,6 +39,20 @@ from tools.gloshia_lab.server import ReviewServer, review_queue_name
 
 
 class ModelPolicyTest(unittest.TestCase):
+    def test_lab_pins_current_r31_model(self) -> None:
+        root = Path(__file__).resolve().parents[3]
+        model = (
+            root
+            / "app-dag-browser/src/main/assets/dag-model/"
+            "tinyclip-r3-head-hybrid-int8.onnx"
+        )
+        self.assertEqual("GloshIA Visual R3.1", cli.EXPECTED_MODEL_NAME)
+        self.assertEqual(
+            "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48",
+            cli.EXPECTED_MODEL_SHA256,
+        )
+        self.assertEqual(cli.EXPECTED_MODEL_SHA256, cli.sha256_file(model))
+
     def test_reference_policy_is_pinned_to_android_constants(self) -> None:
         root = Path(__file__).resolve().parents[3]
         analyzer = (
@@ -390,6 +405,19 @@ class MetricsTest(unittest.TestCase):
             self.assertEqual(1, report["confusion_matrix"]["filter_as_allow"])
             self.assertEqual(0.0, report["filter_recall"])
             self.assertEqual(1.0, report["allow_recall"])
+
+            alternate = corpus / "predictions-r31.jsonl"
+            alternate.write_text(
+                "".join(
+                    json.dumps({**row, "action": "filter", "model_sha256": "r31"}) + "\n"
+                    for row in predictions
+                ),
+                encoding="utf-8",
+            )
+            alternate_report = evaluation_report(corpus, predictions_path=alternate)
+            self.assertEqual("r31", alternate_report["model_sha256"])
+            self.assertEqual(2, alternate_report["reviewed_reference"])
+            self.assertEqual(1, alternate_report["confusion_matrix"]["allow_as_filter"])
 
     def test_calibration_selects_on_main_and_reports_difficult_separately(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

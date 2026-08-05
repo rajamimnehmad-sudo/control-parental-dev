@@ -45,6 +45,25 @@ Modalidad del chat dedicado de backlog:
 - La limpieza conserva corpus, manifests, splits, informes y checkpoints para
   futuros entrenamientos; solo se retiran temporales claramente descartables.
 
+### GLOSHIA-R3.1-BASELINE-REVALIDATION - Métricas sobre los mismos exámenes
+
+- Estado: `Resuelto local; GO condicionado para proponer entrenamiento R3.2`.
+  Prioridad: P0. Tipo: laboratorio GloshIA. Esfuerzo: S. Riesgo: alto.
+- El laboratorio Python estaba fijado al hash histórico de R3 y podía rechazar
+  o confundir el modelo vigente. Se actualizó a R3.1 (`c8b64…`), se agregó una
+  prueba contra el asset Android y `report --predictions` para preservar
+  informes anteriores.
+- R3.1 fue reejecutado sobre gate 27 y round 30: 536 binarias, 26 falsos
+  permisos, 56 falsos filtros, balanced accuracy 84,98 % y PR-AUC 89,22 %.
+  Frente al R3 histórico en exactamente esas muestras: 27/67, 83,15 % y
+  82,14 %. `final_sealed` continúa cerrado.
+- No se entrenó, no se cambiaron pesos, umbral, política, DAG, APK ni Android.
+  Evidencia: `docs/dag/v3/GLOSHIA_R3_1_BASELINE_REVALIDATION_2026-08-05.md`.
+- Siguiente propuesta: `GLOSHIA-R3.2-DIRECTED-REPAIR-TRAIN`, con un único
+  candidato, splits independientes y prioridad en sujetos pequeños/recortados,
+  personas comerciales y banners/maniquíes seguros. Requiere autorización
+  explícita antes de entrenar.
+
 ### DAG-V109-PERFORMANCE-VISUAL-PRIORITY - Entrega visual sin cambiar política
 
 - Estado: `Resuelto local; pendiente cualquier publicación posterior`.
