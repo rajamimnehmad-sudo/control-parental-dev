@@ -41,11 +41,11 @@ Modalidad del chat dedicado de backlog:
   pipeline ni fallback R1.
 - SHA-256: `c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48`.
 - Aceptacion: mismos o menos falsos permisos, menos falsos filtros, ORT CPU
-  abre el modelo y la APK DEV local usa versionCode 108.
+  abre el modelo y la APK DEV local usa versionCode 109.
 - La limpieza conserva corpus, manifests, splits, informes y checkpoints para
   futuros entrenamientos; solo se retiran temporales claramente descartables.
 
-### DAG-V108-PERFORMANCE-VISUAL-PRIORITY - Entrega visual sin cambiar política
+### DAG-V109-PERFORMANCE-VISUAL-PRIORITY - Entrega visual sin cambiar política
 
 - Estado: `Resuelto local; pendiente cualquier publicación posterior`.
 - Prioridad: P1. Tipo: rendimiento DAG/GloshIA. Esfuerzo: S. Riesgo: bajo.
@@ -57,7 +57,11 @@ Modalidad del chat dedicado de backlog:
 - Aceptación local: pruebas JS/Kotlin, Ktlint, Lint, APK y evidencia física
   sin crash/ANR. Falta repetir un benchmark caliente con varias muestras antes
   de considerar publicación DEV.
-- Evidencia: `docs/compatibility/results/dag-browser-v108-performance-gloshia-2026-08-05.md`.
+- Evidencia: `docs/compatibility/results/dag-browser-v109-performance-gloshia-2026-08-05.md`.
+
+El informe conserva el nombre `v108` porque documenta las mediciones comparables
+realizadas antes de corregir el versionado de la extensión. El artefacto local
+final queda en DAG 109 / extensión 1.51.0.
 
 Flujo de una entrada:
 

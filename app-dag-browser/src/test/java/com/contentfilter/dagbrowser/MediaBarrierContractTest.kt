@@ -21,6 +21,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"nativeMessaging\"")
+        assertContains(manifest, "\"version\": \"1.51.0\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
         assertFalse(activity.contains(".installBuiltIn(ExtensionLocation)"))
     }

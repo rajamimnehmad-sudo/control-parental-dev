@@ -1,8 +1,13 @@
 # DAG 108 - medición de carga y GloshIA
 
+Este informe conserva el nombre v108 porque las mediciones se realizaron antes
+de corregir el versionado del artefacto final. La APK local final de esta misma
+línea queda en DAG 109 (`0.69.13-dev`) con extensión `1.51.0`; las cifras no se
+reinterpretan como una comparación causal entre versiones.
+
 Fecha: 2026-08-05
 Dispositivo: Samsung SM-S908E, Android 16, arm64-v8a
-APK: `0.69.12-dev`, `versionCode 108`
+APK medida: `0.69.12-dev`, `versionCode 108`
 Modelo: GloshIA Visual R3.1, SHA-256 `c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48`
 
 ## Diagnóstico

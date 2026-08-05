@@ -17,15 +17,15 @@ el runtime actual desde versiones o worktrees historicos.
   Android 1.27.0 y CPU local.
 - En el mismo examen, los falsos permisos no aumentaron y los falsos filtros
   bajaron de `3/21` a `2/21` y de `2/15` a `0/15`.
-- La APK local de trabajo pasa a versionCode `108`, versionName
-  `0.69.12-dev`. No se publico ni se hizo push.
+- La APK local de trabajo pasa a versionCode `109`, versionName
+  `0.69.13-dev`. No se publico ni se hizo push.
 - `final_sealed` permanece cerrado. Corpus, splits, informes y checkpoints
   privados se conservan para futuros entrenamientos.
-- El APK DEV local de DAG 108 conserva R3.1 y agrega únicamente optimización de
+- El APK DEV local de DAG 109 conserva R3.1 y agrega únicamente optimización de
   entrega: prioridad asíncrona para raster visibles y deduplicación de
   decisiones raster idénticas en vuelo. No cambia pesos, umbral, vistas,
   política ni el contrato fail-closed. Evidencia:
-  `docs/compatibility/results/dag-browser-v108-performance-gloshia-2026-08-05.md`.
+  `docs/compatibility/results/dag-browser-v109-performance-gloshia-2026-08-05.md`.
 
 ## Repositorio y flujo vigente
 
@@ -86,11 +86,23 @@ DAG. No se registra una instalacion fisica de DAG 96 en este cierre.
 
 ## DAG Browser vigente
 
+### DAG 109 local: prioridad visual y deduplicación con extensión 1.51.0
+
+DAG 109 (`0.69.13-dev`) es la continuación local de DAG 108. La extensión
+incorporada queda versionada como `1.51.0` para que GeckoView actualice los
+scripts modificados. Conserva R3.1, R1 como fallback de apertura, el mismo
+pipeline y la misma política; solo agrega prioridad asíncrona de raster visibles
+y deduplicación de decisiones idénticas en vuelo. La matriz fría/caliente del
+S22 terminó sin crash ni ANR; la evidencia está en
+`docs/compatibility/results/dag-browser-v109-performance-gloshia-2026-08-05.md`.
+No se publicó ni se hizo push.
+
 ### DAG 107 local confirmado: DAG 95, GloshIA R3.1 y navegacion estable
 
 DAG 107 parte del navegador de DAG 95 y conserva R3.1 como modelo activo, con R1
 como fallback si R3.1 no abre. El autoactualizador, permisos y recursos
-agregados por DAG 96 permanecen retirados. La extension sigue en `1.50.0`;
+agregados por DAG 96 permanecen retirados. La extension historica de DAG 107
+era `1.50.0`;
 solo cambio el archivo ONNX activo y su metadata, sin cambiar umbral,
 politica ni decisiones de GloshIA.
 
