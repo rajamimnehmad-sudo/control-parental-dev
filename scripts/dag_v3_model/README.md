@@ -3,6 +3,30 @@
 Herramientas locales, reproducibles y sin red para preparar el futuro dataset visual. No forman
 parte del APK y no activan decisiones del navegador.
 
+## Mapa vigente
+
+La única referencia oficial para el runtime es el modelo R3.1 ya incluido en
+`app-dag-browser/src/main/assets/dag-model/`. Los scripts de este directorio
+son herramientas de laboratorio, no rutas de ejecución de DAG.
+
+Para continuar una evaluación nueva se deben reutilizar únicamente estos
+componentes y revisar primero su informe correspondiente:
+
+- `onnx_split_score.py`: examen binario reproducible sobre validation/frozen_test.
+- `r2_candidate_train.py` y `r2_candidate_export.py`: entrenamiento/exportación
+  experimental; no sustituyen el modelo Android.
+- `r3_2_directed_repair_split.py`: splits agrupados y control de contaminación
+  para el experimento R3.2.
+- `manifest_validator.py`, `evaluation_harness.py` y
+  `pilot_training_provenance.py`: validación de contrato, procedencia y
+  resultados.
+
+Los scripts `pilot_*`, `r22_*`, `r23_*`, `r24_*` y los informes fechados de
+R1/R2/R3 anteriores se conservan como evidencia histórica reproducible. No se
+deben usar para seleccionar un modelo nuevo sin un ticket que los vuelva a
+declarar vigentes. Los modelos, imágenes, checkpoints y resultados privados
+permanecen fuera de Git en `.codex-tmp`.
+
 ## Auditar procedencia del piloto binario
 
 Antes de reutilizar rondas historicas o pagar GPU, `pilot_training_provenance.py` comprueba que los
