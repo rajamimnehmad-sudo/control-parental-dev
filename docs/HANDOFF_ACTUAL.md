@@ -21,6 +21,11 @@ el runtime actual desde versiones o worktrees historicos.
   `0.69.12-dev`. No se publico ni se hizo push.
 - `final_sealed` permanece cerrado. Corpus, splits, informes y checkpoints
   privados se conservan para futuros entrenamientos.
+- El APK DEV local de DAG 108 conserva R3.1 y agrega únicamente optimización de
+  entrega: prioridad asíncrona para raster visibles y deduplicación de
+  decisiones raster idénticas en vuelo. No cambia pesos, umbral, vistas,
+  política ni el contrato fail-closed. Evidencia:
+  `docs/compatibility/results/dag-browser-v108-performance-gloshia-2026-08-05.md`.
 
 ## Repositorio y flujo vigente
 

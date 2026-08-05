@@ -45,6 +45,20 @@ Modalidad del chat dedicado de backlog:
 - La limpieza conserva corpus, manifests, splits, informes y checkpoints para
   futuros entrenamientos; solo se retiran temporales claramente descartables.
 
+### DAG-V108-PERFORMANCE-VISUAL-PRIORITY - Entrega visual sin cambiar política
+
+- Estado: `Resuelto local; pendiente cualquier publicación posterior`.
+- Prioridad: P1. Tipo: rendimiento DAG/GloshIA. Esfuerzo: S. Riesgo: bajo.
+- Se midieron Mimo, Cheeky y Frávega en el S22; la cola nativa no estaba
+  saturada. Se descartó ORT a una hebra porque empeoró claramente la latencia.
+- La extensión ahora prioriza raster visibles mediante `IntersectionObserver`
+  y comparte decisiones de bytes idénticos que llegan en vuelo. Los límites,
+  la política, los umbrales, R3.1 y el fail-closed no cambian.
+- Aceptación local: pruebas JS/Kotlin, Ktlint, Lint, APK y evidencia física
+  sin crash/ANR. Falta repetir un benchmark caliente con varias muestras antes
+  de considerar publicación DEV.
+- Evidencia: `docs/compatibility/results/dag-browser-v108-performance-gloshia-2026-08-05.md`.
+
 Flujo de una entrada:
 
 1. Capturar la idea en el chat dedicado o importarla desde una fuente historica.

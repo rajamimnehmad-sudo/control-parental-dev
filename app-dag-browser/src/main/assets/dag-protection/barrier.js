@@ -17,6 +17,8 @@
   const MAX_INLINE_IMAGES_PER_DOCUMENT = 16;
   const MAX_INLINE_NATURAL_EDGE = 128;
   const MAX_INLINE_RENDERED_EDGE = 96;
+  const IMAGE_PRIORITY_ROOT_MARGIN = "800px 0px";
+  const MAX_PRIORITY_SOURCES = 256;
   const documentToken =
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
   const sensitivePreviewSelector = [
@@ -34,6 +36,7 @@
   let inlineImagesSubmitted = 0;
   const pendingImages = new WeakMap();
   const inlineDecisions = new Map();
+  const priorityBySource = new Map();
   try {
     nativePort = browser.runtime.connectNative(NATIVE_APP);
   } catch {
@@ -52,6 +55,22 @@
   };
 
   const imageSource = (image) => image.currentSrc || image.src || "";
+
+  const reportImagePriority = (image, priority) => {
+    const source = imageSource(image);
+    if (!/^https?:\/\//iu.test(source)) return;
+    if (priorityBySource.get(source) === priority) return;
+    if (!priorityBySource.has(source) && priorityBySource.size >= MAX_PRIORITY_SOURCES) {
+      priorityBySource.delete(priorityBySource.keys().next().value);
+    }
+    priorityBySource.set(source, priority);
+    void browser.runtime.sendMessage({
+      type: "image-priority",
+      version: PROTOCOL_VERSION,
+      url: source,
+      priority,
+    }).catch(() => {});
+  };
 
   const hasInlineImageSource = (image) => {
     const source = image.getAttribute("src") || "";
@@ -120,6 +139,25 @@
     });
   };
 
+  const priorityObserver = typeof IntersectionObserver === "function"
+    ? new IntersectionObserver((entries) => {
+      const viewportHeight = window.innerHeight;
+      for (const entry of entries) {
+        const rect = entry.boundingClientRect;
+        const priority = entry.isIntersecting
+          ? rect.bottom > 0 && rect.top < viewportHeight ? "visible" : "nearby"
+          : "background";
+        reportImagePriority(entry.target, priority);
+      }
+    }, { rootMargin: IMAGE_PRIORITY_ROOT_MARGIN })
+    : null;
+
+  const observeImage = (image) => {
+    if (image instanceof HTMLImageElement) {
+      priorityObserver?.observe(image);
+    }
+  };
+
   const stabilizeImage = (image) => {
     if (image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) return;
     if (inlineDataSource(image).length > 0) {
@@ -149,8 +187,12 @@
 
   const inspectAddedImages = (node) => {
     if (!(node instanceof Element)) return;
-    if (node instanceof HTMLImageElement && node.complete) stabilizeImage(node);
+    if (node instanceof HTMLImageElement) {
+      observeImage(node);
+      if (node.complete) stabilizeImage(node);
+    }
     for (const image of node.querySelectorAll("img")) {
+      observeImage(image);
       if (image.complete) stabilizeImage(image);
     }
   };
@@ -162,6 +204,8 @@
   const imageObserver = new MutationObserver((records) => {
     for (const record of records) {
       if (record.type === "attributes" && record.target instanceof HTMLImageElement) {
+        priorityObserver?.unobserve(record.target);
+        observeImage(record.target);
         if (hasInlineImageSource(record.target)) {
           if (record.target.complete) inspectInlineImage(record.target);
           else resetImage(record.target);
@@ -191,6 +235,7 @@
   const completeDocument = () => {
     reportPreviewEligibility();
     for (const image of document.images) {
+      observeImage(image);
       if (image.complete) stabilizeImage(image);
     }
   };

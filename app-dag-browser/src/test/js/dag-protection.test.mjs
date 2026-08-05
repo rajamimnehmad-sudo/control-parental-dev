@@ -94,6 +94,9 @@ const createHarness = async () => {
     decideInline(message, sender = { url: "https://search.example.test/?q=shoes" }) {
       return runtimeMessages.listeners[0](message, sender);
     },
+    setImagePriority(message) {
+      return runtimeMessages.listeners[0](message, { url: "https://shop.example.test/" });
+    },
     answer(message) {
       for (const listener of nativeMessages.listeners) listener(message);
     },
@@ -102,6 +105,21 @@ const createHarness = async () => {
     },
   };
 };
+
+test("visible image hints reach the native queue with priority", async () => {
+  const harness = await createHarness();
+  const details = imageDetails("priority");
+  harness.setImagePriority({
+    type: "image-priority",
+    version: 1,
+    url: details.url,
+    priority: "visible",
+  });
+  deliver(harness, details, Uint8Array.from([0xff, 0xd8, 1, 2, 3, 0xff, 0xd9]));
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "prioritized native request");
+  assert.equal(request.priority, "visible");
+});
 
 const imageDetails = (requestId, url = `https://cdn.example.test/${requestId}.jpg`) => ({
   requestId,
@@ -320,6 +338,28 @@ test("trusted content decision cache avoids a second inference", async () => {
   const second = imageDetails("cache-b");
   deliver(harness, second, original);
   await waitFor(() => harness.filters.get(second.requestId).closed, "cached close");
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
+  assert.deepEqual([...harness.filters.get(second.requestId).writes[0]], [...original]);
+});
+
+test("identical in-flight raster shares one native inference", async () => {
+  const harness = await createHarness();
+  const original = Uint8Array.from([0xff, 0xd8, 6, 6, 6, 0xff, 0xd9]);
+  const first = imageDetails("inflight-a");
+  const second = imageDetails("inflight-b", first.url);
+  deliver(harness, first, original);
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "in-flight native request");
+  deliver(harness, second, original);
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  await waitFor(() => harness.filters.get(first.requestId).closed, "first in-flight close");
+  await waitFor(() => harness.filters.get(second.requestId).closed, "second in-flight close");
   assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
   assert.deepEqual([...harness.filters.get(second.requestId).writes[0]], [...original]);
 });

@@ -30,6 +30,7 @@ const MAX_INLINE_DATA_URL_LENGTH = 66 * 1024;
 const CAPTURE_TIMEOUT_MS = 5_000;
 const NATIVE_TIMEOUT_MS = 2_250;
 const VIEWPORT_QUIET_MS = 250;
+const MAX_PRIORITY_HINTS = 256;
 const BLOCKED_PLACEHOLDER_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
 
@@ -41,8 +42,10 @@ let capturedBytes = 0;
 let nativeInFlight = 0;
 let viewportQuietTimer = null;
 const pendingNative = new Map();
+const pendingDecisions = new Map();
 const analysisQueue = [];
 const decisionCache = new Map();
+const imagePriorityByUrl = new Map();
 const responseMimeByRequest = new Map();
 
 const decodeBase64 = (value) => {
@@ -108,6 +111,19 @@ const rememberDecision = (hash, decision) => {
   }
   decisionCache.set(hash, decision);
 };
+
+const normalizePriority = (value) =>
+  value === "visible" || value === "nearby" ? value : "background";
+
+const rememberImagePriority = (url, priority) => {
+  if (typeof url !== "string" || !/^https?:\/\//iu.test(url)) return;
+  if (!imagePriorityByUrl.has(url) && imagePriorityByUrl.size >= MAX_PRIORITY_HINTS) {
+    imagePriorityByUrl.delete(imagePriorityByUrl.keys().next().value);
+  }
+  imagePriorityByUrl.set(url, normalizePriority(priority));
+};
+
+const imagePriority = (url) => normalizePriority(imagePriorityByUrl.get(url));
 
 const replacementBytes = (value) => {
   if (typeof value !== "string" || value.length === 0) return null;
@@ -179,7 +195,7 @@ const connectNative = () => {
   }
 };
 
-const requestNativeDecision = (details, bytes) => {
+const requestNativeDecision = (details, bytes, priority = imagePriority(details.url)) => {
   connectNative();
   if (nativePort === null) return Promise.resolve({ action: "block", cacheable: false });
   sequence += 1;
@@ -204,7 +220,7 @@ const requestNativeDecision = (details, bytes) => {
         sourceUrl: details.url,
         byteLength: bytes.byteLength,
         bytesBase64,
-        priority: "background",
+        priority: normalizePriority(priority),
         sentAtEpochMillis: Date.now(),
       });
     } catch {
@@ -227,8 +243,17 @@ const drainAnalysisQueue = () => {
         if (cached !== undefined) {
           decision = cached;
         } else {
-          decision = await requestNativeDecision(task.details, task.bytes);
-          if (decision.cacheable) rememberDecision(hash, decision);
+          let sharedDecision = pendingDecisions.get(hash);
+          if (sharedDecision === undefined) {
+            sharedDecision = requestNativeDecision(task.details, task.bytes, task.priority)
+              .then((result) => {
+                if (result.cacheable) rememberDecision(hash, result);
+                return result;
+              })
+              .finally(() => pendingDecisions.delete(hash));
+            pendingDecisions.set(hash, sharedDecision);
+          }
+          decision = await sharedDecision;
         }
       } catch {
         decision = { action: "block", replacement: null };
@@ -255,6 +280,7 @@ const decideInlineRaster = async (message, sender) => {
     analysisQueue.push({
       details: { url: pageUrl },
       bytes,
+      priority: normalizePriority(message?.priority),
       settle: (decision) => {
         bytes.fill(0);
         resolve({ action: decision.action === "allow" ? "allow" : "block" });
@@ -369,6 +395,7 @@ const interceptImage = (details, trustSafeUiUrl = true) => {
     analysisQueue.push({
       details,
       bytes,
+      priority: imagePriority(details.url),
       settle: (decision) => settle(decision, bytes),
     });
     drainAnalysisQueue();
@@ -380,6 +407,10 @@ const interceptImage = (details, trustSafeUiUrl = true) => {
 connectNative();
 
 browser.runtime.onMessage.addListener((message, sender) => {
+  if (message?.type === "image-priority" && message?.version === PROTOCOL_VERSION) {
+    rememberImagePriority(message.url, message.priority);
+    return undefined;
+  }
   if (message?.type !== "inline-raster-decision" || message?.version !== PROTOCOL_VERSION) {
     return undefined;
   }
