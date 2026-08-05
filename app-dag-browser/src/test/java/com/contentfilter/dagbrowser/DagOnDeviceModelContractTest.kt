@@ -15,7 +15,7 @@ class DagOnDeviceModelContractTest {
         assertTrue(model.isFile)
         assertTrue(fallback.isFile)
         assertEquals("GloshIA Visual", DagVisualModelInfo.PublicName)
-        assertEquals("R3 Canary", DagVisualModelInfo.FunctionalVersion)
+        assertEquals("R3.1", DagVisualModelInfo.FunctionalVersion)
         assertEquals("ONNX Runtime Android 1.27.0", DagVisualModelInfo.Runtime)
         assertEquals("dag-36", DagVisualModelInfo.PolicyVersion)
         assertEquals(ExpectedModelSha256, DagVisualModelInfo.ModelSha256)
@@ -26,7 +26,7 @@ class DagOnDeviceModelContractTest {
             listOf(DagVisualModelInfo.ModelAssetPath, DagVisualModelInfo.FallbackModelAssetPath),
             DagOnDeviceImageAnalyzer.ModelAssetPaths,
         )
-        assertTrue(model.length() in 10_000_000L..11_000_000L)
+        assertTrue(model.length() in 9_000_000L..10_000_000L)
         assertTrue(fallback.length() in 8_000_000L..9_000_000L)
         assertEquals(0.4f, DagOnDeviceImageAnalyzer.FilterThreshold)
         assertEquals(0.3f, DagOnDeviceImageAnalyzer.UncertainRegionalReviewFloor)
@@ -44,7 +44,7 @@ class DagOnDeviceModelContractTest {
 
     private companion object {
         const val ExpectedModelSha256 =
-            "0aaa1700182623173c41d233bd0e072cce2b2880aca14430d9f9af43fa2c44a8"
+            "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48"
         const val ExpectedFallbackSha256 =
             "2d52bd9e5eb4cd448cb0d64a784b2ee6f761ad20e890c57b898fd7991d29a9ee"
     }

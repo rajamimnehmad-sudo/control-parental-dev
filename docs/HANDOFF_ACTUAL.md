@@ -6,6 +6,22 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## Estado vigente al 2026-08-05: GloshIA Visual R3.1
+
+- El modelo activo en `main` es GloshIA Visual R3.1, promovido desde el
+  candidato hibrido INT8 del round30.
+- Archivo: `tinyclip-r3-head-hybrid-int8.onnx`.
+- SHA-256: `c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48`.
+- Fallback de apertura: R1, sin ejecutar dos modelos por fotografia.
+- Se preservan RGB 224x224, letterbox DAG, umbral `0,40`, ONNX Runtime
+  Android 1.27.0 y CPU local.
+- En el mismo examen, los falsos permisos no aumentaron y los falsos filtros
+  bajaron de `3/21` a `2/21` y de `2/15` a `0/15`.
+- La APK local de trabajo pasa a versionCode `108`, versionName
+  `0.69.12-dev`. No se publico ni se hizo push.
+- `final_sealed` permanece cerrado. Corpus, splits, informes y checkpoints
+  privados se conservan para futuros entrenamientos.
+
 ## Repositorio y flujo vigente
 
 - Carpeta canonica: `/Users/yejielnehmad/Developer/content-filter`.
@@ -65,12 +81,13 @@ DAG. No se registra una instalacion fisica de DAG 96 en este cierre.
 
 ## DAG Browser vigente
 
-### DAG 107 local confirmado: DAG 95, GloshIA R3 y navegacion estable
+### DAG 107 local confirmado: DAG 95, GloshIA R3.1 y navegacion estable
 
-DAG 107 parte del navegador de DAG 95 y conserva R3 como modelo activo, con R1
-como fallback si R3 no abre. El autoactualizador, permisos y recursos agregados
-por DAG 96 permanecen retirados. La extension sigue en `1.50.0`; no cambiaron
-pesos, umbral, politica ni decisiones de GloshIA.
+DAG 107 parte del navegador de DAG 95 y conserva R3.1 como modelo activo, con R1
+como fallback si R3.1 no abre. El autoactualizador, permisos y recursos
+agregados por DAG 96 permanecen retirados. La extension sigue en `1.50.0`;
+solo cambio el archivo ONNX activo y su metadata, sin cambiar umbral,
+politica ni decisiones de GloshIA.
 
 La transicion conserva en memoria una captura de la pestaña activa ya
 protegida y la muestra hasta que la pagina nueva queda segura. La captura se

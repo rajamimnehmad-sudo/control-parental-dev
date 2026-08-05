@@ -33,6 +33,18 @@ Modalidad del chat dedicado de backlog:
 - Codex no interpreta la captura como aprobacion para codigo ni interrumpe el flujo de ideas con preguntas de detalle.
 - Cuando el usuario pide preparar o elegir trabajo, Codex agrupa las ideas relacionadas en tickets pequenos, propone orden y dependencias, y recien entonces entrevista las decisiones que cambian alcance o aceptacion.
 
+### GLOSHIA-R3.1-PROMOTION - Promocion local del candidato hibrido
+
+- Estado: `Resuelto local; pendiente de cualquier publicacion posterior`.
+- Prioridad: P0. Tipo: modelo Android, cambio unico de pesos.
+- Se promovio el candidato hibrido INT8 sin cambiar politica, umbral,
+  pipeline ni fallback R1.
+- SHA-256: `c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48`.
+- Aceptacion: mismos o menos falsos permisos, menos falsos filtros, ORT CPU
+  abre el modelo y la APK DEV local usa versionCode 108.
+- La limpieza conserva corpus, manifests, splits, informes y checkpoints para
+  futuros entrenamientos; solo se retiran temporales claramente descartables.
+
 Flujo de una entrada:
 
 1. Capturar la idea en el chat dedicado o importarla desde una fuente historica.
