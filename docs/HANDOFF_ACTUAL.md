@@ -131,6 +131,24 @@ reemplazo; R3 permanece oficial, `final_sealed` sigue cerrado y no se modificó
 DAG 107. Evidencia:
 `docs/dag/v3/GLOSHIA_R3_HARD_NEGATIVE_REPAIR_29_2026-08-05.md`.
 
+El experimento privado `GLOSHIA-R3-ROUND30-BINARY-CANDIDATE` incorporó 251
+decisiones binarias nuevas de round30 al train, excluyendo 4 `doubt`, y
+preservó exactamente el examen histórico: 618 train, 28 validation y 29
+frozen_test. La prueba de contaminación pasó para ID, SHA-256, pHash, grupo y
+URL; `final_sealed` permaneció cerrado. Se ejecutaron tres pilotos CPU locales
+con selección únicamente por validation. El piloto 03 fue el seleccionado:
+validation mejoró de 3/21 a 1/21 falsos filtros y frozen_test de 2/15 a 1/15,
+manteniendo 1/7 y 1/14 falsos permisos, respectivamente. Balanced accuracy y
+PR-AUC también subieron en ambos exámenes.
+
+La mejora visual no es todavía desplegable: el FP32 abre con ONNX checker y
+ORT CPU pero pesa 33.220.815 bytes frente a 10.469.698 de R3; el INT8 dinámico
+contiene `ConvInteger` y no abre en ORT CPU; la variante híbrida compacta cambia
+2 de 57 decisiones frente a FP32. Resultado `NO-GO`: R3 continúa oficial e
+intacto en DAG 107, sin APK, Android, umbral, política, Supabase, publicación
+ni push. Informe reproducible:
+`.codex-tmp/gloshia-r3-round30-binary-candidate-20260805/round30-binary-candidate-report.json`.
+
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
 DAG 96 conserva sin cambios el pipeline de navegador y la extension `1.50.0`

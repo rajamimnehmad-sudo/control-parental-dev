@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-08-04
+Ultima sincronizacion: 2026-08-05
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -173,6 +173,30 @@ Flujo de una entrada:
   excepciones por sitio o género.
 - Evidencia:
   `docs/dag/v3/GLOSHIA_R3_HARD_NEGATIVE_REPAIR_29_2026-08-05.md`.
+
+### GLOSHIA-R3-ROUND30-BINARY-CANDIDATE - Mejora visual sin exportación Android
+
+- Estado: `NO-GO para integración; R3 permanece oficial`. Prioridad: P0.
+  Esfuerzo: M. Riesgo: alto.
+- Se agregaron 251 decisiones binarias de round30 sólo al train, con 4 `doubt`
+  excluidas. El split final quedó en 618 train, 28 validation y 29
+  frozen_test; la prueba exacta y perceptual de contaminación pasó. Las
+  imágenes mantienen autorización privada experimental y derechos de
+  entrenamiento inciertos; no se declaró `training_rights_clear`.
+- Con el mismo examen, el candidato FP32 mantuvo los falsos permisos de R3 en
+  validation (`1/7`) y frozen_test (`1/14`), y redujo los falsos filtros de
+  `3/21` a `1/21` y de `2/15` a `1/15`. Balanced accuracy pasó de `0,857143` a
+  `0,904762` en validation y de `0,897619` a `0,930952` en frozen_test; PR-AUC
+  pasó de `0,761429` a `0,792118` y de `0,937374` a `0,963054`.
+- Gate de exportación: FP32 abre en ORT CPU pero pesa 33.220.815 bytes; INT8
+  dinámico falla por `ConvInteger`; híbrido MatMul-INT8 pesa 9.668.603 bytes
+  pero cambia 2/57 decisiones frente a FP32. No existe una exportación compacta
+  apta para Android. No se abrió `final_sealed` y no se tocó DAG 107.
+- Evidencia: `.codex-tmp/gloshia-r3-round30-binary-candidate-20260805/` y el
+  informe consolidado `round30-binary-candidate-report.json`. Próximo paso
+  propuesto: una reparación de exportación selectiva o un nuevo candidato con
+  margen de decisión más estable; no ajustar el umbral ni crear excepciones
+  por sitio, URL, género o campaña.
 
 ### DAG-BROWSER95-R3-97 - Base aceptada con unico cambio de modelo
 
