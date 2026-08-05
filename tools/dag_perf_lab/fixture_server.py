@@ -542,6 +542,11 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--port", type=int, default=8765)
     parser.add_argument("--cert-dir", type=Path, required=True)
     parser.add_argument("--event-log", type=Path, required=True)
+    parser.add_argument(
+        "--http",
+        action="store_true",
+        help="Serve plain HTTP for the isolated DAG lab flavor only.",
+    )
     return parser.parse_args()
 
 
@@ -551,7 +556,6 @@ def main() -> int:
         raise SystemExit("The fixture may only bind to 127.0.0.1")
     if not 1_024 <= args.port <= 65_535:
         raise SystemExit("Port must be between 1024 and 65535")
-    cert_path, key_path = ensure_certificate(args.cert_dir)
     # Do not make the first browser requests pay deterministic image generation.
     for seed in range(4):
         safe_png(seed)
@@ -559,19 +563,23 @@ def main() -> int:
     server.daemon_threads = True
     server.event_log = args.event_log  # type: ignore[attr-defined]
     server.event_lock = threading.Lock()  # type: ignore[attr-defined]
-    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-    context.minimum_version = ssl.TLSVersion.TLSv1_2
-    context.load_cert_chain(certfile=cert_path, keyfile=key_path)
-    server.socket = context.wrap_socket(server.socket, server_side=True)
+    cert_path = None
+    if not args.http:
+        cert_path, key_path = ensure_certificate(args.cert_dir)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(certfile=cert_path, keyfile=key_path)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
 
     def stop(_signum: int, _frame: object) -> None:
         threading.Thread(target=server.shutdown, daemon=True).start()
 
     signal.signal(signal.SIGTERM, stop)
     signal.signal(signal.SIGINT, stop)
-    fingerprint = hashlib.sha256(cert_path.read_bytes()).hexdigest()
+    scheme = "http" if args.http else "https"
+    fingerprint = "not-used" if cert_path is None else hashlib.sha256(cert_path.read_bytes()).hexdigest()
     print(
-        f"READY url=https://localhost:{args.port}/fixture/ cert_file_sha256={fingerprint}",
+        f"READY url={scheme}://localhost:{args.port}/fixture/ cert_file_sha256={fingerprint}",
         flush=True,
     )
     try:

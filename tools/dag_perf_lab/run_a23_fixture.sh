@@ -2,6 +2,7 @@
 set -euo pipefail
 
 readonly PACKAGE="com.contentfilter.dagbrowser.dev"
+readonly LAB_PACKAGE="com.contentfilter.dagbrowser.lab"
 readonly ACTIVITY="com.contentfilter.dagbrowser.DagBrowserActivity"
 readonly MINIMUM_SDK="29"
 readonly EXPECTED_ABI="arm64-v8a"
@@ -14,19 +15,20 @@ Required:
   --serial SERIAL       Exact adb serial of the dedicated Android device.
 
 Options:
-  --port PORT           Local/reversed HTTPS port (default: 8765).
+  --port PORT           Local/reversed fixture port (default: 8765).
   --settle SECONDS      Observation window after launch (default: 24, max: 55).
   --swipes COUNT        Deterministic upward swipes for the lazy grid (default: 3).
   --warm                Do not force-stop DAG before launch.
   --output DIR          Explicit artifact directory.
   --expected-model NAME Require one exact model for a reproducible comparison.
+  --lab                 Use isolated lab APK and HTTP loopback fixture.
   --help                Show this help.
 
 Safety contract:
   - Never clears an app profile, cache or Logcat.
   - Never changes browser roles, Android settings or certificates.
   - Never invokes, stops or inspects Chrome.
-  - Only stops/launches com.contentfilter.dagbrowser.dev and removes its own adb reverse.
+  - Only stops/launches the selected DAG package and removes its own adb reverse.
 EOF
 }
 
@@ -37,6 +39,9 @@ swipes="3"
 cold="1"
 expected_model=""
 output_dir=""
+lab="0"
+package_name="$PACKAGE"
+scheme="https"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -47,6 +52,7 @@ while [[ $# -gt 0 ]]; do
     --warm) cold="0"; shift ;;
     --output) output_dir="${2:-}"; shift 2 ;;
     --expected-model) expected_model="${2:-}"; shift 2 ;;
+    --lab) lab="1"; package_name="$LAB_PACKAGE"; scheme="http"; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -137,8 +143,8 @@ if [[ -n "$expected_model" && "$model" != "$expected_model" ]]; then
   echo "Refusing model '$model'; this run requires '$expected_model'." >&2
   exit 1
 fi
-if ! "$adb_bin" -s "$serial" shell pm path "$PACKAGE" >/dev/null 2>&1; then
-  echo "$PACKAGE is not installed on $serial." >&2
+if ! "$adb_bin" -s "$serial" shell pm path "$package_name" >/dev/null 2>&1; then
+  echo "$package_name is not installed on $serial." >&2
   exit 1
 fi
 if "$adb_bin" -s "$serial" reverse --list | awk -v port="tcp:$port" \
@@ -147,14 +153,19 @@ if "$adb_bin" -s "$serial" reverse --list | awk -v port="tcp:$port" \
   exit 1
 fi
 
-python3 "$script_dir/fixture_server.py" \
-  --port "$port" \
-  --cert-dir "$tls_dir" \
-  --event-log "$output_dir/fixture-events.jsonl" \
+server_args=(
+  --port "$port"
+  --cert-dir "$tls_dir"
+  --event-log "$output_dir/fixture-events.jsonl"
+)
+if [[ "$lab" == "1" ]]; then
+  server_args+=(--http)
+fi
+python3 "$script_dir/fixture_server.py" "${server_args[@]}" \
   >"$output_dir/fixture-server.log" 2>&1 &
 server_pid=$!
 for _ in {1..50}; do
-  if curl -kfsS --connect-timeout 1 "https://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
+  if curl -kfsS --connect-timeout 1 "$scheme://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
     break
   fi
   if ! kill -0 "$server_pid" 2>/dev/null; then
@@ -163,7 +174,7 @@ for _ in {1..50}; do
   fi
   sleep 0.1
 done
-if ! curl -kfsS --connect-timeout 1 "https://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
+if ! curl -kfsS --connect-timeout 1 "$scheme://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
   echo "Fixture server did not become ready." >&2
   exit 1
 fi
@@ -179,18 +190,19 @@ reverse_added="1"
   echo "sdk=$sdk"
   echo "abi=$abi"
   echo "expected_model=${expected_model:-any-compatible}"
-  echo "package=$PACKAGE"
+  echo "package=$package_name"
   echo "cold=$cold"
   echo "settle_seconds=$settle"
   echo "swipes=$swipes"
-  echo "fixture_url=https://localhost:$port/fixture/?run=$run_id"
+  echo "lab=$lab"
+  echo "fixture_url=$scheme://localhost:$port/fixture/?run=$run_id"
   "$adb_bin" -s "$serial" shell getprop ro.build.version.release | tr -d '\r' | sed 's/^/android=/'
-  "$adb_bin" -s "$serial" shell dumpsys package "$PACKAGE" | sed -n 's/^[[:space:]]*versionCode=/versionCode=/p; s/^[[:space:]]*versionName=/versionName=/p' | head -2
+  "$adb_bin" -s "$serial" shell dumpsys package "$package_name" | sed -n 's/^[[:space:]]*versionCode=/versionCode=/p; s/^[[:space:]]*versionName=/versionName=/p' | head -2
 } >"$output_dir/run-metadata.txt"
 
-"$adb_bin" -s "$serial" shell dumpsys meminfo "$PACKAGE" >"$output_dir/meminfo-before.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys meminfo "$package_name" >"$output_dir/meminfo-before.txt" 2>&1 || true
 "$adb_bin" -s "$serial" shell dumpsys thermalservice >"$output_dir/thermal-before.txt" 2>&1 || true
-"$adb_bin" -s "$serial" shell dumpsys activity exit-info "$PACKAGE" >"$output_dir/exit-info-before.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys activity exit-info "$package_name" >"$output_dir/exit-info-before.txt" 2>&1 || true
 
 run_start_epoch_seconds="$($adb_bin -s "$serial" shell date +%s | tr -d '\r')"
 logcat_since="$($adb_bin -s "$serial" shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')"
@@ -215,15 +227,15 @@ sleep 0.1
 "$adb_bin" -s "$serial" shell log -p i -t DagPerfHarness "run_start=$run_id"
 
 if [[ "$cold" == "1" ]]; then
-  "$adb_bin" -s "$serial" shell am force-stop "$PACKAGE"
+  "$adb_bin" -s "$serial" shell am force-stop "$package_name"
 fi
-"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$PACKAGE" reset >"$output_dir/gfxinfo-reset.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$package_name" reset >"$output_dir/gfxinfo-reset.txt" 2>&1 || true
 
-fixture_url="https://localhost:$port/fixture/?run=$run_id"
+fixture_url="$scheme://localhost:$port/fixture/?run=$run_id"
 "$adb_bin" -s "$serial" shell am start -W \
   -a android.intent.action.VIEW \
   -d "$fixture_url" \
-  -n "$PACKAGE/$ACTIVITY" \
+  -n "$package_name/$ACTIVITY" \
   >"$output_dir/am-start.txt" 2>&1
 
 sleep 4
@@ -245,11 +257,11 @@ fi
 remaining=$((settle - 4 - swipes))
 if (( remaining > 0 )); then sleep "$remaining"; fi
 
-"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$PACKAGE" >"$output_dir/gfxinfo-after.txt" 2>&1 || true
-"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$PACKAGE" framestats >"$output_dir/gfxinfo-framestats.txt" 2>&1 || true
-"$adb_bin" -s "$serial" shell dumpsys meminfo "$PACKAGE" >"$output_dir/meminfo-after.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$package_name" >"$output_dir/gfxinfo-after.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$package_name" framestats >"$output_dir/gfxinfo-framestats.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys meminfo "$package_name" >"$output_dir/meminfo-after.txt" 2>&1 || true
 "$adb_bin" -s "$serial" shell dumpsys thermalservice >"$output_dir/thermal-after.txt" 2>&1 || true
-"$adb_bin" -s "$serial" shell dumpsys activity exit-info "$PACKAGE" >"$output_dir/exit-info-after.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys activity exit-info "$package_name" >"$output_dir/exit-info-after.txt" 2>&1 || true
 
 if [[ -s "$output_dir/fixture-events.jsonl" ]]; then
   "$adb_bin" -s "$serial" exec-out screencap -p >"$output_dir/fixture-screen.png" 2>/dev/null || true

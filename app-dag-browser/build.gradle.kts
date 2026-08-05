@@ -57,6 +57,15 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
+            buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "false")
+        }
+        create("lab") {
+            dimension = "distribution"
+            applicationIdSuffix = ".lab"
+            versionCode = 110
+            versionNameSuffix = "-lab"
+            buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
+            buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "true")
         }
     }
 

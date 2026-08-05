@@ -72,6 +72,16 @@ class DagNavigationPolicyTest {
     }
 
     @Test
+    fun `HTTP fixture is limited to the isolated lab flavor`() {
+        val url = "http://localhost:8765/fixture/"
+        if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
+            assertEquals(url, DagNavigationPolicy.sanitizeTopLevel(url))
+        } else {
+            assertNull(DagNavigationPolicy.sanitizeTopLevel(url))
+        }
+    }
+
+    @Test
     fun `new window is redirected into the protected session`() {
         assertEquals(
             DagLoadDecision.Redirect("https://example.com/new"),

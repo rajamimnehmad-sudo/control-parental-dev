@@ -26,6 +26,10 @@ el runtime actual desde versiones o worktrees historicos.
   decisiones raster idénticas en vuelo. No cambia pesos, umbral, vistas,
   política ni el contrato fail-closed. Evidencia:
   `docs/compatibility/results/dag-browser-v109-performance-gloshia-2026-08-05.md`.
+- Se preparó un flavor aislado `lab` (versionCode `110`) para medir el fixture
+  determinista por HTTP de loopback sin alterar TLS ni navegación del flavor
+  DEV. No se instaló ni publicó; su estado está en
+  `docs/compatibility/results/dag-browser-v110-lab-fixture-harness-2026-08-05.md`.
 
 ## Repositorio y flujo vigente
 
@@ -96,6 +100,10 @@ y deduplicación de decisiones idénticas en vuelo. La matriz fría/caliente del
 S22 terminó sin crash ni ANR; la evidencia está en
 `docs/compatibility/results/dag-browser-v109-performance-gloshia-2026-08-05.md`.
 No se publicó ni se hizo push.
+
+El flavor `lab` no es una versión de usuario: existe únicamente para aislar la
+carga visual del fixture local. El flavor DEV normal sigue en HTTPS estricto y
+no acepta el endpoint HTTP del laboratorio.
 
 ### DAG 107 local confirmado: DAG 95, GloshIA R3.1 y navegacion estable
 

@@ -63,6 +63,20 @@ El informe conserva el nombre `v108` porque documenta las mediciones comparables
 realizadas antes de corregir el versionado de la extensión. El artefacto local
 final queda en DAG 109 / extensión 1.51.0.
 
+### DAG-PERF-LAB-FIXTURE-HARNESS - Fixture determinista en flavor aislado
+
+- Estado: `En progreso local`.
+- Prioridad: P1. Tipo: laboratorio de rendimiento. Esfuerzo: S.
+- El fixture HTTPS autofirmado no es aceptado por GeckoView en el runtime DEV.
+  Se preparó un flavor separado `com.contentfilter.dagbrowser.lab` que solo
+  permite `http://localhost/fixture/` y no cambia el APK DEV ni la política
+  publicada.
+- Aceptación pendiente: instalarlo en el S22, ejecutar una corrida fría y una
+  caliente, y registrar `page_visible`, `viewport_images_ready`,
+  `page_analysis_ready`, p50/p95, memoria, jank, prioridades y ausencia de
+  crash/ANR.
+- Evidencia: `docs/compatibility/results/dag-browser-v110-lab-fixture-harness-2026-08-05.md`.
+
 Flujo de una entrada:
 
 1. Capturar la idea en el chat dedicado o importarla desde una fuente historica.

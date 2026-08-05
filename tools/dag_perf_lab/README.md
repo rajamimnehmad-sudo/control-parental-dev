@@ -102,3 +102,19 @@ El runner exige serial, URL y etiqueta explicitos. No contiene dominios
 especiales, no borra datos y produce el mismo `summary.json` que el fixture.
 Una pagina viva puede cambiar entre corridas; por eso complementa al fixture y
 no lo reemplaza como comparacion determinista.
+
+### Fixture HTTP del harness aislado
+
+GeckoView no expone en el runtime productivo una excepción para certificados
+HTTPS autofirmados. Para conservar TLS estricto en DAG DEV, el laboratorio tiene
+un flavor separado `lab` que solo permite `http://localhost/fixture/` y sirve el
+fixture por HTTP mediante `adb reverse`. No se instala una CA, no se desactiva
+TLS en DAG DEV y el APK `lab` nunca es un artefacto de publicación.
+
+Construcción y ejecución:
+
+```bash
+./gradlew assembleLabDebug
+tools/dag_perf_lab/run_a23_fixture.sh \
+  --serial SERIAL --lab --expected-model SM-S908E
+```

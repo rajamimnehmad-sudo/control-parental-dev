@@ -25,6 +25,7 @@ internal object DagNavigationPolicy {
 
     fun sanitizeTopLevel(url: String): String? {
         val parsed = runCatching { URI(url) }.getOrNull() ?: return null
+        if (isLabFixture(parsed)) return url
         if (!parsed.scheme.equals("https", ignoreCase = true)) return null
         if (parsed.host.isNullOrBlank()) return null
         if (!isGoogleSearch(parsed)) return url
@@ -120,6 +121,12 @@ internal object DagNavigationPolicy {
         return (host == "google.com" || host.startsWith("google.")) &&
             uri.path.trimEnd('/').equals("/search", ignoreCase = true)
     }
+
+    private fun isLabFixture(uri: URI): Boolean =
+        BuildConfig.GLOSHIA_LAB_FIXTURE &&
+            uri.scheme.equals("http", ignoreCase = true) &&
+            uri.host.equals("localhost", ignoreCase = true) &&
+            uri.path.startsWith("/fixture/")
 
     private fun hasStrictSafeSearch(rawQuery: String?): Boolean =
         rawQuery
