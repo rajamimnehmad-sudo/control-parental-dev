@@ -46,6 +46,9 @@ La APK no fue publicada, subida ni instalada automáticamente.
 - `testDevDebugUnitTest`: OK; la variante oficial conserva su flujo.
 - `ktlintCheck`: OK.
 - WebExtension `node --test src/test/js/dag-protection.test.mjs`: 17/17 OK.
+- Android instrumentado en S22 Ultra (`SM-S908E`, Android 16): 4 pruebas
+  ejecutadas, 2 escenarios opcionales omitidos, sin fallos; el modelo hizo
+  22/22 inferencias con p50 `30,86 ms`, p95 `32,93 ms`, PSS `116.416 KiB`.
 - Test específico: una redacción entrega el reemplazo validado y los fallos
   permanecen bloqueados.
 
