@@ -25,6 +25,7 @@ internal enum class DagMediaAction(
     val wireValue: String,
 ) {
     Allow("allow"),
+    Redact("redact"),
     Block("block"),
 }
 

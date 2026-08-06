@@ -178,6 +178,27 @@ test("filtered raster receives a neutral PNG without rejected pixels", async () 
   assert.notDeepEqual([...filter.writes[0]], [...original]);
 });
 
+test("experimental redaction delivers the validated frosted replacement", async () => {
+  const harness = await createHarness();
+  const details = imageDetails("redact");
+  const original = Uint8Array.from([0xff, 0xd8, 9, 8, 7, 0xff, 0xd9]);
+  const replacement = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 4, 5]);
+  deliver(harness, details, original);
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "redaction native request");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: request.candidateId,
+    action: "redact",
+    reason: "model_partial_redaction",
+    replacementBytesBase64: btoa(String.fromCharCode(...replacement)),
+  });
+  const filter = harness.filters.get(details.requestId);
+  await waitFor(() => filter.closed, "redacted stream close");
+  assert.deepEqual([...filter.writes[0]], [...replacement]);
+});
+
 test("sanitized passive sprite is cached and preserves replacement bytes", async () => {
   const harness = await createHarness();
   const original = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2]);

@@ -227,6 +227,17 @@ accuracy `96,43 %` y PR-AUC `0,963054`. Su FP32 abre en ORT CPU pero pesa
 Supabase, Production ni GitHub. Evidencia:
 `docs/dag/v3/GLOSHIA_R3_2_DIRECTED_REPAIR_TRAIN_2026-08-05.md`.
 
+Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
+el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
+`com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para
+aplicar un difuminado fuerte tipo vidrio cuando hay una única región moderada;
+varias regiones, riesgo global alto o cualquier error bloquean la imagen
+completa. R3.1, el flavor DEV y el flujo oficial `allow/block` permanecen sin
+cambios. El APK lab es `versionCode 111`, `0.69.13-lab`, SHA-256
+`c7741e504d400bee235531d8996eb2a236401ae7c9363552b255b2c47fd6a17d` y no fue
+instalado, publicado ni subido. Evidencia:
+`docs/dag/v3/GLOSHIA_PARTIAL_REDACTION_LAB_2026-08-05.md`.
+
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
 
 DAG 96 conserva sin cambios el pipeline de navegador y la extension `1.50.0`

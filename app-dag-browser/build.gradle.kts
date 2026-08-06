@@ -62,7 +62,7 @@ android {
         create("lab") {
             dimension = "distribution"
             applicationIdSuffix = ".lab"
-            versionCode = 110
+            versionCode = 111
             versionNameSuffix = "-lab"
             buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
             buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "true")

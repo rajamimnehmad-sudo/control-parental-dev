@@ -1690,13 +1690,19 @@ class DagBrowserActivity : Activity() {
                     } else {
                         DagMediaClassificationMode.DisabledForDevCompatibility
                     },
+                redactionMode =
+                    if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
+                        DagMediaRedactionMode.LabStrongFrosted
+                    } else {
+                        DagMediaRedactionMode.Disabled
+                    },
                 trace = trace,
                 workGuard = lease,
             )
         val currentDecision =
             if (lease.canContinue()) decision else expiredMediaDecision(bytesPayload.candidateId)
         val deliverableDecision =
-            if (currentDecision.action == DagMediaAction.Block) {
+            if (currentDecision.action == DagMediaAction.Block && currentDecision.replacementBytesBase64 == null) {
                 currentDecision.copy(
                     replacementBytesBase64 =
                         currentDecision.replacementBytesBase64

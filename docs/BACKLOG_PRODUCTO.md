@@ -291,6 +291,23 @@ Flujo de una entrada:
   candidato apto para Android. No integrar, no cambiar umbral/política y no
   crear excepciones por sitio, URL, género o campaña.
 - Evidencia: `docs/dag/v3/GLOSHIA_R3_2_DIRECTED_REPAIR_TRAIN_2026-08-05.md`.
+
+### GLOSHIA-PARTIAL-REDACTION-LAB - Prueba local de difuminado regional
+
+- Estado: `APK lab local; pendiente revisión humana`. Prioridad: P1. Esfuerzo:
+  M. Riesgo: alto.
+- Se creó un flavor aislado que conserva R3.1 y prueba un reemplazo PNG con
+  difuminado fuerte tipo vidrio sobre una única región regional moderada. El
+  fallback ante varias regiones, riesgo alto o fallo sigue siendo bloqueo
+  completo.
+- No cambia el modelo, el umbral, la política oficial, DAG DEV, Supabase ni
+  Production. No crea excepciones por género, sitio, URL o campaña.
+- Acceptance gate: revisión humana de casos localizados y bloqueados completos;
+  cero revelaciones no protegidas por fallos o timeouts; medición de latencia,
+  memoria, tamaño del reemplazo y percepción de cobertura; recién después
+  decidir si se prepara un ticket de integración separado.
+- Evidencia:
+  `docs/dag/v3/GLOSHIA_PARTIAL_REDACTION_LAB_2026-08-05.md`.
   107 durante el harness.
 - Criterio: cero falsos permisos nuevos, sin degradación crítica, tamaño y
   latencia comparables, y cierre correcto de sesión. Si falla, R3 permanece

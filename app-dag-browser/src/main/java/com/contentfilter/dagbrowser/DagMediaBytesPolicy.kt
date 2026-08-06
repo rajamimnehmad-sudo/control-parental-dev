@@ -29,6 +29,11 @@ internal enum class DagMediaClassificationMode {
     DisabledForDevCompatibility,
 }
 
+internal enum class DagMediaRedactionMode {
+    Disabled,
+    LabStrongFrosted,
+}
+
 internal object AndroidImageBoundsReader : DagImageBoundsReader {
     override fun read(bytes: ByteArray): DagImageBounds? {
         val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -60,6 +65,7 @@ internal object DagMediaBytesPolicy {
         preprocessor: DagImagePreprocessor = AndroidDagImagePreprocessor,
         analyzer: DagImageAnalyzer = UnavailableDagImageAnalyzer,
         classificationMode: DagMediaClassificationMode = DagMediaClassificationMode.Enabled,
+        redactionMode: DagMediaRedactionMode = DagMediaRedactionMode.Disabled,
         trace: DagMediaPipelineTrace? = null,
         workGuard: DagMediaWorkGuard = AlwaysCurrentDagMediaWork,
     ): DagMediaDecision {
@@ -72,6 +78,7 @@ internal object DagMediaBytesPolicy {
             preprocessor,
             analyzer,
             classificationMode,
+            redactionMode,
             trace,
             workGuard,
         )
@@ -91,6 +98,7 @@ internal object DagMediaBytesPolicy {
         preprocessor: DagImagePreprocessor,
         analyzer: DagImageAnalyzer,
         classificationMode: DagMediaClassificationMode,
+        redactionMode: DagMediaRedactionMode,
         trace: DagMediaPipelineTrace?,
         workGuard: DagMediaWorkGuard,
     ): DagMediaDecision {
@@ -176,7 +184,18 @@ internal object DagMediaBytesPolicy {
                         if (!valid) {
                             blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
                         } else {
-                            decidePreparedImages(payload, preparedImages, analyzer, trace, workGuard)
+                            decidePreparedImages(
+                                payload = payload,
+                                analysisBytes = analysisBytes,
+                                sourceWidth = bounds.width,
+                                sourceHeight = bounds.height,
+                                preparedImages = preparedImages,
+                                regionalCropPlans = result.regionalCropPlans,
+                                analyzer = analyzer,
+                                redactionMode = redactionMode,
+                                trace = trace,
+                                workGuard = workGuard,
+                            )
                         }
                     } catch (_: Exception) {
                         blocked(payload, DagOnDeviceImageAnalyzer.ModelExecutionFailedReason)
@@ -217,8 +236,13 @@ internal object DagMediaBytesPolicy {
 
     private fun decidePreparedImages(
         payload: DagMediaBytesPayload,
+        analysisBytes: ByteArray,
+        sourceWidth: Int,
+        sourceHeight: Int,
         preparedImages: List<DagPreparedImage>,
+        regionalCropPlans: List<DagImageCropPlan>,
         analyzer: DagImageAnalyzer,
+        redactionMode: DagMediaRedactionMode,
         trace: DagMediaPipelineTrace?,
         workGuard: DagMediaWorkGuard,
     ): DagMediaDecision {
@@ -237,7 +261,10 @@ internal object DagMediaBytesPolicy {
                 is DagImageAnalysisResult.Unavailable ->
                     return blocked(payload, analysis.reason)
             }
-        if (fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold) {
+        if (
+            fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold &&
+            redactionMode == DagMediaRedactionMode.Disabled
+        ) {
             return blocked(
                 payload,
                 DagOnDeviceImageAnalyzer.ModelFilterReason,
@@ -265,7 +292,8 @@ internal object DagMediaBytesPolicy {
         return try {
             var maximumProbability = fullProbability
             var regionalFilterVotes = 0
-            for (regionalImage in regionalImages) {
+            val regionalRisks = mutableListOf<DagRegionalRisk>()
+            for ((regionalIndex, regionalImage) in regionalImages.withIndex()) {
                 if (!workGuard.canContinue()) {
                     return blocked(payload, AnalysisExpiredReason)
                 }
@@ -281,6 +309,9 @@ internal object DagMediaBytesPolicy {
                             return blocked(payload, analysis.reason)
                     }
                 maximumProbability = maxOf(maximumProbability, regionalProbability)
+                if (regionalIndex < regionalCropPlans.size) {
+                    regionalRisks += DagRegionalRisk(regionalCropPlans[regionalIndex], regionalProbability)
+                }
                 if (regionalProbability >= DagOnDeviceImageAnalyzer.RegionalFilterThreshold) {
                     regionalFilterVotes += 1
                 }
@@ -289,9 +320,12 @@ internal object DagMediaBytesPolicy {
                         regionalProbability >=
                         DagOnDeviceImageAnalyzer.UncertainRegionalFilterThreshold
                 if (
-                    uncertainRegionIsUnsafe ||
-                    regionalProbability >= DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ||
-                    regionalFilterVotes >= DagOnDeviceImageAnalyzer.RegionalConsensusMinimum
+                    redactionMode == DagMediaRedactionMode.Disabled &&
+                    (
+                        uncertainRegionIsUnsafe ||
+                            regionalProbability >= DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ||
+                            regionalFilterVotes >= DagOnDeviceImageAnalyzer.RegionalConsensusMinimum
+                    )
                 ) {
                     return blocked(
                         payload,
@@ -301,6 +335,30 @@ internal object DagMediaBytesPolicy {
                 }
             }
             if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
+            if (redactionMode == DagMediaRedactionMode.LabStrongFrosted) {
+                val selectedPlans = DagPartialRedactionPolicy.select(fullProbability, regionalRisks)
+                val replacement =
+                    selectedPlans?.let {
+                        DagStrongFrostedRedaction.renderBase64(
+                            bytes = analysisBytes,
+                            sourceWidth = sourceWidth,
+                            sourceHeight = sourceHeight,
+                            cropPlans = it,
+                        )
+                    }
+                if (replacement != null) {
+                    return DagMediaDecision(
+                        candidateId = payload.candidateId,
+                        action = DagMediaAction.Redact,
+                        reason = DagPartialRedactionPolicy.StrongFrostedReason,
+                        filterProbability = maximumProbability,
+                        replacementBytesBase64 = replacement,
+                    )
+                }
+                if (fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold || regionalFilterVotes > 0) {
+                    return blocked(payload, DagOnDeviceImageAnalyzer.ModelFilterReason, maximumProbability)
+                }
+            }
             DagMediaDecision(
                 candidateId = payload.candidateId,
                 action = DagMediaAction.Allow,

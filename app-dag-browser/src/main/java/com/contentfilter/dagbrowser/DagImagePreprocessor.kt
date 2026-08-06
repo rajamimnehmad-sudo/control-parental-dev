@@ -175,6 +175,7 @@ internal sealed interface DagImagePreprocessResult {
     data class Ready(
         val image: DagPreparedImage,
         val regionalImages: List<DagPreparedImage> = emptyList(),
+        val regionalCropPlans: List<DagImageCropPlan> = emptyList(),
     ) : DagImagePreprocessResult
 
     data class Rejected(
@@ -246,6 +247,7 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
                 .Ready(
                     image = preparedImages.first(),
                     regionalImages = preparedImages.drop(1),
+                    regionalCropPlans = DagRegionalCropPlanner.plan(sourceBitmap.width, sourceBitmap.height),
                 ).also {
                     returnedPreparedImages = true
                 }
