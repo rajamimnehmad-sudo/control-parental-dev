@@ -12,6 +12,7 @@
   const PROTOCOL_VERSION = 1;
   const NATIVE_APP = "glosh.dag.protection";
   const IMAGE_STABILITY_MS = 0;
+  const IMAGE_RECONCILIATION_DELAYS_MS = [100, 400, 1000, 2000, 4000];
   const STABLE_IMAGE_ATTRIBUTE = "data-glosh-dag-stable";
   const MAX_INLINE_DATA_URL_LENGTH = 66 * 1024;
   const MAX_INLINE_IMAGES_PER_DOCUMENT = 16;
@@ -182,6 +183,7 @@
         image.isConnected &&
         image.complete &&
         image.naturalWidth > 0 &&
+        !(image.naturalWidth === 1 && image.naturalHeight === 1) &&
         imageSource(image) === source
       ) {
         image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
@@ -260,6 +262,14 @@
     initialDocumentReady = true;
     maybeReportInitialDocumentReady();
   };
+  const reconcileCompleteImages = () => {
+    for (const image of document.images) {
+      if (image.complete && !image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) stabilizeImage(image);
+    }
+  };
+  for (const delay of IMAGE_RECONCILIATION_DELAYS_MS) {
+    setTimeout(reconcileCompleteImages, delay);
+  }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", completeDocument, { once: true });
   } else {

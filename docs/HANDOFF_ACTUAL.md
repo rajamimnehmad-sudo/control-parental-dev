@@ -6,6 +6,33 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## DAG Browser 162: primera carga estable y cache visual versionada
+
+- DAG 162 (`0.69.66-dev`) esta instalado en el SM-S908E con datos preservados;
+  la extension integrada es `1.79.0`.
+- La regresion reciente quedo localizada en dos puntos generales introducidos
+  con DAG 158: cada `versionCode` borraba toda la cache de Gecko y la barrera
+  podia conservar ocultas durante segundos imagenes que ya estaban aprobadas y
+  decodificadas.
+- La cache interceptada ahora tiene una revision propia. Una actualizacion
+  normal de la APK no vuelve a vaciarla; solo un cambio futuro y explicito del
+  contrato de entrega puede incrementar esa revision. No se borra historial,
+  perfil, cookies ni datos del usuario.
+- La barrera ejecuta cinco reconciliaciones acotadas durante los primeros
+  cuatro segundos. Revelan solamente imagenes completas y decodificadas y
+  terminan solas; el placeholder bloqueado de 1x1 no se considera renderizable.
+- El diagnostico temporal demostro la causa: a 5 segundos Fravega tenia 45
+  imagenes decodificadas pero solo 6 estables; a 10 segundos eran 116/116. La
+  instrumentacion fue retirada antes del cierre.
+- En la prueba final con cache fria las dos filas de categorias de Fravega
+  aparecieron completas en la captura de aproximadamente 5 segundos. Mimo
+  abrio su menu completo despues de desplazar la pagina. Google no mostro
+  patrocinados a 2 ni 5 segundos; mapa e imagenes terminaron visibles.
+- No cambian GloshIA R3.1, umbral, politica visual, hilos, ONNX, scheduler ni
+  bloqueo de publicidad/video. No hay excepciones por dominio, URL o sitio.
+- Tests JS 21/21, unitarios, Ktlint y APK son correctos. Evidencia:
+  `docs/compatibility/results/dag-browser-v162-cold-image-reconciliation-sm-s908e-2026-08-06.md`.
+
 ## DAG Browser 159: limpieza estructural y retiro de descargas
 
 - DAG 159 (`0.69.63-dev`) esta instalado en el SM-S908E con datos preservados.
@@ -20,10 +47,8 @@ el runtime actual desde versiones o worktrees historicos.
   scheduler.
 - Tests JS, unitarios, Ktlint, Lint y APK son correctos; no hubo crash, ANR ni
   OOM en Google, Mimo, Fravega y Cheeky.
-- Observacion pendiente: Mimo y Fravega volvieron a mostrar imagenes vacias aun
-  con `model_allow` (67 decisiones allow y cero block en el log acotado). El
-  diff funcional de DAG 159 no toca el pipeline visual, por lo que el problema
-  sigue abierto y no se atribuye al refactor sin evidencia adicional.
+- La observacion de imagenes vacias con `model_allow` quedo diagnosticada y
+  corregida en DAG 162; no fue causada por el refactor de descargas.
 
 ## DAG Browser 158: primera revelacion saneada y fotos restauradas
 

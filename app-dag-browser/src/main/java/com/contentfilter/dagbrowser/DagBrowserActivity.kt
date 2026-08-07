@@ -811,13 +811,27 @@ class DagBrowserActivity : Activity() {
 
     private fun clearInterceptedMediaCacheAfterUpdate() {
         val preferences = getSharedPreferences(CacheMaintenancePreferences, MODE_PRIVATE)
-        if (preferences.getInt(CacheMaintenanceVersionKey, 0) == BuildConfig.VERSION_CODE) {
+        val recordedRevision = preferences.getInt(CacheMaintenanceRevisionKey, 0)
+        if (recordedRevision == InterceptedMediaCacheRevision) {
+            ensureProtectionExtension()
+            return
+        }
+        if (recordedRevision == 0) {
+            // Existing installs used versionCode as the cache key, which forced a full Gecko cache
+            // clear after every APK. Migrate without clearing: fresh installs have no stale cache,
+            // and existing responses still cross the response filter when read from cache.
+            preferences.edit()
+                .putInt(CacheMaintenanceRevisionKey, InterceptedMediaCacheRevision)
+                .remove(LegacyCacheMaintenanceVersionKey)
+                .apply()
             ensureProtectionExtension()
             return
         }
         runtime.storageController.clearData(StorageController.ClearFlags.ALL_CACHES).accept(
             {
-                preferences.edit().putInt(CacheMaintenanceVersionKey, BuildConfig.VERSION_CODE).apply()
+                preferences.edit()
+                    .putInt(CacheMaintenanceRevisionKey, InterceptedMediaCacheRevision)
+                    .apply()
                 runOnUiThread {
                     if (!isFinishing && !isDestroyed) ensureProtectionExtension()
                 }
@@ -2565,7 +2579,9 @@ class DagBrowserActivity : Activity() {
         const val DocumentSanitizedReadyMessage = "document-sanitized-ready"
         const val ProtectionProtocolVersion = 1
         const val CacheMaintenancePreferences = "dag-cache-maintenance"
-        const val CacheMaintenanceVersionKey = "last-cache-clear-version"
+        const val CacheMaintenanceRevisionKey = "intercepted-media-cache-revision"
+        const val LegacyCacheMaintenanceVersionKey = "last-cache-clear-version"
+        const val InterceptedMediaCacheRevision = 4
         const val MinimumPageLoadProgress = 5
         const val PageLoadProgressCompletionDelayMillis = 160L
         const val MaxMediaCandidateIdLength = 80
