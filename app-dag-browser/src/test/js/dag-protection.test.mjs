@@ -495,7 +495,10 @@ test("first paint closes inline and changing image sources before stable reveal"
   assert.match(barrier, /barrier-ready/u);
   assert.match(barrier, /IMAGE_STABILITY_MS = 0/u);
   assert.match(barrier, /MutationObserver/u);
-  assert.match(barrier, /IMAGE_RECONCILIATION_DELAYS_MS = \[100, 400, 1000, 2000, 4000\]/u);
+  assert.match(
+    barrier,
+    /IMAGE_RECONCILIATION_DELAYS_MS = \[100, 400, 1000, 2000, 4000, 6000, 8000, 12000\]/u,
+  );
   assert.match(barrier, /setTimeout\(reconcileCompleteImages, delay\)/u);
   assert.match(barrier, /!\(image\.naturalWidth === 1 && image\.naturalHeight === 1\)/u);
   assert.match(barrier, /attributeFilter: \["src", "srcset", "sizes"\]/u);

@@ -56,3 +56,15 @@ seis procesos de contenido. Optimizar ese limite requiere un A/B separado para
 no introducir recargas o regresiones de fluidez en este lote.
 
 No se hizo push, publicacion remota ni cambio en Supabase o Production.
+
+## Seguimiento DAG 163
+
+Google Imagenes decodificaba fotos reales despues del ultimo barrido de DAG
+162. El diagnostico conto 108 imagenes decodificadas y solo 58 estables a 10
+segundos; las 50 restantes no eran bloqueos de R3.1. DAG 163 (`0.69.67-dev`,
+extension `1.81.0`) agrega reconciliaciones acotadas a 6, 8 y 12 segundos.
+
+En la repeticion final las miniaturas ya estaban presentes a 5 segundos y se
+mantuvieron a 7 y 12 segundos. La pagina fue visible en 1.049 ms y la cola
+visible quedo quieta en 1.346 ms. La instrumentacion temporal fue retirada y
+no cambiaron modelo, umbral, politica, publicidad, video, scheduler o CPU.

@@ -22,7 +22,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"1.79.0\"")
+        assertContains(manifest, "\"version\": \"1.81.0\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
@@ -107,7 +107,10 @@ class MediaBarrierContractTest {
         assertContains(barrier, "barrier-ready")
         assertContains(barrier, "IMAGE_STABILITY_MS = 0")
         assertContains(barrier, "MutationObserver")
-        assertContains(barrier, "IMAGE_RECONCILIATION_DELAYS_MS = [100, 400, 1000, 2000, 4000]")
+        assertContains(
+            barrier,
+            "IMAGE_RECONCILIATION_DELAYS_MS = [100, 400, 1000, 2000, 4000, 6000, 8000, 12000]",
+        )
         assertContains(barrier, "setTimeout(reconcileCompleteImages, delay)")
         assertContains(barrier, "!(image.naturalWidth === 1 && image.naturalHeight === 1)")
         assertContains(barrier, "attributeFilter: [\"src\", \"srcset\", \"sizes\"]")

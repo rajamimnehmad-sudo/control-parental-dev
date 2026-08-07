@@ -6,10 +6,27 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## DAG Browser 163: Google Imagenes y reconciliacion tardia
+
+- DAG 163 (`0.69.67-dev`) esta instalado en el SM-S908E con datos preservados;
+  la extension integrada es `1.81.0`.
+- Google Imagenes podia conservar vacias miniaturas ya aprobadas: a 10 segundos
+  habia 108 imagenes decodificadas y solo 58 estables; las 50 fotos reales
+  restantes habian terminado despues del ultimo barrido de 4 segundos.
+- La reconciliacion sigue siendo acotada, pero agrega barridos a 6, 8 y 12
+  segundos. No queda ningun intervalo, observer global adicional ni proceso
+  permanente.
+- En la validacion final las fotos de Google Imagenes ya estaban visibles en la
+  captura de 5 segundos y permanecieron a 7 y 12 segundos. La pagina fue
+  visible en 1.049 ms y la cola visible quedo quieta en 1.346 ms.
+- La instrumentacion temporal fue retirada. GloshIA R3.1, umbral, politica,
+  scheduler, publicidad, video, hilos y ONNX permanecen intactos.
+- Tests JS 21/21, unitarios, Ktlint y APK son correctos.
+
 ## DAG Browser 162: primera carga estable y cache visual versionada
 
-- DAG 162 (`0.69.66-dev`) esta instalado en el SM-S908E con datos preservados;
-  la extension integrada es `1.79.0`.
+- DAG 162 (`0.69.66-dev`) introdujo la cache visual versionada y la primera
+  reconciliacion acotada; DAG 163 extiende su ventana para Google Imagenes.
 - La regresion reciente quedo localizada en dos puntos generales introducidos
   con DAG 158: cada `versionCode` borraba toda la cache de Gecko y la barrera
   podia conservar ocultas durante segundos imagenes que ya estaban aprobadas y
