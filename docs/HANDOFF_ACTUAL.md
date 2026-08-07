@@ -1,10 +1,44 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-08-06
+Fecha de corte: 2026-08-07
 
 Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
+
+## DAG Browser 169: restauracion determinista de imagenes tras cambios de cache
+
+- DAG 169 (`0.69.73-dev`) esta instalado en el SM-S908E con datos preservados;
+  la extension integrada es `1.86.0`.
+- La eliminacion de descargas/PDF de DAG 159 no causo la regresion: no cambio
+  la barrera, `webRequest`, GeckoView ni el pipeline visual. La intermitencia
+  aparecio despues, al separar en DAG 162 la limpieza de cache del
+  `versionCode` de cada APK.
+- El diagnostico reprodujo una carga vacia sin decisiones nativas de imagen y
+  una carga correcta despues de reiniciar/limpiar cache. La causa era estado de
+  cache de Gecko anterior al comportamiento vigente de los listeners: podia
+  reutilizar una respuesta sin volver a activar el filtro actualizado.
+- La extension registra primero ambos listeners y luego invoca una sola vez
+  `browser.webRequest.handlerBehaviorChanged()` al iniciar. Es la API oficial
+  de Firefox para vaciar la cache en memoria cuando cambia el comportamiento de
+  `webRequest`; no se ejecuta por pagina, gesto ni imagen.
+- La revision de cache interceptada sube de 4 a 5 para retirar una sola vez la
+  cache persistente ya contaminada en instalaciones existentes. No se borran
+  pestanas, historial, cookies, perfiles ni datos del usuario.
+- Fixture LAB frio/caliente: 4/4 raster criticos cargados sin errores;
+  estabilidad visual en 537 ms y 218 ms, respectivamente; cola p95 fria de
+  1 ms; cero crash/ANR. En DEV, Fravega conservo banner, categorias y productos
+  tras dos recargas calientes. Google `Todo -> Imagenes -> Todo -> Imagenes`
+  mostro las fotos completas en ambas transiciones. Mimo mostro sus productos y
+  Cheeky cargo su pagina sin crash/ANR.
+- La instrumentacion temporal fue retirada. GloshIA R3.1, modelo, umbral,
+  politica visual, hilos, ONNX, publicidad, video y scheduler permanecen
+  intactos. No hay excepciones por sitio, URL o dominio.
+- Tests JS 22/22, unitarios, Ktlint, APK DEV y APK LAB correctos. El APK DEV
+  instalado tiene SHA-256
+  `9aa0496d8d1ed4955e592030f0f85f6b1a7f4482c5f042c087480cc86a72a231`.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v169-gecko-cache-listener-refresh-sm-s908e-2026-08-07.md`.
 
 ## DAG Browser 164: miniaturas de pestanas bajo demanda
 

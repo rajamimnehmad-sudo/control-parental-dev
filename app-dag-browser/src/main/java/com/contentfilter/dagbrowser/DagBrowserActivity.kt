@@ -2600,7 +2600,7 @@ class DagBrowserActivity : Activity() {
         const val CacheMaintenancePreferences = "dag-cache-maintenance"
         const val CacheMaintenanceRevisionKey = "intercepted-media-cache-revision"
         const val LegacyCacheMaintenanceVersionKey = "last-cache-clear-version"
-        const val InterceptedMediaCacheRevision = 4
+        const val InterceptedMediaCacheRevision = 5
         const val MinimumPageLoadProgress = 5
         const val PageLoadProgressCompletionDelayMillis = 160L
         const val MaxMediaCandidateIdLength = 80

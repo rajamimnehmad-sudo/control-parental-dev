@@ -473,3 +473,9 @@ browser.webRequest.onHeadersReceived.addListener(
   { urls: ["<all_urls>"] },
   ["blocking", "responseHeaders"],
 );
+
+// Gecko may otherwise satisfy in-memory responses without re-entering the registered
+// webRequest filters. Flush only that transient cache once, after every listener is ready.
+if (typeof browser.webRequest.handlerBehaviorChanged === "function") {
+  void browser.webRequest.handlerBehaviorChanged().catch(() => {});
+}

@@ -35,6 +35,8 @@ const createHarness = async () => {
   const runtimeMessages = eventChannel();
   const postedNative = [];
   const filters = new Map();
+  let handlerBehaviorChanges = 0;
+  const handlerBehaviorChangeListenerCounts = [];
   const nativePort = {
     onMessage: nativeMessages,
     onDisconnect: nativeDisconnects,
@@ -52,6 +54,14 @@ const createHarness = async () => {
     webRequest: {
       onBeforeRequest: beforeRequest,
       onHeadersReceived: headersReceived,
+      handlerBehaviorChanged() {
+        handlerBehaviorChanges += 1;
+        handlerBehaviorChangeListenerCounts.push([
+          beforeRequest.listeners.length,
+          headersReceived.listeners.length,
+        ]);
+        return Promise.resolve();
+      },
       filterResponseData(requestId) {
         const filter = {
           writes: [],
@@ -91,6 +101,10 @@ const createHarness = async () => {
     headers: headersReceived.listeners[0],
     filters,
     postedNative,
+    get handlerBehaviorChanges() {
+      return handlerBehaviorChanges;
+    },
+    handlerBehaviorChangeListenerCounts,
     decideInline(message, sender = { url: "https://search.example.test/?q=shoes" }) {
       return runtimeMessages.listeners[0](message, sender);
     },
@@ -105,6 +119,12 @@ const createHarness = async () => {
     },
   };
 };
+
+test("background flushes Gecko memory cache after installing response filters", async () => {
+  const harness = await createHarness();
+  assert.equal(harness.handlerBehaviorChanges, 1);
+  assert.deepEqual(harness.handlerBehaviorChangeListenerCounts, [[1, 1]]);
+});
 
 test("visible image hints reach the native queue with priority", async () => {
   const harness = await createHarness();

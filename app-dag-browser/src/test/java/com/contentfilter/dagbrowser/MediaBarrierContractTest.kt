@@ -22,7 +22,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"1.81.0\"")
+        assertContains(manifest, "\"version\": \"1.86.0\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
@@ -62,6 +62,7 @@ class MediaBarrierContractTest {
     @Test
     fun `raster response has one bounded native authority`() {
         assertContains(background, "filterResponseData")
+        assertContains(background, "handlerBehaviorChanged")
         assertContains(background, "RASTER_IMAGE_MIME_PATTERN.test(contentType)")
         assertContains(background, "alreadyIntercepted")
         assertContains(background, "MAX_IMAGE_BYTES = 2 * 1024 * 1024")
