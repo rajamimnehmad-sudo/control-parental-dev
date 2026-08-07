@@ -8,7 +8,6 @@
     <color name="dag_muted">#607488</color>
     <color name="dag_on_navy">#FFFFFF</color>
     <color name="dag_on_navy_muted">#BFD3E2</color>
-    <color name="dag_toolbar_button">#26445E</color>
     <color name="dag_border">#D9E4EA</color>
     <color name="dag_status_error">#FFE1DE</color>
     <color name="dag_status_error_text">#8B2820</color>

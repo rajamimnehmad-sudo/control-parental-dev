@@ -294,12 +294,16 @@ Flujo de una entrada:
 
 ### GLOSHIA-PARTIAL-REDACTION-LAB - Prueba local de difuminado regional
 
-- Estado: `APK lab local; pendiente revisión humana`. Prioridad: P1. Esfuerzo:
+- Estado: `APK lab local; revisión técnica completada; pendiente revisión humana`. Prioridad: P1. Esfuerzo:
   M. Riesgo: alto.
 - Se creó un flavor aislado que conserva R3.1 y prueba un reemplazo PNG con
   difuminado fuerte tipo vidrio sobre una única región regional moderada. El
   fallback ante varias regiones, riesgo alto o fallo sigue siendo bloqueo
   completo.
+- Se corrigió el caso que impedía ver el difuminado en fotos normales: LAB
+  genera tres recortes regionales para proporciones estándar; DEV mantiene la
+  ruta optimizada sin esa carga adicional. La prueba real en S22 produjo una
+  decisión `redact` y mostró el reemplazo en pantalla.
 - No cambia el modelo, el umbral, la política oficial, DAG DEV, Supabase ni
   Production. No crea excepciones por género, sitio, URL o campaña.
 - Acceptance gate: revisión humana de casos localizados y bloqueados completos;
@@ -1479,7 +1483,7 @@ Flujo de una entrada:
 | DAG-RESULTS-CLARITY-02 | Idea autorizada para backlog; no aprobada para codigo | P2 | Resultados mas claros con dominio destacado e iconos de sitio no engañosos | M | Medio |
 | DAG-ANALYSIS-SEARCH-02 | Idea autorizada para backlog; no aprobada para codigo | P1 | Permitir una nueva busqueda desde la barra mientras DAG analiza | S | Medio |
 | DAG-ADBLOCK-01 | Idea autorizada para backlog; no aprobada para codigo | P1 | Bloquear anuncios y recursos publicitarios para mejorar velocidad sin romper sitios | L | Alto |
-| DAG-BLACK-RESOURCES-05 | Implementado y validado en candidato local | P1 | Evitar rectangulos negros en recursos seguros sin mostrar contenido no aprobado | M | Alto |
+| DAG-BLACK-RESOURCES-05 | Revalidado en DAG 147 | P1 | Evitar rectangulos negros en recursos seguros sin mostrar contenido no aprobado | M | Alto |
 | DAG-REFRESH-03 | Implementado en candidato local; validacion automatica correcta | P1 | Hacer que Actualizar recargue realmente la pestana activa con estado visible y seguro | S | Medio |
 | DAG-RECENTS-FAVICON-03 | Implementado y validado en candidato local | P2 | Mostrar el favicon real y seguro del sitio en los accesos recientes de Home | M | Medio |
 | DAG-TAB-PREVIEW-04 | Diez pestañas validadas en DAG 45; persistencia segura validada en DAG 46; matriz 50 pendiente | P1 | Mostrar una miniatura util y segura de cada pagina en el selector de pestanas | M | Alto |
@@ -2415,8 +2419,11 @@ Flujo de una entrada:
 
 #### DAG-DOWNLOADS-01 - Descargas seguras y administrables
 
-- Estado: `PDF inline resuelto y validado físicamente en DAG 45; preservación
-  de POST cubierta por contrato automatizado y pendiente de reproducción física`.
+- Estado: `Archivado y retirado del producto en DAG 159 por decision explicita
+  del propietario el 2026-08-06`. La implementacion historica queda recuperable
+  desde Git, pero no forma parte del navegador vigente.
+  Anteriormente: PDF inline resuelto y validado físicamente en DAG 45;
+  preservación de POST cubierta por contrato automatizado.
   Evidencia: el usuario confirma el
   2026-07-29 que las descargas son importantes para que DAG sea un navegador
   profesional y autoriza ejecutar el lote 4 el 2026-07-30. Tipo: compatibilidad
@@ -2838,12 +2845,12 @@ Flujo de una entrada:
 
 #### DAG-BLACK-RESOURCES-05 - Rectangulos negros en contenido seguro
 
-- Estado: `Implementado y validado en candidato local`. Evidencia: captura aportada por el usuario el 2026-07-23; la barra visible comienza con `https://www.mim...`, aunque el reporte menciona Cheeky. Tipo: compatibilidad visual y seguridad. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
+- Estado: `Revalidado físicamente en candidato local DAG 147`. Evidencia inicial: captura aportada por el usuario el 2026-07-23; regresión reproducida y cerrada nuevamente en SM-S908E el 2026-08-06. Tipo: compatibilidad visual y seguridad. Prioridad: P1. Esfuerzo: M. Riesgo: alto.
 - Problema: la pagina conserva su foto principal, pero presenta rectangulos negros grandes en cabecera, iconos y beneficios de envio/retiro. Todavia no esta demostrado si esos bloques son imagenes, fondos CSS, SVG, placeholders del filtro visual, recursos fallidos o coincidencias del bloqueo publicitario.
 - Causa raiz requerida: identificar por recurso y por capa si intervienen WebView/red, bloqueo de anuncios, sanitizacion CSS/SVG, clasificacion visual, respuesta neutra o un error propio del sitio. No crear una excepcion por dominio antes de aislar la causa comun.
 - Seguridad: una correccion no puede mostrar una imagen antes de aprobarla ni convertir el fallo en un bypass. El contenido inseguro conserva bloqueo o blur; logos, controles y recursos seguros recuperan su representacion normal.
 - Aceptacion: el sitio de la captura y una segunda tienda dinamica no muestran rectangulos negros en recursos seguros; los bloqueos intencionales son distinguibles de un recurso roto; se mantienen los filtros de imagenes; recarga y navegacion interna no reintroducen los bloques; queda una prueba general que no dependa de Cheeky/Mimo.
-- Implementacion candidata: la respuesta PNG neutra del filtro dejo de ser un pixel negro opaco y ahora es transparente. Mimo fue repetido fisicamente sin los rectangulos negros de la captura y sin liberar imagenes antes de su decision.
+- Implementación final revalidada: la cola WebExtension anterior a Android dejó de ser FIFO 24/32, acepta la ráfaga completa ya acotada por 8 MiB y extrae visible/cercano/fondo. El fallback de fallos técnicos volvió de píxel negro opaco a transparente. Los bloqueos reales siguen usando reemplazo proporcional y ningún byte original se muestra antes de `allow`. El propietario confirmó Frávega sin la regresión en DAG 147; no hay reglas por sitio.
 
 #### DAG-IMAGE-PRESENTATION-06 - AVIF y estados visuales inequívocos
 

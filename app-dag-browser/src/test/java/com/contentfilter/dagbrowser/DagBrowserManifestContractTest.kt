@@ -18,17 +18,6 @@ class DagBrowserManifestContractTest {
     }
 
     @Test
-    fun `download provider is private and grants only temporary URIs`() {
-        val manifest = File("src/main/AndroidManifest.xml").readText()
-        val paths = File("src/main/res/xml/dag_download_paths.xml").readText()
-
-        assertContains(manifest, "androidx.core.content.FileProvider")
-        assertContains(manifest, "android:exported=\"false\"")
-        assertContains(manifest, "\${applicationId}.downloads.fileprovider")
-        assertContains(paths, "path=\"downloads/\"")
-    }
-
-    @Test
     fun `page scrolling is not intercepted by pull refresh`() {
         val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
 

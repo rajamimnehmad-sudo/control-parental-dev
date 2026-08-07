@@ -6,6 +6,25 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## DAG Browser 159: limpieza estructural y retiro de descargas
+
+- DAG 159 (`0.69.63-dev`) esta instalado en el SM-S908E con datos preservados.
+- Por decision explicita del propietario se retiro por completo la funcion de
+  descargas/PDF: integracion Gecko, politica, estados, ejecutor, FileProvider,
+  menu, dialogs, layouts, iconos, strings y tests asociados.
+- `DagBrowserActivity.kt` bajo de 3.309 a 2.599 lineas. La normalizacion
+  recursiva de opciones de formularios se movio a `DagChoicePromptPolicy` y se
+  retiro `androidx.core`, que ya no tenia consumidores.
+- El lote elimina 1.571 lineas netas y lint no informa recursos sin uso. No
+  modifica GloshIA R3.1, umbral, politica visual, barrera, extension, hilos ni
+  scheduler.
+- Tests JS, unitarios, Ktlint, Lint y APK son correctos; no hubo crash, ANR ni
+  OOM en Google, Mimo, Fravega y Cheeky.
+- Observacion pendiente: Mimo y Fravega volvieron a mostrar imagenes vacias aun
+  con `model_allow` (67 decisiones allow y cero block en el log acotado). El
+  diff funcional de DAG 159 no toca el pipeline visual, por lo que el problema
+  sigue abierto y no se atribuye al refactor sin evidencia adicional.
+
 ## DAG Browser 158: primera revelacion saneada y fotos restauradas
 
 - DAG 158 (`0.69.62-dev`) esta instalado en el SM-S908E con datos preservados.

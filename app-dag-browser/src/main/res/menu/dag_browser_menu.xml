@@ -25,19 +25,12 @@
         android:icon="@drawable/ic_dag_close"
         android:title="@string/close_tab" />
     <item
-        android:id="@+id/menu_downloads"
-        android:icon="@drawable/ic_dag_download"
-        android:title="@string/downloads" />
-    <item
         android:id="@+id/menu_more"
         android:title="@string/more_options">
         <menu>
             <item
                 android:id="@+id/menu_default_browser"
                 android:title="@string/set_default_browser" />
-            <item
-                android:id="@+id/menu_save_current_pdf"
-                android:title="@string/save_current_pdf" />
             <item
                 android:id="@+id/menu_clear_cache"
                 android:title="@string/clear_cache" />

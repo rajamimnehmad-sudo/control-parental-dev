@@ -44,8 +44,9 @@ El contrato detallado esta en
 - Redirecciones de Google vuelven a exigir SafeSearch.
 - Nuevas ventanas permanecen dentro de sesiones DAG controladas.
 - DAG usa el rol oficial de navegador Android; no puede asignarselo en silencio.
-- Historial, favoritos, pestañas, miniaturas seguras y PDF tienen contratos
-  locales separados.
+- Historial, favoritos, pestañas y miniaturas seguras tienen contratos locales
+  separados. Descargas y PDF fueron retirados en DAG 159 por decision de
+  producto.
 
 ## Presentacion visual
 

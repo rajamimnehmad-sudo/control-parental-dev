@@ -19,15 +19,4 @@ class DagNewSessionContractTest {
         assertFalse(delegate.contains("openNewTabForUri(uri)"))
         assertFalse(delegate.contains("newTab.session.loadUri"))
     }
-
-    @Test
-    fun `inline PDF stays hidden but remains available to the guarded saver`() {
-        val activity =
-            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
-
-        assertContains(activity, "session.isPdfJs()")
-        assertContains(activity, "TabDisplayState.PdfReady")
-        assertContains(activity, "if (!tab.session.isOpen || !tab.pdfDocumentReady)")
-        assertContains(activity, "tab.session.pdfFileSaver.save()")
-    }
 }
