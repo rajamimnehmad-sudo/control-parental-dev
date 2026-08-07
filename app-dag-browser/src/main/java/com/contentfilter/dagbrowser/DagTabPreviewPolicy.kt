@@ -11,19 +11,23 @@ internal object DagTabPreviewPolicy {
         sessionOpen: Boolean,
         pageVisible: Boolean,
         eligibilityConfirmed: Boolean,
+        restricted: Boolean,
     ): Boolean =
         viewVisible &&
             sessionOpen &&
             pageVisible &&
-            eligibilityConfirmed
+            eligibilityConfirmed &&
+            !restricted
 
     fun acceptsResult(
         request: DagTabPreviewRequest,
         currentTabId: Long,
         currentRevision: Long,
         pageVisible: Boolean,
+        restricted: Boolean,
     ): Boolean =
         pageVisible &&
+            !restricted &&
             request.tabId == currentTabId &&
             request.revision == currentRevision
 }

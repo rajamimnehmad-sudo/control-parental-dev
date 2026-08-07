@@ -12,12 +12,14 @@ class DagTabPreviewPolicyTest {
         assertFalse(canCapture(sessionOpen = false))
         assertFalse(canCapture(pageVisible = false))
         assertFalse(canCapture(eligibilityConfirmed = false))
+        assertFalse(canCapture(restricted = true))
         assertTrue(
             DagTabPreviewPolicy.canCapture(
                 viewVisible = true,
                 sessionOpen = true,
                 pageVisible = true,
                 eligibilityConfirmed = true,
+                restricted = false,
             ),
         )
     }
@@ -32,6 +34,7 @@ class DagTabPreviewPolicyTest {
                 currentTabId = 4,
                 currentRevision = 9,
                 pageVisible = true,
+                restricted = false,
             ),
         )
     }
@@ -46,6 +49,7 @@ class DagTabPreviewPolicyTest {
                 currentTabId = 5,
                 currentRevision = 8,
                 pageVisible = true,
+                restricted = false,
             ),
         )
     }
@@ -60,6 +64,7 @@ class DagTabPreviewPolicyTest {
                 currentTabId = 4,
                 currentRevision = 8,
                 pageVisible = false,
+                restricted = false,
             ),
         )
     }
@@ -74,6 +79,22 @@ class DagTabPreviewPolicyTest {
                 currentTabId = 4,
                 currentRevision = 8,
                 pageVisible = true,
+                restricted = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `late result is rejected when page becomes restricted`() {
+        val request = DagTabPreviewRequest(tabId = 4, revision = 8)
+
+        assertFalse(
+            DagTabPreviewPolicy.acceptsResult(
+                request = request,
+                currentTabId = 4,
+                currentRevision = 8,
+                pageVisible = true,
+                restricted = true,
             ),
         )
     }
@@ -83,10 +104,12 @@ class DagTabPreviewPolicyTest {
         sessionOpen: Boolean = true,
         pageVisible: Boolean = true,
         eligibilityConfirmed: Boolean = true,
+        restricted: Boolean = false,
     ) = DagTabPreviewPolicy.canCapture(
         viewVisible = viewVisible,
         sessionOpen = sessionOpen,
         pageVisible = pageVisible,
         eligibilityConfirmed = eligibilityConfirmed,
+        restricted = restricted,
     )
 }

@@ -113,10 +113,12 @@ Flujo de una entrada:
 - DAG 96 es el canary DEV publicado: activa R3 híbrida, conserva
   R1 como fallback de apertura y agrega actualización manual desde el propio
   DAG usando el mismo manifiesto de App Usuario. Production permanece intacta.
-- DAG 107 es el punto seguro local confirmado: conserva el navegador de DAG 95,
-  R3 con fallback R1 y el retiro del autoactualizador. Agrega una captura
-  efimera durante navegaciones y una terminacion segura alternativa cuando
-  Gecko omite el primer dibujo. Esta instalado en SM-S908E, sin publicacion.
+- DAG 176 (`0.69.80-dev`, extension `1.90.0`) es el punto seguro local vigente,
+  aceptado por el propietario e instalado en SM-S908E sin publicacion. Conserva
+  R3.1 con fallback R1, modelo, umbral y politica; los experimentos 171, 173 y
+  175 fueron retirados. La pagina anterior permanece como captura estatica
+  durante una navegacion protegida; no se agrega por ahora una segunda sesion
+  Gecko solo para desplazarla. DAG 107 queda como hito historico anterior.
 - DAG 95 es la base rollback anterior de DAG 94: restaura el comportamiento
   comprobado de DAG 92 con `versionCode` superior para permitir la actualizacion
   Android. Permanece instalado en SM-A235M, pero el manifiesto DEV ya anuncia

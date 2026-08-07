@@ -6,6 +6,39 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## Baseline seguro local: DAG Browser 176
+
+- DAG 176 (`0.69.80-dev`) queda aceptado por el propietario como nuevo punto
+  de partida local. Esta instalado en el SM-S908E con datos preservados; la
+  extension integrada es `1.90.0`.
+- Conserva GloshIA Visual R3.1, umbral `0,40`, politica visual, dos workers de
+  analisis, ONNX intra-op 2 / inter-op 1 y `final_sealed` cerrado. No contiene
+  excepciones por sitio, URL, dominio o dispositivo.
+- El lote acota el trabajo tardio de imagenes pendientes, reinicia correctamente
+  elementos `img` reutilizados, conserva el placeholder gris bloqueado con cache
+  acotada, limita por bytes la cache JS de reemplazos, evita copias redundantes
+  del frame de navegacion, protege miniaturas restringidas y retira scroll/pull
+  refresh muertos.
+- La deteccion inicial y dinamica de patrocinados permanece antes del reveal.
+  El escaneo inicial sigue esperando `DOMContentLoaded`: adelantarlo en DAG 175
+  redujo una espera pero dejo fotos ocultas/negras y fue retirado por completo.
+- Tambien se retiraron completamente el R8 experimental de DAG 171 y la
+  transicion interactiva parcial de DAG 173; ninguno forma parte del baseline.
+- Diagnostico Google `Todo -> Imagenes` en DAG 174: fotos visibles a 971 ms,
+  pagina protegida visible a 2.343 ms y `onPageStop` a 2.730 ms; 3/23 cuadros
+  tardios y 12 eventos de alta latencia de entrada. La pausa corresponde a la
+  captura segura de la pagina anterior, no a saturacion principal de CPU o
+  GloshIA. Por decision de producto no se agrega por ahora una segunda sesion
+  Gecko solo para desplazar esa pagina anterior durante la transicion.
+- El propietario confirmo DAG 176 como una version general muy buena. Este es
+  un checkpoint local aceptado, no una certificacion de publicacion: antes de
+  publicar sigue pendiente repetir fixture y matriz Mimo/Cheeky/Fravega.
+- Validacion automatica: JS 23/23, unitarios, Ktlint, Lint y APK DEV correctos.
+  APK SHA-256:
+  `022f191baa272d12b51487fc55e5d05e34da7e4a7ec62868410a6ff620c015f5`.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v176-safe-baseline-sm-s908e-2026-08-07.md`.
+
 ## DAG Browser 169: restauracion determinista de imagenes tras cambios de cache
 
 - DAG 169 (`0.69.73-dev`) esta instalado en el SM-S908E con datos preservados;

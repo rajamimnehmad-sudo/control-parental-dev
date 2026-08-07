@@ -21,7 +21,9 @@ class DagBrowserManifestContractTest {
     fun `page scrolling is not intercepted by pull refresh`() {
         val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
 
-        assertContains(activity, "swipeRefresh.isEnabled = false")
+        assertFalse(activity.contains("scrollDelegate"))
+        assertFalse(activity.contains("contentScrollY"))
+        assertFalse(activity.contains("SwipeRefreshLayout"))
         assertContains(activity, "R.id.menu_reload")
         assertFalse(activity.contains("setOnRefreshListener"))
     }
@@ -36,6 +38,7 @@ class DagBrowserManifestContractTest {
         assertContains(activity, "R.id.menu_reload")
         assertContains(activity, "keepCurrentPageVisible = tab.displayState == TabDisplayState.Visible")
         assertContains(activity, "tab.keepCurrentPageVisibleDuringReload &&")
+        assertContains(activity, "if (tab === activeTab && !keepCurrentPageVisible)")
     }
 
     @Test
@@ -47,6 +50,20 @@ class DagBrowserManifestContractTest {
         assertContains(runtime, ".setParallelMarkingEnabled(true)")
         assertFalse(runtime.contains("COLOR_SCHEME_DARK"))
         assertFalse(runtime.contains("COLOR_SCHEME_SYSTEM"))
+    }
+
+    @Test
+    fun `model initialization leaves the main thread before protected tabs restore`() {
+        val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
+        val initialization =
+            activity
+                .substringAfter("private fun installProtectionExtension")
+                .substringBefore("private fun clearInterceptedMediaCacheAfterUpdate")
+
+        assertContains(initialization, "analyzerInitializationExecutor.execute")
+        assertContains(initialization, "imageAnalyzer = analyzer")
+        assertContains(initialization, "clearInterceptedMediaCacheAfterUpdate()")
+        assertContains(activity, "if (this::imageAnalyzer.isInitialized)")
     }
 
     @Test

@@ -22,7 +22,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"1.86.0\"")
+        assertContains(manifest, "\"version\": \"1.90.0\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
@@ -77,6 +77,9 @@ class MediaBarrierContractTest {
             "MediaAnalysisThreads = 2",
         )
         assertContains(background, "MAX_QUEUED_ANALYSES = 48")
+        assertContains(background, "MAX_CACHED_REPLACEMENT_BYTES = 2 * 1024 * 1024")
+        assertContains(background, "cachedReplacementBytes")
+        assertContains(background, "const cachedDecision")
         assertContains(background, "takeNextAnalysis")
         assertContains(background, "priorityRank")
         assertContains(background, "task.details.url === url")
@@ -112,9 +115,17 @@ class MediaBarrierContractTest {
             barrier,
             "IMAGE_RECONCILIATION_DELAYS_MS = [100, 400, 1000, 2000, 4000, 6000, 8000, 12000]",
         )
-        assertContains(barrier, "setTimeout(reconcileCompleteImages, delay)")
+        assertContains(barrier, "const unsettledImages = new Set()")
+        assertContains(barrier, "for (const image of unsettledImages)")
+        assertContains(barrier, "priorityObserver?.unobserve(image)")
+        assertContains(
+            barrier,
+            "reconcileCompleteImages(index === IMAGE_RECONCILIATION_DELAYS_MS.length - 1)",
+        )
         assertContains(barrier, "!(image.naturalWidth === 1 && image.naturalHeight === 1)")
         assertContains(barrier, "attributeFilter: [\"src\", \"srcset\", \"sizes\"]")
+        assertContains(barrier, "priorityObserver?.unobserve(record.target)")
+        assertContains(barrier, "resetImage(record.target)")
         assertContains(barrier, "imageSource(image) === source")
         assertContains(barrier, "image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)")
         assertContains(barrier, "hasInlineImageSource(record.target)")
@@ -125,6 +136,7 @@ class MediaBarrierContractTest {
         assertContains(barrier, "image-priority")
         assertContains(barrier, "MAX_PRIORITY_SOURCES = 256")
         assertContains(ads, "completeInitialScan")
+        assertContains(ads, "document.addEventListener(\"DOMContentLoaded\", completeInitialScan")
         assertContains(ads, "data-glosh-dag-ads-initial-ready")
         assertContains(barrier, "document-sanitized-ready")
         assertContains(barrier, "maybeReportInitialDocumentReady")
@@ -157,9 +169,13 @@ class MediaBarrierContractTest {
         assertContains(ads, "SEARCH_QUERY_KEYS")
         assertContains(ads, "isSearchResultsDocument")
         assertContains(ads, "NodeFilter.SHOW_TEXT")
-        assertFalse(ads.contains("MutationObserver"))
+        assertContains(ads, "observeDynamicSponsoredResults")
+        assertContains(ads, "new MutationObserver")
+        assertContains(ads, "childList: true")
+        assertContains(ads, "characterData: true")
+        assertFalse(ads.contains("attributes: true"))
         assertFalse(ads.contains("querySelectorAll?.(\"span,div\")"))
-        assertFalse(css.contains("[data-ad-slot]"))
+        assertContains(css, "[data-ad-slot]")
         assertContains(css, "glosh-dag-page-ad-hidden")
     }
 

@@ -28,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 169
-        versionName = "0.69.73"
+        versionCode = 176
+        versionName = "0.69.80"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -101,7 +101,6 @@ ktlint {
 
 dependencies {
     implementation("androidx.recyclerview:recyclerview:1.4.0")
-    implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.0")
     implementation("org.mozilla.geckoview:geckoview-arm64-v8a:153.0.20260715202819")
 

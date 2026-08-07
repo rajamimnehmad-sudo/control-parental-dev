@@ -41,6 +41,7 @@
   let initialDocumentReady = false;
   let initialDocumentReadyReported = false;
   const pendingImages = new WeakMap();
+  const unsettledImages = new Set();
   const inlineDecisions = new Map();
   const priorityBySource = new Map();
   try {
@@ -101,6 +102,13 @@
     if (pending?.timeout !== undefined) clearTimeout(pending.timeout);
     pendingImages.delete(image);
     image.removeAttribute(STABLE_IMAGE_ATTRIBUTE);
+    unsettledImages.add(image);
+  };
+
+  const markImageStable = (image) => {
+    image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
+    unsettledImages.delete(image);
+    priorityObserver?.unobserve(image);
   };
 
   const inlineImageIsBounded = (image, source) => {
@@ -141,7 +149,7 @@
         inlineDataSource(image) !== source
       ) return;
       pendingImages.delete(image);
-      if (result?.action === "allow") image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
+      if (result?.action === "allow") markImageStable(image);
     });
   };
 
@@ -159,7 +167,11 @@
     : null;
 
   const observeImage = (image) => {
-    if (image instanceof HTMLImageElement) {
+    if (
+      image instanceof HTMLImageElement &&
+      !image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)
+    ) {
+      unsettledImages.add(image);
       priorityObserver?.observe(image);
     }
   };
@@ -186,7 +198,7 @@
         !(image.naturalWidth === 1 && image.naturalHeight === 1) &&
         imageSource(image) === source
       ) {
-        image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
+        markImageStable(image);
       }
     }, IMAGE_STABILITY_MS);
     pendingImages.set(image, { source, timeout });
@@ -212,10 +224,10 @@
     for (const record of records) {
       if (record.type === "attributes" && record.target instanceof HTMLImageElement) {
         priorityObserver?.unobserve(record.target);
+        resetImage(record.target);
         observeImage(record.target);
         if (hasInlineImageSource(record.target)) {
           if (record.target.complete) inspectInlineImage(record.target);
-          else resetImage(record.target);
           continue;
         }
         if (record.target.complete) stabilizeImage(record.target);
@@ -262,13 +274,25 @@
     initialDocumentReady = true;
     maybeReportInitialDocumentReady();
   };
-  const reconcileCompleteImages = () => {
-    for (const image of document.images) {
-      if (image.complete && !image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) stabilizeImage(image);
+  const reconcileCompleteImages = (finalPass) => {
+    for (const image of unsettledImages) {
+      if (!image.isConnected || image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) {
+        unsettledImages.delete(image);
+        priorityObserver?.unobserve(image);
+        continue;
+      }
+      if (image.complete) stabilizeImage(image);
+      if (finalPass && unsettledImages.has(image)) {
+        unsettledImages.delete(image);
+        priorityObserver?.unobserve(image);
+      }
     }
   };
-  for (const delay of IMAGE_RECONCILIATION_DELAYS_MS) {
-    setTimeout(reconcileCompleteImages, delay);
+  for (const [index, delay] of IMAGE_RECONCILIATION_DELAYS_MS.entries()) {
+    setTimeout(
+      () => reconcileCompleteImages(index === IMAGE_RECONCILIATION_DELAYS_MS.length - 1),
+      delay,
+    );
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", completeDocument, { once: true });

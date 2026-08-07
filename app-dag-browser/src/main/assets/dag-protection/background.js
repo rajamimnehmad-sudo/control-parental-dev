@@ -26,6 +26,7 @@ const MAX_ACTIVE_STREAMS = 32;
 const MAX_QUEUED_ANALYSES = 48;
 const MAX_NATIVE_IN_FLIGHT = 2;
 const MAX_CACHED_DECISIONS = 512;
+const MAX_CACHED_REPLACEMENT_BYTES = 2 * 1024 * 1024;
 const MAX_REPLACEMENT_BYTES = 256 * 1024;
 const MAX_INLINE_IMAGE_BYTES = 48 * 1024;
 const MAX_INLINE_DATA_URL_LENGTH = 66 * 1024;
@@ -42,6 +43,7 @@ let sequence = 0;
 let activeStreams = 0;
 let capturedBytes = 0;
 let nativeInFlight = 0;
+let cachedReplacementBytes = 0;
 let viewportQuietTimer = null;
 const pendingNative = new Map();
 const pendingDecisions = new Map();
@@ -108,10 +110,32 @@ const contentHash = async (bytes) => {
 };
 
 const rememberDecision = (hash, decision) => {
-  if (!decisionCache.has(hash) && decisionCache.size >= MAX_CACHED_DECISIONS) {
-    decisionCache.delete(decisionCache.keys().next().value);
+  const replacementBytes = decision.replacement?.byteLength || 0;
+  if (replacementBytes > MAX_CACHED_REPLACEMENT_BYTES) return;
+  const existing = decisionCache.get(hash);
+  if (existing !== undefined) {
+    cachedReplacementBytes -= existing.replacement?.byteLength || 0;
+    decisionCache.delete(hash);
+  }
+  while (
+    decisionCache.size >= MAX_CACHED_DECISIONS ||
+    cachedReplacementBytes + replacementBytes > MAX_CACHED_REPLACEMENT_BYTES
+  ) {
+    const oldestHash = decisionCache.keys().next().value;
+    const oldest = decisionCache.get(oldestHash);
+    cachedReplacementBytes -= oldest?.replacement?.byteLength || 0;
+    decisionCache.delete(oldestHash);
   }
   decisionCache.set(hash, decision);
+  cachedReplacementBytes += replacementBytes;
+};
+
+const cachedDecision = (hash) => {
+  const decision = decisionCache.get(hash);
+  if (decision === undefined) return undefined;
+  decisionCache.delete(hash);
+  decisionCache.set(hash, decision);
+  return decision;
 };
 
 const normalizePriority = (value) =>
@@ -265,7 +289,7 @@ const drainAnalysisQueue = () => {
       let decision = { action: "block", replacement: null };
       try {
         const hash = await contentHash(task.bytes);
-        const cached = decisionCache.get(hash);
+        const cached = cachedDecision(hash);
         if (cached !== undefined) {
           decision = cached;
         } else {

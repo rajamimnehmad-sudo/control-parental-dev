@@ -77,6 +77,40 @@
     scanExactSponsoredLabels(root);
   };
 
+  const observeDynamicSponsoredResults = () => {
+    if (isVideoSite() || !isSearchResultsDocument()) return;
+    const observer = new MutationObserver((records) => {
+      for (const record of records) {
+        if (record.type === "characterData") {
+          if (SPONSORED_LABEL.test(record.target.nodeValue?.trim() || "")) {
+            const result = record.target.parentElement?.closest?.(
+              "[data-snhf], [data-rpos], article, li",
+            );
+            if (result instanceof HTMLElement) result.setAttribute(SPONSORED_ATTRIBUTE, "true");
+          }
+          continue;
+        }
+        for (const node of record.addedNodes) {
+          if (node instanceof Element) {
+            scanExactSponsoredLabels(node);
+          } else if (SPONSORED_LABEL.test(node.nodeValue?.trim() || "")) {
+            const result = node.parentElement?.closest?.(
+              "[data-snhf], [data-rpos], article, li",
+            );
+            if (result instanceof HTMLElement) result.setAttribute(SPONSORED_ATTRIBUTE, "true");
+          }
+        }
+      }
+    });
+    observer.observe(document, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+    });
+  };
+
+  observeDynamicSponsoredResults();
+
   const completeInitialScan = () => {
     scan(document);
     document.documentElement?.setAttribute(INITIAL_SCAN_READY_ATTRIBUTE, "true");

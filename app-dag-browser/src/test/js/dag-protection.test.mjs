@@ -519,9 +519,17 @@ test("first paint closes inline and changing image sources before stable reveal"
     barrier,
     /IMAGE_RECONCILIATION_DELAYS_MS = \[100, 400, 1000, 2000, 4000, 6000, 8000, 12000\]/u,
   );
-  assert.match(barrier, /setTimeout\(reconcileCompleteImages, delay\)/u);
+  assert.match(barrier, /const unsettledImages = new Set\(\)/u);
+  assert.match(barrier, /for \(const image of unsettledImages\)/u);
+  assert.match(barrier, /priorityObserver\?\.unobserve\(image\)/u);
+  assert.match(barrier, /reconcileCompleteImages\(index === IMAGE_RECONCILIATION_DELAYS_MS\.length - 1\)/u);
+  assert.doesNotMatch(barrier, /const reconcileCompleteImages = \(\) => \{\s*for \(const image of document\.images\)/u);
   assert.match(barrier, /!\(image\.naturalWidth === 1 && image\.naturalHeight === 1\)/u);
   assert.match(barrier, /attributeFilter: \["src", "srcset", "sizes"\]/u);
+  assert.match(
+    barrier,
+    /priorityObserver\?\.unobserve\(record\.target\);\s*resetImage\(record\.target\);\s*observeImage\(record\.target\)/u,
+  );
   assert.match(barrier, /imageSource\(image\) === source/u);
   assert.match(barrier, /image\.hasAttribute\(STABLE_IMAGE_ATTRIBUTE\)/u);
   assert.match(barrier, /hasInlineImageSource\(record\.target\)/u);
@@ -547,15 +555,77 @@ test("active extension has bounded work and no site or device exceptions", async
   assert.match(background, /MAX_CAPTURED_BYTES = 8 \* 1024 \* 1024/u);
   assert.match(background, /MAX_NATIVE_IN_FLIGHT = 2/u);
   assert.match(background, /MAX_QUEUED_ANALYSES = 48/u);
+  assert.match(background, /MAX_CACHED_REPLACEMENT_BYTES = 2 \* 1024 \* 1024/u);
+  assert.match(background, /cachedReplacementBytes/u);
+  assert.match(background, /const cachedDecision/u);
   assert.match(background, /takeNextAnalysis/u);
   assert.match(background, /MAX_INLINE_IMAGE_BYTES = 48 \* 1024/u);
   assert.match(background, /decodeInlineRaster/u);
   assert.match(ads, /NodeFilter\.SHOW_TEXT/u);
   assert.match(ads, /SEARCH_QUERY_KEYS/u);
   assert.match(ads, /isSearchResultsDocument/u);
-  assert.doesNotMatch(ads, /MutationObserver/u);
+  assert.match(ads, /observeDynamicSponsoredResults/u);
+  assert.match(ads, /new MutationObserver/u);
+  assert.match(ads, /childList: true/u);
+  assert.match(ads, /characterData: true/u);
+  assert.doesNotMatch(ads, /attributes: true/u);
   assert.doesNotMatch(ads, /querySelectorAll\?\.\("span,div"\)/u);
   assert.doesNotMatch(background, /cheeky|mimo|fravega|sm-a235|sm-s908/iu);
+});
+
+test("late sponsored search result is hidden before the next paint without an attribute observer", async () => {
+  let mutationCallback = null;
+  let observerOptions = null;
+  class Element {}
+  class HTMLElement extends Element {
+    constructor() {
+      super();
+      this.attributes = new Map();
+    }
+    setAttribute(name, value) {
+      this.attributes.set(name, value);
+    }
+  }
+  class MutationObserver {
+    constructor(callback) {
+      mutationCallback = callback;
+    }
+    observe(_target, options) {
+      observerOptions = options;
+    }
+  }
+  const result = new HTMLElement();
+  const label = new HTMLElement();
+  label.closest = () => result;
+  const sponsoredText = { nodeValue: "Patrocinado", parentElement: label };
+  const document = {
+    readyState: "loading",
+    documentElement: null,
+    addEventListener() {},
+  };
+  vm.runInNewContext(await readAsset("ads.js"), {
+    CustomEvent,
+    Element,
+    HTMLElement,
+    MutationObserver,
+    NodeFilter: { SHOW_TEXT: 4 },
+    URLSearchParams,
+    dispatchEvent() {},
+    document,
+    location: {
+      hostname: "search.example.test",
+      pathname: "/search",
+      search: "?q=zapatos",
+    },
+  }, { filename: "ads.js" });
+
+  assert.ok(mutationCallback);
+  assert.equal(observerOptions.subtree, true);
+  assert.equal(observerOptions.childList, true);
+  assert.equal(observerOptions.characterData, true);
+  assert.equal("attributes" in observerOptions, false);
+  mutationCallback([{ type: "childList", addedNodes: [sponsoredText] }]);
+  assert.equal(result.attributes.get("data-glosh-dag-sponsored-result"), "true");
 });
 
 test("scheduler guard yields sustained signals without changing normal messages", async () => {

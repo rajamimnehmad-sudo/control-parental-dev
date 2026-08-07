@@ -8,6 +8,7 @@ import android.graphics.Paint
 import android.graphics.Shader
 import java.io.ByteArrayOutputStream
 import java.util.Base64
+import java.util.LinkedHashMap
 import kotlin.math.max
 import kotlin.math.roundToInt
 
@@ -37,39 +38,52 @@ internal object DagPlaceholderSizePlanner {
 }
 
 internal object DagBlockedImagePlaceholder {
+    private val cache =
+        object : LinkedHashMap<DagPlaceholderSize, String>(MaximumCachedSizes, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<DagPlaceholderSize, String>?): Boolean =
+                size > MaximumCachedSizes
+        }
+
     fun renderBase64(
         sourceWidth: Int?,
         sourceHeight: Int?,
-    ): String? =
-        runCatching {
-            val size = DagPlaceholderSizePlanner.plan(sourceWidth, sourceHeight)
-            val bitmap = Bitmap.createBitmap(size.width, size.height, Bitmap.Config.ARGB_8888)
-            try {
-                val canvas = Canvas(bitmap)
-                val background =
-                    Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                        shader =
-                            LinearGradient(
-                                0f,
-                                0f,
-                                size.width.toFloat(),
-                                size.height.toFloat(),
-                                intArrayOf(
-                                    Color.rgb(225, 233, 237),
-                                    Color.rgb(188, 203, 211),
-                                    Color.rgb(235, 240, 242),
-                                ),
-                                null,
-                                Shader.TileMode.CLAMP,
-                            )
+    ): String? {
+        val size = DagPlaceholderSizePlanner.plan(sourceWidth, sourceHeight)
+        synchronized(cache) { cache[size] }?.let { return it }
+        val rendered =
+            runCatching {
+                val bitmap = Bitmap.createBitmap(size.width, size.height, Bitmap.Config.ARGB_8888)
+                try {
+                    val canvas = Canvas(bitmap)
+                    val background =
+                        Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                            shader =
+                                LinearGradient(
+                                    0f,
+                                    0f,
+                                    size.width.toFloat(),
+                                    size.height.toFloat(),
+                                    intArrayOf(
+                                        Color.rgb(225, 233, 237),
+                                        Color.rgb(188, 203, 211),
+                                        Color.rgb(235, 240, 242),
+                                    ),
+                                    null,
+                                    Shader.TileMode.CLAMP,
+                                )
+                        }
+                    canvas.drawRect(0f, 0f, size.width.toFloat(), size.height.toFloat(), background)
+                    ByteArrayOutputStream().use { output ->
+                        check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
+                        Base64.getEncoder().encodeToString(output.toByteArray())
                     }
-                canvas.drawRect(0f, 0f, size.width.toFloat(), size.height.toFloat(), background)
-                ByteArrayOutputStream().use { output ->
-                    check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, output))
-                    Base64.getEncoder().encodeToString(output.toByteArray())
+                } finally {
+                    bitmap.recycle()
                 }
-            } finally {
-                bitmap.recycle()
-            }
-        }.getOrNull()
+            }.getOrNull() ?: return null
+        synchronized(cache) { cache[size] = rendered }
+        return rendered
+    }
+
+    private const val MaximumCachedSizes = 32
 }

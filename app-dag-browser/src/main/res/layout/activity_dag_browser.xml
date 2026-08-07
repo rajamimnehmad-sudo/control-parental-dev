@@ -121,16 +121,12 @@
             android:progressTint="@color/dag_blue"
             android:visibility="gone" />
 
-        <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
-            android:id="@+id/swipe_refresh"
+        <FrameLayout
+            android:id="@+id/browser_content"
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:background="@color/dag_surface"
             android:layout_weight="1">
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent">
 
         <org.mozilla.geckoview.GeckoView
             android:id="@+id/gecko_view"
@@ -217,7 +213,6 @@
             </LinearLayout>
         </FrameLayout>
         </FrameLayout>
-        </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
     </LinearLayout>
 
     <com.contentfilter.dagbrowser.DagTabSwitcherView

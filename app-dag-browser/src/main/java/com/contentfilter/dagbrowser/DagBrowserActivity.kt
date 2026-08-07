@@ -38,7 +38,6 @@ import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import org.json.JSONObject
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
@@ -81,7 +80,6 @@ class DagBrowserActivity : Activity() {
     private lateinit var safetyTitle: TextView
     private lateinit var safetyDetail: TextView
     private lateinit var tabSwitcher: DagTabSwitcherView
-    private lateinit var swipeRefresh: SwipeRefreshLayout
     private lateinit var tabPersistence: DagTabPersistence
     private lateinit var tabThumbnailStore: DagTabThumbnailStore
     private lateinit var historyPersistence: DagHistoryPersistence
@@ -92,6 +90,7 @@ class DagBrowserActivity : Activity() {
     private val handler = Handler(Looper.getMainLooper())
     private val performanceTracker = DagPerformanceTracker(SystemClock::elapsedRealtime)
     private val tabs = mutableListOf<BrowserTab>()
+    private val analyzerInitializationExecutor = Executors.newSingleThreadExecutor()
     private val thumbnailExecutor = Executors.newSingleThreadExecutor()
     private val mediaAnalysisSequence = AtomicLong(0L)
     private val mediaAnalysisThreadSequence = AtomicLong(0L)
@@ -134,7 +133,6 @@ class DagBrowserActivity : Activity() {
     private var loadingShimmerAnimator: ObjectAnimator? = null
     private var navigationFrameBitmap: Bitmap? = null
     private var navigationFrameTabId: Long? = null
-    private var navigationFrameRevision: Long = -1L
     private var tabThumbnailResidencyRequested = false
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
@@ -275,18 +273,6 @@ class DagBrowserActivity : Activity() {
         tabThumbnailStore = DagTabThumbnailStore(applicationContext)
         historyPersistence = DagHistoryPersistence(applicationContext)
         favoritesPersistence = DagFavoritesPersistence(applicationContext)
-        imageAnalyzer =
-            if (BuildConfig.GLOSHIA_VISUAL_ENABLED) {
-                DagLifecycleImageAnalyzer(
-                    DagOnDeviceImageAnalyzer.create(applicationContext).also {
-                        if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
-                            Log.i("DagLabHarness", "analyzer_ready")
-                        }
-                    },
-                )
-            } else {
-                UnavailableDagImageAnalyzer
-            }
         bindViews()
         configureControls()
         registerModernBackCallback()
@@ -342,7 +328,6 @@ class DagBrowserActivity : Activity() {
         safetyTitle = findViewById(R.id.safety_title)
         safetyDetail = findViewById(R.id.safety_detail)
         tabSwitcher = findViewById(R.id.tab_switcher)
-        swipeRefresh = findViewById(R.id.swipe_refresh)
     }
 
     private fun configureControls() {
@@ -352,10 +337,6 @@ class DagBrowserActivity : Activity() {
         }
         newPageButton.setOnClickListener { createTab(switchToTab = true) }
         securityButton.setOnClickListener { showSecurityDetails() }
-        // Reload remains available from the browser menu. Pull-to-refresh is
-        // intentionally disabled because it competes with page scrolling at
-        // the top edge, especially on image-heavy storefronts.
-        swipeRefresh.isEnabled = false
         addressInput.setOnEditorActionListener { _, actionId, event ->
             val submitted =
                 actionId == EditorInfo.IME_ACTION_GO ||
@@ -525,10 +506,9 @@ class DagBrowserActivity : Activity() {
                     val keepCurrentPageVisible =
                         tab.keepCurrentPageVisibleDuringReload &&
                             DagLoadTransitionPolicy.targetsSameDocument(tab.url, url)
-                    if (tab === activeTab) showNavigationSnapshot(tab)
-                    swipeRefresh.isRefreshing = false
-                    tab.navigationRevision += 1
-                    tab.contentScrollY = 0
+                    if (tab === activeTab && !keepCurrentPageVisible) {
+                        showNavigationSnapshot(tab)
+                    }
                     if (tab.displayState != TabDisplayState.Loading) {
                         markTabThumbnailStale(tab)
                     }
@@ -564,7 +544,6 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     success: Boolean,
                 ) {
-                    swipeRefresh.isRefreshing = false
                     finishPageLoadProgress(tab)
                     if (tab === activeTab) {
                         recordPerformanceMetric(
@@ -578,16 +557,6 @@ class DagBrowserActivity : Activity() {
                         showClosedPage(tab)
                     }
                     schedulePersistTabs()
-                }
-            }
-        tab.session.scrollDelegate =
-            object : GeckoSession.ScrollDelegate {
-                override fun onScrollChanged(
-                    session: GeckoSession,
-                    scrollX: Int,
-                    scrollY: Int,
-                ) {
-                    tab.contentScrollY = scrollY.coerceAtLeast(0)
                 }
             }
     }
@@ -806,8 +775,30 @@ class DagBrowserActivity : Activity() {
             detail = "",
             spinning = true,
         )
+        analyzerInitializationExecutor.execute {
+            val analyzer =
+                if (BuildConfig.GLOSHIA_VISUAL_ENABLED) {
+                    DagLifecycleImageAnalyzer(
+                        DagOnDeviceImageAnalyzer.create(applicationContext).also {
+                            if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
+                                Log.i("DagLabHarness", "analyzer_ready")
+                            }
+                        },
+                    )
+                } else {
+                    UnavailableDagImageAnalyzer
+                }
+            handler.post {
+                if (isFinishing || isDestroyed || !mediaAnalysisAccepting.get()) {
+                    (analyzer as? AutoCloseable)?.close()
+                } else {
+                    imageAnalyzer = analyzer
+                    clearInterceptedMediaCacheAfterUpdate()
+                }
+            }
+            analyzerInitializationExecutor.shutdown()
+        }
         runtime = DagGeckoRuntime.get(this)
-        clearInterceptedMediaCacheAfterUpdate()
     }
 
     private fun clearInterceptedMediaCacheAfterUpdate() {
@@ -964,21 +955,20 @@ class DagBrowserActivity : Activity() {
 
     private fun updateNavigationFrame(
         tab: BrowserTab,
-        source: Bitmap,
-    ) {
+        frame: Bitmap,
+    ): Boolean {
         if (
             tab !== activeTab ||
             tab.previewRestricted
         ) {
-            return
+            return false
         }
-        val frame = runCatching { source.copy(Bitmap.Config.ARGB_8888, false) }.getOrNull() ?: return
         val previous = navigationFrameBitmap
         navigationFrameBitmap = frame
         navigationFrameTabId = tab.id
-        navigationFrameRevision = tab.navigationRevision
         navigationSnapshot.setImageBitmap(frame)
         previous?.recycle()
+        return true
     }
 
     private fun releaseNavigationFrame() {
@@ -987,7 +977,6 @@ class DagBrowserActivity : Activity() {
         navigationFrameBitmap?.recycle()
         navigationFrameBitmap = null
         navigationFrameTabId = null
-        navigationFrameRevision = -1L
     }
 
     private fun beginProtectedLoad(
@@ -1228,11 +1217,10 @@ class DagBrowserActivity : Activity() {
             if (currentDecision.action == DagMediaAction.Block && currentDecision.replacementBytesBase64 == null) {
                 currentDecision.copy(
                     replacementBytesBase64 =
-                        currentDecision.replacementBytesBase64
-                            ?: DagBlockedImagePlaceholder.renderBase64(
-                                currentDecision.imageWidth,
-                                currentDecision.imageHeight,
-                            ),
+                        DagBlockedImagePlaceholder.renderBase64(
+                            currentDecision.imageWidth,
+                            currentDecision.imageHeight,
+                        ),
                 )
             } else {
                 currentDecision
@@ -1479,6 +1467,7 @@ class DagBrowserActivity : Activity() {
         if (tab === activeTab || !tab.session.isOpen) return
         cancelBarrierTimeout(tab)
         tab.waitingForBarrier = false
+        tab.keepCurrentPageVisibleDuringReload = false
         tab.canGoBack = false
         tab.needsRestore = tab.url != InitialBlankPage && restorableUrl(tab.url) != null
         tab.displayState = TabDisplayState.Ready
@@ -1762,11 +1751,11 @@ class DagBrowserActivity : Activity() {
                     bitmap.recycle()
                     return@accept
                 }
-                updateNavigationFrame(tab, bitmap)
+                val bitmapOwnedByNavigationFrame = updateNavigationFrame(tab, bitmap)
                 try {
                     thumbnailExecutor.execute {
                         val scaled = scaleThumbnail(bitmap)
-                        if (scaled !== bitmap) bitmap.recycle()
+                        if (!bitmapOwnedByNavigationFrame) bitmap.recycle()
                         val encoded =
                             if (tab.isPrivate) {
                                 null
@@ -1783,6 +1772,7 @@ class DagBrowserActivity : Activity() {
                                     currentTabId = tab.id,
                                     currentRevision = tab.previewRevision,
                                     pageVisible = tab.displayState == TabDisplayState.Visible,
+                                    restricted = tab.previewRestricted,
                                 )
                             ) {
                                 scaled.recycle()
@@ -1799,7 +1789,7 @@ class DagBrowserActivity : Activity() {
                         }
                     }
                 } catch (_: RejectedExecutionException) {
-                    bitmap.recycle()
+                    if (!bitmapOwnedByNavigationFrame) bitmap.recycle()
                 }
             },
             {
@@ -1820,6 +1810,7 @@ class DagBrowserActivity : Activity() {
             eligibilityConfirmed =
                 tab.previewDocumentToken != null &&
                     tab.previewEligibilityToken == tab.previewDocumentToken,
+            restricted = tab.previewRestricted,
         )
 
     private fun applyPreviewEligibility(
@@ -1844,7 +1835,9 @@ class DagBrowserActivity : Activity() {
                 "eligibility tab=${tab.id} restricted=${tab.previewRestricted}",
             )
         }
-        if (tab === activeTab) {
+        if (tab.previewRestricted) {
+            invalidateTabThumbnail(tab)
+        } else if (tab === activeTab) {
             captureActiveTabThumbnail()
         }
     }
@@ -1915,7 +1908,9 @@ class DagBrowserActivity : Activity() {
                 DagTabCapacityPolicy.ThumbnailWidth.toFloat() / source.width,
                 DagTabCapacityPolicy.ThumbnailHeight.toFloat() / source.height,
             )
-        if (scale >= 1f) return source
+        if (scale >= 1f) {
+            return source.copy(Bitmap.Config.ARGB_8888, false)
+        }
         return Bitmap.createScaledBitmap(
             source,
             (source.width * scale).toInt().coerceAtLeast(1),
@@ -2528,9 +2523,12 @@ class DagBrowserActivity : Activity() {
             }
         }
         protectionExtension = null
+        analyzerInitializationExecutor.shutdownNow()
         thumbnailExecutor.shutdownNow()
         mediaAnalysisExecutor.shutdownNow()
-        (imageAnalyzer as? AutoCloseable)?.close()
+        if (this::imageAnalyzer.isInitialized) {
+            (imageAnalyzer as? AutoCloseable)?.close()
+        }
         tabs.forEach { tab ->
             cancelBarrierTimeout(tab)
             setTabActivity(tab, active = false)
@@ -2577,10 +2575,8 @@ class DagBrowserActivity : Activity() {
         var previewEligibilityToken: String? = null,
         var previewRestricted: Boolean = true,
         var recovering: Boolean = false,
-        var navigationRevision: Long = 0,
         var isPrivate: Boolean = false,
         var thumbnailStale: Boolean = false,
-        var contentScrollY: Int = 0,
         var lastActivatedSequence: Long = 0,
         var loadProgress: Int = 0,
         val previewKey: String,
@@ -2620,7 +2616,6 @@ class DagBrowserActivity : Activity() {
         const val ThumbnailCaptureTimeoutMillis = 1_200L
         const val ThumbnailCaptureRetryDelayMillis = 120L
         const val ThumbnailCaptureRetries = 1
-        const val MaxDuplicateFileSuffix = 999
         val PreviewDocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
         const val EnabledControlAlpha = 1f
         const val DisabledControlAlpha = 0.45f

@@ -43,6 +43,14 @@ embed {
 }
 
 [data-glosh-dag-sponsored-result="true"],
-.glosh-dag-page-ad-hidden {
+.glosh-dag-page-ad-hidden,
+[data-ad],
+[data-ad-slot],
+[data-advertisement],
+[data-text-ad],
+[data-pla-slot],
+#tads,
+iframe[name^="google_ads_iframe"],
+[aria-label="Productos patrocinados"] {
   display: none !important;
 }
