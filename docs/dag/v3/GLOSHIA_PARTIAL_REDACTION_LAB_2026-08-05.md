@@ -34,11 +34,12 @@ cualquier uso real.
 - Version code: `111`.
 - Version name: `0.69.13-lab`.
 - Artefacto local: `app-dag-browser/build/outputs/apk/lab/debug/DagBrowser-lab-debug.apk`.
-- SHA-256: `c7741e504d400bee235531d8996eb2a236401ae7c9363552b255b2c47fd6a17d`.
+- SHA-256: `a6bef885002da151270690087da1bc9e6fb739411e15f4cbcf6bc2d81d67b586`.
 - Tamaño: aproximadamente `124 MB`.
 
 No instalar encima de DAG DEV: es otra aplicación por el sufijo `.lab`.
-La APK no fue publicada, subida ni instalada automáticamente.
+La APK fue instalada localmente en el S22 sólo para la prueba y quedó abierta;
+no fue publicada ni subida.
 
 ## Validación ejecutada
 
@@ -46,11 +47,16 @@ La APK no fue publicada, subida ni instalada automáticamente.
 - `testDevDebugUnitTest`: OK; la variante oficial conserva su flujo.
 - `ktlintCheck`: OK.
 - WebExtension `node --test src/test/js/dag-protection.test.mjs`: 17/17 OK.
-- Android instrumentado en S22 Ultra (`SM-S908E`, Android 16): 4 pruebas
-  ejecutadas, 2 escenarios opcionales omitidos, sin fallos; el modelo hizo
+- Android instrumentado en S22 Ultra (`SM-S908E`, Android 16): 6 pruebas
+  completadas, 2 escenarios opcionales omitidos, sin fallos; el modelo hizo
   22/22 inferencias con p50 `30,86 ms`, p95 `32,93 ms`, PSS `116.416 KiB`.
 - Test específico: una redacción entrega el reemplazo validado y los fallos
   permanecen bloqueados.
+- Reparación verificada en carga real: LAB ahora genera tres vistas regionales
+  también para fotos verticales y horizontales normales; antes sólo lo hacía
+  con proporciones de al menos 2:1. En el S22 se observó `action=redact` con un
+  reemplazo PNG y la captura mostró el panel de vidrio, mientras otras imágenes
+  permitidas siguieron visibles.
 
 ## Limitaciones conocidas
 

@@ -110,11 +110,12 @@ internal object DagRegionalCropPlanner {
     fun plan(
         sourceWidth: Int,
         sourceHeight: Int,
+        allowStandardAspect: Boolean = false,
     ): List<DagImageCropPlan> {
         if (sourceWidth <= 0 || sourceHeight <= 0) return emptyList()
         val longEdge = max(sourceWidth, sourceHeight)
         val shortEdge = min(sourceWidth, sourceHeight)
-        if (longEdge.toDouble() / shortEdge.toDouble() < MinAspectRatio) {
+        if (!allowStandardAspect && longEdge.toDouble() / shortEdge.toDouble() < MinAspectRatio) {
             return emptyList()
         }
         return if (sourceWidth >= sourceHeight) {
@@ -143,8 +144,9 @@ internal object DagRegionalCropPlanner {
     fun decodeSize(
         sourceWidth: Int,
         sourceHeight: Int,
+        allowStandardAspect: Boolean = false,
     ): Pair<Int, Int>? {
-        if (plan(sourceWidth, sourceHeight).isEmpty()) return null
+        if (plan(sourceWidth, sourceHeight, allowStandardAspect).isEmpty()) return null
         val scale =
             min(
                 1.0,
@@ -199,6 +201,7 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
         var decoded: Bitmap? = null
         val preparedImages = mutableListOf<DagPreparedImage>()
         var returnedPreparedImages = false
+        val allowStandardAspect = BuildConfig.GLOSHIA_LAB_FIXTURE
         return try {
             val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes).asReadOnlyBuffer())
             var expectedDecodeSize: Pair<Int, Int>? = null
@@ -218,7 +221,11 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
                                 DagMediaBytesPolicy.UnsafeDimensionsReason,
                             )
                     expectedDecodeSize =
-                        DagRegionalCropPlanner.decodeSize(size.width, size.height)
+                        DagRegionalCropPlanner.decodeSize(
+                            size.width,
+                            size.height,
+                            allowStandardAspect = allowStandardAspect,
+                        )
                             ?: Pair(fullImagePlan.contentWidth, fullImagePlan.contentHeight)
                     decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
                     decoder.setTargetColorSpace(ColorSpace.get(ColorSpace.Named.SRGB))
@@ -240,14 +247,18 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
             }
 
             preparedImages += sourceBitmap.toPreparedImage()
-            DagRegionalCropPlanner
-                .plan(sourceBitmap.width, sourceBitmap.height)
-                .forEach { crop -> preparedImages += sourceBitmap.toPreparedImage(crop) }
+            val regionalCropPlans =
+                DagRegionalCropPlanner.plan(
+                    sourceBitmap.width,
+                    sourceBitmap.height,
+                    allowStandardAspect = allowStandardAspect,
+                )
+            regionalCropPlans.forEach { crop -> preparedImages += sourceBitmap.toPreparedImage(crop) }
             DagImagePreprocessResult
                 .Ready(
                     image = preparedImages.first(),
                     regionalImages = preparedImages.drop(1),
-                    regionalCropPlans = DagRegionalCropPlanner.plan(sourceBitmap.width, sourceBitmap.height),
+                    regionalCropPlans = regionalCropPlans,
                 ).also {
                     returnedPreparedImages = true
                 }

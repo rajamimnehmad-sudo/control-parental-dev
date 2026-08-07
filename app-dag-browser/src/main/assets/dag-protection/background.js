@@ -21,7 +21,9 @@ const PROTOCOL_VERSION = 1;
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_CAPTURED_BYTES = 8 * 1024 * 1024;
 const MAX_ACTIVE_STREAMS = 32;
-const MAX_QUEUED_ANALYSES = 24;
+// Covers every bounded response stream plus the content-script inline budget. Captured network
+// bytes still share MAX_CAPTURED_BYTES, so accepting the full bounded burst does not uncap memory.
+const MAX_QUEUED_ANALYSES = 48;
 const MAX_NATIVE_IN_FLIGHT = 2;
 const MAX_CACHED_DECISIONS = 512;
 const MAX_REPLACEMENT_BYTES = 256 * 1024;
@@ -32,7 +34,7 @@ const NATIVE_TIMEOUT_MS = 2_250;
 const VIEWPORT_QUIET_MS = 250;
 const MAX_PRIORITY_HINTS = 256;
 const BLOCKED_PLACEHOLDER_BASE64 =
-  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 
 let nativePort = null;
 let reconnectTimer = null;
@@ -115,12 +117,32 @@ const rememberDecision = (hash, decision) => {
 const normalizePriority = (value) =>
   value === "visible" || value === "nearby" ? value : "background";
 
+const priorityRank = (value) => value === "visible" ? 0 : value === "nearby" ? 1 : 2;
+
+const takeNextAnalysis = () => {
+  if (analysisQueue.length === 0) return null;
+  let selectedIndex = 0;
+  let selectedRank = priorityRank(analysisQueue[0].priority);
+  for (let index = 1; index < analysisQueue.length && selectedRank !== 0; index += 1) {
+    const candidateRank = priorityRank(analysisQueue[index].priority);
+    if (candidateRank < selectedRank) {
+      selectedIndex = index;
+      selectedRank = candidateRank;
+    }
+  }
+  return analysisQueue.splice(selectedIndex, 1)[0];
+};
+
 const rememberImagePriority = (url, priority) => {
   if (typeof url !== "string" || !/^https?:\/\//iu.test(url)) return;
   if (!imagePriorityByUrl.has(url) && imagePriorityByUrl.size >= MAX_PRIORITY_HINTS) {
     imagePriorityByUrl.delete(imagePriorityByUrl.keys().next().value);
   }
-  imagePriorityByUrl.set(url, normalizePriority(priority));
+  const normalized = normalizePriority(priority);
+  imagePriorityByUrl.set(url, normalized);
+  for (const task of analysisQueue) {
+    if (task.details.url === url) task.priority = normalized;
+  }
 };
 
 const imagePriority = (url) => normalizePriority(imagePriorityByUrl.get(url));
@@ -236,7 +258,8 @@ const requestNativeDecision = (details, bytes, priority = imagePriority(details.
 
 const drainAnalysisQueue = () => {
   while (nativeInFlight < MAX_NATIVE_IN_FLIGHT && analysisQueue.length > 0) {
-    const task = analysisQueue.shift();
+    const task = takeNextAnalysis();
+    if (task === null) return;
     nativeInFlight += 1;
     void (async () => {
       let decision = { action: "block", replacement: null };

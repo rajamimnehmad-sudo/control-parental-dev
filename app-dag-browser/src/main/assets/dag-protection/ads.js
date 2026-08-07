@@ -11,6 +11,8 @@
 
   const HIDDEN_CLASS = "glosh-dag-page-ad-hidden";
   const SPONSORED_ATTRIBUTE = "data-glosh-dag-sponsored-result";
+  const INITIAL_SCAN_READY_ATTRIBUTE = "data-glosh-dag-ads-initial-ready";
+  const INITIAL_SCAN_READY_EVENT = "glosh-dag-ads-initial-ready";
   const EXPLICIT_AD_SELECTOR = [
     "[data-ad]",
     "[data-ad-slot]",
@@ -75,9 +77,15 @@
     scanExactSponsoredLabels(root);
   };
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", () => scan(document), { once: true });
-  } else {
+  const completeInitialScan = () => {
     scan(document);
+    document.documentElement?.setAttribute(INITIAL_SCAN_READY_ATTRIBUTE, "true");
+    dispatchEvent(new CustomEvent(INITIAL_SCAN_READY_EVENT));
+  };
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", completeInitialScan, { once: true });
+  } else {
+    completeInitialScan();
   }
 })();

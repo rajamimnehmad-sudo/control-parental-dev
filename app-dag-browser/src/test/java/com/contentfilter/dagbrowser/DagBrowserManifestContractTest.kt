@@ -64,6 +64,10 @@ class DagBrowserManifestContractTest {
     fun `thin page progress replaces the blue loading transition`() {
         val activity = File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
         val layout = File("src/main/res/layout/activity_dag_browser.xml").readText()
+        val acceptedNavigation =
+            activity
+                .substringAfter("private fun maybeCoverAcceptedNavigation")
+                .substringBefore("private fun showNavigationSnapshot")
 
         assertContains(layout, "android:id=\"@+id/page_load_progress\"")
         assertContains(layout, "android:id=\"@+id/navigation_snapshot\"")
@@ -73,10 +77,22 @@ class DagBrowserManifestContractTest {
         assertContains(activity, "finishPageLoadProgress(tab)")
         assertContains(activity, "geckoView.postOnAnimation(::clearNavigationSnapshot)")
         assertContains(activity, "showNavigationSnapshot(tab)\n        beginProtectedLoad(tab")
+        assertContains(
+            acceptedNavigation,
+            "showNavigationSnapshot(tab)\n            beginProtectedLoad(",
+        )
+        assertFalse(
+            activity.contains(
+                "navigationFrameTabId == tab.id && navigationFrameRevision == tab.navigationRevision",
+            ),
+        )
         assertContains(activity, "tab.barrierReadyForNavigation = false")
         assertContains(activity, "tab.protectedContentReadyForNavigation = false")
-        assertContains(activity, "!tab.barrierReadyForNavigation || !tab.protectedContentReadyForNavigation")
-        assertContains(activity, "ViewportImagesReadyMessage -> {")
+        assertContains(activity, "!tab.barrierReadyForNavigation")
+        assertContains(activity, "!tab.protectedContentReadyForNavigation")
+        assertContains(activity, "!tab.documentSanitizedForNavigation")
+        assertContains(activity, "ViewportImagesReadyMessage -> handleViewportImagesReady()")
+        assertContains(activity, "recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)")
         assertFalse(activity.contains("shimmer = true"))
     }
 }

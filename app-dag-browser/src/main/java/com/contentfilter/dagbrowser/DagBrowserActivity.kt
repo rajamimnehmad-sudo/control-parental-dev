@@ -61,6 +61,7 @@ import java.util.Locale
 import java.util.UUID
 import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
+import java.util.concurrent.ThreadFactory
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
@@ -101,9 +102,20 @@ class DagBrowserActivity : Activity() {
     private val thumbnailExecutor = Executors.newSingleThreadExecutor()
     private val downloadExecutor = Executors.newSingleThreadExecutor()
     private val mediaAnalysisSequence = AtomicLong(0L)
+    private val mediaAnalysisThreadSequence = AtomicLong(0L)
     private val mediaAnalysisLifecycleGeneration = AtomicLong(0L)
     private val mediaAnalysisAccepting = AtomicBoolean(true)
     private val mediaAnalysisQueue = DagBoundedMediaTaskQueue(MediaAnalysisQueueCapacity)
+    private val mediaAnalysisThreadFactory =
+        ThreadFactory { work ->
+            Thread(
+                {
+                    android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_BACKGROUND)
+                    work.run()
+                },
+                "dag-media-analysis-${mediaAnalysisThreadSequence.incrementAndGet()}",
+            )
+        }
 
     @Volatile
     private var activeMediaDecisionPort: WebExtension.Port? = null
@@ -114,6 +126,7 @@ class DagBrowserActivity : Activity() {
             0L,
             TimeUnit.MILLISECONDS,
             mediaAnalysisQueue,
+            mediaAnalysisThreadFactory,
         )
     private var protectionExtension: WebExtension? = null
     private var extensionReady = false
@@ -129,6 +142,7 @@ class DagBrowserActivity : Activity() {
     private var downloadDialog: AlertDialog? = null
     private var downloadsScreen: Dialog? = null
     private var pageListScreen: Dialog? = null
+    private var browserMenu: PopupMenu? = null
     private var activeChoicePrompt: ActiveChoicePrompt? = null
     private var pendingNewSessionGesture: PendingNewSessionGesture? = null
     private var backInvokedCallback: OnBackInvokedCallback? = null
@@ -144,86 +158,126 @@ class DagBrowserActivity : Activity() {
                 val sender = port.sender
                 val correctExtension = sender.webExtension.id == ExtensionId
                 val senderTab = tabs.firstOrNull { it.session === sender.session }
+
                 when {
                     correctExtension &&
                         senderTab != null &&
                         sender.environmentType == WebExtension.MessageSender.ENV_TYPE_CONTENT_SCRIPT -> {
-                        if (packageName.endsWith(".dev")) {
-                            Log.i(MediaTransportLogTag, "content_port=connected")
-                        }
-                        port.setDelegate(
-                            object : WebExtension.PortDelegate {
-                                override fun onPortMessage(
-                                    message: Any,
-                                    sourcePort: WebExtension.Port,
-                                ) {
-                                    val payload = message as? JSONObject ?: return
-                                    if (
-                                        payload.optString("type") == BarrierReadyMessage &&
-                                        payload.optInt("version") == ProtectionProtocolVersion &&
-                                        sender.isTopLevel &&
-                                        senderTab.waitingForBarrier
-                                    ) {
-                                        senderTab.previewDocumentToken =
-                                            payload.optString("documentToken")
-                                                .takeIf(PreviewDocumentTokenPattern::matches)
-                                        if (packageName.endsWith(".dev")) {
-                                            Log.i(
-                                                TabPreviewLogTag,
-                                                "barrier tab=${senderTab.id} " +
-                                                    "token=${senderTab.previewDocumentToken != null}",
-                                            )
-                                        }
-                                        confirmProtectedBarrier(senderTab)
-                                    } else if (
-                                        payload.optString("type") == PreviewEligibilityMessage &&
-                                        payload.optInt("version") == ProtectionProtocolVersion &&
-                                        sender.isTopLevel
-                                    ) {
-                                        applyPreviewEligibility(senderTab, payload)
-                                    }
-                                }
-                            },
-                        )
+                        connectContentPort(port, sender, senderTab)
                     }
                     correctExtension &&
                         sender.session == null &&
                         sender.environmentType == WebExtension.MessageSender.ENV_TYPE_EXTENSION -> {
-                        beginMediaDecisionPort(port)
-                        if (packageName.endsWith(".dev")) {
-                            Log.i(MediaTransportLogTag, "decision_port=connected")
-                        }
-                        port.setDelegate(
-                            object : WebExtension.PortDelegate {
-                                override fun onPortMessage(
-                                    message: Any,
-                                    sourcePort: WebExtension.Port,
-                                ) {
-                                    if (sourcePort !== activeMediaDecisionPort) return
-                                    val payload = message as? JSONObject ?: return
-                                    if (payload.optInt("version") != ProtectionProtocolVersion) {
-                                        return
-                                    }
-                                    when (payload.optString("type")) {
-                                        MediaBytesMessage -> mediaBytesDecisionFromPort(payload, sourcePort)
-                                        ViewportImagesReadyMessage -> {
-                                            recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)
-                                            activeTab
-                                                ?.takeIf { it.waitingForBarrier }
-                                                ?.let {
-                                                    it.protectedContentReadyForNavigation = true
-                                                    maybeCompleteProtectedLoad(it)
-                                                }
-                                        }
-                                    }
-                                }
-                            },
-                        )
+                        connectDecisionPort(port)
                     }
                     else -> port.disconnect()
                 }
             }
         }
+
+    private fun connectContentPort(
+        port: WebExtension.Port,
+        sender: WebExtension.MessageSender,
+        senderTab: BrowserTab,
+    ) {
+        if (packageName.endsWith(".dev")) {
+            Log.i(MediaTransportLogTag, "content_port=connected")
+        }
+        port.setDelegate(
+            object : WebExtension.PortDelegate {
+                override fun onPortMessage(
+                    message: Any,
+                    sourcePort: WebExtension.Port,
+                ) {
+                    val payload = message as? JSONObject ?: return
+                    handleContentPortMessage(payload, sender, senderTab)
+                }
+            },
+        )
+    }
+
+    private fun handleContentPortMessage(
+        payload: JSONObject,
+        sender: WebExtension.MessageSender,
+        senderTab: BrowserTab,
+    ) {
+        if (
+            payload.optInt("version") != ProtectionProtocolVersion ||
+            !sender.isTopLevel
+        ) {
+            return
+        }
+
+        when (payload.optString("type")) {
+            BarrierReadyMessage -> handleBarrierReady(payload, senderTab)
+            DocumentSanitizedReadyMessage -> handleDocumentSanitizedReady(senderTab)
+            PreviewEligibilityMessage -> applyPreviewEligibility(senderTab, payload)
+        }
+    }
+
+    private fun handleBarrierReady(
+        payload: JSONObject,
+        senderTab: BrowserTab,
+    ) {
+        if (!senderTab.waitingForBarrier) return
+        senderTab.previewDocumentToken =
+            payload.optString("documentToken")
+                .takeIf(PreviewDocumentTokenPattern::matches)
+        if (packageName.endsWith(".dev")) {
+            Log.i(
+                TabPreviewLogTag,
+                "barrier tab=${senderTab.id} token=${senderTab.previewDocumentToken != null}",
+            )
+        }
+        confirmProtectedBarrier(senderTab)
+    }
+
+    private fun handleDocumentSanitizedReady(senderTab: BrowserTab) {
+        if (!senderTab.waitingForBarrier) return
+        senderTab.documentSanitizedForNavigation = true
+        maybeCompleteProtectedLoad(senderTab)
+    }
+
+    private fun connectDecisionPort(port: WebExtension.Port) {
+        beginMediaDecisionPort(port)
+        if (packageName.endsWith(".dev")) {
+            Log.i(MediaTransportLogTag, "decision_port=connected")
+        }
+        port.setDelegate(
+            object : WebExtension.PortDelegate {
+                override fun onPortMessage(
+                    message: Any,
+                    sourcePort: WebExtension.Port,
+                ) {
+                    handleDecisionPortMessage(message, sourcePort)
+                }
+            },
+        )
+    }
+
+    private fun handleDecisionPortMessage(
+        message: Any,
+        sourcePort: WebExtension.Port,
+    ) {
+        if (sourcePort !== activeMediaDecisionPort) return
+        val payload = message as? JSONObject ?: return
+        if (payload.optInt("version") != ProtectionProtocolVersion) return
+
+        when (payload.optString("type")) {
+            MediaBytesMessage -> mediaBytesDecisionFromPort(payload, sourcePort)
+            ViewportImagesReadyMessage -> handleViewportImagesReady()
+        }
+    }
+
+    private fun handleViewportImagesReady() {
+        recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)
+        activeTab
+            ?.takeIf { it.waitingForBarrier }
+            ?.let {
+                it.protectedContentReadyForNavigation = true
+                maybeCompleteProtectedLoad(it)
+            }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -326,6 +380,7 @@ class DagBrowserActivity : Activity() {
         addressInput.setOnFocusChangeListener { _, _ -> updateAddressActionButton() }
         tabButton.setOnClickListener { showTabSwitcher() }
         menuButton.setOnClickListener { showBrowserMenu() }
+        browserMenu = createBrowserMenu()
         tabSwitcher.setListener(
             object : DagTabSwitcherView.Listener {
                 override fun onTabSelected(tabId: Long) {
@@ -1330,6 +1385,31 @@ class DagBrowserActivity : Activity() {
             spinning = true,
         )
         runtime = DagGeckoRuntime.get(this)
+        clearInterceptedMediaCacheAfterUpdate()
+    }
+
+    private fun clearInterceptedMediaCacheAfterUpdate() {
+        val preferences = getSharedPreferences(CacheMaintenancePreferences, MODE_PRIVATE)
+        if (preferences.getInt(CacheMaintenanceVersionKey, 0) == BuildConfig.VERSION_CODE) {
+            ensureProtectionExtension()
+            return
+        }
+        runtime.storageController.clearData(StorageController.ClearFlags.ALL_CACHES).accept(
+            {
+                preferences.edit().putInt(CacheMaintenanceVersionKey, BuildConfig.VERSION_CODE).apply()
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) ensureProtectionExtension()
+                }
+            },
+            {
+                runOnUiThread {
+                    if (!isFinishing && !isDestroyed) ensureProtectionExtension()
+                }
+            },
+        )
+    }
+
+    private fun ensureProtectionExtension() {
         runtime.webExtensionController
             .ensureBuiltIn(ExtensionLocation, ExtensionId)
             .accept(
@@ -1429,6 +1509,7 @@ class DagBrowserActivity : Activity() {
                     tab.waitingForBarrier && !tab.keepCurrentPageVisibleDuringReload,
             )
         ) {
+            showNavigationSnapshot(tab)
             beginProtectedLoad(
                 tab = tab,
                 startNewPerformanceNavigation = true,
@@ -1451,8 +1532,7 @@ class DagBrowserActivity : Activity() {
     ) {
         if (
             tab !== activeTab ||
-            tab.previewRestricted ||
-            (navigationFrameTabId == tab.id && navigationFrameRevision == tab.navigationRevision)
+            tab.previewRestricted
         ) {
             return
         }
@@ -1488,6 +1568,7 @@ class DagBrowserActivity : Activity() {
         tab.waitingForBarrier = true
         tab.barrierReadyForNavigation = false
         tab.protectedContentReadyForNavigation = false
+        tab.documentSanitizedForNavigation = false
         tab.keepCurrentPageVisibleDuringReload =
             keepCurrentPageVisible && tab.displayState == TabDisplayState.Visible
         if (!tab.keepCurrentPageVisibleDuringReload) {
@@ -1503,7 +1584,13 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun maybeCompleteProtectedLoad(tab: BrowserTab) {
-        if (!tab.barrierReadyForNavigation || !tab.protectedContentReadyForNavigation) return
+        if (
+            !tab.barrierReadyForNavigation ||
+            !tab.protectedContentReadyForNavigation ||
+            !tab.documentSanitizedForNavigation
+        ) {
+            return
+        }
         tab.waitingForBarrier = false
         tab.keepCurrentPageVisibleDuringReload = false
         cancelBarrierTimeout(tab)
@@ -1714,7 +1801,7 @@ class DagBrowserActivity : Activity() {
             } else {
                 currentDecision
             }
-        if (packageName.endsWith(".dev")) {
+        if (packageName.endsWith(".dev") || BuildConfig.GLOSHIA_LAB_FIXTURE) {
             val score =
                 currentDecision.filterProbability?.let {
                     " score=${String.format(Locale.US, "%.4f", it)}"
@@ -1732,7 +1819,9 @@ class DagBrowserActivity : Activity() {
                     "preprocess_ms=${trace.metric(DagMediaPipelineStage.Preprocess)} " +
                     "inference_ms=${trace.metric(DagMediaPipelineStage.Inference)} " +
                     "inferences=${trace.inferenceCount} prepared=${trace.preparedImageCount} " +
-                    "regional=${trace.regionalImageCount} reason=${currentDecision.reason}$score " +
+                    "regional=${trace.regionalImageCount} action=${currentDecision.action.wireValue} " +
+                    "replacement_chars=${currentDecision.replacementBytesBase64?.length ?: 0} " +
+                    "reason=${currentDecision.reason}$score " +
                     "native_ms=${SystemClock.elapsedRealtime() - startedAt}",
             )
         }
@@ -1851,6 +1940,7 @@ class DagBrowserActivity : Activity() {
     private fun showSecurityDetails() {
         val tab = activeTab
         val secureConnection = tab?.url?.startsWith("https://", ignoreCase = true) == true
+        val insecureConnection = tab?.url?.startsWith("http://", ignoreCase = true) == true
         val pageProtection = tab?.displayState == TabDisplayState.Visible && !tab.waitingForBarrier
         val newPage = tab == null || tab.url == InitialBlankPage
         val host = tab?.url?.let { runCatching { Uri.parse(it).host }.getOrNull() }.orEmpty()
@@ -1859,6 +1949,7 @@ class DagBrowserActivity : Activity() {
             when {
                 newPage -> R.string.security_connection_unavailable
                 secureConnection -> R.string.security_secure_connection
+                insecureConnection -> R.string.security_insecure_connection
                 else -> R.string.navigation_blocked
             }
         val protectionLabel =
@@ -1876,7 +1967,15 @@ class DagBrowserActivity : Activity() {
                 append("\n• ")
                 append(getString(protectionLabel))
                 append("\n\n")
-                append(getString(R.string.security_detail))
+                append(
+                    getString(
+                        if (insecureConnection) {
+                            R.string.security_insecure_detail
+                        } else {
+                            R.string.security_detail
+                        },
+                    ),
+                )
             }
         AlertDialog.Builder(this)
             .setTitle(R.string.security_title)
@@ -2441,14 +2540,14 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showBrowserMenu() {
+        val popup = browserMenu ?: createBrowserMenu().also { browserMenu = it }
+        popup.menu.findItem(R.id.menu_default_browser)?.isVisible = !isDefaultBrowser()
+        popup.show()
+    }
+
+    private fun createBrowserMenu(): PopupMenu =
         PopupMenu(this, menuButton, Gravity.END).apply {
             inflate(R.menu.dag_browser_menu)
-            menu.findItem(R.id.menu_default_browser)?.isVisible = !isDefaultBrowser()
-            runCatching {
-                javaClass
-                    .getMethod("setForceShowIcon", Boolean::class.javaPrimitiveType)
-                    .invoke(this, true)
-            }
             setOnMenuItemClickListener { item ->
                 when (item.itemId) {
                     R.id.menu_reload -> {
@@ -2502,8 +2601,7 @@ class DagBrowserActivity : Activity() {
                     else -> false
                 }
             }
-        }.also { popup -> popup.show() }
-    }
+        }
 
     private fun showAboutDag() {
         val packageInfo =
@@ -3154,6 +3252,7 @@ class DagBrowserActivity : Activity() {
         var keepCurrentPageVisibleDuringReload: Boolean = false,
         var barrierReadyForNavigation: Boolean = false,
         var protectedContentReadyForNavigation: Boolean = false,
+        var documentSanitizedForNavigation: Boolean = false,
         var displayState: TabDisplayState = TabDisplayState.Ready,
         var barrierTimeout: Runnable? = null,
         var needsRestore: Boolean = false,
@@ -3199,7 +3298,10 @@ class DagBrowserActivity : Activity() {
         const val MediaBytesMessage = "media-bytes"
         const val MediaDecisionMessage = "media-decision"
         const val ViewportImagesReadyMessage = "viewport-images-ready"
+        const val DocumentSanitizedReadyMessage = "document-sanitized-ready"
         const val ProtectionProtocolVersion = 1
+        const val CacheMaintenancePreferences = "dag-cache-maintenance"
+        const val CacheMaintenanceVersionKey = "last-cache-clear-version"
         const val MinimumPageLoadProgress = 5
         const val PageLoadProgressCompletionDelayMillis = 160L
         const val MaxMediaCandidateIdLength = 80

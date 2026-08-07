@@ -48,7 +48,11 @@ internal object DagStrongFrostedRedaction {
     ): String? {
         if (bytes.isEmpty() || cropPlans.isEmpty()) return null
         val decodeSize =
-            DagRegionalCropPlanner.decodeSize(sourceWidth, sourceHeight) ?: return null
+            DagRegionalCropPlanner.decodeSize(
+                sourceWidth,
+                sourceHeight,
+                allowStandardAspect = BuildConfig.GLOSHIA_LAB_FIXTURE,
+            ) ?: return null
         var decoded: Bitmap? = null
         var output: Bitmap? = null
         return try {

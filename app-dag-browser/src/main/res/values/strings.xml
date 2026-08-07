@@ -1,4 +1,5 @@
 <resources>
+    <string name="more_options">Más opciones</string>
     <string name="app_name">DAG Browser DEV</string>
     <string name="browser_brand">DAG</string>
     <string name="address_hint">Buscar o escribir</string>
@@ -7,11 +8,13 @@
     <string name="security_status">Estado de seguridad de esta página</string>
     <string name="security_title">Seguridad de DAG</string>
     <string name="security_secure_connection">Conexión segura (HTTPS)</string>
-    <string name="security_connection_unavailable">Todavía no hay una página HTTPS cargada</string>
+    <string name="security_insecure_connection">Conexión no cifrada (HTTP)</string>
+    <string name="security_connection_unavailable">Todavía no hay una página cargada</string>
     <string name="security_dag_protection">Protección DAG activa</string>
     <string name="security_dag_ready">Protección DAG lista para la nueva página</string>
     <string name="security_new_page">Nueva página segura</string>
     <string name="security_detail">HTTPS cifra la conexión, pero no garantiza que el sitio sea confiable. DAG además mantiene activa su barrera visual.</string>
+    <string name="security_insecure_detail">HTTP no cifra la conexión. DAG permite la página, pero mantiene activa su barrera visual y bloquea los esquemas que no son web.</string>
     <string name="reload">Recargar</string>
     <string name="set_default_browser">Usar DAG como predeterminado</string>
     <string name="default_browser_active">DAG ya es el navegador predeterminado</string>
@@ -71,7 +74,7 @@ Política: %7$s</string>
     <string name="extension_failed">No se pudo iniciar la protección</string>
     <string name="extension_failed_detail">DAG no abrirá páginas hasta recuperar la barrera visual.</string>
     <string name="navigation_blocked">Dirección bloqueada</string>
-    <string name="navigation_blocked_detail">Esta prueba permite solamente páginas HTTPS.</string>
+    <string name="navigation_blocked_detail">DAG permite páginas HTTP y HTTPS. Se bloquearon esquemas no web o enlaces externos no seguros.</string>
     <string name="external_app_link_kept_in_dag">La aplicación externa quedó bloqueada. Seguís navegando dentro de DAG.</string>
     <string name="download">Descargar</string>
     <string name="download_confirm_title">¿Descargar este PDF?</string>

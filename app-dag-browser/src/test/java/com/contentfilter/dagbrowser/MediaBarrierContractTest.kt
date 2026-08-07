@@ -11,6 +11,7 @@ class MediaBarrierContractTest {
     private val background by lazy { extensionRoot.resolve("background.js").readText() }
     private val barrier by lazy { extensionRoot.resolve("barrier.js").readText() }
     private val ads by lazy { extensionRoot.resolve("ads.js").readText() }
+    private val schedulerGuard by lazy { extensionRoot.resolve("runaway-scheduler-guard.js").readText() }
     private val css by lazy { extensionRoot.resolve("barrier.css").readText() }
 
     @Test
@@ -21,9 +22,39 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"1.51.0\"")
+        assertContains(manifest, "\"version\": \"1.75.0\"")
+        assertContains(manifest, "\"world\": \"MAIN\"")
+        assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
         assertFalse(activity.contains(".installBuiltIn(ExtensionLocation)"))
+    }
+
+    @Test
+    fun `runaway scheduler guard yields only sustained signal ports`() {
+        assertContains(schedulerGuard, "MessagePort?.prototype")
+        assertContains(schedulerGuard, "MINIMUM_SIGNAL_SPAN_MS = 1_000")
+        assertContains(schedulerGuard, "MINIMUM_SIGNAL_COUNT = 12")
+        assertContains(schedulerGuard, "MAIN_THREAD_YIELD_MS = 16")
+        assertContains(schedulerGuard, "MAX_PENDING_SIGNALS = 64")
+        assertContains(schedulerGuard, "flushPending")
+        assertContains(schedulerGuard, "document.readyState === \"complete\"")
+        assertContains(schedulerGuard, "Number.isSafeInteger(message)")
+        assertContains(schedulerGuard, "Reflect.apply(nativePostMessage")
+        assertFalse(schedulerGuard.contains("mimo", ignoreCase = true))
+        assertFalse(schedulerGuard.contains("hostname"))
+        assertFalse(schedulerGuard.contains("location."))
+    }
+
+    @Test
+    fun `app update clears only stale intercepted media caches before restoring tabs`() {
+        val activity =
+            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
+
+        assertContains(activity, "clearInterceptedMediaCacheAfterUpdate()")
+        assertContains(activity, "StorageController.ClearFlags.ALL_CACHES")
+        assertContains(activity, "CacheMaintenanceVersionKey, BuildConfig.VERSION_CODE")
+        assertContains(activity, "ensureProtectionExtension()")
+        assertFalse(activity.contains("ClearFlags.SITE_DATA).accept"))
     }
 
     @Test
@@ -34,7 +65,18 @@ class MediaBarrierContractTest {
         assertContains(background, "MAX_IMAGE_BYTES = 2 * 1024 * 1024")
         assertContains(background, "MAX_CAPTURED_BYTES = 8 * 1024 * 1024")
         assertContains(background, "MAX_NATIVE_IN_FLIGHT = 2")
-        assertContains(background, "MAX_QUEUED_ANALYSES = 24")
+        assertContains(
+            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText(),
+            "THREAD_PRIORITY_BACKGROUND",
+        )
+        assertContains(
+            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText(),
+            "MediaAnalysisThreads = 2",
+        )
+        assertContains(background, "MAX_QUEUED_ANALYSES = 48")
+        assertContains(background, "takeNextAnalysis")
+        assertContains(background, "priorityRank")
+        assertContains(background, "task.details.url === url")
         assertContains(background, "media-bytes")
         assertContains(background, "model_allow")
         assertContains(background, "model_filter")
@@ -48,6 +90,10 @@ class MediaBarrierContractTest {
     @Test
     fun `filtered response never releases rejected pixels`() {
         assertContains(background, "BLOCKED_PLACEHOLDER_BASE64")
+        assertContains(
+            background,
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=",
+        )
         assertContains(background, "blockedPlaceholder")
         assertContains(background, "action === \"allow\"")
         assertFalse(background.contains("filter.write(event.data)"))
@@ -69,6 +115,10 @@ class MediaBarrierContractTest {
         assertContains(barrier, "IntersectionObserver")
         assertContains(barrier, "image-priority")
         assertContains(barrier, "MAX_PRIORITY_SOURCES = 256")
+        assertContains(ads, "completeInitialScan")
+        assertContains(ads, "data-glosh-dag-ads-initial-ready")
+        assertContains(barrier, "document-sanitized-ready")
+        assertContains(barrier, "maybeReportInitialDocumentReady")
         assertContains(background, "MAX_PRIORITY_HINTS = 256")
         assertContains(background, "normalizePriority")
         assertContains(barrier, "pendingImages.get(image) !== request")

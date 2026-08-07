@@ -22,4 +22,17 @@ class DagAboutContractTest {
         assertContains(activity, "DagVisualModelInfo.Runtime")
         assertContains(activity, "DagVisualModelInfo.PolicyVersion")
     }
+
+    @Test
+    fun `browser menu is inflated before the user opens it`() {
+        val activity =
+            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
+
+        assertContains(activity, "browserMenu = createBrowserMenu()")
+        assertContains(activity, "val popup = browserMenu ?: createBrowserMenu()")
+        assertContains(
+            File("src/main/res/menu/dag_browser_menu.xml").readText(),
+            "android:id=\"@+id/menu_more\"",
+        )
+    }
 }

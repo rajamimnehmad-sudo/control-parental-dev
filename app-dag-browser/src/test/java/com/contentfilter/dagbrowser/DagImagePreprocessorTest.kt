@@ -61,6 +61,18 @@ class DagImagePreprocessorTest {
     }
 
     @Test
+    fun `lab can inspect ordinary aspect ratios with three regional views`() {
+        assertEquals(3, DagRegionalCropPlanner.plan(600, 800, allowStandardAspect = true).size)
+        assertTrue(
+            DagRegionalCropPlanner.decodeSize(
+                600,
+                800,
+                allowStandardAspect = true,
+            ) != null,
+        )
+    }
+
+    @Test
     fun `wide images receive three overlapping regional views`() {
         assertEquals(
             listOf(

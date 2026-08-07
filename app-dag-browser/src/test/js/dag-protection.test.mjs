@@ -121,6 +121,67 @@ test("visible image hints reach the native queue with priority", async () => {
   assert.equal(request.priority, "visible");
 });
 
+test("queued visible raster overtakes background work", async () => {
+  const harness = await createHarness();
+  const first = imageDetails("priority-first");
+  const second = imageDetails("priority-second");
+  deliver(harness, first, Uint8Array.from([0xff, 0xd8, 1, 0xff, 0xd9]));
+  deliver(harness, second, Uint8Array.from([0xff, 0xd8, 2, 0xff, 0xd9]));
+  await waitFor(() => harness.postedNative.filter((message) =>
+    message.type === "media-bytes").length === 2, "two occupied native slots");
+
+  const background = imageDetails("priority-background");
+  const promoted = imageDetails("priority-promoted");
+  deliver(harness, background, Uint8Array.from([0xff, 0xd8, 3, 0xff, 0xd9]));
+  deliver(harness, promoted, Uint8Array.from([0xff, 0xd8, 4, 0xff, 0xd9]));
+  harness.setImagePriority({
+    type: "image-priority",
+    version: 1,
+    url: promoted.url,
+    priority: "visible",
+  });
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 20));
+
+  const occupied = harness.postedNative.filter((message) => message.type === "media-bytes");
+  harness.answer({
+    type: "media-decision",
+    version: 1,
+    candidateId: occupied[0].candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  const promotedRequest = await waitFor(() => harness.postedNative.find((message, index) =>
+    index >= 2 && message.sourceUrl === promoted.url), "promoted native request");
+  assert.equal(promotedRequest.priority, "visible");
+  assert.equal(harness.postedNative.some((message, index) =>
+    index >= 2 && message.sourceUrl === background.url), false);
+});
+
+test("full bounded response burst reaches the native gate without placeholder overflow", async () => {
+  const harness = await createHarness();
+  const details = Array.from({ length: 32 }, (_, index) => imageDetails(`burst-${index}`));
+  for (let index = 0; index < details.length; index += 1) {
+    deliver(harness, details[index], Uint8Array.from([0xff, 0xd8, index, 0xff, 0xd9]));
+  }
+
+  for (let answered = 0; answered < details.length; answered += 1) {
+    const request = await waitFor(() => harness.postedNative.filter((message) =>
+      message.type === "media-bytes")[answered], `burst native request ${answered}`);
+    harness.answer({
+      type: "media-decision",
+      version: 1,
+      candidateId: request.candidateId,
+      action: "allow",
+      reason: "model_allow",
+    });
+  }
+  await waitFor(() => details.every(({ requestId }) => harness.filters.get(requestId).closed),
+    "bounded burst close");
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 32);
+  assert.equal(details.every(({ requestId }) =>
+    harness.filters.get(requestId).writes[0][0] === 0xff), true);
+});
+
 const imageDetails = (requestId, url = `https://cdn.example.test/${requestId}.jpg`) => ({
   requestId,
   type: "image",
@@ -252,7 +313,7 @@ test("bounded inline raster crosses the same native gate and fails closed", asyn
   assert.equal((await harness.decideInline({
     type: "inline-raster-decision",
     version: 1,
-    dataUrl: `data:image/png;base64,${"A".repeat(66 * 1024)}`,
+    dataUrl: `data:image/png;base64,${"A".repeat(256 * 1024)}`,
   })).action, "block");
   assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
 });
@@ -404,7 +465,10 @@ test("oversized image closes with the safe placeholder before native work", asyn
   const filter = harness.filters.get(details.requestId);
   filter.ondata({ data: new Uint8Array(2 * 1024 * 1024 + 1).buffer });
   await waitFor(() => filter.closed, "oversized close");
-  assert.deepEqual([...filter.writes[0].slice(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10]);
+  const transparentPlaceholder = Uint8Array.from(atob(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII="
+  ), (character) => character.charCodeAt(0));
+  assert.deepEqual([...filter.writes[0]], [...transparentPlaceholder]);
   assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 0);
 });
 
@@ -456,7 +520,8 @@ test("active extension has bounded work and no site or device exceptions", async
   assert.match(background, /MAX_IMAGE_BYTES = 2 \* 1024 \* 1024/u);
   assert.match(background, /MAX_CAPTURED_BYTES = 8 \* 1024 \* 1024/u);
   assert.match(background, /MAX_NATIVE_IN_FLIGHT = 2/u);
-  assert.match(background, /MAX_QUEUED_ANALYSES = 24/u);
+  assert.match(background, /MAX_QUEUED_ANALYSES = 48/u);
+  assert.match(background, /takeNextAnalysis/u);
   assert.match(background, /MAX_INLINE_IMAGE_BYTES = 48 \* 1024/u);
   assert.match(background, /decodeInlineRaster/u);
   assert.match(ads, /NodeFilter\.SHOW_TEXT/u);
@@ -465,4 +530,129 @@ test("active extension has bounded work and no site or device exceptions", async
   assert.doesNotMatch(ads, /MutationObserver/u);
   assert.doesNotMatch(ads, /querySelectorAll\?\.\("span,div"\)/u);
   assert.doesNotMatch(background, /cheeky|mimo|fravega|sm-a235|sm-s908/iu);
+});
+
+test("scheduler guard yields sustained signals without changing normal messages", async () => {
+  let now = 0;
+  let loadListener = null;
+  let timerSequence = 0;
+  const timers = [];
+  const received = [];
+  class MessagePort {
+    postMessage(message, transfer) {
+      received.push({ message, transfer });
+    }
+  }
+  const context = {
+    addEventListener(type, listener) {
+      if (type === "load") loadListener = listener;
+    },
+    document: { readyState: "loading" },
+    MessagePort,
+    Number,
+    performance: { now: () => now },
+    Reflect,
+    clearTimeout(timerId) {
+      const index = timers.findIndex(({ id }) => id === timerId);
+      if (index >= 0) timers.splice(index, 1);
+    },
+    setTimeout(callback, delay) {
+      timerSequence += 1;
+      timers.push({ callback, dueAt: now + delay, id: timerSequence, sequence: timerSequence });
+      return timerSequence;
+    },
+    WeakMap,
+  };
+  vm.runInNewContext(await readAsset("runaway-scheduler-guard.js"), context, {
+    filename: "runaway-scheduler-guard.js",
+  });
+  const port = new MessagePort();
+
+  port.postMessage({ type: "normal" });
+  port.postMessage(7, ["transfer-token"]);
+  for (let signal = 0; signal < 20; signal += 1) {
+    now = signal * 100;
+    port.postMessage(100 + signal);
+  }
+  assert.equal(timers.length, 0);
+  assert.ok(loadListener);
+  loadListener();
+
+  for (let signal = 0; signal < 11; signal += 1) {
+    now = 2_000 + signal * 100;
+    port.postMessage(signal);
+  }
+  assert.equal(timers.length, 0);
+
+  now = 3_100;
+  port.postMessage(11);
+  now = 3_200;
+  port.postMessage(12);
+  port.postMessage({ type: "still-normal" });
+  assert.ok(timers.length > 0);
+  assert.deepEqual(received.slice(-1), [{ message: { type: "still-normal" }, transfer: undefined }]);
+
+  while (timers.length > 0) {
+    timers.sort((left, right) => left.dueAt - right.dueAt || left.sequence - right.sequence);
+    const timer = timers.shift();
+    now = timer.dueAt;
+    timer.callback();
+  }
+  assert.deepEqual(received.map(({ message }) => message), [
+    { type: "normal" },
+    7,
+    100,
+    101,
+    102,
+    103,
+    104,
+    105,
+    106,
+    107,
+    108,
+    109,
+    110,
+    111,
+    112,
+    113,
+    114,
+    115,
+    116,
+    117,
+    118,
+    119,
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10,
+    { type: "still-normal" },
+    11,
+    12,
+  ]);
+
+  for (let signal = 100; signal <= 164; signal += 1) port.postMessage(signal);
+  assert.deepEqual(received.slice(-65).map(({ message }) => message),
+    Array.from({ length: 65 }, (_, index) => 100 + index));
+  assert.equal(timers.length, 0);
+});
+
+test("extension manifest installs the bounded scheduler guard in the main world", async () => {
+  const manifest = JSON.parse(await readAsset("manifest.json"));
+  const schedulerScript = manifest.content_scripts.find((script) =>
+    script.js?.includes("runaway-scheduler-guard.js"));
+  assert.ok(schedulerScript);
+  assert.equal(schedulerScript.world, "MAIN");
+  assert.equal(schedulerScript.all_frames, false);
+
+  const protectionScript = manifest.content_scripts.find((script) =>
+    script.js?.includes("barrier.js"));
+  assert.ok(protectionScript);
+  assert.ok(protectionScript.js.indexOf("barrier.js") < protectionScript.js.indexOf("ads.js"));
 });

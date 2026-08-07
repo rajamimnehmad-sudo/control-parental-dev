@@ -28,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 109
-        versionName = "0.69.13"
+        versionCode = 158
+        versionName = "0.69.62"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -64,6 +64,7 @@ android {
             applicationIdSuffix = ".lab"
             versionCode = 111
             versionNameSuffix = "-lab"
+            resValue("string", "app_name", "DAG Browser LAB")
             buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
             buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "true")
         }
@@ -120,12 +121,19 @@ val testDagProtectionJs =
         workingDir = projectDir
         commandLine("node", "--test", "src/test/js/dag-protection.test.mjs")
         inputs.files(
+            "src/main/assets/dag-protection/ads.js",
             "src/main/assets/dag-protection/background.js",
             "src/main/assets/dag-protection/barrier.js",
             "src/main/assets/dag-protection/barrier.css",
+            "src/main/assets/dag-protection/manifest.json",
+            "src/main/assets/dag-protection/runaway-scheduler-guard.js",
             "src/test/js/dag-protection.test.mjs",
         )
     }
+
+tasks.withType<org.gradle.api.tasks.testing.Test>().configureEach {
+    inputs.dir("src/main/assets/dag-protection")
+}
 
 tasks.named("check") {
     dependsOn(testDagProtectionJs)

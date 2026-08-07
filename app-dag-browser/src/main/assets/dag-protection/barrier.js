@@ -19,6 +19,8 @@
   const MAX_INLINE_RENDERED_EDGE = 96;
   const IMAGE_PRIORITY_ROOT_MARGIN = "800px 0px";
   const MAX_PRIORITY_SOURCES = 256;
+  const INITIAL_AD_SCAN_READY_ATTRIBUTE = "data-glosh-dag-ads-initial-ready";
+  const INITIAL_AD_SCAN_READY_EVENT = "glosh-dag-ads-initial-ready";
   const documentToken =
     `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
   const sensitivePreviewSelector = [
@@ -34,6 +36,9 @@
 
   let nativePort = null;
   let inlineImagesSubmitted = 0;
+  let initialAdScanReady = false;
+  let initialDocumentReady = false;
+  let initialDocumentReadyReported = false;
   const pendingImages = new WeakMap();
   const inlineDecisions = new Map();
   const priorityBySource = new Map();
@@ -229,6 +234,20 @@
     postToAndroid({ type: "tab-preview-eligibility", restricted });
   };
 
+  const maybeReportInitialDocumentReady = () => {
+    if (!initialAdScanReady || !initialDocumentReady || initialDocumentReadyReported) return;
+    initialDocumentReadyReported = true;
+    postToAndroid({ type: "document-sanitized-ready" });
+  };
+
+  addEventListener(INITIAL_AD_SCAN_READY_EVENT, () => {
+    initialAdScanReady = true;
+    maybeReportInitialDocumentReady();
+  }, { once: true });
+  if (document.documentElement?.hasAttribute(INITIAL_AD_SCAN_READY_ATTRIBUTE)) {
+    initialAdScanReady = true;
+  }
+
   postToAndroid({ type: "barrier-ready", url: location.href });
   reportPreviewEligibility();
 
@@ -238,6 +257,8 @@
       observeImage(image);
       if (image.complete) stabilizeImage(image);
     }
+    initialDocumentReady = true;
+    maybeReportInitialDocumentReady();
   };
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", completeDocument, { once: true });

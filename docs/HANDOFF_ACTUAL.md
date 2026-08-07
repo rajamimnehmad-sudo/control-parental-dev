@@ -1,10 +1,27 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-08-04
+Fecha de corte: 2026-08-06
 
 Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
+
+## DAG Browser 158: primera revelacion saneada y fotos restauradas
+
+- DAG 158 (`0.69.62-dev`) esta instalado en el SM-S908E con datos preservados.
+- La pagina nueva se revela solo despues de barrera, contenido protegido y
+  primer barrido publicitario; esto elimina la rafaga inicial de patrocinados.
+- La regresion de DAG 156 quedo localizada: ejecutar `ads.js` antes de
+  `barrier.js` permitia ocultar contenedores antes de registrar sus imagenes.
+  DAG 157/158 restaura barrera primero y conserva el handshake de saneamiento.
+- En la validacion fisica reaparecieron el hero de Mimo y las categorias e
+  imagenes de Fravega. DAG 158 mantuvo Mimo visible en `1.068 ms`, viewport
+  quieto en `901 ms` y pagina completa en `2.115 ms`, sin crash ni ANR.
+- El puente de mensajes de la extension fue refactorizado en funciones
+  cohesivas y nombradas; no cambia protocolo, politica, modelo, umbral ni
+  concurrencia.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v158-sanitized-reveal-and-image-order-sm-s908e-2026-08-06.md`.
 
 ## Estado vigente al 2026-08-05: GloshIA Visual R3.1
 
@@ -103,6 +120,133 @@ una vez instalado, las versiones siguientes tambien desde el menu propio de
 DAG. No se registra una instalacion fisica de DAG 96 en este cierre.
 
 ## DAG Browser vigente
+
+### DAG 155: transición estable antes del reflow del sitio
+
+DAG 155 (`0.69.59-dev`) conserva la captura protegida de la página anterior
+desde el instante en que Gecko acepta una navegación y permite reemplazar esa
+captura por otra más reciente de la misma revisión. Corrige la ráfaga visible al
+cambiar entre Imágenes y Todo en Google sin agregar demoras, animaciones ni
+excepciones por sitio.
+
+El diagnóstico cuadro por cuadro aisló dos causas: Google reacomodaba el DOM
+antes de `onPageStart`, cuando DAG todavía mostraba la superficie viva, y la
+primera captura de una navegación quedaba congelada aunque se hubiera tomado
+durante un layout intermedio. DAG 154 adelantó la cobertura y retiró el primer
+problema, pero no eliminó el cuadro comprimido porque la captura era vieja. DAG
+155 conserva ese adelanto y permite que las capturas seguras posteriores
+actualicen el frame de navegación. La ráfaga final eliminó el cuadro comprimido
+y el propietario confirmó que la transición quedó correcta.
+
+La corrección es general y no modifica GloshIA Visual R3.1, el umbral, la
+política visual, `final_sealed` ni la compuerta fail-closed. El APK instalado con
+datos preservados tiene SHA-256
+`4ac86de40d0a971d247b93aba2bf8135029b93f0bebf38e821d04416e864a3c7`.
+Evidencia:
+`docs/compatibility/results/dag-browser-v155-stable-navigation-snapshot-sm-s908e-2026-08-06.md`.
+
+### DAG 153: cierre de seguridad, scheduler acotado y A/B de CPU
+
+DAG 153 (`0.69.57-dev`) con extensión `1.73.0` conserva el comportamiento
+visual confirmado de DAG 147 y cierra cinco hallazgos generales sin cambiar
+GloshIA Visual R3.1, el umbral, el preprocesamiento ni la política visual.
+
+- La navegación DEV vuelve a convertir entradas HTTP a HTTPS y rechaza una
+  navegación superior no HTTPS. Sólo el flavor LAB aislado admite su fixture
+  loopback HTTP.
+- `runaway-scheduler-guard.js` conserva como máximo 64 señales pendientes. Si
+  alcanza el límite, vacía en orden mediante el método nativo y desactiva el
+  yield: no pierde mensajes ni permite crecimiento de memoria sin límite.
+- `DagLowInformationRasterPolicy` y sus tests fueron retirados: no tenían
+  ninguna llamada desde el pipeline real y no corresponde conservar una
+  política paralela que sólo exista en pruebas.
+- `testDagProtectionJs` declara como entradas `ads.js`, el guard y
+  `manifest.json`; los tests JVM declaran el directorio completo de assets de
+  protección, por lo que Gradle repite los contratos cuando cambia la extensión.
+- Se evaluó físicamente desactivar el spinning intra-op de ONNX con el mismo
+  S22 y recorrido de Frávega. El promedio gráfico pasó de 58,65 a 60 fps, pero
+  el p95 de inferencia empeoró de 213,5 a 271 ms (aproximadamente 27 %). El
+  experimento fue retirado; se conservan dos workers Android, ONNX intra-op 2 e
+  inter-op 1, que priorizan la carga de fotos frente a una diferencia marginal
+  de frames.
+
+Con la configuración final, el carrusel de Frávega midió 58,65 fps, p95 de
+21,18 ms y un cuadro activo mayor a 33 ms; las tarjetas de Ofertas Únicas
+mostraron fotos reales sin negros/grises generados por DAG. El menú de Mimo,
+después de scroll, abrió completo a 55,42 fps y p95 de 30,08 ms. Cheeky cargó
+banner y controles completos. No hubo crash, ANR ni OOM. El APK fue instalado
+con `adb install -r`, preservando perfil y datos; SHA-256
+`48eb4fc7d6ac4b86cf328b1c6932cbfe166baa7cad6c85f0dc1b9d2bdd204f46`.
+
+Evidencia:
+`docs/compatibility/results/dag-browser-v153-security-scheduler-onnx-sm-s908e-2026-08-06.md`.
+
+### DAG 152: rollback del experimento geométrico
+
+DAG 152 (`0.69.56-dev`) con extensión `1.72.0` vuelve al comportamiento de DAG
+149/147. DAG 150 retuvo trabajos 24 ms y produjo imágenes rotas; DAG 151
+conservó sólo geometría horizontal, pero el propietario no percibió una mejora
+y pidió no conservar código sin efecto visible. Ambos experimentos fueron
+retirados. Los números avanzan sólo para reemplazar extensiones ya instaladas
+sin borrar perfiles o datos.
+
+### DAG 149: rollback completo del experimento de interacción
+
+DAG 149 (`0.69.53-dev`) con extensión `1.69.0` reproduce el código y el
+comportamiento confirmado de DAG 147. DAG 148 intentó pausar la admisión visual
+durante gestos, pero el propietario no percibió mejora y pidió volver atrás; se
+retiraron por completo listeners, estado, mensajes, prueba y documentación de
+ese experimento. Los números avanzan únicamente porque Android bloqueó instalar
+`versionCode 147` sobre 148 y Gecko necesita una extensión superior para
+reemplazar la 1.68 sin borrar datos.
+
+### DAG 147 confirmado: event loop de Gecko, prioridad real y ráfagas sin negros
+
+DAG 147 (`0.69.51-dev`) con extensión `1.67.0` está instalado y confirmado
+visualmente por el propietario en el SM-S908E. El problema
+del menú de Mimo no era una falta general de potencia ni una regresión de
+GloshIA: el sitio sostenía un ciclo de React y su `setImmediate` basado en
+`MessageChannel`, mientras el drawer de VTEX dependía de
+`requestAnimationFrame`. En GeckoView, el trabajo continuo de `MessagePort`
+postergaba los frames del menú después del scroll. El proceso de contenido
+quedaba aproximadamente en `48-60 %` de CPU; con la corrección y la misma
+secuencia de scroll/apertura quedó en tres muestras de `15,6 / 15,0 / 15,0 %`.
+
+La corrección es general: instrumenta `MessagePort.prototype.postMessage`,
+reconoce únicamente señales de scheduler numéricas o `null` sostenidas y,
+recién después de `document.readyState=complete`, intercala una cesión de
+`16 ms`. Mensajes normales, transferencias y la carga inicial usan el método
+nativo. No contiene dominios, URLs, sitios ni dispositivos. El primer governor
+experimental que no mejoró el caso se retiró por completo.
+
+La falta o demora de fotos tenía causas separadas. Primero, un único ejecutor de
+análisis formaba cola en páginas con ráfagas grandes. DAG 146 conserva dos
+hilos internos intra-op y uno inter-op de ONNX Runtime, pero vuelve a dos
+trabajos Android de análisis. En el A/B frío de Frávega contra DAG 145, la cola
+p50/p90/p95 bajó de `147,5/192/198 ms` a `0/1/1 ms`; la vista inicial quieta,
+de `19.394` a `9.240 ms`; y se procesaron `136` raster frente a `118`.
+
+Después se aisló una cola anterior a Android en `background.js`: era FIFO,
+admitía 24 análisis aunque podían existir 32 streams y sustituía silenciosamente
+el excedente por un PNG negro opaco. La prioridad visible llegaba a Android
+pero no gobernaba esa cola. DAG 147 amplía el límite total acotado a 48
+(32 streams más 16 inline, todavía bajo el presupuesto global de 8 MiB), extrae
+visible/cercano/fondo y actualiza la prioridad de trabajos pendientes. El
+fallback técnico vuelve a ser transparente; un filtro real conserva su
+placeholder proporcional y nunca se liberan píxeles rechazados.
+
+La corrida física final de Frávega procesó 126 raster: 124 `model_allow` y dos
+fallos técnicos mínimos (`67` y `43` bytes), con página visible en `1.277 ms`,
+viewport quieto en `9.659 ms`, cola nativa p50/p90/p95 `0/2/2 ms` y jank
+`4,00 %`. Cheeky procesó `98` raster con cola `0/1/2 ms`, jank `4,58 %` y sin
+crash ni ANR. El propietario confirmó después que la carga y los negros
+quedaron corregidos en DAG 147.
+
+No cambiaron GloshIA Visual R3.1, su SHA-256, el umbral `0,40`, el
+preprocesamiento, la política visual ni `final_sealed`. Tampoco se publicó, se
+hizo push ni se tocó Supabase o Production. Evidencia, hitos e intentos
+retirados:
+`docs/compatibility/results/dag-browser-v147-gecko-scheduler-sm-s908e-2026-08-06.md`.
 
 ### DAG 109 local: prioridad visual y deduplicación con extensión 1.51.0
 
@@ -230,12 +374,15 @@ Supabase, Production ni GitHub. Evidencia:
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
 `com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para
-aplicar un difuminado fuerte tipo vidrio cuando hay una única región moderada;
+aplicar un difuminado fuerte tipo vidrio cuando hay una única región moderada.
+En LAB las vistas también se generan para proporciones normales; DEV conserva
+la optimización anterior y no añade esa carga regional.
 varias regiones, riesgo global alto o cualquier error bloquean la imagen
 completa. R3.1, el flavor DEV y el flujo oficial `allow/block` permanecen sin
 cambios. El APK lab es `versionCode 111`, `0.69.13-lab`, SHA-256
-`c7741e504d400bee235531d8996eb2a236401ae7c9363552b255b2c47fd6a17d` y no fue
-instalado, publicado ni subido. Evidencia:
+`a6bef885002da151270690087da1bc9e6fb739411e15f4cbcf6bc2d81d67b586`; fue
+instalado sólo en el S22 para validación local y no fue publicado ni subido.
+La prueba real observó decisiones `redact` y reemplazos PNG. Evidencia:
 `docs/dag/v3/GLOSHIA_PARTIAL_REDACTION_LAB_2026-08-05.md`.
 
 ### DAG 96 publicado en DEV: canary reversible de GloshIA R3
