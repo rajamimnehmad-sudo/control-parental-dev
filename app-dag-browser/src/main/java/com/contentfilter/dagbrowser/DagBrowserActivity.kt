@@ -135,6 +135,7 @@ class DagBrowserActivity : Activity() {
     private var navigationFrameBitmap: Bitmap? = null
     private var navigationFrameTabId: Long? = null
     private var navigationFrameRevision: Long = -1L
+    private var tabThumbnailResidencyRequested = false
     private val persistTabsRunnable = Runnable(::persistTabsNow)
 
     private val messageDelegate =
@@ -370,7 +371,7 @@ class DagBrowserActivity : Activity() {
             object : DagTabSwitcherView.Listener {
                 override fun onTabSelected(tabId: Long) {
                     val tab = tabs.firstOrNull { it.id == tabId } ?: return
-                    tabSwitcher.hide()
+                    hideTabSwitcher()
                     switchTo(tab)
                 }
 
@@ -380,7 +381,7 @@ class DagBrowserActivity : Activity() {
                 }
 
                 override fun onNewTab() {
-                    tabSwitcher.hide()
+                    hideTabSwitcher()
                     createTab(switchToTab = true)
                 }
 
@@ -393,7 +394,7 @@ class DagBrowserActivity : Activity() {
                 }
 
                 override fun onSwitcherClosed() {
-                    tabSwitcher.hide()
+                    hideTabSwitcher()
                 }
             },
         )
@@ -1636,8 +1637,16 @@ class DagBrowserActivity : Activity() {
 
     private fun showTabSwitcher() {
         if (tabs.isEmpty()) return
+        tabThumbnailResidencyRequested = true
         captureActiveTabThumbnail()
         tabSwitcher.show(tabCards())
+        tabs.filter { it.thumbnail == null }.forEach(::restoreTabThumbnail)
+    }
+
+    private fun hideTabSwitcher() {
+        tabThumbnailResidencyRequested = false
+        tabSwitcher.hide()
+        releaseTabThumbnails()
     }
 
     private fun refreshTabSwitcher() {
@@ -1778,10 +1787,14 @@ class DagBrowserActivity : Activity() {
                             ) {
                                 scaled.recycle()
                             } else {
-                                tab.thumbnail = scaled
                                 tab.thumbnailStale = false
-                                refreshTabSwitcher()
                                 if (encoded != null) persistTabThumbnail(tab.previewKey, encoded)
+                                if (tabThumbnailResidencyRequested) {
+                                    tab.thumbnail = scaled
+                                    refreshTabSwitcher()
+                                } else {
+                                    scaled.recycle()
+                                }
                             }
                         }
                     }
@@ -1875,7 +1888,8 @@ class DagBrowserActivity : Activity() {
                         !tabs.contains(tab) ||
                         tab.previewRevision != revision ||
                         tab.thumbnailStale ||
-                        tab.thumbnail != null
+                        tab.thumbnail != null ||
+                        !tabThumbnailResidencyRequested
                     ) {
                         restored.recycle()
                     } else {
@@ -2310,7 +2324,7 @@ class DagBrowserActivity : Activity() {
             .setTitle(R.string.close_all_tabs_title)
             .setMessage(resources.getQuantityString(R.plurals.close_all_tabs_detail, tabs.size, tabs.size))
             .setPositiveButton(R.string.close_all_tabs) { _, _ ->
-                tabSwitcher.hide()
+                hideTabSwitcher()
                 resetTabs()
             }
             .setNegativeButton(R.string.cancel, null)
@@ -2447,7 +2461,7 @@ class DagBrowserActivity : Activity() {
                 getSystemService(InputMethodManager::class.java)
                     .hideSoftInputFromWindow(addressInput.windowToken, 0)
             }
-            DagBackAction.CloseTabSwitcher -> tabSwitcher.hide()
+            DagBackAction.CloseTabSwitcher -> hideTabSwitcher()
             DagBackAction.GoBackInPage -> tab?.session?.goBack()
             DagBackAction.GoHome -> tab?.let(::goHome)
             DagBackAction.ExitBrowser -> finish()
@@ -2456,13 +2470,18 @@ class DagBrowserActivity : Activity() {
 
     override fun onStart() {
         super.onStart()
-        tabs.filter { it.thumbnail == null }.forEach(::restoreTabThumbnail)
+        if (tabSwitcher.isOpen()) {
+            tabThumbnailResidencyRequested = true
+            tabs.filter { it.thumbnail == null }.forEach(::restoreTabThumbnail)
+        }
         activeTab?.let { setTabActivity(it, active = true) }
     }
 
     override fun onStop() {
         dismissActiveChoicePrompt()
         persistTabsNow()
+        tabThumbnailResidencyRequested = false
+        releaseTabThumbnails()
         activeTab?.let { setTabActivity(it, active = false) }
         hibernateInactiveTabs()
         super.onStop()
@@ -2472,13 +2491,13 @@ class DagBrowserActivity : Activity() {
     override fun onTrimMemory(level: Int) {
         super.onTrimMemory(level)
         if (level >= ComponentCallbacks2.TRIM_MEMORY_UI_HIDDEN) {
+            releaseNavigationFrame()
             releaseTabThumbnails()
             hibernateInactiveTabs()
         }
     }
 
     private fun releaseTabThumbnails() {
-        releaseNavigationFrame()
         tabs.forEach { tab ->
             tab.previewRevision += 1
             tab.thumbnail = null

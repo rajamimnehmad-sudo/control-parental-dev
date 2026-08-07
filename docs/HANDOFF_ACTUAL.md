@@ -6,10 +6,33 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## DAG Browser 164: miniaturas de pestanas bajo demanda
+
+- DAG 164 (`0.69.68-dev`) esta instalado en el SM-S908E con datos preservados;
+  la extension integrada permanece en `1.81.0`.
+- La causa del consumo evitable era Android, no Gecko ni GloshIA: al iniciar,
+  la actividad restauraba en memoria miniaturas de todas las pestanas aunque
+  el selector estuviera cerrado. Una restauracion asincrona tambien podia
+  terminar despues del cierre y volver a retener su bitmap.
+- Las miniaturas persistidas ahora se cargan solo al abrir el selector y se
+  liberan al cerrarlo o cuando la actividad deja de estar visible. Los
+  resultados asincronos tardios se descartan si el selector ya no las necesita.
+- El frame de navegacion que evita destellos queda separado y no se libera al
+  cerrar el selector. Se mantienen tres sesiones Gecko abiertas para no
+  degradar el cambio entre pestanas.
+- Medicion fisica con 15 pestanas: selector cerrado, 1 bitmap / 8.505 KiB;
+  abierto, 5 / 25.713 KiB; vuelto a cerrar, 2 / 8.516 KiB. Google Imagenes
+  continuo mostrando fotos despues del cambio.
+- GloshIA R3.1, umbral, politica, extension, publicidad, video, scheduler,
+  hilos y ONNX permanecen intactos. Tests JS 21/21, unitarios, Ktlint y APK son
+  correctos.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v164-tab-thumbnail-residency-sm-s908e-2026-08-06.md`.
+
 ## DAG Browser 163: Google Imagenes y reconciliacion tardia
 
-- DAG 163 (`0.69.67-dev`) esta instalado en el SM-S908E con datos preservados;
-  la extension integrada es `1.81.0`.
+- DAG 163 (`0.69.67-dev`) corrigio Google Imagenes; DAG 164 conserva esa
+  extension y ese comportamiento.
 - Google Imagenes podia conservar vacias miniaturas ya aprobadas: a 10 segundos
   habia 108 imagenes decodificadas y solo 58 estables; las 50 fotos reales
   restantes habian terminado despues del ultimo barrido de 4 segundos.
