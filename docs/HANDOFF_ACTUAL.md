@@ -6,6 +6,27 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## GloshIA Visual R4: lote de entrenamiento cerrado en NO-GO
+
+- R3.1 continúa como único modelo oficial, con umbral `0,40`, política visual y
+  pipeline intactos. No se exportó ONNX ni APK y `frozen_test`/`final_sealed`
+  permanecen cerrados.
+- Sobre 162 grupos revisados por el propietario, el reentrenamiento limpio tipo
+  R1 redujo falsos permisos de 31 a 9, pero elevó falsos filtros de 54 a 56 y
+  degradó todas las validaciones originales; fue rechazado.
+- Los pilotos acotados posteriores también quedaron `NO-GO`: interpolación de
+  pesos, cabeza residual sobre R3.1, MobileNetV4 Conv Small y TinyCLIP 40M/32.
+  Los backbones alternativos captaron positivos, pero sobrebloquearon el control
+  fijo (18 a 35 falsos filtros, con límite 5).
+- Se eliminaron checkpoints y código experimental rechazado; sólo permanecen
+  informes JSON privados. No repetir variantes locales de pesos o arquitectura
+  con este mismo corpus.
+- Próximo paso autorizado sólo como propuesta: corpus independiente de positivos
+  y negativos cercanos, agrupado por identidad/origen, seguido por entrenamiento
+  o destilación con GPU bajo los gates ya congelados. Requiere autorización
+  nueva. Evidencia y detalle:
+  `docs/dag/v3/GLOSHIA_R4_THUMBNAIL_REPAIR_PILOT_2026-08-09.md`.
+
 ## Candidato validado local: DAG Browser 183
 
 - DAG 183 (`0.69.87-dev`) esta instalado en el SM-S908E con datos preservados;

@@ -354,3 +354,49 @@ simultáneamente seguridad y falsos bloqueos con el corpus actual. No repetir
 esta receta ni volver a variar la última capa; el siguiente experimento debe
 evaluar una representación compacta diferente bajo los mismos folds y gates,
 con autorización separada antes de entrenar o integrar.
+
+### Cierre de representaciones compactas locales
+
+El propietario autorizó cerrar el lote con un gate más exigente y alineado con
+seguridad: máximo 15 falsos permisos sobre los 162 grupos, sin superar los 54
+falsos filtros de R3.1; además, cada candidato debía conservar originales en
+máximo 1/7 y 2/21, y las 112 vistas fijas en máximo 12/28 y 5/84. Se mantuvieron
+un solo modelo, el umbral `0,40` y una única inferencia por imagen.
+
+Se hicieron únicamente pilotos de fold 0 y se detuvo cada vía al fallar el
+control fijo:
+
+| representación | configuración | control fijo FP/FF | originales FP/FF | retenido FP/FF | decisión |
+| --- | --- | ---: | ---: | ---: | --- |
+| R3.1 + pesos interpolados | 25 % del reentrenamiento limpio | 12/6 | 2/1 | 5/11 | `NO-GO` |
+| R3.1 + cabeza residual MLP | encoder congelado, 16.449 parámetros | 11/4 | 1/1 | 7/11 | `NO-GO` |
+| MobileNetV4 Conv Small | cabeza logística balanceada | 9/35 | 2/6 | 1/14 | `NO-GO` |
+| MobileNetV4 Conv Small | cabeza logística sin balance | 11/22 | 2/2 | 5/10 | `NO-GO` |
+| TinyCLIP 40M/32 | cabeza logística balanceada | 6/28 | 2/5 | 2/13 | `NO-GO` |
+| TinyCLIP 40M/32 | cabeza logística sin balance | 9/18 | 2/3 | 3/9 | `NO-GO` |
+
+La interpolación altera demasiado pronto la frontera que R3.1 ya protege. La
+cabeza residual preserva el control, pero no generaliza a los grupos retenidos.
+Los dos encoders alternativos reconocen más positivos, pero confunden demasiados
+negativos visualmente cercanos y no cumplen el límite de falsos filtros. No se
+justifica ejecutar cinco folds, afinar backbones completos, exportar ONNX ni
+medir Android con candidatos que ya fallan el control funcional.
+
+MobileNetV4 se evaluó desde el modelo `timm` Apache-2.0; sus pesos ImageNet
+requieren revisión legal antes de cualquier producto. TinyCLIP 40M/32 proviene
+del proyecto MIT de Microsoft/Cream, pero su visión desplegable tiene 39,7 M de
+parámetros y 3,5 GFLOPs teóricos frente a 2,0 GFLOPs del TinyCLIP actual. Apple
+MobileCLIP fue descartado antes de descargar o medir porque la licencia de sus
+pesos prohíbe uso comercial.
+
+Resultado final del lote: ningún candidato reemplaza a R3.1. Todos los
+checkpoints y entrenadores experimentales rechazados fueron retirados; sólo se
+conservan JSON pequeños de evidencia privada. R3.1, Android, APK, umbral y
+política permanecen intactos; `frozen_test` y `final_sealed` siguen cerrados.
+
+El siguiente paso seguro ya no es otra búsqueda local de arquitectura o pesos.
+Requiere ampliar el corpus con negativos cercanos independientes —no elegidos
+sólo por ser errores de R3.1— y positivos equivalentes, separados por identidad
+y origen; después, entrenar o destilar en GPU una representación compacta y
+evaluarla una sola vez con estos gates congelados. Ese trabajo necesita un
+ticket y autorización nuevos.
