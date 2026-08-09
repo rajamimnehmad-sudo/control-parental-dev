@@ -557,15 +557,20 @@ Supabase, Production ni GitHub. Evidencia:
 
 El piloto local `GLOSHIA-R4-THUMBNAIL-REPAIR` confirmó una regresión general de
 R3.1 ante miniaturas: sobre 7 positivos de validation detectó 6 originales,
-pero solo 2 variantes circulares; hubo 8 degradaciones peligrosas `filter` a
+pero solo 2 variantes con máscara elíptica contenida; hubo 8 degradaciones peligrosas `filter` a
 `allow` en 84 pares. Se generaron 360 variantes train y 84 validation,
 agrupadas sin contaminación; `frozen_test` y `final_sealed` permanecieron
 cerrados. Dos fine-tunes conservadores redujeron falsos permisos globales de
 12/28 a 11/28, pero elevaron falsos filtros de 5/84 a 7/84 y 10/84, sin
-corregir ninguna circular peligrosa. Resultado `NO-GO`: no se exportó ni
-integró modelo y R3.1 continúa oficial. Próximo paso: un único experimento con
-pérdida explícita de consistencia original-variante y gates congelados, no más
-ajustes de peso. Evidencia:
+corregir ninguna variante enmascarada peligrosa. Un entrenador posterior dio
+el mismo peso a cada familia, ancló originales al ONNX R3.1 oficial e impuso
+consistencia explícita. Redujo degradaciones peligrosas de 8 a 4, pero dejó
+5/7 falsos permisos enmascarados, creó 2/21 falsos filtros y empeoró originales
+de 1/7 a 2/7 falsos permisos; también queda `NO-GO`. La transformación histórica
+`circle128_q45` preserva aspecto y genera elipses, no un recorte circular real.
+Próximo paso: generar recortes cuadrados centrados y revisar una cola humana
+mínima antes de otro entrenamiento; no más ajustes de peso. No se exportó ni
+integró modelo y R3.1 continúa oficial. Evidencia:
 `docs/dag/v3/GLOSHIA_R4_THUMBNAIL_REPAIR_PILOT_2026-08-09.md`.
 
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo

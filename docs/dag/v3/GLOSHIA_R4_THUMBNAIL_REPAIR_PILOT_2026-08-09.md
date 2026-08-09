@@ -9,13 +9,16 @@ Final sealed: cerrado
 ## Objetivo
 
 Medir y reparar la pérdida de señal de GloshIA Visual cuando una imagen se
-presenta como miniatura pequeña, comprimida o circular. No se cambió el modelo
+presenta como miniatura pequeña, comprimida o enmascarada. No se cambió el modelo
 integrado, el umbral `0,40`, la política regional, Android ni el APK.
 
 ## Datos reproducibles
 
 Se partió del split privado agrupado R3.2 y se generaron transformaciones de la
-imagen completa: `thumb160_q45`, `thumb96_q35` y `circle128_q45`. No se crearon
+imagen completa: `thumb160_q45`, `thumb96_q35` y `circle128_q45`. Esta última
+conserva la relación de aspecto y aplica una elipse sobre la imagen contenida;
+su nombre histórico es impreciso y no representa un `object-fit: cover`
+circular real. No se crearon
 recortes regionales automáticos porque un recorte puede eliminar el hecho que
 justificó la etiqueta y requiere revisión humana separada.
 
@@ -40,11 +43,12 @@ Sobre 28 originales y sus 84 variantes, R3.1 produjo:
 | original | 1/7 | 2/21 |
 | 160 px | 3/7 | 3/21 |
 | 96 px | 3/7 | 0/21 |
-| circular | 5/7 | 0/21 |
+| máscara elíptica contenida | 5/7 | 0/21 |
 
 Hubo 13 cambios de decisión en 84 pares; 8 fueron degradaciones peligrosas de
 `filter` a `allow`. La caída circular de recall filter, de 6/7 originales a
-2/7 circulares, confirma la causa que motivó el ticket.
+2/7 enmascaradas, confirma una pérdida de señal por reducción y máscara, pero
+no demuestra por sí sola el comportamiento de un recorte circular real.
 
 ## Pilotos
 
@@ -58,8 +62,8 @@ entrenó en CPU local y se seleccionó sólo con validation.
 | piloto 02 | 1 época, LR 0,25, peso 1,0 | 11/28 | 10/84 | NO-GO |
 
 El piloto 01 mejoró una miniatura peligrosa de 160 px y conservó originales,
-pero no corrigió ninguna circular peligrosa. El piloto 02 tampoco corrigió las
-circulares y agregó tres falsos filtros circulares. Seguir variando pesos no
+pero no corrigió ninguna variante enmascarada peligrosa. El piloto 02 tampoco
+las corrigió y agregó tres falsos filtros enmascarados. Seguir variando pesos no
 está justificado.
 
 ## Decisión y siguiente paso
@@ -68,9 +72,20 @@ La ampliación de datos con clasificación independiente queda rechazada. No se
 exporta ONNX, no se abre `frozen_test`, no se instala APK y R3.1 continúa como
 único modelo oficial.
 
-El siguiente experimento razonado debe imponer consistencia explícita entre el
-logit del original y los logits de sus variantes, además de la pérdida binaria.
-Antes de entrenar se deben congelar coeficiente, gates por variante y límites
-de regresión en originales e inocentes. Si ese enfoque falla, se prepara una
-cola humana pequeña de recortes ambiguos; no se crean excepciones por sitio ni
-se modifica la política para rescatar al candidato.
+## Piloto de consistencia explícita
+
+Se implementó un entrenador aislado que asigna el mismo peso a cada familia,
+acerca cada variante al original y ancla el original a la salida exacta del
+ONNX R3.1 oficial. Los ocho gates se congelaron antes de entrenar. El epoch 1
+redujo las degradaciones peligrosas entre pares de 8 a 4 y los falsos permisos
+agregados de 11 a 10, pero falló el gate: originales 1→2 falsos permisos,
+variantes enmascaradas 5→5 falsos permisos y 0→2 falsos filtros, y pares seguros
+1→3 degradaciones. El epoch 2 produjo las mismas decisiones. Resultado:
+`NO-GO`, sin exportación ni apertura de `frozen_test`.
+
+El siguiente paso fiable es generar recortes cuadrados centrados con máscara
+circular real y revisar humanamente una cola mínima preseleccionada. No se puede
+heredar automáticamente la etiqueta del original porque el recorte puede quitar
+el hecho visual que la justificaba. Solo después de esa revisión corresponde
+entrenar otro candidato. No se crean excepciones por sitio ni se modifica la
+política para rescatar al candidato.
