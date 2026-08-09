@@ -582,6 +582,17 @@ otros la enfatizan; por eso el manifiesto es solo `review_only`, no contiene
 `target` entrenable y conserva `training_authorized: false`. Falta la revisión
 humana de esas 24 vistas antes de cualquier nuevo entrenamiento.
 
+La revisión humana terminó: 10 allow, 11 filter y 3 doubt excluidas. El
+propietario confirmó política privada desde aproximadamente 5 años o edad
+incierta para presentación femenina, sin aplicar esas señales automáticamente
+a presentación masculina; el escote no necesita ser grande/profundo y una
+persona relevante no evaluable en miniatura queda fail-closed. En las 21
+binarias R3.1 produce 5/10 falsos filtros y 6/11 falsos permisos. El pool
+autorizado quedó en
+`.codex-tmp/gloshia-r4-thumbnail-repair-20260809/circle-review-01/reviewed-pool.json`,
+todavía sin split y no aprobado para ONNX/APK. Próximo paso: A/B cruzado por
+grupos con gates congelados para miniaturas y fotos completas.
+
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
 `com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para

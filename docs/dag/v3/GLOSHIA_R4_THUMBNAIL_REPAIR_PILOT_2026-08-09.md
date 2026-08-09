@@ -99,3 +99,18 @@ persona o señal del original y quedan autos, muebles o ropa; en otros el nuevo
 encuadre enfatiza una señal antes secundaria. El manifiesto queda marcado
 `review_only_not_training_data`, sin `target` entrenable y con
 `training_authorized: false` hasta revisión.
+
+El propietario completó las 24 decisiones: 10 `allow`, 11 `filter` y 3
+`doubt`. Las dudas fueron excluidas. La política privada quedó congelada como
+`gloshia-r4-owner-visual-policy-v1`: las señales femeninas se aplican desde
+aproximadamente 5 años o edad incierta; no se aplican automáticamente a
+presentación masculina; un escote no necesita ser grande o profundo; y una
+miniatura con persona potencialmente relevante pero evidencia insuficiente
+queda cerrada. La misma regla visual aplica a imagen completa y miniatura, pero
+un recorte puede cambiar la decisión si cambia los hechos visibles.
+
+El pool derivado contiene 21 casos claros autorizados para experimento privado
+(10 allow/11 filter) y 0 dudas. R3.1 tiene en este conjunto deliberadamente
+difícil 5/10 falsos filtros y 6/11 falsos permisos. El pool aún no tiene split y
+no autoriza ONNX, APK ni cambio de runtime. Artefacto privado:
+`.codex-tmp/gloshia-r4-thumbnail-repair-20260809/circle-review-01/reviewed-pool.json`.
