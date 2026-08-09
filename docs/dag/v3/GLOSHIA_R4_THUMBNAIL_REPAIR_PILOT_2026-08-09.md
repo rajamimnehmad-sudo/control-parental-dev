@@ -89,3 +89,13 @@ heredar automáticamente la etiqueta del original porque el recorte puede quitar
 el hecho visual que la justificaba. Solo después de esa revisión corresponde
 entrenar otro candidato. No se crean excepciones por sitio ni se modifica la
 política para rescatar al candidato.
+
+La cola quedó preparada fuera de Git en
+`.codex-tmp/gloshia-r4-thumbnail-repair-20260809/circle-review-01/`: se
+generaron y puntuaron 642 recortes train, y se conservaron solo 24 para revisión
+(12 por etiqueta del padre), priorizando desacuerdos fuertes de R3. La inspección
+confirmó que la etiqueta no es heredable: en varios recortes desaparece la
+persona o señal del original y quedan autos, muebles o ropa; en otros el nuevo
+encuadre enfatiza una señal antes secundaria. El manifiesto queda marcado
+`review_only_not_training_data`, sin `target` entrenable y con
+`training_authorized: false` hasta revisión.

@@ -573,6 +573,15 @@ mínima antes de otro entrenamiento; no más ajustes de peso. No se exportó ni
 integró modelo y R3.1 continúa oficial. Evidencia:
 `docs/dag/v3/GLOSHIA_R4_THUMBNAIL_REPAIR_PILOT_2026-08-09.md`.
 
+La cola mínima ya fue preparada: 642 recortes train cuadrados/circulares reales
+se puntuaron localmente y se redujeron a 24 casos informativos, balanceados
+12/12 por etiqueta padre, bajo
+`.codex-tmp/gloshia-r4-thumbnail-repair-20260809/circle-review-01/`. La
+inspección confirmó que varios recortes eliminan la señal o persona original y
+otros la enfatizan; por eso el manifiesto es solo `review_only`, no contiene
+`target` entrenable y conserva `training_authorized: false`. Falta la revisión
+humana de esas 24 vistas antes de cualquier nuevo entrenamiento.
+
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
 `com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para
