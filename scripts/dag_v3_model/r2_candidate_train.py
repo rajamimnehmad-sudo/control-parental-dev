@@ -159,7 +159,7 @@ def main() -> int:
     train, validation = _load_split(args.split, args.image_root)
     initial = torch.load(args.initial_checkpoint, map_location="cpu", weights_only=False)
     vision_state, projection_state, classifier_coef, classifier_intercept = _checkpoint_components(initial)
-    base = AutoModel.from_pretrained(MODEL_ID)
+    base = AutoModel.from_pretrained(MODEL_ID, local_files_only=True)
     base.vision_model.load_state_dict(vision_state)
     base.visual_projection.load_state_dict(projection_state)
 
@@ -185,7 +185,7 @@ def main() -> int:
     for parameter in model.vision_model.post_layernorm.parameters():
         parameter.requires_grad = True
 
-    processor = AutoProcessor.from_pretrained(MODEL_ID)
+    processor = AutoProcessor.from_pretrained(MODEL_ID, local_files_only=True)
     train_loader = DataLoader(TinyDataset(train, processor, augment=True), batch_size=8, shuffle=True, num_workers=0)
     validation_loader = DataLoader(TinyDataset(validation, processor, augment=False), batch_size=8, shuffle=False, num_workers=0)
     counts = np.bincount([record["target"] for record in train], minlength=2)

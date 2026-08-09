@@ -555,6 +555,19 @@ accuracy `96,43 %` y PR-AUC `0,963054`. Su FP32 abre en ORT CPU pero pesa
 Supabase, Production ni GitHub. Evidencia:
 `docs/dag/v3/GLOSHIA_R3_2_DIRECTED_REPAIR_TRAIN_2026-08-05.md`.
 
+El piloto local `GLOSHIA-R4-THUMBNAIL-REPAIR` confirmó una regresión general de
+R3.1 ante miniaturas: sobre 7 positivos de validation detectó 6 originales,
+pero solo 2 variantes circulares; hubo 8 degradaciones peligrosas `filter` a
+`allow` en 84 pares. Se generaron 360 variantes train y 84 validation,
+agrupadas sin contaminación; `frozen_test` y `final_sealed` permanecieron
+cerrados. Dos fine-tunes conservadores redujeron falsos permisos globales de
+12/28 a 11/28, pero elevaron falsos filtros de 5/84 a 7/84 y 10/84, sin
+corregir ninguna circular peligrosa. Resultado `NO-GO`: no se exportó ni
+integró modelo y R3.1 continúa oficial. Próximo paso: un único experimento con
+pérdida explícita de consistencia original-variante y gates congelados, no más
+ajustes de peso. Evidencia:
+`docs/dag/v3/GLOSHIA_R4_THUMBNAIL_REPAIR_PILOT_2026-08-09.md`.
+
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
 `com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para
