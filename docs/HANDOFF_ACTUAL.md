@@ -625,6 +625,14 @@ de piernas femeninas, escotes, hombros, sujetos pequeños y negativos cercanos,
 preetiquetado de forma asistida y agrupado por identidad visual/origen. No se
 modificó R3.1, Android, umbral, política, APK ni `final_sealed`.
 
+El propietario autorizó el corpus semántico dirigido. Se congeló un plan de
+120 vistas: 36 ropa moderna, 30 deportes/sensibles, 18 personas comerciales,
+16 sujetos parciales/pequeños y 20 negativos cercanos. Tras excluir 45 grupos
+ya revisados, R3.1 puntuó 597 recortes y se seleccionaron 120 grupos únicos,
+repartidos en cinco tandas balanceadas de 24 bajo `targeted-review-v1/`. Las
+cinco láminas están preparadas; falta aceptar/corregir sus propuestas antes de
+fusionar etiquetas o entrenar. R3.1 y `final_sealed` permanecen intactos.
+
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
 `com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para

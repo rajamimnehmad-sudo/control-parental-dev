@@ -229,3 +229,20 @@ sujetos pequeños y negativos visualmente cercanos, con agrupación por persona,
 sesión y origen. Puede preetiquetarse de forma asistida para minimizar trabajo,
 pero las correcciones del propietario siguen siendo el gate de política. Este
 corpus dirigido todavía no está autorizado ni preparado.
+
+### Corpus semántico dirigido autorizado
+
+El propietario autorizó preparar 120 vistas nuevas con revisión asistida. El
+plan quedó congelado en `r4_targeted_review_plan_v1.json`: 36 ropa moderna, 30
+deportes/sensibles, 18 personas comerciales, 16 sujetos parciales o pequeños y
+20 negativos/catálogos/banners/controles cercanos. La selección usa 62 padres
+filter y 58 allow únicamente como estratos diagnósticos; esa etiqueta no se
+copia al recorte.
+
+Se excluyeron los 45 grupos ya presentes en las dos colas anteriores. R3.1
+puntuó 597 recortes restantes y se eligieron 120 errores fuertes dentro de los
+estratos semánticos, con 120 grupos únicos. Quedaron cinco tandas numeradas de
+24 bajo `.codex-tmp/gloshia-r4-thumbnail-repair-20260809/targeted-review-v1/`.
+Cada tanda contiene manifiesto, imágenes y `review-sheet.png`. Ninguna decisión
+está autorizada para entrenamiento hasta que el propietario acepte o corrija la
+propuesta asistida; no se abrió ningún examen sellado ni se entrenó modelo.

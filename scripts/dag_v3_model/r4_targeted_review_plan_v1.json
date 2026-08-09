@@ -1,0 +1,26 @@
+{
+  "schema_version": "gloshia-r4-targeted-review-plan-v1",
+  "authorized_total": 120,
+  "batch_size": 24,
+  "selection": "hard R3 crop disagreements within semantic strata; parent label is diagnostic only",
+  "strata": [
+    {"category": "modern_clothing", "parent_allow": 10, "parent_filter": 26},
+    {"category": "sports_and_sensitive", "parent_allow": 10, "parent_filter": 20},
+    {"category": "commercial_people", "parent_allow": 11, "parent_filter": 7},
+    {"category": "partial_or_small_subject", "parent_allow": 11, "parent_filter": 5},
+    {"category": "retail_catalog_fashion", "parent_allow": 6, "parent_filter": 2},
+    {"category": "commercial_banner_people", "parent_allow": 3, "parent_filter": 1},
+    {"category": "commercial_banner_safe", "parent_allow": 3, "parent_filter": 1},
+    {"category": "object_controls", "parent_allow": 4, "parent_filter": 0}
+  ],
+  "policy_targets": [
+    "female legs and knees",
+    "necklines and upper chest",
+    "shoulders and elbows",
+    "small or partially visible relevant people",
+    "visually similar safe men, sports, products, controls and commercial scenes"
+  ],
+  "training_authorized_before_owner_review": false,
+  "runtime_change_authorized": false,
+  "threshold_change_authorized": false
+}
