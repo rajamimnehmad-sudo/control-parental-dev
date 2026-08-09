@@ -127,7 +127,7 @@ class FamilyDataset:
     def __len__(self) -> int:
         return len(self.families)
 
-    def __getitem__(self, index: int) -> tuple[Any, Any, Any]:
+    def __getitem__(self, index: int) -> tuple[Any, Any, Any, Any, Any]:
         import torch
         from PIL import Image, ImageOps
 
@@ -145,10 +145,12 @@ class FamilyDataset:
             torch.stack(tensors),
             torch.tensor(float(family[0]["target"]), dtype=torch.float32),
             torch.tensor(float(self.teacher[family[0]["sample_id"]]), dtype=torch.float32),
+            torch.tensor(float(family[0].get("training_weight", 1.0)), dtype=torch.float32),
+            torch.tensor(bool(family[0].get("teacher_anchor", True)), dtype=torch.bool),
         )
 
 
-def family_collate(rows: list[tuple[Any, Any, Any]]) -> dict[str, Any]:
+def family_collate(rows: list[tuple[Any, Any, Any, Any, Any]]) -> dict[str, Any]:
     import torch
 
     pixels = []
@@ -158,14 +160,18 @@ def family_collate(rows: list[tuple[Any, Any, Any]]) -> dict[str, Any]:
     child_indices = []
     child_parent_indices = []
     teacher_probabilities = []
+    family_weights = []
+    teacher_anchor_mask = []
     cursor = 0
-    for family_index, (family_pixels, target, teacher_probability) in enumerate(rows):
+    for family_index, (family_pixels, target, teacher_probability, family_weight, teacher_anchor) in enumerate(rows):
         views = int(family_pixels.shape[0])
         pixels.append(family_pixels)
         targets.extend([target] * views)
         family_indices.extend([family_index] * views)
         parent_indices.append(cursor)
         teacher_probabilities.append(teacher_probability)
+        family_weights.append(family_weight)
+        teacher_anchor_mask.append(teacher_anchor)
         for child_index in range(cursor + 1, cursor + views):
             child_indices.append(child_index)
             child_parent_indices.append(cursor)
@@ -178,6 +184,8 @@ def family_collate(rows: list[tuple[Any, Any, Any]]) -> dict[str, Any]:
         "child_indices": torch.tensor(child_indices, dtype=torch.long),
         "child_parent_indices": torch.tensor(child_parent_indices, dtype=torch.long),
         "teacher_probabilities": torch.stack(teacher_probabilities),
+        "family_weights": torch.stack(family_weights),
+        "teacher_anchor_mask": torch.stack(teacher_anchor_mask),
         "family_count": len(rows),
     }
 
@@ -201,7 +209,14 @@ def family_losses(
     family_counts = torch.zeros(batch["family_count"], dtype=logits.dtype, device=device)
     family_sums.scatter_add_(0, family_indices, per_view)
     family_counts.scatter_add_(0, family_indices, torch.ones_like(per_view))
-    classification = (family_sums / family_counts).mean()
+    family_means = family_sums / family_counts
+    family_weights = batch.get("family_weights")
+    if family_weights is None:
+        family_weights = torch.ones(batch["family_count"], dtype=logits.dtype)
+    family_weights = family_weights.to(device=device, dtype=logits.dtype)
+    if bool(torch.any(family_weights <= 0)):
+        raise ValueError("family training weights must be positive")
+    classification = (family_means * family_weights).sum() / family_weights.sum()
 
     parent_indices = batch["parent_indices"].to(device)
     child_indices = batch["child_indices"].to(device)
@@ -214,10 +229,17 @@ def family_losses(
         )
     else:
         consistency = logits.sum() * 0.0
-    anchor = functional.mse_loss(
-        probabilities[parent_indices],
-        batch["teacher_probabilities"].to(device),
-    )
+    teacher_anchor_mask = batch.get("teacher_anchor_mask")
+    if teacher_anchor_mask is None:
+        teacher_anchor_mask = torch.ones(batch["family_count"], dtype=torch.bool)
+    teacher_anchor_mask = teacher_anchor_mask.to(device=device, dtype=torch.bool)
+    if bool(torch.any(teacher_anchor_mask)):
+        anchor = functional.mse_loss(
+            probabilities[parent_indices][teacher_anchor_mask],
+            batch["teacher_probabilities"].to(device)[teacher_anchor_mask],
+        )
+    else:
+        anchor = logits.sum() * 0.0
     total = classification + consistency_weight * consistency + anchor_weight * anchor
     return total, {
         "classification": float(classification.detach().cpu()),
@@ -443,9 +465,9 @@ def main() -> int:
             "anchor_weight": args.anchor_weight,
             "weight_decay": args.weight_decay,
             "batch_families": 8,
-            "family_weighting": "mean BCE per family, then mean families",
+            "family_weighting": "mean BCE per family, then weighted mean using optional training_weight",
             "consistency": "MSE child probability to detached current parent probability",
-            "anchor": "MSE parent probability to official R3.1 ONNX probability",
+            "anchor": "MSE parent probability to official R3.1 ONNX probability unless teacher_anchor=false",
         },
         "baseline_gate": baseline_augmentation,
         "history": history,

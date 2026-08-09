@@ -600,6 +600,19 @@ permanece oficial; R1 queda solo como comparador de desacuerdos. Próximo paso:
 A/B cruzado por grupos para un candidato nuevo, con gates congelados para
 miniaturas, cuerpos/escotes y fotos completas.
 
+El A/B agrupado ya se ejecutó y ambos candidatos quedaron `NO-GO`. Los 21
+recortes forman 21 grupos únicos y 10 cambian legítimamente de etiqueta frente
+a su foto padre, causa que invalida la consistencia automática anterior. Una
+cabeza lineal redujo OOF de 6 a 4 falsos permisos, pero subió falsos filtros de
+5 a 6 y deterioró fotos completas en los cinco folds. Un ajuste mínimo de la
+última capa visual preservó fotos completas, redujo falsos permisos sintéticos
+de 11 a 9 y degradaciones peligrosas de 8 a 6, pero creó un falso filtro
+circular y no generalizó: OOF quedó exactamente en 6/11 falsos permisos y 5/10
+falsos filtros. No se exportó ni integró modelo. Se preparó `circle-review-02`
+con 24 casos nuevos de 621, excluyendo los 21 grupos previos; falta una única
+revisión del propietario sobre `review-sheet.png` antes de cualquier otro
+entrenamiento.
+
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
 `com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para

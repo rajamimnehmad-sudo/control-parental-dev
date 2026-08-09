@@ -161,3 +161,43 @@ Evidencia privada reproducible:
 
 No se cambió el modelo oficial, el umbral, la política, DAG, Android ni el APK;
 `final_sealed` permanece cerrado.
+
+## Reparación agrupada con decisiones del propietario
+
+Los 21 recortes se dividieron antes de entrenar en cinco folds estratificados,
+con 21 grupos únicos. Cada fold excluye de train tanto el recorte como la foto
+padre y cualquier variante de su grupo. La inspección confirmó la causa del
+fracaso de la consistencia anterior: 10/21 recortes cambian legítimamente de
+decisión respecto de su padre (cinco `allow→filter` y cinco `filter→allow`).
+Por eso no se volvió a imponer igualdad entre vistas.
+
+El gate congelado exigió reducir OOF de 6 a 4 falsos permisos o menos sin
+superar 5 falsos filtros. Además, cada fold debía conservar fotos completas en
+como máximo 1/7 falsos permisos y 2/21 falsos filtros, y validation completa en
+como máximo 12/28 y 5/84 respectivamente.
+
+El piloto lineal congeló encoder y proyección y ajustó sólo los 513 parámetros
+de la cabeza con destilación del checkpoint R3.1. OOF mejoró a 4/11 falsos
+permisos, pero empeoró a 6/10 falsos filtros. Los cinco modelos deterioraron las
+fotos completas y los falsos filtros validation; resultado `NO-GO`, sin
+checkpoint final.
+
+El piloto de representación mantuvo la misma arquitectura y habilitó sólo la
+última capa visual, normalización, proyección y cabeza. Los recortes humanos de
+train recibieron peso acotado y quedaron sin ancla al padre; el resto conservó
+anclaje al ONNX R3.1. En cada fold mantuvo fotos completas exactamente en 1/7
+falsos permisos y 2/21 falsos filtros, redujo los falsos permisos de variantes
+de 11 a 9 y las degradaciones peligrosas de 8 a 6. Sin embargo creó 1 falso
+filtro circular donde R3.1 tenía 0 y, en OOF sobre los 21 recortes humanos,
+quedó exactamente igual que R3.1: 6/11 falsos permisos y 5/10 falsos filtros.
+Resultado `NO-GO`; no exportar ni integrar.
+
+La conclusión ya no depende de elegir pesos: 21 grupos difíciles alcanzan para
+detectar regresiones, pero no para generalizar a personas nuevas. Seguir
+entrenando sobre ellos sería sobreajuste. Se preparó una segunda cola activa
+excluyendo los 21 grupos anteriores: 621 recortes fueron puntuados y se
+seleccionaron 24 nuevos, 12/12 por etiqueta padre, en
+`.codex-tmp/gloshia-r4-thumbnail-repair-20260809/circle-review-02/`. La lámina
+numerada `review-sheet.png` permite corregir una propuesta de etiquetas en un
+solo mensaje. Hasta completar esa revisión, la cola es sólo
+`review_only_not_training_data`.

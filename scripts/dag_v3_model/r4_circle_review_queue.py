@@ -16,7 +16,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Any
 
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageFont, ImageOps
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -55,6 +55,40 @@ def select_review_rows(rows: list[dict[str, Any]], per_parent_label: int) -> lis
     return sorted(selected, key=lambda row: (int(row["parent_target"]), str(row["sample_id"])))
 
 
+def excluded_groups(payloads: list[dict[str, Any]]) -> set[str]:
+    return {
+        str(row.get("group_key") or row.get("source_cluster"))
+        for payload in payloads
+        for row in payload.get("records", [])
+        if row.get("group_key") or row.get("source_cluster")
+    }
+
+
+def render_contact_sheet(rows: list[dict[str, Any]], output: Path, columns: int = 4) -> None:
+    if columns < 1 or not rows:
+        raise ValueError("contact sheet needs rows and positive columns")
+    tile_width, tile_height = 224, 244
+    sheet_rows = (len(rows) + columns - 1) // columns
+    sheet = Image.new("RGB", (columns * tile_width, sheet_rows * tile_height), (245, 245, 245))
+    draw = ImageDraw.Draw(sheet)
+    try:
+        font = ImageFont.load_default(size=24)
+    except TypeError:
+        font = ImageFont.load_default()
+    for index, row in enumerate(rows):
+        number = int(row.get("review_number") or index + 1)
+        left = (index % columns) * tile_width
+        top = (index // columns) * tile_height
+        with Image.open(row["image_path"]) as opened:
+            image = ImageOps.contain(opened.convert("RGB"), (208, 208), method=Image.Resampling.NEAREST)
+        image_left = left + (tile_width - image.width) // 2
+        sheet.paste(image, (image_left, top + 32))
+        draw.text((left + 8, top + 3), str(number), fill=(10, 10, 10), font=font)
+        draw.rectangle((left, top, left + tile_width - 1, top + tile_height - 1), outline=(170, 170, 170), width=1)
+    output.parent.mkdir(parents=True, exist_ok=True)
+    sheet.save(output, format="PNG", optimize=True)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--split", required=True, type=Path)
@@ -62,6 +96,8 @@ def main() -> int:
     parser.add_argument("--output-dir", required=True, type=Path)
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--per-parent-label", type=int, default=12)
+    parser.add_argument("--exclude-manifest", action="append", type=Path, default=[])
+    parser.add_argument("--contact-sheet", type=Path)
     args = parser.parse_args()
     if args.per_parent_label < 1:
         raise ValueError("--per-parent-label must be positive")
@@ -73,10 +109,15 @@ def main() -> int:
     from pilot_tinyclip_candidate import MODEL_ID
 
     payload = json.loads(args.split.read_text(encoding="utf-8"))
+    excluded = excluded_groups(
+        [json.loads(path.read_text(encoding="utf-8")) for path in args.exclude_manifest]
+    )
     originals = [
         row
         for row in payload["records"]
-        if row.get("split") == "train" and not row.get("parent_sample_id")
+        if row.get("split") == "train"
+        and not row.get("parent_sample_id")
+        and str(row.get("group_key") or row.get("source_cluster")) not in excluded
     ]
     processor = AutoProcessor.from_pretrained(MODEL_ID, local_files_only=True)
     session = ort.InferenceSession(str(args.model), providers=["CPUExecutionProvider"])
@@ -110,6 +151,8 @@ def main() -> int:
             }
         )
     selected = select_review_rows(candidates, args.per_parent_label)
+    for review_number, row in enumerate(selected, start=1):
+        row["review_number"] = review_number
     selected_paths = {row["image_path"] for row in selected}
     for path in args.output_dir.iterdir():
         if str(path.resolve()) not in selected_paths:
@@ -120,6 +163,7 @@ def main() -> int:
         "geometry": "center square cover crop, 128px circular mask, JPEG q45",
         "selection": "balanced by parent label; R3/parent disagreements first, then margin severity",
         "candidate_count": len(candidates),
+        "excluded_reviewed_groups": len(excluded),
         "selected_count": len(selected),
         "selected_parent_allow": sum(int(row["parent_target"]) == 0 for row in selected),
         "selected_parent_filter": sum(int(row["parent_target"]) == 1 for row in selected),
@@ -129,6 +173,8 @@ def main() -> int:
     }
     args.manifest.parent.mkdir(parents=True, exist_ok=True)
     args.manifest.write_text(json.dumps(report, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if args.contact_sheet is not None:
+        render_contact_sheet(selected, args.contact_sheet)
     print(json.dumps({key: report[key] for key in ("candidate_count", "selected_count", "selected_parent_allow", "selected_parent_filter")}, indent=2))
     return 0
 

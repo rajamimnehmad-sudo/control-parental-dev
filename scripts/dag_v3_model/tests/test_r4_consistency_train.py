@@ -91,6 +91,37 @@ class R4ConsistencyTrainTest(unittest.TestCase):
         self.assertAlmostEqual(float(expected), float(total), places=6)
         self.assertAlmostEqual(float(expected), components["classification"], places=6)
 
+    def test_loss_honors_family_weights_and_anchor_mask(self):
+        import torch
+        from torch.nn import functional as functional
+
+        logits = torch.tensor([2.0, 0.0])
+        batch = {
+            "targets": torch.tensor([0.0, 1.0]),
+            "family_indices": torch.tensor([0, 1]),
+            "parent_indices": torch.tensor([0, 1]),
+            "child_indices": torch.tensor([], dtype=torch.long),
+            "child_parent_indices": torch.tensor([], dtype=torch.long),
+            "teacher_probabilities": torch.tensor([0.5, 0.5]),
+            "family_weights": torch.tensor([1.0, 3.0]),
+            "teacher_anchor_mask": torch.tensor([True, False]),
+            "family_count": 2,
+        }
+        total, components = family_losses(
+            logits,
+            batch,
+            pos_weight=torch.tensor(1.0),
+            consistency_weight=0.0,
+            anchor_weight=1.0,
+        )
+        first = functional.binary_cross_entropy_with_logits(torch.tensor(2.0), torch.tensor(0.0))
+        second = functional.binary_cross_entropy_with_logits(torch.tensor(0.0), torch.tensor(1.0))
+        classification = (first + 3 * second) / 4
+        anchor = functional.mse_loss(torch.sigmoid(torch.tensor([2.0])), torch.tensor([0.5]))
+        self.assertAlmostEqual(float(classification), components["classification"], places=6)
+        self.assertAlmostEqual(float(anchor), components["anchor"], places=6)
+        self.assertAlmostEqual(float(classification + anchor), float(total), places=6)
+
 
 if __name__ == "__main__":
     unittest.main()
