@@ -20,10 +20,10 @@ const NATIVE_APP = "glosh.dag.protection";
 const PROTOCOL_VERSION = 1;
 const MAX_IMAGE_BYTES = 2 * 1024 * 1024;
 const MAX_CAPTURED_BYTES = 8 * 1024 * 1024;
-const MAX_ACTIVE_STREAMS = 32;
+const MAX_ACTIVE_STREAMS = 128;
 // Covers every bounded response stream plus the content-script inline budget. Captured network
 // bytes still share MAX_CAPTURED_BYTES, so accepting the full bounded burst does not uncap memory.
-const MAX_QUEUED_ANALYSES = 48;
+const MAX_QUEUED_ANALYSES = 144;
 const MAX_NATIVE_IN_FLIGHT = 2;
 const MAX_CACHED_DECISIONS = 512;
 const MAX_CACHED_REPLACEMENT_BYTES = 2 * 1024 * 1024;
@@ -395,7 +395,9 @@ const interceptImage = (details, trustSafeUiUrl = true) => {
     try {
       filter.close();
     } catch {}
-    if (originalBytes instanceof Uint8Array) originalBytes.fill(0);
+    // Allowed bytes now belong to Gecko's output stream. StreamFilter.write() does not promise
+    // synchronous copying, so mutating that buffer here can corrupt a deferred image decode.
+    if (originalBytes instanceof Uint8Array && delivered !== originalBytes) originalBytes.fill(0);
     chunks.length = 0;
     release();
   };

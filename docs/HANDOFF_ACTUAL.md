@@ -1,10 +1,43 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-08-07
+Fecha de corte: 2026-08-08
 
 Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
+
+## Candidato validado local: DAG Browser 183
+
+- DAG 183 (`0.69.87-dev`) esta instalado en el SM-S908E con datos preservados;
+  la extension integrada es `1.94.0`.
+- Durante un gesto tactil, el executor visual baja una sola vez a un worker y
+  restaura dos workers 250 ms despues de `UP`/`CANCEL`. Ya no cancela y vuelve a
+  publicar el mismo temporizador en cada evento `MOVE`.
+- La rafaga acotada admite hasta 128 respuestas y 144 analisis JS pendientes,
+  manteniendo los presupuestos globales de bytes y dos decisiones nativas en
+  vuelo. El A/B con 32 volvio a dejar fotos vacias y fue retirado.
+- Se corrigio una corrupcion intermitente posterior a `model_allow`: la
+  extension escribia el `Uint8Array` permitido en `StreamFilter` y lo llenaba
+  con ceros inmediatamente. Como `write()` no garantiza una copia sincrona, un
+  decode diferido de Gecko podia recibir bytes alterados. Los bytes permitidos
+  ahora quedan bajo propiedad del stream; los originales bloqueados se siguen
+  limpiando.
+- Fravega `Ofertas Unicas`: en DAG 182, lavarropas y heladera quedaron blancos
+  aunque los logs registraron `model_allow`; en DAG 183 ambas fotos aparecieron
+  despues del mismo desplazamiento. El propietario confirmo el resultado.
+- Mimo conserva el banner raster principal. El rectangulo gris inferior es un
+  GIF/video bloqueado por la politica vigente, no una foto fallida.
+- El A/B de memoria descarto los limites 32/128 y el control tactil como causa
+  del consumo de Mimo. DAG uso aproximadamente 0,85-1,06 GiB PSS y Chrome cerca
+  de 1,04 GiB en la misma pagina; no se agrego ningun ajuste de memoria a ciegas.
+- Modelo, pesos, umbrales, preprocesamiento, politica visual, ONNX y
+  `final_sealed` permanecen intactos. No hay excepciones por sitio, URL, dominio
+  o dispositivo.
+- Validacion automatica: JS 23/23, unitarios, Ktlint, Lint Vital y APK DEV
+  correctos. APK SHA-256:
+  `4fa03dd963e7a41c4365bb2a71ec38e6a2fb50e45868d04a3b89c232c041e50e`.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v183-touch-and-stream-delivery-sm-s908e-2026-08-08.md`.
 
 ## Baseline seguro local: DAG Browser 176
 

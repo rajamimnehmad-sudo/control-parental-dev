@@ -22,7 +22,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"1.90.0\"")
+        assertContains(manifest, "\"version\": \"1.94.0\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
@@ -76,7 +76,8 @@ class MediaBarrierContractTest {
             File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText(),
             "MediaAnalysisThreads = 2",
         )
-        assertContains(background, "MAX_QUEUED_ANALYSES = 48")
+        assertContains(background, "MAX_ACTIVE_STREAMS = 128")
+        assertContains(background, "MAX_QUEUED_ANALYSES = 144")
         assertContains(background, "MAX_CACHED_REPLACEMENT_BYTES = 2 * 1024 * 1024")
         assertContains(background, "cachedReplacementBytes")
         assertContains(background, "const cachedDecision")

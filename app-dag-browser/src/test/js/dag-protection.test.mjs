@@ -70,7 +70,8 @@ const createHarness = async () => {
           onerror: null,
           onstop: null,
           write(data) {
-            this.writes.push(Uint8Array.from(data));
+            // Retain the view to simulate a consumer that reads it after write() returns.
+            this.writes.push(data instanceof Uint8Array ? data : new Uint8Array(data));
           },
           close() {
             this.closed = true;
@@ -179,7 +180,7 @@ test("queued visible raster overtakes background work", async () => {
 
 test("full bounded response burst reaches the native gate without placeholder overflow", async () => {
   const harness = await createHarness();
-  const details = Array.from({ length: 32 }, (_, index) => imageDetails(`burst-${index}`));
+  const details = Array.from({ length: 128 }, (_, index) => imageDetails(`burst-${index}`));
   for (let index = 0; index < details.length; index += 1) {
     deliver(harness, details[index], Uint8Array.from([0xff, 0xd8, index, 0xff, 0xd9]));
   }
@@ -197,7 +198,7 @@ test("full bounded response burst reaches the native gate without placeholder ov
   }
   await waitFor(() => details.every(({ requestId }) => harness.filters.get(requestId).closed),
     "bounded burst close");
-  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 32);
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 128);
   assert.equal(details.every(({ requestId }) =>
     harness.filters.get(requestId).writes[0][0] === 0xff), true);
 });
@@ -554,7 +555,8 @@ test("active extension has bounded work and no site or device exceptions", async
   assert.match(background, /MAX_IMAGE_BYTES = 2 \* 1024 \* 1024/u);
   assert.match(background, /MAX_CAPTURED_BYTES = 8 \* 1024 \* 1024/u);
   assert.match(background, /MAX_NATIVE_IN_FLIGHT = 2/u);
-  assert.match(background, /MAX_QUEUED_ANALYSES = 48/u);
+  assert.match(background, /MAX_ACTIVE_STREAMS = 128/u);
+  assert.match(background, /MAX_QUEUED_ANALYSES = 144/u);
   assert.match(background, /MAX_CACHED_REPLACEMENT_BYTES = 2 \* 1024 \* 1024/u);
   assert.match(background, /cachedReplacementBytes/u);
   assert.match(background, /const cachedDecision/u);

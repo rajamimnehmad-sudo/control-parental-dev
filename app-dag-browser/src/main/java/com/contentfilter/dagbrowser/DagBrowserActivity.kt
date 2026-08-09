@@ -20,6 +20,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.Gravity
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowInsets
@@ -135,6 +136,8 @@ class DagBrowserActivity : Activity() {
     private var navigationFrameTabId: Long? = null
     private var tabThumbnailResidencyRequested = false
     private val persistTabsRunnable = Runnable(::persistTabsNow)
+    private val restoreMediaAnalysisParallelism =
+        Runnable { setMediaAnalysisParallelism(MediaAnalysisThreads) }
 
     private val messageDelegate =
         object : WebExtension.MessageDelegate {
@@ -1263,6 +1266,43 @@ class DagBrowserActivity : Activity() {
         val sentAt = payload.optLong("sentAtEpochMillis", -1L)
         if (sentAt <= 0L) return -1L
         return (System.currentTimeMillis() - sentAt).takeIf { it in 0..MaxPipelineMetricMillis } ?: -1L
+    }
+
+    override fun dispatchTouchEvent(event: MotionEvent): Boolean {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> beginTouchInteraction()
+            MotionEvent.ACTION_UP,
+            MotionEvent.ACTION_CANCEL,
+            -> finishTouchInteraction()
+        }
+        return super.dispatchTouchEvent(event)
+    }
+
+    private fun beginTouchInteraction() {
+        handler.removeCallbacks(restoreMediaAnalysisParallelism)
+        setMediaAnalysisParallelism(DagMediaInteractionPolicy.ActiveAnalysisThreads)
+    }
+
+    private fun finishTouchInteraction() {
+        handler.removeCallbacks(restoreMediaAnalysisParallelism)
+        handler.postDelayed(
+            restoreMediaAnalysisParallelism,
+            DagMediaInteractionPolicy.RestoreDelayMillis,
+        )
+    }
+
+    private fun setMediaAnalysisParallelism(threads: Int) {
+        if (mediaAnalysisExecutor.isShutdown || mediaAnalysisExecutor.corePoolSize == threads) return
+        if (threads < mediaAnalysisExecutor.corePoolSize) {
+            mediaAnalysisExecutor.corePoolSize = threads
+            mediaAnalysisExecutor.maximumPoolSize = threads
+        } else {
+            mediaAnalysisExecutor.maximumPoolSize = threads
+            mediaAnalysisExecutor.corePoolSize = threads
+        }
+        if (packageName.endsWith(".dev")) {
+            Log.i(MediaTransportLogTag, "interaction_threads=$threads")
+        }
     }
 
     private fun DagMediaPipelineTrace.metric(stage: DagMediaPipelineStage): String =
