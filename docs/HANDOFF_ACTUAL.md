@@ -38,6 +38,14 @@ el runtime actual desde versiones o worktrees historicos.
 - Próximo paso posible: destilación GPU hacia un único TinyCLIP del mismo costo
   Android. Requiere autorización separada de proveedor, presupuesto y licencia;
   no hay gasto ni candidato pendiente de integración.
+- Prueba previa de profesores congelados: DINOv2-Small quedó en originales 3/3,
+  holdout 4/7 y dirigido 28/22; SigLIP Base en 3/2, 3/7 y 38/9. Ambos son
+  `NO-GO`: recuperan inocentes pero permiten demasiados positivos. No destilar
+  sus salidas actuales.
+- Siguiente ticket propuesto: ajustar primero un profesor en RunPod Secure Cloud
+  RTX 4090 y sólo destilarlo si pasa los tres gates. Límite sugerido USD 3 y
+  cuatro horas con apagado automático. Subir imágenes privadas, crear recursos
+  o gastar requiere autorización explícita; todavía no fue concedida.
 
 ## Candidato validado local: DAG Browser 183
 

@@ -459,3 +459,30 @@ Debe conservar un único TinyCLIP estudiante y el mismo costo Android. Requiere
 un ticket separado que apruebe proveedor, presupuesto, credenciales efímeras,
 licencias del profesor y apagado automático; no se autoriza gasto por este
 resultado.
+
+### Viabilidad de profesores congelados
+
+Antes de alquilar GPU se midieron localmente dos profesores visuales con pesos
+Apache-2.0 y una única cabeza logística de configuración congelada. Ninguno se
+entrenó ni se destinó a Android. DINOv2-Small usa 21 M de parámetros y 88,2 MB
+de pesos; SigLIP Base se mantuvo como profesor semántico de laboratorio. Ambos
+usaron letterbox DAG y peso filter `1,5` sobre las 1.150 imágenes de train.
+
+| profesor | originales FP/FF | 112 vistas FP/FF | holdout independiente FP/FF | dirigido FP/FF | decisión |
+| --- | ---: | ---: | ---: | ---: | --- |
+| DINOv2-Small | 3/3 | 9/7 | 4/7 | 28/22 | `NO-GO` |
+| SigLIP Base | 3/2 | 13/6 | 3/7 | 38/9 | `NO-GO` |
+
+Los dos recuperan negativos que R3.1 sobrebloquea, pero permiten demasiados
+positivos. No deben destilarse tal como están. Los scripts temporales fueron
+retirados y sólo se conservaron sus reportes privados. Esto cambia el siguiente
+paso: primero hay que ajustar un profesor a la política humana, validarlo con
+los tres gates intactos y únicamente después destilarlo al TinyCLIP estudiante.
+
+La opción operativa recomendada es una GPU RTX 4090 de 24 GB en RunPod Secure
+Cloud, facturada por segundo, con presupuesto máximo de USD 3, plazo máximo de
+cuatro horas, checkpoint reanudable y terminación automática aun ante error.
+La tarifa pública observada el 2026-08-09 fue USD 0,69/h. No crear cuenta, subir
+imágenes, almacenar credenciales ni iniciar gasto sin autorización explícita
+del propietario. El corpus sigue autorizado sólo para experimento privado y no
+declara derechos comerciales claros.
