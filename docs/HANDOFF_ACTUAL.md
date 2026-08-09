@@ -629,9 +629,13 @@ El propietario autorizó el corpus semántico dirigido. Se congeló un plan de
 120 vistas: 36 ropa moderna, 30 deportes/sensibles, 18 personas comerciales,
 16 sujetos parciales/pequeños y 20 negativos cercanos. Tras excluir 45 grupos
 ya revisados, R3.1 puntuó 597 recortes y se seleccionaron 120 grupos únicos,
-repartidos en cinco tandas balanceadas de 24 bajo `targeted-review-v1/`. Las
-cinco láminas están preparadas; falta aceptar/corregir sus propuestas antes de
-fusionar etiquetas o entrenar. R3.1 y `final_sealed` permanecen intactos.
+repartidos en cinco tandas balanceadas de 24 bajo `targeted-review-v1/`. La
+revisión terminó en 59 allow y 61 filter, sin dudas ni grupos repetidos. R3.1
+obtuvo 15/61 falsos permisos y 43/59 falsos filtros; los errores aparecen en
+las cinco tandas y no admiten una corrección simultánea moviendo el umbral. El
+pool consolidado sigue `training_authorized: false`: falta autorización
+explícita antes de congelar y ejecutar un A/B privado. R3.1, Android, APK,
+`frozen_test` y `final_sealed` permanecen intactos.
 
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor

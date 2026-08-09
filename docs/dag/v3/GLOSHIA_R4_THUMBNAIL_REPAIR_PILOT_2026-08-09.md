@@ -246,3 +246,32 @@ estratos semánticos, con 120 grupos únicos. Quedaron cinco tandas numeradas de
 Cada tanda contiene manifiesto, imágenes y `review-sheet.png`. Ninguna decisión
 está autorizada para entrenamiento hasta que el propietario acepte o corrija la
 propuesta asistida; no se abrió ningún examen sellado ni se entrenó modelo.
+
+La revisión de las cinco tandas terminó. El propietario aceptó las propuestas
+asistidas y corrigió explícitamente `batch-01/16=filter`,
+`batch-03/7=filter`, `batch-03/17=allow` y `batch-04/15=allow`. El pool
+consolidado contiene 120 decisiones binarias, 59 allow y 61 filter, con 120
+grupos únicos y ninguna duda. Las etiquetas siguen marcadas
+`training_authorized: false`: completar la revisión no autoriza por sí solo un
+entrenamiento privado, un ONNX, un APK ni un cambio del modelo oficial.
+
+R3.1 se midió a umbral `0,40` sobre ese pool dirigido y obtuvo 15/61 falsos
+permisos y 43/59 falsos filtros. Los falsos filtros se distribuyeron entre las
+cinco tandas (8, 9, 9, 9 y 8), por lo que no son un accidente de una sola hoja.
+Las mayores concentraciones aparecieron en personas comerciales (11), ropa
+moderna (10), sujetos parciales o pequeños (10) y deportes/sensibles (10). El
+resultado confirma un conflicto de representación: mover el umbral para
+recuperar permitidas agravaría los 15 falsos permisos y moverlo en la dirección
+opuesta agravaría los 43 falsos filtros.
+
+Evidencia privada:
+
+- `targeted-review-v1/reviewed-pool-120.json`;
+- `targeted-review-v1/r31-baseline-120.json`;
+- `targeted-review-v1/batch-01..05/owner-decisions.json` y
+  `reviewed-pool.json`.
+
+Próximo gate: autorización explícita del propietario para uso privado de estas
+120 etiquetas. Sólo entonces se puede congelar un A/B agrupado que aprenda la
+representación y exija simultáneamente reducir ambos errores, preservar el
+examen fijo de fotos completas y mantener `final_sealed` cerrado.
