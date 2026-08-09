@@ -314,6 +314,18 @@ entrena con `r4_consistency_train.py`; después,
 reconstruye la validación fija desde sus predicciones y aplica el gate común.
 No lee `frozen_test` ni `final_sealed` y no exporta modelos.
 
+## Corpus independiente R4
+
+`r4_independent_corpus_plan.py` convierte lotes con revisión completa del
+propietario en train y holdout agrupados. Verifica los bytes reales, conserva
+separado el SHA histórico cuando no coincide, excluye dudas, duplicados y
+contaminación por ID, hash, URL, grupo o pHash contra train, validation y el
+gate dirigido. Una serie completa permanece en un solo split aunque contenga
+tomas `allow` y `filter`.
+
+El resultado es sólo para experimento privado: no declara derechos comerciales,
+no abre `frozen_test`/`final_sealed`, no entrena y no autoriza ONNX ni APK.
+
 ## Tests
 
 ```bash

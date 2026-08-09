@@ -26,6 +26,18 @@ el runtime actual desde versiones o worktrees historicos.
   o destilación con GPU bajo los gates ya congelados. Requiere autorización
   nueva. Evidencia y detalle:
   `docs/dag/v3/GLOSHIA_R4_THUMBNAIL_REPAIR_PILOT_2026-08-09.md`.
+- Se preparó después un corpus realmente independiente con 508 imágenes nuevas
+  para train (396 allow/112 filter) y 97 retenidas (76/21), excluyendo 18 dudas,
+  dos duplicaciones/contaminaciones exactas y manteniendo nueve series mixtas
+  dentro de un único split. R3.1 obtuvo 2 permisos peligrosos y 8 falsos filtros
+  en el nuevo holdout.
+- Cuatro pilotos sobre el mismo TinyCLIP —cabeza, tres capas con dos balances y
+  encoder visual completo— fallaron la validación original con 2 o 3 permisos
+  peligrosos frente al máximo 1. Se retiraron código y checkpoints fallidos.
+  No seguir ajustando localmente el mismo estudiante.
+- Próximo paso posible: destilación GPU hacia un único TinyCLIP del mismo costo
+  Android. Requiere autorización separada de proveedor, presupuesto y licencia;
+  no hay gasto ni candidato pendiente de integración.
 
 ## Candidato validado local: DAG Browser 183
 

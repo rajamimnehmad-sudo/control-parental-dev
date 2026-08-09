@@ -400,3 +400,62 @@ sólo por ser errores de R3.1— y positivos equivalentes, separados por identid
 y origen; después, entrenar o destilar en GPU una representación compacta y
 evaluarla una sola vez con estos gates congelados. Ese trabajo necesita un
 ticket y autorización nuevos.
+
+### Corpus independiente y límite del entrenamiento local
+
+Se recuperaron dos lotes históricos ya revisados por el propietario que nunca
+habían sido autorizados como train: 625 decisiones, de las cuales 18 dudas se
+excluyeron. Una imagen idéntica y con la misma decisión aparecía en ambos lotes
+y se conservó una sola vez. La auditoría contra el split R3.1 posterior detectó
+y excluyó otra coincidencia exacta que el SHA histórico no revelaba.
+
+El importador antiguo había escrito en los 625 manifiestos un campo `sha256`
+que no coincide con los bytes actuales, aunque IDs, URLs, tamaños, grupos y
+hashes perceptuales sí son coherentes. No se alteró esa evidencia: el plan nuevo
+conserva el valor como `source_declared_sha256`, calcula el SHA-256 real del
+artefacto y usa ambos junto con URL, grupo y pHash para controlar contaminación.
+
+El plan congelado contiene 605 imágenes únicas y no contaminadas:
+
+| split nuevo | allow | filter | total |
+| --- | ---: | ---: | ---: |
+| train | 396 | 112 | 508 |
+| holdout independiente | 76 | 21 | 97 |
+
+Nueve series contienen tomas de ambas clases y permanecen completas en un solo
+split. Al unir únicamente el train nuevo con las 642 fotos base originales, el
+piloto tuvo 1.150 imágenes; no se incorporaron variantes automáticas ni los 162
+casos dirigidos. Las 28 originales históricas eligieron el checkpoint y las 112
+vistas, el holdout de 97 y los 162 casos quedaron como gates separados.
+
+R3.1 obtuvo en el holdout nuevo 2/21 falsos permisos y 8/76 falsos filtros. El
+gate exigió mejorar ambos, mantener los 162 casos en máximo 15/85 y 54/77, y
+preservar originales en máximo 1/7 y 2/21 y las 112 vistas en 12/28 y 5/84.
+
+Se ejecutaron cuatro pruebas acotadas, sin seleccionar configuración sobre los
+dos gates nuevos:
+
+| piloto | representación entrenable | originales FP/FF | decisión temprana |
+| --- | --- | ---: | --- |
+| cabeza anclada | sólo 513 parámetros | 2/1 | `NO-GO` |
+| parcial conservador | últimas 3 capas, peso 0,625 | 3/1 | `NO-GO` |
+| parcial balanceado | últimas 3 capas, peso 1,0 | 2/1 | `NO-GO` |
+| encoder completo conservador | 10 capas, LR ×0,25 | 2/1 | `NO-GO` |
+
+La cabeza anclada también fue puntuada para confirmar el mecanismo: mejoró el
+holdout de 2/8 a 4/6 y dejó los 162 casos en 53/40. Es decir, recuperó inocentes
+intercambiándolos por permisos peligrosos. Los otros tres candidatos se
+detuvieron al fallar originales y no se puntuaron sobre los gates retenidos.
+
+Todos los checkpoints y el código específico de los ensayos fallidos fueron
+eliminados; se conservaron informes pequeños y el constructor reproducible del
+corpus. R3.1 permanece oficial y no cambian Android, ONNX, umbral, política ni
+runtime. `frozen_test` y `final_sealed` siguen cerrados.
+
+Conclusión: ya no falta un ajuste local más grande del mismo TinyCLIP. El paso
+fundado siguiente es destilación con un profesor visual más capaz y una GPU
+externa, usando estas 508 imágenes sólo como train y los tres gates congelados.
+Debe conservar un único TinyCLIP estudiante y el mismo costo Android. Requiere
+un ticket separado que apruebe proveedor, presupuesto, credenciales efímeras,
+licencias del profesor y apagado automático; no se autoriza gasto por este
+resultado.
