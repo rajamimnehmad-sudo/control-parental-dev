@@ -641,6 +641,19 @@ Los cinco checkpoints fueron eliminados. No repetir pesos sobre la misma última
 capa; el próximo paso requiere estudiar una representación compacta distinta.
 R3.1, Android, APK, `frozen_test` y `final_sealed` permanecen intactos.
 
+Por decisión posterior del propietario se ejecutó además un único A/B limpio
+con la receta original de R1: TinyCLIP preentrenado, cabeza logística nueva y
+ocho épocas acotadas de última capa/proyección/cabeza, sin cargar R3.1, sin
+destilación, sin pesos especiales y excluyendo las 360 variantes automáticas de
+train. OOF sobre los mismos 162 grupos quedó en 9 falsos permisos y 56 falsos
+filtros. Redujo fuertemente los permisos peligrosos frente a R3.1 (`31/54`),
+pero agregó dos bloqueos inocentes, falló el gate `24/43` y los cinco folds
+degradaron las fotos completas a 2/7 falsos permisos. El R1 oficial compatible
+de laboratorio estimó `30/57` en los mismos casos. Resultado `NO-GO`: los seis
+checkpoints, incluido el piloto, y el entrenador específico fueron retirados;
+se conservaron sólo informes y splits reproducibles. R3.1 continúa oficial y
+no se abrieron `frozen_test` ni `final_sealed`.
+
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
 `com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para

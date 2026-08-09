@@ -309,3 +309,48 @@ cuello de botella es la representación visual. El próximo trabajo técnicament
 fundado es comparar backbones compactos con licencia y runtime Android
 verificados, usando estos 162 grupos sólo como gate agrupado; ningún backbone
 nuevo queda autorizado para integración por este resultado.
+
+### Reentrenamiento limpio con la receta original de R1
+
+Por decisión del propietario se contrastó una hipótesis distinta: no reparar
+R3.1, sino repetir desde el TinyCLIP preentrenado original el procedimiento
+compacto de R1. Cada fold aprendió una cabeza logística balanceada nueva y luego
+ajustó durante ocho épocas la última capa visual, post-layernorm, proyección y
+cabeza con las tasas, regularización, augmentación y umbral históricos de R1.
+No se cargaron pesos ni respuestas de R3/R3.1, no hubo búsqueda de
+hiperparámetros y cada recorte humano entró una sola vez, sin peso especial.
+
+Train usó sólo las 642 fotos base originales disponibles —excluyendo en cada
+fold todos los grupos retenidos— más los recortes humanos no retenidos. Las 360
+variantes automáticas quedaron fuera: la revisión anterior ya demostró que un
+recorte puede cambiar legítimamente de etiqueta. La selección de época usó sólo
+las 28 fotos validation originales; las 112 vistas se conservaron como gate
+antirregresión. `frozen_test` y `final_sealed` permanecieron cerrados.
+
+El resultado OOF sobre los 162 grupos fue 9/85 falsos permisos y 56/77 falsos
+filtros. Frente a R3.1 (`31/54`) corrigió 22 permisos peligrosos, pero agregó
+dos bloqueos inocentes y falló el gate simétrico `24/43`. Los cinco folds
+repitieron la misma regresión en fotos completas: 2/7 falsos permisos frente al
+máximo 1/7. En las 112 vistas, los falsos permisos quedaron entre 11 y 12, pero
+los falsos filtros entre 7 y 11, por encima del máximo 5 en todos los folds.
+
+El R1 oficial, medido con el reemplazo de laboratorio compatible con ORT de
+macOS, estimó `30/57` sobre los mismos 162 casos. El nuevo entrenamiento aprendió
+mucho mejor los positivos pequeños que R1, pero prácticamente no recuperó
+negativos (`56` frente a `57`) y tampoco superó el equilibrio de R3.1. Esta
+comparación con R1 es aproximada cerca del umbral por la conversión técnica del
+`ConvInteger`; la decisión de rechazo no depende de ella porque el A/B nuevo y
+R3.1 se midieron directamente.
+
+Resultado: `NO-GO`. Los cinco checkpoints y el checkpoint del piloto corto
+fueron eliminados; el directorio de evidencia bajó de 196 MB a 5,4 MB. También
+se retiró el entrenador específico de este ensayo porque no resolvió el gate.
+Se conservaron únicamente splits, reportes, probabilidades y hashes bajo
+`.codex-tmp/gloshia-r4-thumbnail-repair-20260809/r1-style-cv-v1/`. No se
+exportó ONNX ni se modificaron R3.1, Android, APK, umbral o política.
+
+Conclusión: reentrenar TinyCLIP desde su punto preentrenado como R1 no resuelve
+simultáneamente seguridad y falsos bloqueos con el corpus actual. No repetir
+esta receta ni volver a variar la última capa; el siguiente experimento debe
+evaluar una representación compacta diferente bajo los mismos folds y gates,
+con autorización separada antes de entrenar o integrar.
