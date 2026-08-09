@@ -633,9 +633,13 @@ repartidos en cinco tandas balanceadas de 24 bajo `targeted-review-v1/`. La
 revisión terminó en 59 allow y 61 filter, sin dudas ni grupos repetidos. R3.1
 obtuvo 15/61 falsos permisos y 43/59 falsos filtros; los errores aparecen en
 las cinco tandas y no admiten una corrección simultánea moviendo el umbral. El
-pool consolidado sigue `training_authorized: false`: falta autorización
-explícita antes de congelar y ejecutar un A/B privado. R3.1, Android, APK,
-`frozen_test` y `final_sealed` permanecen intactos.
+propietario autorizó el A/B privado y se unieron esos casos con los 42 previos:
+162 grupos, 77 allow y 85 filter. R3.1 quedó en 31 falsos permisos y 54 falsos
+filtros. El único ajuste cruzado de representación quedó `NO-GO`: OOF 27/54,
+frente a gates 24/43, y un fold empeoró fotos completas a 2/7 falsos permisos.
+Los cinco checkpoints fueron eliminados. No repetir pesos sobre la misma última
+capa; el próximo paso requiere estudiar una representación compacta distinta.
+R3.1, Android, APK, `frozen_test` y `final_sealed` permanecen intactos.
 
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor

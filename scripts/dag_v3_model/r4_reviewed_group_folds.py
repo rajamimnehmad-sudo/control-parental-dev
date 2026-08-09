@@ -75,6 +75,7 @@ def build_group_folds(
         }
 
     required_permission_reduction = max(2, math.ceil(baseline_false_permissions * 0.2))
+    required_false_filter_reduction = max(2, math.ceil(baseline_false_filters * 0.2))
     return {
         "schema_version": "gloshia-r4-reviewed-group-folds-v1",
         "status": "frozen_cross_validation_only_not_approved_for_apk",
@@ -91,14 +92,15 @@ def build_group_folds(
             "reviewed_baseline_false_permissions": baseline_false_permissions,
             "reviewed_baseline_false_filters": baseline_false_filters,
             "required_false_permission_reduction": required_permission_reduction,
+            "required_false_filter_reduction": required_false_filter_reduction,
             "oof_false_permissions_max": max(0, baseline_false_permissions - required_permission_reduction),
-            "oof_false_filters_max": baseline_false_filters,
+            "oof_false_filters_max": max(0, baseline_false_filters - required_false_filter_reduction),
             "fixed_validation_original_false_permissions_max": 1,
             "fixed_validation_original_false_filters_max": 2,
             "fixed_validation_all_false_permissions_max": 12,
             "fixed_validation_all_false_filters_max": 5,
             "every_fold_must_pass_fixed_validation": True,
-            "interpretation": "improve at least two owner-reviewed false permissions without regressing R3.1 fixed validation",
+            "interpretation": "improve both owner-reviewed error types by at least 20% without regressing R3.1 fixed validation",
         },
         "group_contamination": {"passed": True, "crossing_groups": []},
         "frozen_test_opened": False,

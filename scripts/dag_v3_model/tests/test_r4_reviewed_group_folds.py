@@ -45,7 +45,7 @@ class R4ReviewedGroupFoldsTest(unittest.TestCase):
         self.assertEqual(8, len(repairs))
         self.assertTrue(all(row["training_weight"] == 8.0 and not row["teacher_anchor"] for row in repairs))
 
-    def test_gate_scales_permission_reduction_and_preserves_false_filter_baseline(self):
+    def test_gate_requires_twenty_percent_reduction_in_both_error_types(self):
         reviewed, base = fixtures()
         result = build_group_folds(
             reviewed,
@@ -58,7 +58,8 @@ class R4ReviewedGroupFoldsTest(unittest.TestCase):
         )
         gate = result["acceptance_gate"]
         self.assertEqual(12, gate["oof_false_permissions_max"])
-        self.assertEqual(11, gate["oof_false_filters_max"])
+        self.assertEqual(8, gate["oof_false_filters_max"])
+        self.assertEqual(3, gate["required_false_filter_reduction"])
 
 
 if __name__ == "__main__":

@@ -275,3 +275,37 @@ Próximo gate: autorización explícita del propietario para uso privado de esta
 120 etiquetas. Sólo entonces se puede congelar un A/B agrupado que aprenda la
 representación y exija simultáneamente reducir ambos errores, preservar el
 examen fijo de fotos completas y mantener `final_sealed` cerrado.
+
+### A/B privado sobre 162 grupos
+
+El propietario autorizó el uso privado de las etiquetas revisadas. Se unieron
+los 120 grupos nuevos con los 42 claros anteriores: 162 grupos únicos, 77 allow
+y 85 filter; las seis dudas históricas permanecieron excluidas. R3.1 obtuvo en
+la unión 31/85 falsos permisos y 54/77 falsos filtros.
+
+Antes de entrenar se congelaron cinco folds y un gate simétrico: reducir al
+menos 20 % ambos errores OOF (máximo 24 falsos permisos y 43 falsos filtros),
+conservar cada validation original en máximo 1/7 y 2/21, y conservar las 112
+vistas fijas en máximo 12/28 y 5/84. Se reutilizó una sola configuración ya
+conocida: última capa visual, normalización, proyección y cabeza; peso humano 8,
+dos épocas, LR 0,25, class weight 0,625 y anclaje 1 al R3.1 oficial. No hubo
+búsqueda de pesos ni selección sobre los folds retenidos.
+
+El resultado OOF fue 27/85 falsos permisos y 54/77 falsos filtros. Corrigió
+cuatro falsos permisos, pero no recuperó ninguna permitida neta y falló ambos
+gates principales. En los 120 casos dirigidos pasó de 15/43 a 12/43; en los 42
+anteriores, de 16/11 a 15/11. Además, el fold 2 elevó los falsos permisos de
+fotos completas de 1/7 a 2/7 y los cinco folds agregaron un falso filtro en la
+vista circular fija.
+
+Resultado: `NO-GO`. Los cinco checkpoints fueron eliminados; se conservaron
+splits, reportes, probabilidades y hashes. No se exportó ONNX, no se abrió
+`frozen_test` ni `final_sealed`, y no se modificó R3.1, Android, APK, umbral ni
+política. La evidencia principal es
+`.codex-tmp/gloshia-r4-thumbnail-repair-20260809/r4-reviewed-representation-cv-03.json`.
+
+La señal nueva ya no justifica variar pesos de esta misma última capa: el
+cuello de botella es la representación visual. El próximo trabajo técnicamente
+fundado es comparar backbones compactos con licencia y runtime Android
+verificados, usando estos 162 grupos sólo como gate agrupado; ningún backbone
+nuevo queda autorizado para integración por este resultado.

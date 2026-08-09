@@ -305,6 +305,15 @@ python scripts/dag_v3_model/pilot_single_student.py \
 La validacion no ajusta pesos ni detiene epocas, pero la ronda 3 ya influyo en la eleccion de la
 arquitectura. Por eso un resultado favorable exige otra prueba independiente antes de exportar.
 
+## A/B agrupado de representación R4
+
+`r4_reviewed_group_folds.py` congela grupos humanos sin contaminación y exige
+una reducción mínima del 20 % en falsos permisos y falsos filtros. Cada fold se
+entrena con `r4_consistency_train.py`; después,
+`r4_reviewed_representation_cv.py` puntúa exclusivamente los grupos no vistos,
+reconstruye la validación fija desde sus predicciones y aplica el gate común.
+No lee `frozen_test` ni `final_sealed` y no exporta modelos.
+
 ## Tests
 
 ```bash
