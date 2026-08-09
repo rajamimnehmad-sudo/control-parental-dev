@@ -16,8 +16,8 @@
   const STABLE_IMAGE_ATTRIBUTE = "data-glosh-dag-stable";
   const MAX_INLINE_DATA_URL_LENGTH = 66 * 1024;
   const MAX_INLINE_IMAGES_PER_DOCUMENT = 16;
-  const MAX_INLINE_NATURAL_EDGE = 512;
-  const MAX_INLINE_RENDERED_EDGE = 512;
+  const MAX_INLINE_NATURAL_EDGE = 128;
+  const MAX_INLINE_RENDERED_EDGE = 96;
   const IMAGE_PRIORITY_ROOT_MARGIN = "800px 0px";
   const MAX_PRIORITY_SOURCES = 256;
   const INITIAL_AD_SCAN_READY_ATTRIBUTE = "data-glosh-dag-ads-initial-ready";
