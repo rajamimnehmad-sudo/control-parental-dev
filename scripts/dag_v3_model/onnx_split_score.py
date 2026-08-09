@@ -99,7 +99,7 @@ def main() -> int:
     parser.add_argument(
         "--split-name",
         action="append",
-        choices=("validation", "frozen_test"),
+        choices=("validation", "frozen_test", "reviewed_pool"),
         dest="split_names",
         help="Score only the named split; repeat to score both. Defaults to both.",
     )

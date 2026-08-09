@@ -590,8 +590,15 @@ persona relevante no evaluable en miniatura queda fail-closed. En las 21
 binarias R3.1 produce 5/10 falsos filtros y 6/11 falsos permisos. El pool
 autorizado quedó en
 `.codex-tmp/gloshia-r4-thumbnail-repair-20260809/circle-review-01/reviewed-pool.json`,
-todavía sin split y no aprobado para ONNX/APK. Próximo paso: A/B cruzado por
-grupos con gates congelados para miniaturas y fotos completas.
+todavía sin split y no aprobado para ONNX/APK. El contraste solicitado con R1
+descartó un rollback: sobre esas 21 binarias R1 estimó 7/10 falsos filtros y
+6/11 falsos permisos, frente a 5/10 y 6/11 de R3.1. Dos salidas R1 son
+limítrofes por la compatibilidad ORT de macOS, pero aun si ambas se corrigieran
+en Android R1 solo empataría a R3.1. En las 112 vistas validation R1 redujo
+falsos permisos estimados de 12 a 9, pero elevó falsos filtros de 5 a 26. R3.1
+permanece oficial; R1 queda solo como comparador de desacuerdos. Próximo paso:
+A/B cruzado por grupos para un candidato nuevo, con gates congelados para
+miniaturas, cuerpos/escotes y fotos completas.
 
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor

@@ -114,3 +114,50 @@ El pool derivado contiene 21 casos claros autorizados para experimento privado
 difícil 5/10 falsos filtros y 6/11 falsos permisos. El pool aún no tiene split y
 no autoriza ONNX, APK ni cambio de runtime. Artefacto privado:
 `.codex-tmp/gloshia-r4-thumbnail-repair-20260809/circle-review-01/reviewed-pool.json`.
+
+## Contraste R1 frente a R3.1
+
+Se comparó R1 porque el propietario observó permisos dudosos en fotos de
+mujeres, cuerpos y escotes. El R1 oficial usa `ConvInteger`, operación que ORT
+1.19.2 para macOS no ejecuta. Para no alterar Android se generó una copia de
+laboratorio que conserva la cuantización y reemplaza solo esa convolución por
+aritmética FP32 sobre valores enteros. No es un modelo candidato ni puede entrar
+al APK.
+
+La copia se contrastó contra 33 probabilidades históricas producidas por R1 en
+el S22: mantuvo 32/33 decisiones a umbral `0,40`; la única diferencia fue un
+caso limítrofe (`0,3973` local frente a `0,4020` Android). El delta absoluto fue
+`0,01135` medio y `0,03443` máximo. Por eso las métricas R1 siguientes son una
+estimación válida para diferencias grandes, pero cualquier salida local a
+menos de `0,035` del umbral queda marcada como incierta.
+
+| Examen | modelo | falsos permisos | falsos filtros | aciertos |
+| --- | --- | ---: | ---: | ---: |
+| 21 recortes circulares revisados | R3.1 oficial | 6/11 | 5/10 | 10/21 |
+| 21 recortes circulares revisados | R1 estimado | 6/11 | 7/10 | 8/21 |
+| 112 vistas validation | R3.1 oficial | 12/28 | 5/84 | 95/112 |
+| 112 vistas validation | R1 estimado | 9/28 | 26/84 | 77/112 |
+
+Dos de las 21 salidas R1 son limítrofes: una `filter` humana quedó en `0,3698`
+y una `allow` humana en `0,4180`. Aun suponiendo que Android corrigiera ambas,
+R1 solo empataría los 10/21 aciertos de R3.1; no demuestra una mejora en los
+casos seleccionados por el propietario y sí presenta mayor riesgo de
+sobrefiltrado.
+
+En las 28 imágenes completas de validation R1 pareció detectar 7/7 positivas
+frente a 6/7 de R3.1, pero dos de esos aciertos R1 también están pegados al
+umbral y R1 filtró 7/21 permitidas frente a 2/21 de R3.1. En los recortes reales
+revisados por el propietario la posible ventaja desaparece. Resultado:
+`NO-GO` para restaurar R1 o usarlo como reemplazo. R1 sirve únicamente como
+comparador para seleccionar desacuerdos; el siguiente candidato debe aprender
+los positivos de cuerpos/escotes que ambos omiten y conservar los negativos que
+R3.1 ya resuelve mejor.
+
+Evidencia privada reproducible:
+
+- `.codex-tmp/gloshia-r4-thumbnail-repair-20260809/circle-review-01/r1-reviewed-score-compat.json`;
+- `.codex-tmp/gloshia-r4-thumbnail-repair-20260809/pilot-03/r1-validation-baseline-compat.json`;
+- `.codex-tmp/gloshia-r4-thumbnail-repair-20260809/r1-conv-integer-value-compat.json`.
+
+No se cambió el modelo oficial, el umbral, la política, DAG, Android ni el APK;
+`final_sealed` permanece cerrado.
