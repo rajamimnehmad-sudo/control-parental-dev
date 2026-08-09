@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import random
 from collections import Counter, defaultdict
 from pathlib import Path
@@ -27,6 +28,8 @@ def build_group_folds(
     folds: int,
     seed: int,
     policy_sha256: str,
+    baseline_false_permissions: int = 6,
+    baseline_false_filters: int = 5,
 ) -> dict[str, Any]:
     if folds < 2:
         raise ValueError("folds must be at least 2")
@@ -71,6 +74,7 @@ def build_group_folds(
             "groups": sorted(_group(row) for row in fold_rows),
         }
 
+    required_permission_reduction = max(2, math.ceil(baseline_false_permissions * 0.2))
     return {
         "schema_version": "gloshia-r4-reviewed-group-folds-v1",
         "status": "frozen_cross_validation_only_not_approved_for_apk",
@@ -84,8 +88,11 @@ def build_group_folds(
         "counts": dict(Counter("filter" if int(row["target"]) else "allow" for row in assigned)),
         "fold_counts": fold_counts,
         "acceptance_gate": {
-            "oof_false_permissions_max": 4,
-            "oof_false_filters_max": 5,
+            "reviewed_baseline_false_permissions": baseline_false_permissions,
+            "reviewed_baseline_false_filters": baseline_false_filters,
+            "required_false_permission_reduction": required_permission_reduction,
+            "oof_false_permissions_max": max(0, baseline_false_permissions - required_permission_reduction),
+            "oof_false_filters_max": baseline_false_filters,
             "fixed_validation_original_false_permissions_max": 1,
             "fixed_validation_original_false_filters_max": 2,
             "fixed_validation_all_false_permissions_max": 12,
@@ -160,13 +167,22 @@ def main() -> int:
     parser.add_argument("--seed", type=int, default=4201)
     parser.add_argument("--training-output-dir", type=Path)
     parser.add_argument("--reviewed-weight", type=float, default=8.0)
+    parser.add_argument("--reviewed-baseline-report", type=Path)
     args = parser.parse_args()
+    baseline_false_permissions = 6
+    baseline_false_filters = 5
+    if args.reviewed_baseline_report is not None:
+        baseline = json.loads(args.reviewed_baseline_report.read_text(encoding="utf-8"))["metrics"]["reviewed_pool"]["overall"]
+        baseline_false_permissions = int(baseline["false_permissions"]["count"])
+        baseline_false_filters = int(baseline["false_filters"]["count"])
     result = build_group_folds(
         json.loads(args.reviewed_pool.read_text(encoding="utf-8")),
         json.loads(args.base_split.read_text(encoding="utf-8")),
         folds=args.folds,
         seed=args.seed,
         policy_sha256=_sha256(args.policy),
+        baseline_false_permissions=baseline_false_permissions,
+        baseline_false_filters=baseline_false_filters,
     )
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

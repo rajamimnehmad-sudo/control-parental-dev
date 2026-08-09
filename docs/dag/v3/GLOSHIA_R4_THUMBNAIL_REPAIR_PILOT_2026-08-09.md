@@ -201,3 +201,31 @@ seleccionaron 24 nuevos, 12/12 por etiqueta padre, en
 numerada `review-sheet.png` permite corregir una propuesta de etiquetas en un
 solo mensaje. Hasta completar esa revisión, la cola es sólo
 `review_only_not_training_data`.
+
+### Segunda revisión y repetición
+
+El propietario aceptó la propuesta asistida con una corrección explícita: el
+caso 17 es `filter` porque muestra piernas de mujer. La segunda cola terminó en
+8 allow, 13 filter y 3 doubt excluidas. La unión privada quedó en 42 grupos
+claros, 18 allow y 24 filter, sin duplicados; las seis dudas acumuladas siguen
+fuera de entrenamiento y evaluación binaria.
+
+R3.1, sobre esta selección deliberadamente difícil, obtuvo 16/24 falsos
+permisos y 11/18 falsos filtros. El gate cruzado exigió bajar falsos permisos a
+12 o menos sin superar 11 falsos filtros y mantener intacto el examen fijo de
+112 vistas.
+
+La cabeza lineal OOF bajó falsos permisos a 10/24, pero elevó falsos filtros a
+13/18 y deterioró validation; quedó `NO-GO`. El ajuste de representación
+conservador mantuvo fotos completas y volvió a mejorar variantes sintéticas,
+pero OOF quedó exactamente igual a R3.1: 16/24 falsos permisos y 11/18 falsos
+filtros. También conservó el falso filtro circular nuevo. Los cinco checkpoints
+se eliminaron y no se entrenaron variantes de pesos adicionales.
+
+Conclusión: incluso 42 desacuerdos heterogéneos no enseñan una señal semántica
+generalizable. El próximo corpus no debe ser otra cola genérica de desacuerdos:
+debe reunir series dirigidas y variadas de piernas femeninas, escotes, hombros,
+sujetos pequeños y negativos visualmente cercanos, con agrupación por persona,
+sesión y origen. Puede preetiquetarse de forma asistida para minimizar trabajo,
+pero las correcciones del propietario siguen siendo el gate de política. Este
+corpus dirigido todavía no está autorizado ni preparado.

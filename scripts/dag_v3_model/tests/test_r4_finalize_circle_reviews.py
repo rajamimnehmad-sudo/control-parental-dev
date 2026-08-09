@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from scripts.dag_v3_model.r4_finalize_circle_reviews import finalize_reviews
+from scripts.dag_v3_model.r4_finalize_circle_reviews import apply_numbered_decisions, finalize_reviews
 
 
 class R4FinalizeCircleReviewsTest(unittest.TestCase):
@@ -40,6 +40,27 @@ class R4FinalizeCircleReviewsTest(unittest.TestCase):
         payload = {"records": [{"sample_id": "pending", "review_status": "pending", "review_action": None}]}
         with self.assertRaisesRegex(ValueError, "pending"):
             finalize_reviews(payload, authorize_private_training=False)
+
+    def test_numbered_decisions_complete_queue_and_preserve_doubts(self):
+        payload = {
+            "records": [
+                {"sample_id": "a", "review_number": 1, "review_status": "pending", "review_action": None},
+                {"sample_id": "b", "review_number": 2, "review_status": "pending", "review_action": None},
+            ]
+        }
+        reviewed = apply_numbered_decisions(
+            payload,
+            {"decision_source": "owner", "decisions": {"1": "filter", "2": "doubt"}},
+        )
+        self.assertEqual("filter", reviewed["records"][0]["review_action"])
+        self.assertEqual("complete", reviewed["records"][0]["review_status"])
+        self.assertEqual("doubt", reviewed["records"][1]["review_status"])
+        self.assertEqual("owner", reviewed["decision_source"])
+
+    def test_numbered_decisions_require_exact_queue_membership(self):
+        payload = {"records": [{"sample_id": "a", "review_number": 1}]}
+        with self.assertRaisesRegex(ValueError, "do not match"):
+            apply_numbered_decisions(payload, {"decisions": {"2": "allow"}})
 
 
 if __name__ == "__main__":

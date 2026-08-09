@@ -15,6 +15,29 @@ def _sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
+def apply_numbered_decisions(payload: dict[str, Any], decisions: dict[str, Any]) -> dict[str, Any]:
+    result = {**payload, "records": [dict(row) for row in payload.get("records", [])]}
+    by_number = {int(row["review_number"]): row for row in result["records"]}
+    if len(by_number) != len(result["records"]):
+        raise ValueError("review numbers must be present and unique")
+    normalized = {int(number): str(action) for number, action in decisions.get("decisions", {}).items()}
+    if set(normalized) != set(by_number):
+        missing = sorted(set(by_number) - set(normalized))
+        extra = sorted(set(normalized) - set(by_number))
+        raise ValueError(f"numbered decisions do not match queue; missing={missing}, extra={extra}")
+    invalid = {number: action for number, action in normalized.items() if action not in {"allow", "filter", "doubt"}}
+    if invalid:
+        raise ValueError(f"invalid numbered decisions: {invalid}")
+    for number, action in normalized.items():
+        row = by_number[number]
+        row["review_status"] = "doubt" if action == "doubt" else "complete"
+        row["review_action"] = action
+        row["training_authorized"] = False
+    result["status"] = "owner_review_complete_with_doubts_not_training_data"
+    result["decision_source"] = decisions.get("decision_source")
+    return result
+
+
 def finalize_reviews(payload: dict[str, Any], *, authorize_private_training: bool) -> dict[str, Any]:
     records = payload.get("records", [])
     pending = [row["sample_id"] for row in records if row.get("review_status") == "pending"]
@@ -71,8 +94,15 @@ def main() -> int:
     parser.add_argument("--review-manifest", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--owner-authorized-private-training", action="store_true")
+    parser.add_argument("--numbered-decisions", type=Path)
     args = parser.parse_args()
     payload = json.loads(args.review_manifest.read_text(encoding="utf-8"))
+    if args.numbered_decisions is not None:
+        payload = apply_numbered_decisions(
+            payload,
+            json.loads(args.numbered_decisions.read_text(encoding="utf-8")),
+        )
+        args.review_manifest.write_text(json.dumps(payload, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     result = finalize_reviews(payload, authorize_private_training=args.owner_authorized_private_training)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

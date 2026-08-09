@@ -613,6 +613,18 @@ con 24 casos nuevos de 621, excluyendo los 21 grupos previos; falta una única
 revisión del propietario sobre `review-sheet.png` antes de cualquier otro
 entrenamiento.
 
+La segunda revisión ya terminó. El propietario aceptó la propuesta asistida y
+corrigió el caso 17 a `filter` porque son piernas de mujer. Quedaron 8 allow,
+13 filter y 3 doubt; la unión tiene 42 grupos claros (18/24) y seis dudas
+excluidas. R3.1 obtuvo 16/24 falsos permisos y 11/18 falsos filtros. La cabeza
+lineal redujo falsos permisos OOF a 10, pero subió falsos filtros a 13 y dañó
+validation. El ajuste visual quedó exactamente igual que R3.1 fuera de muestra
+(16/11), por lo que ambos son `NO-GO`; sus checkpoints fueron eliminados. No
+seguir variando pesos. El próximo paso propuesto es un corpus semántico dirigido
+de piernas femeninas, escotes, hombros, sujetos pequeños y negativos cercanos,
+preetiquetado de forma asistida y agrupado por identidad visual/origen. No se
+modificó R3.1, Android, umbral, política, APK ni `final_sealed`.
+
 Se preparó un APK local aislado para probar redacción parcial de imágenes bajo
 el ticket experimental `GLOSHIA-PARTIAL-REDACTION-LAB`. Sólo el flavor
 `com.contentfilter.dagbrowser.lab` usa las vistas regionales existentes para
