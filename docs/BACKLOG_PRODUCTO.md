@@ -1404,8 +1404,8 @@ Flujo de una entrada:
 | SUPERADMIN-TOKEN-01 | Implementado DEV 241 y hotfix de visualizacion 2026-07-18; pendiente prueba funcional autenticada | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | SUPERADMIN-ADMIN-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
 | LIC-RELINK-01 | Implementado candidato local Usuario 309; pendiente prueba integral | P0 | Aceptar en App Usuario tokens normales de 6 caracteres y de reenlace de 8 | S | Bajo |
-| LIC-RELINK-02 | Implementado en fuente; Android Usuario 310/Admin 292 validado; SQL bloqueado por historial remoto divergente | P0 | Cerrar reenlace con licencia vigente, sesion unica y confirmacion booleana real | M | Alto |
-| LIC-SUPABASE-HISTORY-01 | Alineacion local preparada; pendiente OK remoto exacto | P0 | Reconciliar versiones de migracion registradas en DEV pero ausentes localmente antes de desplegar licencias | M | Alto |
+| LIC-RELINK-02 | Backend aplicado en DEV y Android Usuario 310/Admin 292 validado; pendiente prueba integral fisica | P0 | Cerrar reenlace con licencia vigente, sesion unica y confirmacion booleana real | M | Alto |
+| LIC-SUPABASE-HISTORY-01 | Resuelto en DEV; historial local/remoto alineado y dry-run limpio | P0 | Reconciliar versiones de migracion registradas en DEV pero ausentes localmente antes de desplegar licencias | M | Alto |
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
@@ -1605,8 +1605,8 @@ Flujo de una entrada:
 
 ### LIC-RELINK-02 - Cierre seguro y unico del reenlace
 
-- Estado: `Implementado en fuente; Android Usuario 310/Admin 292 validado; SQL
-  pendiente de reconciliar y aplicar en DEV`.
+- Estado: `Backend aplicado en DEV; Android Usuario 310/Admin 292 validado;
+  pendiente prueba integral fisica`.
 - Causa raiz: el backend comprobaba el cupo como si el reenlace agregara otro
   dispositivo y podia rechazarlo justo en el limite; ademas permitia mas de una
   sesion provisional por dispositivo. Android descartaba el booleano del RPC y
@@ -1620,33 +1620,36 @@ Flujo de una entrada:
 - Validacion: unitarios de red/sync y builds DEV con Lint Vital correctos. El
   Ktlint global conserva infracciones previas ajenas en
   `SupabaseAppFeedbackRepository.kt`.
-- Bloqueo: Docker local no estaba disponible y el dry-run remoto, sin aplicar
-  cambios, encontro migraciones registradas en DEV que faltan en el arbol local.
-  No reparar el historial automaticamente: primero traer y revisar esa verdad
-  remota; despues validar/aplicar esta migracion y ejecutar el recorrido integral.
+- Despliegue DEV: migracion `20260810174945_fix_device_relink_completion.sql`
+  aplicada despues de reconciliar el historial. Verificacion de solo lectura:
+  historial alineado, dry-run sin pendientes, columna e indice esperados, cero
+  sesiones abiertas, helpers internos cerrados y tabla sin acceso directo de
+  clientes. Los avisos del linter sobre RPC `security definer` expuestos son
+  esperables para el flujo previo a sesion y conservan validacion interna por
+  codigo, token de dispositivo o identidad.
+- Pendiente: ejecutar el recorrido fisico integral de alta, desvinculacion,
+  reenlace correcto, token reemplazado/vencido y confirmacion `false`.
 
 ### LIC-SUPABASE-HISTORY-01 - Reconciliar historial local y DEV
 
-- Estado: `Alineacion local preparada; pendiente OK remoto exacto`. Prioridad
-  P0, esfuerzo y riesgo altos porque la reparacion restante escribe el historial
-  remoto de migraciones.
+- Estado: `Resuelto en Supabase DEV el 2026-08-10`. Prioridad P0; la reparacion
+  remota fue autorizada explicitamente y verificada.
 - Alcance: comparar cada version registrada en Supabase DEV con su SQL local,
   identificar equivalencias creadas con timestamps distintos y preparar una
   reconciliacion reversible. No tocar Production ni ejecutar `migration repair`
   sin una autorizacion explicita separada.
-- Resultado local: 24 archivos equivalentes ahora usan el timestamp realmente
+- Resultado: 24 archivos equivalentes ahora usan el timestamp realmente
   registrado en DEV y se recuperaron las dos migraciones Gloshia que faltaban
-  en Git. No se cambio su esquema ni se tocaron datos.
-- Pendiente remoto: registrar como `applied`, sin ejecutar SQL, las diez versiones
+  en Git. Se registraron como `applied`, sin ejecutar SQL, las diez versiones
   locales historicas `20260702130000`, `20260702143000`, `20260702184913`,
   `20260702213830`, `20260703112000`, `20260707151340`, `20260708110000`,
   `20260710022336`, `20260719022436` y `20260724001301`. El rollback es marcar
-  esas mismas versiones como `reverted`.
+  esas mismas versiones como `reverted`; no fue necesario usarlo.
 - Drift detectado: los objetos de las dos ultimas versiones DAG ya no existen
   en DEV aunque migraciones posteriores figuran aplicadas. Este ticket no debe
   recrearlos ni borrar nada; el chat DAG debe decidir su contrato futuro.
-- Aceptacion: el dry-run remoto deja de informar versiones ausentes y muestra
-  solamente migraciones nuevas reales, empezando por `LIC-RELINK-02`.
+- Aceptacion cumplida: el historial local y DEV coincide; despues de aplicar
+  `LIC-RELINK-02`, el dry-run remoto informa que la base esta actualizada.
 
 ### USER-RELINK-01 - Reenlace de un Usuario existente
 

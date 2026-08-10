@@ -20,17 +20,22 @@ el runtime actual desde versiones o worktrees historicos.
   Usuario 310 y Admin 292 correctos. El Ktlint global de `core-network` sigue
   bloqueado por formato previo en `SupabaseAppFeedbackRepository.kt`, fuera del
   ticket; los archivos modificados no aparecen entre las infracciones.
-- La migracion queda en fuente, sin aplicar. El dry-run no modifico DEV y detecto
-  que el historial remoto contiene versiones ausentes localmente; hay que
-  reconciliar ese historial y validar/aplicar la migracion antes de la prueba
-  integral. No hubo instalacion, push ni publicacion.
-- `LIC-SUPABASE-HISTORY-01` ya alineo localmente 24 timestamps con los nombres
-  registrados en DEV y recupero dos migraciones Gloshia que existian solo en el
-  historial remoto. Quedan diez versiones historicas locales por registrar como
-  `applied`; Supabase DEV no fue modificado porque falta un OK remoto exacto.
+- La migracion `20260810174945_fix_device_relink_completion.sql` quedo aplicada
+  en Supabase DEV. El historial local/remoto coincide y el dry-run final informa
+  que la base remota esta actualizada. No hubo instalacion, push ni publicacion
+  de APK.
+- La comprobacion remota confirma `revoked_at`, el indice unico parcial, cero
+  sesiones abiertas y los nueve RPC/helpers esperados con `search_path` vacio.
+  Los helpers internos no son ejecutables por clientes y la tabla de sesiones
+  no concede acceso directo a `anon` ni `authenticated`. Queda pendiente el
+  recorrido fisico integral de reenlace en Usuario y Admin.
+- `LIC-SUPABASE-HISTORY-01` quedo cerrado en DEV: se alinearon localmente 24
+  timestamps, se recuperaron dos migraciones Gloshia que existian solo en el
+  historial remoto y se registraron como `applied`, sin ejecutar sus SQL, las
+  diez versiones historicas revisadas.
 - Dos de esas diez versiones son de DAG y sus objetos ya no existen en DEV. La
-  reconciliacion de licencias no debe recrearlos: solo registrar el historial y
-  dejar el drift funcional para el chat responsable de DAG.
+  reconciliacion de licencias no los recreo: el drift funcional sigue separado
+  para el chat responsable de DAG.
 
 ## LIC-RELINK-01: tokens de reenlace Usuario admitidos
 
