@@ -144,6 +144,7 @@ class InstalledAppPublisher
 
             fun String.isAlwaysAllowedPackage(): Boolean =
                 this in ExactAllowedPackageNames ||
+                    isProtectedBrowserPackage(this) ||
                     AllowedPackagePrefixes.any { startsWith(it) } ||
                     endsWith(".launcher")
         }

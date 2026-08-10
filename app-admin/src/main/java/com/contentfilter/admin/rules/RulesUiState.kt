@@ -193,4 +193,5 @@ data class AppControlUiState(
     val groupName: String? = null,
     val groupLimitMinutes: Int? = null,
     val isUpdating: Boolean = false,
+    val isPendingApproval: Boolean = false,
 )

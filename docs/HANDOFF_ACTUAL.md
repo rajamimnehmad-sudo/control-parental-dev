@@ -1,10 +1,24 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-08-08
+Fecha de corte: 2026-08-10
 
 Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
+
+## Integracion local App Usuario/Admin con DAG Browser
+
+- App Usuario 308 reconoce los paquetes DAG Browser DEV, LAB y produccion como
+  componentes protegidos. No los incorpora a la linea base de aplicaciones ni
+  genera una solicitud de aprobacion al instalarlos.
+- App Admin 291 conserva como `Pendiente` una aplicacion que tenga una solicitud
+  abierta; ya no la presenta como permitida mientras espera la decision.
+- Pruebas unitarias dirigidas correctas. Lint y APK DEV de ambas apps correctos.
+  El Ktlint global de App Usuario sigue bloqueado por formato previo en
+  `UserAnnouncementsScreen.kt` y `UserFeedbackViewModel.kt`, fuera de este lote;
+  los archivos modificados en este ticket no aparecen entre las infracciones.
+- Es un cierre local: no hubo instalacion fisica, push ni publicacion DEV. Las
+  versiones DEV publicadas continúan siendo Usuario 307 y Admin 290.
 
 ## GloshIA Visual R4: lote de entrenamiento cerrado en NO-GO
 

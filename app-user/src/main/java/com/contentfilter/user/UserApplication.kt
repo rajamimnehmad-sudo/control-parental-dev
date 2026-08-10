@@ -18,6 +18,7 @@ import com.contentfilter.feature.activation.InstalledAppVersionProvider
 import com.contentfilter.feature.vpn.domainlist.WebDomainListUpdater
 import com.contentfilter.feature.vpn.service.VpnController
 import com.contentfilter.user.apps.InstalledAppPublisher
+import com.contentfilter.user.apps.isProtectedBrowserPackage
 import com.contentfilter.user.protection.ProtectionControlCoordinator
 import com.contentfilter.user.protection.ProtectionHealthMonitor
 import com.contentfilter.user.protection.UserLauncherController
@@ -128,6 +129,11 @@ class UserApplication :
                 installApprovalStore.initializeBaseline(
                     installedAppPublisher.installedApps().map(InstalledAppPublisher.DetectedApp::packageName).toSet(),
                 )
+                listOf(
+                    "com.contentfilter.dagbrowser",
+                    "com.contentfilter.dagbrowser.dev",
+                    "com.contentfilter.dagbrowser.lab",
+                ).filter(::isProtectedBrowserPackage).forEach(installApprovalStore::markApproved)
             }.logFailure("install-approval-baseline")
             runCatching { localDataRepair.repairIfNeeded() }
                 .logFailure("local-data-repair")

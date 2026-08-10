@@ -91,7 +91,12 @@ internal fun AppControlCard(
                             maxLines = 1,
                         )
                         StatusChip(
-                            text = if (app.isUpdating) "Guardando..." else status.label,
+                            text =
+                                when {
+                                    app.isUpdating -> "Guardando..."
+                                    app.isPendingApproval -> "Pendiente"
+                                    else -> status.label
+                                },
                             color = status.switchColor,
                         )
                     }

@@ -54,6 +54,7 @@ internal fun List<InstalledApp>.toAppControls(
     nowEpochMillis: Long,
     devices: List<Device>,
     pendingAllowed: Map<String, Boolean>,
+    pendingApprovalPackages: Set<String> = emptySet(),
 ): List<AppControlUiState> {
     val devicesById = devices.associateBy { it.id }
     val groupsByPackage =
@@ -80,6 +81,7 @@ internal fun List<InstalledApp>.toAppControls(
                 extraTimeRemainingMinutes != null ||
                     limit != null ||
                     effectiveRule?.action != RuleAction.Block
+            val awaitingApproval = app.packageName in pendingApprovalPackages
             AppControlUiState(
                 appName = app.appName,
                 packageName = app.packageName,
@@ -87,13 +89,14 @@ internal fun List<InstalledApp>.toAppControls(
                 isSystemApp = app.isSystemApp,
                 iconBase64 = app.iconBase64,
                 deviceName = devicesById[app.deviceId]?.displayName ?: "Usuario",
-                allowed = pendingAllowed[app.packageName] ?: confirmedAllowed,
+                allowed = pendingAllowed[app.packageName] ?: if (awaitingApproval) false else confirmedAllowed,
                 confirmedAllowed = confirmedAllowed,
                 dailyLimitMinutes = limit?.limitMinutes,
                 extraTimeRemainingMinutes = extraTimeRemainingMinutes,
                 groupName = appGroup?.name,
                 groupLimitMinutes = appGroup?.limitMinutes,
                 isUpdating = pendingAllowed.containsKey(app.packageName),
+                isPendingApproval = awaitingApproval,
             )
         }
         .sortedWith(

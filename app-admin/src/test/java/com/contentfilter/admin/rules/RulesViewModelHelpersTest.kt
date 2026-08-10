@@ -657,6 +657,24 @@ class RulesViewModelHelpersTest {
     }
 
     @Test
+    fun `pending approval is not shown as allowed`() {
+        val control =
+            listOf(remoteApp("Saily", "com.saily.android")).toAppControls(
+                rules = emptyList(),
+                limits = emptyList(),
+                grants = emptyList(),
+                appGroups = emptyList(),
+                nowEpochMillis = NowEpochMillis,
+                devices = listOf(Device(id = DeviceId, accountId = AccountId, displayName = "Usuario")),
+                pendingAllowed = emptyMap(),
+                pendingApprovalPackages = setOf("com.saily.android"),
+            ).single()
+
+        assertFalse(control.allowed)
+        assertTrue(control.isPendingApproval)
+    }
+
+    @Test
     fun `recent device with a missing protection layer is unprotected`() {
         val device =
             healthyDevice(

@@ -1,6 +1,6 @@
 # BACKLOG DE PRODUCTO
 
-Ultima sincronizacion: 2026-08-05
+Ultima sincronizacion: 2026-08-10
 
 Este archivo es la fuente canonica del backlog de producto versionado en Git. No reemplaza a `docs/HANDOFF_ACTUAL.md`, que sigue siendo la verdad tecnica de lo implementado y publicado.
 
@@ -32,6 +32,17 @@ Modalidad del chat dedicado de backlog:
 - Codex captura cada idea, asigna un ID estable, registra evidencia y decisiones pendientes, detecta duplicados y la deja en estado `Idea`.
 - Codex no interpreta la captura como aprobacion para codigo ni interrumpe el flujo de ideas con preguntas de detalle.
 - Cuando el usuario pide preparar o elegir trabajo, Codex agrupa las ideas relacionadas en tickets pequenos, propone orden y dependencias, y recien entonces entrevista las decisiones que cambian alcance o aceptacion.
+
+### APPS-PENDING-DAG-INTEGRATION-01 - DAG protegido y solicitudes pendientes coherentes
+
+- Estado: `Resuelto local; pendiente validacion fisica y publicacion`. Prioridad:
+  P1. Tipo: integracion App Usuario/Admin. Esfuerzo: S. Riesgo: bajo.
+- App Usuario reconoce DAG Browser produccion, DEV y LAB como paquetes protegidos
+  y no solicita aprobacion por su instalacion. App Admin muestra como `Pendiente`
+  cualquier aplicacion con una solicitud abierta, sin presentarla como permitida.
+- Unitarios dirigidos, Lint y APK DEV correctos para Usuario 308 y Admin 291.
+  Ktlint global de Usuario permanece bloqueado por dos archivos previos ajenos al
+  ticket. No hubo instalacion, push ni publicacion.
 
 ### GLOSHIA-R3.1-PROMOTION - Promocion local del candidato hibrido
 

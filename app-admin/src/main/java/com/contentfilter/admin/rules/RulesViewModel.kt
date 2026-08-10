@@ -16,6 +16,7 @@ import com.contentfilter.core.domain.model.PolicyTargetType
 import com.contentfilter.core.domain.model.PolicyTimeWindow
 import com.contentfilter.core.domain.model.RuleAction
 import com.contentfilter.core.domain.model.RuleScope
+import com.contentfilter.core.domain.model.RequestStatus
 import com.contentfilter.core.domain.model.WebProtectionSemantics
 import com.contentfilter.core.domain.repository.AppGroupRepository
 import com.contentfilter.core.domain.repository.ExtraTimeGrantRepository
@@ -26,6 +27,7 @@ import com.contentfilter.core.domain.usecase.admin.DeletePolicyRuleUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDailyLimitsUseCase
 import com.contentfilter.core.domain.usecase.admin.ObserveDevicesUseCase
 import com.contentfilter.core.domain.usecase.admin.ObservePolicyRulesUseCase
+import com.contentfilter.core.domain.usecase.admin.ObserveRequestsUseCase
 import com.contentfilter.core.domain.usecase.admin.SaveDailyLimitUseCase
 import com.contentfilter.core.domain.usecase.admin.SavePolicyRuleUseCase
 import com.contentfilter.core.sync.engine.PolicyApplicationState
@@ -57,6 +59,7 @@ class RulesViewModel
         observePolicyRules: ObservePolicyRulesUseCase,
         observeDailyLimits: ObserveDailyLimitsUseCase,
         observeDevices: ObserveDevicesUseCase,
+        observeRequests: ObserveRequestsUseCase,
         private val saveRule: SavePolicyRuleUseCase,
         private val deleteRule: DeletePolicyRuleUseCase,
         private val saveDailyLimit: SaveDailyLimitUseCase,
@@ -87,6 +90,18 @@ class RulesViewModel
             )
         private val selectedPolicyDeviceId = form.map { it.selectedDeviceId }.distinctUntilChanged()
         private val extraTimeGrants = grantRepository.observeGrants()
+        private val pendingApprovalPackages =
+            observeRequests()
+                .map { requests ->
+                    requests
+                        .filter {
+                            (it.status == RequestStatus.PendingLocal || it.status == RequestStatus.PendingRemote) &&
+                                it.targetPackageName != null
+                        }
+                        .mapNotNull { it.targetPackageName }
+                        .toSet()
+                }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptySet())
         private val devices =
             observeDevices().stateIn(
                 scope = viewModelScope,
@@ -119,15 +134,21 @@ class RulesViewModel
                     )
                 }
             }
+        private val formWithPendingApprovals =
+            combine(form, pendingApprovalPackages) { formState, pendingPackages ->
+                formState to pendingPackages
+            }
 
         val uiState =
             combine(
                 policyState,
                 devices,
                 installedApps,
-                form,
+                formWithPendingApprovals,
                 systemStatusRepository.observeHealth(),
-            ) { policy, devices, apps, formState, health ->
+            ) { policy, devices, apps, formAndPending, health ->
+                val formState = formAndPending.first
+                val pendingPackages = formAndPending.second
                 val userDevices = devices.toUserDevices(apps)
                 val selectedDeviceId = userDevices.selectedDeviceId(formState.selectedDeviceId)
                 val selectedPolicy = policy.takeIf { it.deviceId == selectedDeviceId } ?: RulesPolicyState.empty(selectedDeviceId)
@@ -185,6 +206,7 @@ class RulesViewModel
                                     nowEpochMillis = selectedPolicy.nowEpochMillis,
                                     devices = devices,
                                     pendingAllowed = formState.pendingAppAllowedByDevice[selectedDeviceId].orEmpty(),
+                                    pendingApprovalPackages = pendingPackages,
                                 )
                         }
                             .filterBySearch(formState.appSearchQuery),

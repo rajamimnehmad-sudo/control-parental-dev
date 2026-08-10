@@ -30,5 +30,19 @@ class PackageChangeReceiverTest {
                 "com.contentfilter.user.dev",
             ),
         )
+        listOf(
+            "com.contentfilter.dagbrowser",
+            "com.contentfilter.dagbrowser.dev",
+            "com.contentfilter.dagbrowser.lab",
+        ).forEach { packageName ->
+            assertFalse(
+                shouldRequireInstallApproval(
+                    packageName,
+                    false,
+                    false,
+                    "com.contentfilter.user.dev",
+                ),
+            )
+        }
     }
 }
