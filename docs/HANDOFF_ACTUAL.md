@@ -24,6 +24,13 @@ el runtime actual desde versiones o worktrees historicos.
   que el historial remoto contiene versiones ausentes localmente; hay que
   reconciliar ese historial y validar/aplicar la migracion antes de la prueba
   integral. No hubo instalacion, push ni publicacion.
+- `LIC-SUPABASE-HISTORY-01` ya alineo localmente 24 timestamps con los nombres
+  registrados en DEV y recupero dos migraciones Gloshia que existian solo en el
+  historial remoto. Quedan diez versiones historicas locales por registrar como
+  `applied`; Supabase DEV no fue modificado porque falta un OK remoto exacto.
+- Dos de esas diez versiones son de DAG y sus objetos ya no existen en DEV. La
+  reconciliacion de licencias no debe recrearlos: solo registrar el historial y
+  dejar el drift funcional para el chat responsable de DAG.
 
 ## LIC-RELINK-01: tokens de reenlace Usuario admitidos
 

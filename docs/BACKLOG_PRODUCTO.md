@@ -1405,7 +1405,7 @@ Flujo de una entrada:
 | SUPERADMIN-ADMIN-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
 | LIC-RELINK-01 | Implementado candidato local Usuario 309; pendiente prueba integral | P0 | Aceptar en App Usuario tokens normales de 6 caracteres y de reenlace de 8 | S | Bajo |
 | LIC-RELINK-02 | Implementado en fuente; Android Usuario 310/Admin 292 validado; SQL bloqueado por historial remoto divergente | P0 | Cerrar reenlace con licencia vigente, sesion unica y confirmacion booleana real | M | Alto |
-| LIC-SUPABASE-HISTORY-01 | Diagnosticado; pendiente aprobacion | P0 | Reconciliar versiones de migracion registradas en DEV pero ausentes localmente antes de desplegar licencias | M | Alto |
+| LIC-SUPABASE-HISTORY-01 | Alineacion local preparada; pendiente OK remoto exacto | P0 | Reconciliar versiones de migracion registradas en DEV pero ausentes localmente antes de desplegar licencias | M | Alto |
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
@@ -1627,12 +1627,24 @@ Flujo de una entrada:
 
 ### LIC-SUPABASE-HISTORY-01 - Reconciliar historial local y DEV
 
-- Estado: `Diagnosticado; pendiente aprobacion`. Prioridad P0, esfuerzo y riesgo
-  altos porque cualquier reparacion escribe el historial remoto de migraciones.
+- Estado: `Alineacion local preparada; pendiente OK remoto exacto`. Prioridad
+  P0, esfuerzo y riesgo altos porque la reparacion restante escribe el historial
+  remoto de migraciones.
 - Alcance: comparar cada version registrada en Supabase DEV con su SQL local,
   identificar equivalencias creadas con timestamps distintos y preparar una
   reconciliacion reversible. No tocar Production ni ejecutar `migration repair`
   sin una autorizacion explicita separada.
+- Resultado local: 24 archivos equivalentes ahora usan el timestamp realmente
+  registrado en DEV y se recuperaron las dos migraciones Gloshia que faltaban
+  en Git. No se cambio su esquema ni se tocaron datos.
+- Pendiente remoto: registrar como `applied`, sin ejecutar SQL, las diez versiones
+  locales historicas `20260702130000`, `20260702143000`, `20260702184913`,
+  `20260702213830`, `20260703112000`, `20260707151340`, `20260708110000`,
+  `20260710022336`, `20260719022436` y `20260724001301`. El rollback es marcar
+  esas mismas versiones como `reverted`.
+- Drift detectado: los objetos de las dos ultimas versiones DAG ya no existen
+  en DEV aunque migraciones posteriores figuran aplicadas. Este ticket no debe
+  recrearlos ni borrar nada; el chat DAG debe decidir su contrato futuro.
 - Aceptacion: el dry-run remoto deja de informar versiones ausentes y muestra
   solamente migraciones nuevas reales, empezando por `LIC-RELINK-02`.
 
