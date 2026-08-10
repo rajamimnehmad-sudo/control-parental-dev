@@ -6,6 +6,18 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## LIC-RELINK-01: tokens de reenlace Usuario admitidos
+
+- App Usuario 309 acepta los tokens normales de seis caracteres y los tokens
+  de reenlace de ocho caracteres emitidos por App Admin o Superweb.
+- La causa era una validacion local limitada exactamente a seis caracteres; el
+  backend de reenlace no llegaba a recibir el token de ocho caracteres.
+- Unitarios dirigidos, Ktlint del modulo, Lint Vital y APK DEV de Usuario
+  correctos. Es un candidato local: no hubo instalacion, push ni publicacion.
+- Este cierre corrige solo la entrada del token. La confirmacion atomica del
+  reenlace, el limite de dispositivos y las sesiones pendientes pertenecen al
+  ticket separado `LIC-RELINK-02`.
+
 ## Integracion local App Usuario/Admin con DAG Browser
 
 - App Usuario 308 reconoce los paquetes DAG Browser DEV, LAB y produccion como

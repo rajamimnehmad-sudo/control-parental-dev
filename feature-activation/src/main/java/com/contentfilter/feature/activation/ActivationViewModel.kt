@@ -180,7 +180,7 @@ class ActivationViewModel
             companion object {
                 fun from(rawValue: String): PairingToken {
                     val trimmed = rawValue.trim()
-                    val directCode = trimmed.normalizedPairingCodeOrNull()
+                    val directCode = trimmed.normalizedUserPairingCodeOrNull()
                     if (directCode != null) {
                         return PairingToken(
                             code = directCode,
@@ -191,14 +191,14 @@ class ActivationViewModel
 
                     val parts = trimmed.split(Regex("[^A-Za-z0-9]+")).filter { it.isNotBlank() }
                     val code =
-                        parts.lastOrNull { it.normalizedPairingCodeOrNull() != null }
-                            ?.normalizedPairingCodeOrNull()
+                        parts.lastOrNull { it.normalizedUserPairingCodeOrNull() != null }
+                            ?.normalizedUserPairingCodeOrNull()
                             .orEmpty()
                     if (code.isBlank()) return PairingToken(code = "", displayName = null, mode = TokenMode.PastedText)
 
                     val name =
                         parts
-                            .takeWhile { it.normalizedPairingCodeOrNull() == null }
+                            .takeWhile { it.normalizedUserPairingCodeOrNull() == null }
                             .joinToString(" ")
                             .trim()
                             .takeIf { it.isNotBlank() }
@@ -208,17 +208,6 @@ class ActivationViewModel
                         mode = if (name == null) TokenMode.PastedText else TokenMode.NameCode,
                     )
                 }
-
-                private fun String.normalizedPairingCodeOrNull(): String? {
-                    val normalized = trim().uppercase()
-                    return if (normalized.matches(UserPairingCodeRegex)) {
-                        normalized
-                    } else {
-                        null
-                    }
-                }
-
-                private val UserPairingCodeRegex = Regex("[A-Z0-9]{6}")
             }
         }
 
@@ -236,3 +225,10 @@ class ActivationViewModel
             fun String.maskForLog(): String = if (length <= 4) "****" else "${take(2)}***${takeLast(2)}"
         }
     }
+
+internal fun String.normalizedUserPairingCodeOrNull(): String? {
+    val normalized = trim().uppercase()
+    return normalized.takeIf { it.matches(UserPairingCodeRegex) }
+}
+
+private val UserPairingCodeRegex = Regex("(?:[A-Z0-9]{6}|[A-Z0-9]{8})")

@@ -1403,6 +1403,7 @@ Flujo de una entrada:
 | ANDROID-PHYSICAL-CLOSEOUT-01 | Cierre parcial ampliado en SM-A235M DEV 270; quedan recorridos especificos y SM-S908E | P1 | Cerrar en un recorrido fisico los candidatos Android pendientes sin publicar por ticket | M | Alto |
 | SUPERADMIN-TOKEN-01 | Implementado DEV 241 y hotfix de visualizacion 2026-07-18; pendiente prueba funcional autenticada | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | SUPERADMIN-ADMIN-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
+| LIC-RELINK-01 | Implementado candidato local Usuario 309; pendiente prueba integral | P0 | Aceptar en App Usuario tokens normales de 6 caracteres y de reenlace de 8 | S | Bajo |
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
@@ -1585,6 +1586,20 @@ Flujo de una entrada:
   - errores de red o activacion no consumen falsamente el token ni dejan dos estados contradictorios;
   - no se borra comunidad, usuarios protegidos, reglas, solicitudes, licencias ni historial operativo.
 - Decision aplicada: token de un solo uso por 30 minutos. El Admin conserva una sola identidad/dispositivo logico; el acceso anterior se revoca atomicamente sólo despues de la primera sincronizacion completa correcta del nuevo enlace.
+
+### LIC-RELINK-01 - Entrada compatible con tokens de reenlace
+
+- Estado: `Implementado candidato local Usuario 309; pendiente prueba integral`.
+- Causa raiz: App Usuario validaba exclusivamente tokens alfanumericos de seis
+  caracteres, mientras el backend emite ocho para reenlazar un dispositivo
+  existente. El token se rechazaba localmente y nunca llegaba a Supabase.
+- Resultado: la misma entrada admite seis caracteres para altas normales y ocho
+  para reenlaces, conservando normalizacion, rechazo de longitudes no soportadas
+  y mensajes existentes.
+- Validacion: unitarios dirigidos, Ktlint de `feature-activation`, Lint Vital y
+  APK DEV de App Usuario correctos. Sin instalacion, push ni publicacion.
+- Fuera de alcance: confirmacion booleana/atomica, cupo al reenlazar y unicidad
+  de la sesion pendiente quedan en `LIC-RELINK-02`.
 
 ### USER-RELINK-01 - Reenlace de un Usuario existente
 
