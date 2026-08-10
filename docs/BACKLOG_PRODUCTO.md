@@ -1404,6 +1404,8 @@ Flujo de una entrada:
 | SUPERADMIN-TOKEN-01 | Implementado DEV 241 y hotfix de visualizacion 2026-07-18; pendiente prueba funcional autenticada | P2 | Gestion segura y auditable de tokens desde Super Admin | L | Alto |
 | SUPERADMIN-ADMIN-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Volver a enlazar un Admin desvinculado con un token generado desde su tarjeta Superweb | M | Alto |
 | LIC-RELINK-01 | Implementado candidato local Usuario 309; pendiente prueba integral | P0 | Aceptar en App Usuario tokens normales de 6 caracteres y de reenlace de 8 | S | Bajo |
+| LIC-RELINK-02 | Implementado en fuente; Android Usuario 310/Admin 292 validado; SQL bloqueado por historial remoto divergente | P0 | Cerrar reenlace con licencia vigente, sesion unica y confirmacion booleana real | M | Alto |
+| LIC-SUPABASE-HISTORY-01 | Diagnosticado; pendiente aprobacion | P0 | Reconciliar versiones de migracion registradas en DEV pero ausentes localmente antes de desplegar licencias | M | Alto |
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
@@ -1600,6 +1602,39 @@ Flujo de una entrada:
   APK DEV de App Usuario correctos. Sin instalacion, push ni publicacion.
 - Fuera de alcance: confirmacion booleana/atomica, cupo al reenlazar y unicidad
   de la sesion pendiente quedan en `LIC-RELINK-02`.
+
+### LIC-RELINK-02 - Cierre seguro y unico del reenlace
+
+- Estado: `Implementado en fuente; Android Usuario 310/Admin 292 validado; SQL
+  pendiente de reconciliar y aplicar en DEV`.
+- Causa raiz: el backend comprobaba el cupo como si el reenlace agregara otro
+  dispositivo y podia rechazarlo justo en el limite; ademas permitia mas de una
+  sesion provisional por dispositivo. Android descartaba el booleano del RPC y
+  tomaba cualquier HTTP 2xx como confirmacion, incluso cuando devolvia `false`.
+- Resultado: el reenlace mantiene el mismo `device_id`, valida vigencia sin
+  consumir otro cupo, conserva una unica sesion abierta y revoca las
+  provisionales reemplazadas. Android solo borra el pendiente ante `true`.
+- Seguridad: funciones `security definer` con `search_path` vacio, nombres de
+  esquema explicitos y permisos revocados/reotorgados por RPC. Los helpers
+  internos no quedan ejecutables por `anon` ni `authenticated`.
+- Validacion: unitarios de red/sync y builds DEV con Lint Vital correctos. El
+  Ktlint global conserva infracciones previas ajenas en
+  `SupabaseAppFeedbackRepository.kt`.
+- Bloqueo: Docker local no estaba disponible y el dry-run remoto, sin aplicar
+  cambios, encontro migraciones registradas en DEV que faltan en el arbol local.
+  No reparar el historial automaticamente: primero traer y revisar esa verdad
+  remota; despues validar/aplicar esta migracion y ejecutar el recorrido integral.
+
+### LIC-SUPABASE-HISTORY-01 - Reconciliar historial local y DEV
+
+- Estado: `Diagnosticado; pendiente aprobacion`. Prioridad P0, esfuerzo y riesgo
+  altos porque cualquier reparacion escribe el historial remoto de migraciones.
+- Alcance: comparar cada version registrada en Supabase DEV con su SQL local,
+  identificar equivalencias creadas con timestamps distintos y preparar una
+  reconciliacion reversible. No tocar Production ni ejecutar `migration repair`
+  sin una autorizacion explicita separada.
+- Aceptacion: el dry-run remoto deja de informar versiones ausentes y muestra
+  solamente migraciones nuevas reales, empezando por `LIC-RELINK-02`.
 
 ### USER-RELINK-01 - Reenlace de un Usuario existente
 

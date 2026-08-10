@@ -7,6 +7,20 @@ import org.json.JSONObject
 import java.time.Instant
 import javax.inject.Inject
 
+internal fun RemoteResult<Boolean>.toRelinkCompletionResult(): RemoteResult<Unit> =
+    when (this) {
+        is RemoteResult.Success ->
+            if (value) {
+                RemoteResult.Success(Unit)
+            } else {
+                RemoteResult.Failure(
+                    reason = "No se pudo confirmar el reenlace.",
+                    retryable = false,
+                )
+            }
+        is RemoteResult.Failure -> this
+    }
+
 class SupabaseRemoteDeviceRepository
     @Inject
     constructor(
@@ -66,7 +80,9 @@ class SupabaseRemoteDeviceRepository
         }
 
         override suspend fun completeOwnRelink(): RemoteResult<Unit> =
-            client.invokeRpc("complete_own_device_relink", JSONObject())
+            client
+                .invokeRpcForBoolean("complete_own_device_relink", JSONObject())
+                .toRelinkCompletionResult()
 
         private fun SystemHealthSnapshot.toDeviceSeenJson(): JSONObject {
             val now = Instant.now().toString()

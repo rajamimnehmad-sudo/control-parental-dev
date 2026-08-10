@@ -6,6 +6,25 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## LIC-RELINK-02: cierre seguro del reenlace
+
+- El reenlace de Usuario o Admin conserva el mismo dispositivo logico y ahora
+  exige una licencia vigente sin volver a consumir un cupo ya ocupado.
+- Cada dispositivo admite una sola sesion de reenlace abierta. Emitir o consumir
+  un token nuevo revoca la sesion provisional anterior y su activacion asociada;
+  los tokens vencidos, revocados o reemplazados fallan cerrados.
+- Android ahora lee el booleano real de `complete_own_device_relink`: solo
+  `true` limpia el estado pendiente; un HTTP correcto con `false` ya no se toma
+  como reenlace completado.
+- Unitarios de `core-network` y `core-sync`, Lint Vital y APK DEV locales de
+  Usuario 310 y Admin 292 correctos. El Ktlint global de `core-network` sigue
+  bloqueado por formato previo en `SupabaseAppFeedbackRepository.kt`, fuera del
+  ticket; los archivos modificados no aparecen entre las infracciones.
+- La migracion queda en fuente, sin aplicar. El dry-run no modifico DEV y detecto
+  que el historial remoto contiene versiones ausentes localmente; hay que
+  reconciliar ese historial y validar/aplicar la migracion antes de la prueba
+  integral. No hubo instalacion, push ni publicacion.
+
 ## LIC-RELINK-01: tokens de reenlace Usuario admitidos
 
 - App Usuario 309 acepta los tokens normales de seis caracteres y los tokens
