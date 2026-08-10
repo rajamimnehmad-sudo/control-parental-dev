@@ -17,6 +17,13 @@ Para planificacion, captura de ideas o seleccion de tickets:
 - Tratar `docs/HANDOFF_ACTUAL.md` como verdad tecnica y el backlog como verdad de producto.
 - No escribir codigo hasta que el usuario apruebe explicitamente el ticket.
 
+## Esfuerzo de razonamiento
+
+- Usar esfuerzo bajo por defecto en todas las tareas del proyecto.
+- El nivel solo puede cambiarlo manualmente el usuario antes de enviar un mensaje; Codex no puede modificarlo durante una respuesta.
+- Si una tarea requiere esfuerzo medio, alto o superior por riesgo, seguridad o complejidad, avisarlo explicitamente antes de comenzar y esperar un nuevo mensaje del usuario con ese nivel seleccionado.
+- Indicar el nivel recomendado y el motivo concreto; no pedir un aumento para consultas, lectura o planificacion que puedan resolverse correctamente con esfuerzo bajo.
+
 ## Ticket Android autorizado por el usuario (2026-07-14)
 
 - Area: `feature-accessibility`, barrera antimanipulacion tipo Rimon.
