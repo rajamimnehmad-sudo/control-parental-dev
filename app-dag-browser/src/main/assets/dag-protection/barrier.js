@@ -20,6 +20,8 @@
   const MAX_INLINE_DECISION_SOURCE_CHARS = 1024 * 1024;
   const IMAGE_PRIORITY_ROOT_MARGIN = "800px 0px";
   const MAX_PRIORITY_SOURCES = 256;
+  const MAX_COMPACT_SOURCE_DIAGNOSTICS = 64;
+  const COMPACT_SOURCE_DIAGNOSTIC_EDGE = 192;
   const INITIAL_AD_SCAN_READY_ATTRIBUTE = "data-glosh-dag-ads-initial-ready";
   const INITIAL_AD_SCAN_READY_EVENT = "glosh-dag-ads-initial-ready";
   const documentToken =
@@ -40,16 +42,26 @@
   let initialDocumentReady = false;
   let initialDocumentReadyReported = false;
   let inlineDecisionSourceChars = 0;
+  let compactSourceDiagnostics = 0;
+  let compactSourceDiagnosticsEnabled = false;
   const pendingImages = new WeakMap();
   const unsettledImages = new Set();
   const inlineDecisions = new Map();
   const priorityBySource = new Map();
   const priorityByImage = new WeakMap();
+  const diagnosedCompactSources = new WeakSet();
   try {
     nativePort = browser.runtime.connectNative(NATIVE_APP);
   } catch {
     return;
   }
+  nativePort.onMessage.addListener((message) => {
+    if (
+      message?.type === "compact-source-diagnostics-config" &&
+      message?.version === PROTOCOL_VERSION &&
+      message?.enabled === true
+    ) compactSourceDiagnosticsEnabled = true;
+  });
 
   const postToAndroid = (message) => {
     if (window.top !== window || nativePort === null) return;
@@ -73,6 +85,40 @@
   postDocumentLifecycle("document-started");
 
   const imageSource = (image) => image.currentSrc || image.src || "";
+
+  const reportCompactSourceMetadata = (image) => {
+    if (
+      !compactSourceDiagnosticsEnabled ||
+      compactSourceDiagnostics >= MAX_COMPACT_SOURCE_DIAGNOSTICS ||
+      diagnosedCompactSources.has(image) ||
+      inlineImageSource(image).length > 0 ||
+      image.naturalWidth <= 0 ||
+      image.naturalHeight <= 0 ||
+      Math.min(image.naturalWidth, image.naturalHeight) > COMPACT_SOURCE_DIAGNOSTIC_EDGE
+    ) return;
+    diagnosedCompactSources.add(image);
+    compactSourceDiagnostics += 1;
+    const sourceSet = image.getAttribute("srcset") || "";
+    const widthDescriptors = [...sourceSet.matchAll(/(?:^|,)[^,]+\s(\d+)w(?:\s*,|$)/gu)]
+      .map((match) => Number.parseInt(match[1], 10))
+      .filter(Number.isSafeInteger);
+    const densityDescriptors = sourceSet.match(/\s\d+(?:\.\d+)?x(?:\s*,|$)/gu) || [];
+    const declaredSource = image.getAttribute("src") || "";
+    postToAndroid({
+      type: "compact-image-source-metadata",
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      renderedWidth: image.clientWidth,
+      renderedHeight: image.clientHeight,
+      hasSourceSet: sourceSet.length > 0,
+      sourceSetCandidates: Math.max(widthDescriptors.length + densityDescriptors.length, sourceSet.length > 0 ? 1 : 0),
+      hasLargerWidthCandidate: widthDescriptors.some((width) => width > image.naturalWidth),
+      hasDensityCandidate: densityDescriptors.length > 0,
+      pictureSources: image.closest("picture")?.querySelectorAll("source[srcset]").length || 0,
+      currentDiffersFromDeclared: declaredSource.length > 0 && image.currentSrc.length > 0 && image.currentSrc !== image.src,
+      inline: false,
+    });
+  };
 
   const imagePriorityFromRect = (rect) => {
     const viewportHeight = window.innerHeight;
@@ -266,6 +312,7 @@
 
   const stabilizeImage = (image) => {
     if (image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) return;
+    reportCompactSourceMetadata(image);
     if (inlineImageSource(image).length > 0) {
       inspectInlineImage(image);
       return;

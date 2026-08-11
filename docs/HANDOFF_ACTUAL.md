@@ -179,6 +179,24 @@ el runtime actual desde versiones o worktrees historicos.
   reemplaza hasta que el candidato supere seguridad, falsos filtros, latencia y
   tamaño. Evidencia:
   `docs/dag/v3/GLOSHIA_R31_RUNTIME_GATE_2026-08-11.md`.
+- Cierre posterior: R1 como veto adicional quedó `NO-GO` (56/85 frente a
+  85/28 FP/FF de R3.1 en 536 miniaturas). Un MobileNetV4 compacto entrenado con
+  577 grupos limpios también quedó `NO-GO`: 22/256 en el gate y 1/54 en el
+  holdout independiente. No hay checkpoint, ONNX ni integración. El próximo
+  paso no es otro ajuste de pesos sobre los mismos gates.
+- Diagnostic 4 cerró la alternativa de fuente responsiva: los ocho raster
+  físicos no inline observados en Google declararon `srcset=false`, cero
+  candidatos mayores y cero fuentes `picture`. Doce miniaturas de `56-82 px`
+  sí cruzaron el pipeline; cuatro se bloquearon y ocho se permitieron con
+  puntajes entre `0,0283` y `0,8419`. Es pérdida de señal del raster, no un
+  bypass. La instrumentación queda limitada al flavor Diagnostic y no registra
+  URL, consulta, bytes ni píxeles. Los recursos inline y placeholders internos
+  se descartan antes de emitir para evitar ruido. DEV normal instalado continúa
+  en DAG 199.
+- DAG 201 (`0.70.05`) contiene sólo esa herramienta diagnóstica opt-in; no
+  cambia decisiones en DEV/LAB. Próxima decisión de producto: corpus compacto
+  independiente o cierre explícito por incertidumbre aceptando falsos filtros.
+  Evidencia: `docs/compatibility/results/dag-browser-v201-compact-source-diagnostic-sm-s908e-2026-08-11.md`.
 
 ## Candidato validado local: DAG Browser 198
 

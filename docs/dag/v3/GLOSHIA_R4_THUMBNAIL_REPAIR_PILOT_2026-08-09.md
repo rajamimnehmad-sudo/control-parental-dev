@@ -522,3 +522,53 @@ como afinación. R3.1 sigue oficial e intacto. Los informes privados quedan en:
 - `.codex-tmp/gloshia-r4-local-mps-train-20260810/report.json`;
 - `.codex-tmp/gloshia-r4-local-mps-unweighted-20260810/report.json`;
 - `.codex-tmp/gloshia-r4-local-dinov2-safe-20260810/report.json`.
+
+### Cierre de alternativas locales de runtime y especialista compacto
+
+El 2026-08-11 se congeló un examen de 536 decisiones del propietario
+representadas como raster `54x54`: 352 allow y 184 filter. R3.1 obtuvo 85
+falsos permisos y 28 falsos filtros. El R1 histórico se evaluó únicamente como
+segundo veto de laboratorio mediante su copia compatible con ORT macOS. A su
+umbral normal redujo falsos permisos a 56, pero elevó falsos filtros a 85. En
+la banda sin regresiones sólo corrigió entre uno y tres permisos, resultado no
+robusto al delta conocido entre la copia local y Android y sin justificar una
+segunda inferencia. Resultado `NO-GO`; no integrar R1 en el pipeline activo.
+
+También se ejecutó un único piloto local de MobileNetV4 Conv Small especializado
+en rasters compactos. Se excluyeron del train todos los grupos presentes en el
+gate: quedaron 577 imágenes (372 allow/205 filter), 25 de validación interna y
+97 de holdout independiente. La configuración se congeló antes de entrenar:
+ocho épocas, umbral `0,40`, BCE sin peso de clase y degradaciones de 32 a 160
+px. El candidato redujo falsos permisos del gate de 85 a 22, pero elevó falsos
+filtros de 28 a 256; en el holdout compacto produjo 1 falso permiso y 54 falsos
+filtros. Resultado `NO-GO`. No se exportó ONNX ni APK, no quedó checkpoint y el
+entrenador se retiró. Evidencia privada pequeña:
+
+- `.codex-tmp/gloshia-r1-small-gate-20260811/report.json`;
+- `.codex-tmp/gloshia-compact-specialist-20260811/plan.json`;
+- `.codex-tmp/gloshia-compact-specialist-20260811/report.json`.
+
+Estos resultados cierran dos atajos: combinar R1 y entrenar un especialista
+compacto sobre degradaciones del corpus actual. El siguiente diagnóstico no
+debe volver a ajustar pesos con los mismos gates. Primero debe comprobar si el
+elemento web declara una variante real de mayor calidad mediante los estándares
+`srcset` o `picture`; sólo esa evidencia adicional puede recuperar detalle sin
+inventarlo ni bloquear todas las miniaturas. `frozen_test` y `final_sealed`
+permanecen cerrados.
+
+### Diagnóstico físico de fuente responsiva
+
+Diagnostic 3 instrumentó únicamente metadatos acotados de imágenes compactas,
+habilitados por Android de forma opt-in. En Google se observaron ocho raster no
+inline con dimensiones reales (`108x144` o `192x144`): ninguno declaró
+`srcset`, candidatos de ancho o densidad, ni fuentes `picture`. La página no
+ofrece una variante mayor mediante estándares web. No se inspeccionaron ni
+registraron URLs y no corresponde agregar parsing específico de Google.
+
+En la misma corrida, doce raster físicos de `62x82` o `56x56` cruzaron la
+inferencia: cuatro fueron bloqueados y ocho permitidos. Los permitidos cubrieron
+desde `0,0283` hasta `0,8419`; por eso bajar un umbral común para capturarlos
+sobrefiltraría el universo compacto. El diagnóstico confirma pérdida de
+información visual y cierra el rescate general por `srcset`/`picture` en este
+caso. Evidencia completa:
+`docs/compatibility/results/dag-browser-v201-compact-source-diagnostic-sm-s908e-2026-08-11.md`.

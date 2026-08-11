@@ -182,6 +182,16 @@ class DagBrowserActivity : Activity() {
                 }
             },
         )
+        if (packageName.endsWith(".diagnostic.dev")) {
+            runCatching {
+                port.postMessage(
+                    JSONObject()
+                        .put("type", CompactSourceDiagnosticsConfigMessage)
+                        .put("version", ProtectionProtocolVersion)
+                        .put("enabled", true),
+                )
+            }
+        }
     }
 
     private fun handleContentPortMessage(
@@ -200,7 +210,28 @@ class DagBrowserActivity : Activity() {
             BarrierReadyMessage -> handleBarrierReady(payload, senderTab)
             DocumentSanitizedReadyMessage -> handleDocumentSanitizedReady(senderTab, payload)
             PreviewEligibilityMessage -> applyPreviewEligibility(senderTab, payload)
+            CompactImageSourceMetadataMessage -> logCompactImageSourceMetadata(payload)
         }
+    }
+
+    private fun logCompactImageSourceMetadata(payload: JSONObject) {
+        if (!packageName.endsWith(".diagnostic.dev")) return
+        val naturalWidth = payload.optInt("naturalWidth").coerceIn(0, CompactDiagnosticMaxDimension)
+        val naturalHeight = payload.optInt("naturalHeight").coerceIn(0, CompactDiagnosticMaxDimension)
+        val renderedWidth = payload.optInt("renderedWidth").coerceIn(0, CompactDiagnosticMaxDimension)
+        val renderedHeight = payload.optInt("renderedHeight").coerceIn(0, CompactDiagnosticMaxDimension)
+        val candidates = payload.optInt("sourceSetCandidates").coerceIn(0, CompactDiagnosticMaxCandidates)
+        val pictureSources = payload.optInt("pictureSources").coerceIn(0, CompactDiagnosticMaxCandidates)
+        Log.i(
+            CompactImageSourceLogTag,
+            "natural=${naturalWidth}x$naturalHeight " +
+                "rendered=${renderedWidth}x$renderedHeight " +
+                "srcset=${payload.optBoolean("hasSourceSet")} " +
+                "candidates=$candidates larger=${payload.optBoolean("hasLargerWidthCandidate")} " +
+                "density=${payload.optBoolean("hasDensityCandidate")} picture=$pictureSources " +
+                "selected=${payload.optBoolean("currentDiffersFromDeclared")} " +
+                "inline=${payload.optBoolean("inline")}",
+        )
     }
 
     private fun handleBarrierReady(
@@ -2681,6 +2712,8 @@ class DagBrowserActivity : Activity() {
         const val NativeApp = "glosh.dag.protection"
         const val BarrierReadyMessage = "barrier-ready"
         const val PreviewEligibilityMessage = "tab-preview-eligibility"
+        const val CompactImageSourceMetadataMessage = "compact-image-source-metadata"
+        const val CompactSourceDiagnosticsConfigMessage = "compact-source-diagnostics-config"
         const val MediaBytesMessage = "media-bytes"
         const val MediaDecisionMessage = "media-decision"
         const val MediaDocumentCurrentMessage = "media-document-current"
@@ -2700,6 +2733,9 @@ class DagBrowserActivity : Activity() {
         const val MediaAnalysisLifetimeMillis = 2_250L
         const val MediaAnalysisAllowedFutureSkewMillis = 250L
         const val MediaTransportLogTag = "DagMediaTransport"
+        const val CompactImageSourceLogTag = "DagImageSource"
+        const val CompactDiagnosticMaxDimension = 16_384
+        const val CompactDiagnosticMaxCandidates = 64
         const val MaxPipelineMetricMillis = 60_000L
         const val PerformanceLogTag = "DagPerformance"
         const val BackNavigationLogTag = "DagBackNavigation"
