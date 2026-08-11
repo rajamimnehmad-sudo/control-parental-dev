@@ -173,6 +173,12 @@ el runtime actual desde versiones o worktrees historicos.
   Firma DEV estable `d51bc0da…f8a8832` confirmada.
 - APK Diagnostic: 121.789.661 bytes, SHA-256
   `f0615c2a183833b88d4fad7c53b4b73906e47f38e245f6904fdbe5dd3d8b99cd`.
+- El APK DEV candidato se subio como objeto inmutable independiente a Storage
+  publico de Supabase DEV:
+  `dev-updates/candidates/dag-browser-dev-203-c82ff72-c40e82c7.apk`. No se
+  modifico el manifiesto de actualizacion ni se reemplazo el APK DEV publicado.
+  Una descarga completa desde la URL publica confirmo 121.784.309 bytes y el
+  mismo SHA-256 `c40e82c7…27dc1c`. No hubo push ni contacto con Production.
 - Limite conocido separado: raster `data:`/`blob:` declarados dentro de hojas
   CSS o pseudo-elementos no atraviesan `webRequest`. No se agrego un barrido
   global de estilos sin evidencia porque podria degradar carga y scroll; se
