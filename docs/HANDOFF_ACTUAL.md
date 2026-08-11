@@ -178,6 +178,8 @@ el runtime actual desde versiones o worktrees historicos.
 - Artefacto DAG 204 invalidado y no promovido:
   `dev-updates/candidates/dag-browser-dev-204-906aba8-84c25d1c.apk`. No se
   actualizo el manifiesto publico.
+- Artefacto DAG 205 normal inmutable y verificado por descarga:
+  `dev-updates/candidates/dag-browser-dev-205-1c3b1c9-68496358.apk`.
 - Runbook y contrato de privacidad:
   `docs/dag/v3/DAG_DIAGNOSTIC_FLIGHT_RECORDER.md`.
 
