@@ -33,7 +33,7 @@ Modalidad del chat dedicado de backlog:
 - Codex no interpreta la captura como aprobacion para codigo ni interrumpe el flujo de ideas con preguntas de detalle.
 - Cuando el usuario pide preparar o elegir trabajo, Codex agrupa las ideas relacionadas en tickets pequenos, propone orden y dependencias, y recien entonces entrevista las decisiones que cambian alcance o aceptacion.
 
-### DAG-DIAGNOSTIC-FLIGHT-RECORDER-204 - Diagnostico privado sin ADB
+### DAG-DIAGNOSTIC-FLIGHT-RECORDER-205 - Diagnostico privado sin ADB
 
 - Estado: `Resuelto local/remoto; pendiente validacion fisica`. Prioridad: P1.
   Tipo: observabilidad DAG. Esfuerzo: M. Riesgo: medio.
@@ -49,6 +49,10 @@ Modalidad del chat dedicado de backlog:
   APK DEV/Diagnostic, compilacion instrumentada, rechazo remoto 401/400,
   round-trip sintetico y asesores sin hallazgos nuevos. Pendiente: abrir la UI y
   enviar un informe real desde el telefono.
+- Correccion fisica: DAG 204 demostro el anillo local con 16 eventos, pero no
+  podia enviar porque el build independiente leyo `.env` desde una carpeta
+  incorrecta. DAG 205 busca tambien el `.env` canonico del repositorio y el
+  empaquetado falla si no encuentra URL HTTPS y token limitado validos.
 
 ### DAG-RUNTIME-SINGLE-GATE-203 - R3.1 unico y diagnostico aislado
 

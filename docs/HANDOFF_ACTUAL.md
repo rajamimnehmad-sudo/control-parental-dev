@@ -139,9 +139,9 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local en validacion: DAG Browser 204 — caja negra privada
+## Candidato local en validacion: DAG Browser 205 — caja negra privada
 
-- DAG 204 (`0.70.08-dev`, extension `2.0.8`) incorpora un flight recorder
+- DAG 205 (`0.70.09-dev`, extension `2.0.8`) incorpora un flight recorder
   local acotado sin cambiar R3.1, `dag-36`, umbrales, politica, hilos u ONNX.
 - Registra eventos estructurados de navegacion y el resultado terminal de cada
   decision nativa: carrier, prioridad, bytes, dimensiones, razon, score y
@@ -161,18 +161,23 @@ el runtime actual desde versiones o worktrees historicos.
 - Validacion remota: lectura y subida separadas correctas; acceso anonimo 401;
   metadato con forma de URL rechazado 400; informe sintetico recuperado por
   `DAG-BEAKMQRU`; asesores sin hallazgos asociados a los objetos nuevos.
-- Validacion Android local: 153 unitarios DEV y 153 Diagnostic, barrera JS
+- Validacion fisica parcial: DAG 204 guardo 16 eventos, pero su APK se habia
+  construido sin credencial de subida porque el proyecto Gradle independiente
+  buscaba `.env` dentro de `app-dag-browser`. DAG 204 queda invalidado. DAG 205
+  resuelve la ruta y hace fallar el empaquetado si URL HTTPS o token faltan.
+- Validacion Android local de DAG 205: 153 unitarios DEV y 153 Diagnostic,
+  barrera JS
   26/26, Ktlint, Lint DEV/Diagnostic, APK de ambos flavors y compilacion del APK
   instrumentado correctos. Falta prueba fisica de la UI y una subida desde el
-  APK antes de promover DAG 204 sobre DAG 203.
-- APK DEV: 121.838.657 bytes, SHA-256
-  `84c25d1c53afbe9116be0ffbcd722724ad65b6d8e7a443138024368f961da8e6`;
-  firma DEV estable `d51bc0da…f8a8832`. APK Diagnostic: 121.843.713 bytes,
+  APK antes de promover DAG 205 sobre DAG 203.
+- APK DEV: 121.838.725 bytes, SHA-256
+  `6849635811da5025de5572c253e7f82ead879112282dda62dd0dae47bbcf024f`;
+  firma DEV estable `d51bc0da…f8a8832`. APK Diagnostic: 121.843.777 bytes,
   SHA-256
-  `bfd0305d02eb99ab1e533a665a79c7b5fe586aa65998efd44b2d9658101b3b54`.
-- Artefacto DEV normal inmutable verificado por descarga:
+  `bf6df70454fb62e1c77e9fddedb2d8586b9257611a1752371fae522b57a741b0`.
+- Artefacto DAG 204 invalidado y no promovido:
   `dev-updates/candidates/dag-browser-dev-204-906aba8-84c25d1c.apk`. No se
-  actualizo el manifiesto publico ni se promovio sobre DAG 203.
+  actualizo el manifiesto publico.
 - Runbook y contrato de privacidad:
   `docs/dag/v3/DAG_DIAGNOSTIC_FLIGHT_RECORDER.md`.
 

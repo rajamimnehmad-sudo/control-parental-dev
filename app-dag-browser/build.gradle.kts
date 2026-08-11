@@ -7,9 +7,16 @@ plugins {
 fun envValue(name: String): String {
     val fromEnvironment = providers.environmentVariable(name).orNull
     if (!fromEnvironment.isNullOrBlank()) return fromEnvironment
-    val envFile = rootProject.file(".env")
-    if (!envFile.exists()) return ""
-    return envFile.readLines().firstOrNull { it.startsWith("$name=") }?.substringAfter("=")?.trim().orEmpty()
+    val envFiles = listOf(rootProject.file(".env"), rootProject.file("../.env")).distinct()
+    return envFiles
+        .firstNotNullOfOrNull { envFile ->
+            envFile
+                .takeIf { it.isFile }
+                ?.readLines()
+                ?.firstOrNull { it.startsWith("$name=") }
+                ?.substringAfter("=")
+                ?.trim()
+        }.orEmpty()
 }
 
 fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
@@ -36,8 +43,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 204
-        versionName = "0.70.08"
+        versionCode = 205
+        versionName = "0.70.09"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -71,7 +78,7 @@ android {
         create("diagnostic") {
             dimension = "distribution"
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 6
+            versionCode = 7
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
@@ -102,6 +109,27 @@ android {
         jniLibs.useLegacyPackaging = true
     }
 }
+
+val verifyDagDiagnosticUploadConfig =
+    tasks.register("verifyDagDiagnosticUploadConfig") {
+        group = "verification"
+        description = "Fails APK packaging when the private DAG diagnostic upload channel is missing."
+        inputs.property("uploadUrl", diagnosticUploadUrl)
+        inputs.property("uploadTokenLength", diagnosticUploadToken.length)
+        doLast {
+            val uploadUrl = inputs.properties.getValue("uploadUrl") as String
+            val uploadTokenLength = inputs.properties.getValue("uploadTokenLength") as Int
+            check(uploadUrl.startsWith("https://")) {
+                "DAG_DIAGNOSTIC_UPLOAD_URL must use HTTPS"
+            }
+            check(uploadTokenLength >= 32) {
+                "DAG_DIAGNOSTIC_UPLOAD_TOKEN is missing; refusing to package a diagnostic-enabled APK"
+            }
+        }
+    }
+
+tasks.matching { it.name == "packageDevDebug" || it.name == "packageDiagnosticDebug" }
+    .configureEach { dependsOn(verifyDagDiagnosticUploadConfig) }
 
 ktlint {
     android.set(true)
