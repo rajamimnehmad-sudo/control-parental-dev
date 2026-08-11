@@ -170,6 +170,9 @@ el runtime actual desde versiones o worktrees historicos.
   firma DEV estable `d51bc0da…f8a8832`. APK Diagnostic: 121.843.713 bytes,
   SHA-256
   `bfd0305d02eb99ab1e533a665a79c7b5fe586aa65998efd44b2d9658101b3b54`.
+- Artefacto DEV normal inmutable verificado por descarga:
+  `dev-updates/candidates/dag-browser-dev-204-906aba8-84c25d1c.apk`. No se
+  actualizo el manifiesto publico ni se promovio sobre DAG 203.
 - Runbook y contrato de privacidad:
   `docs/dag/v3/DAG_DIAGNOSTIC_FLIGHT_RECORDER.md`.
 
