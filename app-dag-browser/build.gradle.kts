@@ -28,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 202
-        versionName = "0.70.06"
+        versionCode = 203
+        versionName = "0.70.07"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -56,28 +56,15 @@ android {
             dimension = "distribution"
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
-            buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
-            buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "false")
-        }
-        create("lab") {
-            dimension = "distribution"
-            applicationIdSuffix = ".lab"
-            versionCode = 111
-            versionNameSuffix = "-lab"
-            resValue("string", "app_name", "DAG Browser LAB")
-            buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
-            buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "true")
+            buildConfigField("boolean", "DAG_DIAGNOSTICS", "false")
         }
         create("diagnostic") {
             dimension = "distribution"
-            // Keep the final .dev segment so the existing private diagnostic logs remain enabled
-            // without adding instrumentation to the normal DEV or LAB variants.
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 4
+            versionCode = 5
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
-            buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
-            buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "false")
+            buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
         }
     }
 

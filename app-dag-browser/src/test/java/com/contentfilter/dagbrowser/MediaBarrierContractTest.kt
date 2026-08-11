@@ -22,7 +22,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.5\"")
+        assertContains(manifest, "\"version\": \"2.0.7\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
@@ -85,14 +85,34 @@ class MediaBarrierContractTest {
         assertContains(background, "priorityRank")
         assertContains(background, "task.details.url === url")
         assertContains(background, "documentStatesByTab")
+        assertContains(background, "frameTokens")
         assertContains(background, "media-document-current")
         assertContains(background, "media-document-retired")
         assertContains(background, "documentKey: documentState.documentKey")
         assertContains(background, "media-bytes")
+        assertContains(background, "media-diagnostics-config")
+        assertContains(background, "media-diagnostic-summary")
+        assertContains(background, "recordDiagnosticDrop")
         assertContains(background, "model_allow")
         assertContains(background, "model_filter")
         assertFalse(background.contains("safe_ui_sprite"))
+        assertFalse(background.contains("model_partial_redaction"))
         assertFalse(File("src/main/java/com/contentfilter/dagbrowser/DagSafeUiSpritePolicy.kt").exists())
+    }
+
+    @Test
+    fun `normal DEV does not pay diagnostic tracing cost`() {
+        val activity =
+            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
+        val build = File("build.gradle.kts").readText()
+
+        assertContains(build, "buildConfigField(\"boolean\", \"DAG_DIAGNOSTICS\", \"false\")")
+        assertContains(build, "buildConfigField(\"boolean\", \"DAG_DIAGNOSTICS\", \"true\")")
+        assertContains(activity, "if (BuildConfig.DAG_DIAGNOSTICS) DagMediaPipelineTrace() else null")
+        assertFalse(activity.contains("packageName.endsWith(\".dev\")"))
+        assertFalse(build.contains("create(\"lab\")"))
+        assertFalse(build.contains("GLOSHIA_VISUAL_ENABLED"))
+        assertFalse(build.contains("GLOSHIA_LAB_FIXTURE"))
     }
 
     @Test
@@ -148,6 +168,9 @@ class MediaBarrierContractTest {
         assertContains(barrier, "compactSourceDiagnosticsEnabled")
         assertContains(barrier, "compact-source-diagnostics-config")
         assertContains(barrier, "compact-image-source-metadata")
+        assertContains(barrier, "style-raster-carrier-summary")
+        assertContains(barrier, "MAX_STYLE_CARRIER_DIAGNOSTIC_ELEMENTS = 2048")
+        assertContains(barrier, "requestIdleCallback")
         assertContains(barrier, "inlineImageSource(image).length > 0")
         assertContains(barrier, "hasLargerWidthCandidate")
         assertContains(barrier, "pictureSources")

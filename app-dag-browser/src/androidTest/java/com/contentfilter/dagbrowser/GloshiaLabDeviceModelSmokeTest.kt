@@ -59,7 +59,7 @@ class GloshiaLabDeviceModelSmokeTest {
         val memoryInfo = Debug.MemoryInfo().also(Debug::getMemoryInfo)
         val report =
             JSONObject()
-                .put("schema_version", "gloshia-lab-device-model-smoke-v1")
+                .put("schema_version", "gloshia-current-device-model-smoke-v1")
                 .put("model", DagVisualModelInfo.ModelAssetPath)
                 .put("model_sha256", modelSha256)
                 .put("device", Build.MODEL)
@@ -109,8 +109,8 @@ class GloshiaLabDeviceModelSmokeTest {
     }
 
     private companion object {
-        const val LogTag = "GloshiaLabModel"
-        const val StatusKey = "gloshia_lab_model_report"
+        const val LogTag = "GloshiaCurrentModel"
+        const val StatusKey = "gloshia_current_model_report"
         const val ExpectedModelSha256 = "c8b64af8092d3718c58736a511c996d0d443dacf3eaa74620b1e5af439a3cd48"
     }
 }

@@ -23,7 +23,9 @@ internal sealed interface DagImageAnalysisResult {
 
 internal object UnavailableDagImageAnalyzer : DagImageAnalyzer {
     override fun analyze(image: DagPreparedImage): DagImageAnalysisResult =
-        DagImageAnalysisResult.Unavailable(DagMediaAnalysisPolicy.AnalyzerUnavailableReason)
+        DagImageAnalysisResult.Unavailable(AnalyzerUnavailableReason)
+
+    const val AnalyzerUnavailableReason = "analyzer_unavailable"
 }
 
 /**
@@ -160,32 +162,24 @@ internal class DagOnDeviceImageAnalyzer private constructor(
     internal companion object {
         fun create(context: Context): DagImageAnalyzer {
             val environment = OrtEnvironment.getEnvironment()
-            for (assetPath in ModelAssetPaths) {
-                var modelBytes: ByteArray? = null
-                try {
-                    modelBytes = context.assets.open(assetPath).use { it.readBytes() }
-                    val session =
-                        OrtSession.SessionOptions().use { options ->
-                            options.setIntraOpNumThreads(2)
-                            options.setInterOpNumThreads(1)
-                            environment.createSession(requireNotNull(modelBytes), options)
-                        }
-                    return DagOnDeviceImageAnalyzer(environment, session)
-                } catch (_: Exception) {
-                    // DEV canary falls back to the verified R1 asset only when R3 cannot open.
-                } finally {
-                    modelBytes?.fill(0)
-                }
+            var modelBytes: ByteArray? = null
+            return try {
+                modelBytes = context.assets.open(ModelAssetPath).use { it.readBytes() }
+                val session =
+                    OrtSession.SessionOptions().use { options ->
+                        options.setIntraOpNumThreads(2)
+                        options.setInterOpNumThreads(1)
+                        environment.createSession(requireNotNull(modelBytes), options)
+                    }
+                DagOnDeviceImageAnalyzer(environment, session)
+            } catch (_: Exception) {
+                UnavailableDagImageAnalyzer
+            } finally {
+                modelBytes?.fill(0)
             }
-            return UnavailableDagImageAnalyzer
         }
 
         const val ModelAssetPath = DagVisualModelInfo.ModelAssetPath
-        val ModelAssetPaths =
-            listOf(
-                DagVisualModelInfo.ModelAssetPath,
-                DagVisualModelInfo.FallbackModelAssetPath,
-            )
         const val ModelInputName = "pixel_values"
         const val FilterThreshold = 0.4f
         const val FullStrongFilterThreshold = 0.95f

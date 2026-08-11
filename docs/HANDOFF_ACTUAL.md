@@ -139,7 +139,46 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local: DAG Browser 202 — restauración canónica `dag-36`
+## Candidato local en validacion: DAG Browser 203 — runtime visual unico
+
+- DAG 203 (`0.70.07-dev`, extension `2.0.7`) conserva R3.1, `dag-36`, todos
+  los umbrales y la configuracion CPU/ONNX de DAG 202. No cambia pesos, corpus
+  ni politica visual.
+- DEV ya no activa trazas, cronometros ni logs por imagen por coincidir con el
+  sufijo `.dev`; una bandera de compilacion explicita reserva ese trabajo para
+  Diagnostic. Las decisiones de ambas variantes son identicas.
+- Diagnostic recibe resumenes acotados de saturacion, cola, bytes, timeout,
+  stream y decode. No registra URL, consulta ni pixeles. Esto permite separar
+  falsos filtros del modelo de imagenes ausentes por transporte.
+- Un censo de estilos se ejecuta una sola vez y sólo en Diagnostic, en tiempo
+  ocioso y con tope de 2.048 elementos. Informa únicamente cantidades de
+  carriers `data:`/`blob:` en estilos y pseudo-elementos para decidir el cierre
+  de esa cobertura con evidencia, sin cargar DEV.
+- Las fuentes inline `data:`/`blob:` dentro de iframes registran ahora su
+  identidad de frame y atraviesan la misma compuerta R3.1. Antes fallaban
+  cerradas por compararse con el token del documento superior.
+- Android contiene un unico modelo visual R3.1. Se retiro el fallback
+  silencioso R1, el bypass de clasificacion, el flavor LAB instalable, la
+  redaccion parcial experimental y tests/politicas historicos sin uso. Si R3.1
+  no abre, el pipeline falla cerrado.
+- GloshIA Lab permanece como herramienta local en `tools/gloshia_lab/`. El
+  runtime vigente queda registrado en
+  `docs/dag/v3/DAG_GLOSHIA_RUNTIME_REGISTRY.md`.
+- Validacion local correcta: unitarios DEV/Diagnostic, Ktlint, Lint de ambas
+  variantes, barrera JS 26/26, `assembleDevDebug`, `assembleDiagnosticDebug` y
+  compilacion del APK de tests instrumentados. Queda la validacion fisica S22
+  antes de promover el candidato sobre DAG 202.
+- APK DEV: 121.784.309 bytes, SHA-256
+  `c40e82c7fa7dc32d78008c8683df408a0e18f42186d91c6d3cad28880027dc1c`.
+  Firma DEV estable `d51bc0da…f8a8832` confirmada.
+- APK Diagnostic: 121.789.661 bytes, SHA-256
+  `f0615c2a183833b88d4fad7c53b4b73906e47f38e245f6904fdbe5dd3d8b99cd`.
+- Limite conocido separado: raster `data:`/`blob:` declarados dentro de hojas
+  CSS o pseudo-elementos no atraviesan `webRequest`. No se agrego un barrido
+  global de estilos sin evidencia porque podria degradar carga y scroll; se
+  medira como carrier general en Diagnostic antes de elegir una compuerta.
+
+## Baseline fisico anterior: DAG Browser 202 — restauración canónica `dag-36`
 
 - La auditoría integral encontró una regresión de política introducida por
   `4213d87` el 2026-08-06: Android dejó de bloquear directamente la señal

@@ -168,7 +168,7 @@ class DagBrowserActivity : Activity() {
         sender: WebExtension.MessageSender,
         senderTab: BrowserTab,
     ) {
-        if (packageName.endsWith(".dev")) {
+        if (BuildConfig.DAG_DIAGNOSTICS) {
             Log.i(MediaTransportLogTag, "content_port=connected")
         }
         port.setDelegate(
@@ -182,7 +182,7 @@ class DagBrowserActivity : Activity() {
                 }
             },
         )
-        if (packageName.endsWith(".diagnostic.dev")) {
+        if (BuildConfig.DAG_DIAGNOSTICS) {
             runCatching {
                 port.postMessage(
                     JSONObject()
@@ -211,11 +211,23 @@ class DagBrowserActivity : Activity() {
             DocumentSanitizedReadyMessage -> handleDocumentSanitizedReady(senderTab, payload)
             PreviewEligibilityMessage -> applyPreviewEligibility(senderTab, payload)
             CompactImageSourceMetadataMessage -> logCompactImageSourceMetadata(payload)
+            StyleRasterCarrierSummaryMessage -> logStyleRasterCarrierSummary(payload)
         }
     }
 
+    private fun logStyleRasterCarrierSummary(payload: JSONObject) {
+        if (!BuildConfig.DAG_DIAGNOSTICS) return
+        Log.i(
+            CompactImageSourceLogTag,
+            "style_carriers scanned=${payload.optInt("scanned", 0).coerceIn(0, 2_048)} " +
+                "elements=${payload.optInt("elementCarriers", 0).coerceIn(0, 2_048)} " +
+                "pseudo=${payload.optInt("pseudoCarriers", 0).coerceIn(0, 2_048)} " +
+                "truncated=${payload.optBoolean("truncated", true)}",
+        )
+    }
+
     private fun logCompactImageSourceMetadata(payload: JSONObject) {
-        if (!packageName.endsWith(".diagnostic.dev")) return
+        if (!BuildConfig.DAG_DIAGNOSTICS) return
         val naturalWidth = payload.optInt("naturalWidth").coerceIn(0, CompactDiagnosticMaxDimension)
         val naturalHeight = payload.optInt("naturalHeight").coerceIn(0, CompactDiagnosticMaxDimension)
         val renderedWidth = payload.optInt("renderedWidth").coerceIn(0, CompactDiagnosticMaxDimension)
@@ -242,7 +254,7 @@ class DagBrowserActivity : Activity() {
         senderTab.previewDocumentToken =
             payload.optString("documentToken")
                 .takeIf(PreviewDocumentTokenPattern::matches)
-        if (packageName.endsWith(".dev")) {
+        if (BuildConfig.DAG_DIAGNOSTICS) {
             Log.i(
                 TabPreviewLogTag,
                 "barrier tab=${senderTab.id} token=${senderTab.previewDocumentToken != null}",
@@ -267,7 +279,7 @@ class DagBrowserActivity : Activity() {
 
     private fun connectDecisionPort(port: WebExtension.Port) {
         beginMediaDecisionPort(port)
-        if (packageName.endsWith(".dev")) {
+        if (BuildConfig.DAG_DIAGNOSTICS) {
             Log.i(MediaTransportLogTag, "decision_port=connected")
         }
         port.setDelegate(
@@ -280,6 +292,14 @@ class DagBrowserActivity : Activity() {
                 }
             },
         )
+        runCatching {
+            port.postMessage(
+                JSONObject()
+                    .put("type", MediaDiagnosticsConfigMessage)
+                    .put("version", ProtectionProtocolVersion)
+                    .put("enabled", BuildConfig.DAG_DIAGNOSTICS),
+            )
+        }
     }
 
     private fun handleDecisionPortMessage(
@@ -295,7 +315,31 @@ class DagBrowserActivity : Activity() {
             MediaDocumentCurrentMessage -> handleMediaDocumentCurrent(payload)
             MediaDocumentRetiredMessage -> handleMediaDocumentRetired(payload)
             ViewportImagesReadyMessage -> handleViewportImagesReady(payload)
+            MediaDiagnosticSummaryMessage -> logMediaDiagnosticSummary(payload)
         }
+    }
+
+    private fun logMediaDiagnosticSummary(payload: JSONObject) {
+        if (!BuildConfig.DAG_DIAGNOSTICS) return
+        val events = payload.optJSONArray("events") ?: return
+        val summaries =
+            buildList {
+                for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
+                    val event = events.optJSONObject(index) ?: continue
+                    val carrier = event.optString("carrier").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
+                    val reason = event.optString("reason").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
+                    val count = event.optInt("count", 0).coerceIn(1, MaxMediaDiagnosticCount)
+                    add("$carrier:$reason=$count")
+                }
+            }
+        if (summaries.isEmpty()) return
+        Log.i(
+            MediaTransportLogTag,
+            "drop_summary=${summaries.joinToString(",")} " +
+                "streams=${payload.optInt("activeStreams", 0).coerceIn(0, 1_024)} " +
+                "queued=${payload.optInt("queuedAnalyses", 0).coerceIn(0, 1_024)} " +
+                "captured_bytes=${payload.optInt("capturedBytes", 0).coerceIn(0, 16 * 1024 * 1024)}",
+        )
     }
 
     private fun handleMediaDocumentCurrent(payload: JSONObject) {
@@ -335,7 +379,6 @@ class DagBrowserActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (BuildConfig.GLOSHIA_LAB_FIXTURE) Log.i("DagLabHarness", "activity_onCreate")
         setContentView(R.layout.activity_dag_browser)
         pendingExternalUrl = safeExternalUrl(intent)
         applySystemBarInsets()
@@ -847,17 +890,9 @@ class DagBrowserActivity : Activity() {
         )
         analyzerInitializationExecutor.execute {
             val analyzer =
-                if (BuildConfig.GLOSHIA_VISUAL_ENABLED) {
-                    DagLifecycleImageAnalyzer(
-                        DagOnDeviceImageAnalyzer.create(applicationContext).also {
-                            if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
-                                Log.i("DagLabHarness", "analyzer_ready")
-                            }
-                        },
-                    )
-                } else {
-                    UnavailableDagImageAnalyzer
-                }
+                DagLifecycleImageAnalyzer(
+                    DagOnDeviceImageAnalyzer.create(applicationContext),
+                )
             handler.post {
                 if (isFinishing || isDestroyed || !mediaAnalysisAccepting.get()) {
                     (analyzer as? AutoCloseable)?.close()
@@ -1134,6 +1169,7 @@ class DagBrowserActivity : Activity() {
         metric: DagPerformanceMetric,
         detail: String = "",
     ) {
+        if (!BuildConfig.DAG_DIAGNOSTICS) return
         performanceTracker.mark(metric)?.let { recordPerformanceEvent(it, detail) }
     }
 
@@ -1141,7 +1177,7 @@ class DagBrowserActivity : Activity() {
         event: DagPerformanceEvent,
         detail: String = "",
     ) {
-        if (!packageName.endsWith(".dev")) return
+        if (!BuildConfig.DAG_DIAGNOSTICS) return
         val detailSuffix = if (detail.isBlank()) "" else " $detail"
         Log.i(
             PerformanceLogTag,
@@ -1265,7 +1301,7 @@ class DagBrowserActivity : Activity() {
         lease: DagMediaAnalysisLease,
     ): DagMediaDecision {
         val startedAt = SystemClock.elapsedRealtime()
-        val trace = DagMediaPipelineTrace()
+        val trace = if (BuildConfig.DAG_DIAGNOSTICS) DagMediaPipelineTrace() else null
         val bytesPayload =
             DagMediaBytesPayload(
                 candidateId = payload.optString("candidateId"),
@@ -1277,18 +1313,6 @@ class DagBrowserActivity : Activity() {
             DagMediaBytesPolicy.decide(
                 payload = bytesPayload,
                 analyzer = imageAnalyzer,
-                classificationMode =
-                    if (BuildConfig.GLOSHIA_VISUAL_ENABLED) {
-                        DagMediaClassificationMode.Enabled
-                    } else {
-                        DagMediaClassificationMode.DisabledForDevCompatibility
-                    },
-                redactionMode =
-                    if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
-                        DagMediaRedactionMode.LabStrongFrosted
-                    } else {
-                        DagMediaRedactionMode.Disabled
-                    },
                 trace = trace,
                 workGuard = lease,
             )
@@ -1306,7 +1330,7 @@ class DagBrowserActivity : Activity() {
             } else {
                 currentDecision
             }
-        if (packageName.endsWith(".dev") || BuildConfig.GLOSHIA_LAB_FIXTURE) {
+        if (trace != null) {
             val score =
                 currentDecision.filterProbability?.let {
                     " score=${String.format(Locale.US, "%.4f", it)}"
@@ -1383,7 +1407,7 @@ class DagBrowserActivity : Activity() {
             mediaAnalysisExecutor.maximumPoolSize = threads
             mediaAnalysisExecutor.corePoolSize = threads
         }
-        if (packageName.endsWith(".dev")) {
+        if (BuildConfig.DAG_DIAGNOSTICS) {
             Log.i(MediaTransportLogTag, "interaction_threads=$threads")
         }
     }
@@ -1800,7 +1824,7 @@ class DagBrowserActivity : Activity() {
     ) {
         val tab = activeTab ?: return onCaptureReady()
         if (!canCaptureThumbnail(tab)) {
-            if (packageName.endsWith(".dev")) {
+            if (BuildConfig.DAG_DIAGNOSTICS) {
                 Log.i(
                     TabPreviewLogTag,
                     "capture_skip tab=${tab.id} view=${geckoView.visibility} " +
@@ -1846,7 +1870,7 @@ class DagBrowserActivity : Activity() {
         val timeout =
             Runnable {
                 captureExpired = true
-                if (packageName.endsWith(".dev")) {
+                if (BuildConfig.DAG_DIAGNOSTICS) {
                     Log.i(TabPreviewLogTag, "capture_timeout tab=${tab.id} retries=$retriesRemaining")
                 }
                 retryOrComplete()
@@ -1856,7 +1880,7 @@ class DagBrowserActivity : Activity() {
             { bitmap ->
                 handler.removeCallbacks(timeout)
                 val acceptsBitmap = !captureExpired && activeTab === tab
-                if (packageName.endsWith(".dev")) {
+                if (BuildConfig.DAG_DIAGNOSTICS) {
                     Log.i(
                         TabPreviewLogTag,
                         "capture_result tab=${tab.id} bitmap=${bitmap?.width}x${bitmap?.height} " +
@@ -1917,7 +1941,7 @@ class DagBrowserActivity : Activity() {
             },
             {
                 handler.removeCallbacks(timeout)
-                if (packageName.endsWith(".dev")) {
+                if (BuildConfig.DAG_DIAGNOSTICS) {
                     Log.i(TabPreviewLogTag, "capture_error tab=${tab.id} retries=$retriesRemaining")
                 }
                 retryOrComplete()
@@ -1945,14 +1969,14 @@ class DagBrowserActivity : Activity() {
                 .takeIf(PreviewDocumentTokenPattern::matches)
                 ?: return
         if (token != tab.previewDocumentToken) {
-            if (packageName.endsWith(".dev")) {
+            if (BuildConfig.DAG_DIAGNOSTICS) {
                 Log.i(TabPreviewLogTag, "eligibility_mismatch tab=${tab.id}")
             }
             return
         }
         tab.previewEligibilityToken = token
         tab.previewRestricted = payload.optBoolean("restricted", true)
-        if (packageName.endsWith(".dev")) {
+        if (BuildConfig.DAG_DIAGNOSTICS) {
             Log.i(
                 TabPreviewLogTag,
                 "eligibility tab=${tab.id} restricted=${tab.previewRestricted}",
@@ -2395,10 +2419,6 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun maybeOfferDefaultBrowserSetup() {
-        if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
-            Log.i("DagLabHarness", "default_browser_prompt_skipped")
-            return
-        }
         if (isDefaultBrowser()) return
         val preferences = getSharedPreferences(BrowserSetupPreferences, MODE_PRIVATE)
         if (preferences.getBoolean(DefaultBrowserPromptShownKey, false)) return
@@ -2565,7 +2585,7 @@ class DagBrowserActivity : Activity() {
                         protectedPageVisible = tab?.displayState == TabDisplayState.Visible,
                     ),
             )
-        if (packageName.endsWith(".dev")) {
+        if (BuildConfig.DAG_DIAGNOSTICS) {
             Log.i(
                 BackNavigationLogTag,
                 "action=$action tab=${tab?.id} blank=${tab?.url == InitialBlankPage} " +
@@ -2713,9 +2733,12 @@ class DagBrowserActivity : Activity() {
         const val BarrierReadyMessage = "barrier-ready"
         const val PreviewEligibilityMessage = "tab-preview-eligibility"
         const val CompactImageSourceMetadataMessage = "compact-image-source-metadata"
+        const val StyleRasterCarrierSummaryMessage = "style-raster-carrier-summary"
         const val CompactSourceDiagnosticsConfigMessage = "compact-source-diagnostics-config"
         const val MediaBytesMessage = "media-bytes"
         const val MediaDecisionMessage = "media-decision"
+        const val MediaDiagnosticsConfigMessage = "media-diagnostics-config"
+        const val MediaDiagnosticSummaryMessage = "media-diagnostic-summary"
         const val MediaDocumentCurrentMessage = "media-document-current"
         const val MediaDocumentRetiredMessage = "media-document-retired"
         const val ViewportImagesReadyMessage = "viewport-images-ready"
@@ -2728,6 +2751,8 @@ class DagBrowserActivity : Activity() {
         const val MinimumPageLoadProgress = 5
         const val PageLoadProgressCompletionDelayMillis = 160L
         const val MaxMediaCandidateIdLength = 80
+        const val MaxMediaDiagnosticEvents = 32
+        const val MaxMediaDiagnosticCount = 100_000
         const val MediaAnalysisThreads = 2
         const val MediaAnalysisQueueCapacity = 8
         const val MediaAnalysisLifetimeMillis = 2_250L
@@ -2748,6 +2773,7 @@ class DagBrowserActivity : Activity() {
         const val ThumbnailCaptureRetryDelayMillis = 120L
         const val ThumbnailCaptureRetries = 1
         val PreviewDocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
+        val MediaDiagnosticValuePattern = Regex("^[a-z_]{1,40}$")
         const val EnabledControlAlpha = 1f
         const val DisabledControlAlpha = 0.45f
         const val EnabledChoiceAlpha = 1f

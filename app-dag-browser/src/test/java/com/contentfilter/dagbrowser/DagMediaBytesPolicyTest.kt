@@ -37,34 +37,6 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
-    fun `DEV compatibility mode releases exact bytes without decoding or classifying`() {
-        val bytes = byteArrayOf(0x01, 0x02, 0x03, 0x04)
-        val decision =
-            DagMediaBytesPolicy.decide(
-                payload = payload(bytes),
-                boundsReader = DagImageBoundsReader { error("must not decode") },
-                preprocessor = DagImagePreprocessor { error("must not preprocess") },
-                analyzer = DagImageAnalyzer { error("must not classify") },
-                classificationMode = DagMediaClassificationMode.DisabledForDevCompatibility,
-            )
-
-        assertEquals(DagMediaAction.Allow, decision.action)
-        assertEquals(DagMediaBytesPolicy.DevClassifierBypassReason, decision.reason)
-    }
-
-    @Test
-    fun `DEV compatibility mode still rejects an invalid transport envelope`() {
-        val decision =
-            DagMediaBytesPolicy.decide(
-                payload = payload(byteArrayOf(0x01)).copy(sourceUrl = "file:///private.jpg"),
-                classificationMode = DagMediaClassificationMode.DisabledForDevCompatibility,
-            )
-
-        assertEquals(DagMediaAction.Block, decision.action)
-        assertEquals(DagMediaBytesPolicy.InvalidPayloadReason, decision.reason)
-    }
-
-    @Test
     fun `bounded supported image reaches unavailable analyzer and stays blocked`() {
         val decision =
             DagMediaBytesPolicy.decide(
@@ -74,7 +46,7 @@ class DagMediaBytesPolicyTest {
             )
 
         assertEquals(DagMediaAction.Block, decision.action)
-        assertEquals(DagMediaAnalysisPolicy.AnalyzerUnavailableReason, decision.reason)
+        assertEquals(UnavailableDagImageAnalyzer.AnalyzerUnavailableReason, decision.reason)
     }
 
     @Test

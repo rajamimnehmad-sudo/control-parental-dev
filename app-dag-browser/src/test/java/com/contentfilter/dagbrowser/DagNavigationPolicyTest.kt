@@ -72,16 +72,11 @@ class DagNavigationPolicyTest {
     }
 
     @Test
-    fun `HTTP fixture is limited to the isolated lab flavor`() {
+    fun `HTTP loopback fixture is rejected like every insecure top level page`() {
         val url = "http://localhost:8765/fixture/"
         val loopbackUrl = "http://127.0.0.1:8765/fixture/"
-        if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
-            assertEquals(url, DagNavigationPolicy.sanitizeTopLevel(url))
-            assertEquals(loopbackUrl, DagNavigationPolicy.sanitizeTopLevel(loopbackUrl))
-        } else {
-            assertNull(DagNavigationPolicy.sanitizeTopLevel(url))
-            assertNull(DagNavigationPolicy.sanitizeTopLevel(loopbackUrl))
-        }
+        assertNull(DagNavigationPolicy.sanitizeTopLevel(url))
+        assertNull(DagNavigationPolicy.sanitizeTopLevel(loopbackUrl))
     }
 
     @Test

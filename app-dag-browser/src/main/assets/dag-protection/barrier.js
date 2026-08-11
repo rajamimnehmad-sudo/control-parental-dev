@@ -22,6 +22,7 @@
   const MAX_PRIORITY_SOURCES = 256;
   const MAX_COMPACT_SOURCE_DIAGNOSTICS = 64;
   const COMPACT_SOURCE_DIAGNOSTIC_EDGE = 192;
+  const MAX_STYLE_CARRIER_DIAGNOSTIC_ELEMENTS = 2048;
   const INITIAL_AD_SCAN_READY_ATTRIBUTE = "data-glosh-dag-ads-initial-ready";
   const INITIAL_AD_SCAN_READY_EVENT = "glosh-dag-ads-initial-ready";
   const documentToken =
@@ -44,6 +45,7 @@
   let inlineDecisionSourceChars = 0;
   let compactSourceDiagnostics = 0;
   let compactSourceDiagnosticsEnabled = false;
+  let styleCarrierDiagnosticsReported = false;
   const pendingImages = new WeakMap();
   const unsettledImages = new Set();
   const inlineDecisions = new Map();
@@ -60,7 +62,10 @@
       message?.type === "compact-source-diagnostics-config" &&
       message?.version === PROTOCOL_VERSION &&
       message?.enabled === true
-    ) compactSourceDiagnosticsEnabled = true;
+    ) {
+      compactSourceDiagnosticsEnabled = true;
+      scheduleStyleCarrierDiagnostics();
+    }
   });
 
   const postToAndroid = (message) => {
@@ -80,6 +85,60 @@
       version: PROTOCOL_VERSION,
       documentToken,
     }).catch(() => {});
+  };
+
+  const computedStyleContainsInlineRaster = (element, pseudoElement = null) => {
+    try {
+      const style = getComputedStyle(element, pseudoElement);
+      return [
+        style.backgroundImage,
+        style.borderImageSource,
+        style.listStyleImage,
+        style.content,
+      ].some((value) => /(?:data:image\/|blob:)/iu.test(value || ""));
+    } catch {
+      return false;
+    }
+  };
+
+  const reportStyleCarrierDiagnostics = () => {
+    if (!compactSourceDiagnosticsEnabled || styleCarrierDiagnosticsReported) return;
+    styleCarrierDiagnosticsReported = true;
+    let scanned = 0;
+    let elementCarriers = 0;
+    let pseudoCarriers = 0;
+    const elements = document.querySelectorAll("*");
+    for (const element of elements) {
+      if (scanned >= MAX_STYLE_CARRIER_DIAGNOSTIC_ELEMENTS) break;
+      scanned += 1;
+      if (computedStyleContainsInlineRaster(element)) elementCarriers += 1;
+      if (
+        computedStyleContainsInlineRaster(element, "::before") ||
+        computedStyleContainsInlineRaster(element, "::after")
+      ) pseudoCarriers += 1;
+    }
+    postToAndroid({
+      type: "style-raster-carrier-summary",
+      scanned,
+      elementCarriers,
+      pseudoCarriers,
+      truncated: elements.length > scanned,
+    });
+  };
+
+  const scheduleStyleCarrierDiagnostics = () => {
+    const run = () => {
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(reportStyleCarrierDiagnostics, { timeout: 1_000 });
+      } else {
+        setTimeout(reportStyleCarrierDiagnostics, 0);
+      }
+    };
+    if (document.readyState === "loading") {
+      document.addEventListener("DOMContentLoaded", run, { once: true });
+    } else {
+      run();
+    }
   };
 
   postDocumentLifecycle("document-started");

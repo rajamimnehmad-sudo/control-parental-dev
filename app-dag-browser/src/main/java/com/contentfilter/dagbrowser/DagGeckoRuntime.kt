@@ -10,17 +10,14 @@ internal object DagGeckoRuntime {
 
     fun get(context: Context): GeckoRuntime =
         instance ?: synchronized(this) {
-            val settingsBuilder =
-                GeckoRuntimeSettings
-                    .Builder()
-                    .preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_LIGHT)
-            if (BuildConfig.GLOSHIA_LAB_FIXTURE) {
-                settingsBuilder.allowInsecureConnections(GeckoRuntimeSettings.ALLOW_ALL)
-            }
             instance
                 ?: GeckoRuntime.create(
                     context.applicationContext,
-                    settingsBuilder.build().setParallelMarkingEnabled(true),
+                    GeckoRuntimeSettings
+                        .Builder()
+                        .preferredColorScheme(GeckoRuntimeSettings.COLOR_SCHEME_LIGHT)
+                        .build()
+                        .setParallelMarkingEnabled(true),
                 ).also { instance = it }
         }
 }

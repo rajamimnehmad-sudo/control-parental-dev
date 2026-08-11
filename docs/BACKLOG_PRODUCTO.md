@@ -33,6 +33,20 @@ Modalidad del chat dedicado de backlog:
 - Codex no interpreta la captura como aprobacion para codigo ni interrumpe el flujo de ideas con preguntas de detalle.
 - Cuando el usuario pide preparar o elegir trabajo, Codex agrupa las ideas relacionadas en tickets pequenos, propone orden y dependencias, y recien entonces entrevista las decisiones que cambian alcance o aceptacion.
 
+### DAG-RUNTIME-SINGLE-GATE-203 - R3.1 unico y diagnostico aislado
+
+- Estado: `En progreso; pendiente validacion fisica`. Prioridad: P0. Tipo:
+  navegador, cobertura visual y rendimiento. Esfuerzo: M. Riesgo: medio.
+- Aprobado por el propietario el 2026-08-11: separar DEV de Diagnostic,
+  corregir cobertura inline por frame, retirar LAB instalable, fallback R1,
+  bypass y redaccion experimental, sin cambiar R3.1, umbrales o politica.
+- Criterio: DEV no paga instrumentacion; toda fuente inline soportada pertenece
+  al documento/frame exacto; R3.1 es el unico modelo Android; cualquier fallo
+  permanece cerrado; cero excepciones por sitio, URL, dominio o dispositivo.
+- Gate: unitarios DEV/Diagnostic, JS, Ktlint, Lint, APK desde `main` y matriz
+  fisica S22 contra DAG 202. La cobertura CSS `data:`/`blob:` se decide por
+  evidencia de Diagnostic, no por escaneo global especulativo.
+
 ### APPS-PENDING-DAG-INTEGRATION-01 - DAG protegido y solicitudes pendientes coherentes
 
 - Estado: `Resuelto local; pendiente validacion fisica y publicacion`. Prioridad:

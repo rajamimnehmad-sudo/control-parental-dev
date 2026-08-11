@@ -177,7 +177,6 @@ internal sealed interface DagImagePreprocessResult {
     data class Ready(
         val image: DagPreparedImage,
         val regionalImages: List<DagPreparedImage> = emptyList(),
-        val regionalCropPlans: List<DagImageCropPlan> = emptyList(),
     ) : DagImagePreprocessResult
 
     data class Rejected(
@@ -201,7 +200,6 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
         var decoded: Bitmap? = null
         val preparedImages = mutableListOf<DagPreparedImage>()
         var returnedPreparedImages = false
-        val allowStandardAspect = BuildConfig.GLOSHIA_LAB_FIXTURE
         return try {
             val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes).asReadOnlyBuffer())
             var expectedDecodeSize: Pair<Int, Int>? = null
@@ -224,7 +222,7 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
                         DagRegionalCropPlanner.decodeSize(
                             size.width,
                             size.height,
-                            allowStandardAspect = allowStandardAspect,
+                            allowStandardAspect = false,
                         )
                             ?: Pair(fullImagePlan.contentWidth, fullImagePlan.contentHeight)
                     decoder.setAllocator(ImageDecoder.ALLOCATOR_SOFTWARE)
@@ -251,14 +249,13 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
                 DagRegionalCropPlanner.plan(
                     sourceBitmap.width,
                     sourceBitmap.height,
-                    allowStandardAspect = allowStandardAspect,
+                    allowStandardAspect = false,
                 )
             regionalCropPlans.forEach { crop -> preparedImages += sourceBitmap.toPreparedImage(crop) }
             DagImagePreprocessResult
                 .Ready(
                     image = preparedImages.first(),
                     regionalImages = preparedImages.drop(1),
-                    regionalCropPlans = regionalCropPlans,
                 ).also {
                     returnedPreparedImages = true
                 }

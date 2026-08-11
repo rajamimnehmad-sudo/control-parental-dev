@@ -137,6 +137,28 @@ const createHarness = async () => {
     handlerBehaviorChangeListenerCounts,
     startDocument,
     loadDocument,
+    startFrame(
+      frameId,
+      documentToken,
+      tabId = 1,
+      url = "https://frame.example.test/",
+    ) {
+      return sendRuntime(
+        { type: "document-started", version: 2, documentToken },
+        { url, tab: { id: tabId }, frameId },
+      );
+    },
+    retireFrame(
+      frameId,
+      documentToken,
+      tabId = 1,
+      url = "https://frame.example.test/",
+    ) {
+      return sendRuntime(
+        { type: "document-retired", version: 2, documentToken },
+        { url, tab: { id: tabId }, frameId },
+      );
+    },
     retireDocument(
       tabId = 1,
       documentToken = "document_a1",
@@ -359,27 +381,6 @@ test("filtered raster receives a neutral PNG without rejected pixels", async () 
   assert.notDeepEqual([...filter.writes[0]], [...original]);
 });
 
-test("experimental redaction delivers the validated frosted replacement", async () => {
-  const harness = await createHarness();
-  const details = imageDetails("redact");
-  const original = Uint8Array.from([0xff, 0xd8, 9, 8, 7, 0xff, 0xd9]);
-  const replacement = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 4, 5]);
-  deliver(harness, details, original);
-  const request = await waitFor(() => harness.postedNative.find((message) =>
-    message.type === "media-bytes"), "redaction native request");
-  harness.answer({
-    type: "media-decision",
-    version: 2,
-    candidateId: request.candidateId,
-    action: "redact",
-    reason: "model_partial_redaction",
-    replacementBytesBase64: btoa(String.fromCharCode(...replacement)),
-  });
-  const filter = harness.filters.get(details.requestId);
-  await waitFor(() => filter.closed, "redacted stream close");
-  assert.deepEqual([...filter.writes[0]], [...replacement]);
-});
-
 test("unrecognized native raster bypass cannot release replacement pixels", async () => {
   const harness = await createHarness();
   const original = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2]);
@@ -459,6 +460,67 @@ test("bounded inline raster crosses the same native gate and fails closed", asyn
     dataUrl: `data:image/png;base64,${"A".repeat(2_800_001)}`,
   })).action, "block");
   assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 2);
+});
+
+test("bounded inline raster in a registered subframe crosses the same native gate", async () => {
+  const harness = await createHarness();
+  const token = "document_f6";
+  const sender = {
+    url: "https://frame.example.test/catalog",
+    tab: { id: 1 },
+    frameId: 6,
+  };
+  harness.startFrame(6, token);
+  const original = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 7]);
+  const decision = harness.decideInline({
+    type: "inline-raster-decision",
+    version: 2,
+    documentToken: token,
+    dataUrl: `data:image/png;base64,${btoa(String.fromCharCode(...original))}`,
+  }, sender);
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "subframe native request");
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  assert.equal((await decision).action, "allow");
+
+  harness.retireFrame(6, token);
+  const retired = await harness.decideInline({
+    type: "inline-raster-decision",
+    version: 2,
+    documentToken: token,
+    dataUrl: `data:image/png;base64,${btoa(String.fromCharCode(...original))}`,
+  }, sender);
+  assert.equal(retired.action, "block");
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
+});
+
+test("diagnostic mode reports bounded aggregate drop reasons without URLs", async () => {
+  const harness = await createHarness();
+  harness.answer({
+    type: "media-diagnostics-config",
+    version: 2,
+    enabled: true,
+  });
+  const result = await harness.decideInline({
+    type: "inline-raster-decision",
+    version: 2,
+    dataUrl: `data:image/png;base64,${"A".repeat(2_800_001)}`,
+  });
+  assert.equal(result.action, "block");
+  const summary = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-diagnostic-summary"), "diagnostic summary");
+  assert.equal(JSON.stringify(summary.events), JSON.stringify([{
+    carrier: "inline",
+    reason: "invalid_or_oversize",
+    count: 1,
+  }]));
+  assert.equal(JSON.stringify(summary).includes("search.example.test"), false);
 });
 
 test("SVG URLs enter the native gate and only a validated passive vector is released", async () => {

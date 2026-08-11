@@ -32,6 +32,8 @@ const CAPTURE_TIMEOUT_MS = 5_000;
 const NATIVE_TIMEOUT_MS = 2_250;
 const VIEWPORT_QUIET_MS = 250;
 const MAX_PRIORITY_HINTS = 256;
+const DIAGNOSTIC_FLUSH_MS = 500;
+const MAX_DIAGNOSTIC_KEYS = 32;
 const BLOCKED_PLACEHOLDER_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 
@@ -42,12 +44,15 @@ let activeStreams = 0;
 let capturedBytes = 0;
 let nativeInFlight = 0;
 let cachedReplacementBytes = 0;
+let diagnosticsEnabled = false;
+let diagnosticFlushTimer = null;
 const pendingNative = new Map();
 const pendingDecisions = new Map();
 const analysisQueue = [];
 const decisionCache = new Map();
 const imagePriorityByUrl = new Map();
 const documentStatesByTab = new Map();
+const diagnosticDrops = new Map();
 
 const validTabId = (value) => Number.isInteger(value) && value >= 0;
 const validDocumentToken = (value) =>
@@ -104,6 +109,7 @@ const beginDocument = (tabId) => {
     tabId,
     documentKey: newDocumentKey(),
     documentToken: null,
+    frameTokens: new Map(),
     documentLoaded: false,
     viewportReadyReported: false,
     activeStreams: 0,
@@ -120,6 +126,37 @@ const beginDocument = (tabId) => {
 
 const currentDocumentForDetails = (details) =>
   validTabId(details?.tabId) ? documentStatesByTab.get(details.tabId) || null : null;
+
+const flushDiagnosticDrops = () => {
+  diagnosticFlushTimer = null;
+  if (!diagnosticsEnabled || diagnosticDrops.size === 0 || nativePort === null) return;
+  const events = [...diagnosticDrops.entries()].map(([key, count]) => {
+    const [carrier, reason] = key.split(":", 2);
+    return { carrier, reason, count };
+  });
+  diagnosticDrops.clear();
+  try {
+    nativePort.postMessage({
+      type: "media-diagnostic-summary",
+      version: PROTOCOL_VERSION,
+      events,
+      activeStreams,
+      queuedAnalyses: analysisQueue.length,
+      capturedBytes,
+    });
+  } catch {}
+};
+
+const recordDiagnosticDrop = (carrier, reason) => {
+  if (!diagnosticsEnabled) return;
+  const key = `${carrier}:${reason}`;
+  if (diagnosticDrops.has(key) || diagnosticDrops.size < MAX_DIAGNOSTIC_KEYS) {
+    diagnosticDrops.set(key, (diagnosticDrops.get(key) || 0) + 1);
+  }
+  if (diagnosticFlushTimer === null) {
+    diagnosticFlushTimer = setTimeout(flushDiagnosticDrops, DIAGNOSTIC_FLUSH_MS);
+  }
+};
 
 const decodeBase64 = (value) => {
   const binary = atob(value);
@@ -301,6 +338,15 @@ const connectNative = () => {
       if (isCurrentDocument(state)) postDocumentLifecycle("media-document-current", state);
     }
     port.onMessage.addListener((message) => {
+      if (message?.type === "media-diagnostics-config" && message?.version === PROTOCOL_VERSION) {
+        diagnosticsEnabled = message.enabled === true;
+        if (!diagnosticsEnabled) {
+          diagnosticDrops.clear();
+          clearTimeout(diagnosticFlushTimer);
+          diagnosticFlushTimer = null;
+        }
+        return;
+      }
       const pending = pendingNative.get(message?.candidateId);
       if (
         pending === undefined ||
@@ -312,13 +358,11 @@ const connectNative = () => {
       const allow = message.action === "allow" &&
         ["model_allow", "safe_ui_vector"].includes(message.reason);
       const modelBlock = message.action === "block" && message.reason === "model_filter";
-      const modelRedact = message.action === "redact" &&
-        message.reason === "model_partial_redaction";
       const replacement = replacementBytes(message.replacementBytesBase64);
-      const acceptedReplacement = modelBlock || modelRedact ? replacement : null;
+      const acceptedReplacement = modelBlock ? replacement : null;
       pending.resolve({
-        action: allow ? "allow" : modelRedact && acceptedReplacement ? "redact" : "block",
-        cacheable: allow || modelBlock || modelRedact,
+        action: allow ? "allow" : "block",
+        cacheable: allow || modelBlock,
         replacement: allow ? null : acceptedReplacement,
       });
     });
@@ -359,6 +403,7 @@ const requestNativeDecision = (
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       pendingNative.delete(candidateId);
+      recordDiagnosticDrop("native", "decision_timeout");
       resolve({ action: "block", cacheable: false });
     }, NATIVE_TIMEOUT_MS);
     pendingNative.set(candidateId, { resolve, timeout, documentState });
@@ -378,6 +423,7 @@ const requestNativeDecision = (
     } catch {
       pendingNative.delete(candidateId);
       clearTimeout(timeout);
+      recordDiagnosticDrop("native", "post_failed");
       resolve({ action: "block", cacheable: false });
     }
   });
@@ -436,7 +482,13 @@ const drainAnalysisQueue = () => {
 
 const enqueueAnalysis = (task) => {
   const state = task.documentState;
-  if (!isCurrentDocument(state) || analysisQueue.length >= MAX_QUEUED_ANALYSES) {
+  if (!isCurrentDocument(state)) {
+    recordDiagnosticDrop(task.carrier || "network", "stale_document");
+    task.settle({ action: "block", replacement: null });
+    return false;
+  }
+  if (analysisQueue.length >= MAX_QUEUED_ANALYSES) {
+    recordDiagnosticDrop(task.carrier || "network", "queue_full");
     task.settle({ action: "block", replacement: null });
     return false;
   }
@@ -448,17 +500,32 @@ const enqueueAnalysis = (task) => {
 
 const decideInlineRaster = (message, sender) => {
   const pageUrl = sender?.url || "";
-  if (!/^https?:\/\//iu.test(pageUrl)) return { action: "block" };
+  if (!/^https?:\/\//iu.test(pageUrl)) {
+    recordDiagnosticDrop("inline", "invalid_page");
+    return { action: "block" };
+  }
   const tabId = sender?.tab?.id;
   const documentState = validTabId(tabId) ? documentStatesByTab.get(tabId) : null;
+  const frameId = Number.isInteger(sender?.frameId) && sender.frameId >= 0 ? sender.frameId : null;
+  const registeredToken = frameId === 0
+    ? documentState?.documentToken
+    : documentState?.frameTokens.get(frameId);
   if (
     !isCurrentDocument(documentState) ||
+    frameId === null ||
     !validDocumentToken(message?.documentToken) ||
-    documentState.documentToken !== message.documentToken
-  ) return { action: "block" };
+    registeredToken !== message.documentToken
+  ) {
+    recordDiagnosticDrop("inline", "unknown_frame_document");
+    return { action: "block" };
+  }
   const bytes = decodeInlineRaster(message?.dataUrl);
-  if (!(bytes instanceof Uint8Array)) return { action: "block" };
+  if (!(bytes instanceof Uint8Array)) {
+    recordDiagnosticDrop("inline", "invalid_or_oversize");
+    return { action: "block" };
+  }
   if (capturedBytes + bytes.byteLength > MAX_CAPTURED_BYTES) {
+    recordDiagnosticDrop("inline", "byte_budget");
     bytes.fill(0);
     return { action: "block" };
   }
@@ -468,6 +535,7 @@ const decideInlineRaster = (message, sender) => {
       details: { url: pageUrl },
       bytes,
       priority: normalizePriority(message?.priority),
+      carrier: "inline",
       documentState,
       settle: (decision) => {
         capturedBytes = Math.max(0, capturedBytes - bytes.byteLength);
@@ -490,16 +558,24 @@ const combineChunks = (chunks, totalBytes) => {
 
 const interceptImage = (details) => {
   const documentState = currentDocumentForDetails(details);
-  if (
-    !isCurrentDocument(documentState) ||
-    typeof browser.webRequest.filterResponseData !== "function" ||
-    activeStreams >= MAX_ACTIVE_STREAMS
-  ) return { cancel: true };
+  if (!isCurrentDocument(documentState)) {
+    recordDiagnosticDrop("network", "stale_document");
+    return { cancel: true };
+  }
+  if (typeof browser.webRequest.filterResponseData !== "function") {
+    recordDiagnosticDrop("network", "filter_unavailable");
+    return { cancel: true };
+  }
+  if (activeStreams >= MAX_ACTIVE_STREAMS) {
+    recordDiagnosticDrop("network", "stream_limit");
+    return { cancel: true };
+  }
 
   let filter;
   try {
     filter = browser.webRequest.filterResponseData(details.requestId);
   } catch {
+    recordDiagnosticDrop("network", "filter_open_failed");
     return { cancel: true };
   }
 
@@ -509,10 +585,10 @@ const interceptImage = (details) => {
   let totalBytes = 0;
   let reservedBytes = 0;
   let settled = false;
-  const captureTimeout = setTimeout(
-    () => settle({ action: "block", replacement: null }),
-    CAPTURE_TIMEOUT_MS,
-  );
+  const captureTimeout = setTimeout(() => {
+    recordDiagnosticDrop("network", "capture_timeout");
+    settle({ action: "block", replacement: null });
+  }, CAPTURE_TIMEOUT_MS);
 
   const release = () => {
     capturedBytes = Math.max(0, capturedBytes - reservedBytes);
@@ -554,14 +630,18 @@ const interceptImage = (details) => {
     try {
       chunk = new Uint8Array(event.data);
     } catch {
+      recordDiagnosticDrop("network", "chunk_decode_failed");
       settle({ action: "block", replacement: null });
       return;
     }
     if (chunk.byteLength === 0) return;
-    if (
-      totalBytes + chunk.byteLength > MAX_IMAGE_BYTES ||
-      capturedBytes + chunk.byteLength > MAX_CAPTURED_BYTES
-    ) {
+    if (totalBytes + chunk.byteLength > MAX_IMAGE_BYTES) {
+      recordDiagnosticDrop("network", "resource_too_large");
+      settle({ action: "block", replacement: null });
+      return;
+    }
+    if (capturedBytes + chunk.byteLength > MAX_CAPTURED_BYTES) {
+      recordDiagnosticDrop("network", "byte_budget");
       settle({ action: "block", replacement: null });
       return;
     }
@@ -572,10 +652,14 @@ const interceptImage = (details) => {
     capturedBytes += copy.byteLength;
   };
 
-  filter.onerror = () => settle({ action: "block", replacement: null });
+  filter.onerror = () => {
+    recordDiagnosticDrop("network", "stream_error");
+    settle({ action: "block", replacement: null });
+  };
   filter.onstop = () => {
     if (settled) return;
     if (totalBytes === 0) {
+      recordDiagnosticDrop("network", "empty_response");
       settle({ action: "block", replacement: null });
       return;
     }
@@ -585,6 +669,7 @@ const interceptImage = (details) => {
       details,
       bytes,
       priority: imagePriority(details.url),
+      carrier: "network",
       documentState,
       settle: (decision) => settle(decision, bytes),
     });
@@ -601,19 +686,30 @@ browser.runtime.onMessage.addListener((message, sender) => {
     ["document-started", "document-loaded", "document-retired"].includes(message?.type)
   ) {
     const tabId = sender?.tab?.id;
-    if (!validTabId(tabId) || sender?.frameId !== 0 || !validDocumentToken(message.documentToken)) {
+    const frameId = sender?.frameId;
+    if (!validTabId(tabId) || !Number.isInteger(frameId) || frameId < 0 || !validDocumentToken(message.documentToken)) {
       return undefined;
     }
     let state = documentStatesByTab.get(tabId) || null;
     if (message.type === "document-started") {
-      if (!state || (state.documentToken !== null && state.documentToken !== message.documentToken)) {
-        state = beginDocument(tabId);
+      if (frameId === 0) {
+        if (!state || (state.documentToken !== null && state.documentToken !== message.documentToken)) {
+          state = beginDocument(tabId);
+        }
+        state.documentToken = message.documentToken;
+        scheduleDocumentQuiet(state);
+      } else if (isCurrentDocument(state)) {
+        state.frameTokens.set(frameId, message.documentToken);
       }
-      state.documentToken = message.documentToken;
-      scheduleDocumentQuiet(state);
       return undefined;
     }
-    if (!isCurrentDocument(state) || state.documentToken !== message.documentToken) return undefined;
+    if (!isCurrentDocument(state)) return undefined;
+    if (frameId !== 0) {
+      if (state.frameTokens.get(frameId) !== message.documentToken) return undefined;
+      if (message.type === "document-retired") state.frameTokens.delete(frameId);
+      return undefined;
+    }
+    if (state.documentToken !== message.documentToken) return undefined;
     if (message.type === "document-loaded") {
       state.documentLoaded = true;
       scheduleDocumentQuiet(state);

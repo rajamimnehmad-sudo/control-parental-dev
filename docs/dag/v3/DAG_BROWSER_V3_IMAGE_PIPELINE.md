@@ -12,7 +12,7 @@ umbrales son los documentados en el handoff vigente.
 
 ## Contrato de decisión `dag-36`
 
-La decisión oficial es la misma en Android y en GloshIA Lab:
+La decisión oficial es única en Android y en el laboratorio local de GloshIA:
 
 - imagen completa `>= 0,40`: filtrar inmediatamente;
 - imagen ordinaria entre `0,30` y `0,40`: revisar cuatro cuadrantes y filtrar
@@ -24,8 +24,8 @@ La decisión oficial es la misma en Android y en GloshIA Lab:
 La marca diagnóstica `full_strong` distingue scores completos `>= 0,95`, pero
 no es otro umbral de decisión: está contenido dentro del bloqueo canónico
 `>= 0,40`. DEV nunca permite que cuadrantes débiles veten una señal completa
-ya bloqueada. LAB puede producir una redacción experimental, pero no modifica
-la decisión del APK DEV.
+ya bloqueada. No existe un modo de compatibilidad que permita raster sin
+clasificar ni una redacción visual alternativa en el APK.
 
 ## Recorrido de red
 
@@ -35,7 +35,8 @@ la decisión del APK DEV.
    principal.
 3. Cada stream retiene como maximo 2 MiB y el conjunto hasta 8 MiB.
 4. SHA-256 deduplica decisiones efimeras por contenido.
-5. Como maximo dos inferencias nativas trabajan simultaneamente y 24 esperan.
+5. Como maximo dos inferencias nativas trabajan simultaneamente y 144 esperan
+   en la cola JavaScript acotada; Android mantiene una cola adicional de ocho.
 6. Android valida sobre, Base64, formato y dimensiones; preprocesa localmente y
    ejecuta un unico modelo ONNX.
 7. Background escribe el original exacto solo ante `model_allow`; cualquier
@@ -57,7 +58,10 @@ que `barrier.js` marca un `img` completo como estable sin espera artificial
 cambia `src`, `srcset` o `sizes`: los nuevos bytes siguen retenidos por la
 compuerta y Gecko conserva el recurso anterior hasta recibir el original
 permitido o el placeholder filtrado. Las fuentes inline `data:`/`blob:` se
-ocultan de nuevo porque no atraviesan `webRequest`.
+ocultan de nuevo porque no atraviesan `webRequest`; `<img>` y `srcset` acotados
+se convierten en bytes y llegan a la misma compuerta R3.1. Cada frame registra
+su identidad documental para que una fuente inline dentro de un iframe no se
+confunda con la pagina superior.
 
 El observador:
 
@@ -78,16 +82,34 @@ de raster.
 
 - recurso: 2 MiB;
 - captura agregada: 8 MiB;
-- streams activos: 32;
-- cola JS: 24;
+- streams activos: 128;
+- cola JS: 144;
 - inferencias nativas simultaneas: 2;
 - captura: 5.000 ms;
 - respuesta nativa: 2.250 ms;
 - cache efimera: 512 hashes.
 
 Animaciones no autorizadas, recursos demasiado grandes, modelo ausente,
-decodificacion invalida, desconexion o timeout fallan cerrados. El fixture local
-requiere HTTPS con certificado confiable; nunca se relaja TLS para probar.
+decodificacion invalida, desconexion o timeout fallan cerrados. No existe un
+flavor Android LAB ni una excepcion HTTP de loopback; cualquier fixture de
+navegador debe usar HTTPS confiable.
+
+## Variantes y diagnostico
+
+- DEV es la aplicacion de uso normal y no crea trazas ni logs por imagen.
+- Diagnostic ejecuta exactamente el mismo modelo y politica, pero habilita
+  trazas nativas y resumenes acotados de saturacion, timeout, bytes, decode y
+  carrier. Esos resumenes no incluyen URL, consulta ni pixeles.
+- GloshIA Lab permanece como herramienta local en `tools/gloshia_lab/`; no es
+  otro navegador ni otra politica instalable.
+
+## Limite de cobertura pendiente
+
+Los raster `data:`/`blob:` declarados dentro de una hoja CSS o pseudo-elemento
+no pasan por `webRequest`. Bloquear o inspeccionar globalmente todos los estilos
+computados agregaria trabajo de DOM durante carga y scroll. Antes de adoptar
+esa estrategia se debe medir el carrier en Diagnostic y validar una compuerta
+general sin destellos ni regresion. No se acepta una excepcion por sitio.
 
 ## Evidencia
 
