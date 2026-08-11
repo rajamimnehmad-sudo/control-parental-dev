@@ -10,7 +10,9 @@ internal enum class DagMediaPipelineStage {
 
 internal enum class DagMediaDecisionBasis(val wireValue: String) {
     None("none"),
+    FullThreshold("full_threshold"),
     FullStrong("full_strong"),
+    UncertainRegional("uncertain_regional"),
     RegionalStrong("regional_strong"),
     RegionalConsensus("regional_consensus"),
 }

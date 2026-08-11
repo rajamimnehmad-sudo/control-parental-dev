@@ -572,3 +572,84 @@ sobrefiltraría el universo compacto. El diagnóstico confirma pérdida de
 información visual y cierra el rescate general por `srcset`/`picture` en este
 caso. Evidencia completa:
 `docs/compatibility/results/dag-browser-v201-compact-source-diagnostic-sm-s908e-2026-08-11.md`.
+
+### Corpus adjudicado y candidato TinyCLIP multiescala
+
+El 2026-08-11 se volvió a auditar el corpus independiente antes de entrenar.
+La fuente congelada `training-split-v14-adjudicated.json` contiene 1.058
+decisiones del propietario: 684 allow y 374 filter. Las 134 adjudicaciones no
+tienen decisiones pendientes; cuatro correcciones finales están incorporadas y
+una duda quedó excluida. El preflight encontró cero IDs duplicados, archivos
+faltantes, cambios reales de hash, conflictos de etiqueta para un mismo hash y
+cruces de ID, hash o grupo con el holdout.
+
+Permanecen ocho grupos con ambas etiquetas de forma intencional: contienen
+fotografías distintas de la misma serie u origen que el propietario decidió de
+manera diferente. No son duplicados de una misma fotografía con etiquetas
+contradictorias y se mantienen completos dentro de un único split para evitar
+filtración entre train y validation.
+
+Se congeló un único experimento TinyCLIP con tres vistas de imagen completa
+(`160`, `96` y `54` px), sin recortes ni máscara circular. Los 525 grupos del
+gate compacto quedaron excluidos del aprendizaje. El split resultante usó 467
+originales para train y 135 para validation; sus tres vistas produjeron 2.408
+registros totales. El candidato partió del checkpoint exacto de R3.1, conservó
+la misma arquitectura y una única inferencia, y se entrenó localmente en MPS
+durante 150 segundos. No se abrió `frozen_test` ni `final_sealed`.
+
+| examen | R3.1 FP/FF | candidato FP/FF |
+| --- | ---: | ---: |
+| originales validation | 18/10 | 18/13 |
+| tres vistas compactas | 91/17 | 75/37 |
+| vista primaria 54 px | 43/0 | 38/5 |
+| pares peligrosos/seguros degradados | 39/6 | 27/15 |
+
+El modelo recuperó señal peligrosa, pero la obtuvo moviendo la frontera en
+ambas direcciones: agregó cinco falsos filtros a 54 px, veinte sobre las tres
+vistas y tres sobre originales. Falló cuatro de los ocho gates congelados.
+También se evaluaron matemáticamente las 101 mezclas de probabilidades entre
+R3.1 y el candidato, de 0 a 100 % en pasos de 1 %. Ninguna cumplió a la vez la
+mejora compacta y la no regresión; al comenzar a recuperar positivos ya aparecen
+falsos filtros. Esa comprobación no autoriza un ensemble, que además violaría
+el objetivo de una sola inferencia.
+
+Resultado: `NO-GO`. El checkpoint y el código específico del experimento se
+eliminaron; se conservan sólo los datos reproducibles y los informes privados
+en `.codex-tmp/gloshia-r4-compact-consistency-20260811/`. R3.1 sigue siendo el
+único modelo oficial. No se cambió Android, el umbral, la política ni el APK.
+Este cierre confirma que el corpus ya no tiene contradicciones binarias
+pendientes; el límite observado es de generalización/capacidad del estudiante,
+no de memoria de la M2 ni de una omisión del pipeline.
+
+### Auditoría posterior del contrato Android
+
+Después de cerrar el candidato se auditó por separado el runtime oficial. Se
+confirmó que el Lab y todos los experimentos anteriores sí aplicaban `dag-36`,
+pero Android había divergido desde `4213d87`: una señal completa entre `0,40` y
+`0,95` necesitaba corroboración regional y el umbral ordinario regional `0,45`
+había quedado desconectado. La etiqueta de política continuaba diciendo
+`dag-36`, por lo que la divergencia no era visible en metadatos.
+
+En las 162 decisiones deliberadamente difíciles del corpus dirigido, aplicar
+los mismos scores con el runtime divergente produjo 80 falsos permisos y 1
+falso filtro; la política canónica produjo 39 y 50. Esta comparación no estima
+el tráfico normal, pero demuestra la dirección del error y explica permisos de
+miniaturas con señal completa alta. También explica trabajo extra: el runtime
+divergente promedió aproximadamente 3,25 inferencias por caso, frente a una
+para toda señal completa bloqueada por la política canónica.
+
+DAG 202 restaura la semántica oficial en Android y agrega trazas exactas y
+pruebas cruzadas con el Lab. No cambia R3.1, sus pesos, el umbral `0,40`, los
+umbrales regionales ni el corpus. Por lo tanto, este hallazgo no convierte al
+candidato multiescala en viable: continúa `NO-GO` y eliminado. La validación
+física de DAG 202 debe completarse antes de decidir si queda algún déficit real
+de entrenamiento en miniaturas.
+
+La validación física se completó después en el SM-S908E: Google Imágenes,
+Frávega, Mimo y Cheeky mantuvieron colas p95 entre 31 y 45 ms, cero crash/ANR y
+recorrido vertical completo. Los logs confirmaron bloqueos completos entre
+`0,40` y `0,95` con una inferencia. Google presentó reemplazos neutrales y Mimo
+abrió el menú correctamente después de seis desplazamientos. Este resultado
+cierra la divergencia de runtime; no demuestra que R3.1 resuelva todo raster
+compacto con señal completa menor a `0,40`, que sigue siendo el límite de
+modelo a evaluar sólo sobre casos residuales posteriores a DAG 202.

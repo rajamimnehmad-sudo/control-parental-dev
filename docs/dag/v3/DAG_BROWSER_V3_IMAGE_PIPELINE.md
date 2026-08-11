@@ -10,6 +10,23 @@ devuelven un PNG neutro proporcional sin pixeles del recurso rechazado.
 No hay API, Supabase, segunda descarga ni decision por URL. El modelo, pesos y
 umbrales son los documentados en el handoff vigente.
 
+## Contrato de decisión `dag-36`
+
+La decisión oficial es la misma en Android y en GloshIA Lab:
+
+- imagen completa `>= 0,40`: filtrar inmediatamente;
+- imagen ordinaria entre `0,30` y `0,40`: revisar cuatro cuadrantes y filtrar
+  si cualquiera alcanza `0,45`;
+- imagen panorámica: filtrar por una región `>= 0,70` o por dos regiones
+  `>= 0,50`;
+- cualquier valor inválido, modelo ausente o trabajo vencido: fallar cerrado.
+
+La marca diagnóstica `full_strong` distingue scores completos `>= 0,95`, pero
+no es otro umbral de decisión: está contenido dentro del bloqueo canónico
+`>= 0,40`. DEV nunca permite que cuadrantes débiles veten una señal completa
+ya bloqueada. LAB puede producir una redacción experimental, pero no modifica
+la decisión del APK DEV.
+
 ## Recorrido de red
 
 1. `onBeforeRequest` abre `filterResponseData` para `image` e `imageset`.

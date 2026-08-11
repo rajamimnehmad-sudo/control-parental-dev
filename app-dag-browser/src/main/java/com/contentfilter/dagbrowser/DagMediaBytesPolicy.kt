@@ -247,9 +247,14 @@ internal object DagMediaBytesPolicy {
         trace?.fullImageProbability = fullProbability
         if (
             redactionMode == DagMediaRedactionMode.Disabled &&
-            fullProbability >= DagOnDeviceImageAnalyzer.FullStrongFilterThreshold
+            fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold
         ) {
-            trace?.decisionBasis = DagMediaDecisionBasis.FullStrong
+            trace?.decisionBasis =
+                if (fullProbability >= DagOnDeviceImageAnalyzer.FullStrongFilterThreshold) {
+                    DagMediaDecisionBasis.FullStrong
+                } else {
+                    DagMediaDecisionBasis.FullThreshold
+                }
             return blocked(
                 payload,
                 DagOnDeviceImageAnalyzer.ModelFilterReason,
@@ -261,7 +266,7 @@ internal object DagMediaBytesPolicy {
         val generatedUncertainRegions =
             if (
                 preparedRegionalImages.isEmpty() &&
-                fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold
+                fullProbability >= DagOnDeviceImageAnalyzer.UncertainRegionalReviewFloor
             ) {
                 DagUncertainRegionalCropper.quadrantViews(preparedImages.first())
             } else {
@@ -298,18 +303,25 @@ internal object DagMediaBytesPolicy {
                 if (regionalProbability >= DagOnDeviceImageAnalyzer.RegionalFilterThreshold) {
                     regionalFilterVotes += 1
                 }
+                val uncertainRegionIsUnsafe =
+                    generatedUncertainRegions.isNotEmpty() &&
+                        regionalProbability >=
+                        DagOnDeviceImageAnalyzer.UncertainRegionalFilterThreshold
                 if (
                     redactionMode == DagMediaRedactionMode.Disabled &&
                     (
-                        regionalProbability >= DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ||
+                        uncertainRegionIsUnsafe ||
+                            regionalProbability >= DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ||
                             regionalFilterVotes >= DagOnDeviceImageAnalyzer.RegionalConsensusMinimum
                     )
                 ) {
                     trace?.decisionBasis =
-                        if (regionalProbability >= DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold) {
-                            DagMediaDecisionBasis.RegionalStrong
-                        } else {
-                            DagMediaDecisionBasis.RegionalConsensus
+                        when {
+                            uncertainRegionIsUnsafe -> DagMediaDecisionBasis.UncertainRegional
+                            regionalProbability >=
+                                DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ->
+                                DagMediaDecisionBasis.RegionalStrong
+                            else -> DagMediaDecisionBasis.RegionalConsensus
                         }
                     return blocked(
                         payload,
@@ -319,17 +331,6 @@ internal object DagMediaBytesPolicy {
                 }
             }
             if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
-            if (
-                redactionMode == DagMediaRedactionMode.Disabled &&
-                fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold &&
-                regionalImages.isEmpty()
-            ) {
-                return blocked(
-                    payload,
-                    DagOnDeviceImageAnalyzer.ModelFilterReason,
-                    maximumProbability,
-                )
-            }
             if (redactionMode == DagMediaRedactionMode.LabStrongFrosted) {
                 val selectedPlans = DagPartialRedactionPolicy.select(fullProbability, regionalRisks)
                 val replacement =

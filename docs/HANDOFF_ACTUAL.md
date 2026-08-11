@@ -1,6 +1,6 @@
 # HANDOFF ACTUAL - Glosh y DAG Browser
 
-Fecha de corte: 2026-08-10
+Fecha de corte: 2026-08-11
 
 Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
@@ -139,9 +139,50 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local: DAG Browser 199
+## Candidato local: DAG Browser 202 — restauración canónica `dag-36`
 
-- DAG 199 (`0.70.03-dev`) agrega una única compuerta general: una señal completa
+- La auditoría integral encontró una regresión de política introducida por
+  `4213d87` el 2026-08-06: Android dejó de bloquear directamente la señal
+  completa R3.1 `>= 0,40`, exigió corroboración de cuadrantes hasta `0,95` y
+  dejó sin uso real los umbrales ordinarios `0,30/0,45`. GloshIA Lab y la
+  documentación seguían ejecutando la política canónica, aunque Android aún se
+  identificaba incorrectamente como `dag-36`.
+- DAG 202 (`0.70.06-dev`) restaura el contrato oficial sin cambiar pesos,
+  modelo, normalización, umbrales ni política: completa `>=0,40` bloquea con una
+  inferencia; ordinaria `0,30–0,40` revisa cuatro cuadrantes y bloquea cualquiera
+  `>=0,45`; panoramas conservan una región `>=0,70` o consenso de dos `>=0,50`.
+- Se eliminó el bloqueo tardío redundante y la traza distingue
+  `full_threshold`, `full_strong`, `uncertain_regional`, `regional_strong` y
+  `regional_consensus`. El test cruzado del Lab ahora verifica no sólo las
+  constantes Android, sino también estas tres conexiones semánticas.
+- En el examen dirigido de 162 decisiones del propietario, la simulación del
+  runtime divergente produjo 80 permisos peligrosos y 1 falso filtro; el
+  contrato canónico produjo 39 y 50. Es una muestra deliberadamente difícil,
+  no una estimación de producción, pero demuestra que el veto regional estaba
+  anulando señales completas y multiplicando trabajo.
+- Beneficio de rendimiento: cualquier completa `>=0,40` vuelve a terminar con
+  una inferencia en lugar de hasta cinco. No se modificaron colas, timeouts,
+  scheduler, hilos Android/ONNX ni barrera web porque logs físicos recientes
+  descartaron saturación: sus colas p95 quedaron muy por debajo de 2.250 ms.
+- Validación local correcta: unitarios DEV, Ktlint, Lint Vital, barrera JS
+  25/25 y `assembleDevDebug`. APK local versionCode `202`, SHA-256
+  `0a18f4c156b15bce5236a9982180c9b437420ca744b4a294209db881ed982cdd`.
+  Unitarios LAB/Diagnostic y contrato GloshIA Lab 5/5 también correctos.
+- APK instalado in-place sobre DAG 199 en el SM-S908E, preservando perfil y
+  datos. Google Imágenes, Frávega, Mimo y Cheeky procesaron 123/297/110/137
+  raster con cola p95 `32/38/45/31 ms`, cero crash/ANR y recorrido vertical
+  completo. Google mostró placeholders neutrales; Mimo abrió correctamente el
+  menú después de seis desplazamientos. El modal propio de Frávega reaparece en
+  cada recarga y se excluyó de la evaluación de gestos.
+- R3.1 sigue como único modelo oficial. No hay excepción por sitio, URL,
+  dominio, tamaño o dispositivo; `final_sealed` permanece cerrado. El candidato
+  TinyCLIP multiescala local fue `NO-GO` y quedó completamente retirado.
+- Evidencia física:
+  `docs/compatibility/results/dag-browser-v202-dag36-runtime-restoration-sm-s908e-2026-08-11.md`.
+
+## Histórico supersedido: DAG Browser 199
+
+- DAG 199 (`0.70.03-dev`) agregó una compuerta parcial: una señal completa
   R3.1 `>= 0,95` bloquea sin que regiones débiles puedan vetarla. Por debajo de
   `0,95` la política regional anterior permanece intacta.
 - El A/B sobre 536 decisiones binarias del propietario corrigió 13 permisos
@@ -154,9 +195,9 @@ el runtime actual desde versiones o worktrees historicos.
   cinco representaciones no ofrecieron una mejora segura. Bloquear sólo por
   tamaño afectaría fotos permitidas, avatares, productos, logos y controles.
   Continúan siendo una limitación del modelo.
-- R3.1, su hash, umbral binario `0,40`, regiones ordinarias, hilos y ONNX
-  permanecen sin cambios. No hay excepciones por sitio, URL, dominio o
-  dispositivo y `final_sealed` sigue cerrado.
+- R3.1, su hash, hilos y ONNX permanecieron sin cambios. La auditoría posterior
+  de DAG 202 comprobó que la semántica Android ya había divergido de `dag-36`;
+  por eso este estado queda como antecedente, no como baseline vigente.
 - Unitarios DEV/Diagnostic, Ktlint, Lint Vital y APK DEV/Diagnostic correctos.
   APK DEV SHA-256:
   `d3a299431d2a24a18bbf5a9a863d71c14800847f7f22df63802ae46d8607b191`.

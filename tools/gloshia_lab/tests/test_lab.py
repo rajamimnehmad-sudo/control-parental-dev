@@ -65,6 +65,11 @@ class ModelPolicyTest(unittest.TestCase):
             / "app-dag-browser/src/main/java/com/contentfilter/dagbrowser/"
             "DagImagePreprocessor.kt"
         ).read_text(encoding="utf-8")
+        media_policy = (
+            root
+            / "app-dag-browser/src/main/java/com/contentfilter/dagbrowser/"
+            "DagMediaBytesPolicy.kt"
+        ).read_text(encoding="utf-8")
         for expected in (
             "FilterThreshold = 0.4f",
             "UncertainRegionalReviewFloor = 0.3f",
@@ -76,6 +81,16 @@ class ModelPolicyTest(unittest.TestCase):
             self.assertIn(expected, analyzer)
         self.assertIn("private const val CropFraction = 0.56", preprocessor)
         self.assertIn("private const val CropFraction = 0.42", preprocessor)
+        normalized_policy = " ".join(media_policy.split())
+        for expected in (
+            "redactionMode == DagMediaRedactionMode.Disabled && "
+            "fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold",
+            "preparedRegionalImages.isEmpty() && "
+            "fullProbability >= DagOnDeviceImageAnalyzer.UncertainRegionalReviewFloor",
+            "generatedUncertainRegions.isNotEmpty() && regionalProbability >= "
+            "DagOnDeviceImageAnalyzer.UncertainRegionalFilterThreshold",
+        ):
+            self.assertIn(expected, normalized_policy)
 
     def test_fit_plan_matches_android_letterbox_examples(self) -> None:
         self.assertEqual((224, 112, 0, 56), _fit_plan(400, 200))

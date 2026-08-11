@@ -92,7 +92,7 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
-    fun `model probability below threshold releases the image`() {
+    fun `uncertain full signal below threshold receives bounded regional review`() {
         var inferenceCount = 0
         val decision =
             DagMediaBytesPolicy.decide(
@@ -109,7 +109,7 @@ class DagMediaBytesPolicyTest {
         assertEquals(DagMediaAction.Allow, decision.action)
         assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
         assertEquals(0.399f, decision.filterProbability)
-        assertEquals(1, inferenceCount)
+        assertEquals(5, inferenceCount)
     }
 
     @Test
@@ -133,7 +133,7 @@ class DagMediaBytesPolicyTest {
 
     @Test
     fun `one strong quadrant blocks an uncertain ordinary image`() {
-        val probabilities = listOf(0.4f, 0.8f).iterator()
+        val probabilities = listOf(0.336f, 0.8f).iterator()
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
@@ -151,8 +151,9 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
-    fun `one moderate quadrant keeps an uncertain ordinary image allowed`() {
-        val probabilities = listOf(0.4f, 0.45f, 0.2f, 0.1f, 0.2f).iterator()
+    fun `quadrant signal at uncertain threshold blocks an ordinary image`() {
+        val probabilities = listOf(0.336f, 0.45f).iterator()
+        val trace = DagMediaPipelineTrace()
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
@@ -162,16 +163,18 @@ class DagMediaBytesPolicyTest {
                     DagImageAnalyzer {
                         DagImageAnalysisResult.Classified(probabilities.next())
                     },
+                trace = trace,
             )
 
-        assertEquals(DagMediaAction.Allow, decision.action)
-        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
         assertEquals(0.45f, decision.filterProbability)
+        assertEquals(DagMediaDecisionBasis.UncertainRegional, trace.decisionBasis)
     }
 
     @Test
     fun `weak quadrants keep an uncertain ordinary image allowed`() {
-        val probabilities = listOf(0.4f, 0.44f, 0.2f, 0.1f, 0.2f).iterator()
+        val probabilities = listOf(0.336f, 0.44f, 0.2f, 0.1f, 0.2f).iterator()
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
@@ -189,23 +192,9 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
-    fun `full image signal at threshold needs contextual corroboration`() {
-        val decision =
-            DagMediaBytesPolicy.decide(
-                payload = payload(byteArrayOf(1, 2, 3)),
-                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
-                preprocessor = readyPreprocessor,
-                analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.4f) },
-            )
-
-        assertEquals(DagMediaAction.Allow, decision.action)
-        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
-        assertEquals(0.4f, decision.filterProbability)
-    }
-
-    @Test
-    fun `full image false positive is released when every contextual quadrant is clear`() {
-        val probabilities = listOf(0.8f, 0.2f, 0.1f, 0.2f, 0.1f).iterator()
+    fun `full image signal at threshold blocks without regional work`() {
+        var inferenceCount = 0
+        val trace = DagMediaPipelineTrace()
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
@@ -213,13 +202,41 @@ class DagMediaBytesPolicyTest {
                 preprocessor = readyPreprocessor,
                 analyzer =
                     DagImageAnalyzer {
-                        DagImageAnalysisResult.Classified(probabilities.next())
+                        inferenceCount += 1
+                        DagImageAnalysisResult.Classified(0.4f)
                     },
+                trace = trace,
             )
 
-        assertEquals(DagMediaAction.Allow, decision.action)
-        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+        assertEquals(0.4f, decision.filterProbability)
+        assertEquals(1, inferenceCount)
+        assertEquals(DagMediaDecisionBasis.FullThreshold, trace.decisionBasis)
+    }
+
+    @Test
+    fun `full image signal above threshold cannot be vetoed by contextual crops`() {
+        var inferenceCount = 0
+        val trace = DagMediaPipelineTrace()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        inferenceCount += 1
+                        DagImageAnalysisResult.Classified(0.8f)
+                    },
+                trace = trace,
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
         assertEquals(0.8f, decision.filterProbability)
+        assertEquals(1, inferenceCount)
+        assertEquals(DagMediaDecisionBasis.FullThreshold, trace.decisionBasis)
     }
 
     @Test
@@ -247,8 +264,9 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
-    fun `full image signal below strong gate still requires regional corroboration`() {
-        val probabilities = listOf(0.9499f, 0.2f, 0.1f, 0.2f, 0.1f).iterator()
+    fun `full image signal below strong gate still blocks at canonical threshold`() {
+        var inferenceCount = 0
+        val trace = DagMediaPipelineTrace()
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
@@ -256,32 +274,39 @@ class DagMediaBytesPolicyTest {
                 preprocessor = readyPreprocessor,
                 analyzer =
                     DagImageAnalyzer {
-                        DagImageAnalysisResult.Classified(probabilities.next())
+                        inferenceCount += 1
+                        DagImageAnalysisResult.Classified(0.9499f)
                     },
-            )
-
-        assertEquals(DagMediaAction.Allow, decision.action)
-        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
-        assertEquals(0.9499f, decision.filterProbability)
-    }
-
-    @Test
-    fun `full image signal remains blocked when one contextual quadrant is strong`() {
-        val probabilities = listOf(0.8f, 0.7f).iterator()
-        val decision =
-            DagMediaBytesPolicy.decide(
-                payload = payload(byteArrayOf(1, 2, 3)),
-                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
-                preprocessor = readyPreprocessor,
-                analyzer =
-                    DagImageAnalyzer {
-                        DagImageAnalysisResult.Classified(probabilities.next())
-                    },
+                trace = trace,
             )
 
         assertEquals(DagMediaAction.Block, decision.action)
         assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
-        assertEquals(0.8f, decision.filterProbability)
+        assertEquals(0.9499f, decision.filterProbability)
+        assertEquals(1, inferenceCount)
+        assertEquals(DagMediaDecisionBasis.FullThreshold, trace.decisionBasis)
+    }
+
+    @Test
+    fun `one strong generated quadrant records its exact decision basis`() {
+        val probabilities = listOf(0.336f, 0.7f).iterator()
+        val trace = DagMediaPipelineTrace()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+                trace = trace,
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+        assertEquals(0.7f, decision.filterProbability)
+        assertEquals(DagMediaDecisionBasis.UncertainRegional, trace.decisionBasis)
     }
 
     @Test
@@ -461,7 +486,7 @@ class DagMediaBytesPolicyTest {
                     DagImageAnalyzer {
                         inferenceCount += 1
                         current = false
-                        DagImageAnalysisResult.Classified(0.4f)
+                        DagImageAnalysisResult.Classified(0.35f)
                     },
                 workGuard = DagMediaWorkGuard { current },
             )
@@ -769,7 +794,7 @@ class DagMediaBytesPolicyTest {
                 analyzer =
                     DagImageAnalyzer { image ->
                         reviewedBuffers += image.rgb888
-                        DagImageAnalysisResult.Classified(0.4f)
+                        DagImageAnalysisResult.Classified(0.35f)
                     },
             )
 
