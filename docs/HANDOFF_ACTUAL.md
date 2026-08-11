@@ -141,6 +141,14 @@ el runtime actual desde versiones o worktrees historicos.
 
 ## Candidato validado local: DAG Browser 198
 
+- Herramienta diagnóstica local: existe el flavor separado `diagnostic`, paquete
+  `com.contentfilter.dagbrowser.diagnostic.dev`, versionCode `1`. Usa el mismo
+  R3.1, umbral y política que DEV, pero no comparte perfil, pestañas ni proceso.
+  `run_live_site.sh --diagnostic` fija el PID exacto y genera
+  `diagnostic-session.jsonl` sin URL, consulta, bytes ni píxeles. La primera
+  corrida válida de Google produjo 32 decisiones aisladas, cero crash/ANR y
+  reprodujo cinco permisos con señal completa alta (`0,8529-0,9903`) no
+  confirmada por regiones. La herramienta no cambia la decisión visual.
 - DAG 198 (`0.70.02-dev`) está instalado in-place en el SM-S908E con los datos
   preservados; la extensión integrada es `2.0.3`. Todavía requiere aceptación
   visual del propietario antes de reemplazar al baseline seguro DAG 176.

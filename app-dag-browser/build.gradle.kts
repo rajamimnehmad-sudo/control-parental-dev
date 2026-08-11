@@ -68,6 +68,17 @@ android {
             buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
             buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "true")
         }
+        create("diagnostic") {
+            dimension = "distribution"
+            // Keep the final .dev segment so the existing private diagnostic logs remain enabled
+            // without adding instrumentation to the normal DEV or LAB variants.
+            applicationIdSuffix = ".diagnostic.dev"
+            versionCode = 1
+            versionNameSuffix = "-diagnostic"
+            resValue("string", "app_name", "DAG Browser Diagnostic")
+            buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")
+            buildConfigField("boolean", "GLOSHIA_LAB_FIXTURE", "false")
+        }
     }
 
     buildFeatures {

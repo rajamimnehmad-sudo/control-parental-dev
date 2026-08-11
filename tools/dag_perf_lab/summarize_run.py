@@ -12,7 +12,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 
-KEY_VALUE = re.compile(r"([a-z_]+)=([^\s]+)")
+KEY_VALUE = re.compile(r"([a-z0-9_]+)=([^\s]+)")
 PERFORMANCE = re.compile(r"navigation=(\d+) metric=([a-z_]+) elapsed_ms=(\d+)")
 EXIT_RECORD_START = re.compile(r"Historical Process Exit|ApplicationExitInfo", re.IGNORECASE)
 EXIT_REASON = re.compile(r"\breason\s*[=:]\s*(\d+)(?:\s*\(([^)]+)\))?", re.IGNORECASE)
@@ -155,9 +155,28 @@ def main() -> int:
     args = parser.parse_args()
     run_dir = args.run_dir.resolve()
     metadata = read(run_dir / "run-metadata.txt")
-    raw_logcat = read(run_dir / "logcat.txt")
+    app_logcat_path = run_dir / "app-logcat.txt"
+    raw_logcat = read(app_logcat_path) if app_logcat_path.is_file() else read(run_dir / "logcat.txt")
     run_id = metadata_value(metadata, "run_id")
     logcat, marker_found = trim_logcat_to_run(raw_logcat, run_id)
+    diagnostic_events = []
+    for line in logcat.splitlines():
+        if "DagMediaTransport" not in line or "pipeline path=" not in line:
+            continue
+        fields = parse_key_values(line)
+        diagnostic_events.append(
+            {
+                "schema": "dag-media-decision-v1",
+                "sequence": len(diagnostic_events) + 1,
+                "timestamp": line[:18].strip(),
+                **fields,
+            }
+        )
+    diagnostic_path = run_dir / "diagnostic-session.jsonl"
+    diagnostic_path.write_text(
+        "".join(json.dumps(event, sort_keys=True) + "\n" for event in diagnostic_events),
+        encoding="utf-8",
+    )
     am_start = read(run_dir / "am-start.txt")
     gfxinfo = read(run_dir / "gfxinfo-after.txt")
     meminfo = read(run_dir / "meminfo-after.txt")
@@ -229,6 +248,11 @@ def main() -> int:
     summary = {
         "schema_version": "dag-controlled-perf-run-v1",
         "run_dir": str(run_dir),
+        "diagnostic_session": {
+            "events": len(diagnostic_events),
+            "pid_isolated": app_logcat_path.is_file(),
+            "file": str(diagnostic_path),
+        },
         "logcat_window": {
             "marker_found": marker_found,
             "since": read(run_dir / "logcat-since.txt").strip() or None,

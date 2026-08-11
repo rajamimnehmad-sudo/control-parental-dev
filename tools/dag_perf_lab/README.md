@@ -108,6 +108,28 @@ especiales, no borra datos y produce el mismo `summary.json` que el fixture.
 Una pagina viva puede cambiar entre corridas; por eso complementa al fixture y
 no lo reemplaza como comparacion determinista.
 
+Para un diagnostico que no comparta proceso, perfil ni pestañas con el DAG del
+usuario, se construye e instala la variante separada `diagnostic` y se agrega
+`--diagnostic`:
+
+```bash
+./gradlew :app-dag-browser:assembleDiagnosticDebug
+adb install -r app-dag-browser/build/outputs/apk/diagnostic/debug/DagBrowser-diagnostic-debug.apk
+tools/dag_perf_lab/run_live_site.sh \
+  --serial SERIAL \
+  --url https://www.example.com/ \
+  --label example-diagnostic \
+  --diagnostic \
+  --capture-screen
+```
+
+El APK usa el mismo modelo, umbral y politica de DEV, pero tiene paquete y
+perfil independientes. El runner fija el PID exacto después de abrirlo y genera
+`app-logcat.txt` y `diagnostic-session.jsonl`; este último contiene únicamente
+tiempos, tamaños, puntajes y motivos de decisión. No contiene URL, consulta,
+bytes, miniaturas ni píxeles. Cada ejecución queda delimitada por su `run_id` y
+no mezcla movimientos anteriores del teléfono.
+
 ### Fixture HTTP del harness aislado
 
 GeckoView no expone en el runtime productivo una excepción para certificados

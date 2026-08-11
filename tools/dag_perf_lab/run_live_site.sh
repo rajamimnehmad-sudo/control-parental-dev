@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-readonly PACKAGE="com.contentfilter.dagbrowser.dev"
+readonly DEV_PACKAGE="com.contentfilter.dagbrowser.dev"
+readonly DIAGNOSTIC_PACKAGE="com.contentfilter.dagbrowser.diagnostic.dev"
 readonly ACTIVITY="com.contentfilter.dagbrowser.DagBrowserActivity"
 readonly MINIMUM_SDK="29"
 readonly EXPECTED_ABI="arm64-v8a"
@@ -19,13 +20,14 @@ Options:
   --settle SECONDS      Observation window after launch (default: 24, max: 55).
   --swipes COUNT        Deterministic upward swipes (default: 3, max: 8).
   --warm                Do not force-stop DAG before launch.
+  --diagnostic          Use the isolated diagnostic APK instead of the user's DEV profile.
   --capture-screen      Save a screenshot of the exact requested public page.
   --output DIR          Explicit artifact directory.
 
 Safety:
   - Never clears a profile, cache or Logcat.
   - Never changes browser roles, settings, certificates or another app.
-  - Only stops/launches DAG DEV and only navigates to the exact HTTPS URL.
+  - Only stops/launches the selected DAG package and navigates to the exact HTTPS URL.
 EOF
 }
 
@@ -37,6 +39,7 @@ swipes="3"
 cold="1"
 capture_screen="0"
 output_dir=""
+diagnostic="0"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -46,6 +49,7 @@ while [[ $# -gt 0 ]]; do
     --settle) settle="${2:-}"; shift 2 ;;
     --swipes) swipes="${2:-}"; shift 2 ;;
     --warm) cold="0"; shift ;;
+    --diagnostic) diagnostic="1"; shift ;;
     --capture-screen) capture_screen="1"; shift ;;
     --output) output_dir="${2:-}"; shift 2 ;;
     --help|-h) usage; exit 0 ;;
@@ -53,12 +57,19 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+package_name="$DEV_PACKAGE"
+if [[ "$diagnostic" == "1" ]]; then package_name="$DIAGNOSTIC_PACKAGE"; fi
+
 case "$serial" in ''|*[!A-Za-z0-9._:-]*) echo "Invalid adb serial." >&2; exit 2 ;; esac
 case "$label" in ''|*[!A-Za-z0-9._-]*) echo "Invalid label." >&2; exit 2 ;; esac
 case "$settle" in ''|*[!0-9]*) echo "Invalid settle value." >&2; exit 2 ;; esac
 case "$swipes" in ''|*[!0-9]*) echo "Invalid swipe count." >&2; exit 2 ;; esac
 if [[ ! "$url" =~ ^https://[^[:space:]]+$ ]]; then
   echo "Only an explicit HTTPS URL is accepted." >&2
+  exit 2
+fi
+if [[ "$url" == *\"* ]]; then
+  echo "Literal double quotes are not accepted in the URL; percent-encode them." >&2
   exit 2
 fi
 if (( settle < 5 || settle > 55 )); then echo "Settle must be 5..55 seconds." >&2; exit 2; fi
@@ -119,8 +130,8 @@ if [[ "$abi" != "$EXPECTED_ABI" ]]; then
   echo "This DAG artifact requires $EXPECTED_ABI, found ${abi:-unknown}." >&2
   exit 1
 fi
-if ! "$adb_bin" -s "$serial" shell pm path "$PACKAGE" >/dev/null 2>&1; then
-  echo "$PACKAGE is not installed on $serial." >&2
+if ! "$adb_bin" -s "$serial" shell pm path "$package_name" >/dev/null 2>&1; then
+  echo "$package_name is not installed on $serial." >&2
   exit 1
 fi
 
@@ -131,19 +142,20 @@ fi
   echo "model=$model"
   echo "sdk=$sdk"
   echo "abi=$abi"
-  echo "package=$PACKAGE"
+  echo "package=$package_name"
+  echo "diagnostic=$diagnostic"
   echo "cold=$cold"
   echo "settle_seconds=$settle"
   echo "swipes=$swipes"
   echo "url=$url"
   "$adb_bin" -s "$serial" shell getprop ro.build.version.release | tr -d '\r' | sed 's/^/android=/'
-  "$adb_bin" -s "$serial" shell dumpsys package "$PACKAGE" |
+  "$adb_bin" -s "$serial" shell dumpsys package "$package_name" |
     sed -n 's/^[[:space:]]*versionCode=/versionCode=/p; s/^[[:space:]]*versionName=/versionName=/p' | head -2
 } >"$output_dir/run-metadata.txt"
 
-"$adb_bin" -s "$serial" shell dumpsys meminfo "$PACKAGE" >"$output_dir/meminfo-before.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys meminfo "$package_name" >"$output_dir/meminfo-before.txt" 2>&1 || true
 "$adb_bin" -s "$serial" shell dumpsys thermalservice >"$output_dir/thermal-before.txt" 2>&1 || true
-"$adb_bin" -s "$serial" shell dumpsys activity exit-info "$PACKAGE" >"$output_dir/exit-info-before.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys activity exit-info "$package_name" >"$output_dir/exit-info-before.txt" 2>&1 || true
 
 run_start_epoch_seconds="$($adb_bin -s "$serial" shell date +%s | tr -d '\r')"
 logcat_since="$($adb_bin -s "$serial" shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')"
@@ -163,11 +175,19 @@ logcat_pid=$!
 sleep 0.1
 "$adb_bin" -s "$serial" shell log -p i -t DagPerfHarness "run_start=$run_id"
 
-if [[ "$cold" == "1" ]]; then "$adb_bin" -s "$serial" shell am force-stop "$PACKAGE"; fi
-"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$PACKAGE" reset >"$output_dir/gfxinfo-reset.txt" 2>&1 || true
+if [[ "$cold" == "1" ]]; then "$adb_bin" -s "$serial" shell am force-stop "$package_name"; fi
+"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$package_name" reset >"$output_dir/gfxinfo-reset.txt" 2>&1 || true
+remote_quoted_url="\"$url\""
 "$adb_bin" -s "$serial" shell am start -W \
-  -a android.intent.action.VIEW -d "$url" -n "$PACKAGE/$ACTIVITY" \
+  -a android.intent.action.VIEW -d "$remote_quoted_url" -n "$package_name/$ACTIVITY" \
   >"$output_dir/am-start.txt" 2>&1
+
+app_pid="$($adb_bin -s "$serial" shell pidof "$package_name" | tr -d '\r' | awk '{print $1}')"
+if [[ ! "$app_pid" =~ ^[0-9]+$ ]]; then
+  echo "Could not resolve the selected DAG process PID." >&2
+  exit 1
+fi
+printf 'process_pid=%s\n' "$app_pid" >>"$output_dir/run-metadata.txt"
 
 sleep 4
 screen_size="$($adb_bin -s "$serial" shell wm size | tr -d '\r' | sed -n 's/.*Physical size: //p' | tail -1)"
@@ -188,15 +208,19 @@ if (( remaining > 0 )); then sleep "$remaining"; fi
 if [[ "$capture_screen" == "1" ]]; then
   "$adb_bin" -s "$serial" exec-out screencap -p >"$output_dir/screen.png"
 fi
-"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$PACKAGE" >"$output_dir/gfxinfo-after.txt" 2>&1 || true
-"$adb_bin" -s "$serial" shell dumpsys meminfo "$PACKAGE" >"$output_dir/meminfo-after.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys gfxinfo "$package_name" >"$output_dir/gfxinfo-after.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys meminfo "$package_name" >"$output_dir/meminfo-after.txt" 2>&1 || true
 "$adb_bin" -s "$serial" shell dumpsys thermalservice >"$output_dir/thermal-after.txt" 2>&1 || true
-"$adb_bin" -s "$serial" shell dumpsys activity exit-info "$PACKAGE" >"$output_dir/exit-info-after.txt" 2>&1 || true
+"$adb_bin" -s "$serial" shell dumpsys activity exit-info "$package_name" >"$output_dir/exit-info-after.txt" 2>&1 || true
 "$adb_bin" -s "$serial" shell log -p i -t DagPerfHarness "run_end=$run_id"
 sleep 0.2
 kill "$logcat_pid" 2>/dev/null || true
 wait "$logcat_pid" 2>/dev/null || true
 logcat_pid=""
+
+awk -v pid="$app_pid" \
+  'index($0, "DagPerfHarness") || $3 == pid' \
+  "$output_dir/logcat.txt" >"$output_dir/app-logcat.txt"
 
 python3 "$script_dir/summarize_run.py" "$output_dir" >/dev/null
 echo "DAG live run complete: $output_dir"
