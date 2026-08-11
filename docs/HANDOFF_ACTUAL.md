@@ -139,6 +139,40 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
+## Candidato local en validacion: DAG Browser 204 — caja negra privada
+
+- DAG 204 (`0.70.08-dev`, extension `2.0.8`) incorpora un flight recorder
+  local acotado sin cambiar R3.1, `dag-36`, umbrales, politica, hilos u ONNX.
+- Registra eventos estructurados de navegacion y el resultado terminal de cada
+  decision nativa: carrier, prioridad, bytes, dimensiones, razon, score y
+  tiempos acotados. No persiste fotos, pixeles, URL, consultas, texto, HTML,
+  cookies, headers ni credenciales; cada candidata usa un token salado de sesion.
+- El camino visual solo encola una estructura pequena; el hash, el JSON y la
+  escritura por lotes ocurren fuera del hilo UI y del executor visual. Conserva
+  dos archivos internos de 512 KiB y limita cada informe a 4.096 eventos. Sobre
+  el limite reemplaza lo mas antiguo. Las pestañas privadas no se registran.
+- `Mas opciones > Diagnostico DAG` permite revisar cantidad, borrar solo el
+  registro tecnico o enviarlo. Subir no borra el registro. Borrar cache o datos
+  de navegacion no lo toca; desinstalar o borrar los datos Android si.
+- Supabase DEV `syeycayasyufedwoprea` contiene el receptor
+  `dag-diagnostic-report` y la tabla RLS sin acceso de `anon`/`authenticated`.
+  La credencial limitada del APK solo sube; la credencial de lectura queda fuera
+  del APK y del Git. Los informes vencen a los 14 dias mediante `pg_cron`.
+- Validacion remota: lectura y subida separadas correctas; acceso anonimo 401;
+  metadato con forma de URL rechazado 400; informe sintetico recuperado por
+  `DAG-BEAKMQRU`; asesores sin hallazgos asociados a los objetos nuevos.
+- Validacion Android local: 153 unitarios DEV y 153 Diagnostic, barrera JS
+  26/26, Ktlint, Lint DEV/Diagnostic, APK de ambos flavors y compilacion del APK
+  instrumentado correctos. Falta prueba fisica de la UI y una subida desde el
+  APK antes de promover DAG 204 sobre DAG 203.
+- APK DEV: 121.838.657 bytes, SHA-256
+  `84c25d1c53afbe9116be0ffbcd722724ad65b6d8e7a443138024368f961da8e6`;
+  firma DEV estable `d51bc0da…f8a8832`. APK Diagnostic: 121.843.713 bytes,
+  SHA-256
+  `bfd0305d02eb99ab1e533a665a79c7b5fe586aa65998efd44b2d9658101b3b54`.
+- Runbook y contrato de privacidad:
+  `docs/dag/v3/DAG_DIAGNOSTIC_FLIGHT_RECORDER.md`.
+
 ## Candidato local en validacion: DAG Browser 203 — runtime visual unico
 
 - DAG 203 (`0.70.07-dev`, extension `2.0.7`) conserva R3.1, `dag-36`, todos

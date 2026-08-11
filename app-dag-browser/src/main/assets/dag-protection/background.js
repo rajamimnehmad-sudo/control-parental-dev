@@ -386,6 +386,7 @@ const requestNativeDecision = (
   bytes,
   priority = imagePriority(details.url),
   documentState,
+  carrier = "network",
 ) => {
   if (!isCurrentDocument(documentState)) {
     return Promise.resolve({ action: "block", cacheable: false });
@@ -416,6 +417,7 @@ const requestNativeDecision = (
         byteLength: bytes.byteLength,
         bytesBase64,
         priority: normalizePriority(priority),
+        carrier: carrier === "inline" ? "inline" : "network",
         tabId: documentState.tabId,
         documentKey: documentState.documentKey,
         sentAtEpochMillis: Date.now(),
@@ -457,6 +459,7 @@ const drainAnalysisQueue = () => {
               task.bytes,
               task.priority,
               documentState,
+              task.carrier,
             )
               .then((result) => {
                 if (result.cacheable) rememberDecision(hash, result);

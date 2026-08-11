@@ -33,6 +33,23 @@ Modalidad del chat dedicado de backlog:
 - Codex no interpreta la captura como aprobacion para codigo ni interrumpe el flujo de ideas con preguntas de detalle.
 - Cuando el usuario pide preparar o elegir trabajo, Codex agrupa las ideas relacionadas en tickets pequenos, propone orden y dependencias, y recien entonces entrevista las decisiones que cambian alcance o aceptacion.
 
+### DAG-DIAGNOSTIC-FLIGHT-RECORDER-204 - Diagnostico privado sin ADB
+
+- Estado: `Resuelto local/remoto; pendiente validacion fisica`. Prioridad: P1.
+  Tipo: observabilidad DAG. Esfuerzo: M. Riesgo: medio.
+- Aprobado por el propietario el 2026-08-11: caja negra local acotada, pantalla
+  para revisar/borrar/enviar y recuperacion posterior sin ADB mediante Supabase
+  DEV. No autoriza Production ni telemetria visual o de navegacion.
+- Resultado: hasta 1 MiB/4.096 eventos estructurados, escritura por lotes,
+  exclusion de incognito, subida comprimida explicita y vencimiento remoto a 14
+  dias. No se registran fotos, URL, consultas, texto, HTML, cookies, headers ni
+  credenciales. Credenciales de subida y lectura separadas; ninguna Service Role
+  Key entra en Android.
+- Gate automatico aprobado: 153 unitarios por flavor, JS 26/26, Ktlint, Lint,
+  APK DEV/Diagnostic, compilacion instrumentada, rechazo remoto 401/400,
+  round-trip sintetico y asesores sin hallazgos nuevos. Pendiente: abrir la UI y
+  enviar un informe real desde el telefono.
+
 ### DAG-RUNTIME-SINGLE-GATE-203 - R3.1 unico y diagnostico aislado
 
 - Estado: `En progreso; pendiente validacion fisica`. Prioridad: P0. Tipo:

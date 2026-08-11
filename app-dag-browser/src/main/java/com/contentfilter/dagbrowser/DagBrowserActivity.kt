@@ -87,6 +87,8 @@ class DagBrowserActivity : Activity() {
     private lateinit var favoritesPersistence: DagFavoritesPersistence
     private lateinit var imageAnalyzer: DagImageAnalyzer
     private lateinit var runtime: GeckoRuntime
+    private lateinit var flightRecorder: DagFlightRecorder
+    private lateinit var diagnosticUploader: DagDiagnosticReportUploader
 
     private val handler = Handler(Looper.getMainLooper())
     private val performanceTracker = DagPerformanceTracker(SystemClock::elapsedRealtime)
@@ -97,6 +99,7 @@ class DagBrowserActivity : Activity() {
     private val mediaAnalysisThreadSequence = AtomicLong(0L)
     private val mediaAnalysisLifecycleGeneration = AtomicLong(0L)
     private val mediaAnalysisAccepting = AtomicBoolean(true)
+    private val flightRecordingAllowed = AtomicBoolean(true)
     private val mediaAnalysisQueue = DagBoundedMediaTaskQueue(MediaAnalysisQueueCapacity)
     private val mediaDocumentRegistry = DagMediaDocumentRegistry()
     private val mediaAnalysisThreadFactory =
@@ -260,6 +263,7 @@ class DagBrowserActivity : Activity() {
                 "barrier tab=${senderTab.id} token=${senderTab.previewDocumentToken != null}",
             )
         }
+        recordFlight(DagFlightEvent(DagFlightEventType.BarrierReady, tabId = senderTab.id), senderTab)
         confirmProtectedBarrier(senderTab)
     }
 
@@ -274,6 +278,7 @@ class DagBrowserActivity : Activity() {
                 ?: return
         if (documentToken != senderTab.previewDocumentToken) return
         senderTab.documentSanitizedForNavigation = true
+        recordFlight(DagFlightEvent(DagFlightEventType.DocumentSanitized, tabId = senderTab.id), senderTab)
         maybeCompleteProtectedLoad(senderTab)
     }
 
@@ -297,7 +302,7 @@ class DagBrowserActivity : Activity() {
                 JSONObject()
                     .put("type", MediaDiagnosticsConfigMessage)
                     .put("version", ProtectionProtocolVersion)
-                    .put("enabled", BuildConfig.DAG_DIAGNOSTICS),
+                    .put("enabled", true),
             )
         }
     }
@@ -320,7 +325,6 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun logMediaDiagnosticSummary(payload: JSONObject) {
-        if (!BuildConfig.DAG_DIAGNOSTICS) return
         val events = payload.optJSONArray("events") ?: return
         val summaries =
             buildList {
@@ -333,6 +337,23 @@ class DagBrowserActivity : Activity() {
                 }
             }
         if (summaries.isEmpty()) return
+        if (flightRecordingAllowed.get()) {
+            for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
+                val event = events.optJSONObject(index) ?: continue
+                val carrier = event.optString("carrier").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
+                val reason = event.optString("reason").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
+                val count = event.optInt("count", 0).coerceIn(1, MaxMediaDiagnosticCount)
+                flightRecorder.record(
+                    DagFlightEvent(
+                        type = DagFlightEventType.MediaDrop,
+                        carrier = carrier,
+                        reason = reason,
+                        count = count,
+                    ),
+                )
+            }
+        }
+        if (!BuildConfig.DAG_DIAGNOSTICS) return
         Log.i(
             MediaTransportLogTag,
             "drop_summary=${summaries.joinToString(",")} " +
@@ -365,6 +386,7 @@ class DagBrowserActivity : Activity() {
         if (!PreviewDocumentTokenPattern.matches(documentToken)) return
         val tab = tabs.firstOrNull { it.previewDocumentToken == documentToken } ?: return
         if (!tab.waitingForBarrier) return
+        recordFlight(DagFlightEvent(DagFlightEventType.ViewportReady, tabId = tab.id), tab)
         if (tab === activeTab) recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)
         tab.protectedContentReadyForNavigation = true
         maybeCompleteProtectedLoad(tab)
@@ -379,6 +401,13 @@ class DagBrowserActivity : Activity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        flightRecorder = DagFlightRecorder(applicationContext)
+        diagnosticUploader =
+            DagDiagnosticReportUploader(
+                endpoint = BuildConfig.DAG_DIAGNOSTIC_UPLOAD_URL,
+                uploadToken = BuildConfig.DAG_DIAGNOSTIC_UPLOAD_TOKEN,
+            )
+        flightRecorder.record(DagFlightEvent(DagFlightEventType.AppStarted))
         setContentView(R.layout.activity_dag_browser)
         pendingExternalUrl = safeExternalUrl(intent)
         applySystemBarInsets()
@@ -1095,6 +1124,7 @@ class DagBrowserActivity : Activity() {
         if (tab === activeTab && (startNewPerformanceNavigation || !tab.waitingForBarrier)) {
             recordPerformanceEvent(performanceTracker.begin())
         }
+        recordFlight(DagFlightEvent(DagFlightEventType.NavigationStarted, tabId = tab.id), tab)
         tab.waitingForBarrier = true
         tab.barrierReadyForNavigation = false
         tab.protectedContentReadyForNavigation = false
@@ -1137,6 +1167,9 @@ class DagBrowserActivity : Activity() {
         updateLoadingShimmer(enabled = false)
         geckoView.visibility = View.VISIBLE
         safetyOverlay.visibility = View.GONE
+        activeTab?.let { tab ->
+            recordFlight(DagFlightEvent(DagFlightEventType.PageVisible, tabId = tab.id), tab)
+        }
         recordPerformanceMetric(DagPerformanceMetric.PageVisible)
     }
 
@@ -1145,6 +1178,7 @@ class DagBrowserActivity : Activity() {
         val timeout =
             Runnable {
                 if (tab.waitingForBarrier && tabs.contains(tab)) {
+                    recordFlight(DagFlightEvent(DagFlightEventType.BarrierTimeout, tabId = tab.id), tab)
                     tab.waitingForBarrier = false
                     tab.keepCurrentPageVisibleDuringReload = false
                     tab.displayState = TabDisplayState.Closed
@@ -1202,14 +1236,36 @@ class DagBrowserActivity : Activity() {
     ) {
         val candidateId = payload.optString("candidateId").take(MaxMediaCandidateIdLength)
         val priority = DagMediaAnalysisPriority.fromWire(payload.optString("priority"))
+        val receivedAt = SystemClock.elapsedRealtime()
+        val recordedQueueWaitMillis = AtomicLong(0L)
+        val terminalRecorded = AtomicBoolean(false)
         if (!mediaAnalysisAccepting.get() || activeMediaDecisionPort !== port) return
         val documentIdentity = mediaDocumentIdentity(payload)
         if (documentIdentity == null) {
-            runCatching { port.postMessage(decisionPayload(expiredMediaDecision(candidateId))) }
+            val decision = expiredMediaDecision(candidateId)
+            if (flightRecordingAllowed.get()) {
+                recordMediaDecision(
+                    payload = payload,
+                    decision = decision,
+                    priority = priority,
+                    queueWaitMillis = 0L,
+                    nativeMillis = (SystemClock.elapsedRealtime() - receivedAt).coerceAtLeast(0L),
+                )
+            }
+            runCatching { port.postMessage(decisionPayload(decision)) }
             return
         }
         val generation = mediaAnalysisLifecycleGeneration.get()
         val completeDecision: (DagMediaDecision) -> Unit = completeDecision@{ decision ->
+            if (terminalRecorded.compareAndSet(false, true) && flightRecordingAllowed.get()) {
+                recordMediaDecision(
+                    payload = payload,
+                    decision = decision,
+                    priority = priority,
+                    queueWaitMillis = recordedQueueWaitMillis.get(),
+                    nativeMillis = (SystemClock.elapsedRealtime() - receivedAt).coerceAtLeast(0L),
+                )
+            }
             if (!mediaAnalysisAccepting.get() || activeMediaDecisionPort !== port) {
                 return@completeDecision
             }
@@ -1266,6 +1322,7 @@ class DagBrowserActivity : Activity() {
                 ) {
                     val queueWaitMillis =
                         (SystemClock.elapsedRealtime() - queuedAt).coerceAtLeast(0L)
+                    recordedQueueWaitMillis.set(queueWaitMillis)
                     val decision =
                         if (!lease.canContinue()) {
                             expiredMediaDecision(candidateId)
@@ -1360,6 +1417,40 @@ class DagBrowserActivity : Activity() {
             )
         }
         return deliverableDecision
+    }
+
+    private fun recordMediaDecision(
+        payload: JSONObject,
+        decision: DagMediaDecision,
+        priority: DagMediaAnalysisPriority,
+        queueWaitMillis: Long,
+        nativeMillis: Long,
+    ) {
+        flightRecorder.record(
+            DagFlightEvent(
+                type = DagFlightEventType.MediaDecision,
+                candidateId = decision.candidateId,
+                carrier = payload.optString("carrier").takeIf(MediaDiagnosticValuePattern::matches) ?: "network",
+                priority = priority.name.lowercase(Locale.US),
+                action = decision.action.wireValue,
+                reason = decision.reason,
+                byteCount = payload.optInt("byteLength", 0),
+                width = decision.imageWidth,
+                height = decision.imageHeight,
+                score = decision.filterProbability,
+                bridgeMillis = bridgeElapsedMillis(payload),
+                queueMillis = queueWaitMillis,
+                nativeMillis = nativeMillis,
+            ),
+        )
+    }
+
+    private fun recordFlight(
+        event: DagFlightEvent,
+        tab: BrowserTab?,
+    ) {
+        if (tab?.isPrivate == true) return
+        flightRecorder.record(event)
     }
 
     private fun expiredMediaDecision(candidateId: String) =
@@ -1567,6 +1658,7 @@ class DagBrowserActivity : Activity() {
     private fun switchTo(tab: BrowserTab) {
         if (!tabs.contains(tab)) return
         if (tab === activeTab) {
+            flightRecordingAllowed.set(!tab.isPrivate)
             restoreTabIfNeeded(tab)
             renderActiveTab()
             return
@@ -1581,6 +1673,7 @@ class DagBrowserActivity : Activity() {
         activeTab?.let { setTabActivity(it, active = false) }
         if (activeTab != null) runCatching { geckoView.releaseSession() }
         activeTab = tab
+        flightRecordingAllowed.set(!tab.isPrivate)
         tab.lastActivatedSequence = nextTabActivationSequence++
         ensureSessionOpen(tab)
         geckoView.setSession(tab.session)
@@ -2168,6 +2261,10 @@ class DagBrowserActivity : Activity() {
                         confirmClearBrowsingData()
                         true
                     }
+                    R.id.menu_diagnostics -> {
+                        showDagDiagnostics()
+                        true
+                    }
                     R.id.menu_about -> {
                         showAboutDag()
                         true
@@ -2176,6 +2273,117 @@ class DagBrowserActivity : Activity() {
                 }
             }
         }
+
+    private fun showDagDiagnostics() {
+        Toast.makeText(this, R.string.dag_diagnostics_loading, Toast.LENGTH_SHORT).show()
+        flightRecorder.snapshot { result ->
+            handler.post {
+                if (isFinishing || isDestroyed) return@post
+                val snapshot = result.getOrNull()
+                val message =
+                    when {
+                        snapshot == null -> getString(R.string.dag_diagnostics_send_failed)
+                        snapshot.eventCount == 0 -> getString(R.string.dag_diagnostics_empty)
+                        else -> getString(R.string.dag_diagnostics_summary, snapshot.eventCount)
+                    }
+                val dialog =
+                    AlertDialog.Builder(this)
+                        .setTitle(R.string.dag_diagnostics_title)
+                        .setMessage(message)
+                        .setNegativeButton(R.string.close, null)
+                        .setNeutralButton(R.string.dag_diagnostics_clear, null)
+                        .setPositiveButton(R.string.dag_diagnostics_send, null)
+                        .create()
+                dialog.setOnShowListener {
+                    dialog.getButton(AlertDialog.BUTTON_POSITIVE).apply {
+                        isEnabled = snapshot != null && snapshot.eventCount > 0 && diagnosticUploader.configured
+                        setOnClickListener {
+                            dialog.dismiss()
+                            sendDagDiagnosticReport()
+                        }
+                    }
+                    dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener {
+                        dialog.dismiss()
+                        confirmClearDagDiagnostics()
+                    }
+                    if (!diagnosticUploader.configured && snapshot?.eventCount != 0) {
+                        dialog.setMessage("$message\n\n${getString(R.string.dag_diagnostics_not_configured)}")
+                    }
+                }
+                dialog.show()
+            }
+        }
+    }
+
+    private fun sendDagDiagnosticReport() {
+        if (!diagnosticUploader.configured) {
+            Toast.makeText(this, R.string.dag_diagnostics_not_configured, Toast.LENGTH_LONG).show()
+            return
+        }
+        Toast.makeText(this, R.string.dag_diagnostics_sending, Toast.LENGTH_SHORT).show()
+        flightRecorder.snapshot { snapshotResult ->
+            val snapshot =
+                snapshotResult.getOrElse {
+                    handler.post {
+                        Toast.makeText(this, R.string.dag_diagnostics_send_failed, Toast.LENGTH_LONG).show()
+                    }
+                    return@snapshot
+                }
+            diagnosticUploader.upload(snapshot, diagnosticDeviceInfo()) { uploadResult ->
+                handler.post {
+                    if (isFinishing || isDestroyed) return@post
+                    val receipt = uploadResult.getOrNull()
+                    Toast.makeText(
+                        this,
+                        if (receipt == null) {
+                            getString(R.string.dag_diagnostics_send_failed)
+                        } else {
+                            getString(R.string.dag_diagnostics_sent, receipt.reportCode)
+                        },
+                        Toast.LENGTH_LONG,
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun confirmClearDagDiagnostics() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.dag_diagnostics_clear_confirm)
+            .setMessage(R.string.dag_diagnostics_clear_detail)
+            .setNegativeButton(R.string.cancel, null)
+            .setPositiveButton(R.string.delete) { _, _ ->
+                flightRecorder.clear { cleared ->
+                    if (!cleared) return@clear
+                    handler.post {
+                        if (!isFinishing && !isDestroyed) {
+                            Toast.makeText(this, R.string.dag_diagnostics_cleared, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+                }
+            }
+            .show()
+    }
+
+    private fun diagnosticDeviceInfo(): DagDiagnosticDeviceInfo {
+        val packageInfo =
+            runCatching {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    packageManager.getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+                } else {
+                    @Suppress("DEPRECATION")
+                    packageManager.getPackageInfo(packageName, 0)
+                }
+            }.getOrNull()
+        return DagDiagnosticDeviceInfo(
+            packageName = packageName,
+            versionCode = packageInfo?.longVersionCode ?: BuildConfig.VERSION_CODE.toLong(),
+            versionName = packageInfo?.versionName.orEmpty().ifBlank { BuildConfig.VERSION_NAME },
+            sdkInt = Build.VERSION.SDK_INT,
+            manufacturer = Build.MANUFACTURER.orEmpty(),
+            model = Build.MODEL.orEmpty(),
+        )
+    }
 
     private fun showAboutDag() {
         val packageInfo =
@@ -2618,6 +2826,7 @@ class DagBrowserActivity : Activity() {
     override fun onStop() {
         dismissActiveChoicePrompt()
         persistTabsNow()
+        flightRecorder.flush()
         tabThumbnailResidencyRequested = false
         releaseTabThumbnails()
         activeTab?.let { setTabActivity(it, active = false) }
@@ -2670,6 +2879,8 @@ class DagBrowserActivity : Activity() {
         analyzerInitializationExecutor.shutdownNow()
         thumbnailExecutor.shutdownNow()
         mediaAnalysisExecutor.shutdownNow()
+        diagnosticUploader.close()
+        flightRecorder.close()
         if (this::imageAnalyzer.isInitialized) {
             (imageAnalyzer as? AutoCloseable)?.close()
         }

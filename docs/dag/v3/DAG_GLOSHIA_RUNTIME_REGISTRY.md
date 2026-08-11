@@ -10,6 +10,8 @@ historicos permanecen en Git y en sus informes de laboratorio.
   `com.contentfilter.dagbrowser.diagnostic.dev`;
 - ambos ejecutan la misma decision visual; Diagnostic solo agrega
   observabilidad acotada;
+- ambos conservan una caja negra local liviana y acotada; Diagnostic agrega las
+  trazas detalladas de laboratorio, pero no otra decision visual;
 - no existe un flavor Android LAB ni una politica de redaccion parcial.
 
 ## Modelo unico
@@ -36,3 +38,5 @@ Todo raster estatico soportado que alcance la compuerta produce `model_allow`,
 `model_filter` o un cierre seguro con razon estructurada. No existen reglas por
 sitio, URL, dominio, comercio, telefono o tamaño renderizado. Los limites de
 bytes, dimensiones, tiempo y memoria son defensas fail-closed, no permisos.
+El flight recorder observa resultados ya producidos y no participa en la cola,
+el preprocesamiento, la inferencia ni la entrega de bytes.

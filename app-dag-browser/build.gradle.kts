@@ -12,6 +12,14 @@ fun envValue(name: String): String {
     return envFile.readLines().firstOrNull { it.startsWith("$name=") }?.substringAfter("=")?.trim().orEmpty()
 }
 
+fun buildConfigString(value: String): String = "\"${value.replace("\\", "\\\\").replace("\"", "\\\"")}\""
+
+val diagnosticUploadUrl =
+    envValue("DAG_DIAGNOSTIC_UPLOAD_URL").ifBlank {
+        "https://syeycayasyufedwoprea.supabase.co/functions/v1/dag-diagnostic-report"
+    }
+val diagnosticUploadToken = envValue("DAG_DIAGNOSTIC_UPLOAD_TOKEN")
+
 val devSigningStorePath = providers.environmentVariable("ANDROID_DEV_KEYSTORE_PATH").orNull
 
 android {
@@ -28,8 +36,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 203
-        versionName = "0.70.07"
+        versionCode = 204
+        versionName = "0.70.08"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -57,14 +65,18 @@ android {
             applicationIdSuffix = ".dev"
             versionNameSuffix = "-dev"
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "false")
+            buildConfigField("String", "DAG_DIAGNOSTIC_UPLOAD_URL", buildConfigString(diagnosticUploadUrl))
+            buildConfigField("String", "DAG_DIAGNOSTIC_UPLOAD_TOKEN", buildConfigString(diagnosticUploadToken))
         }
         create("diagnostic") {
             dimension = "distribution"
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 5
+            versionCode = 6
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
+            buildConfigField("String", "DAG_DIAGNOSTIC_UPLOAD_URL", buildConfigString(diagnosticUploadUrl))
+            buildConfigField("String", "DAG_DIAGNOSTIC_UPLOAD_TOKEN", buildConfigString(diagnosticUploadToken))
         }
     }
 
