@@ -139,6 +139,47 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
+## Candidato local: DAG Browser 199
+
+- DAG 199 (`0.70.03-dev`) agrega una única compuerta general: una señal completa
+  R3.1 `>= 0,95` bloquea sin que regiones débiles puedan vetarla. Por debajo de
+  `0,95` la política regional anterior permanece intacta.
+- El A/B sobre 536 decisiones binarias del propietario corrigió 13 permisos
+  erróneos sin agregar falsos filtros en ese examen. La decisión fuerte usa una
+  sola inferencia y queda identificada en diagnóstico como `full_strong`.
+- Diagnostic 2 reprodujo una miniatura de bikini `137x137` en `0,9453`. Una
+  compuerta compacta experimental `0,94` se retiró al comprobar que otra
+  variante `62x82` de la misma búsqueda bajó a `0,7847-0,9166` y siguió visible.
+- Las miniaturas de señal media o baja no se parcharon: regiones forzadas y
+  cinco representaciones no ofrecieron una mejora segura. Bloquear sólo por
+  tamaño afectaría fotos permitidas, avatares, productos, logos y controles.
+  Continúan siendo una limitación del modelo.
+- R3.1, su hash, umbral binario `0,40`, regiones ordinarias, hilos y ONNX
+  permanecen sin cambios. No hay excepciones por sitio, URL, dominio o
+  dispositivo y `final_sealed` sigue cerrado.
+- Unitarios DEV/Diagnostic, Ktlint, Lint Vital y APK DEV/Diagnostic correctos.
+  APK DEV SHA-256:
+  `d3a299431d2a24a18bbf5a9a863d71c14800847f7f22df63802ae46d8607b191`.
+  El flavor Diagnostic pasa a versionCode `2`.
+- Los APK DEV y Diagnostic se instalaron in-place en el SM-S908E. El propietario
+  confirmó en DAG normal que el caso de la tienda de bikinis corregido por la
+  compuerta fuerte ya no aparece. Google Diagnostic confirmó que las miniaturas
+  circulares restantes sí pasan por el pipeline pero R3.1 las permite con señal
+  insuficiente; no es una omisión del interceptor.
+- Mimo y Cheeky recorrieron hasta el pie en vertical sin crash/ANR. Mimo obtuvo
+  `page_visible=1562 ms`, cola p95 `31 ms` y 1/42 cuadros lentos; Cheeky
+  `page_visible=2656 ms`, cola p95 `43 ms` y 2/42 cuadros lentos. Frávega cargó
+  tarjetas e imágenes, pero su modal propio de ubicación interceptó los gestos;
+  esa muestra no certifica scroll ni carrusel.
+- `run_live_site.sh` usa ahora el `logicalFrame` activo y registra
+  `gesture_display_size`; antes un cambio a horizontal podía colocar los swipes
+  fuera de la pantalla y producir una muestra engañosa.
+- Siguiente trabajo autorizado: candidato compacto separado, entrenado con
+  pares original/miniatura y negativos cercanos. R3.1 continúa oficial y no se
+  reemplaza hasta que el candidato supere seguridad, falsos filtros, latencia y
+  tamaño. Evidencia:
+  `docs/dag/v3/GLOSHIA_R31_RUNTIME_GATE_2026-08-11.md`.
+
 ## Candidato validado local: DAG Browser 198
 
 - Herramienta diagnóstica local: existe el flavor separado `diagnostic`, paquete

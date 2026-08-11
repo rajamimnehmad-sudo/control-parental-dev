@@ -245,6 +245,17 @@ internal object DagMediaBytesPolicy {
             }
         if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
         trace?.fullImageProbability = fullProbability
+        if (
+            redactionMode == DagMediaRedactionMode.Disabled &&
+            fullProbability >= DagOnDeviceImageAnalyzer.FullStrongFilterThreshold
+        ) {
+            trace?.decisionBasis = DagMediaDecisionBasis.FullStrong
+            return blocked(
+                payload,
+                DagOnDeviceImageAnalyzer.ModelFilterReason,
+                fullProbability,
+            )
+        }
 
         val preparedRegionalImages = preparedImages.drop(1)
         val generatedUncertainRegions =

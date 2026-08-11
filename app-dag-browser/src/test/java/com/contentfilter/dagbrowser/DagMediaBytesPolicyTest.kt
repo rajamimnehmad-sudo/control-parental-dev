@@ -223,6 +223,49 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
+    fun `very strong full image signal blocks without regional veto`() {
+        var callCount = 0
+        val trace = DagMediaPipelineTrace()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        callCount += 1
+                        DagImageAnalysisResult.Classified(0.95f)
+                    },
+                trace = trace,
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelFilterReason, decision.reason)
+        assertEquals(0.95f, decision.filterProbability)
+        assertEquals(1, callCount)
+        assertEquals(DagMediaDecisionBasis.FullStrong, trace.decisionBasis)
+    }
+
+    @Test
+    fun `full image signal below strong gate still requires regional corroboration`() {
+        val probabilities = listOf(0.9499f, 0.2f, 0.1f, 0.2f, 0.1f).iterator()
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/jpeg") },
+                preprocessor = readyPreprocessor,
+                analyzer =
+                    DagImageAnalyzer {
+                        DagImageAnalysisResult.Classified(probabilities.next())
+                    },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+        assertEquals(0.9499f, decision.filterProbability)
+    }
+
+    @Test
     fun `full image signal remains blocked when one contextual quadrant is strong`() {
         val probabilities = listOf(0.8f, 0.7f).iterator()
         val decision =

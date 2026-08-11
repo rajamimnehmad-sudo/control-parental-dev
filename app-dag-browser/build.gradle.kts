@@ -28,8 +28,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 198
-        versionName = "0.70.02"
+        versionCode = 199
+        versionName = "0.70.03"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -73,7 +73,7 @@ android {
             // Keep the final .dev segment so the existing private diagnostic logs remain enabled
             // without adding instrumentation to the normal DEV or LAB variants.
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 1
+            versionCode = 2
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "GLOSHIA_VISUAL_ENABLED", "true")

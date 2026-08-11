@@ -190,7 +190,12 @@ fi
 printf 'process_pid=%s\n' "$app_pid" >>"$output_dir/run-metadata.txt"
 
 sleep 4
-screen_size="$($adb_bin -s "$serial" shell wm size | tr -d '\r' | sed -n 's/.*Physical size: //p' | tail -1)"
+screen_size="$($adb_bin -s "$serial" shell dumpsys input | tr -d '\r' | sed -n \
+  's/.*Viewport INTERNAL: displayId=0.*logicalFrame=\[0, 0, \([0-9][0-9]*\), \([0-9][0-9]*\)\].*/\1x\2/p' | head -1)"
+if [[ -z "$screen_size" ]]; then
+  screen_size="$($adb_bin -s "$serial" shell wm size | tr -d '\r' | sed -n 's/.*Physical size: //p' | tail -1)"
+fi
+printf 'gesture_display_size=%s\n' "${screen_size:-unknown}" >>"$output_dir/run-metadata.txt"
 screen_width="${screen_size%x*}"
 screen_height="${screen_size#*x}"
 if [[ "$screen_width" =~ ^[0-9]+$ && "$screen_height" =~ ^[0-9]+$ ]]; then

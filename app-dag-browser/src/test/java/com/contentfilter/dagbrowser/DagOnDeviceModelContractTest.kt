@@ -29,6 +29,7 @@ class DagOnDeviceModelContractTest {
         assertTrue(model.length() in 9_000_000L..10_000_000L)
         assertTrue(fallback.length() in 8_000_000L..9_000_000L)
         assertEquals(0.4f, DagOnDeviceImageAnalyzer.FilterThreshold)
+        assertEquals(0.95f, DagOnDeviceImageAnalyzer.FullStrongFilterThreshold)
         assertEquals(0.3f, DagOnDeviceImageAnalyzer.UncertainRegionalReviewFloor)
         assertEquals(0.45f, DagOnDeviceImageAnalyzer.UncertainRegionalFilterThreshold)
         assertEquals(0.5f, DagOnDeviceImageAnalyzer.RegionalFilterThreshold)
