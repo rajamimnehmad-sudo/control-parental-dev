@@ -8,7 +8,6 @@ import com.contentfilter.core.domain.model.SystemHealthSnapshot
 import com.contentfilter.core.domain.model.UpdateState
 
 internal fun SystemHealthEntity.toDomain(): SystemHealthSnapshot {
-    val now = System.currentTimeMillis()
     val storedState = enumValueOrDefault(licenseState, LicenseState.PendingActivation)
     val effectiveState =
         LicenseEntitlement(
@@ -17,7 +16,7 @@ internal fun SystemHealthEntity.toDomain(): SystemHealthSnapshot {
             expiresAtEpochMillis = licenseExpiresAtEpochMillis,
             verifiedAtEpochMillis = licenseVerifiedAtEpochMillis ?: checkedAtEpochMillis,
             dagEntitled = dagEntitled,
-        ).effectiveState(now)
+        ).effectiveState()
     return SystemHealthSnapshot(
         vpnState = enumValueOrDefault(vpnState, ComponentState.Unknown),
         accessibilityState = enumValueOrDefault(accessibilityState, ComponentState.Unknown),

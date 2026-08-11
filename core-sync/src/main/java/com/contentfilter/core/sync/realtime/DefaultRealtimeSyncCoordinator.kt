@@ -42,6 +42,7 @@ class DefaultRealtimeSyncCoordinator
                                     requestId = change.requestId,
                                     reason = "realtime",
                                 )
+                            is RealtimeChange.LicenseInvalidated -> syncEngine.syncOnce()
                             is RealtimeChange.Table -> syncEngine.syncOnce()
                         }
                     }

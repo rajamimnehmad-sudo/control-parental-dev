@@ -210,7 +210,14 @@ internal fun parseRealtimeChange(
 ): RealtimeChange? {
     val json = runCatching { JSONObject(text) }.getOrNull() ?: return null
     val payload = json.optJSONObject("payload")
-    if (json.optString("event") == "broadcast" && payload?.optString("event") == "policy_revision") {
+    val broadcastEvent = payload?.optString("event")
+    if (json.optString("event") == "broadcast" && broadcastEvent == "license_changed") {
+        val licensePayload = payload.optJSONObject("payload") ?: return null
+        val deviceId = licensePayload.optString("device_id")
+        if (deviceId.isBlank() || expectedDeviceId == null || deviceId != expectedDeviceId) return null
+        return RealtimeChange.LicenseInvalidated(deviceId)
+    }
+    if (json.optString("event") == "broadcast" && broadcastEvent == "policy_revision") {
         val revisionPayload = payload.optJSONObject("payload") ?: return null
         val deviceId = revisionPayload.optString("device_id")
         if (expectedDeviceId != null && deviceId != expectedDeviceId) return null

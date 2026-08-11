@@ -44,6 +44,39 @@ class SupabaseRealtimeSubscriptionTest {
     }
 
     @Test
+    fun `license invalidation for current device requests authoritative refresh`() {
+        val change =
+            parseRealtimeChange(
+                """{"event":"broadcast","payload":{"event":"license_changed","payload":{"device_id":"device-1"}}}""",
+                expectedDeviceId = "device-1",
+            ) as RealtimeChange.LicenseInvalidated
+
+        assertEquals("device-1", change.deviceId)
+    }
+
+    @Test
+    fun `license invalidation for another device is ignored`() {
+        val change =
+            parseRealtimeChange(
+                """{"event":"broadcast","payload":{"event":"license_changed","payload":{"device_id":"other"}}}""",
+                expectedDeviceId = "device-1",
+            )
+
+        assertNull(change)
+    }
+
+    @Test
+    fun `license invalidation without bound device is ignored`() {
+        val change =
+            parseRealtimeChange(
+                """{"event":"broadcast","payload":{"event":"license_changed","payload":{"device_id":"device-1"}}}""",
+                expectedDeviceId = null,
+            )
+
+        assertNull(change)
+    }
+
+    @Test
     fun `legacy table event remains available for maintenance sync`() {
         val change =
             parseRealtimeChange(

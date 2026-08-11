@@ -14,4 +14,8 @@ sealed interface RealtimeChange {
         val policyId: String,
         val revision: Long,
     ) : RealtimeChange
+
+    data class LicenseInvalidated(
+        val deviceId: String,
+    ) : RealtimeChange
 }

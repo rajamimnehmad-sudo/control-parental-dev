@@ -7,26 +7,63 @@ import kotlin.test.assertTrue
 
 class LicenseEntitlementTest {
     @Test
-    fun `active entitlement expires locally without another server response`() {
-        val entitlement = entitlement(LicenseState.Active, startsAt = 1_000, expiresAt = 10 * DayMillis)
+    fun `device clock cannot expire an active server entitlement`() {
+        val entitlement =
+            entitlement(
+                state = LicenseState.Active,
+                startsAt = 1_000,
+                expiresAt = 10 * DayMillis,
+                verifiedAt = 2_000,
+            )
 
-        assertEquals(LicenseState.Active, entitlement.effectiveState(2_000))
-        assertEquals(LicenseState.Expired, entitlement.effectiveState(10 * DayMillis))
+        assertEquals(LicenseState.Active, entitlement.effectiveState())
     }
 
     @Test
-    fun `scheduled entitlement activates locally at its start`() {
-        val entitlement = entitlement(LicenseState.Scheduled, startsAt = 5_000, expiresAt = null)
+    fun `scheduled entitlement requires a new server verification to activate`() {
+        val scheduled =
+            entitlement(
+                state = LicenseState.Scheduled,
+                startsAt = 5_000,
+                expiresAt = null,
+                verifiedAt = 4_999,
+            )
+        val activated =
+            entitlement(
+                state = LicenseState.Active,
+                startsAt = 5_000,
+                expiresAt = null,
+                verifiedAt = 5_000,
+            )
 
-        assertEquals(LicenseState.Scheduled, entitlement.effectiveState(4_999))
-        assertEquals(LicenseState.Active, entitlement.effectiveState(5_000))
+        assertEquals(LicenseState.Scheduled, scheduled.effectiveState())
+        assertEquals(LicenseState.Active, activated.effectiveState())
     }
 
     @Test
     fun `manual suspension has priority over dates`() {
-        val entitlement = entitlement(LicenseState.Suspended, startsAt = 1_000, expiresAt = 10_000)
+        val entitlement =
+            entitlement(
+                state = LicenseState.Suspended,
+                startsAt = 1_000,
+                expiresAt = 10_000,
+                verifiedAt = 2_000,
+            )
 
-        assertEquals(LicenseState.Suspended, entitlement.effectiveState(2_000))
+        assertEquals(LicenseState.Suspended, entitlement.effectiveState())
+    }
+
+    @Test
+    fun `expiring soon uses server evaluated time`() {
+        val entitlement =
+            entitlement(
+                state = LicenseState.Active,
+                startsAt = 1_000,
+                expiresAt = 8 * DayMillis,
+                verifiedAt = 2 * DayMillis,
+            )
+
+        assertEquals(LicenseState.ExpiringSoon, entitlement.effectiveState())
     }
 
     @Test
@@ -44,11 +81,12 @@ class LicenseEntitlementTest {
         state: LicenseState,
         startsAt: Long?,
         expiresAt: Long?,
+        verifiedAt: Long,
     ) = LicenseEntitlement(
         state = state,
         startsAtEpochMillis = startsAt,
         expiresAtEpochMillis = expiresAt,
-        verifiedAtEpochMillis = 1_000,
+        verifiedAtEpochMillis = verifiedAt,
     )
 
     private companion object {

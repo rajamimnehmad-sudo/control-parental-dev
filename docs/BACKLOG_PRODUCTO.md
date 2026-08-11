@@ -1406,6 +1406,7 @@ Flujo de una entrada:
 | LIC-RELINK-01 | Implementado candidato local Usuario 309; pendiente prueba integral | P0 | Aceptar en App Usuario tokens normales de 6 caracteres y de reenlace de 8 | S | Bajo |
 | LIC-RELINK-02 | Backend aplicado en DEV y Android Usuario 310/Admin 292 validado; pendiente prueba integral fisica | P0 | Cerrar reenlace con licencia vigente, sesion unica y confirmacion booleana real | M | Alto |
 | LIC-SUPABASE-HISTORY-01 | Resuelto en DEV; historial local/remoto alineado y dry-run limpio | P0 | Reconciliar versiones de migracion registradas en DEV pero ausentes localmente antes de desplegar licencias | M | Alto |
+| LIC-REVOCATION-01A | Candidato local Usuario 311/Admin 293; migracion pendiente de autorizacion DEV y prueba fisica | P0 | Propagar cambios, comienzos y vencimientos de licencia con hora del servidor y revalidacion autorizada | M | Alto |
 | USER-RELINK-01 | Backend y Android publicados DEV 264; Superweb en fuente; pendiente prueba | P1 | Reenlazar un Usuario con token de reemplazo desde App Admin o Superweb | L | Alto |
 | ANDROID-BRAND-ICONS-01 | Publicado DEV 264; pendiente comprobacion visual | P2 | Iconos oficiales diferenciados para App Usuario y App Admin | S | Bajo |
 | UI-POLISH-01 | Publicado DEV 243; pendiente comprobacion visual desbloqueada | P2 | Consistencia visual y accesibilidad de ambas apps y Superweb | M | Bajo |
@@ -1629,6 +1630,33 @@ Flujo de una entrada:
   codigo, token de dispositivo o identidad.
 - Pendiente: ejecutar el recorrido fisico integral de alta, desvinculacion,
   reenlace correcto, token reemplazado/vencido y confirmacion `false`.
+
+### LIC-REVOCATION-01A - Propagacion y hora confiable de licencia
+
+- Estado: `Candidato local Usuario 311/Admin 293; migracion pendiente de
+  autorizacion DEV y prueba fisica`.
+- Causa raiz: la Superweb actualizaba `community_licenses`, pero esa tabla no
+  generaba ningun aviso dirigido. Usuario y Admin conocian una suspension o
+  renovacion recien en la siguiente sincronizacion periodica. Ademas, Android
+  recalculaba comienzo y vencimiento con el reloj modificable del telefono.
+- Resultado: los cambios relevantes emiten una invalidacion minima por el canal
+  existente del dispositivo. Ese mensaje nunca concede ni revoca permisos:
+  dispara una lectura nueva del RPC autorizado con token de dispositivo. Un
+  proceso de servidor revisa cada minuto comienzos y vencimientos, persiste los
+  vencimientos y emite la misma invalidacion. Android solo usa la hora evaluada
+  por Supabase para derivar el estado efectivo.
+- Seguridad: el Broadcast no contiene estado, plan, fechas ni entitlement DAG;
+  un mensaje falso solo puede solicitar una revalidacion que vuelve a pasar por
+  `device_token_matches_device`. Los helpers de trigger/cron son `security
+  definer`, tienen `search_path` vacio y no son ejecutables por clientes.
+- Validacion local: unitarios de `core-domain`, `core-data`, `core-network` y
+  `core-sync`; Lint Vital y APK DEV locales de ambas apps; `git diff --check` y
+  dry-run de Supabase correctos. La migracion pendiente es
+  `20260811004228_broadcast_license_invalidation.sql`.
+- Fuera de alcance: no libera Device Admin, Accessibility ni barrera; no inicia
+  desinstalacion. Eso queda en `LIC-REVOCATION-01B` y debe activarse solo luego
+  de una revocacion confirmada por servidor. Tampoco reemplaza la prueba fisica
+  pendiente de licencias y reenlace.
 
 ### LIC-SUPABASE-HISTORY-01 - Reconciliar historial local y DEV
 

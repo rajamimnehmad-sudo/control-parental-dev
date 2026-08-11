@@ -9,14 +9,16 @@ data class LicenseEntitlement(
     val verifiedAtEpochMillis: Long,
     val dagEntitled: Boolean = false,
 ) {
-    fun effectiveState(nowEpochMillis: Long): LicenseState =
+    fun effectiveState(): LicenseState =
         when {
             state == LicenseState.Suspended -> LicenseState.Suspended
             state == LicenseState.Expired -> LicenseState.Expired
             state == LicenseState.PendingActivation -> LicenseState.PendingActivation
-            startsAtEpochMillis != null && nowEpochMillis < startsAtEpochMillis -> LicenseState.Scheduled
-            expiresAtEpochMillis != null && nowEpochMillis >= expiresAtEpochMillis -> LicenseState.Expired
-            expiresAtEpochMillis != null && expiresAtEpochMillis - nowEpochMillis <= ExpiringSoonWindowMillis ->
+            state == LicenseState.Scheduled -> LicenseState.Scheduled
+            startsAtEpochMillis != null && verifiedAtEpochMillis < startsAtEpochMillis -> LicenseState.Scheduled
+            expiresAtEpochMillis != null && verifiedAtEpochMillis >= expiresAtEpochMillis -> LicenseState.Expired
+            expiresAtEpochMillis != null &&
+                expiresAtEpochMillis - verifiedAtEpochMillis <= ExpiringSoonWindowMillis ->
                 LicenseState.ExpiringSoon
             else -> LicenseState.Active
         }

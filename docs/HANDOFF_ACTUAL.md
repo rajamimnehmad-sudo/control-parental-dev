@@ -6,6 +6,25 @@ Este archivo contiene solo el estado tecnico vigente. El historial vive en
 `docs/BACKLOG_PRODUCTO.md`, `docs/compatibility/results/` y Git. No reconstruir
 el runtime actual desde versiones o worktrees historicos.
 
+## LIC-REVOCATION-01A: propagacion confiable de licencia
+
+- Candidato local Usuario 311/Admin 293: un cambio relevante de licencia emite
+  una invalidacion Realtime dirigida a cada dispositivo de la comunidad. El
+  mensaje no contiene estado, fechas ni permisos; obliga a consultar nuevamente
+  `get_device_license_entitlement` con el token propio del dispositivo.
+- Supabase procesa cada minuto vencimientos y comienzos programados usando hora
+  del servidor. Android conserva el ultimo estado verificado y ya no permite
+  que adelantar o atrasar el reloj local active o venza una licencia.
+- Unitarios de dominio, datos, red y sync correctos; Lint Vital y APK DEV locales
+  de ambas apps correctos. La migracion
+  `20260811004228_broadcast_license_invalidation.sql` pasa el dry-run y es la
+  unica pendiente remota, pero todavia no fue aplicada. No hubo instalacion,
+  push ni publicacion.
+- Pendiente: autorizacion separada para aplicar la migracion en Supabase DEV,
+  verificacion posterior y recorrido fisico de cambio manual, vencimiento,
+  renovacion y funcionamiento offline. La liberacion de permisos y el flujo de
+  desinstalacion pertenecen a `LIC-REVOCATION-01B`.
+
 ## LIC-RELINK-02: cierre seguro del reenlace
 
 - El reenlace de Usuario o Admin conserva el mismo dispositivo logico y ahora

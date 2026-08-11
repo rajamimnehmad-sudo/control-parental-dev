@@ -44,10 +44,9 @@ class RoomSystemStatusRepository
         }
 
         override suspend fun updateLicenseEntitlement(entitlement: LicenseEntitlement) {
-            val now = System.currentTimeMillis()
             updateHealth {
                 it.copy(
-                    licenseState = entitlement.effectiveState(now),
+                    licenseState = entitlement.effectiveState(),
                     licenseStartsAtEpochMillis = entitlement.startsAtEpochMillis,
                     licenseExpiresAtEpochMillis = entitlement.expiresAtEpochMillis,
                     licenseVerifiedAtEpochMillis = entitlement.verifiedAtEpochMillis,
@@ -57,7 +56,6 @@ class RoomSystemStatusRepository
         }
 
         override suspend fun refreshLicenseState() {
-            val now = System.currentTimeMillis()
             updateHealth { current ->
                 current.copy(
                     licenseState =
@@ -67,7 +65,7 @@ class RoomSystemStatusRepository
                             expiresAtEpochMillis = current.licenseExpiresAtEpochMillis,
                             verifiedAtEpochMillis = current.licenseVerifiedAtEpochMillis ?: current.checkedAtEpochMillis,
                             dagEntitled = current.dagEntitled,
-                        ).effectiveState(now),
+                        ).effectiveState(),
                 )
             }
         }
