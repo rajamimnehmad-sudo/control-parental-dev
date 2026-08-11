@@ -170,6 +170,8 @@ el runtime actual desde versiones o worktrees historicos.
   primera carga y scroll rapido en Mimo, Cheeky y Fravega, y enviar un informe
   nuevo para confirmar formatos recuperados y distinguir timeout de inicio de
   timeout por inactividad. No se actualizo el manifiesto publico.
+- Artefacto DEV candidato inmutable y descarga publica verificada byte a byte:
+  `dev-updates/candidates/dag-browser-dev-206-0153586-62a5b378.apk`.
 
 ## Candidato local en validacion: DAG Browser 205 — caja negra privada
 
