@@ -124,7 +124,20 @@ el runtime actual desde versiones o worktrees historicos.
 - Siguiente ticket propuesto: ajustar primero un profesor en RunPod Secure Cloud
   RTX 4090 y sólo destilarlo si pasa los tres gates. Límite sugerido USD 3 y
   cuatro horas con apagado automático. Subir imágenes privadas, crear recursos
-  o gastar requiere autorización explícita; todavía no fue concedida.
+  o gastar requiere autorización explícita. El propietario autorizó el camino,
+  pero eligió no alquilar GPU antes de crear cuenta, subir imágenes o gastar;
+  no hubo operación externa.
+- Se probó entonces el último camino local fundado en el MacBook Air M2 de 8 GB:
+  SigLIP Base balanceado, SigLIP Base sin peso de clase y DINOv2-Small con peso
+  filter 1,5. Los tres quedaron `NO-GO`. El mejor SigLIP mantuvo seguridad pero
+  dejó 22 falsos filtros en las 112 vistas y 19 en el holdout; DINOv2 dejó 58 y
+  51 respectivamente. No destilar ni repetir balances/capas/épocas contra los
+  mismos gates.
+- MPS sí fue técnicamente viable: los smokes usaron aproximadamente 622 MB para
+  SigLIP y 207 MB para DINOv2. El límite fue generalización, no memoria ni falta
+  de aceleración local. R3.1, Android, ONNX, umbral, política y `final_sealed`
+  permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
+  informes privados y la evidencia detallada en el documento R4.
 
 ## Candidato validado local: DAG Browser 183
 

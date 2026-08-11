@@ -486,3 +486,39 @@ La tarifa pública observada el 2026-08-09 fue USD 0,69/h. No crear cuenta, subi
 imágenes, almacenar credenciales ni iniciar gasto sin autorización explícita
 del propietario. El corpus sigue autorizado sólo para experimento privado y no
 declara derechos comerciales claros.
+
+### Ajuste local de profesores en Apple M2
+
+El 2026-08-10 el propietario autorizó primero el experimento externo, pero
+eligió continuar sin alquilar GPU antes de crear una cuenta, subir imágenes o
+iniciar gasto. Se comprobó que el MacBook Air M2 de 8 GB expone PyTorch MPS fuera
+del aislamiento. El entrenamiento quedó totalmente local y privado.
+
+Se usaron únicamente las 1.033 imágenes de train y 25 de validación interna del
+corpus adjudicado. El checkpoint se eligió antes de inferir los gates. Después
+se puntuaron las 112 vistas fijas, los 162 casos dirigidos y el holdout
+independiente de 97. `frozen_test` y `final_sealed` no se abrieron.
+
+| profesor ajustado | originales FP/FF | 112 vistas FP/FF | holdout FP/FF | dirigido FP/FF | decisión |
+| --- | ---: | ---: | ---: | ---: | --- |
+| SigLIP Base, peso balanceado | 1/6 | 8/22 | 1/19 | 4/52 | `NO-GO` |
+| SigLIP Base, sin peso de clase | 1/7 | 6/39 | 2/22 | 0/73 | `NO-GO` |
+| DINOv2-Small, peso filter 1,5 | 0/17 | 7/58 | 0/51 | 8/62 | `NO-GO` |
+
+El smoke real de SigLIP con lote 4 y acumulación 4 usó 622.184.192 bytes MPS
+y tardó 3,0 segundos en cuatro lotes. DINOv2-Small usó 206.682.112 bytes y
+tardó 1,11 segundos. Por lo tanto, el bloqueo no fue capacidad técnica del M2:
+los profesores aprendieron una frontera demasiado conservadora y no
+generalizaron los negativos cercanos.
+
+La corrección analítica completa del sesgo de clase de SigLIP también se
+descartó antes de otro gate: en validación interna cambió de 1/3 a 3/0
+FP/FF. No se modificó el umbral `0,40` para compensar el modelo.
+
+Resultado: `NO-GO` local definitivo para estos dos profesores y este corpus.
+No destilar, exportar ONNX ni repetir balances, épocas o capas usando los gates
+como afinación. R3.1 sigue oficial e intacto. Los informes privados quedan en:
+
+- `.codex-tmp/gloshia-r4-local-mps-train-20260810/report.json`;
+- `.codex-tmp/gloshia-r4-local-mps-unweighted-20260810/report.json`;
+- `.codex-tmp/gloshia-r4-local-dinov2-safe-20260810/report.json`.
