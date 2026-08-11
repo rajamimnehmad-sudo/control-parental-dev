@@ -1,14 +1,14 @@
 /*
  * HTTP(S) raster bytes remain entirely owned by the response gate. Inline
- * sources start neutral; only a bounded data raster approved by the same local
- * gate receives the stable attribute. Blob and unsupported inline media stay closed.
+ * sources start neutral; only bounded data or blob media approved by the same
+ * local gate receive the stable attribute. Unsupported inline media stay closed.
  */
 img[src^="data:" i]:not([data-glosh-dag-stable="true"]),
-img[src^="blob:" i],
+img[src^="blob:" i]:not([data-glosh-dag-stable="true"]),
 img[srcset*="data:image" i]:not([data-glosh-dag-stable="true"]),
-img[srcset*="blob:" i],
+img[srcset*="blob:" i]:not([data-glosh-dag-stable="true"]),
 picture:has(source[srcset*="data:image" i]) img:not([data-glosh-dag-stable="true"]),
-picture:has(source[srcset*="blob:" i]) img,
+picture:has(source[srcset*="blob:" i]) img:not([data-glosh-dag-stable="true"]),
 svg image[href^="data:" i],
 svg image[href^="blob:" i],
 svg image[xlink\:href^="data:" i],
@@ -23,15 +23,6 @@ svg image[xlink\:href^="blob:" i] {
 
 img:not([data-glosh-dag-stable="true"]) {
   visibility: hidden !important;
-}
-
-img[src$=".svg" i],
-img[src*=".svg?" i],
-img[src*=".svg#" i],
-img[src$=".ico" i],
-img[src*=".ico?" i],
-img[src*=".ico#" i] {
-  visibility: visible !important;
 }
 
 video,

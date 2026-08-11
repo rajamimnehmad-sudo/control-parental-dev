@@ -139,6 +139,35 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
+## Candidato validado local: DAG Browser 198
+
+- DAG 198 (`0.70.02-dev`) está instalado in-place en el SM-S908E con los datos
+  preservados; la extensión integrada es `2.0.3`. Todavía requiere aceptación
+  visual del propietario antes de reemplazar al baseline seguro DAG 176.
+- La cola, cancelación, quietud y entrega quedan ligadas a la identidad exacta
+  de pestaña/documento. Un documento retirado ya no puede publicar decisiones,
+  completar el viewport ni contaminar la vista siguiente.
+- `data:` y `blob:` pasan por la compuerta nativa con presupuestos acotados; no
+  existe el límite histórico de 16 fuentes que dejaba miniaturas posteriores
+  sin decisión. La prueba física permitió dos raster seguros y bloqueó dos
+  sondas de filtro.
+- SVG/ICO ya no tienen bypass visible general. Sólo SVG pasivo, pequeño y
+  saneable se permite como interfaz; animación, decode fallido y formato
+  desconocido fallan cerrados. Se retiró la liberación heurística de sprites
+  raster sin decisión GloshIA.
+- Dos corridas deterministas cargaron 4/4 imágenes críticas en `364/381 ms` y
+  20/20 lazy en `8.940/8.839 ms`; cola p95 `1 ms`, PSS `266-277 MiB`, cero
+  crash/ANR. Frávega, Cheeky y Mimo registraron `5,41/5,13/7,32 %` de frames
+  lentos y cola p95 `47/74/33 ms` bajo ráfagas reales.
+- Se preservaron R3.1, umbral `0,40`, preprocesamiento, política regional,
+  hilos ONNX y `final_sealed`. No hay excepciones por sitio, URL, dominio o
+  dispositivo. El banner GIF sigue bloqueado por la política de animación.
+- Validación: harness JS 25/25, `testDagProtectionJs`, unitarios DEV, Ktlint,
+  APK DEV/LAB y sintaxis del laboratorio correctos. APK DEV SHA-256:
+  `be11b9905901a604a80a3bf028e1357a009b3c5647ca384b74f43ce1157421c7`.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v198-document-inline-media-gate-sm-s908e-2026-08-11.md`.
+
 ## Candidato validado local: DAG Browser 183
 
 - DAG 183 (`0.69.87-dev`) esta instalado en el SM-S908E con datos preservados;

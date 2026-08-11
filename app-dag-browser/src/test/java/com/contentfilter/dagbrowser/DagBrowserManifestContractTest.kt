@@ -97,7 +97,10 @@ class DagBrowserManifestContractTest {
         assertContains(activity, "!tab.barrierReadyForNavigation")
         assertContains(activity, "!tab.protectedContentReadyForNavigation")
         assertContains(activity, "!tab.documentSanitizedForNavigation")
-        assertContains(activity, "ViewportImagesReadyMessage -> handleViewportImagesReady()")
+        assertContains(activity, "ViewportImagesReadyMessage -> handleViewportImagesReady(payload)")
+        assertContains(activity, "mediaDocumentRegistry.isCurrent")
+        assertContains(activity, "it.previewDocumentToken == documentToken")
+        assertContains(activity, "documentToken != senderTab.previewDocumentToken")
         assertContains(activity, "recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)")
         assertFalse(activity.contains("shimmer = true"))
     }

@@ -9,15 +9,15 @@
     writable: false,
   });
 
-  const PROTOCOL_VERSION = 1;
+  const PROTOCOL_VERSION = 2;
   const NATIVE_APP = "glosh.dag.protection";
   const IMAGE_STABILITY_MS = 0;
   const IMAGE_RECONCILIATION_DELAYS_MS = [100, 400, 1000, 2000, 4000, 6000, 8000, 12000];
   const STABLE_IMAGE_ATTRIBUTE = "data-glosh-dag-stable";
-  const MAX_INLINE_DATA_URL_LENGTH = 66 * 1024;
-  const MAX_INLINE_IMAGES_PER_DOCUMENT = 16;
-  const MAX_INLINE_NATURAL_EDGE = 128;
-  const MAX_INLINE_RENDERED_EDGE = 96;
+  const MAX_INLINE_IMAGE_BYTES = 2 * 1024 * 1024;
+  const MAX_INLINE_DATA_URL_LENGTH = 2_800_000;
+  const MAX_INLINE_DECISIONS = 64;
+  const MAX_INLINE_DECISION_SOURCE_CHARS = 1024 * 1024;
   const IMAGE_PRIORITY_ROOT_MARGIN = "800px 0px";
   const MAX_PRIORITY_SOURCES = 256;
   const INITIAL_AD_SCAN_READY_ATTRIBUTE = "data-glosh-dag-ads-initial-ready";
@@ -36,14 +36,15 @@
   ].join(",");
 
   let nativePort = null;
-  let inlineImagesSubmitted = 0;
   let initialAdScanReady = false;
   let initialDocumentReady = false;
   let initialDocumentReadyReported = false;
+  let inlineDecisionSourceChars = 0;
   const pendingImages = new WeakMap();
   const unsettledImages = new Set();
   const inlineDecisions = new Map();
   const priorityBySource = new Map();
+  const priorityByImage = new WeakMap();
   try {
     nativePort = browser.runtime.connectNative(NATIVE_APP);
   } catch {
@@ -61,9 +62,30 @@
     } catch {}
   };
 
+  const postDocumentLifecycle = (type) => {
+    void browser.runtime.sendMessage({
+      type,
+      version: PROTOCOL_VERSION,
+      documentToken,
+    }).catch(() => {});
+  };
+
+  postDocumentLifecycle("document-started");
+
   const imageSource = (image) => image.currentSrc || image.src || "";
 
+  const imagePriorityFromRect = (rect) => {
+    const viewportHeight = window.innerHeight;
+    if (rect.bottom > 0 && rect.top < viewportHeight) return "visible";
+    if (rect.bottom > -800 && rect.top < viewportHeight + 800) return "nearby";
+    return "background";
+  };
+
+  const immediateImagePriority = (image) =>
+    priorityByImage.get(image) || imagePriorityFromRect(image.getBoundingClientRect());
+
   const reportImagePriority = (image, priority) => {
+    priorityByImage.set(image, priority);
     const source = imageSource(image);
     if (!/^https?:\/\//iu.test(source)) return;
     if (priorityBySource.get(source) === priority) return;
@@ -90,11 +112,55 @@
     );
   };
 
-  const inlineDataSource = (image) => {
+  const inlineImageSource = (image) => {
     const current = image.currentSrc || "";
-    if (current.startsWith("data:image/")) return current;
+    if (current.startsWith("data:image/") || current.startsWith("blob:")) return current;
     const source = image.getAttribute("src") || "";
-    return source.startsWith("data:image/") ? source : "";
+    return source.startsWith("data:image/") || source.startsWith("blob:") ? source : "";
+  };
+
+  const encodeBase64 = (bytes) => {
+    let binary = "";
+    for (let offset = 0; offset < bytes.byteLength; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
+    return btoa(binary);
+  };
+
+  const blobDataUrl = async (source) => {
+    try {
+      const response = await fetch(source);
+      const blob = await response.blob();
+      if (blob.size <= 0 || blob.size > MAX_INLINE_IMAGE_BYTES) return null;
+      const bytes = new Uint8Array(await blob.arrayBuffer());
+      if (bytes.byteLength !== blob.size) return null;
+      const mimeType = /^image\/[a-z\d.+-]+$/iu.test(blob.type) ? blob.type : "image/unknown";
+      return `data:${mimeType};base64,${encodeBase64(bytes)}`;
+    } catch {
+      return null;
+    }
+  };
+
+  const cachedInlineDecision = (source) => {
+    const decision = inlineDecisions.get(source);
+    if (decision === undefined) return undefined;
+    inlineDecisions.delete(source);
+    inlineDecisions.set(source, decision);
+    return decision;
+  };
+
+  const rememberInlineDecision = (source, decision) => {
+    if (source.length > MAX_INLINE_DECISION_SOURCE_CHARS) return;
+    inlineDecisions.set(source, decision);
+    inlineDecisionSourceChars += source.length;
+    while (
+      inlineDecisions.size > MAX_INLINE_DECISIONS ||
+      inlineDecisionSourceChars > MAX_INLINE_DECISION_SOURCE_CHARS
+    ) {
+      const oldestSource = inlineDecisions.keys().next().value;
+      inlineDecisions.delete(oldestSource);
+      inlineDecisionSourceChars = Math.max(0, inlineDecisionSourceChars - oldestSource.length);
+    }
   };
 
   const resetImage = (image) => {
@@ -105,6 +171,19 @@
     unsettledImages.add(image);
   };
 
+  const closeImage = (image) => {
+    const pending = pendingImages.get(image);
+    if (pending?.timeout !== undefined) clearTimeout(pending.timeout);
+    pendingImages.delete(image);
+    unsettledImages.delete(image);
+    priorityObserver?.unobserve(image);
+  };
+
+  const releaseImage = (image) => {
+    closeImage(image);
+    priorityByImage.delete(image);
+  };
+
   const markImageStable = (image) => {
     image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
     unsettledImages.delete(image);
@@ -112,33 +191,39 @@
   };
 
   const inlineImageIsBounded = (image, source) => {
-    if (
+    return !(
       source.length === 0 ||
-      source.length > MAX_INLINE_DATA_URL_LENGTH ||
+      (!source.startsWith("blob:") && source.length > MAX_INLINE_DATA_URL_LENGTH) ||
       image.naturalWidth <= 0 ||
-      image.naturalHeight <= 0 ||
-      image.naturalWidth > MAX_INLINE_NATURAL_EDGE ||
-      image.naturalHeight > MAX_INLINE_NATURAL_EDGE
-    ) return false;
-    const bounds = image.getBoundingClientRect();
-    return bounds.width > 0 && bounds.height > 0 &&
-      bounds.width <= MAX_INLINE_RENDERED_EDGE && bounds.height <= MAX_INLINE_RENDERED_EDGE;
+      image.naturalHeight <= 0
+    );
   };
 
   const inspectInlineImage = (image) => {
-    const source = inlineDataSource(image);
+    const source = inlineImageSource(image);
+    const pending = pendingImages.get(image);
+    if (pending?.source === source && pending.decision !== undefined) return;
     resetImage(image);
-    if (!inlineImageIsBounded(image, source)) return;
-    let decision = inlineDecisions.get(source);
+    if (!inlineImageIsBounded(image, source)) {
+      closeImage(image);
+      return;
+    }
+    let decision = cachedInlineDecision(source);
     if (decision === undefined) {
-      if (inlineImagesSubmitted >= MAX_INLINE_IMAGES_PER_DOCUMENT) return;
-      inlineImagesSubmitted += 1;
-      decision = browser.runtime.sendMessage({
-        type: "inline-raster-decision",
-        version: PROTOCOL_VERSION,
-        dataUrl: source,
-      }).catch(() => ({ action: "block" }));
-      inlineDecisions.set(source, decision);
+      decision = (async () => {
+        const dataUrl = source.startsWith("blob:") ? await blobDataUrl(source) : source;
+        if (dataUrl === null || dataUrl.length > MAX_INLINE_DATA_URL_LENGTH) {
+          return { action: "block" };
+        }
+        return browser.runtime.sendMessage({
+          type: "inline-raster-decision",
+          version: PROTOCOL_VERSION,
+          documentToken,
+          dataUrl,
+          priority: immediateImagePriority(image),
+        });
+      })().catch(() => ({ action: "block" }));
+      rememberInlineDecision(source, decision);
     }
     const request = { source, decision };
     pendingImages.set(image, request);
@@ -146,20 +231,23 @@
       if (
         pendingImages.get(image) !== request ||
         !image.isConnected ||
-        inlineDataSource(image) !== source
+        inlineImageSource(image) !== source
       ) return;
       pendingImages.delete(image);
-      if (result?.action === "allow") markImageStable(image);
+      if (result?.action === "allow") {
+        markImageStable(image);
+      } else {
+        closeImage(image);
+      }
     });
   };
 
   const priorityObserver = typeof IntersectionObserver === "function"
     ? new IntersectionObserver((entries) => {
-      const viewportHeight = window.innerHeight;
       for (const entry of entries) {
         const rect = entry.boundingClientRect;
         const priority = entry.isIntersecting
-          ? rect.bottom > 0 && rect.top < viewportHeight ? "visible" : "nearby"
+          ? imagePriorityFromRect(rect)
           : "background";
         reportImagePriority(entry.target, priority);
       }
@@ -178,7 +266,7 @@
 
   const stabilizeImage = (image) => {
     if (image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) return;
-    if (inlineDataSource(image).length > 0) {
+    if (inlineImageSource(image).length > 0) {
       inspectInlineImage(image);
       return;
     }
@@ -199,6 +287,8 @@
         imageSource(image) === source
       ) {
         markImageStable(image);
+      } else {
+        closeImage(image);
       }
     }, IMAGE_STABILITY_MS);
     pendingImages.set(image, { source, timeout });
@@ -214,6 +304,12 @@
       observeImage(image);
       if (image.complete) stabilizeImage(image);
     }
+  };
+
+  const releaseRemovedImages = (node) => {
+    if (!(node instanceof Element)) return;
+    if (node instanceof HTMLImageElement) releaseImage(node);
+    for (const image of node.querySelectorAll("img")) releaseImage(image);
   };
 
   document.addEventListener("load", (event) => {
@@ -234,6 +330,7 @@
         continue;
       }
       for (const node of record.addedNodes) inspectAddedImages(node);
+      for (const node of record.removedNodes) releaseRemovedImages(node);
     }
   });
   imageObserver.observe(document, {
@@ -272,6 +369,7 @@
       if (image.complete) stabilizeImage(image);
     }
     initialDocumentReady = true;
+    postDocumentLifecycle("document-loaded");
     maybeReportInitialDocumentReady();
   };
   const reconcileCompleteImages = (finalPass) => {
@@ -304,4 +402,12 @@
       postToAndroid({ type: "tab-preview-eligibility", restricted: true });
     }
   }, true);
+  addEventListener("pagehide", (event) => {
+    if (!event.persisted) postDocumentLifecycle("document-retired");
+  });
+  addEventListener("pageshow", (event) => {
+    if (!event.persisted) return;
+    postDocumentLifecycle("document-started");
+    if (initialDocumentReady) postDocumentLifecycle("document-loaded");
+  });
 })();

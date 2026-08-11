@@ -22,7 +22,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.0\"")
+        assertContains(manifest, "\"version\": \"2.0.3\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
@@ -63,7 +63,7 @@ class MediaBarrierContractTest {
     fun `raster response has one bounded native authority`() {
         assertContains(background, "filterResponseData")
         assertContains(background, "handlerBehaviorChanged")
-        assertContains(background, "RASTER_IMAGE_MIME_PATTERN.test(contentType)")
+        assertContains(background, "IMAGE_MIME_PATTERN.test(contentType)")
         assertContains(background, "alreadyIntercepted")
         assertContains(background, "MAX_IMAGE_BYTES = 2 * 1024 * 1024")
         assertContains(background, "MAX_CAPTURED_BYTES = 8 * 1024 * 1024")
@@ -84,14 +84,15 @@ class MediaBarrierContractTest {
         assertContains(background, "takeNextAnalysis")
         assertContains(background, "priorityRank")
         assertContains(background, "task.details.url === url")
+        assertContains(background, "documentStatesByTab")
+        assertContains(background, "media-document-current")
+        assertContains(background, "media-document-retired")
+        assertContains(background, "documentKey: documentState.documentKey")
         assertContains(background, "media-bytes")
         assertContains(background, "model_allow")
         assertContains(background, "model_filter")
-        assertContains(background, "safe_ui_sprite")
-        assertContains(
-            File("src/main/java/com/contentfilter/dagbrowser/DagSafeUiSpritePolicy.kt").readText(),
-            "AndroidDagSafeUiSpriteInspector",
-        )
+        assertFalse(background.contains("safe_ui_sprite"))
+        assertFalse(File("src/main/java/com/contentfilter/dagbrowser/DagSafeUiSpritePolicy.kt").exists())
     }
 
     @Test
@@ -110,6 +111,9 @@ class MediaBarrierContractTest {
     @Test
     fun `inline and changing image sources close before stable reveal`() {
         assertContains(barrier, "barrier-ready")
+        assertContains(barrier, "document-started")
+        assertContains(barrier, "document-loaded")
+        assertContains(barrier, "document-retired")
         assertContains(barrier, "IMAGE_STABILITY_MS = 0")
         assertContains(barrier, "MutationObserver")
         assertContains(
@@ -130,9 +134,13 @@ class MediaBarrierContractTest {
         assertContains(barrier, "imageSource(image) === source")
         assertContains(barrier, "image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)")
         assertContains(barrier, "hasInlineImageSource(record.target)")
-        assertContains(barrier, "MAX_INLINE_IMAGES_PER_DOCUMENT = 16")
+        assertContains(barrier, "MAX_INLINE_DECISIONS = 64")
+        assertFalse(barrier.contains("MAX_INLINE_IMAGES_PER_DOCUMENT"))
         assertContains(barrier, "inlineImageIsBounded")
         assertContains(barrier, "inline-raster-decision")
+        assertContains(barrier, "documentToken,")
+        assertContains(barrier, "priority: immediateImagePriority(image)")
+        assertContains(barrier, "releaseRemovedImages")
         assertContains(barrier, "IntersectionObserver")
         assertContains(barrier, "image-priority")
         assertContains(barrier, "MAX_PRIORITY_SOURCES = 256")
@@ -144,9 +152,12 @@ class MediaBarrierContractTest {
         assertContains(background, "MAX_PRIORITY_HINTS = 256")
         assertContains(background, "normalizePriority")
         assertContains(barrier, "pendingImages.get(image) !== request")
-        assertContains(background, "MAX_INLINE_IMAGE_BYTES = 48 * 1024")
-        assertContains(barrier, "MAX_INLINE_NATURAL_EDGE = 128")
-        assertContains(barrier, "MAX_INLINE_RENDERED_EDGE = 96")
+        assertContains(background, "MAX_INLINE_IMAGE_BYTES = MAX_IMAGE_BYTES")
+        assertContains(background, "capturedBytes + bytes.byteLength > MAX_CAPTURED_BYTES")
+        assertContains(barrier, "blobDataUrl")
+        assertContains(barrier, "MAX_INLINE_DECISION_SOURCE_CHARS")
+        assertFalse(barrier.contains("MAX_INLINE_NATURAL_EDGE"))
+        assertFalse(barrier.contains("MAX_INLINE_RENDERED_EDGE"))
         assertContains(background, "decodeInlineRaster")
         assertContains(background, "browser.runtime.onMessage.addListener")
         assertFalse(barrier.contains(".src ="))
@@ -163,8 +174,9 @@ class MediaBarrierContractTest {
 
     @Test
     fun `vector UI video and advertisements stay isolated`() {
-        assertContains(background, "SAFE_UI_MIME_PATTERN")
-        assertContains(background, "SAFE_UI_URL_PATTERN")
+        assertContains(background, "IMAGE_MIME_PATTERN")
+        assertFalse(background.contains("SAFE_UI_MIME_PATTERN"))
+        assertFalse(background.contains("SAFE_UI_URL_PATTERN"))
         assertContains(background, "BLOCKED_RESOURCE_TYPES")
         assertContains(background, "BLOCKED_MEDIA_MIME_PATTERN")
         assertContains(manifest, "\"ads.js\"")
@@ -188,8 +200,6 @@ class MediaBarrierContractTest {
         listOf("cheeky", "mimo", "fravega", "sm-a235", "sm-s908").forEach { forbidden ->
             assertFalse(activeProtection.contains(forbidden, ignoreCase = true))
         }
-        assertFalse(background.contains("media-document-current"))
-        assertFalse(background.contains("media-document-retired"))
         assertFalse(background.contains("media-presentation"))
     }
 }

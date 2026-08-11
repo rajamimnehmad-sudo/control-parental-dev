@@ -97,6 +97,35 @@ const createHarness = async () => {
     Promise,
     setTimeout,
   }, { filename: "background.js" });
+  const sendRuntime = (message, sender) => runtimeMessages.listeners[0](message, sender);
+  const startDocument = (
+    tabId = 1,
+    documentToken = "document_a1",
+    url = "https://shop.example.test/",
+  ) => {
+    beforeRequest.listeners[0]({
+      requestId: `document-${tabId}-${documentToken}`,
+      type: "main_frame",
+      tabId,
+      frameId: 0,
+      url,
+    });
+    sendRuntime(
+      { type: "document-started", version: 2, documentToken },
+      { url, tab: { id: tabId }, frameId: 0 },
+    );
+  };
+  const loadDocument = (
+    tabId = 1,
+    documentToken = "document_a1",
+    url = "https://shop.example.test/",
+  ) => sendRuntime(
+    { type: "document-loaded", version: 2, documentToken },
+    { url, tab: { id: tabId }, frameId: 0 },
+  );
+  startDocument();
+  loadDocument();
+  postedNative.length = 0;
   return {
     before: beforeRequest.listeners[0],
     headers: headersReceived.listeners[0],
@@ -106,8 +135,30 @@ const createHarness = async () => {
       return handlerBehaviorChanges;
     },
     handlerBehaviorChangeListenerCounts,
-    decideInline(message, sender = { url: "https://search.example.test/?q=shoes" }) {
-      return runtimeMessages.listeners[0](message, sender);
+    startDocument,
+    loadDocument,
+    retireDocument(
+      tabId = 1,
+      documentToken = "document_a1",
+      url = "https://shop.example.test/",
+    ) {
+      return sendRuntime(
+        { type: "document-retired", version: 2, documentToken },
+        { url, tab: { id: tabId }, frameId: 0 },
+      );
+    },
+    decideInline(
+      message,
+      sender = {
+        url: "https://search.example.test/?q=shoes",
+        tab: { id: 1 },
+        frameId: 0,
+      },
+    ) {
+      return runtimeMessages.listeners[0](
+        { documentToken: "document_a1", ...message },
+        sender,
+      );
     },
     setImagePriority(message) {
       return runtimeMessages.listeners[0](message, { url: "https://shop.example.test/" });
@@ -132,7 +183,7 @@ test("visible image hints reach the native queue with priority", async () => {
   const details = imageDetails("priority");
   harness.setImagePriority({
     type: "image-priority",
-    version: 1,
+    version: 2,
     url: details.url,
     priority: "visible",
   });
@@ -140,6 +191,52 @@ test("visible image hints reach the native queue with priority", async () => {
   const request = await waitFor(() => harness.postedNative.find((message) =>
     message.type === "media-bytes"), "prioritized native request");
   assert.equal(request.priority, "visible");
+  assert.equal(request.tabId, 1);
+  assert.match(request.documentKey, /^document_[a-f0-9]{1,16}$/u);
+});
+
+test("navigation retires old media work and isolates the next document", async () => {
+  const harness = await createHarness();
+  const oldDetails = imageDetails("old-document");
+  const oldBytes = Uint8Array.from([0xff, 0xd8, 1, 2, 0xff, 0xd9]);
+  deliver(harness, oldDetails, oldBytes);
+  const oldRequest = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "old document native request");
+
+  harness.startDocument(1, "document_b2", "https://shop.example.test/next");
+  harness.loadDocument(1, "document_b2", "https://shop.example.test/next");
+  const oldFilter = harness.filters.get(oldDetails.requestId);
+  await waitFor(() => oldFilter.closed, "retired document stream close");
+  assert.notDeepEqual([...oldFilter.writes[0]], [...oldBytes]);
+
+  const newDetails = imageDetails("new-document");
+  const newBytes = Uint8Array.from([0xff, 0xd8, 3, 4, 0xff, 0xd9]);
+  deliver(harness, newDetails, newBytes);
+  const newRequest = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes" && message.candidateId !== oldRequest.candidateId),
+  "new document native request");
+  assert.notEqual(newRequest.documentKey, oldRequest.documentKey);
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: newRequest.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  const newFilter = harness.filters.get(newDetails.requestId);
+  await waitFor(() => newFilter.closed, "new document stream close");
+  assert.deepEqual([...newFilter.writes[0]], [...newBytes]);
+});
+
+test("viewport readiness belongs to the exact loaded document", async () => {
+  const harness = await createHarness();
+  harness.startDocument(1, "document_c3", "https://shop.example.test/current");
+  harness.loadDocument(1, "document_c3", "https://shop.example.test/current");
+  const ready = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "viewport-images-ready" && message.documentToken === "document_c3"),
+  "document viewport readiness");
+  assert.equal(ready.tabId, 1);
+  assert.match(ready.documentKey, /^document_[a-f0-9]{1,16}$/u);
 });
 
 test("queued visible raster overtakes background work", async () => {
@@ -157,7 +254,7 @@ test("queued visible raster overtakes background work", async () => {
   deliver(harness, promoted, Uint8Array.from([0xff, 0xd8, 4, 0xff, 0xd9]));
   harness.setImagePriority({
     type: "image-priority",
-    version: 1,
+    version: 2,
     url: promoted.url,
     priority: "visible",
   });
@@ -166,7 +263,7 @@ test("queued visible raster overtakes background work", async () => {
   const occupied = harness.postedNative.filter((message) => message.type === "media-bytes");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: occupied[0].candidateId,
     action: "allow",
     reason: "model_allow",
@@ -190,7 +287,7 @@ test("full bounded response burst reaches the native gate without placeholder ov
       message.type === "media-bytes")[answered], `burst native request ${answered}`);
     harness.answer({
       type: "media-decision",
-      version: 1,
+      version: 2,
       candidateId: request.candidateId,
       action: "allow",
       reason: "model_allow",
@@ -206,6 +303,8 @@ test("full bounded response burst reaches the native gate without placeholder ov
 const imageDetails = (requestId, url = `https://cdn.example.test/${requestId}.jpg`) => ({
   requestId,
   type: "image",
+  tabId: 1,
+  frameId: 0,
   url,
   documentUrl: "https://shop.example.test/",
 });
@@ -229,7 +328,7 @@ test("allowed raster crosses one native gate and keeps exact bytes", async () =>
     message.type === "media-bytes"), "native request");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "allow",
     reason: "model_allow",
@@ -249,7 +348,7 @@ test("filtered raster receives a neutral PNG without rejected pixels", async () 
     message.type === "media-bytes"), "native request");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "block",
     reason: "model_filter",
@@ -270,7 +369,7 @@ test("experimental redaction delivers the validated frosted replacement", async 
     message.type === "media-bytes"), "redaction native request");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "redact",
     reason: "model_partial_redaction",
@@ -281,7 +380,7 @@ test("experimental redaction delivers the validated frosted replacement", async 
   assert.deepEqual([...filter.writes[0]], [...replacement]);
 });
 
-test("sanitized passive sprite is cached and preserves replacement bytes", async () => {
+test("unrecognized native raster bypass cannot release replacement pixels", async () => {
   const harness = await createHarness();
   const original = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2]);
   const sanitized = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 9, 8]);
@@ -291,20 +390,31 @@ test("sanitized passive sprite is cached and preserves replacement bytes", async
     message.type === "media-bytes"), "sprite native request");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "block",
     reason: "safe_ui_sprite",
     replacementBytesBase64: btoa(String.fromCharCode(...sanitized)),
   });
   await waitFor(() => harness.filters.get(first.requestId).closed, "sprite close");
-  assert.deepEqual([...harness.filters.get(first.requestId).writes[0]], [...sanitized]);
+  assert.notDeepEqual([...harness.filters.get(first.requestId).writes[0]], [...sanitized]);
 
   const second = imageDetails("sprite-b", "https://cdn.example.test/ui-strip.png?copy=1");
   deliver(harness, second, original, "image/png");
-  await waitFor(() => harness.filters.get(second.requestId).closed, "cached sprite close");
-  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
-  assert.deepEqual([...harness.filters.get(second.requestId).writes[0]], [...sanitized]);
+  const secondRequest = await waitFor(() => {
+    const requests = harness.postedNative.filter((message) => message.type === "media-bytes");
+    return requests.length === 2 ? requests.at(-1) : null;
+  }, "second sprite native request");
+  assert.notEqual(secondRequest.candidateId, request.candidateId);
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: secondRequest.candidateId,
+    action: "block",
+    reason: "model_filter",
+  });
+  await waitFor(() => harness.filters.get(second.requestId).closed, "second sprite close");
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 2);
 });
 
 test("bounded inline raster crosses the same native gate and fails closed", async () => {
@@ -312,50 +422,85 @@ test("bounded inline raster crosses the same native gate and fails closed", asyn
   const original = Uint8Array.from([137, 80, 78, 71, 13, 10, 26, 10, 1, 2]);
   const allowed = harness.decideInline({
     type: "inline-raster-decision",
-    version: 1,
+    version: 2,
     dataUrl: `data:image/png;base64,${btoa(String.fromCharCode(...original))}`,
   });
   const request = await waitFor(() => harness.postedNative.find((message) =>
     message.type === "media-bytes"), "inline native request");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "allow",
     reason: "model_allow",
   });
   assert.equal((await allowed).action, "allow");
 
-  assert.equal((await harness.decideInline({
+  const vector = harness.decideInline({
     type: "inline-raster-decision",
-    version: 1,
+    version: 2,
     dataUrl: "data:image/svg+xml;base64,PHN2Zy8+",
-  })).action, "block");
+  });
+  const vectorRequest = await waitFor(() => {
+    const requests = harness.postedNative.filter((message) => message.type === "media-bytes");
+    return requests.length === 2 ? requests.at(-1) : null;
+  }, "inline vector native request");
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: vectorRequest.candidateId,
+    action: "allow",
+    reason: "safe_ui_vector",
+  });
+  assert.equal((await vector).action, "allow");
   assert.equal((await harness.decideInline({
     type: "inline-raster-decision",
-    version: 1,
-    dataUrl: `data:image/png;base64,${"A".repeat(256 * 1024)}`,
+    version: 2,
+    dataUrl: `data:image/png;base64,${"A".repeat(2_800_001)}`,
   })).action, "block");
-  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 2);
 });
 
-test("SVG and icon URLs never enter the response gate", async () => {
+test("SVG URLs enter the native gate and only a validated passive vector is released", async () => {
   const harness = await createHarness();
-  const result = harness.before(imageDetails("icon", "https://cdn.example.test/heart.svg?v=2"));
-  assert.equal(Object.keys(result).length, 0);
-  assert.equal(harness.filters.size, 0);
-  assert.equal(harness.postedNative.length, 0);
-});
-
-test("vector MIME discovered after request start passes exact bytes without inference", async () => {
-  const harness = await createHarness();
-  const details = imageDetails("vector", "https://cdn.example.test/asset?id=2");
+  const details = imageDetails("icon", "https://cdn.example.test/heart.svg?v=2");
   const original = new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'/>");
   deliver(harness, details, original, "image/svg+xml");
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "SVG native request");
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "safe_ui_vector",
+  });
+  const filter = harness.filters.get(details.requestId);
+  await waitFor(() => filter.closed, "SVG stream close");
+  assert.deepEqual([...filter.writes[0]], [...original]);
+});
+
+test("vector MIME discovered on a data request still crosses the native gate", async () => {
+  const harness = await createHarness();
+  const details = {
+    ...imageDetails("vector", "https://cdn.example.test/asset?id=2"),
+    type: "xmlhttprequest",
+  };
+  const original = new TextEncoder().encode("<svg xmlns='http://www.w3.org/2000/svg'/>");
+  deliver(harness, details, original, "image/svg+xml");
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "vector MIME native request");
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "safe_ui_vector",
+  });
   const filter = harness.filters.get(details.requestId);
   await waitFor(() => filter.closed, "vector stream close");
   assert.deepEqual([...filter.writes[0]], [...original]);
-  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 0);
+  assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
 });
 
 test("raster opened as a top-level page still crosses the same native gate", async () => {
@@ -363,6 +508,8 @@ test("raster opened as a top-level page still crosses the same native gate", asy
   const details = {
     requestId: "top-level-raster",
     type: "main_frame",
+    tabId: 1,
+    frameId: 0,
     url: "https://cdn.example.test/photo.jpg",
   };
   const original = Uint8Array.from([0xff, 0xd8, 5, 6, 7, 0xff, 0xd9]);
@@ -381,7 +528,7 @@ test("raster opened as a top-level page still crosses the same native gate", asy
     message.type === "media-bytes"), "top-level native request");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "allow",
     reason: "model_allow",
@@ -395,6 +542,8 @@ test("raster fetched as data crosses the same native gate before page code sees 
   const details = {
     requestId: "fetched-raster",
     type: "xmlhttprequest",
+    tabId: 1,
+    frameId: 0,
     url: "https://cdn.example.test/preview?id=42",
     documentUrl: "https://images.example.test/",
   };
@@ -413,7 +562,7 @@ test("raster fetched as data crosses the same native gate before page code sees 
     message.type === "media-bytes"), "fetched raster native request");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "block",
     reason: "model_filter",
@@ -431,7 +580,7 @@ test("trusted content decision cache avoids a second inference", async () => {
     message.type === "media-bytes"), "first native request");
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "allow",
     reason: "model_allow",
@@ -456,7 +605,7 @@ test("identical in-flight raster shares one native inference", async () => {
   deliver(harness, second, original);
   harness.answer({
     type: "media-decision",
-    version: 1,
+    version: 2,
     candidateId: request.candidateId,
     action: "allow",
     reason: "model_allow",
@@ -534,10 +683,15 @@ test("first paint closes inline and changing image sources before stable reveal"
   assert.match(barrier, /imageSource\(image\) === source/u);
   assert.match(barrier, /image\.hasAttribute\(STABLE_IMAGE_ATTRIBUTE\)/u);
   assert.match(barrier, /hasInlineImageSource\(record\.target\)/u);
-  assert.match(barrier, /MAX_INLINE_IMAGES_PER_DOCUMENT = 16/u);
+  assert.match(barrier, /MAX_INLINE_DECISIONS = 64/u);
+  assert.doesNotMatch(barrier, /MAX_INLINE_IMAGES_PER_DOCUMENT/u);
   assert.match(barrier, /inlineImageIsBounded/u);
   assert.match(barrier, /inline-raster-decision/u);
+  assert.match(barrier, /documentToken,/u);
+  assert.match(barrier, /priority: immediateImagePriority\(image\)/u);
+  assert.match(barrier, /releaseRemovedImages/u);
   assert.match(barrier, /pendingImages\.get\(image\) !== request/u);
+  assert.doesNotMatch(barrier, /MAX_INLINE_(?:NATURAL|RENDERED)_EDGE/u);
   assert.doesNotMatch(barrier, /\.src\s*=|\.srcset\s*=|cheeky|google\.com/iu);
   assert.match(css, /img\[src\^="data:" i\]/u);
   assert.match(css, /img\[src\^="blob:" i\]/u);
@@ -561,7 +715,8 @@ test("active extension has bounded work and no site or device exceptions", async
   assert.match(background, /cachedReplacementBytes/u);
   assert.match(background, /const cachedDecision/u);
   assert.match(background, /takeNextAnalysis/u);
-  assert.match(background, /MAX_INLINE_IMAGE_BYTES = 48 \* 1024/u);
+  assert.match(background, /MAX_INLINE_IMAGE_BYTES = MAX_IMAGE_BYTES/u);
+  assert.match(background, /capturedBytes \+ bytes\.byteLength > MAX_CAPTURED_BYTES/u);
   assert.match(background, /decodeInlineRaster/u);
   assert.match(ads, /NodeFilter\.SHOW_TEXT/u);
   assert.match(ads, /SEARCH_QUERY_KEYS/u);

@@ -34,7 +34,7 @@ NO_STORE_HEADERS = {
     "Referrer-Policy": "no-referrer",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
     "Content-Security-Policy": (
-        "default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; "
+        "default-src 'self'; img-src 'self' data: blob:; style-src 'self'; script-src 'self'; "
         "connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'"
     ),
 }
@@ -150,6 +150,7 @@ APP_JS = r"""(() => {
   const params = new URLSearchParams(location.search);
   const runId = (params.get('run') || 'manual').slice(0, 80);
   const lazyCount = Math.min(40, Math.max(4, Number(params.get('lazy') || 20)));
+  const inlineMode = params.get('inline') === '1';
   const startedAt = performance.now();
   const status = document.getElementById('fixture-status');
   let lazyStarted = false;
@@ -180,6 +181,50 @@ APP_JS = r"""(() => {
         image.addEventListener('error', () => resolve('error'), {once: true});
       });
     }));
+  }
+
+  function dataUrl(blob) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.addEventListener('load', () => resolve(String(reader.result)), {once: true});
+      reader.addEventListener('error', reject, {once: true});
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function insertInlineFixtures() {
+    const specifications = [
+      ['safe-data', '/fixture/media/safe-0.bin', 'image/png', 'data'],
+      ['safe-blob', '/fixture/media/safe-1.bin', 'image/png', 'blob'],
+      ['filter-data', '/fixture/media/filter-probe.bin', 'image/jpeg', 'data'],
+      ['filter-blob', '/fixture/media/filter-probe.bin?copy=1', 'image/jpeg', 'blob'],
+    ];
+    const section = document.createElement('section');
+    section.className = 'critical';
+    section.setAttribute('aria-label', 'Recursos inline controlados');
+    const images = [];
+    for (const [label, url, mimeType, transport] of specifications) {
+      const response = await fetch(url, {cache: 'no-store'});
+      const bytes = await response.arrayBuffer();
+      const blob = new Blob([bytes], {type: mimeType});
+      const image = document.createElement('img');
+      image.alt = label;
+      image.dataset.fixtureInline = label;
+      image.src = transport === 'blob' ? URL.createObjectURL(blob) : await dataUrl(blob);
+      const article = document.createElement('article');
+      const heading = document.createElement('h2');
+      heading.textContent = label;
+      article.append(heading, image);
+      section.append(article);
+      images.push(image);
+    }
+    document.querySelector('main').append(section);
+    await waitForImages(images);
+    window.setTimeout(() => {
+      const allowed = images.filter((image) =>
+        image.getAttribute('data-glosh-dag-stable') === 'true').length;
+      report('inline-settled', {count: images.length, allowed, blocked: images.length - allowed});
+    }, 3000);
   }
 
   function insertLazyGrid() {
@@ -216,6 +261,7 @@ APP_JS = r"""(() => {
   }
 
   report('script-ready');
+  if (inlineMode) insertInlineFixtures().catch(() => report('inline-error'));
   document.addEventListener('DOMContentLoaded', () => report('dom-content-loaded'), {once: true});
 
   const criticalImages = Array.from(document.querySelectorAll('#critical img'));
@@ -367,7 +413,7 @@ def _safe_event(raw: object) -> dict[str, object] | None:
         return None
     if not isinstance(elapsed_ms, (int, float)) or not 0 <= elapsed_ms <= 300_000:
         return None
-    allowed = {"event", "run_id", "elapsed_ms", "count", "loaded", "errors"}
+    allowed = {"event", "run_id", "elapsed_ms", "count", "loaded", "errors", "allowed", "blocked"}
     return {key: value for key, value in raw.items() if key in allowed and isinstance(value, (str, int, float))}
 
 
@@ -414,6 +460,7 @@ class FixtureHandler(http.server.BaseHTTPRequestHandler):
             "/fixture/media/icon.svg": ("image/svg+xml", ICON_SVG.encode()),
             "/fixture/media/control.svg": ("image/svg+xml", CONTROL_SVG.encode()),
             "/fixture/media/filter-probe.jpg": ("image/jpeg", FILTER_PROBE_JPEG),
+            "/fixture/media/filter-probe.bin": ("application/octet-stream", FILTER_PROBE_JPEG),
         }
         if parsed.path in routes:
             content_type, payload = routes[parsed.path]
@@ -425,6 +472,11 @@ class FixtureHandler(http.server.BaseHTTPRequestHandler):
             seed_text = media_name[5:-4]
             if seed_text.isdigit() and 0 <= int(seed_text) <= 999:
                 self._send(200, "image/png", safe_png(int(seed_text) % 4))
+                return
+        if media_name.startswith("safe-") and media_name.endswith(".bin"):
+            seed_text = media_name[5:-4]
+            if seed_text.isdigit() and 0 <= int(seed_text) <= 999:
+                self._send(200, "application/octet-stream", safe_png(int(seed_text) % 4))
                 return
         if media_name.startswith("sensitive-") and media_name.endswith(".png"):
             seed_text = media_name[10:-4]

@@ -348,6 +348,8 @@ internal object DagImageDecodeContract {
         setOf(
             "image/avif",
             "image/gif",
+            "image/heic",
+            "image/heif",
             "image/jpeg",
             "image/png",
             "image/webp",

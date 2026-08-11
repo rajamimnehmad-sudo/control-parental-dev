@@ -58,6 +58,11 @@ El runner:
   antes/después y, cuando existe timestamp numérico, sólo desde el inicio;
 - guarda todo fuera de Git en `.codex-tmp/dag-perf-lab/runs/`.
 
+La variante opcional `?inline=1` agrega cuatro casos controlados `data:`/`blob:`
+(dos seguros y dos de filtro) obtenidos como `application/octet-stream`, de modo
+que la medicion comprueba el gate inline y no reutiliza una decision previa del
+filtro de respuestas HTTP.
+
 Cada ejecución abre como máximo una pestaña nueva. Para una batería de muestras,
 cerrar las pestañas de laboratorio entre corridas o preparar el perfil DAG fuera
 del runner; el script nunca borra datos por sí solo.

@@ -9,45 +9,31 @@ import kotlin.test.assertTrue
 
 class DagMediaBytesPolicyTest {
     @Test
-    fun `sanitized passive sprite preserves geometry without photo inference`() {
-        val replacement = Base64.getEncoder().encodeToString(byteArrayOf(1, 2, 3, 4))
+    fun `oversized raster cannot bypass photo inference as a passive sprite`() {
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
                 boundsReader = DagImageBoundsReader { DagImageBounds(6_144, 64, "image/png") },
-                safeUiSpriteInspector =
-                    DagSafeUiSpriteInspector { _, _ ->
-                        DagSafeUiSpriteResult.Sanitized(replacement)
-                    },
-                preprocessor = DagImagePreprocessor { error("must not preprocess a UI sprite") },
-                analyzer = DagImageAnalyzer { error("must not classify a UI sprite") },
+                preprocessor = DagImagePreprocessor { error("must not preprocess unsafe geometry") },
+                analyzer = DagImageAnalyzer { error("must not classify unsafe geometry") },
             )
 
         assertEquals(DagMediaAction.Block, decision.action)
-        assertEquals(DagMediaBytesPolicy.SafeUiSpriteReason, decision.reason)
-        assertEquals(replacement, decision.replacementBytesBase64)
-        assertEquals(6_144, decision.imageWidth)
-        assertEquals(64, decision.imageHeight)
+        assertEquals(DagMediaBytesPolicy.UnsafeDimensionsReason, decision.reason)
+        assertEquals(null, decision.replacementBytesBase64)
     }
 
     @Test
-    fun `ordinary unsafe geometry cannot use the sprite path`() {
-        var spriteInspections = 0
+    fun `ordinary unsafe geometry fails closed before preprocessing`() {
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
                 boundsReader = DagImageBoundsReader { DagImageBounds(5_000, 5_000, "image/png") },
-                safeUiSpriteInspector =
-                    DagSafeUiSpriteInspector { _, _ ->
-                        spriteInspections += 1
-                        DagSafeUiSpriteResult.NotSafe
-                    },
                 preprocessor = DagImagePreprocessor { error("must not preprocess unsafe geometry") },
             )
 
         assertEquals(DagMediaAction.Block, decision.action)
         assertEquals(DagMediaBytesPolicy.UnsafeDimensionsReason, decision.reason)
-        assertEquals(1, spriteInspections)
     }
 
     @Test
@@ -585,11 +571,27 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
+    fun `static HEIF aliases reach the same bounded classifier`() {
+        for (mimeType in listOf("image/heic", "image/heif")) {
+            val decision =
+                DagMediaBytesPolicy.decide(
+                    payload = payload(byteArrayOf(1, 2, 3)),
+                    boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, mimeType) },
+                    preprocessor = readyPreprocessor,
+                    analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.2f) },
+                )
+
+            assertEquals(DagMediaAction.Allow, decision.action, mimeType)
+            assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason, mimeType)
+        }
+    }
+
+    @Test
     fun `unsupported decoded format stays blocked`() {
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
-                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/heic") },
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/bmp") },
             )
 
         assertEquals(DagMediaAction.Block, decision.action)

@@ -4,9 +4,14 @@ internal enum class DagMediaPipelineStage {
     Base64Decode,
     SafeVectorCheck,
     BoundsRead,
-    SafeSpriteCheck,
     Preprocess,
     Inference,
+}
+
+internal enum class DagMediaDecisionBasis(val wireValue: String) {
+    None("none"),
+    RegionalStrong("regional_strong"),
+    RegionalConsensus("regional_consensus"),
 }
 
 internal class DagMediaPipelineTrace(
@@ -18,6 +23,8 @@ internal class DagMediaPipelineTrace(
         private set
     var preparedImageCount: Int = 0
     var regionalImageCount: Int = 0
+    var fullImageProbability: Float? = null
+    var decisionBasis: DagMediaDecisionBasis = DagMediaDecisionBasis.None
 
     fun <T> measure(
         stage: DagMediaPipelineStage,
