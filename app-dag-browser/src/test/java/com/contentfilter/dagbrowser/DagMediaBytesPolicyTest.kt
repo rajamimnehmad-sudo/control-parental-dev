@@ -627,11 +627,90 @@ class DagMediaBytesPolicyTest {
     }
 
     @Test
+    fun `static bitmap and icon formats reach the same bounded classifier`() {
+        for (mimeType in listOf("image/bmp", "image/ico", "image/vnd.microsoft.icon", "image/x-icon")) {
+            val decision =
+                DagMediaBytesPolicy.decide(
+                    payload = payload(byteArrayOf(1, 2, 3)),
+                    boundsReader = DagImageBoundsReader { DagImageBounds(64, 64, mimeType) },
+                    preprocessor = readyPreprocessor,
+                    analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.2f) },
+                )
+
+            assertEquals(DagMediaAction.Allow, decision.action, mimeType)
+            assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason, mimeType)
+        }
+    }
+
+    @Test
+    fun `ImageDecoder metadata can recover a static image missed by BitmapFactory bounds`() {
+        val sourceBounds = DagImageBounds(96, 72, "image/webp")
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { null },
+                preprocessor =
+                    DagImagePreprocessor {
+                        DagImagePreprocessResult.Ready(
+                            image = preparedImage(),
+                            sourceBounds = sourceBounds,
+                        )
+                    },
+                analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.2f) },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+        assertEquals(sourceBounds.width, decision.imageWidth)
+        assertEquals(sourceBounds.height, decision.imageHeight)
+    }
+
+    @Test
+    fun `preliminary MIME cannot veto authoritative ImageDecoder metadata`() {
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { DagImageBounds(96, 72, "image/vendor-alias") },
+                preprocessor =
+                    DagImagePreprocessor {
+                        DagImagePreprocessResult.Ready(
+                            image = preparedImage(),
+                            sourceBounds = DagImageBounds(96, 72, "image/webp"),
+                        )
+                    },
+                analyzer = DagImageAnalyzer { DagImageAnalysisResult.Classified(0.2f) },
+            )
+
+        assertEquals(DagMediaAction.Allow, decision.action)
+        assertEquals(DagOnDeviceImageAnalyzer.ModelAllowReason, decision.reason)
+    }
+
+    @Test
+    fun `ImageDecoder fallback still rejects unsafe source dimensions before inference`() {
+        val decision =
+            DagMediaBytesPolicy.decide(
+                payload = payload(byteArrayOf(1, 2, 3)),
+                boundsReader = DagImageBoundsReader { null },
+                preprocessor =
+                    DagImagePreprocessor {
+                        DagImagePreprocessResult.Ready(
+                            image = preparedImage(),
+                            sourceBounds = DagImageBounds(8_192, 8_192, "image/png"),
+                        )
+                    },
+                analyzer = DagImageAnalyzer { error("unsafe fallback must not reach inference") },
+            )
+
+        assertEquals(DagMediaAction.Block, decision.action)
+        assertEquals(DagMediaBytesPolicy.UnsafeDimensionsReason, decision.reason)
+    }
+
+    @Test
     fun `unsupported decoded format stays blocked`() {
         val decision =
             DagMediaBytesPolicy.decide(
                 payload = payload(byteArrayOf(1, 2, 3)),
-                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/bmp") },
+                boundsReader = DagImageBoundsReader { DagImageBounds(320, 240, "image/tiff") },
             )
 
         assertEquals(DagMediaAction.Block, decision.action)

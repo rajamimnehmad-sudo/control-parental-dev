@@ -139,6 +139,38 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
+## Candidato local en validacion: DAG Browser 206 — captura progresiva y formatos estaticos
+
+- DAG 206 (`0.70.10-dev`, extension `2.0.9`) corrige dos causas generales
+  observadas en el informe real `DAG-EA8DTGZM`, sin excepciones por sitio y sin
+  cambiar R3.1, el umbral, la politica visual, los hilos ni ONNX.
+- La captura de red ya no usa un vencimiento absoluto de cinco segundos: admite
+  hasta quince segundos para comenzar y, una vez iniciada, renueva un limite de
+  inactividad de cinco segundos con cada bloque recibido. Conserva los topes de
+  2 MiB por imagen, 8 MiB globales y 128 streams activos.
+- `ImageDecoder` puede ahora reconocer de forma autoritativa una imagen que
+  `BitmapFactory` no identifica en la lectura preliminar. Se agregaron BMP e ICO
+  estaticos a los MIME admitidos; dimensiones inseguras, animaciones, contenido
+  corrupto, respuestas vacias y errores de red siguen cerrados.
+- El flight recorder conserva `viewport_images_ready` aunque FCP ya haya hecho
+  visible el documento. Es una correccion de observabilidad; no retrasa ni
+  libera la navegacion.
+- Evidencia del informe previo: 431 decisiones de medios, cola nativa promedio
+  13 ms, inferencia promedio 62 ms y ningun trabajo superior a un segundo. Los
+  29 `unsupported_image` y 36 cierres de transporte concentraban el problema;
+  CPU/ONNX no era el cuello de botella de esa sesion.
+- Validacion local: 157 unitarios DEV y 157 Diagnostic, barrera JS 27/27,
+  Ktlint, Lint de ambos flavors, compilacion instrumentada y APK DEV/Diagnostic
+  correctos. APK DEV: 121.839.665 bytes, SHA-256
+  `62a5b3787892c515dfc76eca929bca16ac4df66c66df15fb0c3b062b8aa6feca`;
+  firma DEV estable `d51bc0da…f8a8832`. APK Diagnostic: 121.844.721 bytes,
+  SHA-256
+  `edfd355bf4e0fca4fadfaafeaf67ca5970a27bf2f33a7f7132ee054503c093d3`.
+- Pendiente antes de promover: instalar el APK normal preservando datos, probar
+  primera carga y scroll rapido en Mimo, Cheeky y Fravega, y enviar un informe
+  nuevo para confirmar formatos recuperados y distinguir timeout de inicio de
+  timeout por inactividad. No se actualizo el manifiesto publico.
+
 ## Candidato local en validacion: DAG Browser 205 — caja negra privada
 
 - DAG 205 (`0.70.09-dev`, extension `2.0.8`) incorpora un flight recorder

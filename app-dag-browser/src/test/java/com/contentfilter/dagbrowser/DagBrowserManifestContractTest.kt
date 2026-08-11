@@ -4,6 +4,7 @@ import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class DagBrowserManifestContractTest {
     @Test
@@ -102,6 +103,14 @@ class DagBrowserManifestContractTest {
         assertContains(activity, "it.previewDocumentToken == documentToken")
         assertContains(activity, "documentToken != senderTab.previewDocumentToken")
         assertContains(activity, "recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)")
+        val viewportHandler =
+            activity
+                .substringAfter("private fun handleViewportImagesReady")
+                .substringBefore("private fun mediaDocumentIdentity")
+        assertTrue(
+            viewportHandler.indexOf("DagFlightEventType.ViewportReady") <
+                viewportHandler.indexOf("if (!tab.waitingForBarrier) return"),
+        )
         assertFalse(activity.contains("shimmer = true"))
     }
 }

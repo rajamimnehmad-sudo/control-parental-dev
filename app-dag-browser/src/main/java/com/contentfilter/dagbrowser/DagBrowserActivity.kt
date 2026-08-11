@@ -385,9 +385,9 @@ class DagBrowserActivity : Activity() {
         val documentToken = payload.optString("documentToken")
         if (!PreviewDocumentTokenPattern.matches(documentToken)) return
         val tab = tabs.firstOrNull { it.previewDocumentToken == documentToken } ?: return
-        if (!tab.waitingForBarrier) return
         recordFlight(DagFlightEvent(DagFlightEventType.ViewportReady, tabId = tab.id), tab)
         if (tab === activeTab) recordPerformanceMetric(DagPerformanceMetric.ViewportImagesReady)
+        if (!tab.waitingForBarrier) return
         tab.protectedContentReadyForNavigation = true
         maybeCompleteProtectedLoad(tab)
     }

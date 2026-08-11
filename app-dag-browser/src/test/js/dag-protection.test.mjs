@@ -27,7 +27,7 @@ const waitFor = async (predicate, label) => {
   throw new Error(`Timed out waiting for ${label}`);
 };
 
-const createHarness = async () => {
+const createHarness = async ({ captureStartTimeoutMs = null, captureIdleTimeoutMs = null } = {}) => {
   const beforeRequest = eventChannel();
   const headersReceived = eventChannel();
   const nativeMessages = eventChannel();
@@ -66,6 +66,7 @@ const createHarness = async () => {
         const filter = {
           writes: [],
           closed: false,
+          onstart: null,
           ondata: null,
           onerror: null,
           onstop: null,
@@ -83,6 +84,14 @@ const createHarness = async () => {
     },
   };
   const source = await readAsset("background.js");
+  const contextSetTimeout = (callback, delay, ...args) => {
+    const effectiveDelay = delay === 15_000 && captureStartTimeoutMs !== null
+      ? captureStartTimeoutMs
+      : delay === 5_000 && captureIdleTimeoutMs !== null
+        ? captureIdleTimeoutMs
+        : delay;
+    return setTimeout(callback, effectiveDelay, ...args);
+  };
   vm.runInNewContext(source, {
     URL,
     Uint32Array,
@@ -95,7 +104,7 @@ const createHarness = async () => {
     crypto: webcrypto,
     Date,
     Promise,
-    setTimeout,
+    setTimeout: contextSetTimeout,
   }, { filename: "background.js" });
   const sendRuntime = (message, sender) => runtimeMessages.listeners[0](message, sender);
   const startDocument = (
@@ -320,6 +329,32 @@ test("full bounded response burst reaches the native gate without placeholder ov
   assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 128);
   assert.equal(details.every(({ requestId }) =>
     harness.filters.get(requestId).writes[0][0] === 0xff), true);
+});
+
+test("capture timeout measures network inactivity instead of total transfer time", async () => {
+  const harness = await createHarness({ captureStartTimeoutMs: 40, captureIdleTimeoutMs: 40 });
+  const details = imageDetails("progressive-transfer");
+  harness.before(details);
+  const filter = harness.filters.get(details.requestId);
+  assert.ok(filter);
+  filter.onstart();
+  filter.ondata({ data: Uint8Array.from([0xff, 0xd8, 1]).buffer });
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+  filter.ondata({ data: Uint8Array.from([2, 3, 0xff, 0xd9]).buffer });
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+  assert.equal(filter.closed, false);
+  filter.onstop();
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "progressive native request");
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  await waitFor(() => filter.closed, "progressive stream close");
+  assert.deepEqual([...filter.writes[0]], [0xff, 0xd8, 1, 2, 3, 0xff, 0xd9]);
 });
 
 const imageDetails = (requestId, url = `https://cdn.example.test/${requestId}.jpg`) => ({

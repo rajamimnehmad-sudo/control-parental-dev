@@ -33,6 +33,21 @@ Modalidad del chat dedicado de backlog:
 - Codex no interpreta la captura como aprobacion para codigo ni interrumpe el flujo de ideas con preguntas de detalle.
 - Cuando el usuario pide preparar o elegir trabajo, Codex agrupa las ideas relacionadas en tickets pequenos, propone orden y dependencias, y recien entonces entrevista las decisiones que cambian alcance o aceptacion.
 
+### DAG-MEDIA-ROBUSTNESS-206 - Streams progresivos y formatos estaticos
+
+- Estado: `Resuelto local; pendiente validacion fisica`. Prioridad: P0. Tipo:
+  transporte y cobertura visual DAG. Esfuerzo: S. Riesgo: medio.
+- Aprobado por el propietario el 2026-08-11 a partir del informe real
+  `DAG-EA8DTGZM`. La captura renueva su timeout mientras recibe datos y
+  `ImageDecoder` pasa a ser la fuente autoritativa cuando la lectura preliminar
+  no reconoce el formato. BMP e ICO estaticos entran al mismo modelo.
+- No cambia R3.1, umbral, politica, hilos u ONNX; no contiene excepciones por
+  sitio, URL o dominio. Los limites de bytes, concurrencia y dimensiones se
+  conservan, y todo fallo permanece cerrado.
+- Gate automatico: 157 unitarios por flavor, JS 27/27, Ktlint, Lint,
+  compilacion instrumentada y APK DEV/Diagnostic correctos. Pendiente la matriz
+  fisica Mimo/Cheeky/Fravega y un informe posterior desde la caja negra.
+
 ### DAG-DIAGNOSTIC-FLIGHT-RECORDER-205 - Diagnostico privado sin ADB
 
 - Estado: `Resuelto local/remoto; pendiente validacion fisica`. Prioridad: P1.

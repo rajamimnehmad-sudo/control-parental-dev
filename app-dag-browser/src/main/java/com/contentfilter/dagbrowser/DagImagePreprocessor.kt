@@ -177,6 +177,7 @@ internal sealed interface DagImagePreprocessResult {
     data class Ready(
         val image: DagPreparedImage,
         val regionalImages: List<DagPreparedImage> = emptyList(),
+        val sourceBounds: DagImageBounds? = null,
     ) : DagImagePreprocessResult
 
     data class Rejected(
@@ -203,6 +204,7 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
         return try {
             val source = ImageDecoder.createSource(ByteBuffer.wrap(bytes).asReadOnlyBuffer())
             var expectedDecodeSize: Pair<Int, Int>? = null
+            var sourceBounds: DagImageBounds? = null
             decoded =
                 ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
                     val size = info.size
@@ -213,6 +215,12 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
                         !DagImageDecodeContract.hasSafeDimensions(size.width, size.height) ->
                             throw RejectedHeaderException(DagMediaBytesPolicy.UnsafeDimensionsReason)
                     }
+                    sourceBounds =
+                        DagImageBounds(
+                            width = size.width,
+                            height = size.height,
+                            mimeType = info.mimeType,
+                        )
                     val fullImagePlan =
                         DagImageFitPlanner.plan(size.width, size.height)
                             ?: throw RejectedHeaderException(
@@ -256,6 +264,7 @@ internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
                 .Ready(
                     image = preparedImages.first(),
                     regionalImages = preparedImages.drop(1),
+                    sourceBounds = requireNotNull(sourceBounds),
                 ).also {
                     returnedPreparedImages = true
                 }
@@ -344,12 +353,16 @@ internal object DagImageDecodeContract {
     val SupportedMimeTypes =
         setOf(
             "image/avif",
+            "image/bmp",
             "image/gif",
             "image/heic",
             "image/heif",
+            "image/ico",
             "image/jpeg",
             "image/png",
+            "image/vnd.microsoft.icon",
             "image/webp",
+            "image/x-icon",
         )
     const val TargetSize = 224
     const val RgbChannelCount = 3

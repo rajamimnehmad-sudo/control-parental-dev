@@ -14,9 +14,9 @@ apta.
 ## Contrato
 
 1. Solo recibe los bytes originales capturados por Gecko, sin una segunda descarga.
-2. Conserva el limite previo de 256 KiB comprimidos.
+2. Conserva el limite de 2 MiB comprimidos por imagen.
 3. Revalida formato y dimensiones antes de decodificar pixeles:
-   - JPEG, PNG, WebP o GIF estatico;
+   - AVIF, BMP, GIF estatico, HEIC/HEIF, ICO, JPEG, PNG o WebP;
    - maximo 4096 px por lado;
    - maximo 16 777 216 pixeles de origen.
 4. Rechaza animaciones, imagenes parciales, formatos no admitidos y errores de decodificacion.
@@ -26,6 +26,12 @@ apta.
 8. Entrega exactamente 150 528 bytes RGB888.
 9. Recicla los bitmaps y sobrescribe el RGB al terminar la decision; no persiste, sube ni registra
    pixeles.
+
+La lectura de encabezado con `BitmapFactory` es una comprobacion preliminar, no
+la lista real de formatos de Android. Si no reconoce el archivo, `ImageDecoder`
+puede identificarlo y entrega MIME y dimensiones autoritativas antes de crear
+pixeles. Ambos caminos aplican los mismos limites; si ninguno obtiene metadatos
+validos, la imagen queda bloqueada.
 
 No recortar es intencional: hombros, mangas, cintura, rodillas y contexto de vestimenta pueden
 quedar fuera de un recorte central. Entrenamiento y evaluacion deben usar exactamente esta misma

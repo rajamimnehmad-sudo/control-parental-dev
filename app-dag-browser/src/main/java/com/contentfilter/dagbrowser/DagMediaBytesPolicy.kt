@@ -111,14 +111,12 @@ internal object DagMediaBytesPolicy {
                 )
             }
             if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
-            val bounds =
+            val preliminaryBounds =
                 trace.measure(DagMediaPipelineStage.BoundsRead) { boundsReader.read(analysisBytes) }
-                    ?: return blocked(payload, UnsupportedImageReason)
-            if (bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes) {
-                return blocked(payload, UnsupportedImageReason)
-            }
-            if (!DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height)) {
-                return blocked(payload, UnsafeDimensionsReason)
+            preliminaryBounds?.let { bounds ->
+                if (!DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height)) {
+                    return blocked(payload, UnsafeDimensionsReason)
+                }
             }
             if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
             return when (
@@ -136,29 +134,49 @@ internal object DagMediaBytesPolicy {
             ) {
                 is DagImagePreprocessResult.Ready -> {
                     val preparedImages = listOf(result.image) + result.regionalImages
+                    val bounds = result.sourceBounds ?: preliminaryBounds
                     trace?.preparedImageCount = preparedImages.size
                     trace?.regionalImageCount = result.regionalImages.size
                     val valid = preparedImages.all(DagImageDecodeContract::isValid)
-                    try {
-                        if (!valid) {
-                            blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
-                        } else {
-                            decidePreparedImages(
-                                payload = payload,
-                                preparedImages = preparedImages,
-                                analyzer = analyzer,
-                                trace = trace,
-                                workGuard = workGuard,
-                            )
+                    val decision =
+                        try {
+                            val rejectionReason = bounds?.let(::boundsRejectionReason)
+                            when {
+                                bounds == null -> blocked(payload, UnsupportedImageReason)
+                                rejectionReason != null -> blocked(payload, rejectionReason)
+                                !valid -> blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
+                                else ->
+                                    decidePreparedImages(
+                                        payload = payload,
+                                        preparedImages = preparedImages,
+                                        analyzer = analyzer,
+                                        trace = trace,
+                                        workGuard = workGuard,
+                                    )
+                            }
+                        } catch (_: Exception) {
+                            blocked(payload, DagOnDeviceImageAnalyzer.ModelExecutionFailedReason)
+                        } finally {
+                            preparedImages.forEach { it.rgb888.fill(0) }
                         }
-                    } catch (_: Exception) {
-                        blocked(payload, DagOnDeviceImageAnalyzer.ModelExecutionFailedReason)
-                    } finally {
-                        preparedImages.forEach { it.rgb888.fill(0) }
-                    }
+                    decision.copy(imageWidth = bounds?.width, imageHeight = bounds?.height)
                 }
-                is DagImagePreprocessResult.Rejected -> blocked(payload, result.reason)
-            }.copy(imageWidth = bounds.width, imageHeight = bounds.height)
+                is DagImagePreprocessResult.Rejected -> {
+                    val reason =
+                        if (
+                            result.reason == AndroidDagImagePreprocessor.DecodeFailedReason &&
+                            (
+                                preliminaryBounds == null ||
+                                    preliminaryBounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes
+                            )
+                        ) {
+                            UnsupportedImageReason
+                        } else {
+                            result.reason
+                        }
+                    blocked(payload, reason)
+                }
+            }
         } finally {
             if (analysisBytes !== bytes) analysisBytes.fill(0)
             bytes.fill(0)
@@ -300,6 +318,13 @@ internal object DagMediaBytesPolicy {
     }
 
     private fun isValidProbability(probability: Float): Boolean = probability.isFinite() && probability in 0f..1f
+
+    private fun boundsRejectionReason(bounds: DagImageBounds): String? =
+        when {
+            bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes -> UnsupportedImageReason
+            !DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height) -> UnsafeDimensionsReason
+            else -> null
+        }
 
     private fun blocked(
         payload: DagMediaBytesPayload,

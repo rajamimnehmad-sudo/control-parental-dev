@@ -34,6 +34,11 @@ Paquete DEV: `com.contentfilter.dagbrowser.dev`.
 7. Una pagina no puede liberar medios modificando atributos `data-glosh-*`.
 8. Bytes y buffers preparados se limpian al terminar.
 
+La captura de una respuesta espera de forma acotada su inicio y, una vez
+comenzada, mide inactividad entre bloques. No aplica un vencimiento absoluto a
+una transferencia que continua progresando. Los limites de bytes y streams
+siguen siendo obligatorios y cualquier vencimiento termina cerrado.
+
 El contrato detallado esta en
 `docs/dag/v3/DAG_BROWSER_V3_IMAGE_PIPELINE.md`.
 

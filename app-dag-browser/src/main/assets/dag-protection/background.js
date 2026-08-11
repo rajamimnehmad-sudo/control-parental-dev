@@ -28,7 +28,8 @@ const MAX_CACHED_REPLACEMENT_BYTES = 2 * 1024 * 1024;
 const MAX_REPLACEMENT_BYTES = 256 * 1024;
 const MAX_INLINE_IMAGE_BYTES = MAX_IMAGE_BYTES;
 const MAX_INLINE_DATA_URL_LENGTH = 2_800_000;
-const CAPTURE_TIMEOUT_MS = 5_000;
+const CAPTURE_START_TIMEOUT_MS = 15_000;
+const CAPTURE_IDLE_TIMEOUT_MS = 5_000;
 const NATIVE_TIMEOUT_MS = 2_250;
 const VIEWPORT_QUIET_MS = 250;
 const MAX_PRIORITY_HINTS = 256;
@@ -588,10 +589,7 @@ const interceptImage = (details) => {
   let totalBytes = 0;
   let reservedBytes = 0;
   let settled = false;
-  const captureTimeout = setTimeout(() => {
-    recordDiagnosticDrop("network", "capture_timeout");
-    settle({ action: "block", replacement: null });
-  }, CAPTURE_TIMEOUT_MS);
+  let captureTimeout = null;
 
   const release = () => {
     capturedBytes = Math.max(0, capturedBytes - reservedBytes);
@@ -606,6 +604,7 @@ const interceptImage = (details) => {
     if (settled) return;
     settled = true;
     clearTimeout(captureTimeout);
+    captureTimeout = null;
     const currentDecision = isCurrentDocument(documentState)
       ? decision
       : { action: "block", replacement: null };
@@ -626,6 +625,20 @@ const interceptImage = (details) => {
   };
   const cancelStream = () => settle({ action: "block", replacement: null });
   documentState.streamCancellers.add(cancelStream);
+
+  const armCaptureTimeout = (delayMillis, reason) => {
+    clearTimeout(captureTimeout);
+    captureTimeout = setTimeout(() => {
+      recordDiagnosticDrop("network", reason);
+      settle({ action: "block", replacement: null });
+    }, delayMillis);
+  };
+
+  armCaptureTimeout(CAPTURE_START_TIMEOUT_MS, "capture_start_timeout");
+
+  filter.onstart = () => {
+    if (!settled) armCaptureTimeout(CAPTURE_IDLE_TIMEOUT_MS, "capture_idle_timeout");
+  };
 
   filter.ondata = (event) => {
     if (settled) return;
@@ -653,6 +666,7 @@ const interceptImage = (details) => {
     totalBytes += copy.byteLength;
     reservedBytes += copy.byteLength;
     capturedBytes += copy.byteLength;
+    armCaptureTimeout(CAPTURE_IDLE_TIMEOUT_MS, "capture_idle_timeout");
   };
 
   filter.onerror = () => {
