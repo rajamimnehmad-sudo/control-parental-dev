@@ -1579,4 +1579,9 @@ Documentos vigentes:
 - DAG usa el rol oficial de navegador con confirmacion Android.
 - No usar Device Owner, MDM, Knox ni restablecimiento de fabrica.
 - Video permanece bloqueado; clasificar fotogramas es otro ticket.
+- La propuesta futura de video queda registrada en
+  `docs/dag/v3/GLOSHIA_VIDEO_V1_PROPOSAL_2026-08-12.md`: audio fuera de alcance,
+  misma autoridad GloshIA Visual para fotos y fotogramas, cobertura previa,
+  detector temporal general y primer paso `DAG-VIDEO-01A` de laboratorio en S22
+  y A23. No esta aprobada para implementacion y no cambia el runtime vigente.
 - No hacer push, PR, publicacion DEV ni Production sin un OK nuevo y explicito.

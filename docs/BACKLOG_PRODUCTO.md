@@ -3451,6 +3451,28 @@ Flujo de una entrada:
 - Evidencia: pruebas unitarias de politica/red, validacion Gradle integral y carga fisica de fotos seguras en SM-A235M con APK publico DEV 210. Actualizacion in-place con Device Admin, Accessibility y VPN preservados; cero consultas Brave.
 - Limitacion explicita: el modelo es probabilistico y no puede garantizar 100 % de aciertos. Clasificar video requiere `DAG-VIDEO-01`, aun no aprobado.
 
+### DAG-VIDEO-01 - GloshIA Visual sobre fotogramas de video
+
+- Estado: `Propuesta documentada; no aprobado para implementacion`.
+- Objetivo: habilitar video local con una compuerta temporal general, sin
+  mostrar fotogramas antes de decidirlos y sin excepciones por sitio, URL o
+  dominio.
+- Decision vigente: reutilizar primero el mismo GloshIA Visual oficial para
+  fotos y fotogramas. Video selecciona muestras; no crea otra autoridad ni
+  modifica R3.1. Un futuro modelo rapido auxiliar solo se evalua si la evidencia
+  fisica en A23 demuestra que es necesario.
+- Experiencia objetivo: preparar el video visible mientras conserva su poster,
+  reutilizar huellas en escenas estables, mantener el ultimo fotograma seguro
+  durante cambios pendientes y cancelar trabajo al cambiar de reel, pestana o
+  viewport.
+- Audio queda fuera de alcance y no se clasifica. DRM, vivo, PiP, casting,
+  pantalla completa no validada y cualquier captura fallida permanecen
+  cerrados.
+- Primer ticket futuro: `DAG-VIDEO-01A`, laboratorio de captura cubierta con
+  R3.1 en S22 y A23. Video permanece bloqueado hasta aprobarlo y pasar gates.
+- Propuesta completa:
+  `docs/dag/v3/GLOSHIA_VIDEO_V1_PROPOSAL_2026-08-12.md`.
+
 ### DAG-IMAGE-QUEUE-03 - Entrega continua, lazy, iconos y SVG seguro
 
 - Estado: `Completado y publicado en DEV 252`; aprobado por el usuario el 2026-07-17.
@@ -3598,7 +3620,7 @@ Flujo de una entrada:
 | NET-EVASION-01 | Idea | P2 | DoH/DoT desconocido, IP directa, proxies y VPN externas |
 | AI-VISUAL-01 | Idea | P3 | Evaluacion puntual de regiones visibles, sujeta a privacidad, bateria y politicas |
 | AI-SENSITIVE-01 | Idea | P3 | Riesgos sensibles en chats como proyecto separado legal y de privacidad |
-| DAG-VIDEO-01 | Idea | P2 | Clasificar video localmente mediante muestreo temporal, con limites de CPU, bateria y memoria; video sigue bloqueado hasta aprobar el ticket |
+| DAG-VIDEO-01 | Propuesta; no aprobado | P2 | Compuerta temporal local con el mismo GloshIA Visual, cobertura previa, detector de escenas y gates S22/A23; video sigue bloqueado |
 | POLICY-SCHEDULE-01 | Idea | P2 | Politicas adaptativas por horario o contexto, siempre bajo control del administrador |
 | WEB-AMBIGUITY-01 | Idea | P2 | Fallback seguro a SafeSearch o Solo resultados ante decisiones ambiguas |
 | POLICY-EXPLAIN-01 | Idea | P2 | Explicaciones simples y solicitud de autorizacion para decisiones bloqueadas o inciertas |
