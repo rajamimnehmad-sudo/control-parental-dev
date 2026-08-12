@@ -85,6 +85,25 @@ el runtime actual desde versiones o worktrees historicos.
 - Es un cierre local: no hubo instalacion fisica, push ni publicacion DEV. Las
   versiones DEV publicadas continúan siendo Usuario 307 y Admin 290.
 
+## Entrega local Wi-Fi de APK DAG
+
+- La Mac de desarrollo tiene activo el LaunchAgent
+  `com.glosh.dag-apk-wifi` en el puerto `8787`. Sirve solamente el APK DEV
+  local de DAG mediante una ruta privada persistente y no depende de ADB ni de
+  Supabase.
+- El servidor no lista carpetas, no copia el APK, no registra la ruta secreta,
+  usa `no-store` y admite descarga reanudable. El token queda fuera de Git con
+  permisos `0600`; la URL vigente se obtiene con
+  `python3 scripts/dag_diagnostics/dag_apk_wifi_server.py urls`.
+- Verificacion local: cinco unitarios correctos, LaunchAgent en estado
+  `running`, pagina accesible por la IPv4 Wi-Fi y descarga integral de DAG 206
+  con 121.839.665 bytes y SHA-256
+  `62a5b3787892c515dfc76eca929bca16ac4df66c66df15fb0c3b062b8aa6feca`,
+  identico al artefacto construido.
+- No cambia Android, GloshIA, Gradle, Supabase ni Production. Android conserva
+  su confirmacion manual de instalacion. La Mac debe estar encendida, despierta
+  y en la misma LAN que el telefono.
+
 ## GloshIA Visual R4: lote de entrenamiento cerrado en NO-GO
 
 - R3.1 continúa como único modelo oficial, con umbral `0,40`, política visual y

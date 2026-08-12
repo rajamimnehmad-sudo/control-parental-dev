@@ -33,6 +33,19 @@ Modalidad del chat dedicado de backlog:
 - Codex no interpreta la captura como aprobacion para codigo ni interrumpe el flujo de ideas con preguntas de detalle.
 - Cuando el usuario pide preparar o elegir trabajo, Codex agrupa las ideas relacionadas en tickets pequenos, propone orden y dependencias, y recien entonces entrevista las decisiones que cambian alcance o aceptacion.
 
+### DAG-APK-WIFI-LOCAL-01 - Entrega local persistente sin ADB ni Supabase
+
+- Estado: `Resuelto local; pendiente apertura desde el telefono`. Prioridad: P1.
+  Tipo: herramienta de desarrollo DAG. Esfuerzo: S. Riesgo: bajo.
+- Aprobado por el propietario el 2026-08-11. Un LaunchAgent de usuario sirve
+  exclusivamente el ultimo APK DEV construido mediante una ruta privada
+  persistente en la LAN, sin listar el repositorio ni copiar el artefacto.
+- La URL usa token fuera de Git, cache deshabilitada y descarga reanudable. La
+  direccion `.local` evita depender de la IP; se ofrece IPv4 como alternativa.
+- Cinco unitarios, servicio activo, HEAD por IPv4 y descarga integral de DAG 206
+  con hash identico al APK local correctos. No cambia ni publica ninguna APK,
+  backend o manifiesto. Pendiente confirmar acceso y descarga desde Android.
+
 ### DAG-MEDIA-ROBUSTNESS-206 - Streams progresivos y formatos estaticos
 
 - Estado: `Resuelto local; pendiente validacion fisica`. Prioridad: P0. Tipo:
