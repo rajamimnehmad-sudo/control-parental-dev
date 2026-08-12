@@ -52,6 +52,7 @@
   let elementStateDiagnostics = 0;
   let elementStateFlushTimer = null;
   const pendingImages = new WeakMap();
+  const stableImageSources = new WeakMap();
   const unsettledImages = new Set();
   const inlineDecisions = new Map();
   const priorityBySource = new Map();
@@ -322,6 +323,7 @@
     const pending = pendingImages.get(image);
     if (pending?.timeout !== undefined) clearTimeout(pending.timeout);
     pendingImages.delete(image);
+    stableImageSources.delete(image);
     image.removeAttribute(STABLE_IMAGE_ATTRIBUTE);
     unsettledImages.add(image);
   };
@@ -340,7 +342,8 @@
     priorityByImage.delete(image);
   };
 
-  const markImageStable = (image) => {
+  const markImageStable = (image, source = imageSource(image)) => {
+    stableImageSources.set(image, source);
     image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
     unsettledImages.delete(image);
     priorityObserver?.unobserve(image);
@@ -393,7 +396,7 @@
       ) return;
       pendingImages.delete(image);
       if (result?.action === "allow") {
-        markImageStable(image);
+        markImageStable(image, source);
       } else {
         closeImage(image);
       }
@@ -423,14 +426,18 @@
   };
 
   const stabilizeImage = (image) => {
-    if (image.hasAttribute(STABLE_IMAGE_ATTRIBUTE)) return;
+    const source = imageSource(image);
+    if (
+      image.hasAttribute(STABLE_IMAGE_ATTRIBUTE) &&
+      stableImageSources.get(image) === source
+    ) return;
+    if (pendingImages.get(image)?.source === source) return;
     reportCompactSourceMetadata(image);
     if (inlineImageSource(image).length > 0) {
       inspectInlineImage(image);
       return;
     }
     resetImage(image);
-    const source = imageSource(image);
     if (
       source.length === 0 ||
       source.startsWith("data:") ||
@@ -445,7 +452,7 @@
         !(image.naturalWidth === 1 && image.naturalHeight === 1) &&
         imageSource(image) === source
       ) {
-        markImageStable(image);
+        markImageStable(image, source);
       } else {
         closeImage(image);
       }
@@ -479,6 +486,10 @@
     for (const record of records) {
       if (record.type === "attributes" && record.target instanceof HTMLImageElement) {
         priorityObserver?.unobserve(record.target);
+        const stableSourceUnchanged =
+          record.target.hasAttribute(STABLE_IMAGE_ATTRIBUTE) &&
+          stableImageSources.get(record.target) === imageSource(record.target);
+        if (stableSourceUnchanged) continue;
         resetImage(record.target);
         observeImage(record.target);
         if (hasInlineImageSource(record.target)) {
@@ -488,13 +499,23 @@
         if (record.target.complete) stabilizeImage(record.target);
         continue;
       }
+      if (record.type === "attributes" && record.target instanceof HTMLSourceElement) {
+        const image = record.target.closest("picture")?.querySelector("img");
+        if (image instanceof HTMLImageElement) {
+          priorityObserver?.unobserve(image);
+          resetImage(image);
+          observeImage(image);
+          if (image.complete) stabilizeImage(image);
+        }
+        continue;
+      }
       for (const node of record.addedNodes) inspectAddedImages(node);
       for (const node of record.removedNodes) releaseRemovedImages(node);
     }
   });
   imageObserver.observe(document, {
     attributes: true,
-    attributeFilter: ["src", "srcset", "sizes"],
+    attributeFilter: ["src", "srcset", "sizes", "media", "type"],
     childList: true,
     subtree: true,
   });

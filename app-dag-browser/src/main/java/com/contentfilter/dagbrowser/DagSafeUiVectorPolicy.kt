@@ -25,6 +25,7 @@ internal object DagSafeUiVectorPolicy {
             "radialgradient",
             "rect",
             "stop",
+            "style",
             "svg",
             "symbol",
             "title",
@@ -93,6 +94,15 @@ internal object DagSafeUiVectorPolicy {
             if (elementCount > MaxElements) return false
             val localName = element.localName?.lowercase() ?: element.tagName.lowercase()
             if (localName !in allowedElements) return false
+            if (
+                localName == "style" &&
+                (
+                    element.parentNode?.localName?.lowercase() != "defs" ||
+                        containsUnsafeCss(element.textContent.orEmpty())
+                )
+            ) {
+                return false
+            }
             for (index in 0 until element.attributes.length) {
                 val attribute = element.attributes.item(index)
                 val name = attribute.nodeName.lowercase()
@@ -102,8 +112,7 @@ internal object DagSafeUiVectorPolicy {
                     return false
                 }
                 if (
-                    externalCssPattern.containsMatchIn(value) ||
-                    unsafeCssPattern.containsMatchIn(value)
+                    containsUnsafeCss(value)
                 ) {
                     return false
                 }
@@ -114,6 +123,9 @@ internal object DagSafeUiVectorPolicy {
         }
         return true
     }
+
+    private fun containsUnsafeCss(value: String): Boolean =
+        externalCssPattern.containsMatchIn(value) || unsafeCssPattern.containsMatchIn(value)
 
     private fun looksLikeSvg(bytes: ByteArray): Boolean {
         val prefix =

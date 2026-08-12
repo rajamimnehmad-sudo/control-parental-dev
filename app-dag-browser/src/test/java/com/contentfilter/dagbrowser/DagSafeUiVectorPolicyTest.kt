@@ -39,6 +39,21 @@ class DagSafeUiVectorPolicyTest {
     }
 
     @Test
+    fun `passive bounded icon with internal css is allowed`() {
+        assertTrue(
+            safe(
+                """
+                <svg xmlns="http://www.w3.org/2000/svg" width="20.74" height="21"
+                  viewBox="0 0 20.74 21">
+                  <defs><style>.icon{fill:#464646;}</style></defs>
+                  <path class="icon" d="M0 0h20v21H0z"/>
+                </svg>
+                """,
+            ),
+        )
+    }
+
+    @Test
     fun `small vector with active content stays blocked`() {
         assertFalse(
             safe(
@@ -77,6 +92,26 @@ class DagSafeUiVectorPolicyTest {
                 """
                 <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24"
                   onload="alert(1)"><path d="M0 0h24v24z"/></svg>
+                """,
+            ),
+        )
+        assertFalse(
+            safe(
+                """
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                  <defs><style>.icon{fill:url(https://example.test/photo.jpg);}</style></defs>
+                  <path class="icon" d="M0 0h24v24z"/>
+                </svg>
+                """,
+            ),
+        )
+        assertFalse(
+            safe(
+                """
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">
+                  <defs><style>@import "https://example.test/theme.css";</style></defs>
+                  <path d="M0 0h24v24z"/>
+                </svg>
                 """,
             ),
         )

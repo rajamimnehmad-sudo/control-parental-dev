@@ -158,7 +158,37 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local en validacion: DAG Browser 208 — recarga sin reemplazos espurios
+## Candidato local en validacion: DAG Browser 209 — SVG pasivo y permiso visual por fuente
+
+- DAG 209 (`0.70.13-dev`, extension `2.0.12`) parte del informe real 208
+  `DAG-HVKFLJ7K`: 1.651 eventos de esquema 2 sin perdidas en memoria. No cambia
+  R3.1, el umbral, la politica visual, los hilos ni ONNX y no agrega excepciones
+  por sitio, URL, dominio, dispositivo o tamaño.
+- En Mimo, 18 SVG llegaron al gate como `unsupported_image`; 15 elementos
+  terminaron ocultos como reemplazos 1x1. Carrito, buscar, usuario, locales y
+  promociones son vectores pasivos y acotados que usan una regla CSS interna
+  dentro de `defs`. La politica segura ahora admite ese unico caso y conserva
+  cerrados scripts, eventos, `DOCTYPE`, entidades, referencias externas,
+  `@import`, `data:` y CSS activo.
+- La barrera visual ya no trata el atributo `stable` como permiso permanente
+  del elemento. Registra la fuente exacta autorizada: un cambio real de
+  `src`, `srcset` o `picture/source` retira el permiso antes de volver a
+  evaluar, mientras una mutacion que mantiene el mismo `currentSrc` no provoca
+  un ocultado y revelado redundante. Esto corrige la causa general compatible
+  con el parpadeo de Google y cierra la reutilizacion de un `img` con contenido
+  nuevo antes de autorizarlo.
+- Validacion local correcta: 158 unitarios DEV, barrera JS 30/30, Ktlint y
+  `assembleDevDebug`. APK DEV: 121.857.361 bytes, SHA-256
+  `a61a9ec4b83e12e54e6f968bb8db7c86d34799ad44c64e6346ae4a8b3828ced8`;
+  paquete `com.contentfilter.dagbrowser.dev`, firma DEV historica preservada.
+  El servidor Wi-Fi confirma codigo 209, version `0.70.13-dev`, tamaño y fecha
+  local `12/08/2026 00:17:54 -03` con `no-store`.
+- Pendiente para cerrar: actualizacion in-place y prueba fisica de los tres
+  sintomas exactos —iconos de Mimo visibles, carga de Google sin parpadeo y
+  ninguna miniatura rechazada visible antes del reemplazo— seguida por un
+  informe DAG 209 si queda cualquier diferencia.
+
+## Candidato local anterior: DAG Browser 208 — recarga sin reemplazos espurios
 
 - DAG 208 (`0.70.12-dev`, extension `2.0.11`) corrige una causa general
   demostrada por el informe 207 `DAG-C7ACKPQU`, sin excepciones por sitio y sin

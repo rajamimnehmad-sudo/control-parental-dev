@@ -885,10 +885,15 @@ test("first paint closes inline and changing image sources before stable reveal"
   assert.match(barrier, /reconcileCompleteImages\(index === IMAGE_RECONCILIATION_DELAYS_MS\.length - 1\)/u);
   assert.doesNotMatch(barrier, /const reconcileCompleteImages = \(\) => \{\s*for \(const image of document\.images\)/u);
   assert.match(barrier, /!\(image\.naturalWidth === 1 && image\.naturalHeight === 1\)/u);
-  assert.match(barrier, /attributeFilter: \["src", "srcset", "sizes"\]/u);
+  assert.match(barrier, /const stableImageSources = new WeakMap\(\)/u);
+  assert.match(barrier, /stableImageSources\.get\(image\) === source/u);
+  assert.match(barrier, /stableImageSources\.set\(image, source\)/u);
+  assert.match(barrier, /if \(stableSourceUnchanged\) continue/u);
+  assert.match(barrier, /record\.target instanceof HTMLSourceElement/u);
+  assert.match(barrier, /attributeFilter: \["src", "srcset", "sizes", "media", "type"\]/u);
   assert.match(
     barrier,
-    /priorityObserver\?\.unobserve\(record\.target\);\s*resetImage\(record\.target\);\s*observeImage\(record\.target\)/u,
+    /if \(stableSourceUnchanged\) continue;\s*resetImage\(record\.target\);\s*observeImage\(record\.target\)/u,
   );
   assert.match(barrier, /imageSource\(image\) === source/u);
   assert.match(barrier, /image\.hasAttribute\(STABLE_IMAGE_ATTRIBUTE\)/u);
