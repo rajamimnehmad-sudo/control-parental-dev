@@ -57,6 +57,7 @@
   const inlineDecisions = new Map();
   const priorityBySource = new Map();
   const priorityByImage = new WeakMap();
+  const diagnosticSourceIdsByImage = new WeakMap();
   const lastElementStateByImage = new WeakMap();
   const pendingElementStates = new Map();
   const diagnosedCompactSources = new WeakSet();
@@ -295,12 +296,14 @@
     if (elementStateDiagnostics >= MAX_ELEMENT_STATE_DIAGNOSTICS) return;
     const source = diagnosticImageSource(image);
     if (source.length === 0) return;
-    const signature = `${source}:${visualState}:${image.naturalWidth}x${image.naturalHeight}:${image.clientWidth}x${image.clientHeight}`;
+    const sourceInstance = diagnosticSourceIdsByImage.get(image) || "";
+    const signature = `${source}:${sourceInstance}:${visualState}:${image.naturalWidth}x${image.naturalHeight}:${image.clientWidth}x${image.clientHeight}`;
     if (lastElementStateByImage.get(image) === signature) return;
     lastElementStateByImage.set(image, signature);
     elementStateDiagnostics += 1;
     pendingElementStates.set(signature, {
       url: source,
+      sourceInstance,
       visualState,
       naturalWidth: image.naturalWidth,
       naturalHeight: image.naturalHeight,
@@ -345,9 +348,18 @@
     return decision;
   };
 
-  const rememberInlineDecision = (source, decision) => {
-    if (source.length > MAX_INLINE_DECISION_SOURCE_CHARS) return;
-    inlineDecisions.set(source, decision);
+  const newDiagnosticSourceId = () => {
+    const words = crypto.getRandomValues(new Uint32Array(2));
+    return `inline_${Array.from(words, (word) => word.toString(16).padStart(8, "0")).join("")}`;
+  };
+
+  const rememberInlineDecision = (source, decision, diagnosticId) => {
+    const record = {
+      decision,
+      diagnosticId,
+    };
+    if (source.length > MAX_INLINE_DECISION_SOURCE_CHARS) return record;
+    inlineDecisions.set(source, record);
     inlineDecisionSourceChars += source.length;
     while (
       inlineDecisions.size > MAX_INLINE_DECISIONS ||
@@ -357,6 +369,7 @@
       inlineDecisions.delete(oldestSource);
       inlineDecisionSourceChars = Math.max(0, inlineDecisionSourceChars - oldestSource.length);
     }
+    return record;
   };
 
   const resetImage = (image) => {
@@ -380,6 +393,7 @@
   const releaseImage = (image) => {
     closeImage(image);
     priorityByImage.delete(image);
+    diagnosticSourceIdsByImage.delete(image);
   };
 
   const markImageStable = (image, source = imageSource(image)) => {
@@ -408,9 +422,10 @@
       closeImage(image);
       return;
     }
-    let decision = cachedInlineDecision(source);
-    if (decision === undefined) {
-      decision = (async () => {
+    let decisionRecord = cachedInlineDecision(source);
+    if (decisionRecord === undefined) {
+      const diagnosticId = newDiagnosticSourceId();
+      const decision = (async () => {
         const dataUrl = source.startsWith("blob:") ? await blobDataUrl(source) : source;
         if (dataUrl === null || dataUrl.length > MAX_INLINE_DATA_URL_LENGTH) {
           return { action: "block" };
@@ -422,13 +437,19 @@
           dataUrl,
           mimeType: dataUrl.substring(5, dataUrl.indexOf(";")),
           priority: immediateImagePriority(image),
+          sourceInstance: diagnosticId,
         });
       })().catch(() => ({ action: "block" }));
-      rememberInlineDecision(source, decision);
+      decisionRecord = rememberInlineDecision(source, decision, diagnosticId);
     }
-    const request = { source, decision };
+    if (decisionRecord === undefined) {
+      closeImage(image);
+      return;
+    }
+    diagnosticSourceIdsByImage.set(image, decisionRecord.diagnosticId);
+    const request = { source, decision: decisionRecord.decision };
     pendingImages.set(image, request);
-    void decision.then((result) => {
+    void decisionRecord.decision.then((result) => {
       if (
         pendingImages.get(image) !== request ||
         !image.isConnected ||
@@ -477,6 +498,7 @@
       inspectInlineImage(image);
       return;
     }
+    diagnosticSourceIdsByImage.delete(image);
     resetImage(image);
     if (
       source.length === 0 ||

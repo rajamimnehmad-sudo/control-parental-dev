@@ -158,7 +158,43 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local en validacion: DAG Browser 210 — fuentes y capturas ligadas a la revision exacta
+## Candidato local en validacion: DAG Browser 211 — carga diferida y diagnostico exacto
+
+- DAG 211 (`0.70.15-dev`, extension `2.0.14`) parte del informe fisico 210
+  `DAG-L4225BUR`, compuesto integramente por esa version: 1.430 eventos y cero
+  perdidas en memoria. No cambia R3.1, el umbral 0,40, la politica visual, los
+  hilos, ONNX ni el tratamiento de video, y no agrega excepciones por sitio,
+  URL, dominio, dispositivo, formato o tamano.
+- La causa de las fotos inferiores ausentes en la primera carga de Cheeky era
+  general: `filterResponseData` abria correctamente el flujo al solicitar cada
+  imagen, pero lo cerraba a los 15 segundos si Gecko aun no habia emitido el
+  primer byte. En una pagina con carga diferida, 64 solicitudes pendientes
+  vencieron juntas aunque no estaban consumiendo bytes capturados ni tiempo de
+  inferencia; al llegar luego al viewport ya no podian cargar.
+- Se elimina solamente ese vencimiento anterior al primer byte. El limite de
+  128 flujos activos, el presupuesto global de 8 MiB, la cola acotada y el
+  retiro de todos los flujos al recargar, navegar o cerrar el documento siguen
+  vigentes. Una vez iniciado un flujo, el timeout de inactividad de 5 segundos
+  continua rearmandose por cada bloque recibido. Dos regresiones deterministas
+  cubren una imagen diferida y 96 flujos sin abrir a traves de recargas rapidas.
+- La caja negra ahora registra tambien cada decision reutilizada desde la cache
+  de contenido, con accion, motivo, dimensiones y marca de cache, sin repetir
+  inferencia. Para `data:` y `blob:` asigna un identificador aleatorio acotado a
+  la fuente exacta y lo conserva entre decision y estados `shown`/`hidden`; no
+  guarda pixeles ni el contenido del data URL. Esto permite distinguir si una
+  misma miniatura se expuso antes de bloquearse, en vez de agrupar todos los
+  inline como el token generico `data:image`.
+- Se evita ademas duplicar `navigation_started` cuando las dos etapas internas
+  de una misma navegacion llaman a la cobertura protegida. Es una correccion de
+  observabilidad: no altera el momento de mostrar la pagina ni su barrera.
+- Validacion automatizada correcta: 158 unitarios DEV, barrera JS 32/32,
+  Ktlint, Lint vital y `assembleDevDebug`. El APK fisico y su hash se
+  documentan al cerrar el artefacto.
+- Limite separado: las miniaturas pequenas que R3.1 permite con un score real
+  inferior a 0,40 siguen siendo un problema del modelo, no un bypass del
+  navegador. Este lote no falsea ese resultado con reglas por sitio o tamano.
+
+## Candidato local anterior: DAG Browser 210 — fuentes y capturas ligadas a la revision exacta
 
 - DAG 210 (`0.70.14-dev`, extension `2.0.13`) parte del informe real 209
   `DAG-B5VQDV26`, con 1.005 eventos y cero perdidas en memoria. No cambia R3.1,

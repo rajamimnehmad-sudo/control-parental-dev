@@ -52,10 +52,12 @@ internal data class DagFlightEvent(
     val requestId: String? = null,
     val resourceType: String? = null,
     val sourceKind: String? = null,
+    val sourceInstance: String? = null,
     val mimeType: String? = null,
     val frameId: Int? = null,
     val statusCode: Int? = null,
     val fromCache: Boolean? = null,
+    val decisionCacheHit: Boolean? = null,
     val activeStreams: Int? = null,
     val queuedAnalyses: Int? = null,
     val capturedBytes: Int? = null,
@@ -257,10 +259,12 @@ internal class DagFlightRecorder private constructor(
                 event.requestId?.takeIf(RequestIdPattern::matches)?.let { put("request", opaqueToken(it)) }
                 event.resourceType?.takeIf(SafeValuePattern::matches)?.let { put("resource_type", it) }
                 event.sourceKind?.takeIf(SafeValuePattern::matches)?.let { put("source_kind", it) }
+                event.sourceInstance?.takeIf(SafeValuePattern::matches)?.let { put("source_instance", it) }
                 event.mimeType?.let(::sanitizedMimeType)?.let { put("mime", it) }
                 event.frameId?.let { put("frame", it.coerceIn(0, MaxRecordedFrame)) }
                 event.statusCode?.let { put("status", it.coerceIn(0, 999)) }
                 event.fromCache?.let { put("from_cache", it) }
+                event.decisionCacheHit?.let { put("decision_cache", it) }
                 event.activeStreams?.let { put("active_streams", it.coerceIn(0, MaxRecordedCount)) }
                 event.queuedAnalyses?.let { put("queued_analyses", it.coerceIn(0, MaxRecordedCount)) }
                 event.capturedBytes?.let { put("captured_bytes", it.coerceIn(0, MaxRecordedBytes)) }

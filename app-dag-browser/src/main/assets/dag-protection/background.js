@@ -28,7 +28,6 @@ const MAX_CACHED_REPLACEMENT_BYTES = 2 * 1024 * 1024;
 const MAX_REPLACEMENT_BYTES = 256 * 1024;
 const MAX_INLINE_IMAGE_BYTES = MAX_IMAGE_BYTES;
 const MAX_INLINE_DATA_URL_LENGTH = 2_800_000;
-const CAPTURE_START_TIMEOUT_MS = 15_000;
 const CAPTURE_IDLE_TIMEOUT_MS = 5_000;
 const NATIVE_TIMEOUT_MS = 2_250;
 const VIEWPORT_QUIET_MS = 250;
@@ -56,6 +55,7 @@ const documentStatesByTab = new Map();
 const diagnosticDrops = new Map();
 const diagnosticResources = new Map();
 const diagnosticElements = new Map();
+const diagnosticDecisions = new Map();
 const responseMetadataByRequest = new Map();
 
 const validTabId = (value) => Number.isInteger(value) && value >= 0;
@@ -140,10 +140,17 @@ const flushDiagnosticDrops = () => {
   const events = [...diagnosticDrops.values()].map(({ event, count }) => ({ ...event, count }));
   const resources = [...diagnosticResources.values()];
   const elements = [...diagnosticElements.values()];
-  if (events.length === 0 && resources.length === 0 && elements.length === 0) return;
+  const decisions = [...diagnosticDecisions.values()];
+  if (
+    events.length === 0 &&
+    resources.length === 0 &&
+    elements.length === 0 &&
+    decisions.length === 0
+  ) return;
   diagnosticDrops.clear();
   diagnosticResources.clear();
   diagnosticElements.clear();
+  diagnosticDecisions.clear();
   try {
     nativePort.postMessage({
       type: "media-diagnostic-summary",
@@ -151,6 +158,7 @@ const flushDiagnosticDrops = () => {
       events,
       resources,
       elements,
+      decisions,
       activeStreams,
       queuedAnalyses: analysisQueue.length,
       capturedBytes,
@@ -173,6 +181,10 @@ const diagnosticContext = (details, state) => ({
   sourceKind: typeof details?.sourceKind === "string"
     ? details.sourceKind
     : /^data:/iu.test(details?.url || "") ? "data" : /^blob:/iu.test(details?.url || "") ? "blob" : "network",
+  sourceInstance:
+    typeof details?.sourceInstance === "string" && /^[a-z0-9_]{1,40}$/u.test(details.sourceInstance)
+      ? details.sourceInstance
+      : "",
   frameId: Number.isInteger(details?.frameId) ? details.frameId : 0,
   statusCode: Number.isInteger(details?.statusCode) ? details.statusCode : undefined,
   fromCache: typeof details?.fromCache === "boolean" ? details.fromCache : undefined,
@@ -234,11 +246,16 @@ const recordElementDiagnostic = (message, sender) => {
   const state = validTabId(tabId) ? documentStatesByTab.get(tabId) : null;
   if (!isCurrentDocument(state) || !Number.isInteger(frameId) || frameId < 0) return;
   const sourceUrl = boundedDiagnosticUrl(message.url);
-  const key = `${frameId}:${sourceUrl}:${message.visualState}`;
+  const sourceInstance =
+    typeof message.sourceInstance === "string" && /^[a-z0-9_]{1,40}$/u.test(message.sourceInstance)
+      ? message.sourceInstance
+      : "";
+  const key = `${frameId}:${sourceUrl}:${sourceInstance}:${message.visualState}`;
   diagnosticElements.set(key, {
     tabId,
     pageUrl: boundedDiagnosticUrl(sender?.url || state.pageUrl),
     sourceUrl,
+    sourceInstance,
     resourceType: "image",
     sourceKind: /^data:/iu.test(sourceUrl) ? "data" : sourceUrl === "blob" || /^blob:/iu.test(sourceUrl) ? "blob" : "network",
     frameId,
@@ -247,6 +264,23 @@ const recordElementDiagnostic = (message, sender) => {
     naturalHeight: message.naturalHeight,
     renderedWidth: message.renderedWidth,
     renderedHeight: message.renderedHeight,
+  });
+  scheduleDiagnosticFlush();
+};
+
+const recordCachedDecisionDiagnostic = (task, decision) => {
+  if (!diagnosticsEnabled || diagnosticDecisions.size >= MAX_DIAGNOSTIC_KEYS) return;
+  const context = diagnosticContext(task.details, task.documentState);
+  const key = context.requestId || `${context.sourceUrl}:${task.carrier || "network"}`;
+  diagnosticDecisions.set(key, {
+    ...context,
+    carrier: task.carrier === "inline" ? "inline" : "network",
+    priority: normalizePriority(task.priority),
+    action: decision.action === "allow" ? "allow" : "block",
+    reason: typeof decision.reason === "string" ? decision.reason : "cached_decision",
+    width: Number.isInteger(decision.width) ? decision.width : undefined,
+    height: Number.isInteger(decision.height) ? decision.height : undefined,
+    decisionCacheHit: true,
   });
   scheduleDiagnosticFlush();
 };
@@ -428,7 +462,10 @@ const connectNative = () => {
     const port = browser.runtime.connectNative(NATIVE_APP);
     nativePort = port;
     if (diagnosticsEnabled && (
-      diagnosticDrops.size > 0 || diagnosticResources.size > 0 || diagnosticElements.size > 0
+      diagnosticDrops.size > 0 ||
+      diagnosticResources.size > 0 ||
+      diagnosticElements.size > 0 ||
+      diagnosticDecisions.size > 0
     )) scheduleDiagnosticFlush();
     for (const state of documentStatesByTab.values()) {
       if (isCurrentDocument(state)) postDocumentLifecycle("media-document-current", state);
@@ -440,6 +477,7 @@ const connectNative = () => {
           diagnosticDrops.clear();
           diagnosticResources.clear();
           diagnosticElements.clear();
+          diagnosticDecisions.clear();
           clearTimeout(diagnosticFlushTimer);
           diagnosticFlushTimer = null;
         }
@@ -462,6 +500,9 @@ const connectNative = () => {
         action: allow ? "allow" : "block",
         cacheable: allow || modelBlock,
         replacement: allow ? null : acceptedReplacement,
+        reason: typeof message.reason === "string" ? message.reason : "invalid_decision",
+        width: Number.isInteger(message.imageWidth) ? message.imageWidth : undefined,
+        height: Number.isInteger(message.imageHeight) ? message.imageHeight : undefined,
       });
     });
     port.onDisconnect.addListener(() => {
@@ -518,6 +559,10 @@ const requestNativeDecision = (
         sourceKind: typeof details.sourceKind === "string"
           ? details.sourceKind
           : /^data:/iu.test(details.url || "") ? "data" : /^blob:/iu.test(details.url || "") ? "blob" : "network",
+        sourceInstance:
+          typeof details.sourceInstance === "string" && /^[a-z0-9_]{1,40}$/u.test(details.sourceInstance)
+            ? details.sourceInstance
+            : "",
         mimeType: typeof details.mimeType === "string" ? details.mimeType : "",
         frameId: Number.isInteger(details.frameId) ? details.frameId : 0,
         statusCode: Number.isInteger(details.statusCode) ? details.statusCode : undefined,
@@ -561,6 +606,7 @@ const drainAnalysisQueue = () => {
         const cached = cachedDecision(hash);
         if (cached !== undefined) {
           decision = cached;
+          recordCachedDecisionDiagnostic(task, decision);
         } else {
           const pendingKey = `${documentState.documentKey}:${hash}`;
           let sharedDecision = pendingDecisions.get(pendingKey);
@@ -621,6 +667,10 @@ const decideInlineRaster = (message, sender) => {
     frameId: sender?.frameId,
     type: "image",
     sourceKind: "inline",
+    sourceInstance:
+      typeof message?.sourceInstance === "string" && /^[a-z0-9_]{1,40}$/u.test(message.sourceInstance)
+        ? message.sourceInstance
+        : "",
     mimeType: typeof message?.mimeType === "string" ? message.mimeType : "",
   };
   if (!/^https?:\/\//iu.test(pageUrl)) {
@@ -772,8 +822,6 @@ const interceptImage = (details) => {
       settle({ action: "block", replacement: null });
     }, delayMillis);
   };
-
-  armCaptureTimeout(CAPTURE_START_TIMEOUT_MS, "capture_start_timeout");
 
   filter.onstart = () => {
     if (!settled) armCaptureTimeout(CAPTURE_IDLE_TIMEOUT_MS, "capture_idle_timeout");

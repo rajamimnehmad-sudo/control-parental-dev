@@ -93,6 +93,7 @@ class DagBrowserManifestContractTest {
         assertContains(activity, "if (navigationSnapshot.visibility == View.VISIBLE) return")
         assertContains(activity, "val bitmapOwnedByNavigationFrame = updateNavigationFrame(tab, request, bitmap)")
         assertContains(activity, "tab.barrierReadyForNavigation = false")
+        assertContains(activity, "if (startsNewNavigation) {\n            recordFlight")
         assertContains(activity, "tab.protectedContentReadyForNavigation = false")
         assertContains(activity, "!tab.barrierReadyForNavigation")
         assertContains(activity, "!tab.protectedContentReadyForNavigation")

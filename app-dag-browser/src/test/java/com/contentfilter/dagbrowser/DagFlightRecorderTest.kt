@@ -39,6 +39,8 @@ class DagFlightRecorderTest {
                     frameId = 3,
                     statusCode = 200,
                     fromCache = false,
+                    decisionCacheHit = true,
+                    sourceInstance = "inline_a1b2c3",
                 ),
             )
             val snapshot = recorder.awaitSnapshot()
@@ -52,6 +54,8 @@ class DagFlightRecorderTest {
             assertTrue(encoded.contains("https://www.google.com/search?q&tbm"))
             assertTrue(encoded.contains("https://cdn.example.test/image.jpg?token&width"))
             assertTrue(encoded.contains("image/jpeg"))
+            assertTrue(encoded.contains("\"decision_cache\":true"))
+            assertTrue(encoded.contains("\"source_instance\":\"inline_a1b2c3\""))
             assertFalse(encoded.contains("private+search"))
             assertFalse(encoded.contains("secret"))
             assertFalse(encoded.contains("#private"))

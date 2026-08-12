@@ -357,6 +357,7 @@ class DagBrowserActivity : Activity() {
             }
             recordDiagnosticEventArray(payload.optJSONArray("resources"), DagFlightEventType.MediaResource)
             recordDiagnosticEventArray(payload.optJSONArray("elements"), DagFlightEventType.MediaElement)
+            recordDiagnosticEventArray(payload.optJSONArray("decisions"), DagFlightEventType.MediaDecision)
         }
         if (!BuildConfig.DAG_DIAGNOSTICS || summaries.isEmpty()) return
         Log.i(
@@ -389,6 +390,8 @@ class DagBrowserActivity : Activity() {
         type = type,
         tabId = payload.optLong("tabId", -1L).takeIf { it >= 0L },
         carrier = carrier ?: payload.optString("carrier").takeIf(MediaDiagnosticValuePattern::matches),
+        priority = payload.optString("priority").takeIf(MediaDiagnosticValuePattern::matches),
+        action = payload.optString("action").takeIf(MediaDiagnosticValuePattern::matches),
         reason = reason ?: payload.optString("reason").takeIf(MediaDiagnosticValuePattern::matches),
         count = count,
         pageUrl = payload.optString("pageUrl").takeIf(String::isNotBlank),
@@ -396,13 +399,18 @@ class DagBrowserActivity : Activity() {
         requestId = payload.optString("requestId").takeIf(String::isNotBlank),
         resourceType = payload.optString("resourceType").takeIf(MediaDiagnosticValuePattern::matches),
         sourceKind = payload.optString("sourceKind").takeIf(MediaDiagnosticValuePattern::matches),
+        sourceInstance = payload.optString("sourceInstance").takeIf(MediaDiagnosticTokenPattern::matches),
         mimeType = payload.optString("mimeType").takeIf(String::isNotBlank),
         frameId = payload.optInt("frameId", -1).takeIf { it >= 0 },
         statusCode = payload.optInt("statusCode", -1).takeIf { it >= 0 },
         fromCache = payload.optBoolean("fromCache").takeIf { payload.has("fromCache") },
+        decisionCacheHit =
+            payload.optBoolean("decisionCacheHit").takeIf { payload.has("decisionCacheHit") },
         activeStreams = payload.optInt("activeStreams", -1).takeIf { it >= 0 },
         queuedAnalyses = payload.optInt("queuedAnalyses", -1).takeIf { it >= 0 },
         capturedBytes = payload.optInt("capturedBytes", -1).takeIf { it >= 0 },
+        width = payload.optInt("width", -1).takeIf { it >= 0 },
+        height = payload.optInt("height", -1).takeIf { it >= 0 },
         naturalWidth = payload.optInt("naturalWidth", -1).takeIf { it >= 0 },
         naturalHeight = payload.optInt("naturalHeight", -1).takeIf { it >= 0 },
         renderedWidth = payload.optInt("renderedWidth", -1).takeIf { it >= 0 },
@@ -1187,10 +1195,13 @@ class DagBrowserActivity : Activity() {
         if (tab.displayState != TabDisplayState.Loading) {
             markTabThumbnailStale(tab)
         }
-        if (tab === activeTab && (startNewPerformanceNavigation || !tab.waitingForBarrier)) {
+        val startsNewNavigation = startNewPerformanceNavigation || !tab.waitingForBarrier
+        if (tab === activeTab && startsNewNavigation) {
             recordPerformanceEvent(performanceTracker.begin())
         }
-        recordFlight(DagFlightEvent(DagFlightEventType.NavigationStarted, tabId = tab.id), tab)
+        if (startsNewNavigation) {
+            recordFlight(DagFlightEvent(DagFlightEventType.NavigationStarted, tabId = tab.id), tab)
+        }
         tab.waitingForBarrier = true
         tab.barrierReadyForNavigation = false
         tab.protectedContentReadyForNavigation = false
@@ -1512,6 +1523,7 @@ class DagBrowserActivity : Activity() {
                 requestId = payload.optString("requestId").takeIf(String::isNotBlank),
                 resourceType = payload.optString("resourceType").takeIf(MediaDiagnosticValuePattern::matches),
                 sourceKind = payload.optString("sourceKind").takeIf(MediaDiagnosticValuePattern::matches),
+                sourceInstance = payload.optString("sourceInstance").takeIf(MediaDiagnosticTokenPattern::matches),
                 mimeType = payload.optString("mimeType").takeIf(String::isNotBlank),
                 frameId = payload.optInt("frameId", -1).takeIf { it >= 0 },
                 statusCode = payload.optInt("statusCode", -1).takeIf { it >= 0 },
@@ -3072,6 +3084,7 @@ class DagBrowserActivity : Activity() {
         const val ThumbnailCaptureRetries = 1
         val PreviewDocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
         val MediaDiagnosticValuePattern = Regex("^[a-z_]{1,40}$")
+        val MediaDiagnosticTokenPattern = Regex("^[a-z0-9_]{1,40}$")
         const val EnabledControlAlpha = 1f
         const val DisabledControlAlpha = 0.45f
         const val EnabledChoiceAlpha = 1f

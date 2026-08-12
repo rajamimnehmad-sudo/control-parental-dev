@@ -27,7 +27,7 @@ const waitFor = async (predicate, label) => {
   throw new Error(`Timed out waiting for ${label}`);
 };
 
-const createHarness = async ({ captureStartTimeoutMs = null, captureIdleTimeoutMs = null } = {}) => {
+const createHarness = async ({ captureIdleTimeoutMs = null } = {}) => {
   const beforeRequest = eventChannel();
   const headersReceived = eventChannel();
   const nativeMessages = eventChannel();
@@ -85,9 +85,7 @@ const createHarness = async ({ captureStartTimeoutMs = null, captureIdleTimeoutM
   };
   const source = await readAsset("background.js");
   const contextSetTimeout = (callback, delay, ...args) => {
-    const effectiveDelay = delay === 15_000 && captureStartTimeoutMs !== null
-      ? captureStartTimeoutMs
-      : delay === 5_000 && captureIdleTimeoutMs !== null
+    const effectiveDelay = delay === 5_000 && captureIdleTimeoutMs !== null
         ? captureIdleTimeoutMs
         : delay;
     return setTimeout(callback, effectiveDelay, ...args);
@@ -269,6 +267,38 @@ test("navigation retires old media work and isolates the next document", async (
   assert.deepEqual([...newFilter.writes[0]], [...newBytes]);
 });
 
+test("rapid reload retires every unopened stream without poisoning the next document", async () => {
+  const harness = await createHarness();
+  const oldDetails = Array.from({ length: 96 }, (_, index) =>
+    imageDetails(`lazy-old-${index}`));
+  for (const details of oldDetails) harness.before(details);
+
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+  assert.equal(oldDetails.every(({ requestId }) => !harness.filters.get(requestId).closed), true);
+
+  harness.startDocument(1, "document_b3", "https://shop.example.test/reloaded");
+  harness.loadDocument(1, "document_b3", "https://shop.example.test/reloaded");
+  assert.equal(oldDetails.every(({ requestId }) => harness.filters.get(requestId).closed), true);
+  assert.equal(oldDetails.every(({ requestId }) =>
+    harness.filters.get(requestId).writes.length === 0), true);
+
+  const fresh = imageDetails("lazy-fresh");
+  const original = Uint8Array.from([0xff, 0xd8, 5, 6, 0xff, 0xd9]);
+  deliver(harness, fresh, original);
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes" && message.requestId === fresh.requestId),
+  "fresh document native request");
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  await waitFor(() => harness.filters.get(fresh.requestId).closed, "fresh stream close");
+  assert.deepEqual([...harness.filters.get(fresh.requestId).writes[0]], [...original]);
+});
+
 test("viewport readiness belongs to the exact loaded document", async () => {
   const harness = await createHarness();
   harness.startDocument(1, "document_c3", "https://shop.example.test/current");
@@ -342,7 +372,7 @@ test("full bounded response burst reaches the native gate without placeholder ov
 });
 
 test("capture timeout measures network inactivity instead of total transfer time", async () => {
-  const harness = await createHarness({ captureStartTimeoutMs: 40, captureIdleTimeoutMs: 40 });
+  const harness = await createHarness({ captureIdleTimeoutMs: 40 });
   const details = imageDetails("progressive-transfer");
   harness.before(details);
   const filter = harness.filters.get(details.requestId);
@@ -365,6 +395,18 @@ test("capture timeout measures network inactivity instead of total transfer time
   });
   await waitFor(() => filter.closed, "progressive stream close");
   assert.deepEqual([...filter.writes[0]], [0xff, 0xd8, 1, 2, 3, 0xff, 0xd9]);
+});
+
+test("lazy response may remain unopened until Gecko starts its bounded stream", async () => {
+  const harness = await createHarness({ captureIdleTimeoutMs: 20 });
+  const details = imageDetails("lazy-unopened");
+  harness.before(details);
+  const filter = harness.filters.get(details.requestId);
+  await new Promise((resolvePromise) => setTimeout(resolvePromise, 45));
+  assert.equal(filter.closed, false);
+  harness.startDocument(1, "document_b4", "https://shop.example.test/after-lazy");
+  await waitFor(() => filter.closed, "unopened stream retirement");
+  assert.equal(filter.writes.length, 0);
 });
 
 test("cancelled empty response closes without manufacturing a placeholder and clean retry succeeds", async () => {
@@ -783,6 +825,7 @@ test("raster fetched as data crosses the same native gate before page code sees 
 
 test("trusted content decision cache avoids a second inference", async () => {
   const harness = await createHarness();
+  harness.answer({ type: "media-diagnostics-config", version: 2, enabled: true });
   const original = Uint8Array.from([0xff, 0xd8, 3, 3, 3, 0xff, 0xd9]);
   const first = imageDetails("cache-a");
   deliver(harness, first, original);
@@ -794,6 +837,8 @@ test("trusted content decision cache avoids a second inference", async () => {
     candidateId: request.candidateId,
     action: "allow",
     reason: "model_allow",
+    imageWidth: 320,
+    imageHeight: 240,
   });
   await waitFor(() => harness.filters.get(first.requestId).closed, "first close");
 
@@ -802,6 +847,15 @@ test("trusted content decision cache avoids a second inference", async () => {
   await waitFor(() => harness.filters.get(second.requestId).closed, "cached close");
   assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
   assert.deepEqual([...harness.filters.get(second.requestId).writes[0]], [...original]);
+  const summary = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-diagnostic-summary" && message.decisions?.length > 0),
+  "cached decision diagnostic");
+  assert.equal(summary.decisions[0].requestId, second.requestId);
+  assert.equal(summary.decisions[0].action, "allow");
+  assert.equal(summary.decisions[0].reason, "model_allow");
+  assert.equal(summary.decisions[0].decisionCacheHit, true);
+  assert.equal(summary.decisions[0].width, 320);
+  assert.equal(summary.decisions[0].height, 240);
 });
 
 test("identical in-flight raster shares one native inference", async () => {
@@ -886,6 +940,10 @@ test("first paint closes inline and changing image sources before stable reveal"
   assert.doesNotMatch(barrier, /const reconcileCompleteImages = \(\) => \{\s*for \(const image of document\.images\)/u);
   assert.match(barrier, /!\(image\.naturalWidth === 1 && image\.naturalHeight === 1\)/u);
   assert.match(barrier, /const stableImageSources = new WeakMap\(\)/u);
+  assert.match(barrier, /const diagnosticSourceIdsByImage = new WeakMap\(\)/u);
+  assert.match(barrier, /sourceInstance,/u);
+  assert.match(barrier, /diagnosticSourceIdsByImage\.set\(image, decisionRecord\.diagnosticId\)/u);
+  assert.match(barrier, /sourceInstance: diagnosticId/u);
   assert.match(barrier, /stableImageSources\.get\(image\) === source/u);
   assert.match(barrier, /stableImageSources\.set\(image, source\)/u);
   assert.match(barrier, /if \(stableSourceUnchanged\) continue/u);
@@ -941,6 +999,9 @@ test("active extension has bounded work and no site or device exceptions", async
   assert.match(background, /MAX_CACHED_REPLACEMENT_BYTES = 2 \* 1024 \* 1024/u);
   assert.match(background, /cachedReplacementBytes/u);
   assert.match(background, /const cachedDecision/u);
+  assert.match(background, /const recordCachedDecisionDiagnostic/u);
+  assert.match(background, /decisionCacheHit: true/u);
+  assert.match(background, /sourceInstance:\s*typeof details\?\.sourceInstance/u);
   assert.match(background, /takeNextAnalysis/u);
   assert.match(background, /MAX_INLINE_IMAGE_BYTES = MAX_IMAGE_BYTES/u);
   assert.match(background, /capturedBytes \+ bytes\.byteLength > MAX_CAPTURED_BYTES/u);
