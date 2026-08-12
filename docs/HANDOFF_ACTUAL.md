@@ -192,7 +192,7 @@ el runtime actual desde versiones o worktrees historicos.
   `data:` reutilizando el mismo elemento. Validacion local correcta: 158
   unitarios DEV, barrera JS 30/30, Ktlint, fixture HTTP `no-store`, Lint vital y
   `assembleDevDebug`. APK DEV: 121.858.105 bytes, SHA-256
-  `e9ac13c83aeda72898f3f353bdb01d9355743ac359993f54e37b6e4fedeecd09`;
+  `87e241dddfb2d19ccb63c0b8a32806d02ef1845e651033eb7ad2278bdf8f179f`;
   paquete `com.contentfilter.dagbrowser.dev`, firma DEV historica preservada.
 - Limite separado y no ocultado por este lote: las miniaturas diminutas que
   quedan visibles de forma persistente son falsos permisos reales de R3.1. En
