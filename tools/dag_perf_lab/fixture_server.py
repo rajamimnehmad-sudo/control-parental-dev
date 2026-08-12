@@ -287,8 +287,19 @@ APP_JS = r"""(() => {
 
   window.setTimeout(() => {
     const rotating = document.getElementById('rotating-source');
-    rotating.src = '/fixture/media/filter-probe.jpg?surface=rotating&delay_ms=90';
-    report('source-rotated');
+    if (inlineMode) {
+      fetch('/fixture/media/filter-probe.bin?surface=rotating', {cache: 'no-store'})
+        .then((response) => response.blob())
+        .then(dataUrl)
+        .then((source) => {
+          rotating.src = source;
+          report('source-rotated', {transport: 'data'});
+        })
+        .catch(() => report('source-rotate-error', {transport: 'data'}));
+    } else {
+      rotating.src = '/fixture/media/filter-probe.jpg?surface=rotating&delay_ms=90';
+      report('source-rotated', {transport: 'network'});
+    }
   }, 1400);
 
   window.addEventListener('load', () => report('window-load'), {once: true});

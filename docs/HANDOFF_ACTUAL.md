@@ -158,7 +158,55 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local en validacion: DAG Browser 209 — SVG pasivo y permiso visual por fuente
+## Candidato local en validacion: DAG Browser 210 — fuentes y capturas ligadas a la revision exacta
+
+- DAG 210 (`0.70.14-dev`, extension `2.0.13`) parte del informe real 209
+  `DAG-B5VQDV26`, con 1.005 eventos y cero perdidas en memoria. No cambia R3.1,
+  el umbral 0,40, la politica visual, los hilos, ONNX ni el tratamiento de
+  video, y no agrega excepciones por sitio, URL, dominio, dispositivo o tamaño.
+- El informe demostro dos carreras distintas. Un `img` inline bloqueado de
+  54x54 llego a registrar `shown` y luego `hidden`; al mutar `src` o `srcset`,
+  Gecko aun podia exponer el `currentSrc` anterior y DAG conservaba por error
+  su permiso estable. Ademas hubo dos `navigation_started` finales sin un nuevo
+  `barrier_ready` ni `page_visible`, mientras una captura tardia solo estaba
+  ligada a la pestaña y podia reemplazar el fotograma de transicion con la
+  pagina anterior.
+- La barrera ahora revoca sincronicamente el permiso anterior cuando el nuevo
+  portador declarado es `data:` o `blob:`, y liga la decision al contenido
+  inline exacto antes de revelarlo. En cambios de red conserva los pixeles
+  anteriores ya aprobados mientras `filterResponseData` mantiene cerrados los
+  bytes nuevos; al completar, revela atomicamente la imagen permitida o su
+  reemplazo neutral. Esto evita tanto la exposicion inline como ocultamientos
+  redundantes de una imagen de red ya segura.
+- La prioridad de una imagen se comunica desde el `src`, `srcset` o `picture`
+  declarado en el momento de la mutacion, incluidas rutas relativas, en vez de
+  esperar a que `currentSrc` cambie despues de la carga. No agrega inferencias,
+  hilos ni competencia con Gecko: solo permite que el trabajo ya en cola se
+  ordene antes como visible, cercano o de fondo.
+- Cada captura de navegacion queda ligada a `tabId + previewRevision`. Un
+  resultado tardio se descarta antes de convertirse en fotograma o miniatura;
+  el fotograma seguro elegido al iniciar la transicion puede permanecer visible
+  hasta que la pagina nueva completa barrera, saneamiento e imagenes del
+  viewport, pero no puede reutilizarse en una navegacion posterior.
+- El fixture local agrega la regresion general `img` seguro -> raster sensible
+  `data:` reutilizando el mismo elemento. Validacion local correcta: 158
+  unitarios DEV, barrera JS 30/30, Ktlint, fixture HTTP `no-store`, Lint vital y
+  `assembleDevDebug`. APK DEV: 121.858.105 bytes, SHA-256
+  `e9ac13c83aeda72898f3f353bdb01d9355743ac359993f54e37b6e4fedeecd09`;
+  paquete `com.contentfilter.dagbrowser.dev`, firma DEV historica preservada.
+- Limite separado y no ocultado por este lote: las miniaturas diminutas que
+  quedan visibles de forma persistente son falsos permisos reales de R3.1. En
+  este informe, varios 54x54 obtuvieron aproximadamente 0,014-0,357, por debajo
+  del umbral oficial. Los ensayos locales documentados siguen `NO-GO`; no se
+  altera el modelo o el umbral con un parche de navegador. Los 69 elementos
+  servidos por cache sin una decision repetida tampoco representan un bypass,
+  pero dejan una limitacion de observabilidad a mejorar en la caja negra.
+- Pendiente para cerrar fisicamente: actualizar in-place y probar Google
+  Imagenes (sin destello previo), Cheeky (carga y navegacion sin pagina anterior)
+  y Mimo/Fravega. El informe 209 no contiene una navegacion Cheeky completa, por
+  lo que ese sintoma no se declara resuelto hasta recibir evidencia de DAG 210.
+
+## Candidato local anterior: DAG Browser 209 — SVG pasivo y permiso visual por fuente
 
 - DAG 209 (`0.70.13-dev`, extension `2.0.12`) parte del informe real 208
   `DAG-HVKFLJ7K`: 1.651 eventos de esquema 2 sin perdidas en memoria. No cambia

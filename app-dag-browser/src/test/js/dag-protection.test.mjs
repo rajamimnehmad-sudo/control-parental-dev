@@ -893,7 +893,19 @@ test("first paint closes inline and changing image sources before stable reveal"
   assert.match(barrier, /attributeFilter: \["src", "srcset", "sizes", "media", "type"\]/u);
   assert.match(
     barrier,
-    /if \(stableSourceUnchanged\) continue;\s*resetImage\(record\.target\);\s*observeImage\(record\.target\)/u,
+    /if \(hasInlineImageSource\(record\.target\)\) \{\s*settleInlineSourceMutation\(record\.target\)/u,
+  );
+  assert.match(barrier, /reportImagePriority\(record\.target, priority, declaredNetworkImageSource\(record\.target\)\)/u);
+  assert.match(barrier, /const declaredNetworkImageSource/u);
+  assert.match(
+    barrier,
+    /const settleInlineSourceMutation = \(image\) => \{\s*resetImage\(image\);\s*observeImage\(image\)/u,
+  );
+  assert.match(barrier, /\/\(\?:data:image\|blob:\)\/iu\.test\(pictureSourceSet\)/u);
+  assert.ok(
+    barrier.indexOf("if (hasInlineImageSource(record.target))") <
+      barrier.indexOf("const stableSourceUnchanged"),
+    "an inline source mutation must revoke the previous stable source before currentSrc can lag",
   );
   assert.match(barrier, /imageSource\(image\) === source/u);
   assert.match(barrier, /image\.hasAttribute\(STABLE_IMAGE_ATTRIBUTE\)/u);

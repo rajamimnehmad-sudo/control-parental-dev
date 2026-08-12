@@ -139,6 +139,7 @@ class DagBrowserActivity : Activity() {
     private var loadingShimmerAnimator: ObjectAnimator? = null
     private var navigationFrameBitmap: Bitmap? = null
     private var navigationFrameTabId: Long? = null
+    private var navigationFrameRevision: Long = -1L
     private var tabThumbnailResidencyRequested = false
     private val persistTabsRunnable = Runnable(::persistTabsNow)
     private val restoreMediaAnalysisParallelism =
@@ -1125,7 +1126,17 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun showNavigationSnapshot(tab: BrowserTab) {
-        if (navigationFrameTabId != tab.id || navigationFrameBitmap == null) return
+        if (navigationSnapshot.visibility == View.VISIBLE) return
+        if (
+            navigationFrameTabId != tab.id ||
+            navigationFrameRevision != tab.previewRevision ||
+            navigationFrameBitmap == null ||
+            tab.displayState != TabDisplayState.Visible ||
+            tab.previewRestricted
+        ) {
+            clearNavigationSnapshot()
+            return
+        }
         navigationSnapshot.visibility = View.VISIBLE
     }
 
@@ -1135,17 +1146,25 @@ class DagBrowserActivity : Activity() {
 
     private fun updateNavigationFrame(
         tab: BrowserTab,
+        request: DagTabPreviewRequest,
         frame: Bitmap,
     ): Boolean {
         if (
             tab !== activeTab ||
-            tab.previewRestricted
+            !DagTabPreviewPolicy.acceptsResult(
+                request = request,
+                currentTabId = tab.id,
+                currentRevision = tab.previewRevision,
+                pageVisible = tab.displayState == TabDisplayState.Visible,
+                restricted = tab.previewRestricted,
+            )
         ) {
             return false
         }
         val previous = navigationFrameBitmap
         navigationFrameBitmap = frame
         navigationFrameTabId = tab.id
+        navigationFrameRevision = request.revision
         navigationSnapshot.setImageBitmap(frame)
         previous?.recycle()
         return true
@@ -1157,6 +1176,7 @@ class DagBrowserActivity : Activity() {
         navigationFrameBitmap?.recycle()
         navigationFrameBitmap = null
         navigationFrameTabId = null
+        navigationFrameRevision = -1L
     }
 
     private fun beginProtectedLoad(
@@ -2030,7 +2050,16 @@ class DagBrowserActivity : Activity() {
         geckoView.capturePixels().accept(
             { bitmap ->
                 handler.removeCallbacks(timeout)
-                val acceptsBitmap = !captureExpired && activeTab === tab
+                val acceptsBitmap =
+                    !captureExpired &&
+                        activeTab === tab &&
+                        DagTabPreviewPolicy.acceptsResult(
+                            request = request,
+                            currentTabId = tab.id,
+                            currentRevision = tab.previewRevision,
+                            pageVisible = tab.displayState == TabDisplayState.Visible,
+                            restricted = tab.previewRestricted,
+                        )
                 if (BuildConfig.DAG_DIAGNOSTICS) {
                     Log.i(
                         TabPreviewLogTag,
@@ -2049,7 +2078,7 @@ class DagBrowserActivity : Activity() {
                     bitmap.recycle()
                     return@accept
                 }
-                val bitmapOwnedByNavigationFrame = updateNavigationFrame(tab, bitmap)
+                val bitmapOwnedByNavigationFrame = updateNavigationFrame(tab, request, bitmap)
                 try {
                     thumbnailExecutor.execute {
                         val scaled = scaleThumbnail(bitmap)

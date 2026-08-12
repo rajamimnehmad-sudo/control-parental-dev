@@ -88,11 +88,10 @@ class DagBrowserManifestContractTest {
             acceptedNavigation,
             "showNavigationSnapshot(tab)\n            beginProtectedLoad(",
         )
-        assertFalse(
-            activity.contains(
-                "navigationFrameTabId == tab.id && navigationFrameRevision == tab.navigationRevision",
-            ),
-        )
+        assertContains(activity, "navigationFrameRevision != tab.previewRevision")
+        assertContains(activity, "navigationFrameRevision = request.revision")
+        assertContains(activity, "if (navigationSnapshot.visibility == View.VISIBLE) return")
+        assertContains(activity, "val bitmapOwnedByNavigationFrame = updateNavigationFrame(tab, request, bitmap)")
         assertContains(activity, "tab.barrierReadyForNavigation = false")
         assertContains(activity, "tab.protectedContentReadyForNavigation = false")
         assertContains(activity, "!tab.barrierReadyForNavigation")

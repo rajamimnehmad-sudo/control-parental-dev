@@ -153,6 +153,44 @@
 
   const imageSource = (image) => image.currentSrc || image.src || "";
 
+  const absoluteNetworkSource = (source) => {
+    if (source.length === 0) return "";
+    try {
+      const absolute = new URL(source, document.baseURI).href;
+      return /^https?:\/\//iu.test(absolute) ? absolute : "";
+    } catch {
+      return "";
+    }
+  };
+
+  const firstNetworkCandidate = (sourceSet) => {
+    if (/(?:data:|blob:)/iu.test(sourceSet)) {
+      return sourceSet.match(/https?:\/\/[^\s,]+/iu)?.[0] || "";
+    }
+    for (const candidate of sourceSet.split(",")) {
+      const source = candidate.trim().split(/\s+/u, 1)[0] || "";
+      const absolute = absoluteNetworkSource(source);
+      if (absolute.length > 0) return absolute;
+    }
+    return "";
+  };
+
+  const declaredNetworkImageSource = (image) => {
+    const declared = image.getAttribute("src") || "";
+    const declaredNetwork = absoluteNetworkSource(declared);
+    if (declaredNetwork.length > 0) return declaredNetwork;
+    const ownCandidate = firstNetworkCandidate(image.getAttribute("srcset") || "");
+    if (ownCandidate.length > 0) return ownCandidate;
+    const pictureCandidate = firstNetworkCandidate(
+      [...(image.closest("picture")?.querySelectorAll("source[srcset]") || [])]
+        .map((source) => source.getAttribute("srcset") || "")
+        .join(","),
+    );
+    if (pictureCandidate.length > 0) return pictureCandidate;
+    const selected = imageSource(image);
+    return /^https?:\/\//iu.test(selected) ? selected : "";
+  };
+
   const reportCompactSourceMetadata = (image) => {
     if (
       !compactSourceDiagnosticsEnabled ||
@@ -197,9 +235,8 @@
   const immediateImagePriority = (image) =>
     priorityByImage.get(image) || imagePriorityFromRect(image.getBoundingClientRect());
 
-  const reportImagePriority = (image, priority) => {
+  const reportImagePriority = (image, priority, source = imageSource(image)) => {
     priorityByImage.set(image, priority);
-    const source = imageSource(image);
     if (!/^https?:\/\//iu.test(source)) return;
     if (priorityBySource.get(source) === priority) return;
     if (!priorityBySource.has(source) && priorityBySource.size >= MAX_PRIORITY_SOURCES) {
@@ -217,19 +254,22 @@
   const hasInlineImageSource = (image) => {
     const source = image.getAttribute("src") || "";
     const sourceSet = image.getAttribute("srcset") || "";
+    const pictureSourceSet =
+      [...(image.closest("picture")?.querySelectorAll("source[srcset]") || [])]
+        .map((candidate) => candidate.getAttribute("srcset") || "")
+        .join(",");
     return (
-      source.startsWith("data:") ||
-      source.startsWith("blob:") ||
-      sourceSet.includes("data:image") ||
-      sourceSet.includes("blob:")
+      /^(?:data:|blob:)/iu.test(source) ||
+      /(?:data:image|blob:)/iu.test(sourceSet) ||
+      /(?:data:image|blob:)/iu.test(pictureSourceSet)
     );
   };
 
   const inlineImageSource = (image) => {
-    const current = image.currentSrc || "";
-    if (current.startsWith("data:image/") || current.startsWith("blob:")) return current;
     const source = image.getAttribute("src") || "";
-    return source.startsWith("data:image/") || source.startsWith("blob:") ? source : "";
+    if (/^(?:data:image\/|blob:)/iu.test(source)) return source;
+    const current = image.currentSrc || "";
+    return /^(?:data:image\/|blob:)/iu.test(current) ? current : "";
   };
 
   const diagnosticImageSource = (image) => {
@@ -460,6 +500,19 @@
     pendingImages.set(image, { source, timeout });
   };
 
+  const settleInlineSourceMutation = (image) => {
+    resetImage(image);
+    observeImage(image);
+    if (!image.complete) return;
+    setTimeout(() => {
+      if (
+        image.isConnected &&
+        image.complete &&
+        inlineImageSource(image).length > 0
+      ) inspectInlineImage(image);
+    }, 0);
+  };
+
   const inspectAddedImages = (node) => {
     if (!(node instanceof Element)) return;
     if (node instanceof HTMLImageElement) {
@@ -486,16 +539,18 @@
     for (const record of records) {
       if (record.type === "attributes" && record.target instanceof HTMLImageElement) {
         priorityObserver?.unobserve(record.target);
+        const priority = immediateImagePriority(record.target);
+        reportImagePriority(record.target, priority, declaredNetworkImageSource(record.target));
+        if (hasInlineImageSource(record.target)) {
+          settleInlineSourceMutation(record.target);
+          continue;
+        }
         const stableSourceUnchanged =
           record.target.hasAttribute(STABLE_IMAGE_ATTRIBUTE) &&
           stableImageSources.get(record.target) === imageSource(record.target);
         if (stableSourceUnchanged) continue;
         resetImage(record.target);
         observeImage(record.target);
-        if (hasInlineImageSource(record.target)) {
-          if (record.target.complete) inspectInlineImage(record.target);
-          continue;
-        }
         if (record.target.complete) stabilizeImage(record.target);
         continue;
       }
@@ -503,6 +558,16 @@
         const image = record.target.closest("picture")?.querySelector("img");
         if (image instanceof HTMLImageElement) {
           priorityObserver?.unobserve(image);
+          reportImagePriority(image, immediateImagePriority(image), declaredNetworkImageSource(image));
+          const declaredSourceSet = record.target.getAttribute("srcset") || "";
+          if (/(?:data:image|blob:)/iu.test(declaredSourceSet)) {
+            settleInlineSourceMutation(image);
+            continue;
+          }
+          const stableSourceUnchanged =
+            image.hasAttribute(STABLE_IMAGE_ATTRIBUTE) &&
+            stableImageSources.get(image) === imageSource(image);
+          if (stableSourceUnchanged) continue;
           resetImage(image);
           observeImage(image);
           if (image.complete) stabilizeImage(image);
