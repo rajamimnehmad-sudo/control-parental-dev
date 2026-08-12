@@ -188,8 +188,10 @@ el runtime actual desde versiones o worktrees historicos.
   de una misma navegacion llaman a la cobertura protegida. Es una correccion de
   observabilidad: no altera el momento de mostrar la pagina ni su barrera.
 - Validacion automatizada correcta: 158 unitarios DEV, barrera JS 32/32,
-  Ktlint, Lint vital y `assembleDevDebug`. El APK fisico y su hash se
-  documentan al cerrar el artefacto.
+  Ktlint, Lint vital y `assembleDevDebug`. APK DEV final construido desde
+  `main`: 121.860.369 bytes, SHA-256
+  `6b6c8c72bc730a36ed38f1ff81c951b8ec8534b28ba379b4c7e0a1565ab3b5ca`;
+  paquete `com.contentfilter.dagbrowser.dev`, firma DEV historica preservada.
 - Limite separado: las miniaturas pequenas que R3.1 permite con un score real
   inferior a 0,40 siguen siendo un problema del modelo, no un bypass del
   navegador. Este lote no falsea ese resultado con reglas por sitio o tamano.
