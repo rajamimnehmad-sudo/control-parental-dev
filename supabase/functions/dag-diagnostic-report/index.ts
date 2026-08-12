@@ -1,8 +1,8 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 
-const MAX_COMPRESSED_BYTES = 256 * 1024;
-const MAX_JSON_BYTES = 1024 * 1024;
+const MAX_COMPRESSED_BYTES = 768 * 1024;
+const MAX_JSON_BYTES = 2 * 1024 * 1024;
 const MAX_EVENTS = 4096;
 const MAX_REPORTS_PER_HOUR = 120;
 const RETENTION_DAYS = 14;
@@ -15,11 +15,28 @@ const EVENT_KEYS = new Set([
   "sequence", "wall_ms", "elapsed_ms", "type", "tab", "candidate", "carrier", "priority",
   "action", "reason", "basis", "bytes", "width", "height", "score", "full_score",
   "bridge_ms", "queue_ms", "native_ms", "inference_ms", "inferences", "count",
+  "event_schema", "app_version_code", "page_url", "page", "resource_url", "resource",
+  "request", "resource_type", "source_kind", "mime", "frame", "status", "from_cache",
+  "active_streams", "queued_analyses", "captured_bytes", "natural_width", "natural_height",
+  "rendered_width", "rendered_height", "visual_state",
 ]);
 const SAFE_EVENT_TYPES = new Set([
   "app_started", "navigation_started", "barrier_ready", "document_sanitized", "viewport_ready",
   "page_visible", "barrier_timeout", "media_decision", "media_drop",
+  "media_resource", "media_element",
 ]);
+
+function safeDiagnosticUrl(value: unknown): boolean {
+  if (value === "data:image" || value === "blob") return true;
+  if (typeof value !== "string" || value.length < 1 || value.length > 768) return false;
+  try {
+    const parsed = new URL(value);
+    if (!["http:", "https:"].includes(parsed.protocol) || parsed.username || parsed.password || parsed.hash) return false;
+    return [...parsed.search.slice(1).split("&")].every((part) => part.length === 0 || (!part.includes("=") && /^[A-Za-z0-9_.%~-]{1,48}$/u.test(part)));
+  } catch {
+    return false;
+  }
+}
 
 function json(data: unknown, status = 200): Response {
   return new Response(JSON.stringify(data), {
@@ -86,8 +103,19 @@ function validateEvent(value: unknown): boolean {
   for (const key of ["carrier", "priority", "action", "reason", "basis"] as const) {
     if (event[key] !== undefined && (typeof event[key] !== "string" || !SAFE_EVENT_VALUE.test(event[key]))) return false;
   }
-  if (event.candidate !== undefined && (typeof event.candidate !== "string" || !/^[a-f0-9]{16}$/u.test(event.candidate))) return false;
-  for (const key of ["tab", "bytes", "width", "height", "inferences", "count"] as const) {
+  for (const key of ["candidate", "page", "resource", "request"] as const) {
+    if (event[key] !== undefined && (typeof event[key] !== "string" || !/^[a-f0-9]{16}$/u.test(event[key]))) return false;
+  }
+  for (const key of ["resource_type", "source_kind", "visual_state"] as const) {
+    if (event[key] !== undefined && (typeof event[key] !== "string" || !SAFE_EVENT_VALUE.test(event[key]))) return false;
+  }
+  if (event.mime !== undefined && (typeof event.mime !== "string" || !/^[a-z0-9.+-]{1,64}\/[a-z0-9.+-]{1,64}$/u.test(event.mime))) return false;
+  if (event.page_url !== undefined && !safeDiagnosticUrl(event.page_url)) return false;
+  if (event.resource_url !== undefined && !safeDiagnosticUrl(event.resource_url)) return false;
+  if (event.from_cache !== undefined && typeof event.from_cache !== "boolean") return false;
+  if (event.event_schema !== undefined && event.event_schema !== 2) return false;
+  if (event.app_version_code !== undefined && !finiteNumber(event.app_version_code, 1, Number.MAX_SAFE_INTEGER)) return false;
+  for (const key of ["tab", "bytes", "width", "height", "inferences", "count", "frame", "status", "active_streams", "queued_analyses", "captured_bytes", "natural_width", "natural_height", "rendered_width", "rendered_height"] as const) {
     if (event[key] !== undefined && !finiteNumber(event[key], 0, 10_000_000)) return false;
   }
   for (const key of ["score", "full_score"] as const) {
@@ -114,7 +142,7 @@ function validateReport(value: unknown): ValidReport | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const report = value as Record<string, unknown>;
   const allowedRoot = new Set(["schema_version", "report_id", "session_id", "created_at_ms", "event_count", "dropped_in_memory", "app", "device", "events"]);
-  if (Object.keys(report).some((key) => !allowedRoot.has(key)) || report.schema_version !== 1) return null;
+  if (Object.keys(report).some((key) => !allowedRoot.has(key)) || ![1, 2].includes(Number(report.schema_version))) return null;
   if (!UUID_PATTERN.test(String(report.report_id ?? "")) || !UUID_PATTERN.test(String(report.session_id ?? ""))) return null;
   if (!Array.isArray(report.events) || report.events.length > MAX_EVENTS || !report.events.every(validateEvent)) return null;
   if (report.event_count !== report.events.length || !finiteNumber(report.dropped_in_memory, 0, 1_000_000)) return null;

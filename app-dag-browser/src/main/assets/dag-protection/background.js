@@ -34,7 +34,7 @@ const NATIVE_TIMEOUT_MS = 2_250;
 const VIEWPORT_QUIET_MS = 250;
 const MAX_PRIORITY_HINTS = 256;
 const DIAGNOSTIC_FLUSH_MS = 500;
-const MAX_DIAGNOSTIC_KEYS = 32;
+const MAX_DIAGNOSTIC_KEYS = 64;
 const BLOCKED_PLACEHOLDER_BASE64 =
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNgYAAAAAMAASsJTYQAAAAASUVORK5CYII=";
 
@@ -54,10 +54,13 @@ const decisionCache = new Map();
 const imagePriorityByUrl = new Map();
 const documentStatesByTab = new Map();
 const diagnosticDrops = new Map();
+const diagnosticResources = new Map();
+const diagnosticElements = new Map();
 
 const validTabId = (value) => Number.isInteger(value) && value >= 0;
 const validDocumentToken = (value) =>
   typeof value === "string" && /^document_[a-f0-9]{1,16}$/u.test(value);
+const boundedDiagnosticUrl = (value) => typeof value === "string" ? value.slice(0, 4_096) : "";
 const newDocumentKey = () =>
   `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
 
@@ -72,6 +75,7 @@ const postDocumentLifecycle = (type, state) => {
       version: PROTOCOL_VERSION,
       tabId: state.tabId,
       documentKey: state.documentKey,
+      pageUrl: state.pageUrl || "",
     });
   } catch {}
 };
@@ -110,6 +114,7 @@ const beginDocument = (tabId) => {
     tabId,
     documentKey: newDocumentKey(),
     documentToken: null,
+    pageUrl: "",
     frameTokens: new Map(),
     documentLoaded: false,
     viewportReadyReported: false,
@@ -130,17 +135,21 @@ const currentDocumentForDetails = (details) =>
 
 const flushDiagnosticDrops = () => {
   diagnosticFlushTimer = null;
-  if (!diagnosticsEnabled || diagnosticDrops.size === 0 || nativePort === null) return;
-  const events = [...diagnosticDrops.entries()].map(([key, count]) => {
-    const [carrier, reason] = key.split(":", 2);
-    return { carrier, reason, count };
-  });
+  if (!diagnosticsEnabled || nativePort === null) return;
+  const events = [...diagnosticDrops.values()].map(({ event, count }) => ({ ...event, count }));
+  const resources = [...diagnosticResources.values()];
+  const elements = [...diagnosticElements.values()];
+  if (events.length === 0 && resources.length === 0 && elements.length === 0) return;
   diagnosticDrops.clear();
+  diagnosticResources.clear();
+  diagnosticElements.clear();
   try {
     nativePort.postMessage({
       type: "media-diagnostic-summary",
       version: PROTOCOL_VERSION,
       events,
+      resources,
+      elements,
       activeStreams,
       queuedAnalyses: analysisQueue.length,
       capturedBytes,
@@ -148,15 +157,75 @@ const flushDiagnosticDrops = () => {
   } catch {}
 };
 
-const recordDiagnosticDrop = (carrier, reason) => {
-  if (!diagnosticsEnabled) return;
-  const key = `${carrier}:${reason}`;
-  if (diagnosticDrops.has(key) || diagnosticDrops.size < MAX_DIAGNOSTIC_KEYS) {
-    diagnosticDrops.set(key, (diagnosticDrops.get(key) || 0) + 1);
-  }
+const scheduleDiagnosticFlush = () => {
   if (diagnosticFlushTimer === null) {
     diagnosticFlushTimer = setTimeout(flushDiagnosticDrops, DIAGNOSTIC_FLUSH_MS);
   }
+};
+
+const diagnosticContext = (details, state) => ({
+  tabId: validTabId(details?.tabId) ? details.tabId : state?.tabId,
+  pageUrl: boundedDiagnosticUrl(details?.documentUrl || details?.originUrl || state?.pageUrl),
+  sourceUrl: boundedDiagnosticUrl(details?.url),
+  requestId: typeof details?.requestId === "string" ? details.requestId : "",
+  resourceType: typeof details?.type === "string" ? details.type : "unknown",
+  sourceKind: typeof details?.sourceKind === "string"
+    ? details.sourceKind
+    : /^data:/iu.test(details?.url || "") ? "data" : /^blob:/iu.test(details?.url || "") ? "blob" : "network",
+  frameId: Number.isInteger(details?.frameId) ? details.frameId : 0,
+  statusCode: Number.isInteger(details?.statusCode) ? details.statusCode : undefined,
+  fromCache: typeof details?.fromCache === "boolean" ? details.fromCache : undefined,
+  activeStreams,
+  queuedAnalyses: analysisQueue.length,
+  capturedBytes,
+});
+
+const recordDiagnosticDrop = (carrier, reason, details = null, state = null) => {
+  if (!diagnosticsEnabled) return;
+  const context = diagnosticContext(details, state);
+  const key = context.requestId || `${carrier}:${reason}`;
+  if (diagnosticDrops.has(key) || diagnosticDrops.size < MAX_DIAGNOSTIC_KEYS) {
+    const existing = diagnosticDrops.get(key);
+    diagnosticDrops.set(key, {
+      event: { carrier, reason, ...context },
+      count: (existing?.count || 0) + 1,
+    });
+  }
+  scheduleDiagnosticFlush();
+};
+
+const recordResourceDiagnostic = (details, mimeType) => {
+  if (!diagnosticsEnabled || diagnosticResources.size >= MAX_DIAGNOSTIC_KEYS) return;
+  const context = diagnosticContext(details, currentDocumentForDetails(details));
+  diagnosticResources.set(context.requestId || `${context.sourceUrl}:${context.statusCode}`, {
+    ...context,
+    mimeType,
+  });
+  scheduleDiagnosticFlush();
+};
+
+const recordElementDiagnostic = (message, sender) => {
+  if (!diagnosticsEnabled || diagnosticElements.size >= MAX_DIAGNOSTIC_KEYS) return;
+  const tabId = sender?.tab?.id;
+  const frameId = sender?.frameId;
+  const state = validTabId(tabId) ? documentStatesByTab.get(tabId) : null;
+  if (!isCurrentDocument(state) || !Number.isInteger(frameId) || frameId < 0) return;
+  const sourceUrl = boundedDiagnosticUrl(message.url);
+  const key = `${frameId}:${sourceUrl}:${message.visualState}`;
+  diagnosticElements.set(key, {
+    tabId,
+    pageUrl: boundedDiagnosticUrl(sender?.url || state.pageUrl),
+    sourceUrl,
+    resourceType: "image",
+    sourceKind: /^data:/iu.test(sourceUrl) ? "data" : sourceUrl === "blob" || /^blob:/iu.test(sourceUrl) ? "blob" : "network",
+    frameId,
+    visualState: message.visualState,
+    naturalWidth: message.naturalWidth,
+    naturalHeight: message.naturalHeight,
+    renderedWidth: message.renderedWidth,
+    renderedHeight: message.renderedHeight,
+  });
+  scheduleDiagnosticFlush();
 };
 
 const decodeBase64 = (value) => {
@@ -335,6 +404,9 @@ const connectNative = () => {
   try {
     const port = browser.runtime.connectNative(NATIVE_APP);
     nativePort = port;
+    if (diagnosticsEnabled && (
+      diagnosticDrops.size > 0 || diagnosticResources.size > 0 || diagnosticElements.size > 0
+    )) scheduleDiagnosticFlush();
     for (const state of documentStatesByTab.values()) {
       if (isCurrentDocument(state)) postDocumentLifecycle("media-document-current", state);
     }
@@ -343,6 +415,8 @@ const connectNative = () => {
         diagnosticsEnabled = message.enabled === true;
         if (!diagnosticsEnabled) {
           diagnosticDrops.clear();
+          diagnosticResources.clear();
+          diagnosticElements.clear();
           clearTimeout(diagnosticFlushTimer);
           diagnosticFlushTimer = null;
         }
@@ -405,7 +479,7 @@ const requestNativeDecision = (
   return new Promise((resolve) => {
     const timeout = setTimeout(() => {
       pendingNative.delete(candidateId);
-      recordDiagnosticDrop("native", "decision_timeout");
+      recordDiagnosticDrop("native", "decision_timeout", details, documentState);
       resolve({ action: "block", cacheable: false });
     }, NATIVE_TIMEOUT_MS);
     pendingNative.set(candidateId, { resolve, timeout, documentState });
@@ -415,6 +489,19 @@ const requestNativeDecision = (
         version: PROTOCOL_VERSION,
         candidateId,
         sourceUrl: details.url,
+        pageUrl: details.documentUrl || details.originUrl || documentState.pageUrl || "",
+        requestId: typeof details.requestId === "string" ? details.requestId : "",
+        resourceType: typeof details.type === "string" ? details.type : "image",
+        sourceKind: typeof details.sourceKind === "string"
+          ? details.sourceKind
+          : /^data:/iu.test(details.url || "") ? "data" : /^blob:/iu.test(details.url || "") ? "blob" : "network",
+        mimeType: typeof details.mimeType === "string" ? details.mimeType : "",
+        frameId: Number.isInteger(details.frameId) ? details.frameId : 0,
+        statusCode: Number.isInteger(details.statusCode) ? details.statusCode : undefined,
+        fromCache: typeof details.fromCache === "boolean" ? details.fromCache : undefined,
+        activeStreams,
+        queuedAnalyses: analysisQueue.length,
+        capturedBytes,
         byteLength: bytes.byteLength,
         bytesBase64,
         priority: normalizePriority(priority),
@@ -426,7 +513,7 @@ const requestNativeDecision = (
     } catch {
       pendingNative.delete(candidateId);
       clearTimeout(timeout);
-      recordDiagnosticDrop("native", "post_failed");
+      recordDiagnosticDrop("native", "post_failed", details, documentState);
       resolve({ action: "block", cacheable: false });
     }
   });
@@ -487,12 +574,12 @@ const drainAnalysisQueue = () => {
 const enqueueAnalysis = (task) => {
   const state = task.documentState;
   if (!isCurrentDocument(state)) {
-    recordDiagnosticDrop(task.carrier || "network", "stale_document");
+    recordDiagnosticDrop(task.carrier || "network", "stale_document", task.details, state);
     task.settle({ action: "block", replacement: null });
     return false;
   }
   if (analysisQueue.length >= MAX_QUEUED_ANALYSES) {
-    recordDiagnosticDrop(task.carrier || "network", "queue_full");
+    recordDiagnosticDrop(task.carrier || "network", "queue_full", task.details, state);
     task.settle({ action: "block", replacement: null });
     return false;
   }
@@ -504,8 +591,17 @@ const enqueueAnalysis = (task) => {
 
 const decideInlineRaster = (message, sender) => {
   const pageUrl = sender?.url || "";
+  const inlineDetails = {
+    url: pageUrl,
+    documentUrl: pageUrl,
+    tabId: sender?.tab?.id,
+    frameId: sender?.frameId,
+    type: "image",
+    sourceKind: "inline",
+    mimeType: typeof message?.mimeType === "string" ? message.mimeType : "",
+  };
   if (!/^https?:\/\//iu.test(pageUrl)) {
-    recordDiagnosticDrop("inline", "invalid_page");
+    recordDiagnosticDrop("inline", "invalid_page", inlineDetails);
     return { action: "block" };
   }
   const tabId = sender?.tab?.id;
@@ -520,23 +616,23 @@ const decideInlineRaster = (message, sender) => {
     !validDocumentToken(message?.documentToken) ||
     registeredToken !== message.documentToken
   ) {
-    recordDiagnosticDrop("inline", "unknown_frame_document");
+    recordDiagnosticDrop("inline", "unknown_frame_document", inlineDetails, documentState);
     return { action: "block" };
   }
   const bytes = decodeInlineRaster(message?.dataUrl);
   if (!(bytes instanceof Uint8Array)) {
-    recordDiagnosticDrop("inline", "invalid_or_oversize");
+    recordDiagnosticDrop("inline", "invalid_or_oversize", inlineDetails, documentState);
     return { action: "block" };
   }
   if (capturedBytes + bytes.byteLength > MAX_CAPTURED_BYTES) {
-    recordDiagnosticDrop("inline", "byte_budget");
+    recordDiagnosticDrop("inline", "byte_budget", inlineDetails, documentState);
     bytes.fill(0);
     return { action: "block" };
   }
   capturedBytes += bytes.byteLength;
   return new Promise((resolve) => {
     enqueueAnalysis({
-      details: { url: pageUrl },
+      details: inlineDetails,
       bytes,
       priority: normalizePriority(message?.priority),
       carrier: "inline",
@@ -563,15 +659,15 @@ const combineChunks = (chunks, totalBytes) => {
 const interceptImage = (details) => {
   const documentState = currentDocumentForDetails(details);
   if (!isCurrentDocument(documentState)) {
-    recordDiagnosticDrop("network", "stale_document");
+    recordDiagnosticDrop("network", "stale_document", details, documentState);
     return { cancel: true };
   }
   if (typeof browser.webRequest.filterResponseData !== "function") {
-    recordDiagnosticDrop("network", "filter_unavailable");
+    recordDiagnosticDrop("network", "filter_unavailable", details, documentState);
     return { cancel: true };
   }
   if (activeStreams >= MAX_ACTIVE_STREAMS) {
-    recordDiagnosticDrop("network", "stream_limit");
+    recordDiagnosticDrop("network", "stream_limit", details, documentState);
     return { cancel: true };
   }
 
@@ -579,7 +675,7 @@ const interceptImage = (details) => {
   try {
     filter = browser.webRequest.filterResponseData(details.requestId);
   } catch {
-    recordDiagnosticDrop("network", "filter_open_failed");
+    recordDiagnosticDrop("network", "filter_open_failed", details, documentState);
     return { cancel: true };
   }
 
@@ -629,7 +725,7 @@ const interceptImage = (details) => {
   const armCaptureTimeout = (delayMillis, reason) => {
     clearTimeout(captureTimeout);
     captureTimeout = setTimeout(() => {
-      recordDiagnosticDrop("network", reason);
+      recordDiagnosticDrop("network", reason, details, documentState);
       settle({ action: "block", replacement: null });
     }, delayMillis);
   };
@@ -646,18 +742,18 @@ const interceptImage = (details) => {
     try {
       chunk = new Uint8Array(event.data);
     } catch {
-      recordDiagnosticDrop("network", "chunk_decode_failed");
+      recordDiagnosticDrop("network", "chunk_decode_failed", details, documentState);
       settle({ action: "block", replacement: null });
       return;
     }
     if (chunk.byteLength === 0) return;
     if (totalBytes + chunk.byteLength > MAX_IMAGE_BYTES) {
-      recordDiagnosticDrop("network", "resource_too_large");
+      recordDiagnosticDrop("network", "resource_too_large", details, documentState);
       settle({ action: "block", replacement: null });
       return;
     }
     if (capturedBytes + chunk.byteLength > MAX_CAPTURED_BYTES) {
-      recordDiagnosticDrop("network", "byte_budget");
+      recordDiagnosticDrop("network", "byte_budget", details, documentState);
       settle({ action: "block", replacement: null });
       return;
     }
@@ -670,13 +766,13 @@ const interceptImage = (details) => {
   };
 
   filter.onerror = () => {
-    recordDiagnosticDrop("network", "stream_error");
+    recordDiagnosticDrop("network", "stream_error", details, documentState);
     settle({ action: "block", replacement: null });
   };
   filter.onstop = () => {
     if (settled) return;
     if (totalBytes === 0) {
-      recordDiagnosticDrop("network", "empty_response");
+      recordDiagnosticDrop("network", "empty_response", details, documentState);
       settle({ action: "block", replacement: null });
       return;
     }
@@ -714,6 +810,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
           state = beginDocument(tabId);
         }
         state.documentToken = message.documentToken;
+        state.pageUrl = boundedDiagnosticUrl(sender?.url);
         scheduleDocumentQuiet(state);
       } else if (isCurrentDocument(state)) {
         state.frameTokens.set(frameId, message.documentToken);
@@ -737,6 +834,11 @@ browser.runtime.onMessage.addListener((message, sender) => {
   }
   if (message?.type === "image-priority" && message?.version === PROTOCOL_VERSION) {
     rememberImagePriority(message.url, message.priority);
+    return undefined;
+  }
+  if (message?.type === "media-element-states" && message?.version === PROTOCOL_VERSION) {
+    const events = Array.isArray(message.events) ? message.events.slice(0, MAX_DIAGNOSTIC_KEYS) : [];
+    for (const event of events) recordElementDiagnostic(event, sender);
     return undefined;
   }
   if (message?.type !== "inline-raster-decision" || message?.version !== PROTOCOL_VERSION) {
@@ -763,6 +865,9 @@ browser.webRequest.onHeadersReceived.addListener(
       ?.find((header) => header.name.toLowerCase() === "content-type")
       ?.value?.trim() || "";
     const alreadyIntercepted = ANALYZED_RESOURCE_TYPES.has(details.type);
+    if (alreadyIntercepted || IMAGE_MIME_PATTERN.test(contentType)) {
+      recordResourceDiagnostic(details, contentType);
+    }
     if (IMAGE_MIME_PATTERN.test(contentType) && !alreadyIntercepted) {
       return interceptImage(details);
     }

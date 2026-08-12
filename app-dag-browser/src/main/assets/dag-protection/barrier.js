@@ -23,6 +23,9 @@
   const MAX_COMPACT_SOURCE_DIAGNOSTICS = 64;
   const COMPACT_SOURCE_DIAGNOSTIC_EDGE = 192;
   const MAX_STYLE_CARRIER_DIAGNOSTIC_ELEMENTS = 2048;
+  const MAX_ELEMENT_STATE_DIAGNOSTICS = 512;
+  const MAX_ELEMENT_STATE_BATCH = 64;
+  const ELEMENT_STATE_FLUSH_MS = 250;
   const INITIAL_AD_SCAN_READY_ATTRIBUTE = "data-glosh-dag-ads-initial-ready";
   const INITIAL_AD_SCAN_READY_EVENT = "glosh-dag-ads-initial-ready";
   const documentToken =
@@ -46,11 +49,15 @@
   let compactSourceDiagnostics = 0;
   let compactSourceDiagnosticsEnabled = false;
   let styleCarrierDiagnosticsReported = false;
+  let elementStateDiagnostics = 0;
+  let elementStateFlushTimer = null;
   const pendingImages = new WeakMap();
   const unsettledImages = new Set();
   const inlineDecisions = new Map();
   const priorityBySource = new Map();
   const priorityByImage = new WeakMap();
+  const lastElementStateByImage = new WeakMap();
+  const pendingElementStates = new Map();
   const diagnosedCompactSources = new WeakSet();
   try {
     nativePort = browser.runtime.connectNative(NATIVE_APP);
@@ -224,6 +231,49 @@
     return source.startsWith("data:image/") || source.startsWith("blob:") ? source : "";
   };
 
+  const diagnosticImageSource = (image) => {
+    const source = imageSource(image);
+    if (source.startsWith("data:")) return "data:image";
+    if (source.startsWith("blob:")) return "blob";
+    return source;
+  };
+
+  const flushElementStates = () => {
+    elementStateFlushTimer = null;
+    if (pendingElementStates.size === 0) return;
+    const events = [...pendingElementStates.values()];
+    pendingElementStates.clear();
+    void browser.runtime.sendMessage({
+      type: "media-element-states",
+      version: PROTOCOL_VERSION,
+      events,
+    }).catch(() => {});
+  };
+
+  const reportElementState = (image, visualState) => {
+    if (elementStateDiagnostics >= MAX_ELEMENT_STATE_DIAGNOSTICS) return;
+    const source = diagnosticImageSource(image);
+    if (source.length === 0) return;
+    const signature = `${source}:${visualState}:${image.naturalWidth}x${image.naturalHeight}:${image.clientWidth}x${image.clientHeight}`;
+    if (lastElementStateByImage.get(image) === signature) return;
+    lastElementStateByImage.set(image, signature);
+    elementStateDiagnostics += 1;
+    pendingElementStates.set(signature, {
+      url: source,
+      visualState,
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      renderedWidth: image.clientWidth,
+      renderedHeight: image.clientHeight,
+    });
+    if (pendingElementStates.size >= MAX_ELEMENT_STATE_BATCH) {
+      clearTimeout(elementStateFlushTimer);
+      flushElementStates();
+    } else if (elementStateFlushTimer === null) {
+      elementStateFlushTimer = setTimeout(flushElementStates, ELEMENT_STATE_FLUSH_MS);
+    }
+  };
+
   const encodeBase64 = (bytes) => {
     let binary = "";
     for (let offset = 0; offset < bytes.byteLength; offset += 0x8000) {
@@ -282,6 +332,7 @@
     pendingImages.delete(image);
     unsettledImages.delete(image);
     priorityObserver?.unobserve(image);
+    if (image.isConnected) reportElementState(image, "hidden");
   };
 
   const releaseImage = (image) => {
@@ -293,6 +344,7 @@
     image.setAttribute(STABLE_IMAGE_ATTRIBUTE, "true");
     unsettledImages.delete(image);
     priorityObserver?.unobserve(image);
+    reportElementState(image, "shown");
   };
 
   const inlineImageIsBounded = (image, source) => {
@@ -325,6 +377,7 @@
           version: PROTOCOL_VERSION,
           documentToken,
           dataUrl,
+          mimeType: dataUrl.substring(5, dataUrl.indexOf(";")),
           priority: immediateImagePriority(image),
         });
       })().catch(() => ({ action: "block" }));
@@ -509,6 +562,7 @@
     }
   }, true);
   addEventListener("pagehide", (event) => {
+    flushElementStates();
     if (!event.persisted) postDocumentLifecycle("document-retired");
   });
   addEventListener("pageshow", (event) => {

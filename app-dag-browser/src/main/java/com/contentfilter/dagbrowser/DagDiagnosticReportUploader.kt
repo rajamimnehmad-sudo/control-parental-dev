@@ -126,10 +126,10 @@ internal class DagDiagnosticReportUploader(
     }
 
     private companion object {
-        const val SchemaVersion = 1
+        const val SchemaVersion = 2
         const val MinimumTokenLength = 32
         const val MaxMetadataLength = 80
-        const val MaxCompressedReportBytes = 256 * 1024
+        const val MaxCompressedReportBytes = 768 * 1024
         const val MaxResponseChars = 4_096
         const val ConnectTimeoutMillis = 10_000
         const val ReadTimeoutMillis = 20_000

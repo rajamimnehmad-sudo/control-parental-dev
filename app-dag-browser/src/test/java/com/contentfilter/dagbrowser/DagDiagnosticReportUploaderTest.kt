@@ -47,10 +47,9 @@ class DagDiagnosticReportUploaderTest {
             val decoded =
                 GZIPInputStream(ByteArrayInputStream(compressed)).bufferedReader().use { it.readText() }
             val report = JSONObject(decoded)
-            assertEquals(1, report.getInt("schema_version"))
+            assertEquals(2, report.getInt("schema_version"))
             assertEquals(1, report.getInt("event_count"))
             assertEquals("model_filter", report.getJSONArray("events").getJSONObject(0).getString("reason"))
-            assertFalse(decoded.contains("url", ignoreCase = true))
             assertFalse(decoded.contains("cookie", ignoreCase = true))
             assertFalse(decoded.contains("pixels", ignoreCase = true))
         } finally {

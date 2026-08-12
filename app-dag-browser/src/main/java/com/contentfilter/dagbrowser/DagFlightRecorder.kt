@@ -4,6 +4,7 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.net.URI
 import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.Executors
@@ -22,6 +23,8 @@ internal enum class DagFlightEventType(val wireValue: String) {
     BarrierTimeout("barrier_timeout"),
     MediaDecision("media_decision"),
     MediaDrop("media_drop"),
+    MediaResource("media_resource"),
+    MediaElement("media_element"),
 }
 
 internal data class DagFlightEvent(
@@ -44,6 +47,23 @@ internal data class DagFlightEvent(
     val inferenceMillis: Double? = null,
     val inferenceCount: Int? = null,
     val count: Int? = null,
+    val pageUrl: String? = null,
+    val resourceUrl: String? = null,
+    val requestId: String? = null,
+    val resourceType: String? = null,
+    val sourceKind: String? = null,
+    val mimeType: String? = null,
+    val frameId: Int? = null,
+    val statusCode: Int? = null,
+    val fromCache: Boolean? = null,
+    val activeStreams: Int? = null,
+    val queuedAnalyses: Int? = null,
+    val capturedBytes: Int? = null,
+    val naturalWidth: Int? = null,
+    val naturalHeight: Int? = null,
+    val renderedWidth: Int? = null,
+    val renderedHeight: Int? = null,
+    val visualState: String? = null,
 )
 
 private data class DagPendingFlightEvent(
@@ -64,9 +84,10 @@ internal data class DagFlightSnapshot(
 }
 
 /**
- * Bounded, local-first diagnostic journal. It accepts only typed metadata and never URLs, page
- * text, media bytes, pixels, headers or credentials. Disk work is serialized away from UI and
- * media-analysis threads.
+ * Bounded, local-first diagnostic journal. Page/resource locations are reduced to origin, path and
+ * query-key names; query values, user info, fragments, page text, media bytes, pixels, headers and
+ * credentials are never persisted. Disk work is serialized away from UI and media-analysis
+ * threads.
  */
 internal class DagFlightRecorder private constructor(
     private val directory: File,
@@ -202,6 +223,8 @@ internal class DagFlightRecorder private constructor(
             .put("wall_ms", pendingEvent.wallMillis)
             .put("elapsed_ms", pendingEvent.elapsedMillis)
             .put("type", event.type.wireValue)
+            .put("event_schema", EventSchemaVersion)
+            .put("app_version_code", BuildConfig.VERSION_CODE)
             .apply {
                 event.tabId?.let { put("tab", it.coerceAtLeast(0L)) }
                 event.candidateId?.takeIf(CandidateIdPattern::matches)?.let { put("candidate", candidateToken(it)) }
@@ -223,15 +246,71 @@ internal class DagFlightRecorder private constructor(
                 }
                 event.inferenceCount?.let { put("inferences", it.coerceIn(0, MaxRecordedInferences)) }
                 event.count?.let { put("count", it.coerceIn(1, MaxRecordedCount)) }
+                event.pageUrl?.let { raw ->
+                    sanitizedUrl(raw)?.let { put("page_url", it) }
+                    put("page", opaqueToken(raw.take(MaxRawUrlChars)))
+                }
+                event.resourceUrl?.let { raw ->
+                    sanitizedUrl(raw)?.let { put("resource_url", it) }
+                    put("resource", opaqueToken(raw.take(MaxRawUrlChars)))
+                }
+                event.requestId?.takeIf(RequestIdPattern::matches)?.let { put("request", opaqueToken(it)) }
+                event.resourceType?.takeIf(SafeValuePattern::matches)?.let { put("resource_type", it) }
+                event.sourceKind?.takeIf(SafeValuePattern::matches)?.let { put("source_kind", it) }
+                event.mimeType?.let(::sanitizedMimeType)?.let { put("mime", it) }
+                event.frameId?.let { put("frame", it.coerceIn(0, MaxRecordedFrame)) }
+                event.statusCode?.let { put("status", it.coerceIn(0, 999)) }
+                event.fromCache?.let { put("from_cache", it) }
+                event.activeStreams?.let { put("active_streams", it.coerceIn(0, MaxRecordedCount)) }
+                event.queuedAnalyses?.let { put("queued_analyses", it.coerceIn(0, MaxRecordedCount)) }
+                event.capturedBytes?.let { put("captured_bytes", it.coerceIn(0, MaxRecordedBytes)) }
+                event.naturalWidth?.let { put("natural_width", it.coerceIn(0, MaxRecordedDimension)) }
+                event.naturalHeight?.let { put("natural_height", it.coerceIn(0, MaxRecordedDimension)) }
+                event.renderedWidth?.let { put("rendered_width", it.coerceIn(0, MaxRecordedDimension)) }
+                event.renderedHeight?.let { put("rendered_height", it.coerceIn(0, MaxRecordedDimension)) }
+                event.visualState?.takeIf(SafeValuePattern::matches)?.let { put("visual_state", it) }
             }
     }
 
     private fun candidateToken(candidateId: String): String {
+        return opaqueToken(candidateId)
+    }
+
+    private fun opaqueToken(value: String): String {
         val digest =
             MessageDigest.getInstance("SHA-256")
-                .digest("$sessionSalt:$candidateId".toByteArray(Charsets.UTF_8))
+                .digest("$sessionSalt:$value".toByteArray(Charsets.UTF_8))
         return digest.take(CandidateTokenBytes).joinToString("") { "%02x".format(it) }
     }
+
+    private fun sanitizedUrl(value: String): String? {
+        val trimmed = value.trim().take(MaxRawUrlChars)
+        if (trimmed.startsWith("data:", ignoreCase = true)) return "data:image"
+        if (trimmed.startsWith("blob:", ignoreCase = true)) return "blob"
+        val uri = runCatching { URI(trimmed) }.getOrNull() ?: return null
+        val scheme = uri.scheme?.lowercase()?.takeIf { it == "http" || it == "https" } ?: return null
+        val host = uri.host?.lowercase()?.takeIf(HostPattern::matches) ?: return null
+        val port = uri.port.takeIf { it in 1..65535 }?.let { ":$it" }.orEmpty()
+        val path =
+            uri.rawPath.orEmpty()
+                .take(MaxRecordedUrlChars / 2)
+                .replace(UnsafeUrlCharacterPattern, "")
+                .ifBlank { "/" }
+        val queryKeys =
+            uri.rawQuery.orEmpty()
+                .split('&')
+                .asSequence()
+                .map { it.substringBefore('=').take(MaxQueryKeyChars) }
+                .filter(QueryKeyPattern::matches)
+                .distinct()
+                .take(MaxQueryKeys)
+                .toList()
+        val query = queryKeys.takeIf(List<String>::isNotEmpty)?.joinToString("&", prefix = "?").orEmpty()
+        return "$scheme://$host$port$path$query".take(MaxRecordedUrlChars)
+    }
+
+    private fun sanitizedMimeType(value: String): String? =
+        value.substringBefore(';').trim().lowercase().takeIf(MimeTypePattern::matches)
 
     private fun flushSafely() {
         runCatching { flushPending() }
@@ -267,12 +346,23 @@ internal class DagFlightRecorder private constructor(
         const val MaxReportEvents = 4_096
         const val MaxFileBytes = 512L * 1024L
         const val CandidateTokenBytes = 8
+        const val EventSchemaVersion = 2
         const val MaxRecordedBytes = 8 * 1024 * 1024
         const val MaxRecordedDimension = 16_384
         const val MaxRecordedMillis = 60_000L
         const val MaxRecordedInferences = 8
         const val MaxRecordedCount = 100_000
+        const val MaxRecordedFrame = 10_000
+        const val MaxRawUrlChars = 4_096
+        const val MaxRecordedUrlChars = 768
+        const val MaxQueryKeyChars = 48
+        const val MaxQueryKeys = 16
         val CandidateIdPattern = Regex("^[A-Za-z0-9_-]{1,80}$")
+        val RequestIdPattern = Regex("^[A-Za-z0-9_.:-]{1,160}$")
         val SafeValuePattern = Regex("^[a-z0-9_]{1,48}$")
+        val HostPattern = Regex("^[A-Za-z0-9.-]{1,253}$")
+        val QueryKeyPattern = Regex("^[A-Za-z0-9_.%~-]{1,48}$")
+        val MimeTypePattern = Regex("^[a-z0-9.+-]{1,64}/[a-z0-9.+-]{1,64}$")
+        val UnsafeUrlCharacterPattern = Regex("[\\p{Cc}\\p{Cf}\\s]")
     }
 }

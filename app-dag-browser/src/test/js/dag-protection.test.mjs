@@ -194,6 +194,16 @@ const createHarness = async ({ captureStartTimeoutMs = null, captureIdleTimeoutM
     setImagePriority(message) {
       return runtimeMessages.listeners[0](message, { url: "https://shop.example.test/" });
     },
+    setElementState(
+      message,
+      sender = { url: "https://shop.example.test/", tab: { id: 1 }, frameId: 0 },
+    ) {
+      return runtimeMessages.listeners[0]({
+        type: "media-element-states",
+        version: 2,
+        events: [message],
+      }, sender);
+    },
     answer(message) {
       for (const listener of nativeMessages.listeners) listener(message);
     },
@@ -535,7 +545,7 @@ test("bounded inline raster in a registered subframe crosses the same native gat
   assert.equal(harness.postedNative.filter((message) => message.type === "media-bytes").length, 1);
 });
 
-test("diagnostic mode reports bounded aggregate drop reasons without URLs", async () => {
+test("diagnostic mode reports bounded drops with exact resource correlation", async () => {
   const harness = await createHarness();
   harness.answer({
     type: "media-diagnostics-config",
@@ -550,12 +560,54 @@ test("diagnostic mode reports bounded aggregate drop reasons without URLs", asyn
   assert.equal(result.action, "block");
   const summary = await waitFor(() => harness.postedNative.find((message) =>
     message.type === "media-diagnostic-summary"), "diagnostic summary");
-  assert.equal(JSON.stringify(summary.events), JSON.stringify([{
-    carrier: "inline",
-    reason: "invalid_or_oversize",
-    count: 1,
-  }]));
-  assert.equal(JSON.stringify(summary).includes("search.example.test"), false);
+  assert.equal(summary.events.length, 1);
+  assert.equal(summary.events[0].carrier, "inline");
+  assert.equal(summary.events[0].reason, "invalid_or_oversize");
+  assert.equal(summary.events[0].count, 1);
+  assert.equal(summary.events[0].pageUrl, "https://search.example.test/?q=shoes");
+  assert.equal(summary.events[0].resourceType, "image");
+  assert.equal(summary.events[0].activeStreams, 0);
+});
+
+test("diagnostic mode correlates HTTP response and terminal DOM image state", async () => {
+  const harness = await createHarness();
+  harness.answer({ type: "media-diagnostics-config", version: 2, enabled: true });
+  const details = imageDetails("correlated", "https://cdn.example.test/photo.jpg?w=320&token=secret");
+  harness.before(details);
+  harness.headers({
+    ...details,
+    statusCode: 200,
+    fromCache: false,
+    responseHeaders: [{ name: "Content-Type", value: "image/webp" }],
+  });
+  const filter = harness.filters.get(details.requestId);
+  filter.ondata({ data: Uint8Array.from([0x52, 0x49, 0x46, 0x46]).buffer });
+  filter.onstop();
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes"), "correlated native request");
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  harness.setElementState({
+    url: details.url,
+    visualState: "shown",
+    naturalWidth: 320,
+    naturalHeight: 240,
+    renderedWidth: 160,
+    renderedHeight: 120,
+  });
+  const summary = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-diagnostic-summary"), "correlated diagnostic summary");
+  assert.equal(summary.resources[0].requestId, "correlated");
+  assert.equal(summary.resources[0].statusCode, 200);
+  assert.equal(summary.resources[0].mimeType, "image/webp");
+  assert.equal(summary.elements[0].sourceUrl, details.url);
+  assert.equal(summary.elements[0].visualState, "shown");
+  assert.equal(summary.elements[0].naturalWidth, 320);
 });
 
 test("SVG URLs enter the native gate and only a validated passive vector is released", async () => {

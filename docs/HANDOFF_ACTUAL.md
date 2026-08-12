@@ -158,7 +158,36 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local en validacion: DAG Browser 206 — captura progresiva y formatos estaticos
+## Candidato local en validacion: DAG Browser 207 — diagnostico correlacionado
+
+- DAG 207 (`0.70.11-dev`, extension `2.0.10`) amplía la caja negra sin cambiar
+  R3.1, `dag-36`, el umbral, la politica visual, los hilos ni ONNX.
+- Cada evento nuevo identifica su esquema y `versionCode`; los eventos legacy
+  conservados tras una actualizacion ya no pueden confundirse con los nuevos.
+- La evidencia permite correlacionar pagina, respuesta HTTP/MIME/cache, request,
+  decision terminal de GloshIA y estado final `shown`/`hidden` del `img`. Los
+  elementos visuales se agrupan en lotes de hasta 64 antes de cruzar el puente,
+  para no introducir un mensaje nativo por imagen.
+- Las direcciones se reducen localmente a host, ruta y nombres de claves de
+  query. No se guardan valores, fragmentos, `userinfo`, fotos, Base64, pixeles,
+  HTML, cookies, headers ni credenciales. Tokens salados preservan la
+  correlacion exacta sin exponer esos valores.
+- El receptor privado `dag-diagnostic-report` de Supabase DEV quedó en version
+  4, compatible con esquemas 1 y 2. La prueba remota `DAG-Q6RBJC6B` confirmó
+  subida, validacion estricta y lectura del nuevo esquema. Production no cambió.
+- Validacion local: 157 unitarios DEV y 157 Diagnostic, barrera JS 28/28,
+  Ktlint, Lint de ambos flavors, compilacion instrumentada y APK DEV/Diagnostic
+  correctos. APK DEV: 121.856.429 bytes, SHA-256
+  `91341d538140186f7a4d17cbfb0be7f187bed3b6ec4811ca17c4e83ed59339c4`;
+  firma DEV estable `d51bc0da…f8a8832`. APK Diagnostic: 121.861.369 bytes,
+  SHA-256
+  `5f1ea1b6ba480f207e0d07fbfe3421419c9f415908628996562b7036ca5117fa`.
+- El servidor Wi-Fi local sirve byte a byte ese APK DEV 207 en la ruta privada
+  persistente. Pendiente: instalacion fisica, reproducir fotos ausentes o fugas
+  y enviar un informe 207; el lote mejora la precision diagnostica, no afirma
+  todavía haber corregido una causa visual que no se midió con este esquema.
+
+## Candidato local anterior: DAG Browser 206 — captura progresiva y formatos estaticos
 
 - DAG 206 (`0.70.10-dev`, extension `2.0.9`) corrige dos causas generales
   observadas en el informe real `DAG-EA8DTGZM`, sin excepciones por sitio y sin

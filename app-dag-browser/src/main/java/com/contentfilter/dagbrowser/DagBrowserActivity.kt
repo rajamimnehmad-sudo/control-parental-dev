@@ -39,6 +39,7 @@ import android.widget.Toast
 import android.window.OnBackInvokedCallback
 import android.window.OnBackInvokedDispatcher
 import androidx.recyclerview.widget.LinearLayoutManager
+import org.json.JSONArray
 import org.json.JSONObject
 import org.mozilla.geckoview.AllowOrDeny
 import org.mozilla.geckoview.GeckoResult
@@ -263,7 +264,14 @@ class DagBrowserActivity : Activity() {
                 "barrier tab=${senderTab.id} token=${senderTab.previewDocumentToken != null}",
             )
         }
-        recordFlight(DagFlightEvent(DagFlightEventType.BarrierReady, tabId = senderTab.id), senderTab)
+        recordFlight(
+            DagFlightEvent(
+                DagFlightEventType.BarrierReady,
+                tabId = senderTab.id,
+                pageUrl = payload.optString("url"),
+            ),
+            senderTab,
+        )
         confirmProtectedBarrier(senderTab)
     }
 
@@ -325,7 +333,7 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun logMediaDiagnosticSummary(payload: JSONObject) {
-        val events = payload.optJSONArray("events") ?: return
+        val events = payload.optJSONArray("events") ?: JSONArray()
         val summaries =
             buildList {
                 for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
@@ -336,7 +344,6 @@ class DagBrowserActivity : Activity() {
                     add("$carrier:$reason=$count")
                 }
             }
-        if (summaries.isEmpty()) return
         if (flightRecordingAllowed.get()) {
             for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
                 val event = events.optJSONObject(index) ?: continue
@@ -344,16 +351,13 @@ class DagBrowserActivity : Activity() {
                 val reason = event.optString("reason").takeIf(MediaDiagnosticValuePattern::matches) ?: continue
                 val count = event.optInt("count", 0).coerceIn(1, MaxMediaDiagnosticCount)
                 flightRecorder.record(
-                    DagFlightEvent(
-                        type = DagFlightEventType.MediaDrop,
-                        carrier = carrier,
-                        reason = reason,
-                        count = count,
-                    ),
+                    diagnosticMediaEvent(DagFlightEventType.MediaDrop, event, carrier, reason, count),
                 )
             }
+            recordDiagnosticEventArray(payload.optJSONArray("resources"), DagFlightEventType.MediaResource)
+            recordDiagnosticEventArray(payload.optJSONArray("elements"), DagFlightEventType.MediaElement)
         }
-        if (!BuildConfig.DAG_DIAGNOSTICS) return
+        if (!BuildConfig.DAG_DIAGNOSTICS || summaries.isEmpty()) return
         Log.i(
             MediaTransportLogTag,
             "drop_summary=${summaries.joinToString(",")} " +
@@ -362,6 +366,48 @@ class DagBrowserActivity : Activity() {
                 "captured_bytes=${payload.optInt("capturedBytes", 0).coerceIn(0, 16 * 1024 * 1024)}",
         )
     }
+
+    private fun recordDiagnosticEventArray(
+        events: JSONArray?,
+        type: DagFlightEventType,
+    ) {
+        if (events == null) return
+        for (index in 0 until minOf(events.length(), MaxMediaDiagnosticEvents)) {
+            val event = events.optJSONObject(index) ?: continue
+            flightRecorder.record(diagnosticMediaEvent(type, event))
+        }
+    }
+
+    private fun diagnosticMediaEvent(
+        type: DagFlightEventType,
+        payload: JSONObject,
+        carrier: String? = null,
+        reason: String? = null,
+        count: Int? = null,
+    ) = DagFlightEvent(
+        type = type,
+        tabId = payload.optLong("tabId", -1L).takeIf { it >= 0L },
+        carrier = carrier ?: payload.optString("carrier").takeIf(MediaDiagnosticValuePattern::matches),
+        reason = reason ?: payload.optString("reason").takeIf(MediaDiagnosticValuePattern::matches),
+        count = count,
+        pageUrl = payload.optString("pageUrl").takeIf(String::isNotBlank),
+        resourceUrl = payload.optString("sourceUrl").takeIf(String::isNotBlank),
+        requestId = payload.optString("requestId").takeIf(String::isNotBlank),
+        resourceType = payload.optString("resourceType").takeIf(MediaDiagnosticValuePattern::matches),
+        sourceKind = payload.optString("sourceKind").takeIf(MediaDiagnosticValuePattern::matches),
+        mimeType = payload.optString("mimeType").takeIf(String::isNotBlank),
+        frameId = payload.optInt("frameId", -1).takeIf { it >= 0 },
+        statusCode = payload.optInt("statusCode", -1).takeIf { it >= 0 },
+        fromCache = payload.optBoolean("fromCache").takeIf { payload.has("fromCache") },
+        activeStreams = payload.optInt("activeStreams", -1).takeIf { it >= 0 },
+        queuedAnalyses = payload.optInt("queuedAnalyses", -1).takeIf { it >= 0 },
+        capturedBytes = payload.optInt("capturedBytes", -1).takeIf { it >= 0 },
+        naturalWidth = payload.optInt("naturalWidth", -1).takeIf { it >= 0 },
+        naturalHeight = payload.optInt("naturalHeight", -1).takeIf { it >= 0 },
+        renderedWidth = payload.optInt("renderedWidth", -1).takeIf { it >= 0 },
+        renderedHeight = payload.optInt("renderedHeight", -1).takeIf { it >= 0 },
+        visualState = payload.optString("visualState").takeIf(MediaDiagnosticValuePattern::matches),
+    )
 
     private fun handleMediaDocumentCurrent(payload: JSONObject) {
         val identity = mediaDocumentIdentity(payload) ?: return
@@ -1441,6 +1487,18 @@ class DagBrowserActivity : Activity() {
                 bridgeMillis = bridgeElapsedMillis(payload),
                 queueMillis = queueWaitMillis,
                 nativeMillis = nativeMillis,
+                pageUrl = payload.optString("pageUrl").takeIf(String::isNotBlank),
+                resourceUrl = payload.optString("sourceUrl").takeIf(String::isNotBlank),
+                requestId = payload.optString("requestId").takeIf(String::isNotBlank),
+                resourceType = payload.optString("resourceType").takeIf(MediaDiagnosticValuePattern::matches),
+                sourceKind = payload.optString("sourceKind").takeIf(MediaDiagnosticValuePattern::matches),
+                mimeType = payload.optString("mimeType").takeIf(String::isNotBlank),
+                frameId = payload.optInt("frameId", -1).takeIf { it >= 0 },
+                statusCode = payload.optInt("statusCode", -1).takeIf { it >= 0 },
+                fromCache = payload.optBoolean("fromCache").takeIf { payload.has("fromCache") },
+                activeStreams = payload.optInt("activeStreams", -1).takeIf { it >= 0 },
+                queuedAnalyses = payload.optInt("queuedAnalyses", -1).takeIf { it >= 0 },
+                capturedBytes = payload.optInt("capturedBytes", -1).takeIf { it >= 0 },
             ),
         )
     }
@@ -2962,7 +3020,7 @@ class DagBrowserActivity : Activity() {
         const val MinimumPageLoadProgress = 5
         const val PageLoadProgressCompletionDelayMillis = 160L
         const val MaxMediaCandidateIdLength = 80
-        const val MaxMediaDiagnosticEvents = 32
+        const val MaxMediaDiagnosticEvents = 64
         const val MaxMediaDiagnosticCount = 100_000
         const val MediaAnalysisThreads = 2
         const val MediaAnalysisQueueCapacity = 8

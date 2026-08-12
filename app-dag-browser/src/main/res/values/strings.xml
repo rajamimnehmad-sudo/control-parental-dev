@@ -34,7 +34,7 @@
     <string name="dag_diagnostics">Diagnóstico DAG</string>
     <string name="dag_diagnostics_title">Caja negra de DAG</string>
     <string name="dag_diagnostics_loading">Preparando el resumen…</string>
-    <string name="dag_diagnostics_summary">Hay %1$d eventos técnicos guardados. El registro está limitado a aproximadamente 1 MB y reemplaza automáticamente lo más antiguo. No contiene fotos, direcciones, búsquedas, texto de páginas, cookies ni credenciales.</string>
+    <string name="dag_diagnostics_summary">Hay %1$d eventos técnicos guardados. El registro está limitado a aproximadamente 1 MB y reemplaza automáticamente lo más antiguo. Incluye dominios y rutas técnicas sin valores de búsqueda. No contiene fotos, texto de páginas, cookies, credenciales ni valores de consultas.</string>
     <string name="dag_diagnostics_empty">Todavía no hay eventos técnicos para enviar.</string>
     <string name="dag_diagnostics_send">Enviar diagnóstico</string>
     <string name="dag_diagnostics_sending">Enviando diagnóstico…</string>

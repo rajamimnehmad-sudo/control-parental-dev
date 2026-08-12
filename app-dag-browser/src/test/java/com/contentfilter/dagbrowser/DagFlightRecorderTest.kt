@@ -11,7 +11,7 @@ import kotlin.test.assertTrue
 
 class DagFlightRecorderTest {
     @Test
-    fun `snapshot contains bounded typed metadata without source material`() {
+    fun `snapshot correlates sanitized locations without sensitive query values`() {
         val directory = Files.createTempDirectory("dag-flight-test").toFile()
         var wall = 1_000L
         var elapsed = 10L
@@ -31,6 +31,14 @@ class DagFlightRecorderTest {
                     score = 0.9453f,
                     queueMillis = 4,
                     nativeMillis = 38,
+                    pageUrl = "https://www.google.com/search?q=private+search&tbm=isch",
+                    resourceUrl = "https://cdn.example.test/image.jpg?token=secret&width=320#private",
+                    requestId = "request-17",
+                    resourceType = "image",
+                    mimeType = "image/jpeg; charset=binary",
+                    frameId = 3,
+                    statusCode = 200,
+                    fromCache = false,
                 ),
             )
             val snapshot = recorder.awaitSnapshot()
@@ -41,8 +49,12 @@ class DagFlightRecorderTest {
             assertTrue(encoded.contains("model_filter"))
             assertTrue(encoded.contains(candidate))
             assertFalse(encoded.contains("image_1_secret"))
-            assertFalse(encoded.contains("http"))
-            assertFalse(encoded.contains("source"))
+            assertTrue(encoded.contains("https://www.google.com/search?q&tbm"))
+            assertTrue(encoded.contains("https://cdn.example.test/image.jpg?token&width"))
+            assertTrue(encoded.contains("image/jpeg"))
+            assertFalse(encoded.contains("private+search"))
+            assertFalse(encoded.contains("secret"))
+            assertFalse(encoded.contains("#private"))
             assertFalse(encoded.contains("pixels"))
             recorder.record(
                 DagFlightEvent(

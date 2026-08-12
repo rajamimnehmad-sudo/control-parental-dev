@@ -35,21 +35,31 @@ borra la copia local.
 - relojes de pared y monotono;
 - identificador numerico local de pestaña no privada;
 - token de candidata salado por sesion;
+- version de esquema y `versionCode` en cada evento nuevo, para separar con
+  certeza eventos conservados antes y despues de una actualizacion;
 - carrier `network`/`inline`, prioridad, accion y razon cerrada;
 - bytes, dimensiones, score del modelo y tiempos acotados;
+- pagina y recurso reducidos a `https://host/ruta?nombre_de_clave`, sin valores
+  de query, fragmentos ni `userinfo`, mas tokens opacos que permiten
+  correlacionar el mismo recurso entre red, GloshIA y DOM;
+- `requestId` convertido en token, tipo de recurso, frame, MIME, estado HTTP,
+  procedencia de cache y presion acotada de streams/cola/memoria capturada;
+- estado terminal de cada `img` observado (`shown`/`hidden`) y sus dimensiones
+  naturales/renderizadas, sin selector, HTML ni contenido de la imagen;
 - version de APK, SDK, fabricante y modelo de telefono.
 
 ## Datos prohibidos
 
 - fotos, miniaturas, pixeles, Base64 o reemplazos visuales;
-- URL, host, consultas, historial o direcciones de recursos;
+- valores de busqueda/query, fragmentos, `userinfo` o parametros secretos;
 - texto, selectores, clases, ID, HTML o formularios de la pagina;
 - cookies, headers, tokens, correos, nombres o credenciales;
 - cualquier evento de una pestaña incognito.
 
 Android usa almacenamiento interno con backup deshabilitado. El encoder local
-es tipado y descarta strings fuera de vocabularios cerrados. La Edge Function
-repite la validacion y rechaza metadatos con forma de URL o campos desconocidos.
+es tipado, limita direcciones a 768 caracteres y sanitiza antes de escribir. La
+Edge Function repite la validacion, acepta solamente HTTP(S), exige consultas
+sin valores y rechaza campos desconocidos.
 
 ## Seguridad remota
 
@@ -60,7 +70,7 @@ repite la validacion y rechaza metadatos con forma de URL o campos desconocidos.
 - Supabase conserva unicamente hashes SHA-256 de ambas credenciales;
 - acceso anonimo y token incorrecto devuelven 401;
 - retencion automatica: 14 dias mediante `pg_cron`;
-- limite actual: 120 informes por hora en todo DEV y 256 KiB comprimidos por
+- limite actual: 120 informes por hora en todo DEV y 768 KiB comprimidos por
   informe.
 
 La credencial de subida de un APK puede extraerse mediante ingenieria inversa;
@@ -86,3 +96,18 @@ El recorder explica el pipeline controlado por DAG. ADB/Perfetto sigue siendo
 necesario para un crash o ANR nativo, fallos internos de Gecko fuera del puente,
 perfil de CPU/GPU o jank a nivel sistema. Un informe remoto no sustituye esas
 herramientas cuando el proceso muere antes de poder enviar.
+
+## Correlacion disponible desde el esquema 2
+
+Para una imagen de red, `request`, `resource` y `page` permiten reconstruir la
+secuencia sin guardar secretos:
+
+1. `media_resource`: respuesta HTTP/MIME/cache recibida por Gecko;
+2. `media_decision`: bytes entregados al pipeline y resultado terminal de
+   GloshIA, con tiempos y presion de trabajo;
+3. `media_element`: estado final y tamaño del elemento visible;
+4. `media_drop`: motivo exacto y contexto si el recurso no alcanzo una decision.
+
+Los eventos anteriores a DAG 207 siguen siendo legibles, pero se reconocen como
+legacy porque no incluyen `event_schema` ni `app_version_code`. Desde DAG 207
+cada evento nuevo queda identificado aunque el anillo sobreviva una actualizacion.
