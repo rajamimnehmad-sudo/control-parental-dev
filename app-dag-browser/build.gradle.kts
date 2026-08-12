@@ -43,8 +43,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 211
-        versionName = "0.70.15"
+        versionCode = 212
+        versionName = "0.70.16"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -78,7 +78,7 @@ android {
         create("diagnostic") {
             dimension = "distribution"
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 10
+            versionCode = 11
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
@@ -163,6 +163,9 @@ val testDagProtectionJs =
             "src/main/assets/dag-protection/barrier.css",
             "src/main/assets/dag-protection/manifest.json",
             "src/main/assets/dag-protection/runaway-scheduler-guard.js",
+            "src/main/assets/dag-protection/video-lab-fixture.html",
+            "src/main/assets/dag-protection/video-lab-fixture.js",
+            "src/main/assets/dag-protection/video-lab.js",
             "src/test/js/dag-protection.test.mjs",
         )
     }

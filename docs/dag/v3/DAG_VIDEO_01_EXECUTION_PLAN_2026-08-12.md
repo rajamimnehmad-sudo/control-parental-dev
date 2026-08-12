@@ -1,7 +1,7 @@
 # DAG Video 01 — plan de ejecucion y gates
 
 Fecha: 2026-08-12
-Estado: plan listo; implementacion pendiente de aprobacion explicita
+Estado: `01A0` cerrado con gate fisico A23; `01A1` pendiente de aprobacion
 Baseline protegido: DAG Browser 211 (`0.70.15-dev`)
 Autoridad visual: GloshIA Visual R3.1, sin cambios de modelo, umbral o politica
 
@@ -32,9 +32,10 @@ en dos capas deliberadas.
 - El puente nativo recibe rasteres de imagen codificados; no recibe estados ni
   fotogramas de video.
 - `GeckoView.capturePixels()` ya se usa para miniaturas de pestanas, pero captura
-  la superficie completa. La version GeckoView incluida tambien contiene el
-  `ScreenshotBuilder` regional, que debe exponerse de forma controlada desde la
-  vista propietaria antes de usarlo en produccion.
+  la superficie completa. La API publica de la vista embebida no expone el
+  `ScreenshotBuilder` regional de su display interno; `01A0` usa
+  `PixelCopy.request(SurfaceView, Rect, Bitmap, ...)`, API oficial de Android,
+  para copiar y escalar solamente el rectangulo visible a `224x224`.
 - El analizador oficial acepta RGB `224x224`, utiliza una sesion ONNX con dos
   hilos intra-op y uno inter-op, y comparte hoy un executor acotado de dos
   trabajos para imagenes.
@@ -197,6 +198,24 @@ Gate:
 - una sola captura en vuelo y memoria vuelve al baseline;
 - DAG normal conserva exactamente el bloqueo total actual.
 
+Estado de implementacion local:
+
+- candidato DAG normal `212` (`0.70.16-dev`) y Diagnostic `11`;
+- fixture sintetica interna, sin red ni contenido del corpus;
+- cobertura Android opaca confirmada durante dos cuadros antes del decode;
+- captura regional `PixelCopy` de `224x224`, reciclada inmediatamente;
+- prueba del patron de cuatro cuadrantes para demostrar recorte y decode
+  correctos sin persistir pixeles;
+- identidad `documento/video/revision`, una captura en vuelo y timers acotados;
+- CSS de barrera instalado con origen `user`, no anulable por estilos de pagina;
+- el laboratorio solo acepta la URL interna exacta de la fixture. Todo video de
+  red, audio, DASH, HLS, `object` y `embed` continua bloqueado incluso en la
+  variante diagnostica;
+- suite automatizada correcta y gate fisico cerrado en SM-A235M: cobertura
+  opaca, recorte correcto en vertical/horizontal/scroll, tres muestras validas
+  y retiro sin fuga de la memoria de captura. Evidencia:
+  `docs/compatibility/results/dag-browser-v212-video-a0-sm-a235m-2026-08-12.md`.
+
 ### `DAG-VIDEO-01A1` — R3.1 y telemetria local
 
 Alcance:
@@ -287,9 +306,9 @@ de esas areas, el ticket se detiene y se replantea.
 - Rollback de cualquier laboratorio: desactivar el gate diagnostico; el bloqueo
   total actual sigue siendo la ruta por defecto.
 
-## Aprobacion requerida
+## Aprobacion y siguiente limite
 
-El siguiente paso de codigo es exclusivamente `DAG-VIDEO-01A0`. Requiere una
-aprobacion explicita del usuario y esfuerzo alto por tocar el limite entre
-WebExtension, compositor Gecko y UI Android. `01A1`, `01A2`, `01B` y `01C` no
-quedan aprobados automaticamente.
+`DAG-VIDEO-01A0` fue aprobado, implementado y validado fisicamente en A23. Su
+cierre no autoriza por si solo `01A1`, `01A2`, `01B` ni `01C`; cada ampliacion
+conserva su gate. En particular, ningun sitio real ni GloshIA R3.1 entra en la
+ruta de `01A0`.

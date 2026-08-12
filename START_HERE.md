@@ -33,6 +33,13 @@ Antes de cualquier ticket:
     - hacer fixes faciles de revisar;
     - mantener el repo limpio y escalable.
 
+Regla permanente de DAG Browser:
+
+- `app-dag-browser` usa un Gradle aislado. Ejecutar sus tareas exclusivamente
+  mediante `scripts/dag_gradle.sh <tareas>` desde la raiz del repositorio.
+- Nunca intentar `./gradlew :app-dag-browser:...`: ese proyecto no esta incluido
+  en `settings.gradle.kts` de la raiz.
+
 Regla de build/publicacion:
 
 - Si solo cambian docs, no compilar.

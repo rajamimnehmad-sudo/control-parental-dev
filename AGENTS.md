@@ -11,6 +11,12 @@ Antes de cualquier tarea en este repositorio:
 7. Modificar la menor cantidad posible de archivos.
 8. Si solo cambian docs, no compilar, no incrementar versionCode y no publicar APK.
 
+## Gradle de DAG Browser
+
+- `app-dag-browser` es un proyecto Gradle aislado y no forma parte del Gradle raiz.
+- Para cualquier test, lint o build de DAG usar siempre `scripts/dag_gradle.sh <tareas>`
+  desde la raiz canonica. No ejecutar `./gradlew :app-dag-browser:...`.
+
 Para planificacion, captura de ideas o seleccion de tickets:
 
 - Leer `docs/BACKLOG_PRODUCTO.md`.

@@ -158,7 +158,34 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local en validacion: DAG Browser 211 — carga diferida y diagnostico exacto
+## Candidato local: DAG Browser 212 — contrato cubierto de video 01A0
+
+- DAG 212 (`0.70.16-dev`, extension `2.0.15`) implementa exclusivamente
+  `DAG-VIDEO-01A0`; la variante Diagnostic avanza a versionCode `11`.
+- Agrega una fixture sintetica interna sin red, cobertura Android opaca previa,
+  decode mudo, identidad exacta de documento/video/revision y captura regional
+  `PixelCopy` ya escalada a `224x224`. Cuatro muestras de color verifican que el
+  recorte corresponde a la region del video; el bitmap se recicla y nunca se
+  persiste.
+- El laboratorio mantiene una sola captura en vuelo, tres muestras maximas y
+  timeouts acotados. Cambio de fuente, autoridad, navegacion, puerto o error
+  falla cerrado; resultados obsoletos no avanzan el estado.
+- La barrera CSS pasa a origen privilegiado `user`. La habilitacion de decode
+  acepta solo la URL interna exacta de la fixture y solo en Diagnostic. Media
+  de red, audio, DASH, HLS, `object` y `embed` siguen totalmente bloqueados en
+  ambas variantes; no hay excepciones de sitio ni conexion a R3.1 en este lote.
+- La validacion automatizada cubre 35/35 pruebas JS, unitarios DEV/Diagnostic,
+  Ktlint, Lint y armado de ambos APK. El gate fisico cerro en SM-A235M: recorte
+  correcto en vertical, horizontal y scroll; tres muestras finales en 9, 15 y
+  11 ms; cobertura opaca, retiro correcto y sin crash, ANR ni fuga de captura.
+  Evidencia:
+  `docs/compatibility/results/dag-browser-v212-video-a0-sm-a235m-2026-08-12.md`.
+- El acceso Gradle queda corregido de forma permanente: DAG Browser es un
+  proyecto aislado y todas sus tareas se ejecutan desde la raiz con
+  `scripts/dag_gradle.sh`; no volver a usar el wrapper Gradle raiz con un path
+  `:app-dag-browser:`.
+
+## Baseline anterior: DAG Browser 211 — carga diferida y diagnostico exacto
 
 - DAG 211 (`0.70.15-dev`, extension `2.0.14`) parte del informe fisico 210
   `DAG-L4225BUR`, compuesto integramente por esa version: 1.430 eventos y cero
@@ -1586,6 +1613,11 @@ Documentos vigentes:
   y A23. El plan ejecutable esta en
   `docs/dag/v3/DAG_VIDEO_01_EXECUTION_PLAN_2026-08-12.md`; divide el laboratorio
   en `01A0` (captura cubierta), `01A1` (R3.1 y diagnostico) y `01A2` (gate
-  fisico). Ninguno esta aprobado para implementacion y no cambia el runtime
-  vigente.
+  fisico). `01A0` fue aprobado, implementado y validado fisicamente en A23 con
+  el candidato DAG normal 212 / Diagnostic 11. Usa una fixture sintetica
+  interna, cobertura Android previa, recorte regional `PixelCopy` a `224x224`,
+  identidad por revision y validacion del patron capturado. No conecta R3.1 ni
+  habilita media de red: DAG normal y las webs de la variante diagnostica
+  mantienen video/audio totalmente bloqueados. `01A1` en adelante no estan
+  autorizados automaticamente.
 - No hacer push, PR, publicacion DEV ni Production sin un OK nuevo y explicito.

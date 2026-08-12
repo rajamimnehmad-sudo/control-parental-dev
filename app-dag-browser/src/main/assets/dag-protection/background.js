@@ -4,6 +4,8 @@ const ANALYZED_RESOURCE_TYPES = new Set(["image", "imageset"]);
 const BLOCKED_RESOURCE_TYPES = new Set(["media", "object"]);
 const BLOCKED_MEDIA_MIME_PATTERN =
   /^(?:audio|video)\/|^application\/(?:dash\+xml|vnd\.apple\.mpegurl|x-mpegurl)/iu;
+const VIDEO_LAB_REVEAL_MESSAGE = "video-lab-reveal-style";
+const VIDEO_LAB_CONCEAL_MESSAGE = "video-lab-conceal-style";
 const IMAGE_MIME_PATTERN = /^image\//iu;
 const PAGE_AD_HOSTS = new Set([
   "doubleclick.net", "googlesyndication.com", "googleadservices.com",
@@ -45,6 +47,7 @@ let capturedBytes = 0;
 let nativeInFlight = 0;
 let cachedReplacementBytes = 0;
 let diagnosticsEnabled = false;
+let videoLabEnabled = false;
 let diagnosticFlushTimer = null;
 const pendingNative = new Map();
 const pendingDecisions = new Map();
@@ -61,6 +64,8 @@ const responseMetadataByRequest = new Map();
 const validTabId = (value) => Number.isInteger(value) && value >= 0;
 const validDocumentToken = (value) =>
   typeof value === "string" && /^document_[a-f0-9]{1,16}$/u.test(value);
+const validVideoLabToken = (value) =>
+  typeof value === "string" && /^[a-f0-9]{32}$/u.test(value);
 const boundedDiagnosticUrl = (value) => typeof value === "string" ? value.slice(0, 4_096) : "";
 const newDocumentKey = () =>
   `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
@@ -80,6 +85,9 @@ const postDocumentLifecycle = (type, state) => {
     });
   } catch {}
 };
+
+const isVideoLabFixtureSender = (sender) =>
+  sender?.url === browser.runtime.getURL("video-lab-fixture.html");
 
 const settleQueuedDocumentWork = (state) => {
   for (let index = analysisQueue.length - 1; index >= 0; index -= 1) {
@@ -483,6 +491,10 @@ const connectNative = () => {
         }
         return;
       }
+      if (message?.type === "video-lab-config" && message?.version === PROTOCOL_VERSION) {
+        videoLabEnabled = message.enabled === true;
+        return;
+      }
       const pending = pendingNative.get(message?.candidateId);
       if (
         pending === undefined ||
@@ -506,7 +518,10 @@ const connectNative = () => {
       });
     });
     port.onDisconnect.addListener(() => {
-      if (nativePort === port) nativePort = null;
+      if (nativePort === port) {
+        nativePort = null;
+        videoLabEnabled = false;
+      }
       failPendingNative();
       if (reconnectTimer === null) {
         reconnectTimer = setTimeout(() => {
@@ -517,6 +532,7 @@ const connectNative = () => {
     });
   } catch {
     nativePort = null;
+    videoLabEnabled = false;
   }
 };
 
@@ -889,6 +905,36 @@ const interceptImage = (details) => {
 connectNative();
 
 browser.runtime.onMessage.addListener((message, sender) => {
+  if (
+    message?.type === VIDEO_LAB_REVEAL_MESSAGE &&
+    message?.version === PROTOCOL_VERSION
+  ) {
+    const tabId = sender?.tab?.id;
+    const state = validTabId(tabId) ? documentStatesByTab.get(tabId) : null;
+    return Promise.resolve({
+      inserted:
+        videoLabEnabled &&
+        isVideoLabFixtureSender(sender) &&
+        isCurrentDocument(state) &&
+        sender?.frameId === 0 &&
+        state.documentToken === message.documentToken &&
+        validVideoLabToken(message.token),
+    });
+  }
+  if (
+    message?.type === VIDEO_LAB_CONCEAL_MESSAGE &&
+    message?.version === PROTOCOL_VERSION
+  ) {
+    return Promise.resolve({
+      removed:
+        isVideoLabFixtureSender(sender) &&
+        sender?.frameId === 0 &&
+        validVideoLabToken(message.token),
+    });
+  }
+  if (message?.type === "video-lab-status" && message?.version === PROTOCOL_VERSION) {
+    return Promise.resolve({ enabled: videoLabEnabled && isVideoLabFixtureSender(sender) });
+  }
   if (
     message?.version === PROTOCOL_VERSION &&
     ["document-started", "document-loaded", "document-retired"].includes(message?.type)

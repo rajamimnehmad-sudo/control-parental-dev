@@ -42,6 +42,7 @@
   ].join(",");
 
   let nativePort = null;
+  const videoLab = globalThis.__gloshDagVideoLab || null;
   let initialAdScanReady = false;
   let initialDocumentReady = false;
   let initialDocumentReadyReported = false;
@@ -67,6 +68,7 @@
     return;
   }
   nativePort.onMessage.addListener((message) => {
+    videoLab?.onNativeMessage(message);
     if (
       message?.type === "compact-source-diagnostics-config" &&
       message?.version === PROTOCOL_VERSION &&
@@ -87,6 +89,12 @@
       });
     } catch {}
   };
+
+  videoLab?.install({
+    protocolVersion: PROTOCOL_VERSION,
+    documentToken,
+    postToAndroid,
+  });
 
   const postDocumentLifecycle = (type) => {
     void browser.runtime.sendMessage({

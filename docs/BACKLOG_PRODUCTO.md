@@ -3453,7 +3453,8 @@ Flujo de una entrada:
 
 ### DAG-VIDEO-01 - GloshIA Visual sobre fotogramas de video
 
-- Estado: `Plan listo; no aprobado para implementacion`.
+- Estado: `01A0 resuelto localmente y validado fisicamente en A23; 01A1 no
+  autorizado`.
 - Objetivo: habilitar video local con una compuerta temporal general, sin
   mostrar fotogramas antes de decidirlos y sin excepciones por sitio, URL o
   dominio.
@@ -3468,8 +3469,11 @@ Flujo de una entrada:
 - Audio queda fuera de alcance y no se clasifica. DRM, vivo, PiP, casting,
   pantalla completa no validada y cualquier captura fallida permanecen
   cerrados.
-- Primer ticket futuro: `DAG-VIDEO-01A`, laboratorio de captura cubierta con
-  R3.1 en S22 y A23. Video permanece bloqueado hasta aprobarlo y pasar gates.
+- Primer ticket: `DAG-VIDEO-01A0`, aprobado, implementado y validado fisicamente
+  como laboratorio aislado en DAG normal 212 / Diagnostic 11. La fixture
+  interna demostro el handshake de cobertura, decode mudo y captura regional
+  `224x224` en vertical, horizontal y scroll. No usa aun R3.1 ni habilita video
+  de red. `01A1` conectara el modelo solo si recibe aprobacion separada.
 - Propuesta completa:
   `docs/dag/v3/GLOSHIA_VIDEO_V1_PROPOSAL_2026-08-12.md`.
 - Plan ejecutable, gates y primer ticket pequeno:

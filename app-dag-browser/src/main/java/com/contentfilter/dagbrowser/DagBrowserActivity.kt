@@ -11,6 +11,9 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
+import android.graphics.Rect
+import android.graphics.RectF
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -46,7 +49,6 @@ import org.mozilla.geckoview.GeckoResult
 import org.mozilla.geckoview.GeckoRuntime
 import org.mozilla.geckoview.GeckoSession
 import org.mozilla.geckoview.GeckoSessionSettings
-import org.mozilla.geckoview.GeckoView
 import org.mozilla.geckoview.StorageController
 import org.mozilla.geckoview.WebExtension
 import java.text.DateFormat
@@ -60,10 +62,13 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import kotlin.math.ceil
+import kotlin.math.floor
 
 class DagBrowserActivity : Activity() {
-    private lateinit var geckoView: GeckoView
+    private lateinit var geckoView: DagGeckoView
     private lateinit var navigationSnapshot: ImageView
+    private lateinit var videoLabOverlay: View
     private lateinit var browserRoot: View
     private lateinit var browserToolbar: View
     private lateinit var addressBar: View
@@ -103,6 +108,7 @@ class DagBrowserActivity : Activity() {
     private val flightRecordingAllowed = AtomicBoolean(true)
     private val mediaAnalysisQueue = DagBoundedMediaTaskQueue(MediaAnalysisQueueCapacity)
     private val mediaDocumentRegistry = DagMediaDocumentRegistry()
+    private val videoLabState = DagVideoLabStateMachine()
     private val mediaAnalysisThreadFactory =
         ThreadFactory { work ->
             Thread(
@@ -126,6 +132,7 @@ class DagBrowserActivity : Activity() {
             mediaAnalysisThreadFactory,
         )
     private var protectionExtension: WebExtension? = null
+    private var activeVideoLabPort: WebExtension.Port? = null
     private var extensionReady = false
     private var activeTab: BrowserTab? = null
     private var nextTabId = 1L
@@ -155,7 +162,10 @@ class DagBrowserActivity : Activity() {
                 when {
                     correctExtension &&
                         senderTab != null &&
-                        sender.environmentType == WebExtension.MessageSender.ENV_TYPE_CONTENT_SCRIPT -> {
+                        (
+                            sender.environmentType == WebExtension.MessageSender.ENV_TYPE_CONTENT_SCRIPT ||
+                                isVideoLabFixtureSender(sender)
+                        ) -> {
                         connectContentPort(port, sender, senderTab)
                     }
                     correctExtension &&
@@ -183,7 +193,11 @@ class DagBrowserActivity : Activity() {
                     sourcePort: WebExtension.Port,
                 ) {
                     val payload = message as? JSONObject ?: return
-                    handleContentPortMessage(payload, sender, senderTab)
+                    handleContentPortMessage(payload, sender, senderTab, sourcePort)
+                }
+
+                override fun onDisconnect(port: WebExtension.Port) {
+                    retireVideoLabForPort(port, "port_disconnected")
                 }
             },
         )
@@ -197,12 +211,14 @@ class DagBrowserActivity : Activity() {
                 )
             }
         }
+        postVideoLabConfig(port, enabled = isVideoLabFixtureSender(sender))
     }
 
     private fun handleContentPortMessage(
         payload: JSONObject,
         sender: WebExtension.MessageSender,
         senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
     ) {
         if (
             payload.optInt("version") != ProtectionProtocolVersion ||
@@ -217,6 +233,383 @@ class DagBrowserActivity : Activity() {
             PreviewEligibilityMessage -> applyPreviewEligibility(senderTab, payload)
             CompactImageSourceMetadataMessage -> logCompactImageSourceMetadata(payload)
             StyleRasterCarrierSummaryMessage -> logStyleRasterCarrierSummary(payload)
+            VideoLabCoverRequestMessage ->
+                handleVideoLabCoverRequest(payload, sender, senderTab, sourcePort)
+            VideoLabFrameRequestMessage ->
+                handleVideoLabFrameRequest(payload, sender, senderTab, sourcePort)
+            VideoLabRetireMessage -> handleVideoLabRetire(payload, senderTab, sourcePort)
+        }
+    }
+
+    private fun postVideoLabConfig(
+        port: WebExtension.Port,
+        enabled: Boolean,
+    ) {
+        runCatching {
+            port.postMessage(
+                JSONObject()
+                    .put("type", VideoLabConfigMessage)
+                    .put("version", ProtectionProtocolVersion)
+                    .put("enabled", BuildConfig.DAG_DIAGNOSTICS && enabled),
+            )
+        }
+    }
+
+    private fun handleVideoLabCoverRequest(
+        payload: JSONObject,
+        sender: WebExtension.MessageSender,
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+    ) {
+        if (!validVideoLabContext(payload, sender, senderTab)) return
+        val key = videoLabKey(payload, senderTab) ?: return
+        val rect = videoLabRect(payload) ?: return
+        if (!videoLabState.requestCover(key, rect)) return
+        activeVideoLabPort = sourcePort
+        videoLabOverlay.visibility = View.VISIBLE
+        videoLabOverlay.bringToFront()
+        recordVideoLabEvent(senderTab, key, "cover_requested", "diagnostic")
+        videoLabOverlay.postOnAnimation {
+            videoLabOverlay.postOnAnimation {
+                if (
+                    !isFinishing &&
+                    !isDestroyed &&
+                    activeVideoLabPort === sourcePort &&
+                    videoLabState.markCovered(key)
+                ) {
+                    recordVideoLabEvent(senderTab, key, "cover_armed", "two_frame_commit")
+                    postVideoLabResult(sourcePort, VideoLabCoverArmedMessage, key)
+                }
+            }
+        }
+    }
+
+    private fun handleVideoLabFrameRequest(
+        payload: JSONObject,
+        sender: WebExtension.MessageSender,
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+    ) {
+        if (!validVideoLabContext(payload, sender, senderTab)) return
+        val key = videoLabKey(payload, senderTab) ?: return
+        val rect = videoLabRect(payload) ?: return
+        if (
+            sourcePort !== activeVideoLabPort ||
+            !videoLabState.requestCapture(key, rect)
+        ) {
+            return
+        }
+        val startedAt = SystemClock.elapsedRealtime()
+        captureVideoLabFrame(
+            senderTab = senderTab,
+            sourcePort = sourcePort,
+            key = key,
+            rect = rect,
+            fixture = isVideoLabFixtureSender(sender),
+            startedAt = startedAt,
+            attempt = 0,
+        )
+    }
+
+    private fun captureVideoLabFrame(
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+        key: DagVideoLabKey,
+        rect: DagVideoLabClientRect,
+        fixture: Boolean,
+        startedAt: Long,
+        attempt: Int,
+    ) {
+        if (
+            sourcePort !== activeVideoLabPort ||
+            !videoLabState.isCurrent(key, DagVideoLabState.Capturing)
+        ) {
+            return
+        }
+        geckoView.postOnAnimation {
+            val surfaceRect = videoLabSurfaceRect(senderTab, rect)
+            if (surfaceRect == null) {
+                if (attempt < VideoLabSurfaceReadyRetries) {
+                    handler.postDelayed(
+                        {
+                            captureVideoLabFrame(
+                                senderTab,
+                                sourcePort,
+                                key,
+                                rect,
+                                fixture,
+                                startedAt,
+                                attempt + 1,
+                            )
+                        },
+                        VideoLabSurfaceRetryDelayMillis,
+                    )
+                } else {
+                    failVideoLabCapture(senderTab, sourcePort, key, "invalid_surface_rect", startedAt)
+                }
+                return@postOnAnimation
+            }
+            geckoView.captureRegion(
+                source = surfaceRect,
+                targetWidth = VideoLabCaptureEdge,
+                targetHeight = VideoLabCaptureEdge,
+                callbackHandler = handler,
+            ) { bitmap, result ->
+                val sized =
+                    bitmap != null &&
+                        bitmap.width == VideoLabCaptureEdge &&
+                        bitmap.height == VideoLabCaptureEdge
+                val fixtureMatches = !fixture || (sized && videoLabFixtureMatches(bitmap, rect))
+                val captured = sized && fixtureMatches
+                bitmap?.recycle()
+                completeVideoLabCapture(
+                    senderTab = senderTab,
+                    sourcePort = sourcePort,
+                    key = key,
+                    captured = captured,
+                    reason =
+                        when {
+                            !sized -> "pixel_copy_$result"
+                            fixtureMatches -> if (fixture) "fixture_pattern_ok" else "capture_ok"
+                            else -> "fixture_pattern_mismatch"
+                        },
+                    startedAt = startedAt,
+                )
+            }
+        }
+    }
+
+    private fun videoLabFixtureMatches(
+        bitmap: Bitmap,
+        rect: DagVideoLabClientRect,
+    ): Boolean {
+        val quarter = bitmap.width / 4
+        val threeQuarters = bitmap.width * 3 / 4
+        return DagVideoLabFixtureProbe.matches(
+            topLeft = bitmap.getPixel(quarter, quarter),
+            topRight = bitmap.getPixel(threeQuarters, quarter),
+            bottomLeft = bitmap.getPixel(quarter, threeQuarters),
+            bottomRight = bitmap.getPixel(threeQuarters, threeQuarters),
+            expectedTopLeft = fixtureExpectedColor(rect, 0.25f, 0.25f),
+            expectedTopRight = fixtureExpectedColor(rect, 0.75f, 0.25f),
+            expectedBottomLeft = fixtureExpectedColor(rect, 0.25f, 0.75f),
+            expectedBottomRight = fixtureExpectedColor(rect, 0.75f, 0.75f),
+        )
+    }
+
+    private fun fixtureExpectedColor(
+        rect: DagVideoLabClientRect,
+        sampleX: Float,
+        sampleY: Float,
+    ): DagVideoLabFixtureColor {
+        val visibleLeft = maxOf(0f, rect.left)
+        val visibleTop = maxOf(0f, rect.top)
+        val visibleRight = minOf(rect.viewportWidth, rect.left + rect.width)
+        val visibleBottom = minOf(rect.viewportHeight, rect.top + rect.height)
+        val normalizedX =
+            ((visibleLeft + (visibleRight - visibleLeft) * sampleX - rect.left) / rect.width)
+                .coerceIn(0f, 1f)
+        val normalizedY =
+            ((visibleTop + (visibleBottom - visibleTop) * sampleY - rect.top) / rect.height)
+                .coerceIn(0f, 1f)
+        return when {
+            normalizedX < 0.5f && normalizedY < 0.5f -> DagVideoLabFixtureColor.Red
+            normalizedX >= 0.5f && normalizedY < 0.5f -> DagVideoLabFixtureColor.Green
+            normalizedX < 0.5f -> DagVideoLabFixtureColor.Blue
+            else -> DagVideoLabFixtureColor.LightNeutral
+        }
+    }
+
+    private fun handleVideoLabRetire(
+        payload: JSONObject,
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+    ) {
+        if (!BuildConfig.DAG_DIAGNOSTICS || sourcePort !== activeVideoLabPort) return
+        val key = videoLabKey(payload, senderTab) ?: return
+        if (!videoLabState.retire(key)) return
+        recordVideoLabEvent(
+            senderTab,
+            key,
+            "retired",
+            payload.optString("reason").takeIf(VideoLabReasonPattern::matches) ?: "content_retired",
+        )
+        activeVideoLabPort = null
+        videoLabOverlay.visibility = View.GONE
+    }
+
+    private fun completeVideoLabCapture(
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+        key: DagVideoLabKey,
+        captured: Boolean,
+        reason: String,
+        startedAt: Long,
+    ) {
+        if (!videoLabState.completeCapture(key, captured)) return
+        recordVideoLabEvent(
+            senderTab,
+            key,
+            action = if (captured) "frame_captured" else "capture_failed",
+            reason = reason,
+            nativeMillis = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L),
+        )
+        postVideoLabResult(
+            sourcePort,
+            VideoLabFrameResultMessage,
+            key,
+            JSONObject().put("captured", captured),
+        )
+    }
+
+    private fun failVideoLabCapture(
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+        key: DagVideoLabKey,
+        reason: String,
+        startedAt: Long,
+    ) {
+        completeVideoLabCapture(
+            senderTab = senderTab,
+            sourcePort = sourcePort,
+            key = key,
+            captured = false,
+            reason = reason,
+            startedAt = startedAt,
+        )
+    }
+
+    private fun postVideoLabResult(
+        port: WebExtension.Port,
+        type: String,
+        key: DagVideoLabKey,
+        extra: JSONObject = JSONObject(),
+    ) {
+        if (port !== activeVideoLabPort || !videoLabState.isCurrent(key)) return
+        val message =
+            JSONObject()
+                .put("type", type)
+                .put("version", ProtectionProtocolVersion)
+                .put("videoId", key.videoId)
+                .put("revision", key.revision)
+        extra.keys().forEach { name -> message.put(name, extra.get(name)) }
+        runCatching { port.postMessage(message) }
+    }
+
+    private fun validVideoLabContext(
+        payload: JSONObject,
+        sender: WebExtension.MessageSender,
+        senderTab: BrowserTab,
+    ): Boolean =
+        BuildConfig.DAG_DIAGNOSTICS &&
+            isVideoLabFixtureSender(sender) &&
+            sender.isTopLevel &&
+            senderTab === activeTab &&
+            senderTab.session === geckoView.session &&
+            payload.optString("documentToken") == senderTab.previewDocumentToken
+
+    private fun videoLabKey(
+        payload: JSONObject,
+        senderTab: BrowserTab,
+    ): DagVideoLabKey? {
+        val documentToken = payload.optString("documentToken")
+        val videoId = payload.optString("videoId")
+        val revision = payload.optInt("revision", -1)
+        return DagVideoLabKey(senderTab.id, documentToken, videoId, revision)
+            .takeIf {
+                documentToken == senderTab.previewDocumentToken &&
+                    VideoLabIdPattern.matches(videoId) &&
+                    revision in 1..VideoLabMaximumRevision
+            }
+    }
+
+    private fun videoLabRect(payload: JSONObject): DagVideoLabClientRect? =
+        DagVideoLabClientRect(
+            left = payload.optDouble("left", Double.NaN).toFloat(),
+            top = payload.optDouble("top", Double.NaN).toFloat(),
+            width = payload.optDouble("width", Double.NaN).toFloat(),
+            height = payload.optDouble("height", Double.NaN).toFloat(),
+            viewportWidth = payload.optDouble("viewportWidth", Double.NaN).toFloat(),
+            viewportHeight = payload.optDouble("viewportHeight", Double.NaN).toFloat(),
+        ).takeIf(DagVideoLabClientRect::isValid)
+
+    private fun videoLabSurfaceRect(
+        senderTab: BrowserTab,
+        clientRect: DagVideoLabClientRect,
+    ): Rect? {
+        if (
+            senderTab !== activeTab ||
+            senderTab.session !== geckoView.session ||
+            geckoView.width <= 0 ||
+            geckoView.height <= 0 ||
+            geckoView.visibility != View.VISIBLE ||
+            videoLabOverlay.visibility != View.VISIBLE
+        ) {
+            return null
+        }
+        val transformed =
+            RectF(
+                clientRect.left,
+                clientRect.top,
+                clientRect.left + clientRect.width,
+                clientRect.top + clientRect.height,
+            )
+        val matrix = Matrix()
+        runCatching { senderTab.session.getClientToSurfaceMatrix(matrix) }.getOrNull() ?: return null
+        matrix.mapRect(transformed)
+        if (!transformed.intersect(0f, 0f, geckoView.width.toFloat(), geckoView.height.toFloat())) {
+            return null
+        }
+        val result =
+            Rect(
+                floor(transformed.left).toInt().coerceIn(0, geckoView.width),
+                floor(transformed.top).toInt().coerceIn(0, geckoView.height),
+                ceil(transformed.right).toInt().coerceIn(0, geckoView.width),
+                ceil(transformed.bottom).toInt().coerceIn(0, geckoView.height),
+            )
+        return result.takeIf { it.width() >= 2 && it.height() >= 2 }
+    }
+
+    private fun retireVideoLabForPort(
+        port: WebExtension.Port,
+        reason: String,
+    ) {
+        if (port !== activeVideoLabPort) return
+        retireActiveVideoLab(reason)
+    }
+
+    private fun retireActiveVideoLab(reason: String) {
+        val key = videoLabState.retireAll() ?: return
+        tabs.firstOrNull { it.id == key.tabId }?.let { tab ->
+            recordVideoLabEvent(tab, key, "retired", reason)
+        }
+        activeVideoLabPort = null
+        videoLabOverlay.visibility = View.GONE
+    }
+
+    private fun recordVideoLabEvent(
+        tab: BrowserTab,
+        key: DagVideoLabKey,
+        action: String,
+        reason: String,
+        nativeMillis: Long? = null,
+    ) {
+        recordFlight(
+            DagFlightEvent(
+                type = DagFlightEventType.VideoLab,
+                tabId = tab.id,
+                candidateId = key.videoId,
+                action = action,
+                reason = reason,
+                nativeMillis = nativeMillis,
+            ),
+            tab,
+        )
+        if (BuildConfig.DAG_DIAGNOSTICS) {
+            Log.i(
+                VideoLabLogTag,
+                "action=$action reason=$reason revision=${key.revision} native_ms=${nativeMillis ?: -1}",
+            )
         }
     }
 
@@ -314,6 +707,7 @@ class DagBrowserActivity : Activity() {
                     .put("enabled", true),
             )
         }
+        postVideoLabConfig(port, enabled = true)
     }
 
     private fun handleDecisionPortMessage(
@@ -510,6 +904,7 @@ class DagBrowserActivity : Activity() {
         addressBar = findViewById(R.id.address_bar)
         geckoView = findViewById(R.id.gecko_view)
         navigationSnapshot = findViewById(R.id.navigation_snapshot)
+        videoLabOverlay = findViewById(R.id.video_lab_overlay)
         addressInput = findViewById(R.id.address_input)
         newPageButton = findViewById(R.id.new_page_button)
         securityButton = findViewById(R.id.security_button)
@@ -625,6 +1020,10 @@ class DagBrowserActivity : Activity() {
                     session: GeckoSession,
                     request: GeckoSession.NavigationDelegate.LoadRequest,
                 ): GeckoResult<AllowOrDeny> {
+                    if (isVideoLabFixtureUrl(request.uri)) {
+                        maybeCoverAcceptedNavigation(tab, request)
+                        return GeckoResult.fromValue(AllowOrDeny.ALLOW)
+                    }
                     if (request.target == GeckoSession.NavigationDelegate.TARGET_WINDOW_NEW) {
                         return when (
                             val decision =
@@ -1192,6 +1591,7 @@ class DagBrowserActivity : Activity() {
         startNewPerformanceNavigation: Boolean = false,
         keepCurrentPageVisible: Boolean = false,
     ) {
+        val retiresVideoLab = videoLabState.currentKey?.tabId == tab.id
         if (tab.displayState != TabDisplayState.Loading) {
             markTabThumbnailStale(tab)
         }
@@ -1207,12 +1607,13 @@ class DagBrowserActivity : Activity() {
         tab.protectedContentReadyForNavigation = false
         tab.documentSanitizedForNavigation = false
         tab.keepCurrentPageVisibleDuringReload =
-            keepCurrentPageVisible && tab.displayState == TabDisplayState.Visible
+            keepCurrentPageVisible && !retiresVideoLab && tab.displayState == TabDisplayState.Visible
         if (!tab.keepCurrentPageVisibleDuringReload) {
             tab.displayState = TabDisplayState.Loading
         }
         scheduleBarrierTimeout(tab)
         if (tab === activeTab) renderActiveTab()
+        if (retiresVideoLab) retireActiveVideoLab("navigation_started")
     }
 
     private fun confirmProtectedBarrier(tab: BrowserTab) {
@@ -1762,11 +2163,16 @@ class DagBrowserActivity : Activity() {
         dismissActiveChoicePrompt()
         activeTab?.let { setTabActivity(it, active = false) }
         if (activeTab != null) runCatching { geckoView.releaseSession() }
+        videoLabOverlay.visibility = View.GONE
         activeTab = tab
         flightRecordingAllowed.set(!tab.isPrivate)
         tab.lastActivatedSequence = nextTabActivationSequence++
         ensureSessionOpen(tab)
         geckoView.setSession(tab.session)
+        if (videoLabState.currentKey?.tabId == tab.id) {
+            videoLabOverlay.visibility = View.VISIBLE
+            videoLabOverlay.bringToFront()
+        }
         setTabActivity(tab, active = true)
         restoreTabIfNeeded(tab)
         renderActiveTab()
@@ -2316,6 +2722,7 @@ class DagBrowserActivity : Activity() {
     private fun showBrowserMenu() {
         val popup = browserMenu ?: createBrowserMenu().also { browserMenu = it }
         popup.menu.findItem(R.id.menu_default_browser)?.isVisible = !isDefaultBrowser()
+        popup.menu.findItem(R.id.menu_video_lab)?.isVisible = BuildConfig.DAG_DIAGNOSTICS
         popup.show()
     }
 
@@ -2364,6 +2771,10 @@ class DagBrowserActivity : Activity() {
                         showDagDiagnostics()
                         true
                     }
+                    R.id.menu_video_lab -> {
+                        openVideoLabFixture()
+                        true
+                    }
                     R.id.menu_about -> {
                         showAboutDag()
                         true
@@ -2372,6 +2783,37 @@ class DagBrowserActivity : Activity() {
                 }
             }
         }
+
+    private fun openVideoLabFixture() {
+        val tab = activeTab
+        val fixtureUrl = videoLabFixtureUrl()
+        if (
+            !BuildConfig.DAG_DIAGNOSTICS ||
+            tab == null ||
+            !tab.session.isOpen ||
+            fixtureUrl == null
+        ) {
+            Toast.makeText(this, R.string.video_lab_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        invalidateTabThumbnail(tab)
+        beginProtectedLoad(tab, startNewPerformanceNavigation = true)
+        tab.session.loadUri(fixtureUrl)
+    }
+
+    private fun videoLabFixtureUrl(): String? =
+        protectionExtension
+            ?.metaData
+            ?.baseUrl
+            ?.let { baseUrl -> "$baseUrl$VideoLabFixturePath" }
+
+    private fun isVideoLabFixtureUrl(url: String): Boolean = BuildConfig.DAG_DIAGNOSTICS && url == videoLabFixtureUrl()
+
+    private fun isVideoLabFixtureSender(sender: WebExtension.MessageSender): Boolean =
+        BuildConfig.DAG_DIAGNOSTICS &&
+            sender.session != null &&
+            sender.isTopLevel &&
+            sender.url == videoLabFixtureUrl()
 
     private fun showDagDiagnostics() {
         Toast.makeText(this, R.string.dag_diagnostics_loading, Toast.LENGTH_SHORT).show()
@@ -2955,6 +3397,7 @@ class DagBrowserActivity : Activity() {
         mediaAnalysisAccepting.set(false)
         mediaAnalysisLifecycleGeneration.incrementAndGet()
         activeMediaDecisionPort = null
+        retireActiveVideoLab("activity_destroyed")
         mediaAnalysisQueue.discardMatching { true }
         mediaDocumentRegistry.clear()
         dismissActiveChoicePrompt()
@@ -3053,6 +3496,13 @@ class DagBrowserActivity : Activity() {
         const val MediaDocumentRetiredMessage = "media-document-retired"
         const val ViewportImagesReadyMessage = "viewport-images-ready"
         const val DocumentSanitizedReadyMessage = "document-sanitized-ready"
+        const val VideoLabConfigMessage = "video-lab-config"
+        const val VideoLabCoverRequestMessage = "video-lab-cover-request"
+        const val VideoLabCoverArmedMessage = "video-lab-cover-armed"
+        const val VideoLabFrameRequestMessage = "video-lab-frame-request"
+        const val VideoLabFrameResultMessage = "video-lab-frame-result"
+        const val VideoLabRetireMessage = "video-lab-retire"
+        const val VideoLabFixturePath = "video-lab-fixture.html"
         const val ProtectionProtocolVersion = 2
         const val CacheMaintenancePreferences = "dag-cache-maintenance"
         const val CacheMaintenanceRevisionKey = "intercepted-media-cache-revision"
@@ -3075,6 +3525,11 @@ class DagBrowserActivity : Activity() {
         const val PerformanceLogTag = "DagPerformance"
         const val BackNavigationLogTag = "DagBackNavigation"
         const val TabPreviewLogTag = "DagTabPreview"
+        const val VideoLabLogTag = "DagVideoLab"
+        const val VideoLabCaptureEdge = 224
+        const val VideoLabSurfaceReadyRetries = 10
+        const val VideoLabSurfaceRetryDelayMillis = 50L
+        const val VideoLabMaximumRevision = 1_000_000
         const val BarrierTimeoutMillis = 12_000L
         const val InitialBlankPage = "about:blank"
         const val MaxTabLabelLength = 36
@@ -3085,6 +3540,8 @@ class DagBrowserActivity : Activity() {
         val PreviewDocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
         val MediaDiagnosticValuePattern = Regex("^[a-z_]{1,40}$")
         val MediaDiagnosticTokenPattern = Regex("^[a-z0-9_]{1,40}$")
+        val VideoLabIdPattern = Regex("^video_[a-f0-9]{16}$")
+        val VideoLabReasonPattern = Regex("^[a-z_]{1,40}$")
         const val EnabledControlAlpha = 1f
         const val DisabledControlAlpha = 0.45f
         const val EnabledChoiceAlpha = 1f

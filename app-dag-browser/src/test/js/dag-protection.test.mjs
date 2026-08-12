@@ -50,6 +50,9 @@ const createHarness = async ({ captureIdleTimeoutMs = null } = {}) => {
       connectNative() {
         return nativePort;
       },
+      getURL(path) {
+        return `moz-extension://dag-test/${path}`;
+      },
     },
     webRequest: {
       onBeforeRequest: beforeRequest,
@@ -202,6 +205,7 @@ const createHarness = async ({ captureIdleTimeoutMs = null } = {}) => {
         events: [message],
       }, sender);
     },
+    sendRuntime,
     answer(message) {
       for (const listener of nativeMessages.listeners) listener(message);
     },
@@ -922,6 +926,84 @@ test("video and advertisement policy remains isolated", async () => {
   }).cancel, true);
 });
 
+test("video laboratory keeps every network media response closed", async () => {
+  const harness = await createHarness();
+  const media = { type: "media", url: "https://media.example.test/a.mp4" };
+  const videoHeaders = {
+    type: "xmlhttprequest",
+    requestId: "video-lab-header",
+    url: "https://media.example.test/a",
+    responseHeaders: [{ name: "content-type", value: "video/mp4" }],
+  };
+  const audioHeaders = {
+    ...videoHeaders,
+    requestId: "audio-lab-header",
+    responseHeaders: [{ name: "content-type", value: "audio/mp4" }],
+  };
+
+  assert.equal(harness.before(media).cancel, true);
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal(harness.before(media).cancel, true);
+  assert.equal(harness.headers(videoHeaders).cancel, true);
+  assert.equal(harness.headers(audioHeaders).cancel, true);
+  assert.equal(harness.before({ type: "object", url: "https://media.example.test/a" }).cancel, true);
+  harness.answer({ type: "video-lab-config", version: 2, enabled: false });
+  assert.equal(harness.before(media).cancel, true);
+});
+
+test("video laboratory reveal is exact, internal and fail-closed", async () => {
+  const harness = await createHarness();
+  const sender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const token = "0123456789abcdef0123456789abcdef";
+  const reveal = {
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  };
+
+  assert.equal((await harness.sendRuntime(reveal, sender)).inserted, false);
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime(reveal, sender)).inserted, false);
+  const fixtureSender = { ...sender, url: "moz-extension://dag-test/video-lab-fixture.html" };
+  assert.equal((await harness.sendRuntime(reveal, fixtureSender)).inserted, true);
+
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-conceal-style",
+    version: 2,
+    token,
+  }, fixtureSender)).removed, true);
+
+  assert.equal((await harness.sendRuntime({ ...reveal, token: "too_short" }, sender)).inserted, false);
+  assert.equal((await harness.sendRuntime(reveal, { ...fixtureSender, frameId: 2 })).inserted, false);
+  assert.equal((await harness.sendRuntime({
+    ...reveal,
+    documentToken: "document_stale",
+  }, fixtureSender)).inserted, false);
+});
+
+test("video laboratory transport is bounded and contains no provider exceptions", async () => {
+  const videoLab = await readAsset("video-lab.js");
+  const css = await readAsset("barrier.css");
+  new vm.Script(videoLab);
+  assert.match(videoLab, /MAX_CAPTURE_COUNT = 3/u);
+  assert.match(videoLab, /MAX_STATUS_RETRIES = 20/u);
+  assert.match(videoLab, /video-lab-cover-request/u);
+  assert.match(videoLab, /video-lab-frame-request/u);
+  assert.match(videoLab, /video-lab-retire/u);
+  assert.match(videoLab, /record\.video\.muted = true/u);
+  assert.match(videoLab, /record\.video\.pause\(\)/u);
+  assert.match(videoLab, /data-glosh-dag-video-lab-token/u);
+  assert.match(videoLab, /FRAME_RESULT_TIMEOUT_MS = 2_500/u);
+  assert.match(css, /video,\s*audio,/u);
+  assert.doesNotMatch(css, /data-glosh-dag-video-lab/u);
+  assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
+});
+
 test("first paint closes inline and changing image sources before stable reveal", async () => {
   const barrier = await readAsset("barrier.js");
   const css = await readAsset("barrier.css");
@@ -1195,5 +1277,7 @@ test("extension manifest installs the bounded scheduler guard in the main world"
   const protectionScript = manifest.content_scripts.find((script) =>
     script.js?.includes("barrier.js"));
   assert.ok(protectionScript);
+  assert.equal(protectionScript.css_origin, "user");
+  assert.ok(protectionScript.js.indexOf("video-lab.js") < protectionScript.js.indexOf("barrier.js"));
   assert.ok(protectionScript.js.indexOf("barrier.js") < protectionScript.js.indexOf("ads.js"));
 });

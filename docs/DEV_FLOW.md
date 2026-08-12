@@ -32,6 +32,10 @@ Si solo cambian docs, SQL, scripts, GitHub Actions o archivos que no entran en A
 
 ## Build minimo segun tipo de cambio
 
+`app-dag-browser` es un proyecto Gradle aislado. Todos sus comandos se ejecutan
+desde la raiz canonica con `scripts/dag_gradle.sh`; no existe el path de tarea
+`:app-dag-browser:` dentro del wrapper raiz.
+
 | Cambio | Build local minimo | Tests locales minimos | Checks recomendados |
 | --- | --- | --- | --- |
 | Solo docs | Ninguno | Ninguno | `git diff --check` opcional |
@@ -43,6 +47,7 @@ Si solo cambian docs, SQL, scripts, GitHub Actions o archivos que no entran en A
 | `core-data` / `core-database` | `./gradlew --no-daemon :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | tests de modulo afectado, si existen | Revisar migrations/schemas si cambia DB |
 | `core-sync` / `core-network` | `./gradlew --no-daemon :app-user:assembleDevDebug :app-admin:assembleDevDebug -x uploadDevUpdatesToStorage -x prepareDevUpdatesForStorage` | tests del modulo o app afectada | Validar outbox/realtime en CI |
 | Updates/publicacion Android | build de cada app afectada; ambas si cambia infraestructura compartida | unitarios de cada app afectada | Verificar manifests locales y publicos actualizados |
+| DAG Browser | `scripts/dag_gradle.sh assembleDevDebug assembleDiagnosticDebug` | `scripts/dag_gradle.sh testDevDebugUnitTest testDiagnosticDebugUnitTest testDagProtectionJs` | `scripts/dag_gradle.sh ktlintCheck lintDevDebug` |
 
 ## Modulos a compilar por area
 

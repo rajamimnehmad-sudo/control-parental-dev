@@ -10,6 +10,7 @@ class MediaBarrierContractTest {
     private val manifest by lazy { extensionRoot.resolve("manifest.json").readText() }
     private val background by lazy { extensionRoot.resolve("background.js").readText() }
     private val barrier by lazy { extensionRoot.resolve("barrier.js").readText() }
+    private val videoLab by lazy { extensionRoot.resolve("video-lab.js").readText() }
     private val ads by lazy { extensionRoot.resolve("ads.js").readText() }
     private val schedulerGuard by lazy { extensionRoot.resolve("runaway-scheduler-guard.js").readText() }
     private val css by lazy { extensionRoot.resolve("barrier.css").readText() }
@@ -21,8 +22,9 @@ class MediaBarrierContractTest {
 
         assertContains(manifest, "\"run_at\": \"document_start\"")
         assertContains(manifest, "\"all_frames\": true")
+        assertContains(manifest, "\"css_origin\": \"user\"")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.14\"")
+        assertContains(manifest, "\"version\": \"2.0.15\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
@@ -114,6 +116,7 @@ class MediaBarrierContractTest {
         assertContains(build, "buildConfigField(\"boolean\", \"DAG_DIAGNOSTICS\", \"false\")")
         assertContains(build, "buildConfigField(\"boolean\", \"DAG_DIAGNOSTICS\", \"true\")")
         assertContains(activity, "if (BuildConfig.DAG_DIAGNOSTICS) DagMediaPipelineTrace() else null")
+        assertContains(activity, ".put(\"enabled\", BuildConfig.DAG_DIAGNOSTICS && enabled)")
         assertFalse(activity.contains("packageName.endsWith(\".dev\")"))
         assertFalse(build.contains("create(\"lab\")"))
         assertFalse(build.contains("GLOSHIA_VISUAL_ENABLED"))
@@ -232,11 +235,21 @@ class MediaBarrierContractTest {
         assertFalse(ads.contains("querySelectorAll?.(\"span,div\")"))
         assertContains(css, "[data-ad-slot]")
         assertContains(css, "glosh-dag-page-ad-hidden")
+        assertContains(videoLab, "MAX_CAPTURE_COUNT = 3")
+        assertContains(videoLab, "video-lab-cover-request")
+        assertContains(videoLab, "video-lab-frame-request")
+        assertContains(videoLab, "record.video.muted = true")
+        assertContains(videoLab, "data-glosh-dag-video-lab-token")
+        assertContains(videoLab, "FRAME_RESULT_TIMEOUT_MS = 2_500")
+        assertContains(background, "isVideoLabFixtureSender")
+        assertFalse(background.contains("tabs.insertCSS"))
+        assertContains(css, "video,")
+        assertFalse(css.contains("data-glosh-dag-video-lab"))
     }
 
     @Test
     fun `active protection has no store device or document remapping exceptions`() {
-        val activeProtection = "$background\n$barrier\n$css"
+        val activeProtection = "$background\n$barrier\n$videoLab\n$css"
         listOf("cheeky", "mimo", "fravega", "sm-a235", "sm-s908").forEach { forbidden ->
             assertFalse(activeProtection.contains(forbidden, ignoreCase = true))
         }

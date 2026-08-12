@@ -41,6 +41,9 @@
                 android:id="@+id/menu_diagnostics"
                 android:title="@string/dag_diagnostics" />
             <item
+                android:id="@+id/menu_video_lab"
+                android:title="@string/video_lab_open" />
+            <item
                 android:id="@+id/menu_about"
                 android:title="@string/about_dag" />
         </menu>

@@ -25,6 +25,7 @@ internal enum class DagFlightEventType(val wireValue: String) {
     MediaDrop("media_drop"),
     MediaResource("media_resource"),
     MediaElement("media_element"),
+    VideoLab("video_lab"),
 }
 
 internal data class DagFlightEvent(
