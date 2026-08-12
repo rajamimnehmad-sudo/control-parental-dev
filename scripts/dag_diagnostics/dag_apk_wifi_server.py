@@ -8,6 +8,7 @@ repository and does not copy or publish the APK.
 from __future__ import annotations
 
 import argparse
+import datetime
 import hmac
 import html
 import json
@@ -70,6 +71,11 @@ def apk_metadata(metadata_path: pathlib.Path) -> Tuple[str, int]:
         return str(element["versionName"]), int(element["versionCode"])
     except (FileNotFoundError, KeyError, IndexError, TypeError, ValueError, json.JSONDecodeError):
         return "local", 0
+
+
+def formatted_update_time(timestamp: float) -> Tuple[str, str]:
+    updated_at = datetime.datetime.fromtimestamp(timestamp).astimezone()
+    return updated_at.isoformat(timespec="seconds"), updated_at.strftime("%d/%m/%Y %H:%M:%S %Z")
 
 
 def parse_range(value: Optional[str], size: int) -> Optional[Tuple[int, int]]:
@@ -158,11 +164,13 @@ class DagApkRequestHandler(BaseHTTPRequestHandler):
             version_name, version_code = apk_metadata(self.dag_server.metadata_path)
             version = html.escape(version_name)
             size_mb = stat.st_size / (1024 * 1024)
+            updated_iso, updated_display = formatted_update_time(stat.st_mtime)
             cache_key = f"{stat.st_mtime_ns}-{stat.st_size}"
             content = f"""<!doctype html>
 <html lang=\"es\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">
 <title>DAG Browser DEV</title><style>body{{font:18px system-ui;margin:2rem;max-width:36rem}}a{{display:inline-block;padding:1rem 1.3rem;background:#087f5b;color:white;border-radius:.7rem;text-decoration:none}}small{{color:#555}}</style></head>
 <body><h1>DAG Browser DEV</h1><p>Versión {version} · código {version_code} · {size_mb:.1f} MiB</p>
+<p>Última actualización disponible: <time datetime="{updated_iso}">{updated_display}</time></p>
 <p><a href=\"dag.apk?v={cache_key}\">Descargar el último APK</a></p>
 <small>Servidor privado de desarrollo en tu red local. La instalación requiere confirmación de Android.</small></body></html>"""
             self._send_text(

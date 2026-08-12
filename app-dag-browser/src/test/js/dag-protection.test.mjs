@@ -248,7 +248,7 @@ test("navigation retires old media work and isolates the next document", async (
   harness.loadDocument(1, "document_b2", "https://shop.example.test/next");
   const oldFilter = harness.filters.get(oldDetails.requestId);
   await waitFor(() => oldFilter.closed, "retired document stream close");
-  assert.notDeepEqual([...oldFilter.writes[0]], [...oldBytes]);
+  assert.equal(oldFilter.writes.length, 0);
 
   const newDetails = imageDetails("new-document");
   const newBytes = Uint8Array.from([0xff, 0xd8, 3, 4, 0xff, 0xd9]);
@@ -367,6 +367,59 @@ test("capture timeout measures network inactivity instead of total transfer time
   assert.deepEqual([...filter.writes[0]], [0xff, 0xd8, 1, 2, 3, 0xff, 0xd9]);
 });
 
+test("cancelled empty response closes without manufacturing a placeholder and clean retry succeeds", async () => {
+  const harness = await createHarness();
+  harness.answer({ type: "media-diagnostics-config", version: 2, enabled: true });
+  const sourceUrl = "https://cdn.example.test/retry.jpg";
+  const cancelled = imageDetails("cancelled-empty", sourceUrl);
+  harness.before(cancelled);
+  const cancelledFilter = harness.filters.get(cancelled.requestId);
+  cancelledFilter.onstop();
+  assert.equal(cancelledFilter.closed, true);
+  assert.equal(cancelledFilter.writes.length, 0);
+
+  const summary = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-diagnostic-summary"), "cancelled response diagnostic");
+  assert.equal(summary.events[0].reason, "cancelled_before_headers");
+
+  const retry = imageDetails("clean-retry", sourceUrl);
+  const original = Uint8Array.from([0xff, 0xd8, 7, 8, 0xff, 0xd9]);
+  deliver(harness, retry, original);
+  const request = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-bytes" && message.requestId === "clean-retry"), "retry native request");
+  harness.answer({
+    type: "media-decision",
+    version: 2,
+    candidateId: request.candidateId,
+    action: "allow",
+    reason: "model_allow",
+  });
+  const retryFilter = harness.filters.get(retry.requestId);
+  await waitFor(() => retryFilter.closed, "retry close");
+  assert.deepEqual([...retryFilter.writes[0]], [...original]);
+});
+
+test("HTTP 204 image response closes empty and is diagnosed as no content", async () => {
+  const harness = await createHarness();
+  harness.answer({ type: "media-diagnostics-config", version: 2, enabled: true });
+  const details = imageDetails("no-content", "https://tracking.example.test/pixel");
+  harness.before(details);
+  harness.headers({
+    ...details,
+    statusCode: 204,
+    fromCache: false,
+    responseHeaders: [{ name: "Content-Type", value: "image/gif" }],
+  });
+  const filter = harness.filters.get(details.requestId);
+  filter.onstop();
+  assert.equal(filter.closed, true);
+  assert.equal(filter.writes.length, 0);
+  const summary = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "media-diagnostic-summary"), "no-content diagnostic");
+  assert.equal(summary.events[0].reason, "no_content_response");
+  assert.equal(summary.events[0].statusCode, 204);
+});
+
 const imageDetails = (requestId, url = `https://cdn.example.test/${requestId}.jpg`) => ({
   requestId,
   type: "image",
@@ -378,7 +431,12 @@ const imageDetails = (requestId, url = `https://cdn.example.test/${requestId}.jp
 
 const deliver = (harness, details, bytes, mime = "image/jpeg") => {
   const result = harness.before(details);
-  harness.headers({ ...details, responseHeaders: [{ name: "Content-Type", value: mime }] });
+  harness.headers({
+    ...details,
+    statusCode: 200,
+    fromCache: false,
+    responseHeaders: [{ name: "Content-Type", value: mime }],
+  });
   const filter = harness.filters.get(details.requestId);
   assert.ok(filter);
   filter.ondata({ data: Uint8Array.from(bytes).buffer });
@@ -393,6 +451,9 @@ test("allowed raster crosses one native gate and keeps exact bytes", async () =>
   assert.equal(Object.keys(deliver(harness, details, original)).length, 0);
   const request = await waitFor(() => harness.postedNative.find((message) =>
     message.type === "media-bytes"), "native request");
+  assert.equal(request.statusCode, 200);
+  assert.equal(request.mimeType, "image/jpeg");
+  assert.equal(request.fromCache, false);
   harness.answer({
     type: "media-decision",
     version: 2,

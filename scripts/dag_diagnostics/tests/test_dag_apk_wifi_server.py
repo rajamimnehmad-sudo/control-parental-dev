@@ -72,6 +72,8 @@ class DagApkWifiServerTest(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertEqual("no-store", headers["Cache-Control"])
         self.assertIn(b"0.70.10-dev", body)
+        self.assertIn("Última actualización disponible:".encode(), body)
+        self.assertIn(b"<time datetime=\"", body)
         self.assertIn(b"dag.apk?v=", body)
 
     def test_full_apk_download_is_exact_and_supports_head(self) -> None:

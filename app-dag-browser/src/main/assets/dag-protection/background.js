@@ -56,6 +56,7 @@ const documentStatesByTab = new Map();
 const diagnosticDrops = new Map();
 const diagnosticResources = new Map();
 const diagnosticElements = new Map();
+const responseMetadataByRequest = new Map();
 
 const validTabId = (value) => Number.isInteger(value) && value >= 0;
 const validDocumentToken = (value) =>
@@ -178,6 +179,28 @@ const diagnosticContext = (details, state) => ({
   activeStreams,
   queuedAnalyses: analysisQueue.length,
   capturedBytes,
+});
+
+const responseMetadata = (details) => {
+  const requestId = typeof details?.requestId === "string" ? details.requestId : "";
+  let metadata = responseMetadataByRequest.get(requestId);
+  if (metadata === undefined) {
+    metadata = {
+      headersReceived: false,
+      statusCode: undefined,
+      fromCache: undefined,
+      mimeType: "",
+    };
+    if (requestId.length > 0) responseMetadataByRequest.set(requestId, metadata);
+  }
+  return metadata;
+};
+
+const detailsWithResponseMetadata = (details, metadata) => ({
+  ...details,
+  statusCode: metadata.statusCode,
+  fromCache: metadata.fromCache,
+  mimeType: metadata.mimeType,
 });
 
 const recordDiagnosticDrop = (carrier, reason, details = null, state = null) => {
@@ -660,14 +683,17 @@ const interceptImage = (details) => {
   const documentState = currentDocumentForDetails(details);
   if (!isCurrentDocument(documentState)) {
     recordDiagnosticDrop("network", "stale_document", details, documentState);
+    responseMetadataByRequest.delete(details.requestId);
     return { cancel: true };
   }
   if (typeof browser.webRequest.filterResponseData !== "function") {
     recordDiagnosticDrop("network", "filter_unavailable", details, documentState);
+    responseMetadataByRequest.delete(details.requestId);
     return { cancel: true };
   }
   if (activeStreams >= MAX_ACTIVE_STREAMS) {
     recordDiagnosticDrop("network", "stream_limit", details, documentState);
+    responseMetadataByRequest.delete(details.requestId);
     return { cancel: true };
   }
 
@@ -676,8 +702,10 @@ const interceptImage = (details) => {
     filter = browser.webRequest.filterResponseData(details.requestId);
   } catch {
     recordDiagnosticDrop("network", "filter_open_failed", details, documentState);
+    responseMetadataByRequest.delete(details.requestId);
     return { cancel: true };
   }
+  const metadata = responseMetadata(details);
 
   activeStreams += 1;
   documentState.activeStreams += 1;
@@ -693,20 +721,35 @@ const interceptImage = (details) => {
     activeStreams = Math.max(0, activeStreams - 1);
     documentState.streamCancellers.delete(cancelStream);
     documentState.activeStreams = Math.max(0, documentState.activeStreams - 1);
+    responseMetadataByRequest.delete(details.requestId);
     scheduleDocumentQuiet(documentState);
   };
 
-  const settle = (decision, originalBytes = null) => {
+  const closeWithoutBody = (originalBytes = null) => {
     if (settled) return;
     settled = true;
     clearTimeout(captureTimeout);
     captureTimeout = null;
-    const currentDecision = isCurrentDocument(documentState)
-      ? decision
-      : { action: "block", replacement: null };
-    const delivered = currentDecision.action === "allow" && originalBytes instanceof Uint8Array
+    try {
+      filter.close();
+    } catch {}
+    if (originalBytes instanceof Uint8Array) originalBytes.fill(0);
+    chunks.length = 0;
+    release();
+  };
+
+  const settle = (decision, originalBytes = null) => {
+    if (settled) return;
+    if (!isCurrentDocument(documentState)) {
+      closeWithoutBody(originalBytes);
+      return;
+    }
+    settled = true;
+    clearTimeout(captureTimeout);
+    captureTimeout = null;
+    const delivered = decision.action === "allow" && originalBytes instanceof Uint8Array
       ? originalBytes
-      : currentDecision.replacement || blockedPlaceholder;
+      : decision.replacement || blockedPlaceholder;
     try {
       filter.write(delivered);
     } catch {}
@@ -719,7 +762,7 @@ const interceptImage = (details) => {
     chunks.length = 0;
     release();
   };
-  const cancelStream = () => settle({ action: "block", replacement: null });
+  const cancelStream = () => closeWithoutBody();
   documentState.streamCancellers.add(cancelStream);
 
   const armCaptureTimeout = (delayMillis, reason) => {
@@ -772,14 +815,18 @@ const interceptImage = (details) => {
   filter.onstop = () => {
     if (settled) return;
     if (totalBytes === 0) {
-      recordDiagnosticDrop("network", "empty_response", details, documentState);
-      settle({ action: "block", replacement: null });
+      const enrichedDetails = detailsWithResponseMetadata(details, metadata);
+      const reason = metadata.statusCode === 204
+        ? "no_content_response"
+        : metadata.headersReceived ? "empty_response" : "cancelled_before_headers";
+      recordDiagnosticDrop("network", reason, enrichedDetails, documentState);
+      closeWithoutBody();
       return;
     }
     const bytes = chunks.length === 1 ? chunks[0] : combineChunks(chunks, totalBytes);
     chunks.length = 0;
     enqueueAnalysis({
-      details,
+      details: detailsWithResponseMetadata(details, metadata),
       bytes,
       priority: imagePriority(details.url),
       carrier: "network",
@@ -866,6 +913,11 @@ browser.webRequest.onHeadersReceived.addListener(
       ?.value?.trim() || "";
     const alreadyIntercepted = ANALYZED_RESOURCE_TYPES.has(details.type);
     if (alreadyIntercepted || IMAGE_MIME_PATTERN.test(contentType)) {
+      const metadata = responseMetadata(details);
+      metadata.headersReceived = true;
+      metadata.statusCode = Number.isInteger(details.statusCode) ? details.statusCode : undefined;
+      metadata.fromCache = typeof details.fromCache === "boolean" ? details.fromCache : undefined;
+      metadata.mimeType = contentType;
       recordResourceDiagnostic(details, contentType);
     }
     if (IMAGE_MIME_PATTERN.test(contentType) && !alreadyIntercepted) {

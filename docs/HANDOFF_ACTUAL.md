@@ -158,7 +158,38 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local en validacion: DAG Browser 207 — diagnostico correlacionado
+## Candidato local en validacion: DAG Browser 208 — recarga sin reemplazos espurios
+
+- DAG 208 (`0.70.12-dev`, extension `2.0.11`) corrige una causa general
+  demostrada por el informe 207 `DAG-C7ACKPQU`, sin excepciones por sitio y sin
+  cambiar R3.1, el umbral, la politica visual, los hilos ni ONNX.
+- En la recarga de Cheeky, 50 solicitudes terminaron sin cuerpo antes de recibir
+  cabeceras; 47 de esos mismos recursos se solicitaron otra vez y luego llegaron
+  normalmente a GloshIA. DAG escribia un PNG neutral incluso para la primera
+  solicitud cancelada, lo que podia dejar un cuadro temporal o interferir con
+  la recarga limpia.
+- Una respuesta sin bytes ahora se cierra sin fabricar contenido. La seguridad
+  permanece cerrada porque no se libera ningun byte original. El mismo cierre
+  limpio se aplica al retirar un documento o recibir tarde una decision de un
+  documento anterior; los fallos reales con contenido conservan el reemplazo
+  seguro existente.
+- El transporte conserva metadatos de respuesta por `requestId` y distingue
+  `cancelled_before_headers`, `no_content_response` HTTP 204 y
+  `empty_response`. La metadata se elimina al cerrar cada stream y no crea una
+  cola sin limite.
+- Validacion local: 157 unitarios DEV y 157 Diagnostic, barrera JS 30/30 con
+  reproduccion de cancelacion/reintento y HTTP 204, Ktlint, Lint de ambos
+  flavors, compilacion instrumentada y APK DEV/Diagnostic correctos. APK DEV:
+  121.856.741 bytes, SHA-256
+  `fb010a0ae9b49745f984c014cb3c64dd5be12ef0f087c590599305f787ed37f4`;
+  firma DEV historica `d51bc0da…f8a8832`. APK Diagnostic:
+  121.861.685 bytes, SHA-256
+  `719103e84b0e254a356f1a6504f7da7156c9dcd649f2a1ac435de8405e736568`.
+- El servidor Wi-Fi muestra desde este candidato la fecha y hora local exactas
+  de modificacion del APK disponible. Pendiente: prueba fisica de primera carga
+  y recarga en Cheeky, Mimo y Fravega, seguida por un informe DAG 208.
+
+## Candidato local anterior: DAG Browser 207 — diagnostico correlacionado
 
 - DAG 207 (`0.70.11-dev`, extension `2.0.10`) amplía la caja negra sin cambiar
   R3.1, `dag-36`, el umbral, la politica visual, los hilos ni ONNX.
