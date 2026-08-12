@@ -1583,5 +1583,9 @@ Documentos vigentes:
   `docs/dag/v3/GLOSHIA_VIDEO_V1_PROPOSAL_2026-08-12.md`: audio fuera de alcance,
   misma autoridad GloshIA Visual para fotos y fotogramas, cobertura previa,
   detector temporal general y primer paso `DAG-VIDEO-01A` de laboratorio en S22
-  y A23. No esta aprobada para implementacion y no cambia el runtime vigente.
+  y A23. El plan ejecutable esta en
+  `docs/dag/v3/DAG_VIDEO_01_EXECUTION_PLAN_2026-08-12.md`; divide el laboratorio
+  en `01A0` (captura cubierta), `01A1` (R3.1 y diagnostico) y `01A2` (gate
+  fisico). Ninguno esta aprobado para implementacion y no cambia el runtime
+  vigente.
 - No hacer push, PR, publicacion DEV ni Production sin un OK nuevo y explicito.

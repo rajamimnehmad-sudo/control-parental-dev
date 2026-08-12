@@ -1,7 +1,7 @@
 # GloshIA Video V1 — propuesta de compuerta visual temporal
 
 Fecha: 2026-08-12  
-Estado: propuesta documentada; implementacion no iniciada  
+Estado: propuesta convertida en plan; implementacion no iniciada
 Ticket futuro: `DAG-VIDEO-01`  
 Baseline de navegador: DAG Browser 211 (`0.70.15-dev`)  
 Modelo oficial vigente: GloshIA Visual R3.1
@@ -189,3 +189,6 @@ No se implementan reglas especiales para resolver estos casos por proveedor.
 Cuando el usuario pida `hacer el plan de GloshIA Visual para videos`, abrir este
 documento y convertir primero `DAG-VIDEO-01A` en un ticket pequeno aprobado. No
 comenzar por entrenamiento ni por excepciones de compatibilidad.
+
+Plan de ejecucion resultante:
+`docs/dag/v3/DAG_VIDEO_01_EXECUTION_PLAN_2026-08-12.md`.

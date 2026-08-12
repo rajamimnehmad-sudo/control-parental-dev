@@ -3453,7 +3453,7 @@ Flujo de una entrada:
 
 ### DAG-VIDEO-01 - GloshIA Visual sobre fotogramas de video
 
-- Estado: `Propuesta documentada; no aprobado para implementacion`.
+- Estado: `Plan listo; no aprobado para implementacion`.
 - Objetivo: habilitar video local con una compuerta temporal general, sin
   mostrar fotogramas antes de decidirlos y sin excepciones por sitio, URL o
   dominio.
@@ -3472,6 +3472,8 @@ Flujo de una entrada:
   R3.1 en S22 y A23. Video permanece bloqueado hasta aprobarlo y pasar gates.
 - Propuesta completa:
   `docs/dag/v3/GLOSHIA_VIDEO_V1_PROPOSAL_2026-08-12.md`.
+- Plan ejecutable, gates y primer ticket pequeno:
+  `docs/dag/v3/DAG_VIDEO_01_EXECUTION_PLAN_2026-08-12.md`.
 
 ### DAG-IMAGE-QUEUE-03 - Entrega continua, lazy, iconos y SVG seguro
 
