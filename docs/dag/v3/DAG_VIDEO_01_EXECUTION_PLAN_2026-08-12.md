@@ -1,7 +1,7 @@
 # DAG Video 01 — plan de ejecucion y gates
 
 Fecha: 2026-08-12
-Estado: `01A0` y `01A1` cerrados con gate fisico A23; `01A2` pendiente de aprobacion
+Estado: `01A0` y `01A1` cerrados; `01A2` aprobado, GO en A23 y pendiente S22
 Baseline protegido: DAG Browser 211 (`0.70.15-dev`)
 Autoridad visual: GloshIA Visual R3.1, sin cambios de modelo, umbral o politica
 
@@ -257,6 +257,13 @@ gates de laboratorio, no permiso para revelar escenas posteriores.
 El informe termina en `GO`, `GO CON CONDICIONES` o `NO-GO`, con evidencia. No
 modifica el APK normal.
 
+Estado de ejecucion: Diagnostic 13 habilita el laboratorio web solo mediante un
+interruptor efimero de sesion y mantiene DAG normal cerrado. A23 completo cinco
+primeras preparaciones con p50 `967,67 ms` y p95/peor caso `2.185,70 ms`, sin
+crash, ANR ni fuga: `GO` para A23. El resultado global es
+`GO CON CONDICIONES` porque el S22 aun no estuvo disponible. Evidencia:
+`docs/compatibility/results/dag-browser-v213-video-a2-sm-a235m-2026-08-12.md`.
+
 ### `DAG-VIDEO-01B` — motor temporal
 
 Solo se planifica en detalle despues de `01A2`. Debe decidir, con los datos
@@ -316,7 +323,8 @@ de esas areas, el ticket se detiene y se replantea.
 
 ## Aprobacion y siguiente limite
 
-`DAG-VIDEO-01A0` y `01A1` fueron aprobados, implementados y validados
-fisicamente en A23. Su cierre no autoriza por si solo `01A2`, `01B` ni `01C`;
-cada ampliacion conserva su gate. En particular, `01A1` usa R3.1 solo sobre la
-fixture interna cubierta y no habilita ningun sitio real.
+`DAG-VIDEO-01A0`, `01A1` y `01A2` fueron aprobados. Los dos primeros estan
+cerrados; `01A2` paso A23 y queda pendiente del S22. Ninguno autoriza por si
+solo `01B` ni `01C`; cada ampliacion conserva su gate. Diagnostic 13 permite
+video real solo mientras el laboratorio efimero esta armado y siempre bajo
+cobertura; DAG normal continua con bloqueo total.

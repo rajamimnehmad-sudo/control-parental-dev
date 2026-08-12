@@ -1,11 +1,14 @@
 "use strict";
 
 const ANALYZED_RESOURCE_TYPES = new Set(["image", "imageset"]);
-const BLOCKED_RESOURCE_TYPES = new Set(["media", "object"]);
-const BLOCKED_MEDIA_MIME_PATTERN =
-  /^(?:audio|video)\/|^application\/(?:dash\+xml|vnd\.apple\.mpegurl|x-mpegurl)/iu;
+const BLOCKED_RESOURCE_TYPES = new Set(["object"]);
+const VIDEO_MEDIA_MIME_PATTERN = /^video\//iu;
+const AUDIO_MEDIA_MIME_PATTERN = /^audio\//iu;
+const VIDEO_MANIFEST_MIME_PATTERN =
+  /^application\/(?:dash\+xml|vnd\.apple\.mpegurl|x-mpegurl)/iu;
 const VIDEO_LAB_REVEAL_MESSAGE = "video-lab-reveal-style";
 const VIDEO_LAB_CONCEAL_MESSAGE = "video-lab-conceal-style";
+const VIDEO_LAB_TOKEN_ATTRIBUTE = "data-glosh-dag-video-lab-token";
 const IMAGE_MIME_PATTERN = /^image\//iu;
 const PAGE_AD_HOSTS = new Set([
   "doubleclick.net", "googlesyndication.com", "googleadservices.com",
@@ -60,6 +63,7 @@ const diagnosticResources = new Map();
 const diagnosticElements = new Map();
 const diagnosticDecisions = new Map();
 const responseMetadataByRequest = new Map();
+const videoLabGrantsByTab = new Map();
 
 const validTabId = (value) => Number.isInteger(value) && value >= 0;
 const validDocumentToken = (value) =>
@@ -89,6 +93,42 @@ const postDocumentLifecycle = (type, state) => {
 const isVideoLabFixtureSender = (sender) =>
   sender?.url === browser.runtime.getURL("video-lab-fixture.html");
 
+const isVideoLabEligibleSender = (sender) =>
+  sender?.frameId === 0 &&
+  (isVideoLabFixtureSender(sender) || /^https:\/\//iu.test(sender?.url || ""));
+
+const videoLabCss = (token) =>
+  `[${VIDEO_LAB_TOKEN_ATTRIBUTE}="${token}"] { visibility: visible !important; }`;
+
+const removeVideoLabGrant = async (tabId, expectedToken = null) => {
+  const grant = videoLabGrantsByTab.get(tabId);
+  if (grant === undefined || (expectedToken !== null && grant.token !== expectedToken)) return false;
+  videoLabGrantsByTab.delete(tabId);
+  try {
+    await browser.tabs.removeCSS(tabId, {
+      code: grant.css,
+      cssOrigin: "user",
+      frameId: 0,
+    });
+  } catch {}
+  return true;
+};
+
+const revokeAllVideoLabGrants = () => {
+  for (const tabId of [...videoLabGrantsByTab.keys()]) void removeVideoLabGrant(tabId);
+};
+
+const hasCurrentVideoLabGrant = (details) => {
+  if (
+    !videoLabEnabled ||
+    !validTabId(details?.tabId) ||
+    details?.frameId !== 0
+  ) return false;
+  const state = documentStatesByTab.get(details.tabId);
+  const grant = videoLabGrantsByTab.get(details.tabId);
+  return isCurrentDocument(state) && grant?.documentState === state;
+};
+
 const settleQueuedDocumentWork = (state) => {
   for (let index = analysisQueue.length - 1; index >= 0; index -= 1) {
     const task = analysisQueue[index];
@@ -108,6 +148,7 @@ const settleQueuedDocumentWork = (state) => {
 const retireDocument = (state) => {
   if (!state || state.retired) return;
   state.retired = true;
+  void removeVideoLabGrant(state.tabId);
   clearTimeout(state.quietTimer);
   state.quietTimer = null;
   if (documentStatesByTab.get(state.tabId) === state) documentStatesByTab.delete(state.tabId);
@@ -493,6 +534,7 @@ const connectNative = () => {
       }
       if (message?.type === "video-lab-config" && message?.version === PROTOCOL_VERSION) {
         videoLabEnabled = message.enabled === true;
+        if (!videoLabEnabled) revokeAllVideoLabGrants();
         return;
       }
       const pending = pendingNative.get(message?.candidateId);
@@ -521,6 +563,7 @@ const connectNative = () => {
       if (nativePort === port) {
         nativePort = null;
         videoLabEnabled = false;
+        revokeAllVideoLabGrants();
       }
       failPendingNative();
       if (reconnectTimer === null) {
@@ -533,6 +576,7 @@ const connectNative = () => {
   } catch {
     nativePort = null;
     videoLabEnabled = false;
+    revokeAllVideoLabGrants();
   }
 };
 
@@ -911,29 +955,61 @@ browser.runtime.onMessage.addListener((message, sender) => {
   ) {
     const tabId = sender?.tab?.id;
     const state = validTabId(tabId) ? documentStatesByTab.get(tabId) : null;
-    return Promise.resolve({
-      inserted:
-        videoLabEnabled &&
-        isVideoLabFixtureSender(sender) &&
-        isCurrentDocument(state) &&
-        sender?.frameId === 0 &&
-        state.documentToken === message.documentToken &&
-        validVideoLabToken(message.token),
-    });
+    if (
+      !videoLabEnabled ||
+      !isVideoLabEligibleSender(sender) ||
+      !isCurrentDocument(state) ||
+      state.pageUrl !== sender.url ||
+      state.documentToken !== message.documentToken ||
+      !validVideoLabToken(message.token)
+    ) {
+      return Promise.resolve({ inserted: false });
+    }
+    if (isVideoLabFixtureSender(sender)) return Promise.resolve({ inserted: true });
+    return (async () => {
+      await removeVideoLabGrant(tabId);
+      const css = videoLabCss(message.token);
+      try {
+        await browser.tabs.insertCSS(tabId, {
+          code: css,
+          cssOrigin: "user",
+          frameId: 0,
+        });
+      } catch {
+        return { inserted: false };
+      }
+      if (!videoLabEnabled || !isCurrentDocument(state)) {
+        try {
+          await browser.tabs.removeCSS(tabId, { code: css, cssOrigin: "user", frameId: 0 });
+        } catch {}
+        return { inserted: false };
+      }
+      videoLabGrantsByTab.set(tabId, {
+        css,
+        documentState: state,
+        token: message.token,
+      });
+      return { inserted: true };
+    })();
   }
   if (
     message?.type === VIDEO_LAB_CONCEAL_MESSAGE &&
     message?.version === PROTOCOL_VERSION
   ) {
-    return Promise.resolve({
-      removed:
-        isVideoLabFixtureSender(sender) &&
-        sender?.frameId === 0 &&
-        validVideoLabToken(message.token),
-    });
+    if (
+      !isVideoLabEligibleSender(sender) ||
+      !validTabId(sender?.tab?.id) ||
+      !validVideoLabToken(message.token)
+    ) {
+      return Promise.resolve({ removed: false });
+    }
+    if (isVideoLabFixtureSender(sender)) return Promise.resolve({ removed: true });
+    const grant = videoLabGrantsByTab.get(sender.tab.id);
+    if (grant?.documentState?.pageUrl !== sender.url) return Promise.resolve({ removed: false });
+    return removeVideoLabGrant(sender.tab.id, message.token).then((removed) => ({ removed }));
   }
   if (message?.type === "video-lab-status" && message?.version === PROTOCOL_VERSION) {
-    return Promise.resolve({ enabled: videoLabEnabled && isVideoLabFixtureSender(sender) });
+    return Promise.resolve({ enabled: videoLabEnabled && isVideoLabEligibleSender(sender) });
   }
   if (
     message?.version === PROTOCOL_VERSION &&
@@ -993,6 +1069,9 @@ browser.webRequest.onBeforeRequest.addListener(
     if (details.type === "main_frame") beginDocument(details.tabId);
     if (isPageAdvertisementRequest(details)) return { cancel: true };
     if (ANALYZED_RESOURCE_TYPES.has(details.type)) return interceptImage(details);
+    if (details.type === "media") {
+      return hasCurrentVideoLabGrant(details) ? {} : { cancel: true };
+    }
     if (BLOCKED_RESOURCE_TYPES.has(details.type)) return { cancel: true };
     return {};
   },
@@ -1017,7 +1096,14 @@ browser.webRequest.onHeadersReceived.addListener(
     if (IMAGE_MIME_PATTERN.test(contentType) && !alreadyIntercepted) {
       return interceptImage(details);
     }
-    return BLOCKED_MEDIA_MIME_PATTERN.test(contentType) ? { cancel: true } : {};
+    if (AUDIO_MEDIA_MIME_PATTERN.test(contentType)) return { cancel: true };
+    if (
+      VIDEO_MEDIA_MIME_PATTERN.test(contentType) ||
+      VIDEO_MANIFEST_MIME_PATTERN.test(contentType)
+    ) {
+      return hasCurrentVideoLabGrant(details) ? {} : { cancel: true };
+    }
+    return {};
   },
   { urls: ["<all_urls>"] },
   ["blocking", "responseHeaders"],

@@ -34,6 +34,8 @@ const createHarness = async ({ captureIdleTimeoutMs = null } = {}) => {
   const nativeDisconnects = eventChannel();
   const runtimeMessages = eventChannel();
   const postedNative = [];
+  const insertedCss = [];
+  const removedCss = [];
   const filters = new Map();
   let handlerBehaviorChanges = 0;
   const handlerBehaviorChangeListenerCounts = [];
@@ -45,6 +47,16 @@ const createHarness = async ({ captureIdleTimeoutMs = null } = {}) => {
     },
   };
   const browser = {
+    tabs: {
+      insertCSS(tabId, details) {
+        insertedCss.push({ tabId, details });
+        return Promise.resolve();
+      },
+      removeCSS(tabId, details) {
+        removedCss.push({ tabId, details });
+        return Promise.resolve();
+      },
+    },
     runtime: {
       onMessage: runtimeMessages,
       connectNative() {
@@ -140,6 +152,8 @@ const createHarness = async ({ captureIdleTimeoutMs = null } = {}) => {
     before: beforeRequest.listeners[0],
     headers: headersReceived.listeners[0],
     filters,
+    insertedCss,
+    removedCss,
     postedNative,
     get handlerBehaviorChanges() {
       return handlerBehaviorChanges;
@@ -926,11 +940,32 @@ test("video and advertisement policy remains isolated", async () => {
   }).cancel, true);
 });
 
-test("video laboratory keeps every network media response closed", async () => {
+test("video laboratory opens only covered video bytes for the exact diagnostic document", async () => {
   const harness = await createHarness();
-  const media = { type: "media", url: "https://media.example.test/a.mp4" };
+  const sender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const token = "0123456789abcdef0123456789abcdef";
+  const reveal = {
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  };
+  const media = {
+    type: "media",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: sender.url,
+    url: "https://media.example.test/a.mp4",
+  };
   const videoHeaders = {
     type: "xmlhttprequest",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: sender.url,
     requestId: "video-lab-header",
     url: "https://media.example.test/a",
     responseHeaders: [{ name: "content-type", value: "video/mp4" }],
@@ -944,14 +979,28 @@ test("video laboratory keeps every network media response closed", async () => {
   assert.equal(harness.before(media).cancel, true);
   harness.answer({ type: "video-lab-config", version: 2, enabled: true });
   assert.equal(harness.before(media).cancel, true);
-  assert.equal(harness.headers(videoHeaders).cancel, true);
+  assert.equal((await harness.sendRuntime(reveal, sender)).inserted, true);
+  assert.equal(harness.insertedCss.length, 1);
+  assert.equal(harness.insertedCss[0].details.cssOrigin, "user");
+  assert.match(harness.insertedCss[0].details.code, new RegExp(token, "u"));
+  assert.equal(Object.keys(harness.before(media)).length, 0);
+  assert.equal(harness.before({ ...media, frameId: 2 }).cancel, true);
+  assert.equal(Object.keys(harness.headers(videoHeaders)).length, 0);
+  assert.equal(harness.headers({ ...videoHeaders, frameId: 2 }).cancel, true);
   assert.equal(harness.headers(audioHeaders).cancel, true);
   assert.equal(harness.before({ type: "object", url: "https://media.example.test/a" }).cancel, true);
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-conceal-style",
+    version: 2,
+    token,
+  }, sender)).removed, true);
+  assert.equal(harness.removedCss.length, 1);
+  assert.equal(harness.before(media).cancel, true);
   harness.answer({ type: "video-lab-config", version: 2, enabled: false });
   assert.equal(harness.before(media).cancel, true);
 });
 
-test("video laboratory reveal is exact, internal and fail-closed", async () => {
+test("video laboratory reveal is exact, HTTPS-only and fail-closed", async () => {
   const harness = await createHarness();
   const sender = {
     url: "https://shop.example.test/",
@@ -968,22 +1017,63 @@ test("video laboratory reveal is exact, internal and fail-closed", async () => {
 
   assert.equal((await harness.sendRuntime(reveal, sender)).inserted, false);
   harness.answer({ type: "video-lab-config", version: 2, enabled: true });
-  assert.equal((await harness.sendRuntime(reveal, sender)).inserted, false);
-  const fixtureSender = { ...sender, url: "moz-extension://dag-test/video-lab-fixture.html" };
-  assert.equal((await harness.sendRuntime(reveal, fixtureSender)).inserted, true);
+  assert.equal((await harness.sendRuntime(reveal, sender)).inserted, true);
 
   assert.equal((await harness.sendRuntime({
     type: "video-lab-conceal-style",
     version: 2,
     token,
-  }, fixtureSender)).removed, true);
+  }, sender)).removed, true);
 
   assert.equal((await harness.sendRuntime({ ...reveal, token: "too_short" }, sender)).inserted, false);
-  assert.equal((await harness.sendRuntime(reveal, { ...fixtureSender, frameId: 2 })).inserted, false);
+  assert.equal((await harness.sendRuntime(reveal, { ...sender, frameId: 2 })).inserted, false);
+  assert.equal((await harness.sendRuntime(reveal, { ...sender, url: "http://shop.example.test/" })).inserted, false);
   assert.equal((await harness.sendRuntime({
     ...reveal,
     documentToken: "document_stale",
-  }, fixtureSender)).inserted, false);
+  }, sender)).inserted, false);
+  assert.equal((await harness.sendRuntime(reveal, {
+    ...sender,
+    url: "https://other.example.test/",
+  })).inserted, false);
+
+  harness.startDocument(1, "document_c3", "moz-extension://dag-test/video-lab-fixture.html");
+  const fixtureSender = {
+    ...sender,
+    url: "moz-extension://dag-test/video-lab-fixture.html",
+  };
+  assert.equal((await harness.sendRuntime({
+    ...reveal,
+    documentToken: "document_c3",
+  }, fixtureSender)).inserted, true);
+  assert.equal(harness.insertedCss.length, 1, "internal fixture uses its packaged CSS");
+});
+
+test("video laboratory navigation revokes its user-origin grant before new media", async () => {
+  const harness = await createHarness();
+  const sender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const token = "abcdef0123456789abcdef0123456789";
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  }, sender)).inserted, true);
+
+  harness.startDocument(1, "document_b2", "https://shop.example.test/next");
+  await waitFor(() => harness.removedCss.length === 1, "video grant removal");
+  assert.equal(harness.before({
+    type: "media",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: "https://shop.example.test/next",
+    url: "https://media.example.test/next.mp4",
+  }).cancel, true);
 });
 
 test("video laboratory transport is bounded and contains no provider exceptions", async () => {
@@ -997,8 +1087,11 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /video-lab-retire/u);
   assert.match(videoLab, /record\.video\.muted = true/u);
   assert.match(videoLab, /record\.video\.pause\(\)/u);
+  assert.match(videoLab, /document\.documentElement\.hasAttribute\(INTERNAL_FIXTURE_ATTRIBUTE\)/u);
+  assert.doesNotMatch(videoLab, /record\.video\.load\(\);\s*void record\.video\.play/u);
   assert.match(videoLab, /data-glosh-dag-video-lab-token/u);
   assert.match(videoLab, /FRAME_RESULT_TIMEOUT_MS = 2_500/u);
+  assert.match(videoLab, /!record\.covered \|\|\s*record\.framePending \|\|/u);
   assert.match(css, /video,\s*audio,/u);
   assert.doesNotMatch(css, /data-glosh-dag-video-lab/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);

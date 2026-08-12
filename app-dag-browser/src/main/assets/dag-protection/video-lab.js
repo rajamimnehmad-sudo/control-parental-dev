@@ -22,6 +22,7 @@
   const FRAME_RESULT_TIMEOUT_MS = 2_500;
   const VIEWPORT_SETTLE_MS = 150;
   const MAX_CAPTURE_RECOVERIES = 1;
+  const INTERNAL_FIXTURE_ATTRIBUTE = "data-glosh-dag-video-lab-fixture";
 
   let installed = false;
   let enabled = false;
@@ -37,6 +38,13 @@
   const randomToken = (wordCount) => {
     const words = crypto.getRandomValues(new Uint32Array(wordCount));
     return Array.from(words, (word) => word.toString(16).padStart(8, "0")).join("");
+  };
+
+  const enforceMuted = (record) => {
+    if (!enabled || record !== activeRecord) return;
+    if (!record.video.muted) record.video.muted = true;
+    if (!record.video.defaultMuted) record.video.defaultMuted = true;
+    if (record.video.volume !== 0) record.video.volume = 0;
   };
 
   const recordFor = (video) => {
@@ -57,7 +65,13 @@
       resultTimer: null,
       coverTimer: null,
       recoveries: 0,
+      coverRequestedAt: null,
+      coverMillis: null,
+      decodeStartedAt: null,
     };
+    const keepMuted = () => enforceMuted(record);
+    video.addEventListener("play", keepMuted);
+    video.addEventListener("volumechange", keepMuted);
     records.set(video, record);
     return record;
   };
@@ -159,17 +173,22 @@
       record.coverPending = false;
       record.framePending = false;
       record.recoveries = 0;
+      record.coverRequestedAt = null;
+      record.coverMillis = null;
+      record.decodeStartedAt = null;
       void concealRecord(record);
       record.revealToken = randomToken(4);
       record.video.pause();
     }
     record.sourceSignature = signature;
     if (record.covered || record.coverPending) return;
+    const coverRequestedAt = performance.now();
     record.coverPending = postRecord(COVER_REQUEST_MESSAGE, record, {
       readyState: record.video.readyState,
       durationFinite: Number.isFinite(record.video.duration),
     });
     if (record.coverPending) {
+      record.coverRequestedAt = coverRequestedAt;
       record.coverTimer = setTimeout(() => {
         record.coverTimer = null;
         retireRecord(record, "cover_timeout");
@@ -230,7 +249,12 @@
     ) return;
     const deadline = performance.now() + FRAME_READY_TIMEOUT_MS;
     const request = () => {
-      if (record !== activeRecord || !record.covered || !record.video.isConnected) return;
+      if (
+        record !== activeRecord ||
+        !record.covered ||
+        record.framePending ||
+        !record.video.isConnected
+      ) return;
       const viewportWait = VIEWPORT_SETTLE_MS - (performance.now() - lastViewportChangeAt);
       if (viewportWait > 0) {
         record.readinessTimer = setTimeout(request, viewportWait);
@@ -245,7 +269,14 @@
         return;
       }
       record.readinessTimer = null;
-      if (!postRecord(FRAME_REQUEST_MESSAGE, record, { captureIndex: record.captures })) return;
+      const decodeMillis = record.decodeStartedAt === null
+        ? null
+        : Math.max(0, performance.now() - record.decodeStartedAt);
+      if (!postRecord(FRAME_REQUEST_MESSAGE, record, {
+        captureIndex: record.captures,
+        coverMillis: record.coverMillis,
+        decodeMillis,
+      })) return;
       record.framePending = true;
       record.resultTimer = setTimeout(() => {
         record.resultTimer = null;
@@ -265,6 +296,9 @@
     ) return;
     clearTimeout(record.coverTimer);
     record.coverTimer = null;
+    record.coverMillis = record.coverRequestedAt === null
+      ? null
+      : Math.max(0, performance.now() - record.coverRequestedAt);
     const reveal = await browser.runtime.sendMessage({
       type: REVEAL_MESSAGE,
       version: protocolVersion,
@@ -283,10 +317,14 @@
     record.covered = true;
     record.video.muted = true;
     record.video.defaultMuted = true;
+    record.video.volume = 0;
     record.video.playsInline = true;
     record.video.preload = "auto";
     record.video.setAttribute(TOKEN_ATTRIBUTE, record.revealToken);
-    record.video.load();
+    record.decodeStartedAt = performance.now();
+    if (document.documentElement.hasAttribute(INTERNAL_FIXTURE_ATTRIBUTE)) {
+      record.video.load();
+    }
     void record.video.play().catch(() => {});
     requestFrameWhenReady(record);
   };

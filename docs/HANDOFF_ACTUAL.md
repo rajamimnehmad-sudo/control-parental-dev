@@ -158,7 +158,30 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local: DAG Browser 213 — GloshIA R3.1 sobre captura cubierta 01A1
+## Candidato local: DAG Browser 213 / Diagnostic 13 — gate web cubierto 01A2
+
+- `DAG-VIDEO-01A2` queda `GO CON CONDICIONES`: el A23 paso el gate fisico y
+  falta repetirlo en S22. DAG normal permanece en 213 (`0.70.17-dev`), con video
+  bloqueado; solo Diagnostic avanza a versionCode `13` y extension `2.0.16`.
+- El laboratorio web es explicito, efimero y solo por sesion: arranca apagado,
+  se arma desde el menu y al desarmar revoca concesiones, cobertura y trabajo.
+  Usa documento HTTPS superior, token aleatorio y CSS `user` exactos; no agrega
+  excepciones por proveedor, sitio, URL, dominio ni dispositivo.
+- La cobertura Android se confirma antes de abrir bytes de video. Audio se
+  cancela y el elemento cubierto conserva mute/volumen cero ante `play` y
+  `volumechange`. Navegacion, cambio de fuente, timeout o desconexion fallan
+  cerrados. Fotos y fotogramas siguen compartiendo R3.1, sesion y cola acotada.
+- A23: cinco primeras preparaciones web dieron p50 `967,67 ms`, p95/peor caso
+  `2.185,70 ms`, debajo del gate de 4 s. El APK final repitio YouTube en unos
+  438 ms. No hubo crash, ANR, fuga ni resultado tardio aceptado.
+- Validacion: JS 36/36; unitarios DEV y Diagnostic 171/171; Ktlint, Lint y APK
+  Diagnostic correctos. SHA-256:
+  `bc47f59f2a555fc52c861be1ed28fc90f10d2d332c1135c5b8e3551834cf19b4`.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v213-video-a2-sm-a235m-2026-08-12.md`.
+- No hubo push, publicacion, Supabase ni Production. `01B` no esta autorizado.
+
+## Baseline local anterior: DAG Browser 213 — GloshIA R3.1 sobre captura cubierta 01A1
 
 - DAG 213 (`0.70.17-dev`) cierra `DAG-VIDEO-01A1`; Diagnostic avanza a
   versionCode `12`. La extension permanece en `2.0.15` porque no cambio su
@@ -180,8 +203,8 @@ el runtime actual desde versiones o worktrees historicos.
   Fravega conservaron imagenes e interaccion.
 - Evidencia:
   `docs/compatibility/results/dag-browser-v213-video-a1-sm-a235m-2026-08-12.md`.
-- Video de red continua bloqueado en normal y Diagnostic. `01A2` no esta
-  autorizado; no hubo push, publicacion, Supabase ni Production.
+- En ese baseline, video de red continuaba bloqueado en normal y Diagnostic.
+  No hubo push, publicacion, Supabase ni Production.
 
 ## Baseline local anterior: DAG Browser 212 — contrato cubierto de video 01A0
 
@@ -1638,12 +1661,9 @@ Documentos vigentes:
   y A23. El plan ejecutable esta en
   `docs/dag/v3/DAG_VIDEO_01_EXECUTION_PLAN_2026-08-12.md`; divide el laboratorio
   en `01A0` (captura cubierta), `01A1` (R3.1 y diagnostico) y `01A2` (gate
-  fisico). `01A0` y `01A1` fueron aprobados, implementados y validados
-  fisicamente en A23. El candidato vigente es DAG normal 213 / Diagnostic 12;
-  usa una fixture sintetica
-  interna, cobertura Android previa, recorte regional `PixelCopy` a `224x224`,
-  identidad por revision y validacion del patron capturado. No conecta R3.1 ni
-  habilita media de red: DAG normal y las webs de la variante diagnostica
-  mantienen video/audio totalmente bloqueados. `01A2` en adelante no estan
-  autorizados automaticamente.
+  fisico). Los tres fueron aprobados; `01A0` y `01A1` estan cerrados y `01A2`
+  paso A23, pendiente S22. El candidato vigente es DAG normal 213 / Diagnostic
+  13: reutiliza R3.1 sobre fixture y video HTTPS real bajo cobertura, solo
+  mientras el laboratorio efimero esta armado. DAG normal mantiene video/audio
+  totalmente bloqueados. `01B` en adelante no estan autorizados automaticamente.
 - No hacer push, PR, publicacion DEV ni Production sin un OK nuevo y explicito.

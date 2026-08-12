@@ -43,6 +43,10 @@ internal data class DagFlightEvent(
     val score: Float? = null,
     val fullScore: Float? = null,
     val bridgeMillis: Long? = null,
+    val coverMillis: Double? = null,
+    val decodeMillis: Double? = null,
+    val captureMillis: Long? = null,
+    val preprocessMillis: Long? = null,
     val queueMillis: Long? = null,
     val nativeMillis: Long? = null,
     val inferenceMillis: Double? = null,
@@ -242,6 +246,14 @@ internal class DagFlightRecorder private constructor(
                 event.score?.takeIf(Float::isFinite)?.let { put("score", it.coerceIn(0f, 1f).toDouble()) }
                 event.fullScore?.takeIf(Float::isFinite)?.let { put("full_score", it.coerceIn(0f, 1f).toDouble()) }
                 event.bridgeMillis?.let { put("bridge_ms", it.coerceIn(-1L, MaxRecordedMillis)) }
+                event.coverMillis?.takeIf(Double::isFinite)?.let {
+                    put("cover_ms", it.coerceIn(0.0, MaxRecordedMillis.toDouble()))
+                }
+                event.decodeMillis?.takeIf(Double::isFinite)?.let {
+                    put("decode_ms", it.coerceIn(0.0, MaxRecordedMillis.toDouble()))
+                }
+                event.captureMillis?.let { put("capture_ms", it.coerceIn(0L, MaxRecordedMillis)) }
+                event.preprocessMillis?.let { put("preprocess_ms", it.coerceIn(0L, MaxRecordedMillis)) }
                 event.queueMillis?.let { put("queue_ms", it.coerceIn(0L, MaxRecordedMillis)) }
                 event.nativeMillis?.let { put("native_ms", it.coerceIn(0L, MaxRecordedMillis)) }
                 event.inferenceMillis?.takeIf(Double::isFinite)?.let {
@@ -351,7 +363,7 @@ internal class DagFlightRecorder private constructor(
         const val MaxReportEvents = 4_096
         const val MaxFileBytes = 512L * 1024L
         const val CandidateTokenBytes = 8
-        const val EventSchemaVersion = 2
+        const val EventSchemaVersion = 3
         const val MaxRecordedBytes = 8 * 1024 * 1024
         const val MaxRecordedDimension = 16_384
         const val MaxRecordedMillis = 60_000L

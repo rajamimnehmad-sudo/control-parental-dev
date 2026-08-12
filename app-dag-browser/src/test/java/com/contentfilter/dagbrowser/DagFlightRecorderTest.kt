@@ -29,6 +29,10 @@ class DagFlightRecorderTest {
                     width = 137,
                     height = 137,
                     score = 0.9453f,
+                    coverMillis = 31.5,
+                    decodeMillis = 84.25,
+                    captureMillis = 17,
+                    preprocessMillis = 2,
                     queueMillis = 4,
                     nativeMillis = 38,
                     pageUrl = "https://www.google.com/search?q=private+search&tbm=isch",
@@ -56,6 +60,11 @@ class DagFlightRecorderTest {
             assertTrue(encoded.contains("image/jpeg"))
             assertTrue(encoded.contains("\"decision_cache\":true"))
             assertTrue(encoded.contains("\"source_instance\":\"inline_a1b2c3\""))
+            assertTrue(encoded.contains("\"event_schema\":3"))
+            assertTrue(encoded.contains("\"cover_ms\":31.5"))
+            assertTrue(encoded.contains("\"decode_ms\":84.25"))
+            assertTrue(encoded.contains("\"capture_ms\":17"))
+            assertTrue(encoded.contains("\"preprocess_ms\":2"))
             assertFalse(encoded.contains("private+search"))
             assertFalse(encoded.contains("secret"))
             assertFalse(encoded.contains("#private"))

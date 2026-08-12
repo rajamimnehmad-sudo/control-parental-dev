@@ -3453,8 +3453,7 @@ Flujo de una entrada:
 
 ### DAG-VIDEO-01 - GloshIA Visual sobre fotogramas de video
 
-- Estado: `01A0 y 01A1 resueltos localmente y validados fisicamente en A23;
-  01A2 no autorizado`.
+- Estado: `01A0 y 01A1 resueltos; 01A2 autorizado y GO en A23, pendiente S22`.
 - Objetivo: habilitar video local con una compuerta temporal general, sin
   mostrar fotogramas antes de decidirlos y sin excepciones por sitio, URL o
   dominio.
@@ -3477,8 +3476,11 @@ Flujo de una entrada:
 - Segundo ticket: `DAG-VIDEO-01A1`, aprobado, implementado y validado en DAG
   normal 213 / Diagnostic 12. Fotos y fotogramas comparten una sola autoridad
   de raster, la sesion R3.1 y la cola acotada. La fixture registro captura,
-  cola, inferencia, score y decision sin retirar la cobertura. `01A2` requiere
-  aprobacion separada y es el primer gate sobre video real.
+  cola, inferencia, score y decision sin retirar la cobertura.
+- Tercer ticket: `DAG-VIDEO-01A2`, aprobado e implementado en Diagnostic 13.
+  El gate A23 sobre video web real dio p50 `967,67 ms` y peor caso `2.185,70 ms`,
+  sin crash, ANR ni fuga. Queda `GO CON CONDICIONES` hasta validar S22; no
+  autoriza `01B`, revelar video ni modificar DAG normal.
 - Propuesta completa:
   `docs/dag/v3/GLOSHIA_VIDEO_V1_PROPOSAL_2026-08-12.md`.
 - Plan ejecutable, gates y primer ticket pequeno:

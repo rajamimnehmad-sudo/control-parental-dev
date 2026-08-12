@@ -136,6 +136,7 @@ class DagBrowserActivity : Activity() {
         )
     private var protectionExtension: WebExtension? = null
     private var activeVideoLabPort: WebExtension.Port? = null
+    private var videoLabArmedForSession = false
     private var extensionReady = false
     private var activeTab: BrowserTab? = null
     private var nextTabId = 1L
@@ -214,7 +215,7 @@ class DagBrowserActivity : Activity() {
                 )
             }
         }
-        postVideoLabConfig(port, enabled = isVideoLabFixtureSender(sender))
+        postVideoLabConfig(port, enabled = isVideoLabActiveSender(sender))
     }
 
     private fun handleContentPortMessage(
@@ -309,6 +310,16 @@ class DagBrowserActivity : Activity() {
         ) {
             return
         }
+        val coverMillis = videoLabMetric(payload, "coverMillis")
+        val decodeMillis = videoLabMetric(payload, "decodeMillis")
+        recordVideoLabEvent(
+            senderTab,
+            key,
+            action = "frame_requested",
+            reason = if (isVideoLabFixtureSender(sender)) "fixture" else "web_video",
+            coverMillis = coverMillis,
+            decodeMillis = decodeMillis,
+        )
         val startedAt = SystemClock.elapsedRealtime()
         captureVideoLabFrame(
             senderTab = senderTab,
@@ -316,6 +327,8 @@ class DagBrowserActivity : Activity() {
             key = key,
             rect = rect,
             fixture = isVideoLabFixtureSender(sender),
+            coverMillis = coverMillis,
+            decodeMillis = decodeMillis,
             startedAt = startedAt,
             attempt = 0,
         )
@@ -327,6 +340,8 @@ class DagBrowserActivity : Activity() {
         key: DagVideoLabKey,
         rect: DagVideoLabClientRect,
         fixture: Boolean,
+        coverMillis: Double?,
+        decodeMillis: Double?,
         startedAt: Long,
         attempt: Int,
     ) {
@@ -348,6 +363,8 @@ class DagBrowserActivity : Activity() {
                                 key,
                                 rect,
                                 fixture,
+                                coverMillis,
+                                decodeMillis,
                                 startedAt,
                                 attempt + 1,
                             )
@@ -359,23 +376,29 @@ class DagBrowserActivity : Activity() {
                 }
                 return@postOnAnimation
             }
+            val captureStartedAt = SystemClock.elapsedRealtime()
             geckoView.captureRegion(
                 source = surfaceRect,
                 targetWidth = VideoLabCaptureEdge,
                 targetHeight = VideoLabCaptureEdge,
                 callbackHandler = handler,
             ) { bitmap, result ->
+                val captureMillis =
+                    (SystemClock.elapsedRealtime() - captureStartedAt).coerceAtLeast(0L)
                 val sized =
                     bitmap != null &&
                         bitmap.width == VideoLabCaptureEdge &&
                         bitmap.height == VideoLabCaptureEdge
                 val fixtureMatches = !fixture || (sized && videoLabFixtureMatches(bitmap, rect))
+                val preprocessStartedAt = SystemClock.elapsedRealtime()
                 val preparedImage =
                     if (sized && fixtureMatches) {
                         AndroidDagImagePreprocessor.prepareCapturedRaster(requireNotNull(bitmap))
                     } else {
                         null
                     }
+                val preprocessMillis =
+                    (SystemClock.elapsedRealtime() - preprocessStartedAt).coerceAtLeast(0L)
                 bitmap?.recycle()
                 when {
                     !sized ->
@@ -404,6 +427,10 @@ class DagBrowserActivity : Activity() {
                             reason = if (fixture) "fixture_pattern_ok" else "capture_ok",
                             nativeMillis =
                                 (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L),
+                            coverMillis = coverMillis,
+                            decodeMillis = decodeMillis,
+                            captureMillis = captureMillis,
+                            preprocessMillis = preprocessMillis,
                         )
                         enqueueVideoLabAnalysis(senderTab, sourcePort, key, preparedImage)
                     }
@@ -681,7 +708,7 @@ class DagBrowserActivity : Activity() {
         senderTab: BrowserTab,
     ): Boolean =
         BuildConfig.DAG_DIAGNOSTICS &&
-            isVideoLabFixtureSender(sender) &&
+            isVideoLabActiveSender(sender) &&
             sender.isTopLevel &&
             senderTab === activeTab &&
             senderTab.session === geckoView.session &&
@@ -711,6 +738,13 @@ class DagBrowserActivity : Activity() {
             viewportWidth = payload.optDouble("viewportWidth", Double.NaN).toFloat(),
             viewportHeight = payload.optDouble("viewportHeight", Double.NaN).toFloat(),
         ).takeIf(DagVideoLabClientRect::isValid)
+
+    private fun videoLabMetric(
+        payload: JSONObject,
+        name: String,
+    ): Double? =
+        payload.optDouble(name, Double.NaN)
+            .takeIf { it.isFinite() && it in 0.0..MaxPipelineMetricMillis.toDouble() }
 
     private fun videoLabSurfaceRect(
         senderTab: BrowserTab,
@@ -780,6 +814,10 @@ class DagBrowserActivity : Activity() {
         action: String,
         reason: String,
         nativeMillis: Long? = null,
+        coverMillis: Double? = null,
+        decodeMillis: Double? = null,
+        captureMillis: Long? = null,
+        preprocessMillis: Long? = null,
         score: Float? = null,
         basis: String? = null,
         queueMillis: Long? = null,
@@ -796,6 +834,10 @@ class DagBrowserActivity : Activity() {
                 basis = basis,
                 score = score,
                 nativeMillis = nativeMillis,
+                coverMillis = coverMillis,
+                decodeMillis = decodeMillis,
+                captureMillis = captureMillis,
+                preprocessMillis = preprocessMillis,
                 queueMillis = queueMillis,
                 inferenceMillis = inferenceMillis,
                 inferenceCount = inferenceCount,
@@ -805,7 +847,10 @@ class DagBrowserActivity : Activity() {
         if (BuildConfig.DAG_DIAGNOSTICS) {
             Log.i(
                 VideoLabLogTag,
-                "action=$action reason=$reason revision=${key.revision} native_ms=${nativeMillis ?: -1}",
+                "action=$action reason=$reason revision=${key.revision} " +
+                    "cover_ms=${coverMillis ?: -1.0} decode_ms=${decodeMillis ?: -1.0} " +
+                    "capture_ms=${captureMillis ?: -1} preprocess_ms=${preprocessMillis ?: -1} " +
+                    "native_ms=${nativeMillis ?: -1}",
             )
         }
     }
@@ -904,7 +949,7 @@ class DagBrowserActivity : Activity() {
                     .put("enabled", true),
             )
         }
-        postVideoLabConfig(port, enabled = true)
+        postVideoLabConfig(port, enabled = videoLabArmedForSession)
     }
 
     private fun handleDecisionPortMessage(
@@ -2919,7 +2964,17 @@ class DagBrowserActivity : Activity() {
     private fun showBrowserMenu() {
         val popup = browserMenu ?: createBrowserMenu().also { browserMenu = it }
         popup.menu.findItem(R.id.menu_default_browser)?.isVisible = !isDefaultBrowser()
-        popup.menu.findItem(R.id.menu_video_lab)?.isVisible = BuildConfig.DAG_DIAGNOSTICS
+        popup.menu.findItem(R.id.menu_video_lab)?.apply {
+            isVisible = BuildConfig.DAG_DIAGNOSTICS
+            title =
+                getString(
+                    if (videoLabArmedForSession) {
+                        R.string.video_lab_disable
+                    } else {
+                        R.string.video_lab_open
+                    },
+                )
+        }
         popup.show()
     }
 
@@ -2969,7 +3024,7 @@ class DagBrowserActivity : Activity() {
                         true
                     }
                     R.id.menu_video_lab -> {
-                        openVideoLabFixture()
+                        toggleVideoLab()
                         true
                     }
                     R.id.menu_about -> {
@@ -2981,11 +3036,28 @@ class DagBrowserActivity : Activity() {
             }
         }
 
+    private fun toggleVideoLab() {
+        if (!BuildConfig.DAG_DIAGNOSTICS) {
+            Toast.makeText(this, R.string.video_lab_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        videoLabArmedForSession = !videoLabArmedForSession
+        activeMediaDecisionPort?.let { postVideoLabConfig(it, videoLabArmedForSession) }
+        if (videoLabArmedForSession) {
+            openVideoLabFixture()
+            return
+        }
+        activeVideoLabPort?.let { postVideoLabConfig(it, enabled = false) }
+        retireActiveVideoLab("lab_disabled")
+        Toast.makeText(this, R.string.video_lab_disabled, Toast.LENGTH_SHORT).show()
+    }
+
     private fun openVideoLabFixture() {
         val tab = activeTab
         val fixtureUrl = videoLabFixtureUrl()
         if (
             !BuildConfig.DAG_DIAGNOSTICS ||
+            !videoLabArmedForSession ||
             tab == null ||
             !tab.session.isOpen ||
             fixtureUrl == null
@@ -3011,6 +3083,18 @@ class DagBrowserActivity : Activity() {
             sender.session != null &&
             sender.isTopLevel &&
             sender.url == videoLabFixtureUrl()
+
+    private fun isVideoLabEligibleSender(sender: WebExtension.MessageSender): Boolean =
+        BuildConfig.DAG_DIAGNOSTICS &&
+            sender.session != null &&
+            sender.isTopLevel &&
+            (
+                sender.url == videoLabFixtureUrl() ||
+                    sender.url.orEmpty().startsWith("https://", ignoreCase = true)
+            )
+
+    private fun isVideoLabActiveSender(sender: WebExtension.MessageSender): Boolean =
+        videoLabArmedForSession && isVideoLabEligibleSender(sender)
 
     private fun showDagDiagnostics() {
         Toast.makeText(this, R.string.dag_diagnostics_loading, Toast.LENGTH_SHORT).show()
