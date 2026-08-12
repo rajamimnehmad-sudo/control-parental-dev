@@ -35,6 +35,7 @@ internal class DagPrioritizedMediaTask(
     private val priority: DagMediaAnalysisPriority,
     private val sequence: Long,
     internal val documentIdentity: DagMediaDocumentIdentity? = null,
+    internal val videoLabKey: DagVideoLabKey? = null,
     private val onDiscard: () -> Unit = {},
     private val action: () -> Unit,
 ) : Runnable,

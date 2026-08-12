@@ -158,7 +158,32 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local: DAG Browser 212 — contrato cubierto de video 01A0
+## Candidato local: DAG Browser 213 — GloshIA R3.1 sobre captura cubierta 01A1
+
+- DAG 213 (`0.70.17-dev`) cierra `DAG-VIDEO-01A1`; Diagnostic avanza a
+  versionCode `12`. La extension permanece en `2.0.15` porque no cambio su
+  codigo.
+- La ruta de fotos y la de fotogramas usan ahora una unica
+  `DagPreparedRasterPolicy`: mismo RGB `224x224`, umbral `0,40`, revision
+  regional y fallo cerrado. Video reutiliza la unica sesion R3.1 y la cola
+  multimedia acotada; no crea otro modelo, executor ni cola.
+- Documento/video/revision, una generacion atomica y un deadline de 2,5 s
+  invalidan trabajos tardios. PixelCopy se recicla antes de encolar y los bytes
+  RGB se ponen a cero al completar o descartar.
+- La caja negra guarda captura, cola, inferencia, score, base, accion y razon;
+  nunca persiste pixeles. Allow, block, incertidumbre, error y vencimiento
+  conservan la cobertura Android en este ticket.
+- Validacion: JS 35/35; unitarios DEV 171/171 y Diagnostic 171/171; Ktlint,
+  Lint y ambos APK correctos. En A23, tres capturas validas demoraron 34/17/9 ms,
+  la cola 1/2/1 ms y R3.1 194,60/145,18/137,86 ms. Cobertura opaca, retiro y
+  memoria correctos; sin crash ni ANR. Mimo, Cheeky y una portada valida de
+  Fravega conservaron imagenes e interaccion.
+- Evidencia:
+  `docs/compatibility/results/dag-browser-v213-video-a1-sm-a235m-2026-08-12.md`.
+- Video de red continua bloqueado en normal y Diagnostic. `01A2` no esta
+  autorizado; no hubo push, publicacion, Supabase ni Production.
+
+## Baseline local anterior: DAG Browser 212 — contrato cubierto de video 01A0
 
 - DAG 212 (`0.70.16-dev`, extension `2.0.15`) implementa exclusivamente
   `DAG-VIDEO-01A0`; la variante Diagnostic avanza a versionCode `11`.
@@ -1613,11 +1638,12 @@ Documentos vigentes:
   y A23. El plan ejecutable esta en
   `docs/dag/v3/DAG_VIDEO_01_EXECUTION_PLAN_2026-08-12.md`; divide el laboratorio
   en `01A0` (captura cubierta), `01A1` (R3.1 y diagnostico) y `01A2` (gate
-  fisico). `01A0` fue aprobado, implementado y validado fisicamente en A23 con
-  el candidato DAG normal 212 / Diagnostic 11. Usa una fixture sintetica
+  fisico). `01A0` y `01A1` fueron aprobados, implementados y validados
+  fisicamente en A23. El candidato vigente es DAG normal 213 / Diagnostic 12;
+  usa una fixture sintetica
   interna, cobertura Android previa, recorte regional `PixelCopy` a `224x224`,
   identidad por revision y validacion del patron capturado. No conecta R3.1 ni
   habilita media de red: DAG normal y las webs de la variante diagnostica
-  mantienen video/audio totalmente bloqueados. `01A1` en adelante no estan
+  mantienen video/audio totalmente bloqueados. `01A2` en adelante no estan
   autorizados automaticamente.
 - No hacer push, PR, publicacion DEV ni Production sin un OK nuevo y explicito.

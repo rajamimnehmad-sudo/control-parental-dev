@@ -197,6 +197,21 @@ internal fun interface DagImagePreprocessor {
  * Animated and partial images fail closed.
  */
 internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
+    fun prepareCapturedRaster(bitmap: Bitmap): DagPreparedImage? {
+        if (
+            bitmap.isRecycled ||
+            bitmap.width != DagImageDecodeContract.TargetSize ||
+            bitmap.height != DagImageDecodeContract.TargetSize
+        ) {
+            return null
+        }
+        return DagPreparedImage(
+            width = bitmap.width,
+            height = bitmap.height,
+            rgb888 = bitmap.toRgb888(),
+        )
+    }
+
     override fun prepare(bytes: ByteArray): DagImagePreprocessResult {
         var decoded: Bitmap? = null
         val preparedImages = mutableListOf<DagPreparedImage>()

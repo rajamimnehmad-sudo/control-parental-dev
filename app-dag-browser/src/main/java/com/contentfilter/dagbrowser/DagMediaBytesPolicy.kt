@@ -146,8 +146,8 @@ internal object DagMediaBytesPolicy {
                                 rejectionReason != null -> blocked(payload, rejectionReason)
                                 !valid -> blocked(payload, AndroidDagImagePreprocessor.DecodeFailedReason)
                                 else ->
-                                    decidePreparedImages(
-                                        payload = payload,
+                                    DagPreparedRasterPolicy.decide(
+                                        candidateId = payload.candidateId,
                                         preparedImages = preparedImages,
                                         analyzer = analyzer,
                                         trace = trace,
@@ -206,119 +206,6 @@ internal object DagMediaBytesPolicy {
         }.getOrNull()
     }
 
-    private fun decidePreparedImages(
-        payload: DagMediaBytesPayload,
-        preparedImages: List<DagPreparedImage>,
-        analyzer: DagImageAnalyzer,
-        trace: DagMediaPipelineTrace?,
-        workGuard: DagMediaWorkGuard,
-    ): DagMediaDecision {
-        if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
-        val fullProbability =
-            when (
-                val analysis =
-                    trace.measureInference { analyzer.analyze(preparedImages.first()) }
-            ) {
-                is DagImageAnalysisResult.Classified ->
-                    analysis.filterProbability.takeIf(::isValidProbability)
-                        ?: return blocked(
-                            payload,
-                            DagOnDeviceImageAnalyzer.InvalidModelOutputReason,
-                        )
-                is DagImageAnalysisResult.Unavailable ->
-                    return blocked(payload, analysis.reason)
-            }
-        if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
-        trace?.fullImageProbability = fullProbability
-        if (fullProbability >= DagOnDeviceImageAnalyzer.FilterThreshold) {
-            trace?.decisionBasis =
-                if (fullProbability >= DagOnDeviceImageAnalyzer.FullStrongFilterThreshold) {
-                    DagMediaDecisionBasis.FullStrong
-                } else {
-                    DagMediaDecisionBasis.FullThreshold
-                }
-            return blocked(
-                payload,
-                DagOnDeviceImageAnalyzer.ModelFilterReason,
-                fullProbability,
-            )
-        }
-
-        val preparedRegionalImages = preparedImages.drop(1)
-        val generatedUncertainRegions =
-            if (
-                preparedRegionalImages.isEmpty() &&
-                fullProbability >= DagOnDeviceImageAnalyzer.UncertainRegionalReviewFloor
-            ) {
-                DagUncertainRegionalCropper.quadrantViews(preparedImages.first())
-            } else {
-                emptyList()
-            }
-        val regionalImages = preparedRegionalImages.ifEmpty { generatedUncertainRegions }
-        if (generatedUncertainRegions.isNotEmpty()) {
-            trace?.regionalImageCount = generatedUncertainRegions.size
-            trace?.preparedImageCount = 1 + generatedUncertainRegions.size
-        }
-        return try {
-            var maximumProbability = fullProbability
-            var regionalFilterVotes = 0
-            for (regionalImage in regionalImages) {
-                if (!workGuard.canContinue()) {
-                    return blocked(payload, AnalysisExpiredReason)
-                }
-                val regionalProbability =
-                    when (val analysis = trace.measureInference { analyzer.analyze(regionalImage) }) {
-                        is DagImageAnalysisResult.Classified ->
-                            analysis.filterProbability.takeIf(::isValidProbability)
-                                ?: return blocked(
-                                    payload,
-                                    DagOnDeviceImageAnalyzer.InvalidModelOutputReason,
-                                )
-                        is DagImageAnalysisResult.Unavailable ->
-                            return blocked(payload, analysis.reason)
-                    }
-                maximumProbability = maxOf(maximumProbability, regionalProbability)
-                if (regionalProbability >= DagOnDeviceImageAnalyzer.RegionalFilterThreshold) {
-                    regionalFilterVotes += 1
-                }
-                val uncertainRegionIsUnsafe =
-                    generatedUncertainRegions.isNotEmpty() &&
-                        regionalProbability >=
-                        DagOnDeviceImageAnalyzer.UncertainRegionalFilterThreshold
-                if (
-                    uncertainRegionIsUnsafe ||
-                    regionalProbability >= DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ||
-                    regionalFilterVotes >= DagOnDeviceImageAnalyzer.RegionalConsensusMinimum
-                ) {
-                    trace?.decisionBasis =
-                        when {
-                            uncertainRegionIsUnsafe -> DagMediaDecisionBasis.UncertainRegional
-                            regionalProbability >=
-                                DagOnDeviceImageAnalyzer.RegionalStrongFilterThreshold ->
-                                DagMediaDecisionBasis.RegionalStrong
-                            else -> DagMediaDecisionBasis.RegionalConsensus
-                        }
-                    return blocked(
-                        payload,
-                        DagOnDeviceImageAnalyzer.ModelFilterReason,
-                        maximumProbability,
-                    )
-                }
-            }
-            if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
-            DagMediaDecision(
-                candidateId = payload.candidateId,
-                action = DagMediaAction.Allow,
-                reason = DagOnDeviceImageAnalyzer.ModelAllowReason,
-                filterProbability = maximumProbability,
-            )
-        } finally {
-            generatedUncertainRegions.forEach { it.rgb888.fill(0) }
-        }
-    }
-
-    private fun isValidProbability(probability: Float): Boolean = probability.isFinite() && probability in 0f..1f
-
     private fun boundsRejectionReason(bounds: DagImageBounds): String? =
         when {
             bounds.mimeType !in DagImageDecodeContract.SupportedMimeTypes -> UnsupportedImageReason
@@ -360,6 +247,3 @@ private fun <T> DagMediaPipelineTrace?.measure(
     stage: DagMediaPipelineStage,
     operation: () -> T,
 ): T = this?.measure(stage, operation) ?: operation()
-
-private fun <T> DagMediaPipelineTrace?.measureInference(operation: () -> T): T =
-    this?.measureInference(operation) ?: operation()

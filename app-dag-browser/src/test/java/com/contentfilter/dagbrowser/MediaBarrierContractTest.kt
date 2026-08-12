@@ -3,6 +3,7 @@ package com.contentfilter.dagbrowser
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertContains
+import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 
 class MediaBarrierContractTest {
@@ -121,6 +122,27 @@ class MediaBarrierContractTest {
         assertFalse(build.contains("create(\"lab\")"))
         assertFalse(build.contains("GLOSHIA_VISUAL_ENABLED"))
         assertFalse(build.contains("GLOSHIA_LAB_FIXTURE"))
+    }
+
+    @Test
+    fun `covered video reuses one prepared raster authority without revealing frames`() {
+        val activity =
+            File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
+        val imagePolicy =
+            File("src/main/java/com/contentfilter/dagbrowser/DagMediaBytesPolicy.kt").readText()
+        val rasterPolicy =
+            File("src/main/java/com/contentfilter/dagbrowser/DagPreparedRasterPolicy.kt").readText()
+
+        assertContains(imagePolicy, "DagPreparedRasterPolicy.decide(")
+        assertContains(activity, "DagPreparedRasterPolicy.decide(")
+        assertEquals(1, Regex("DagOnDeviceImageAnalyzer\\.create\\(").findAll(activity).count())
+        assertContains(activity, "videoLabKey = key")
+        assertContains(activity, "activeVideoLabKey.get() == key")
+        assertContains(activity, "VideoLabAnalysisLifetimeMillis = 2_500L")
+        assertContains(rasterPolicy, "DagOnDeviceImageAnalyzer.FilterThreshold")
+        assertContains(rasterPolicy, "DagUncertainRegionalCropper.quadrantViews")
+        assertFalse(videoLab.contains("style.visibility"))
+        assertFalse(videoLab.contains("message.action"))
     }
 
     @Test

@@ -1,7 +1,7 @@
 # DAG Video 01 — plan de ejecucion y gates
 
 Fecha: 2026-08-12
-Estado: `01A0` cerrado con gate fisico A23; `01A1` pendiente de aprobacion
+Estado: `01A0` y `01A1` cerrados con gate fisico A23; `01A2` pendiente de aprobacion
 Baseline protegido: DAG Browser 211 (`0.70.15-dev`)
 Autoridad visual: GloshIA Visual R3.1, sin cambios de modelo, umbral o politica
 
@@ -232,6 +232,14 @@ Gate:
 - no segunda sesion ONNX, cola sin limite ni crecimiento de bitmaps;
 - imagenes, menus, scroll y carga mantienen el baseline 211.
 
+Estado: cerrado en DAG normal `213` / Diagnostic `12`. Fotos y fotogramas
+convergen en una unica `DagPreparedRasterPolicy`, la fixture reutiliza la sesion
+R3.1 oficial y la cola multimedia acotada, y la caja negra guarda captura, cola,
+inferencia, score, base, accion y razon sin pixeles. El gate A23 completo tres
+muestras allow cubiertas, la cancelacion y la regresion visual Mimo/Cheeky/
+Fravega. Evidencia:
+`docs/compatibility/results/dag-browser-v213-video-a1-sm-a235m-2026-08-12.md`.
+
 ### `DAG-VIDEO-01A2` — gate fisico S22/A23
 
 Medir en frio y caliente:
@@ -308,7 +316,7 @@ de esas areas, el ticket se detiene y se replantea.
 
 ## Aprobacion y siguiente limite
 
-`DAG-VIDEO-01A0` fue aprobado, implementado y validado fisicamente en A23. Su
-cierre no autoriza por si solo `01A1`, `01A2`, `01B` ni `01C`; cada ampliacion
-conserva su gate. En particular, ningun sitio real ni GloshIA R3.1 entra en la
-ruta de `01A0`.
+`DAG-VIDEO-01A0` y `01A1` fueron aprobados, implementados y validados
+fisicamente en A23. Su cierre no autoriza por si solo `01A2`, `01B` ni `01C`;
+cada ampliacion conserva su gate. En particular, `01A1` usa R3.1 solo sobre la
+fixture interna cubierta y no habilita ningun sitio real.

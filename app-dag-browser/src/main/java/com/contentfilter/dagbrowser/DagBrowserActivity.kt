@@ -62,6 +62,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.math.ceil
 import kotlin.math.floor
 
@@ -109,6 +110,8 @@ class DagBrowserActivity : Activity() {
     private val mediaAnalysisQueue = DagBoundedMediaTaskQueue(MediaAnalysisQueueCapacity)
     private val mediaDocumentRegistry = DagMediaDocumentRegistry()
     private val videoLabState = DagVideoLabStateMachine()
+    private val activeVideoLabKey = AtomicReference<DagVideoLabKey?>(null)
+    private val videoLabAnalysisGeneration = AtomicLong(0L)
     private val mediaAnalysisThreadFactory =
         ThreadFactory { work ->
             Thread(
@@ -265,6 +268,13 @@ class DagBrowserActivity : Activity() {
         val key = videoLabKey(payload, senderTab) ?: return
         val rect = videoLabRect(payload) ?: return
         if (!videoLabState.requestCover(key, rect)) return
+        val previousKey = activeVideoLabKey.getAndSet(key)
+        if (previousKey != key) {
+            videoLabAnalysisGeneration.incrementAndGet()
+            previousKey?.let { retiredKey ->
+                mediaAnalysisQueue.discardMatching { it.videoLabKey == retiredKey }
+            }
+        }
         activeVideoLabPort = sourcePort
         videoLabOverlay.visibility = View.VISIBLE
         videoLabOverlay.bringToFront()
@@ -360,22 +370,135 @@ class DagBrowserActivity : Activity() {
                         bitmap.width == VideoLabCaptureEdge &&
                         bitmap.height == VideoLabCaptureEdge
                 val fixtureMatches = !fixture || (sized && videoLabFixtureMatches(bitmap, rect))
-                val captured = sized && fixtureMatches
+                val preparedImage =
+                    if (sized && fixtureMatches) {
+                        AndroidDagImagePreprocessor.prepareCapturedRaster(requireNotNull(bitmap))
+                    } else {
+                        null
+                    }
                 bitmap?.recycle()
-                completeVideoLabCapture(
-                    senderTab = senderTab,
-                    sourcePort = sourcePort,
-                    key = key,
-                    captured = captured,
-                    reason =
-                        when {
-                            !sized -> "pixel_copy_$result"
-                            fixtureMatches -> if (fixture) "fixture_pattern_ok" else "capture_ok"
-                            else -> "fixture_pattern_mismatch"
-                        },
-                    startedAt = startedAt,
-                )
+                when {
+                    !sized ->
+                        failVideoLabCapture(senderTab, sourcePort, key, "pixel_copy_$result", startedAt)
+                    !fixtureMatches ->
+                        failVideoLabCapture(
+                            senderTab,
+                            sourcePort,
+                            key,
+                            "fixture_pattern_mismatch",
+                            startedAt,
+                        )
+                    preparedImage == null ->
+                        failVideoLabCapture(
+                            senderTab,
+                            sourcePort,
+                            key,
+                            "raster_prepare_failed",
+                            startedAt,
+                        )
+                    else -> {
+                        recordVideoLabEvent(
+                            senderTab,
+                            key,
+                            action = "frame_captured",
+                            reason = if (fixture) "fixture_pattern_ok" else "capture_ok",
+                            nativeMillis =
+                                (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L),
+                        )
+                        enqueueVideoLabAnalysis(senderTab, sourcePort, key, preparedImage)
+                    }
+                }
             }
+        }
+    }
+
+    private fun enqueueVideoLabAnalysis(
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+        key: DagVideoLabKey,
+        preparedImage: DagPreparedImage,
+    ) {
+        val queuedAt = SystemClock.elapsedRealtime()
+        val generation = videoLabAnalysisGeneration.get()
+        val documentIdentity =
+            DagMediaDocumentIdentity(
+                tabId = key.tabId.toInt(),
+                documentToken = key.documentToken,
+            )
+        val lease =
+            DagMediaAnalysisLease(
+                generation = generation,
+                deadlineElapsedRealtime = queuedAt + VideoLabAnalysisLifetimeMillis,
+                currentGeneration = videoLabAnalysisGeneration::get,
+                elapsedRealtime = SystemClock::elapsedRealtime,
+                acceptingWork = mediaAnalysisAccepting::get,
+                documentCurrent = { activeVideoLabKey.get() == key },
+            )
+        val task =
+            DagPrioritizedMediaTask(
+                priority = DagMediaAnalysisPriority.Visible,
+                sequence = mediaAnalysisSequence.getAndIncrement(),
+                documentIdentity = documentIdentity,
+                videoLabKey = key,
+                onDiscard = {
+                    preparedImage.rgb888.fill(0)
+                    handler.post {
+                        completeVideoLabAnalysis(
+                            senderTab,
+                            sourcePort,
+                            key,
+                            expiredVideoLabDecision(key),
+                            trace = null,
+                            queueMillis =
+                                (SystemClock.elapsedRealtime() - queuedAt).coerceAtLeast(0L),
+                        )
+                    }
+                },
+            ) {
+                val queueMillis = (SystemClock.elapsedRealtime() - queuedAt).coerceAtLeast(0L)
+                val trace = DagMediaPipelineTrace()
+                val decision =
+                    try {
+                        DagPreparedRasterPolicy.decide(
+                            candidateId = key.videoId,
+                            preparedImages = listOf(preparedImage),
+                            analyzer =
+                                if (this::imageAnalyzer.isInitialized) {
+                                    imageAnalyzer
+                                } else {
+                                    UnavailableDagImageAnalyzer
+                                },
+                            trace = trace,
+                            workGuard = lease,
+                        )
+                    } catch (_: Exception) {
+                        DagMediaDecision(
+                            candidateId = key.videoId,
+                            action = DagMediaAction.Block,
+                            reason = DagOnDeviceImageAnalyzer.ModelExecutionFailedReason,
+                        )
+                    } finally {
+                        preparedImage.rgb888.fill(0)
+                    }
+                handler.post {
+                    completeVideoLabAnalysis(
+                        senderTab,
+                        sourcePort,
+                        key,
+                        decision,
+                        trace,
+                        queueMillis,
+                    )
+                }
+            }
+        if (!lease.canContinue()) {
+            task.discard()
+            return
+        }
+        try {
+            mediaAnalysisExecutor.execute(task)
+        } catch (_: RejectedExecutionException) {
+            task.discard()
         }
     }
 
@@ -428,6 +551,7 @@ class DagBrowserActivity : Activity() {
         if (!BuildConfig.DAG_DIAGNOSTICS || sourcePort !== activeVideoLabPort) return
         val key = videoLabKey(payload, senderTab) ?: return
         if (!videoLabState.retire(key)) return
+        invalidateVideoLabAnalysis(key)
         recordVideoLabEvent(
             senderTab,
             key,
@@ -438,27 +562,66 @@ class DagBrowserActivity : Activity() {
         videoLabOverlay.visibility = View.GONE
     }
 
-    private fun completeVideoLabCapture(
+    private fun completeVideoLabAnalysis(
         senderTab: BrowserTab,
         sourcePort: WebExtension.Port,
         key: DagVideoLabKey,
-        captured: Boolean,
-        reason: String,
-        startedAt: Long,
+        decision: DagMediaDecision,
+        trace: DagMediaPipelineTrace?,
+        queueMillis: Long,
     ) {
-        if (!videoLabState.completeCapture(key, captured)) return
+        if (
+            sourcePort !== activeVideoLabPort ||
+            activeVideoLabKey.get() != key ||
+            !videoLabState.isCurrent(key, DagVideoLabState.Capturing)
+        ) {
+            return
+        }
+        val classified =
+            decision.reason == DagOnDeviceImageAnalyzer.ModelAllowReason ||
+                decision.reason == DagOnDeviceImageAnalyzer.ModelFilterReason
+        if (!videoLabState.completeCapture(key, classified)) return
+        val inferenceMillis = trace?.elapsedMillis(DagMediaPipelineStage.Inference)
         recordVideoLabEvent(
             senderTab,
             key,
-            action = if (captured) "frame_captured" else "capture_failed",
-            reason = reason,
-            nativeMillis = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L),
+            action =
+                when {
+                    !classified -> "analysis_failed"
+                    decision.action == DagMediaAction.Allow -> "frame_allowed"
+                    else -> "frame_blocked"
+                },
+            reason = decision.reason,
+            score = decision.filterProbability,
+            basis = trace?.decisionBasis?.wireValue,
+            queueMillis = queueMillis,
+            inferenceMillis = inferenceMillis,
+            inferenceCount = trace?.inferenceCount,
         )
+        if (BuildConfig.DAG_DIAGNOSTICS) {
+            Log.i(
+                VideoLabLogTag,
+                "pipeline action=${decision.action.wireValue} reason=${decision.reason} " +
+                    "score=${decision.filterProbability ?: -1f} basis=${trace?.decisionBasis?.wireValue ?: "none"} " +
+                    "queue_ms=$queueMillis inference_ms=${inferenceMillis ?: -1.0} " +
+                    "inferences=${trace?.inferenceCount ?: 0}",
+            )
+        }
+        val result =
+            JSONObject()
+                .put("captured", classified)
+                .put("action", decision.action.wireValue)
+                .put("reason", decision.reason)
+                .put("basis", trace?.decisionBasis?.wireValue ?: DagMediaDecisionBasis.None.wireValue)
+                .put("queueMillis", queueMillis)
+                .put("inferenceCount", trace?.inferenceCount ?: 0)
+        decision.filterProbability?.takeIf(Float::isFinite)?.let { result.put("score", it.toDouble()) }
+        inferenceMillis?.takeIf(Double::isFinite)?.let { result.put("inferenceMillis", it) }
         postVideoLabResult(
             sourcePort,
             VideoLabFrameResultMessage,
             key,
-            JSONObject().put("captured", captured),
+            result,
         )
     }
 
@@ -469,15 +632,31 @@ class DagBrowserActivity : Activity() {
         reason: String,
         startedAt: Long,
     ) {
-        completeVideoLabCapture(
-            senderTab = senderTab,
-            sourcePort = sourcePort,
-            key = key,
-            captured = false,
+        if (!videoLabState.completeCapture(key, captured = false)) return
+        recordVideoLabEvent(
+            senderTab,
+            key,
+            action = "capture_failed",
             reason = reason,
-            startedAt = startedAt,
+            nativeMillis = (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L),
+        )
+        postVideoLabResult(
+            sourcePort,
+            VideoLabFrameResultMessage,
+            key,
+            JSONObject()
+                .put("captured", false)
+                .put("action", DagMediaAction.Block.wireValue)
+                .put("reason", reason),
         )
     }
+
+    private fun expiredVideoLabDecision(key: DagVideoLabKey) =
+        DagMediaDecision(
+            candidateId = key.videoId,
+            action = DagMediaAction.Block,
+            reason = DagMediaBytesPolicy.AnalysisExpiredReason,
+        )
 
     private fun postVideoLabResult(
         port: WebExtension.Port,
@@ -580,11 +759,19 @@ class DagBrowserActivity : Activity() {
 
     private fun retireActiveVideoLab(reason: String) {
         val key = videoLabState.retireAll() ?: return
+        invalidateVideoLabAnalysis(key)
         tabs.firstOrNull { it.id == key.tabId }?.let { tab ->
             recordVideoLabEvent(tab, key, "retired", reason)
         }
         activeVideoLabPort = null
         videoLabOverlay.visibility = View.GONE
+    }
+
+    private fun invalidateVideoLabAnalysis(key: DagVideoLabKey) {
+        if (activeVideoLabKey.compareAndSet(key, null)) {
+            videoLabAnalysisGeneration.incrementAndGet()
+        }
+        mediaAnalysisQueue.discardMatching { it.videoLabKey == key }
     }
 
     private fun recordVideoLabEvent(
@@ -593,6 +780,11 @@ class DagBrowserActivity : Activity() {
         action: String,
         reason: String,
         nativeMillis: Long? = null,
+        score: Float? = null,
+        basis: String? = null,
+        queueMillis: Long? = null,
+        inferenceMillis: Double? = null,
+        inferenceCount: Int? = null,
     ) {
         recordFlight(
             DagFlightEvent(
@@ -601,7 +793,12 @@ class DagBrowserActivity : Activity() {
                 candidateId = key.videoId,
                 action = action,
                 reason = reason,
+                basis = basis,
+                score = score,
                 nativeMillis = nativeMillis,
+                queueMillis = queueMillis,
+                inferenceMillis = inferenceMillis,
+                inferenceCount = inferenceCount,
             ),
             tab,
         )
@@ -3529,6 +3726,7 @@ class DagBrowserActivity : Activity() {
         const val VideoLabCaptureEdge = 224
         const val VideoLabSurfaceReadyRetries = 10
         const val VideoLabSurfaceRetryDelayMillis = 50L
+        const val VideoLabAnalysisLifetimeMillis = 2_500L
         const val VideoLabMaximumRevision = 1_000_000
         const val BarrierTimeoutMillis = 12_000L
         const val InitialBlankPage = "about:blank"
