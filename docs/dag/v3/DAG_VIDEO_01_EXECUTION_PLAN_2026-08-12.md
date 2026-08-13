@@ -353,7 +353,7 @@ de esas areas, el ticket se detiene y se replantea.
 
 `DAG-VIDEO-01A0`, `01A1` y `01A2` fueron aprobados. Los dos primeros estan
 cerrados; `01A2` paso A23 y queda pendiente del S22. Una autorizacion posterior
-permitio implementar `01B` solo como candidato local Diagnostic 14; no autoriza
+permitio implementar `01B` solo como candidato local Diagnostic 15; no autoriza
 `01C`, activacion en DAG normal ni publicacion. La seguridad y la experiencia
 de 01B permanecen `NO-GO` hasta disponer de barrera de audio con autoridad,
 evidencia de oclusion en S22, fixture verificada y metricas fisicas de fluidez.

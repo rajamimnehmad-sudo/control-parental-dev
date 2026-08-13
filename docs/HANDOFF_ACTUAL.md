@@ -158,12 +158,12 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local `NO-GO`: DAG Browser 214 / Diagnostic 14 — replay estricto 01B
+## Candidato local `NO-GO`: DAG Browser 215 / Diagnostic 15 — replay estricto 01B
 
 - La autorizacion de `DAG-VIDEO-01B` produjo solo un candidato local de
-  Diagnostic. DAG normal sube por los assets compartidos a versionCode `214`
-  (`0.70.18-dev`), pero conserva el bloqueo total de video; el laboratorio solo
-  existe con el interruptor efimero de Diagnostic `14` y extension `2.0.17`.
+  Diagnostic. DAG normal sube por los assets compartidos a versionCode `215`
+  (`0.70.19-dev`), pero conserva el bloqueo total de video; el laboratorio solo
+  existe con el interruptor efimero de Diagnostic `15` y extension `2.0.17`.
 - Nunca se vuelve visible el `video` de Gecko para presentar una muestra. La
   cobertura Android opaca queda arriba de Gecko y solo su `ImageView` hijo recibe
   el mismo `Bitmap` regional capturado por `PixelCopy` despues de dos condiciones
@@ -186,6 +186,12 @@ el runtime actual desde versiones o worktrees historicos.
 - Validacion local: JS `48/48`; unitarios DEV y Diagnostic `175/175`; Ktlint,
   Lint y `assembleDevDebug`/`assembleDiagnosticDebug` correctos. No hubo push,
   publicacion, Supabase ni Production.
+- Prueba fisica S22 por USB: la version inicial 14 revelo un defecto transversal
+  de empaquetado (`NoClassDefFoundError: kotlin.collections.CollectionsKt`) y
+  fallaba al iniciar. 15 declara el runtime Kotlin y arranca sin crash ni ANR.
+  La fixture y YouTube HTTPS conservan el video sin reproducir; no emitieron
+  `cover_requested` ni aceptaron un cuadro, por lo que el pipeline 01B sigue
+  fallando cerrado y no acredita replay funcional ni la oclusion S22.
 - Estado de seguridad y entrega: `NO-GO`. El aislamiento de elementos HTML no
   puede silenciar de forma confiable un `AudioContext` creado por una pagina en
   MAIN world; falta una barrera nativa/Gecko con esa autoridad. Tambien faltan el

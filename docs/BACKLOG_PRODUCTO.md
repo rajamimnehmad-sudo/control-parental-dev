@@ -3482,12 +3482,14 @@ Flujo de una entrada:
   sin crash, ANR ni fuga. Queda `GO CON CONDICIONES` hasta validar S22; no
   activa video ni modifica DAG normal.
 - Cuarto ticket: `DAG-VIDEO-01B`, autorizado solo para candidato local en
-  Diagnostic 14. Reproduce exclusivamente el bitmap regional ya permitido por
+  Diagnostic 15. Reproduce exclusivamente el bitmap regional ya permitido por
   GloshIA dentro de la cobertura Android, con identidad por cuadro y cierre con
   ACK de revocacion exacto; no revela el compositor Gecko ni cambia R3.1,
   umbral o politica. El candidato queda `NO-GO`: faltan una barrera fiable para
   WebAudio de MAIN world, el gate fisico S22 de oclusion, la verificacion fisica
-  de la fixture y una medicion de fluidez. DAG normal y cualquier publicacion
+  de la fixture y una medicion de fluidez. En S22, la fixture y YouTube HTTPS
+  no emiten `cover_requested`, de modo que hoy fallan cerrados sin replay.
+  DAG normal y cualquier publicacion
   continúan bloqueados.
 - Propuesta completa:
   `docs/dag/v3/GLOSHIA_VIDEO_V1_PROPOSAL_2026-08-12.md`.

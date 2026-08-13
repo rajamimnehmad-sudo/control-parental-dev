@@ -43,8 +43,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 214
-        versionName = "0.70.18"
+        versionCode = 215
+        versionName = "0.70.19"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -78,7 +78,7 @@ android {
         create("diagnostic") {
             dimension = "distribution"
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 14
+            versionCode = 15
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
@@ -138,6 +138,7 @@ ktlint {
 }
 
 dependencies {
+    implementation(kotlin("stdlib"))
     implementation("androidx.recyclerview:recyclerview:1.4.0")
     implementation("com.microsoft.onnxruntime:onnxruntime-android:1.27.0")
     implementation("org.mozilla.geckoview:geckoview-arm64-v8a:153.0.20260715202819")
