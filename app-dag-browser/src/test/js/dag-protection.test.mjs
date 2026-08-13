@@ -27,7 +27,11 @@ const waitFor = async (predicate, label) => {
   throw new Error(`Timed out waiting for ${label}`);
 };
 
-const createHarness = async ({ captureIdleTimeoutMs = null } = {}) => {
+const createHarness = async ({
+  captureIdleTimeoutMs = null,
+  insertCss = null,
+  removeCss = null,
+} = {}) => {
   const beforeRequest = eventChannel();
   const headersReceived = eventChannel();
   const nativeMessages = eventChannel();
@@ -50,11 +54,11 @@ const createHarness = async ({ captureIdleTimeoutMs = null } = {}) => {
     tabs: {
       insertCSS(tabId, details) {
         insertedCss.push({ tabId, details });
-        return Promise.resolve();
+        return insertCss === null ? Promise.resolve() : Promise.resolve(insertCss(tabId, details));
       },
       removeCSS(tabId, details) {
         removedCss.push({ tabId, details });
-        return Promise.resolve();
+        return removeCss === null ? Promise.resolve() : Promise.resolve(removeCss(tabId, details));
       },
     },
     runtime: {
@@ -992,6 +996,7 @@ test("video laboratory opens only covered video bytes for the exact diagnostic d
   assert.equal((await harness.sendRuntime({
     type: "video-lab-conceal-style",
     version: 2,
+    documentToken: "document_a1",
     token,
   }, sender)).removed, true);
   assert.equal(harness.removedCss.length, 1);
@@ -1022,6 +1027,7 @@ test("video laboratory reveal is exact, HTTPS-only and fail-closed", async () =>
   assert.equal((await harness.sendRuntime({
     type: "video-lab-conceal-style",
     version: 2,
+    documentToken: "document_a1",
     token,
   }, sender)).removed, true);
 
@@ -1046,7 +1052,15 @@ test("video laboratory reveal is exact, HTTPS-only and fail-closed", async () =>
     ...reveal,
     documentToken: "document_c3",
   }, fixtureSender)).inserted, true);
-  assert.equal(harness.insertedCss.length, 1, "internal fixture uses its packaged CSS");
+  assert.equal(harness.insertedCss.length, 2, "internal fixture uses the same user-origin grant");
+  assert.equal(harness.insertedCss.at(-1).details.cssOrigin, "user");
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-conceal-style",
+    version: 2,
+    documentToken: "document_c3",
+    token,
+  }, fixtureSender)).removed, true);
+  assert.equal(harness.removedCss.length, 2, "fixture revocation removes the privileged CSS");
 });
 
 test("video laboratory navigation revokes its user-origin grant before new media", async () => {
@@ -1076,25 +1090,842 @@ test("video laboratory navigation revokes its user-origin grant before new media
   }).cancel, true);
 });
 
+test("native video close denies media until its exact CSS revocation is acknowledged", async () => {
+  let resolveRemoval = null;
+  const harness = await createHarness({
+    removeCss() {
+      return new Promise((resolve) => {
+        resolveRemoval = resolve;
+      });
+    },
+  });
+  const sender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const token = "abcdef0123456789abcdef0123456789";
+  const closeNonce = "0123456789abcdef0123456789abcdef";
+  const media = {
+    type: "media",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: sender.url,
+    url: "https://media.example.test/a.mp4",
+  };
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  }, sender)).inserted, true);
+  assert.equal(Object.keys(harness.before(media)).length, 0);
+
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_a1",
+    closeNonce,
+  });
+  await waitFor(() => harness.removedCss.length === 1, "closing CSS removal starts");
+  assert.equal(harness.before(media).cancel, true, "closing synchronously revokes media authority");
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token: "fedcba9876543210fedcba9876543210",
+  }, sender)).inserted, false, "a closing grant cannot be replaced");
+  assert.equal(harness.postedNative.some((message) => message.type === "video-lab-revoked"), false);
+
+  resolveRemoval();
+  const acknowledgement = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "video-lab-revoked"), "exact native close acknowledgement");
+  assert.equal(acknowledgement.version, 2);
+  assert.equal(acknowledgement.tabId, 1);
+  assert.equal(acknowledgement.documentToken, "document_a1");
+  assert.equal(acknowledgement.closeNonce, closeNonce);
+});
+
+test("unknown native video close never acknowledges after background state loss", async () => {
+  const harness = await createHarness();
+  const closeNonce = "0123456789abcdef0123456789abcdef";
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_a1",
+    closeNonce,
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.postedNative.some((message) =>
+    message.type === "video-lab-revoked" && message.closeNonce === closeNonce), false);
+  assert.equal(harness.before({
+    type: "media",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: "https://shop.example.test/",
+    url: "https://media.example.test/a.mp4",
+  }).cancel, true, "unknown state remains fail-closed");
+});
+
+test("successful prior video CSS revocation proves a later exact native close", async () => {
+  const harness = await createHarness();
+  const sender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const token = "abcdef0123456789abcdef0123456789";
+  const closeNonce = "0123456789abcdef0123456789abcdef";
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  }, sender)).inserted, true);
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-conceal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  }, sender)).removed, true);
+
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_a1",
+    closeNonce,
+  });
+  const acknowledgement = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "video-lab-revoked" && message.closeNonce === closeNonce),
+  "close acknowledgement from exact revocation proof");
+  assert.equal(acknowledgement.documentToken, "document_a1");
+  assert.equal(harness.removedCss.length, 1, "the proof avoids a duplicate CSS removal");
+});
+
+test("failed video CSS insertion proves no grant was created for a later exact close", async () => {
+  const harness = await createHarness({
+    insertCss() {
+      return Promise.reject(new Error("insertCSS unavailable"));
+    },
+  });
+  const sender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const closeNonce = "0123456789abcdef0123456789abcdef";
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token: "abcdef0123456789abcdef0123456789",
+  }, sender)).inserted, false);
+
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_a1",
+    closeNonce,
+  });
+  const acknowledgement = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "video-lab-revoked" && message.closeNonce === closeNonce),
+  "close acknowledgement from failed insertion proof");
+  assert.equal(acknowledgement.documentToken, "document_a1");
+  assert.equal(harness.removedCss.length, 0);
+});
+
+test("native video close waits for a registered pending CSS insertion before acknowledging", async () => {
+  let resolveInsertion = null;
+  const harness = await createHarness({
+    insertCss() {
+      return new Promise((resolve) => {
+        resolveInsertion = resolve;
+      });
+    },
+  });
+  const sender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const token = "abcdef0123456789abcdef0123456789";
+  const closeNonce = "0123456789abcdef0123456789abcdef";
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  const reveal = harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  }, sender);
+  await waitFor(() => harness.insertedCss.length === 1, "pending CSS insertion registered");
+
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_a1",
+    closeNonce,
+  });
+  assert.equal(harness.before({
+    type: "media",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: sender.url,
+    url: "https://media.example.test/a.mp4",
+  }).cancel, true, "opening state never authorizes media");
+  assert.equal(harness.removedCss.length, 0, "cannot remove before insertion settles");
+  assert.equal(harness.postedNative.some((message) => message.type === "video-lab-revoked"), false);
+
+  resolveInsertion();
+  assert.equal((await reveal).inserted, false, "a close invalidates the pending reveal");
+  await waitFor(() => harness.removedCss.length === 1, "CSS removed after pending insertion");
+  const acknowledgement = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "video-lab-revoked" && message.closeNonce === closeNonce),
+  "pending insertion close acknowledgement");
+  assert.equal(acknowledgement.documentToken, "document_a1");
+});
+
+test("fixture video uses the same close acknowledgement and user-origin CSS revocation", async () => {
+  const harness = await createHarness();
+  const fixtureUrl = "moz-extension://dag-test/video-lab-fixture.html";
+  const sender = { url: fixtureUrl, tab: { id: 1 }, frameId: 0 };
+  const token = "abcdef0123456789abcdef0123456789";
+  const closeNonce = "0123456789abcdef0123456789abcdef";
+  harness.startDocument(1, "document_c3", fixtureUrl);
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_c3",
+    token,
+  }, sender)).inserted, true);
+  assert.equal(harness.insertedCss.length, 1);
+  assert.equal(harness.insertedCss[0].details.cssOrigin, "user");
+
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_c3",
+    closeNonce,
+  });
+  await waitFor(() => harness.removedCss.length === 1, "fixture CSS revocation");
+  const acknowledgement = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "video-lab-revoked" && message.closeNonce === closeNonce),
+  "fixture close acknowledgement");
+  assert.equal(acknowledgement.documentToken, "document_c3");
+});
+
+test("failed video CSS revocation leaves the diagnostic grant fail-closed without an acknowledgement", async () => {
+  const harness = await createHarness({
+    removeCss() {
+      return Promise.reject(new Error("removeCSS unavailable"));
+    },
+  });
+  const sender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const token = "abcdef0123456789abcdef0123456789";
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  }, sender)).inserted, true);
+
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_a1",
+    closeNonce: "0123456789abcdef0123456789abcdef",
+  });
+  await waitFor(() => harness.removedCss.length === 1, "failed CSS removal attempted");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.postedNative.some((message) => message.type === "video-lab-revoked"), false);
+
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token: "fedcba9876543210fedcba9876543210",
+  }, sender)).inserted, false, "failed grant stays closing after a later enable");
+  assert.equal(harness.before({
+    type: "media",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: sender.url,
+    url: "https://media.example.test/a.mp4",
+  }).cancel, true);
+});
+
+test("an old-document native close acknowledges only after navigation removed its grant", async () => {
+  const harness = await createHarness();
+  const oldSender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const token = "abcdef0123456789abcdef0123456789";
+  const closeNonce = "0123456789abcdef0123456789abcdef";
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_a1",
+    token,
+  }, oldSender)).inserted, true);
+
+  harness.startDocument(1, "document_b2", "https://shop.example.test/next");
+  await waitFor(() => harness.removedCss.length === 1, "old grant removed by navigation");
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_a1",
+    closeNonce,
+  });
+  const acknowledgement = await waitFor(() => harness.postedNative.find((message) =>
+    message.type === "video-lab-revoked" && message.closeNonce === closeNonce),
+  "old document close acknowledgement after navigation");
+  assert.equal(acknowledgement.documentToken, "document_a1");
+  assert.equal(acknowledgement.tabId, 1);
+  assert.equal(harness.before({
+    type: "media",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: "https://shop.example.test/next",
+    url: "https://media.example.test/next.mp4",
+  }).cancel, true, "old close leaves the next document denied");
+});
+
+test("a stale native close removes a newer grant but never acknowledges the stale document", async () => {
+  const harness = await createHarness();
+  const oldSender = {
+    url: "https://shop.example.test/",
+    tab: { id: 1 },
+    frameId: 0,
+  };
+  const newUrl = "https://shop.example.test/next";
+  const newSender = { ...oldSender, url: newUrl };
+  const staleNonce = "0123456789abcdef0123456789abcdef";
+  harness.answer({ type: "video-lab-config", version: 2, enabled: true });
+  harness.startDocument(1, "document_b2", newUrl);
+  assert.equal((await harness.sendRuntime({
+    type: "video-lab-reveal-style",
+    version: 2,
+    documentToken: "document_b2",
+    token: "abcdef0123456789abcdef0123456789",
+  }, newSender)).inserted, true);
+
+  harness.answer({
+    type: "video-lab-close",
+    version: 2,
+    tabId: 1,
+    documentToken: "document_a1",
+    closeNonce: staleNonce,
+  });
+  await waitFor(() => harness.removedCss.length === 1, "newer grant removed for stale close");
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(harness.postedNative.some((message) =>
+    message.type === "video-lab-revoked" && message.closeNonce === staleNonce), false);
+  assert.equal(harness.before({
+    type: "media",
+    tabId: 1,
+    frameId: 0,
+    documentUrl: newUrl,
+    url: "https://media.example.test/next.mp4",
+  }).cancel, true);
+});
+
 test("video laboratory transport is bounded and contains no provider exceptions", async () => {
   const videoLab = await readAsset("video-lab.js");
   const css = await readAsset("barrier.css");
+  const fixture = await readAsset("video-lab-fixture.html");
   new vm.Script(videoLab);
-  assert.match(videoLab, /MAX_CAPTURE_COUNT = 3/u);
+  assert.match(videoLab, /MAX_CAPTURE_COUNT = 120/u);
   assert.match(videoLab, /MAX_STATUS_RETRIES = 20/u);
   assert.match(videoLab, /video-lab-cover-request/u);
   assert.match(videoLab, /video-lab-frame-request/u);
+  assert.match(videoLab, /video-lab-frame-captured/u);
+  assert.match(videoLab, /video-lab-frame-concealed/u);
   assert.match(videoLab, /video-lab-retire/u);
   assert.match(videoLab, /record\.video\.muted = true/u);
-  assert.match(videoLab, /record\.video\.pause\(\)/u);
+  assert.match(videoLab, /video\.pause\(\)/u);
+  assert.match(videoLab, /document\.querySelectorAll\("audio, video"\)/u);
+  assert.match(videoLab, /const mediaIsolationActive/u);
+  assert.match(videoLab, /const isAuthorizedRawPlayback/u);
+  assert.match(videoLab, /!isAuthorizedRawPlayback\(media\)\) safePause\(media\)/u);
+  assert.match(videoLab, /document\.addEventListener\("play", stopUnauthorizedPlayback, true\)/u);
+  assert.match(videoLab, /document\.addEventListener\("volumechange", stopUnauthorizedPlayback, true\)/u);
+  assert.match(videoLab, /const mutationObserver = new MutationObserver\(\(recordsList\) => \{\s*enforceMediaIsolation\(\)/u);
+  assert.match(videoLab, /video\.remote/u);
+  assert.match(videoLab, /remote\.addEventListener\("connecting", closeUnsafePresentation\)/u);
+  assert.match(videoLab, /remote\.addEventListener\("connect", closeUnsafePresentation\)/u);
+  assert.match(videoLab, /remote\.addEventListener\("disconnect", closeUnsafePresentation\)/u);
+  assert.match(videoLab, /webkitcurrentplaybacktargetiswirelesschanged/u);
+  assert.match(videoLab, /const enforcePresentationCapabilities/u);
+  assert.match(videoLab, /video\.disablePictureInPicture = true/u);
+  assert.match(videoLab, /video\.disableRemotePlayback = true/u);
+  assert.match(videoLab, /video\.playsInline = true/u);
+  assert.match(videoLab, /controlsList\.add\("nofullscreen"\)/u);
+  assert.match(videoLab, /controlsList\.add\("noremoteplayback"\)/u);
+  assert.match(videoLab, /attributeOldValue: true/u);
+  assert.match(videoLab, /const mutationRequiresTerminalClose/u);
+  assert.match(videoLab, /"disablepictureinpicture"/u);
+  assert.match(videoLab, /"disableremoteplayback"/u);
+  assert.match(videoLab, /"controlslist"/u);
+  assert.match(videoLab, /"playsinline"/u);
   assert.match(videoLab, /document\.documentElement\.hasAttribute\(INTERNAL_FIXTURE_ATTRIBUTE\)/u);
-  assert.doesNotMatch(videoLab, /record\.video\.load\(\);\s*void record\.video\.play/u);
+  assert.match(videoLab, /requestVideoFrameCallback/u);
+  assert.match(videoLab, /frameSequence/u);
+  assert.match(videoLab, /viewportEpoch/u);
+  assert.match(videoLab, /record\.frameConcealed/u);
+  assert.match(videoLab, /message\.action === "allow"/u);
   assert.match(videoLab, /data-glosh-dag-video-lab-token/u);
   assert.match(videoLab, /FRAME_RESULT_TIMEOUT_MS = 2_500/u);
   assert.match(videoLab, /!record\.covered \|\|\s*record\.framePending \|\|/u);
   assert.match(css, /video,\s*audio,/u);
   assert.doesNotMatch(css, /data-glosh-dag-video-lab/u);
+  assert.doesNotMatch(fixture, /video\[data-glosh-dag-video-lab-token\]/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
+});
+
+test("video laboratory silences dynamic unselected media in capture phase", async () => {
+  const documentListeners = new Map();
+  let mutationCallback = null;
+  const media = [];
+  class HTMLMediaElement {
+    constructor() {
+      this.defaultMuted = false;
+      this.muted = false;
+      this.pauseCalls = 0;
+      this.volume = 1;
+    }
+    addEventListener() {}
+    pause() {
+      this.pauseCalls += 1;
+    }
+  }
+  class MutationObserver {
+    constructor(callback) {
+      mutationCallback = callback;
+    }
+    observe() {}
+  }
+  const document = {
+    documentElement: { hasAttribute: () => false },
+    fullscreenElement: null,
+    pictureInPictureElement: null,
+    addEventListener(type, listener, capture) {
+      documentListeners.set(type, { capture, listener });
+    },
+    querySelectorAll(selector) {
+      assert.equal(selector, "audio, video");
+      return media;
+    },
+  };
+  const context = {
+    HTMLMediaElement,
+    HTMLSourceElement: class {},
+    MutationObserver,
+    Uint32Array,
+    browser: { runtime: { sendMessage: () => Promise.resolve({ enabled: true }) } },
+    clearTimeout() {},
+    crypto: webcrypto,
+    document,
+    performance: { now: () => 0 },
+    requestAnimationFrame: () => 1,
+    setTimeout: () => 1,
+    addEventListener() {},
+    window: { top: null },
+  };
+  context.window.top = context.window;
+
+  const initialAudio = new HTMLMediaElement();
+  const initialVideo = new HTMLMediaElement();
+  media.push(initialAudio, initialVideo);
+  vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
+  context.__gloshDagVideoLab.install({
+    protocolVersion: 2,
+    documentToken: "document_a1",
+    postToAndroid() {},
+  });
+  context.__gloshDagVideoLab.onNativeMessage({
+    type: "video-lab-config",
+    version: 2,
+    enabled: true,
+  });
+
+  for (const element of [initialAudio, initialVideo]) {
+    assert.equal(element.muted, true);
+    assert.equal(element.defaultMuted, true);
+    assert.equal(element.volume, 0);
+    assert.ok(element.pauseCalls >= 1);
+  }
+
+  const dynamicAudio = new HTMLMediaElement();
+  media.push(dynamicAudio);
+  mutationCallback([{ type: "childList", addedNodes: [dynamicAudio], removedNodes: [] }]);
+  assert.equal(dynamicAudio.muted, true);
+  assert.equal(dynamicAudio.defaultMuted, true);
+  assert.equal(dynamicAudio.volume, 0);
+  assert.ok(dynamicAudio.pauseCalls >= 1);
+
+  dynamicAudio.muted = false;
+  dynamicAudio.defaultMuted = false;
+  dynamicAudio.volume = 1;
+  const pausesBeforePlay = dynamicAudio.pauseCalls;
+  const playListener = documentListeners.get("play");
+  assert.equal(playListener.capture, true);
+  playListener.listener({ target: dynamicAudio });
+  assert.equal(dynamicAudio.muted, true);
+  assert.equal(dynamicAudio.defaultMuted, true);
+  assert.equal(dynamicAudio.volume, 0);
+  assert.equal(dynamicAudio.pauseCalls, pausesBeforePlay + 1);
+});
+
+test("video laboratory closes when a selected presentation capability is mutated", async () => {
+  const animationFrames = [];
+  let mutationCallback = null;
+  const media = [];
+  const posted = [];
+  class HTMLMediaElement {
+    constructor() {
+      this.defaultMuted = false;
+      this.muted = false;
+      this.pauseCalls = 0;
+      this.volume = 1;
+    }
+    addEventListener() {}
+    pause() {
+      this.pauseCalls += 1;
+    }
+  }
+  class HTMLVideoElement extends HTMLMediaElement {
+    constructor() {
+      super();
+      this.attributes = new Map();
+      this.currentSrc = "https://media.example.test/fixture.mp4";
+      this.duration = 10;
+      this.isConnected = true;
+      this.readyState = 4;
+      this.srcObject = null;
+    }
+    getAttribute(name) {
+      const attribute = name.toLowerCase();
+      return this.attributes.has(attribute) ? this.attributes.get(attribute) : null;
+    }
+    setAttribute(name, value) {
+      this.attributes.set(name.toLowerCase(), value);
+    }
+    removeAttribute(name) {
+      this.attributes.delete(name.toLowerCase());
+    }
+    get disablePictureInPicture() {
+      return this.attributes.has("disablepictureinpicture");
+    }
+    set disablePictureInPicture(enabled) {
+      if (enabled) this.attributes.set("disablepictureinpicture", "");
+      else this.attributes.delete("disablepictureinpicture");
+    }
+    get disableRemotePlayback() {
+      return this.attributes.has("disableremoteplayback");
+    }
+    set disableRemotePlayback(enabled) {
+      if (enabled) this.attributes.set("disableremoteplayback", "");
+      else this.attributes.delete("disableremoteplayback");
+    }
+    get playsInline() {
+      return this.attributes.has("playsinline");
+    }
+    set playsInline(enabled) {
+      if (enabled) this.attributes.set("playsinline", "");
+      else this.attributes.delete("playsinline");
+    }
+    get controlsList() {
+      return {
+        add: (token) => {
+          const tokens = new Set((this.getAttribute("controlslist") || "").split(" ").filter(Boolean));
+          tokens.add(token);
+          this.attributes.set("controlslist", [...tokens].join(" "));
+        },
+      };
+    }
+    getBoundingClientRect() {
+      return { bottom: 80, height: 80, left: 0, right: 100, top: 0, width: 100 };
+    }
+    querySelectorAll() {
+      return [];
+    }
+  }
+  class MutationObserver {
+    constructor(callback) {
+      mutationCallback = callback;
+    }
+    observe() {}
+  }
+  const document = {
+    documentElement: { hasAttribute: () => false },
+    fullscreenElement: null,
+    pictureInPictureElement: null,
+    addEventListener() {},
+    querySelectorAll(selector) {
+      if (selector === "audio, video") return media;
+      if (selector === "video") return media;
+      return [];
+    },
+  };
+  const context = {
+    HTMLMediaElement,
+    HTMLSourceElement: class {},
+    MutationObserver,
+    Uint32Array,
+    browser: { runtime: { sendMessage: () => Promise.resolve({ enabled: true }) } },
+    clearTimeout() {},
+    crypto: { getRandomValues: (words) => words.fill(1) },
+    document,
+    innerHeight: 100,
+    innerWidth: 100,
+    performance: { now: () => 200 },
+    requestAnimationFrame(callback) {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    },
+    setTimeout: () => 1,
+    addEventListener() {},
+    window: { top: null },
+  };
+  context.window.top = context.window;
+  const video = new HTMLVideoElement();
+  media.push(video);
+
+  vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
+  context.__gloshDagVideoLab.install({
+    protocolVersion: 2,
+    documentToken: "document_a1",
+    postToAndroid(message) {
+      posted.push(message);
+    },
+  });
+  context.__gloshDagVideoLab.onNativeMessage({
+    type: "video-lab-config",
+    version: 2,
+    enabled: true,
+  });
+  animationFrames.shift()();
+
+  assert.equal(video.disablePictureInPicture, true);
+  assert.equal(video.disableRemotePlayback, true);
+  assert.equal(video.playsInline, true);
+  assert.equal(video.getAttribute("controlslist"), "nofullscreen noremoteplayback");
+  mutationCallback([
+    { attributeName: "disablepictureinpicture", oldValue: null, target: video, type: "attributes" },
+    { attributeName: "disableremoteplayback", oldValue: null, target: video, type: "attributes" },
+    { attributeName: "playsinline", oldValue: null, target: video, type: "attributes" },
+    { attributeName: "controlslist", oldValue: null, target: video, type: "attributes" },
+    { attributeName: "controlslist", oldValue: "nofullscreen", target: video, type: "attributes" },
+  ]);
+  assert.equal(posted.some((message) => message.type === "video-lab-retire"), false);
+
+  const previousValue = video.getAttribute("playsinline");
+  video.removeAttribute("playsinline");
+  mutationCallback([{
+    attributeName: "playsinline",
+    oldValue: previousValue,
+    target: video,
+    type: "attributes",
+  }]);
+  const retirement = await waitFor(() => posted.find((message) =>
+    message.type === "video-lab-retire"), "terminal presentation mutation retirement");
+  assert.equal(retirement.reason, "active_video_mutated");
+});
+
+test("failed video conceal leaves terminal media isolation locked until native retry", async () => {
+  const documentListeners = new Map();
+  const windowListeners = new Map();
+  const animationFrames = [];
+  const media = [];
+  const posted = [];
+  let concealAttempts = 0;
+  let concealSucceeds = false;
+  let now = 200;
+  class HTMLMediaElement {
+    constructor() {
+      this.defaultMuted = false;
+      this.muted = false;
+      this.pauseCalls = 0;
+      this.volume = 1;
+    }
+    addEventListener() {}
+    pause() {
+      this.pauseCalls += 1;
+    }
+  }
+  class HTMLVideoElement extends HTMLMediaElement {
+    constructor() {
+      super();
+      this.currentSrc = "https://media.example.test/fixture.mp4";
+      this.duration = 10;
+      this.frameCallback = null;
+      this.isConnected = true;
+      this.readyState = 4;
+      this.srcObject = null;
+      this.attributes = new Map();
+    }
+    getAttribute(name) {
+      return this.attributes.get(name) || null;
+    }
+    getBoundingClientRect() {
+      return { bottom: 80, height: 80, left: 0, right: 100, top: 0, width: 100 };
+    }
+    play() {
+      return Promise.resolve();
+    }
+    removeAttribute(name) {
+      this.attributes.delete(name);
+    }
+    querySelectorAll() {
+      return [];
+    }
+    requestVideoFrameCallback(callback) {
+      this.frameCallback = callback;
+      return 1;
+    }
+    setAttribute(name, value) {
+      this.attributes.set(name, value);
+    }
+  }
+  class MutationObserver {
+    constructor() {}
+    observe() {}
+  }
+  const document = {
+    documentElement: { hasAttribute: () => false },
+    fullscreenElement: null,
+    pictureInPictureElement: null,
+    addEventListener(type, listener, capture) {
+      documentListeners.set(type, { capture, listener });
+    },
+    querySelectorAll(selector) {
+      if (selector === "audio, video") return media;
+      if (selector === "video") return media.filter((element) => element instanceof HTMLVideoElement);
+      return [];
+    },
+  };
+  const context = {
+    HTMLMediaElement,
+    HTMLSourceElement: class {},
+    MutationObserver,
+    Uint32Array,
+    browser: {
+      runtime: {
+        sendMessage(message) {
+          if (message.type === "video-lab-status") return Promise.resolve({ enabled: true });
+          if (message.type === "video-lab-reveal-style") return Promise.resolve({ inserted: true });
+          if (message.type === "video-lab-conceal-style") {
+            concealAttempts += 1;
+            return Promise.resolve({ removed: concealSucceeds });
+          }
+          return Promise.resolve(null);
+        },
+      },
+    },
+    clearTimeout() {},
+    crypto: { getRandomValues: (words) => words.fill(1) },
+    document,
+    innerHeight: 100,
+    innerWidth: 100,
+    performance: { now: () => now },
+    requestAnimationFrame(callback) {
+      animationFrames.push(callback);
+      return animationFrames.length;
+    },
+    setTimeout: () => 1,
+    addEventListener(type, listener) {
+      windowListeners.set(type, listener);
+    },
+    window: { top: null },
+  };
+  context.window.top = context.window;
+
+  const video = new HTMLVideoElement();
+  const audio = new HTMLMediaElement();
+  media.push(video, audio);
+  vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
+  context.__gloshDagVideoLab.install({
+    protocolVersion: 2,
+    documentToken: "document_a1",
+    postToAndroid(message) {
+      posted.push(message);
+    },
+  });
+  context.__gloshDagVideoLab.onNativeMessage({
+    type: "video-lab-config",
+    version: 2,
+    enabled: true,
+  });
+  animationFrames.shift()();
+  await waitFor(() => posted.some((message) => message.type === "video-lab-cover-request"),
+    "video cover request");
+  const cover = posted.find((message) => message.type === "video-lab-cover-request");
+  now = 400;
+  context.__gloshDagVideoLab.onNativeMessage({
+    type: "video-lab-cover-armed",
+    version: 2,
+    videoId: cover.videoId,
+    revision: cover.revision,
+  });
+  await waitFor(() => video.frameCallback !== null, "video frame callback");
+  video.frameCallback(0, { presentedFrames: 1 });
+  const frame = await waitFor(() => posted.find((message) =>
+    message.type === "video-lab-frame-request"), "video frame request");
+  context.__gloshDagVideoLab.onNativeMessage({
+    type: "video-lab-frame-captured",
+    version: 2,
+    videoId: frame.videoId,
+    revision: frame.revision,
+    frameSequence: frame.frameSequence,
+    viewportEpoch: frame.viewportEpoch,
+  });
+  await waitFor(() => concealAttempts === 1, "failed conceal attempt");
+  await new Promise((resolve) => setImmediate(resolve));
+
+  // Page activity cannot clear the terminal lock after active/closing state is
+  // gone. A fresh audio play must still be stopped synchronously in capture.
+  windowListeners.get("scroll")();
+  while (animationFrames.length > 0) animationFrames.shift()();
+  audio.defaultMuted = false;
+  audio.muted = false;
+  audio.volume = 1;
+  const pausesBeforePlay = audio.pauseCalls;
+  documentListeners.get("play").listener({ target: audio });
+  assert.equal(audio.defaultMuted, true);
+  assert.equal(audio.muted, true);
+  assert.equal(audio.volume, 0);
+  assert.equal(audio.pauseCalls, pausesBeforePlay + 1);
+  assert.equal(concealAttempts, 1);
+
+  // Only a new valid native enable request retries the failed revocation.
+  concealSucceeds = true;
+  context.__gloshDagVideoLab.onNativeMessage({
+    type: "video-lab-config",
+    version: 2,
+    enabled: true,
+  });
+  await waitFor(() => concealAttempts === 2, "explicit terminal conceal retry");
+  now += 1;
 });
 
 test("first paint closes inline and changing image sources before stable reveal", async () => {

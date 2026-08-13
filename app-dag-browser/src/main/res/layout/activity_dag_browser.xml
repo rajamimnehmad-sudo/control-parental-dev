@@ -148,12 +148,24 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:background="@color/dag_navy"
-            android:clickable="false"
-            android:focusable="false"
+            android:clickable="true"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
             android:importantForAccessibility="noHideDescendants"
             android:visibility="gone">
 
+            <ImageView
+                android:id="@+id/video_lab_frame"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:contentDescription="@null"
+                android:focusable="false"
+                android:importantForAccessibility="no"
+                android:scaleType="fitXY"
+                android:visibility="gone" />
+
             <TextView
+                android:id="@+id/video_lab_cover_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"

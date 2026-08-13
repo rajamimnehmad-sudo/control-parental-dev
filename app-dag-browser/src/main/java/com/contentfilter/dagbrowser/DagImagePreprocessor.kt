@@ -197,6 +197,22 @@ internal fun interface DagImagePreprocessor {
  * Animated and partial images fail closed.
  */
 internal object AndroidDagImagePreprocessor : DagImagePreprocessor {
+    /**
+     * Converts the bounded, aspect-preserved PixelCopy bitmap used by strict video replay into the
+     * canonical R3.1 RGB tensor. The source bitmap is never resized in place or recycled here: the
+     * same captured pixels remain available for native replay only after their decision is allowed.
+     */
+    fun prepareVideoCapturedRaster(bitmap: Bitmap): DagPreparedImage? {
+        if (
+            bitmap.isRecycled ||
+            bitmap.width !in 1..DagVideoLabCapturePlan.DefaultMaxLongEdge ||
+            bitmap.height !in 1..DagVideoLabCapturePlan.DefaultMaxLongEdge
+        ) {
+            return null
+        }
+        return runCatching { bitmap.toPreparedImage() }.getOrNull()
+    }
+
     fun prepareCapturedRaster(bitmap: Bitmap): DagPreparedImage? {
         if (
             bitmap.isRecycled ||

@@ -12,12 +12,14 @@ internal object DagTabPreviewPolicy {
         pageVisible: Boolean,
         eligibilityConfirmed: Boolean,
         restricted: Boolean,
+        videoCovered: Boolean,
     ): Boolean =
         viewVisible &&
             sessionOpen &&
             pageVisible &&
             eligibilityConfirmed &&
-            !restricted
+            !restricted &&
+            !videoCovered
 
     fun acceptsResult(
         request: DagTabPreviewRequest,
@@ -25,9 +27,11 @@ internal object DagTabPreviewPolicy {
         currentRevision: Long,
         pageVisible: Boolean,
         restricted: Boolean,
+        videoCovered: Boolean,
     ): Boolean =
         pageVisible &&
             !restricted &&
+            !videoCovered &&
             request.tabId == currentTabId &&
             request.revision == currentRevision
 }

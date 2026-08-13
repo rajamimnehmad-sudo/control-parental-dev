@@ -15,6 +15,7 @@ class MediaBarrierContractTest {
     private val ads by lazy { extensionRoot.resolve("ads.js").readText() }
     private val schedulerGuard by lazy { extensionRoot.resolve("runaway-scheduler-guard.js").readText() }
     private val css by lazy { extensionRoot.resolve("barrier.css").readText() }
+    private val browserLayout by lazy { File("src/main/res/layout/activity_dag_browser.xml").readText() }
 
     @Test
     fun `extension starts before content and updates in place`() {
@@ -25,7 +26,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"css_origin\": \"user\"")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.16\"")
+        assertContains(manifest, "\"version\": \"2.0.17\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
@@ -142,7 +143,17 @@ class MediaBarrierContractTest {
         assertContains(activity, "isVideoLabEligibleSender(sender)")
         assertContains(activity, "videoLabArmedForSession && isVideoLabEligibleSender(sender)")
         assertContains(activity, "postVideoLabConfig(port, enabled = videoLabArmedForSession)")
-        assertContains(activity, "retireActiveVideoLab(\"lab_disabled\")")
+        assertContains(activity, "beginVideoLabClose(\"lab_disabled\")")
+        assertContains(activity, "DagVideoLabCloseRequest(")
+        assertContains(activity, "videoLabState.acknowledgeClose(close.key, close.nonce)")
+        assertContains(activity, "videoLabState.blockClosing(close.key, close.nonce)")
+        assertContains(activity, "VideoLabFrameCapturedMessage")
+        assertContains(activity, "VideoLabFrameConcealedMessage")
+        assertContains(activity, "AndroidDagImagePreprocessor.prepareVideoCapturedRaster")
+        assertContains(activity, "videoLabOverlay.setOnTouchListener { _, _ -> true }")
+        assertContains(browserLayout, "android:id=\"@+id/video_lab_overlay\"")
+        assertContains(browserLayout, "android:clickable=\"true\"")
+        assertContains(browserLayout, "android:focusableInTouchMode=\"true\"")
         assertContains(background, "browser.tabs.insertCSS")
         assertContains(background, "browser.tabs.removeCSS")
         assertContains(background, "cssOrigin: \"user\"")
@@ -153,7 +164,8 @@ class MediaBarrierContractTest {
         assertContains(rasterPolicy, "DagOnDeviceImageAnalyzer.FilterThreshold")
         assertContains(rasterPolicy, "DagUncertainRegionalCropper.quadrantViews")
         assertFalse(videoLab.contains("style.visibility"))
-        assertFalse(videoLab.contains("message.action"))
+        assertContains(videoLab, "message.action === \"allow\"")
+        assertContains(videoLab, "record.frameConcealed")
     }
 
     @Test
@@ -270,7 +282,7 @@ class MediaBarrierContractTest {
         assertFalse(ads.contains("querySelectorAll?.(\"span,div\")"))
         assertContains(css, "[data-ad-slot]")
         assertContains(css, "glosh-dag-page-ad-hidden")
-        assertContains(videoLab, "MAX_CAPTURE_COUNT = 3")
+        assertContains(videoLab, "MAX_CAPTURE_COUNT = 120")
         assertContains(videoLab, "video-lab-cover-request")
         assertContains(videoLab, "video-lab-frame-request")
         assertContains(videoLab, "record.video.muted = true")
@@ -280,6 +292,9 @@ class MediaBarrierContractTest {
         assertContains(videoLab, "data-glosh-dag-video-lab-token")
         assertContains(videoLab, "FRAME_RESULT_TIMEOUT_MS = 2_500")
         assertContains(videoLab, "record.framePending ||")
+        assertContains(videoLab, "requestVideoFrameCallback")
+        assertContains(videoLab, "frameSequence")
+        assertContains(videoLab, "viewportEpoch")
         assertContains(background, "isVideoLabFixtureSender")
         assertContains(background, "browser.tabs.insertCSS")
         assertContains(background, "browser.tabs.removeCSS")

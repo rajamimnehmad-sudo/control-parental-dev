@@ -3453,7 +3453,7 @@ Flujo de una entrada:
 
 ### DAG-VIDEO-01 - GloshIA Visual sobre fotogramas de video
 
-- Estado: `01A0 y 01A1 resueltos; 01A2 autorizado y GO en A23, pendiente S22`.
+- Estado: `01A0 y 01A1 resueltos; 01A2 GO en A23 y pendiente S22; 01B candidato local Diagnostic, NO-GO de seguridad y entrega`.
 - Objetivo: habilitar video local con una compuerta temporal general, sin
   mostrar fotogramas antes de decidirlos y sin excepciones por sitio, URL o
   dominio.
@@ -3480,7 +3480,15 @@ Flujo de una entrada:
 - Tercer ticket: `DAG-VIDEO-01A2`, aprobado e implementado en Diagnostic 13.
   El gate A23 sobre video web real dio p50 `967,67 ms` y peor caso `2.185,70 ms`,
   sin crash, ANR ni fuga. Queda `GO CON CONDICIONES` hasta validar S22; no
-  autoriza `01B`, revelar video ni modificar DAG normal.
+  activa video ni modifica DAG normal.
+- Cuarto ticket: `DAG-VIDEO-01B`, autorizado solo para candidato local en
+  Diagnostic 14. Reproduce exclusivamente el bitmap regional ya permitido por
+  GloshIA dentro de la cobertura Android, con identidad por cuadro y cierre con
+  ACK de revocacion exacto; no revela el compositor Gecko ni cambia R3.1,
+  umbral o politica. El candidato queda `NO-GO`: faltan una barrera fiable para
+  WebAudio de MAIN world, el gate fisico S22 de oclusion, la verificacion fisica
+  de la fixture y una medicion de fluidez. DAG normal y cualquier publicacion
+  continúan bloqueados.
 - Propuesta completa:
   `docs/dag/v3/GLOSHIA_VIDEO_V1_PROPOSAL_2026-08-12.md`.
 - Plan ejecutable, gates y primer ticket pequeno:
@@ -3633,7 +3641,7 @@ Flujo de una entrada:
 | NET-EVASION-01 | Idea | P2 | DoH/DoT desconocido, IP directa, proxies y VPN externas |
 | AI-VISUAL-01 | Idea | P3 | Evaluacion puntual de regiones visibles, sujeta a privacidad, bateria y politicas |
 | AI-SENSITIVE-01 | Idea | P3 | Riesgos sensibles en chats como proyecto separado legal y de privacidad |
-| DAG-VIDEO-01 | Propuesta; no aprobado | P2 | Compuerta temporal local con el mismo GloshIA Visual, cobertura previa, detector de escenas y gates S22/A23; video sigue bloqueado |
+| DAG-VIDEO-01 | Diagnostico 01B local; NO-GO | P2 | Compuerta temporal local con el mismo GloshIA Visual, cobertura previa, detector de escenas y gates S22/A23; video sigue bloqueado |
 | POLICY-SCHEDULE-01 | Idea | P2 | Politicas adaptativas por horario o contexto, siempre bajo control del administrador |
 | WEB-AMBIGUITY-01 | Idea | P2 | Fallback seguro a SafeSearch o Solo resultados ante decisiones ambiguas |
 | POLICY-EXPLAIN-01 | Idea | P2 | Explicaciones simples y solicitud de autorizacion para decisiones bloqueadas o inciertas |

@@ -158,7 +158,43 @@ el runtime actual desde versiones o worktrees historicos.
   permanecen intactos. Los entrenadores fallidos se retiraron; sólo se conservan
   informes privados y la evidencia detallada en el documento R4.
 
-## Candidato local: DAG Browser 213 / Diagnostic 13 — gate web cubierto 01A2
+## Candidato local `NO-GO`: DAG Browser 214 / Diagnostic 14 — replay estricto 01B
+
+- La autorizacion de `DAG-VIDEO-01B` produjo solo un candidato local de
+  Diagnostic. DAG normal sube por los assets compartidos a versionCode `214`
+  (`0.70.18-dev`), pero conserva el bloqueo total de video; el laboratorio solo
+  existe con el interruptor efimero de Diagnostic `14` y extension `2.0.17`.
+- Nunca se vuelve visible el `video` de Gecko para presentar una muestra. La
+  cobertura Android opaca queda arriba de Gecko y solo su `ImageView` hijo recibe
+  el mismo `Bitmap` regional capturado por `PixelCopy` despues de dos condiciones
+  exactas: GloshIA R3.1 lo permite y la extension confirma que el cuadro bruto ya
+  fue ocultado. La captura conserva aspecto con borde largo maximo de 512 px; el
+  RGB `224x224` letterboxed se deriva de ese mismo bitmap para la autoridad
+  existente. No cambiaron modelo, umbral, politica ni R3.1.
+- Documento, video, revision, epoch de viewport y secuencia estrictamente
+  creciente identifican cada cuadro. Un callback tardio, cambio de fuente,
+  scroll, navegacion, pestaña, error, timeout, pantalla completa, PiP o remoto
+  invalida el candidato; no hay cache ni persistencia de fotogramas. Las
+  miniaturas de pestaña y snapshots de navegacion se invalidan mientras la
+  cobertura esta activa.
+- El cierre entra en `CLOSING`: conserva la cobertura, pausa y revoca el grant,
+  y solo la oculta tras el ACK exacto de `removeCSS` por pestaña/documento/nonce.
+  Insercion pendiente, fallo de revocacion, desconexion o reinicio desconocido
+  del background no dan ACK y dejan Diagnostic bloqueado. La fixture usa la
+  misma concesion revocable; no hay excepcion por sitio, proveedor, URL o
+  dispositivo.
+- Validacion local: JS `48/48`; unitarios DEV y Diagnostic `175/175`; Ktlint,
+  Lint y `assembleDevDebug`/`assembleDiagnosticDebug` correctos. No hubo push,
+  publicacion, Supabase ni Production.
+- Estado de seguridad y entrega: `NO-GO`. El aislamiento de elementos HTML no
+  puede silenciar de forma confiable un `AudioContext` creado por una pagina en
+  MAIN world; falta una barrera nativa/Gecko con esa autoridad. Tambien faltan el
+  gate fisico S22 que demuestre la oclusion de `SurfaceView` en cada transicion,
+  la comprobacion fisica de que la fixture acepta CSS `user` y metricas que
+  demuestren fluidez real. No activar DAG normal, no publicar ni llamar a este
+  candidato reproduccion segura hasta cerrar esos gates.
+
+## Candidato local anterior: DAG Browser 213 / Diagnostic 13 — gate web cubierto 01A2
 
 - `DAG-VIDEO-01A2` queda `GO CON CONDICIONES`: el A23 paso el gate fisico y
   falta repetirlo en S22. DAG normal permanece en 213 (`0.70.17-dev`), con video

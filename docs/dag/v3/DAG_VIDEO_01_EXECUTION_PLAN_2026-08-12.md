@@ -1,7 +1,8 @@
 # DAG Video 01 — plan de ejecucion y gates
 
 Fecha: 2026-08-12
-Estado: `01A0` y `01A1` cerrados; `01A2` aprobado, GO en A23 y pendiente S22
+Actualizado: 2026-08-13
+Estado: `01A0` y `01A1` cerrados; `01A2` GO en A23 y pendiente S22; `01B` candidato local Diagnostic `NO-GO`
 Baseline protegido: DAG Browser 211 (`0.70.15-dev`)
 Autoridad visual: GloshIA Visual R3.1, sin cambios de modelo, umbral o politica
 
@@ -266,8 +267,32 @@ crash, ANR ni fuga: `GO` para A23. El resultado global es
 
 ### `DAG-VIDEO-01B` — motor temporal
 
-Solo se planifica en detalle despues de `01A2`. Debe decidir, con los datos
-fisicos, entre:
+La autorizacion posterior permite implementar un candidato local de reproduccion
+estrictamente diferida en Diagnostic, no activarlo ni promoverlo. El candidato
+debe presentar dentro de una cobertura Android permanente el mismo bitmap
+regional que acaba de autorizar GloshIA; nunca debe descubrir el `video` de
+Gecko. Captura con aspecto preservado y borde maximo acotado, deriva de ese
+bitmap el RGB canonical `224x224` para R3.1 y solo transfiere el bitmap original
+al `ImageView` nativo despues de `allow` y del ACK de ocultamiento del cuadro
+bruto. Identidad de documento/video/revision/viewport/secuencia invalida toda
+respuesta tardia; no hay cache persistente ni miniaturas mientras la cobertura
+esta activa.
+
+El teardown entra en `CLOSING` y retiene la cobertura hasta que background
+acredita la revocacion CSS exacta por documento y nonce. Insercion pendiente,
+fallo, desconexion o estado perdido de background no reciben ACK y quedan
+bloqueados. PiP, pantalla completa y reproducción remota se solicitan denegar
+preventivamente y cualquier evento o mutacion los retira; esos atributos DOM no
+son una raiz de confianza frente a una pagina MAIN world hostil.
+
+El candidato actual no es un `GO`: el aislamiento de `HTMLMediaElement` no basta
+para garantizar silencio de `AudioContext` MAIN world, falta el gate fisico S22
+que pruebe la oclusion de la superficie Gecko y aun no existen metricas fisicas
+de fluidez. La secuencia R3.1 medida en A23 tampoco autoriza afirmar 30/60 fps.
+El resultado correcto hasta cerrar esos puntos es `NO-GO`, sin debilitar la
+barrera ni ajustar modelo, umbral o politica.
+
+Una vez satisfechos los gates, se decidira entre:
 
 - reproduccion visual estrictamente diferida mediante cuadros ya autorizados;
 - integracion mas profunda en decode/compositor;
@@ -290,6 +315,9 @@ Solo despues de que `01B` demuestre seguridad y experiencia en ambos equipos:
 - Preanalisis siempre mudo.
 - Si la imagen queda bloqueada, audio pausado por defecto. La accion manual
   `solo audio` pertenece a UX posterior y no afirma que el audio sea seguro.
+- La guarda actual de `HTMLMediaElement` no acredita silencio de `AudioContext`
+  MAIN world; 01B permanece `NO-GO` hasta que exista una barrera con esa
+  autoridad.
 - Pantalla completa, PiP, casting, vivo y DRM permanecen cerrados en `01A`.
 - No se cambia R3.1 para cumplir tiempos.
 - No hay excepciones por proveedor ni heuristicas semanticas basadas en URL.
@@ -324,7 +352,9 @@ de esas areas, el ticket se detiene y se replantea.
 ## Aprobacion y siguiente limite
 
 `DAG-VIDEO-01A0`, `01A1` y `01A2` fueron aprobados. Los dos primeros estan
-cerrados; `01A2` paso A23 y queda pendiente del S22. Ninguno autoriza por si
-solo `01B` ni `01C`; cada ampliacion conserva su gate. Diagnostic 13 permite
-video real solo mientras el laboratorio efimero esta armado y siempre bajo
-cobertura; DAG normal continua con bloqueo total.
+cerrados; `01A2` paso A23 y queda pendiente del S22. Una autorizacion posterior
+permitio implementar `01B` solo como candidato local Diagnostic 14; no autoriza
+`01C`, activacion en DAG normal ni publicacion. La seguridad y la experiencia
+de 01B permanecen `NO-GO` hasta disponer de barrera de audio con autoridad,
+evidencia de oclusion en S22, fixture verificada y metricas fisicas de fluidez.
+DAG normal continua con bloqueo total.

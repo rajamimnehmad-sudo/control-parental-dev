@@ -1,11 +1,96 @@
 package com.contentfilter.dagbrowser
 
+import android.graphics.Rect
+import kotlin.math.max
+import kotlin.math.min
+import kotlin.math.roundToInt
+
 internal data class DagVideoLabKey(
     val tabId: Long,
     val documentToken: String,
     val videoId: String,
     val revision: Int,
 )
+
+/**
+ * Identifies one immutable captured video frame.
+ *
+ * The page-provided video revision alone is not enough to authorize a replay: a viewport movement
+ * or a late callback can otherwise bind pixels from a different displayed frame. Both counters are
+ * monotonically issued by the content-side authority for the active video revision.
+ */
+internal data class DagVideoLabFrameKey(
+    val videoKey: DagVideoLabKey,
+    val viewportEpoch: Int,
+    val frameSequence: Int,
+) {
+    fun isValid(): Boolean {
+        return viewportEpoch in 1..MaximumCounter && frameSequence in 1..MaximumCounter
+    }
+
+    private companion object {
+        const val MaximumCounter = 1_000_000
+    }
+}
+
+/**
+ * A close request is acknowledged only after the extension has removed its temporary raw-video
+ * permission. A nonce makes a late acknowledgement from an older close attempt harmless.
+ */
+internal data class DagVideoLabCloseRequest(
+    val key: DagVideoLabKey,
+    val nonce: String,
+) {
+    fun isValid(): Boolean = CloseNoncePattern.matches(nonce)
+
+    private companion object {
+        val CloseNoncePattern = Regex("^[a-f0-9]{32}$")
+    }
+}
+
+/**
+ * PixelCopy scales exactly to the requested bitmap dimensions. This plan preserves the source
+ * aspect ratio while bounding allocation before the same bitmap is letterboxed for R3.1.
+ */
+internal data class DagVideoLabCapturePlan(
+    val targetWidth: Int,
+    val targetHeight: Int,
+) {
+    companion object {
+        const val DefaultMaxLongEdge = 512
+        const val MaximumLongEdge = DefaultMaxLongEdge
+
+        fun fromSurfaceRect(
+            surfaceRect: Rect,
+            maxLongEdge: Int = DefaultMaxLongEdge,
+        ): DagVideoLabCapturePlan? =
+            fromDimensions(
+                sourceWidth = surfaceRect.width(),
+                sourceHeight = surfaceRect.height(),
+                maxLongEdge = maxLongEdge,
+            )
+
+        fun fromDimensions(
+            sourceWidth: Int,
+            sourceHeight: Int,
+            maxLongEdge: Int = DefaultMaxLongEdge,
+        ): DagVideoLabCapturePlan? {
+            if (
+                sourceWidth <= 0 ||
+                sourceHeight <= 0 ||
+                maxLongEdge !in 1..MaximumLongEdge
+            ) {
+                return null
+            }
+            val sourceLongEdge = max(sourceWidth, sourceHeight)
+            val scale = min(1.0, maxLongEdge.toDouble() / sourceLongEdge.toDouble())
+            return DagVideoLabCapturePlan(
+                targetWidth = (sourceWidth * scale).roundToInt().coerceAtLeast(1),
+                targetHeight = (sourceHeight * scale).roundToInt().coerceAtLeast(1),
+            )
+        }
+    }
+}
 
 internal data class DagVideoLabClientRect(
     val left: Float,
@@ -38,6 +123,8 @@ internal enum class DagVideoLabState {
     Covered,
     Capturing,
     Failed,
+    Closing,
+    Blocked,
 }
 
 /**
@@ -50,6 +137,9 @@ internal class DagVideoLabStateMachine {
     private data class Active(
         val key: DagVideoLabKey,
         var state: DagVideoLabState,
+        var frameKey: DagVideoLabFrameKey? = null,
+        var lastFrameSequence: Int = 0,
+        var closeNonce: String? = null,
     )
 
     private var active: Active? = null
@@ -60,12 +150,21 @@ internal class DagVideoLabStateMachine {
     val currentState: DagVideoLabState?
         get() = active?.state
 
+    val currentFrameKey: DagVideoLabFrameKey?
+        get() = active?.frameKey
+
+    val currentCloseNonce: String?
+        get() = active?.closeNonce
+
     fun requestCover(
         key: DagVideoLabKey,
         rect: DagVideoLabClientRect,
     ): Boolean {
         if (!validKey(key) || !rect.isValid()) return false
-        if (active?.state == DagVideoLabState.Capturing) return false
+        // A new authority must never overwrite a covered, failed or closing
+        // revision. The caller must keep the Android cover and complete the
+        // exact revocation handshake first, then create a fresh state.
+        if (active !== null) return false
         active = Active(key, DagVideoLabState.Covering)
         return true
     }
@@ -78,41 +177,104 @@ internal class DagVideoLabStateMachine {
         )
 
     fun requestCapture(
-        key: DagVideoLabKey,
+        frameKey: DagVideoLabFrameKey,
         rect: DagVideoLabClientRect,
     ): Boolean {
-        if (!rect.isValid()) return false
-        return transition(
-            key = key,
-            expected = DagVideoLabState.Covered,
-            next = DagVideoLabState.Capturing,
-        )
+        val current = active ?: return false
+        if (
+            !rect.isValid() ||
+            !frameKey.isValid() ||
+            current.key != frameKey.videoKey ||
+            current.state != DagVideoLabState.Covered ||
+            frameKey.frameSequence <= current.lastFrameSequence
+        ) {
+            return false
+        }
+        current.frameKey = frameKey
+        current.lastFrameSequence = frameKey.frameSequence
+        current.state = DagVideoLabState.Capturing
+        return true
     }
 
     fun completeCapture(
-        key: DagVideoLabKey,
+        frameKey: DagVideoLabFrameKey,
         captured: Boolean,
-    ): Boolean =
-        transition(
-            key = key,
-            expected = DagVideoLabState.Capturing,
-            next = if (captured) DagVideoLabState.Covered else DagVideoLabState.Failed,
-        )
+    ): Boolean {
+        val current = active ?: return false
+        if (
+            current.key != frameKey.videoKey ||
+            current.frameKey != frameKey ||
+            current.state != DagVideoLabState.Capturing
+        ) {
+            return false
+        }
+        current.state = if (captured) DagVideoLabState.Covered else DagVideoLabState.Failed
+        return true
+    }
 
     fun fail(key: DagVideoLabKey): Boolean {
         val current = active ?: return false
         if (current.key != key) return false
         current.state = DagVideoLabState.Failed
+        current.frameKey = null
         return true
     }
 
-    fun retire(key: DagVideoLabKey): Boolean {
-        if (active?.key != key) return false
+    /**
+     * Begins a fail-closed teardown. The Android cover remains in place until the exact nonce is
+     * acknowledged; timeout or a disconnect must call [blockClosing] instead of exposing Gecko.
+     */
+    fun beginClosing(
+        key: DagVideoLabKey,
+        nonce: String,
+    ): Boolean {
+        val current = active ?: return false
+        if (
+            current.key != key ||
+            current.state == DagVideoLabState.Closing ||
+            current.state == DagVideoLabState.Blocked ||
+            !DagVideoLabCloseRequest(key, nonce).isValid()
+        ) {
+            return false
+        }
+        current.state = DagVideoLabState.Closing
+        current.frameKey = null
+        current.closeNonce = nonce
+        return true
+    }
+
+    fun acknowledgeClose(
+        key: DagVideoLabKey,
+        nonce: String,
+    ): Boolean {
+        val current = active ?: return false
+        if (
+            current.key != key ||
+            current.state != DagVideoLabState.Closing ||
+            current.closeNonce != nonce
+        ) {
+            return false
+        }
         active = null
         return true
     }
 
-    fun retireAll(): DagVideoLabKey? = active?.key.also { active = null }
+    fun blockClosing(
+        key: DagVideoLabKey,
+        nonce: String,
+    ): Boolean {
+        val current = active ?: return false
+        if (
+            current.key != key ||
+            current.state != DagVideoLabState.Closing ||
+            current.closeNonce != nonce
+        ) {
+            return false
+        }
+        current.state = DagVideoLabState.Blocked
+        current.frameKey = null
+        return true
+    }
 
     fun isCurrent(
         key: DagVideoLabKey,
@@ -120,6 +282,18 @@ internal class DagVideoLabStateMachine {
     ): Boolean {
         val current = active ?: return false
         return current.key == key && (state == null || current.state == state)
+    }
+
+    fun isCurrent(
+        frameKey: DagVideoLabFrameKey,
+        state: DagVideoLabState? = null,
+    ): Boolean {
+        val current = active ?: return false
+        return (
+            current.key == frameKey.videoKey &&
+                current.frameKey == frameKey &&
+                (state == null || current.state == state)
+        )
     }
 
     private fun transition(

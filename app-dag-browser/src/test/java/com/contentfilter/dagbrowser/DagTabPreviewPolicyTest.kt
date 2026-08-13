@@ -13,6 +13,7 @@ class DagTabPreviewPolicyTest {
         assertFalse(canCapture(pageVisible = false))
         assertFalse(canCapture(eligibilityConfirmed = false))
         assertFalse(canCapture(restricted = true))
+        assertFalse(canCapture(videoCovered = true))
         assertTrue(
             DagTabPreviewPolicy.canCapture(
                 viewVisible = true,
@@ -20,6 +21,7 @@ class DagTabPreviewPolicyTest {
                 pageVisible = true,
                 eligibilityConfirmed = true,
                 restricted = false,
+                videoCovered = false,
             ),
         )
     }
@@ -35,6 +37,7 @@ class DagTabPreviewPolicyTest {
                 currentRevision = 9,
                 pageVisible = true,
                 restricted = false,
+                videoCovered = false,
             ),
         )
     }
@@ -50,6 +53,7 @@ class DagTabPreviewPolicyTest {
                 currentRevision = 8,
                 pageVisible = true,
                 restricted = false,
+                videoCovered = false,
             ),
         )
     }
@@ -65,6 +69,7 @@ class DagTabPreviewPolicyTest {
                 currentRevision = 8,
                 pageVisible = false,
                 restricted = false,
+                videoCovered = false,
             ),
         )
     }
@@ -80,6 +85,7 @@ class DagTabPreviewPolicyTest {
                 currentRevision = 8,
                 pageVisible = true,
                 restricted = false,
+                videoCovered = false,
             ),
         )
     }
@@ -95,6 +101,24 @@ class DagTabPreviewPolicyTest {
                 currentRevision = 8,
                 pageVisible = true,
                 restricted = true,
+                videoCovered = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `thumbnail capture and late results stay closed while video coverage is active`() {
+        val request = DagTabPreviewRequest(tabId = 4, revision = 8)
+
+        assertFalse(canCapture(videoCovered = true))
+        assertFalse(
+            DagTabPreviewPolicy.acceptsResult(
+                request = request,
+                currentTabId = 4,
+                currentRevision = 8,
+                pageVisible = true,
+                restricted = false,
+                videoCovered = true,
             ),
         )
     }
@@ -105,11 +129,13 @@ class DagTabPreviewPolicyTest {
         pageVisible: Boolean = true,
         eligibilityConfirmed: Boolean = true,
         restricted: Boolean = false,
+        videoCovered: Boolean = false,
     ) = DagTabPreviewPolicy.canCapture(
         viewVisible = viewVisible,
         sessionOpen = sessionOpen,
         pageVisible = pageVisible,
         eligibilityConfirmed = eligibilityConfirmed,
         restricted = restricted,
+        videoCovered = videoCovered,
     )
 }
