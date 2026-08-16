@@ -18,6 +18,10 @@
       if (!allowed || !dependencies.state.enabled || record.terminal) {
         record.terminal = true;
         dependencies.safePause(record.video);
+        void dependencies.retireRecord(
+          record,
+          !allowed ? "frame_blocked" : "runtime_disabled",
+        );
         return;
       }
       record.captures += 1;

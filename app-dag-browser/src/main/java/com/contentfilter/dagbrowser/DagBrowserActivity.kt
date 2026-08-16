@@ -1263,8 +1263,8 @@ class DagBrowserActivity : Activity() {
 
     /**
      * Defers a session-replacing UI action until background has proved that its temporary
-     * user-origin CSS/media capability is gone. A terminal Blocked close intentionally retains
-     * the cover and drops the action rather than replacing the protected SurfaceView.
+     * user-origin CSS/media capability is gone. If proof times out, the blocked recovery path
+     * discards the exact Gecko document before allowing any replacement UI.
      */
     private fun deferVideoLabActionUntilRevoked(
         reason: String,
@@ -1357,13 +1357,55 @@ class DagBrowserActivity : Activity() {
         videoLabSmoothGrant = null
         videoLabMode = null
         videoLabTargetTabId = null
-        videoLabPostCloseAction = null
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
         showVideoLabCover()
-        tabs.firstOrNull { it.id == close.key.tabId }?.let { tab ->
+        val blockedTab = tabs.firstOrNull { it.id == close.key.tabId }
+        blockedTab?.let { tab ->
             recordVideoLabEvent(tab, close.key, "blocked", reason)
         }
+        recoverBlockedVideoLabDocument(close.key, blockedTab)
+    }
+
+    /**
+     * A missing revocation acknowledgement can never release the covered Gecko document. The
+     * bounded fallback is to discard that exact tab/session, then clear the native cover and
+     * return the browser to another tab (or a fresh blank tab). No page data or cache reset is
+     * required, and the unacknowledged document is never attached again.
+     */
+    private fun recoverBlockedVideoLabDocument(
+        key: DagVideoLabKey,
+        blockedTab: BrowserTab?,
+    ) {
+        val postCloseAction = videoLabPostCloseAction
+        videoLabPostCloseAction = null
+        val oldIndex = blockedTab?.let(tabs::indexOf)?.takeIf { it >= 0 } ?: 0
+        val wasActive = blockedTab != null && blockedTab === activeTab
+        if (blockedTab != null) {
+            if (wasActive) {
+                geckoView.visibility = View.INVISIBLE
+                setTabActivity(blockedTab, active = false)
+                runCatching { geckoView.releaseSession() }
+                activeTab = null
+            }
+            tabs.remove(blockedTab)
+            disposeTab(blockedTab, deletePersistedPreview = true)
+        }
+        if (!videoLabState.retireBlockedDocument(key)) return
+        videoLabOverlay.visibility = View.GONE
+        if (isFinishing || isDestroyed) return
+        if (wasActive || activeTab == null) {
+            if (tabs.isEmpty()) {
+                createTab(switchToTab = true)
+            } else {
+                switchTo(tabs[oldIndex.coerceAtMost(tabs.lastIndex)])
+            }
+        }
+        postCloseAction?.invoke()
+        updateTabButton()
+        schedulePersistTabs()
+        refreshTabSwitcher()
+        Toast.makeText(this, R.string.video_protection_tab_recovered, Toast.LENGTH_LONG).show()
     }
 
     private fun invalidateVideoLabAnalysis(key: DagVideoLabKey) {

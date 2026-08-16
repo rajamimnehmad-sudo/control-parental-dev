@@ -329,10 +329,13 @@ test("product smooth mode restores visible audible playback and revokes the orig
     captured: true,
   });
   await waitFor(() => concealMessages.length > 0, "smooth grant concealment");
+  const retire = await waitFor(() => posted.find((message) =>
+    message.type === "video-lab-retire"), "blocked video retirement");
 
   const finalConceal = concealMessages.at(-1);
   assert.equal(finalConceal.frameSequence, persistentGrant.frameSequence);
   assert.notEqual(finalConceal.frameSequence, blockedFrame.frameSequence);
+  assert.equal(retire.reason, "frame_blocked");
   assert.ok(video.pauseCalls > 0);
   assert.equal(concealMessages.length > 0, true);
 });

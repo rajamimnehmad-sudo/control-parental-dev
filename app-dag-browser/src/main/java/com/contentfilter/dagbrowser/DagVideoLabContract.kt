@@ -347,6 +347,18 @@ internal class DagVideoLabStateMachine {
         return true
     }
 
+    /**
+     * Releases the native cover only after the exact Gecko document has been permanently
+     * detached. This is the recovery path when the extension cannot acknowledge revocation: the
+     * document is discarded instead of trusting an absent acknowledgement.
+     */
+    fun retireBlockedDocument(key: DagVideoLabKey): Boolean {
+        val current = active ?: return false
+        if (current.key != key || current.state != DagVideoLabState.Blocked) return false
+        active = null
+        return true
+    }
+
     fun isCurrent(
         key: DagVideoLabKey,
         state: DagVideoLabState? = null,

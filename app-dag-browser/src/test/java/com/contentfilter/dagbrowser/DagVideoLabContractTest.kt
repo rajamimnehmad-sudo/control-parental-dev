@@ -274,6 +274,24 @@ class DagVideoLabContractTest {
     }
 
     @Test
+    fun `blocked cover retires only after its exact document is discarded`() {
+        val machine = DagVideoLabStateMachine()
+        val key = key()
+        val nonce = closeNonce()
+
+        assertTrue(machine.requestCover(key, rect()))
+        assertTrue(machine.markCovered(key))
+        assertFalse(machine.retireBlockedDocument(key))
+        assertTrue(machine.beginClosing(key, nonce))
+        assertTrue(machine.blockClosing(key, nonce))
+        assertFalse(machine.retireBlockedDocument(key(revision = 2)))
+        assertEquals(DagVideoLabState.Blocked, machine.currentState)
+        assertTrue(machine.retireBlockedDocument(key))
+        assertNull(machine.currentKey)
+        assertTrue(machine.requestCover(key(revision = 2), rect()))
+    }
+
+    @Test
     fun `capture plan keeps source aspect while bounding its long edge`() {
         assertEquals(
             DagVideoLabCapturePlan(targetWidth = 512, targetHeight = 288),

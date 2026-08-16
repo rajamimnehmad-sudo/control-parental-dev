@@ -266,9 +266,12 @@
             }
             record.smoothActive = false;
             record.frameConcealed = true;
-            dependencies.finishFrameIfReady(record);
+            void dependencies.retireRecord(record, "frame_blocked");
           });
+        } else {
+          void dependencies.retireRecord(record, "frame_blocked");
         }
+        return;
       }
       dependencies.finishFrameIfReady(record);
     };

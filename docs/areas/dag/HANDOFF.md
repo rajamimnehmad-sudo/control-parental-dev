@@ -11,7 +11,7 @@ video y herramientas Diagnostic. Gradle es aislado; usar siempre
 ## Estado operativo
 
 - Rama `main` local; lote DAG modificado y no publicado.
-- DEV 217 candidata local; Diagnostic 80 automatico; extension integrada 2.0.37.
+- DEV 218 candidata local; Diagnostic 82 automatico; extension integrada 2.0.39.
 - Diagnostic es una herramienta temporal. LAB ya no se construye. Video de
   producto continua NO-GO.
 - R3.1, su umbral y la politica de imagen siguen siendo la referencia vigente.
@@ -108,6 +108,21 @@ prueba, un segundo YouTube distinto arranco automaticamente, llego a
 con 39 pestañas acumuladas agoto el decoder VP9 del A23 (`NO_MEMORY`); no fue una
 regresion del filtro y desaparecio al volver a una pestaña limpia.
 
+Diagnostic 82 corrige el bloqueo permanente denunciado en S22. Habia dos rutas:
+un `model_filter` pausaba y cubria el video pero no retiraba su registro, y un
+fallo posterior de confirmacion dejaba deliberadamente la cobertura nativa para
+siempre. Ahora el bloqueo del modelo oculta el cuadro, retira la autoridad exacta
+y espera el acuse durable. Si ese acuse no puede demostrarse, Android descarta
+la pestaña y sesion exactas antes de quitar la cobertura y recupera una pagina
+limpia; nunca exige borrar datos de navegacion. En A23 una corrida automatica
+reprodujo un bloqueo real a score 0,448: `frame_blocked -> closing -> revoke_ack
+-> retired`; un cierre tardio sin entrega activo la recuperacion secundaria.
+Tres segundos despues no habia cobertura, la pagina nueva era utilizable y el
+proceso seguia vivo, sin crash ni ANR. Suite JS 64/64 y contratos dirigidos
+verdes. Gates finales DEV/Diagnostic: unitarios, ktlint, lint y ambos assemble
+completos. DEV 218 SHA-256
+`5a07356f9a3c5ff6471a66820c5f7da79ea3801c5a1da46b09a35f3a463b76ef`.
+
 La saturacion tambien cerro una deuda general de pestañas: el A23 no sostiene de
 forma fiable decodificadores VP9 en tres sesiones Gecko abiertas. La politica
 local ahora conserva abierta solo la pestaña activa; las otras mantienen sus
@@ -143,7 +158,7 @@ Progreso ejecutivo DAG Video: 99%.
 
 ## Siguiente hito — matriz y promocion
 
-1. Mantener Diagnostic 80 como referencia automatica mientras se completa la
+1. Mantener Diagnostic 82 como referencia automatica mientras se completa la
    investigacion; no enviar APK por ahora.
 2. Cuando se cierre el lote, compilar una sola DEV con el mismo runtime universal
    y hacer una unica comprobacion humana S22.
