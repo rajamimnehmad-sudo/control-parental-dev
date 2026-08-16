@@ -10,12 +10,14 @@ video y herramientas Diagnostic. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`; 19 commits locales por delante de `origin/main`, sin push.
-- DEV 219 candidata; Diagnostic 83; extension integrada 2.0.40.
+- Rama `main`; al cerrar este lote quedara 21 commits por delante de
+  `origin/main`, sin push.
+- DEV 220 candidata; Diagnostic 85; extension integrada 2.0.42.
 - Diagnostic es temporal. LAB ya no se construye. No hay APK Production.
 - Fotos estan mas maduras y validadas que video. R3.1 y su politica vigente no
   cambiaron.
-- Video de producto continua NO-GO general hasta cerrar S22 y la matriz minima.
+- YouTube normal y sus controles basicos estan GO local. Video general continua
+  NO-GO hasta cerrar S22 y la matriz minima.
 
 ## Ticket activo — cierre DAG-VIDEO-03
 
@@ -41,28 +43,39 @@ entre muestras. El pipeline estricto con buffer A/V queda fuera del runtime.
   pausado, mudo y oculto; solo su rectangulo se mostro bordo y la pagina siguio
   utilizable. Una interaccion externa, navegacion o recarga retira el rectangulo
   para que no quede fijo sobre otro contenido.
+- Diagnostic 85 hace localizada tambien la cobertura de analisis: solo cubre el
+  rectangulo del video y deja visible/usable el resto de la pagina. En A23 la
+  cobertura inicial aparecio en 64 ms. Un doble toque `+10` retiro el grant
+  anterior con `revoke_ack`, creo revision 2, analizo dos cuadros y restauro
+  reproduccion fluida en ~2,1 s sin cerrar la pestaña. Los eventos repetidos de
+  un mismo gesto se agrupan bajo la misma cobertura; cambio de fuente/documento
+  sigue fail-closed. Sin crash ni ANR. PSS 232 MiB, RSS 249 MiB y CPU puntual
+  10% durante reproduccion. APK Diagnostic 85 SHA-256:
+  `71863c5b22ae342f5a152dd53c6170adf2a81100d8367f0df15969de148d6d4c`.
 - La politica de pestañas conserva abierta solo la sesion activa para evitar
   agotar decodificadores VP9 en dispositivos modestos.
-- Gates DEV/Diagnostic verdes: JS 64/64, unitarios, ktlint, lint y assemble.
+- Gates verdes: JS 70/70, unitarios DEV/Diagnostic, ktlint, lint DEV/Diagnostic
+  y assemble Diagnostic.
 - DEV 219 SHA-256:
   `9fd1b6ced4613602ba3a1fa144ee450e6365cc4b756c6bcccf277dcd1dd8ff96`.
 - Commits de cierre: `c5d8f332` y `a933c0f7`. Sin push ni publicacion.
 
 ## Pendiente inmediato
 
-1. Confirmar DEV 219 una vez en S22: reproduccion normal y bloqueo localizado.
-2. Mantener Diagnostic 83 solo como referencia hasta esa confirmacion.
+1. Construir una unica DEV 220 desde `main` integrado y confirmar en S22:
+   reproduccion, cobertura localizada, bloqueo bordo y doble toque `+10`.
+2. Mantener Diagnostic 85 solo como referencia hasta esa confirmacion.
 3. Shorts, anuncios, TikTok e Instagram siguen NO PROBADOS/NO-GO si no exponen
    un elemento de video estable. No crear excepciones por proveedor.
 4. Con matriz suficiente, promover el mismo runtime DEV y retirar Diagnostic del
    telefono de prueba.
 
-Progreso ejecutivo DAG Video: 99%.
+Progreso: base DAG Video/YouTube normal 99%; matriz premium general 85%.
 
-## Proximo ticket — DAG-VIDEO-CONTROLS-01
+## Ticket cerrado — DAG-VIDEO-CONTROLS-01
 
-Objetivo: adelantar, retroceder y mover la barra sin revelar el destino antes de
-analizarlo. Hoy `seeking` es terminal.
+Adelantar y retroceder ya no son terminales: el destino nunca se revela antes de
+reanalizarlo.
 
 Contrato a diseñar antes del runtime:
 
@@ -70,14 +83,13 @@ Contrato a diseñar antes del runtime:
 - revocar el grant anterior con identidad exacta;
 - esperar `seeked` y estabilidad de fuente/geometria;
 - abrir una autoridad nueva bajo cobertura y repetir los dos cuadros iniciales;
-- cualquier salto repetido, cambio de fuente, timeout o falta de acuse queda
-  fail-closed;
+- eventos repetidos del mismo gesto se agrupan; cambio de fuente, timeout o falta
+  de acuse queda fail-closed;
 - primero replay determinista; una sola APK fisica recien si el contrato pasa.
 
-El contrato puro ya esta aislado fuera del manifiesto: cubre los dos ordenes
-posibles entre `seeked` y el acuse nativo, exige estabilidad antes de rearmar y
-cierra ante repeticion, cambio, ambiguedad o timeout. Suite JS 67/67 verde. Aun
-no cambia el runtime, la version ni la APK.
+Estado y coordinador viven en modulos separados. Cubren los dos ordenes posibles
+entre `seeked` y el acuse nativo, exigen estabilidad y una autoridad nueva antes
+de rearmar. Validado automaticamente y en YouTube real A23.
 
 ## Backlog posterior
 

@@ -1724,6 +1724,8 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   const videoCapture = await readAsset("video-lab-capture.js");
   const videoViewport = await readAsset("video-lab-viewport.js");
   const videoBootstrap = await readAsset("video-lab-bootstrap.js");
+  const videoSeek = await readAsset("video-lab-seek.js");
+  const videoSeekState = await readAsset("video-seek-state.js");
   const videoDiagnostics = await readAsset("video-lab-diagnostics.js");
   const videoLab = await readAsset("video-lab.js");
   const presentationGuard = await readAsset("presentation-guard.js");
@@ -1741,6 +1743,8 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   new vm.Script(videoCapture);
   new vm.Script(videoViewport);
   new vm.Script(videoBootstrap);
+  new vm.Script(videoSeek);
+  new vm.Script(videoSeekState);
   new vm.Script(videoDiagnostics);
   new vm.Script(videoLab);
   assert.match(videoLab, /INITIAL_COVERED_CAPTURE_COUNT = 2/u);
@@ -1757,8 +1761,9 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoPlayback, /smoothGrantIdentity = Object\.freeze\(dependencies\.grantIdentity\(record\)\)/u);
   assert.match(videoLifecycle, /smoothGrantIdentity \?\? dependencies\.grantIdentity\(record\)/u);
   assert.match(videoLab, /video-lab-retire/u);
-  assert.match(videoLab, /retireRecord\(record, "seek_requested"\)/u);
-  assert.match(videoLab, /video\.addEventListener\("seeking", closeTimelineDiscontinuity\)/u);
+  assert.match(videoSeek, /retireRecord\(record, "seek_requested"\)/u);
+  assert.match(videoLab, /video\.addEventListener\("seeking", \(\) => seekController\?\.onSeeking\(record\)\)/u);
+  assert.match(videoLab, /video\.addEventListener\("seeked", \(\) => seekController\?\.onSeeked\(record\)\)/u);
   assert.match(videoPlayback, /record\.video\.muted = true/u);
   assert.match(videoIsolation, /video\.pause\(\)/u);
   assert.match(videoIsolation, /document\.querySelectorAll\("audio, video"\)/u);
@@ -1884,7 +1889,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoViewport, /dependencies\.fixtureEnabled\(\)[\s\S]*event\?\.type === "resize"[\s\S]*dependencies\.sameVideoRect/u);
   assert.match(background, /awaitVideoLabCloseProof/u);
   assert.match(background, /revoke_waiting_for_proof/u);
-  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-isolation.js",\s*"video-lab-lifecycle.js",\s*"video-lab-playback.js",\s*"video-lab-capture.js",\s*"video-lab-viewport.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
+  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-isolation.js",\s*"video-lab-lifecycle.js",\s*"video-lab-playback.js",\s*"video-lab-capture.js",\s*"video-lab-viewport.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-seek-state.js",\s*"video-lab-seek.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
 });
 
@@ -1967,6 +1972,8 @@ test("video laboratory silences dynamic unselected media in capture phase", asyn
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
+  vm.runInNewContext(await readAsset("video-seek-state.js"), context, { filename: "video-seek-state.js" });
+  vm.runInNewContext(await readAsset("video-lab-seek.js"), context, { filename: "video-lab-seek.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2145,6 +2152,8 @@ test("video laboratory ignores controls UI and closes on preventive capability m
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
+  vm.runInNewContext(await readAsset("video-seek-state.js"), context, { filename: "video-seek-state.js" });
+  vm.runInNewContext(await readAsset("video-lab-seek.js"), context, { filename: "video-lab-seek.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2396,6 +2405,8 @@ test("failed video conceal leaves terminal media isolation locked until native r
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
+  vm.runInNewContext(await readAsset("video-seek-state.js"), context, { filename: "video-seek-state.js" });
+  vm.runInNewContext(await readAsset("video-lab-seek.js"), context, { filename: "video-lab-seek.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2857,7 +2868,8 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.equal(protectionScript.js.includes("video-fluid-transport-benchmark.js"), false);
   assert.equal(protectionScript.js.includes("video-fluid-transport-runner.js"), false);
   assert.equal(protectionScript.js.includes("video-fluid-capability.js"), false);
-  assert.equal(protectionScript.js.includes("video-seek-state.js"), false);
+  assert.equal(protectionScript.js.includes("video-seek-state.js"), true);
+  assert.equal(protectionScript.js.includes("video-lab-seek.js"), true);
   assert.ok(protectionScript.js.indexOf("video-lab-geometry.js") <
     protectionScript.js.indexOf("video-lab-presentation.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-presentation.js") <
@@ -2881,6 +2893,10 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.ok(protectionScript.js.indexOf("video-bootstrap-state.js") <
     protectionScript.js.indexOf("video-lab-bootstrap.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-bootstrap.js") <
+    protectionScript.js.indexOf("video-seek-state.js"));
+  assert.ok(protectionScript.js.indexOf("video-seek-state.js") <
+    protectionScript.js.indexOf("video-lab-seek.js"));
+  assert.ok(protectionScript.js.indexOf("video-lab-seek.js") <
     protectionScript.js.indexOf("video-lab.js"));
   assert.ok(protectionScript.js.indexOf("video-lab.js") < protectionScript.js.indexOf("barrier.js"));
   assert.ok(protectionScript.js.indexOf("barrier.js") < protectionScript.js.indexOf("ads.js"));

@@ -70,6 +70,22 @@
       return phase;
     };
 
+    const observeSeeking = (snapshot) => {
+      if (
+        phase !== Phase.Closing &&
+        phase !== Phase.WaitingSeeked &&
+        phase !== Phase.Stabilizing
+      ) {
+        return terminal("seeking_unexpected");
+      }
+      if (!validSnapshot(snapshot) || !sameAuthority(origin, snapshot)) {
+        return terminal("seek_destination_invalid");
+      }
+      destination = null;
+      phase = revoked ? Phase.WaitingSeeked : Phase.Closing;
+      return phase;
+    };
+
     const settle = (snapshot) => {
       if (phase !== Phase.Stabilizing) return terminal("seek_settle_unexpected");
       if (
@@ -99,6 +115,7 @@
       begin,
       fail: (reason = "seek_failed") => terminal(reason),
       observeSeeked,
+      observeSeeking,
       phase: () => phase,
       reason: () => terminalReason,
       settle,

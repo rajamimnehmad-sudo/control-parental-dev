@@ -51,10 +51,12 @@ test("product smooth mode restores visible audible playback and revokes the orig
       super();
       this.attributes = new Map();
       this.currentSrc = "https://media.example.test/movie.mp4";
+      this.currentTime = 0;
       this.duration = 30;
       this.frameCallback = null;
       this.isConnected = true;
       this.readyState = 4;
+      this.seeking = false;
       this.remote = { state: "disconnected", addEventListener() {} };
       this.srcObject = null;
       this.playCalls = 0;
@@ -234,6 +236,12 @@ test("product smooth mode restores visible audible playback and revokes the orig
   });
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, {
     filename: "video-lab-bootstrap.js",
+  });
+  vm.runInNewContext(await readAsset("video-seek-state.js"), context, {
+    filename: "video-seek-state.js",
+  });
+  vm.runInNewContext(await readAsset("video-lab-seek.js"), context, {
+    filename: "video-lab-seek.js",
   });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({

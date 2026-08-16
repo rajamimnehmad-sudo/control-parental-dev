@@ -32,6 +32,18 @@ internal class DagVideoBlockedPlaceholderPresenter(
     }
 
     fun show(key: DagVideoLabKey): Boolean {
+        return showLocalized(key, blockedColor, clearOutside = true)
+    }
+
+    fun showProtection(key: DagVideoLabKey): Boolean {
+        return showLocalized(key, fullCoverColor, clearOutside = false)
+    }
+
+    private fun showLocalized(
+        key: DagVideoLabKey,
+        color: Int,
+        clearOutside: Boolean,
+    ): Boolean {
         if (targetKey != key) return false
         val surfaceRect = targetRect?.takeUnless(Rect::isEmpty) ?: return false
         val (originX, originY) = overlayOrigin()
@@ -40,17 +52,23 @@ internal class DagVideoBlockedPlaceholderPresenter(
         overlay.setBackgroundColor(Color.TRANSPARENT)
         overlay.isClickable = false
         overlay.isFocusable = false
-        overlay.setOnTouchListener { _, event ->
-            if (
-                event.actionMasked == MotionEvent.ACTION_DOWN &&
-                !displayRect.contains(event.x.toInt(), event.y.toInt())
-            ) {
-                clear()
-            }
-            false
-        }
+        overlay.setOnTouchListener(
+            if (clearOutside) {
+                View.OnTouchListener { _, event ->
+                    if (
+                        event.actionMasked == MotionEvent.ACTION_DOWN &&
+                        !displayRect.contains(event.x.toInt(), event.y.toInt())
+                    ) {
+                        clear()
+                    }
+                    false
+                }
+            } else {
+                null
+            },
+        )
         frame.setImageDrawable(null)
-        frame.setBackgroundColor(blockedColor)
+        frame.setBackgroundColor(color)
         frame.layoutParams =
             FrameLayout.LayoutParams(displayRect.width(), displayRect.height()).apply {
                 gravity = Gravity.TOP or Gravity.START
@@ -61,7 +79,7 @@ internal class DagVideoBlockedPlaceholderPresenter(
         frame.setOnTouchListener { _, _ -> true }
         frame.visibility = View.VISIBLE
         label.visibility = View.GONE
-        placeholderKey = key
+        placeholderKey = key.takeIf { clearOutside }
         overlay.visibility = View.VISIBLE
         overlay.bringToFront()
         return true
@@ -71,27 +89,17 @@ internal class DagVideoBlockedPlaceholderPresenter(
         if (placeholderKey?.tabId == tabId || targetKey?.tabId == tabId) clear()
     }
 
-    fun prepareFullCover() {
-        if (placeholderKey != null) clearFrame()
-        placeholderKey = null
-        overlay.setBackgroundColor(fullCoverColor)
-        overlay.isClickable = true
-        overlay.isFocusable = true
-        overlay.setOnTouchListener { _, _ -> true }
-        label.visibility = View.VISIBLE
-    }
-
     fun clear() {
         clearFrame()
         targetKey = null
         targetRect = null
         placeholderKey = null
         overlay.visibility = View.GONE
-        overlay.setBackgroundColor(fullCoverColor)
-        overlay.isClickable = true
-        overlay.isFocusable = true
-        overlay.setOnTouchListener { _, _ -> true }
-        label.visibility = View.VISIBLE
+        overlay.setBackgroundColor(Color.TRANSPARENT)
+        overlay.isClickable = false
+        overlay.isFocusable = false
+        overlay.setOnTouchListener(null)
+        label.visibility = View.GONE
     }
 
     private fun clearFrame() {

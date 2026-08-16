@@ -2,7 +2,6 @@
 
 (() => {
   if (globalThis.__gloshDagVideoLab !== undefined) return;
-
   const CONFIG_MESSAGE = "video-lab-config";
   const STATUS_MESSAGE = "video-lab-status";
   const DIAGNOSTIC_MESSAGE = "video-lab-diagnostic";
@@ -45,6 +44,8 @@
   const playbackRuntime = globalThis.__gloshDagVideoLabPlayback;
   const captureRuntime = globalThis.__gloshDagVideoLabCapture;
   const viewportRuntime = globalThis.__gloshDagVideoLabViewport;
+  const seekRuntime = globalThis.__gloshDagVideoLabSeek;
+  const seekStateRuntime = globalThis.__gloshDagVideoSeekState;
   if (
     diagnosticLabels === undefined ||
     geometry === undefined ||
@@ -56,7 +57,9 @@
     lifecycleRuntime === undefined ||
     playbackRuntime === undefined ||
     captureRuntime === undefined ||
-    viewportRuntime === undefined
+    viewportRuntime === undefined ||
+    seekRuntime === undefined ||
+    seekStateRuntime === undefined
   ) return;
   const {
     hasBackingMedia,
@@ -71,7 +74,6 @@
   const viewportSignature = (video) =>
     geometry.viewportSignature(video, innerWidth, innerHeight, globalThis.visualViewport);
   const visibleArea = (video) => geometry.visibleArea(video, innerWidth, innerHeight);
-
   let installed = false;
   let enabled = false;
   let protocolVersion = 0;
@@ -89,41 +91,36 @@
   let fixtureEnabled = false;
   let lastDiagnosticStage = "";
   let unsafePresentationBlocked = false;
+  let seekController = null;
   let lastViewportChangeAt = performance.now();
   const diagnosticStartedAt = performance.now();
   const timelineStages = new Set();
   const records = new WeakMap();
   const backingSnapshots = new WeakMap();
-
   const randomToken = (wordCount) => {
     const words = crypto.getRandomValues(new Uint32Array(wordCount));
     return Array.from(words, (word) => word.toString(16).padStart(8, "0")).join("");
   };
-
   const frameIdentity = (record) => ({
     frameSequence: record.frameSequence,
     viewportEpoch: record.frameViewportEpoch,
   });
-
   const grantIdentity = (record) => ({
     videoId: record.videoId,
     revision: record.revision,
     ...frameIdentity(record),
     token: record.revealToken,
   });
-
   const recordMatchesMessage = (record, message) =>
     record !== null &&
     record === activeRecord &&
     message?.videoId === record.videoId &&
     message?.revision === record.revision;
-
   const frameMatchesMessage = (record, message) =>
     recordMatchesMessage(record, message) &&
     record.framePending &&
     message?.frameSequence === record.frameSequence &&
     message?.viewportEpoch === record.frameViewportEpoch;
-
   const postRecord = (type, record, extra = {}) => {
     if (
       postToAndroid === null ||
@@ -140,7 +137,6 @@
     });
     return true;
   };
-
   // Diagnostic builds report only a finite state label. No URL, DOM, media
   // identifier or frame data leaves the content script through this path.
   const postDiagnostic = (stage) => {
@@ -154,7 +150,6 @@
       });
     } catch {}
   };
-
   const postTimeline = (stage) => {
     if (timelineStages.has(stage)) return;
     timelineStages.add(stage);
@@ -287,10 +282,6 @@
       }
     };
     const remote = video.remote;
-    const closeTimelineDiscontinuity = () => {
-      if (record !== activeRecord || record.retiring) return;
-      void retireRecord(record, "seek_requested");
-    };
     video.addEventListener("play", keepMuted);
     for (const type of ["play", "playing", "pause", "abort", "emptied", "waiting", "stalled"]) {
       video.addEventListener(type, reportPlaybackEvent);
@@ -299,7 +290,8 @@
       video.addEventListener(type, reportBackingEvent);
     }
     video.addEventListener("volumechange", keepMuted);
-    video.addEventListener("seeking", closeTimelineDiscontinuity);
+    video.addEventListener("seeking", () => seekController?.onSeeking(record));
+    video.addEventListener("seeked", () => seekController?.onSeeked(record));
     video.addEventListener("enterpictureinpicture", closeUnsafePresentation);
     video.addEventListener("leavepictureinpicture", closeUnsafePresentation);
     video.addEventListener("webkitbeginfullscreen", closeUnsafePresentation);
@@ -514,10 +506,26 @@
   };
 
   const scheduleScan = () => {
-    if (scanScheduled || unsafePresentationBlocked) return;
+    if (scanScheduled || unsafePresentationBlocked || seekController?.holdsScan() === true) return;
     scanScheduled = true;
     requestAnimationFrame(selectVisibleVideo);
   };
+
+  seekController = seekRuntime.create({
+    Phase: seekStateRuntime.Phase,
+    activeRecord: () => activeRecord,
+    clearTimeout: (timer) => clearTimeout(timer),
+    enforceMediaIsolation,
+    postDiagnostic,
+    retireRecord,
+    scheduleScan,
+    setTimeout: (callback, millis) => setTimeout(callback, millis),
+    settleMillis: VIEWPORT_SETTLE_MS,
+    sourceSignature,
+    stateRuntime: seekStateRuntime,
+    timeoutMillis: FRAME_READY_TIMEOUT_MS,
+    viewportSignature,
+  });
 
   const backgroundReady = async () => {
     for (let attempt = 0; attempt < MAX_STATUS_RETRIES; attempt += 1) {
@@ -767,7 +775,7 @@
           lastDiagnosticStage = "";
           postDiagnostic("config_enabled");
           enforceMediaIsolation();
-          scheduleScan();
+          if (seekController?.onNativeRearm() !== true) scheduleScan();
         } else {
           enabled = false;
           void retireRecord(activeRecord, "lab_disabled");
