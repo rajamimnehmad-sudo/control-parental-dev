@@ -10,9 +10,9 @@ video y herramientas Diagnostic. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`; al cerrar este lote quedara 21 commits por delante de
+- Rama `main`; al cerrar este lote quedara 22 commits por delante de
   `origin/main`, sin push.
-- DEV 220 candidata; Diagnostic 85; extension integrada 2.0.42.
+- DEV 220 candidata; Diagnostic 86; extension integrada 2.0.42.
 - Diagnostic es temporal. LAB ya no se construye. No hay APK Production.
 - Fotos estan mas maduras y validadas que video. R3.1 y su politica vigente no
   cambiaron.
@@ -62,9 +62,9 @@ entre muestras. El pipeline estricto con buffer A/V queda fuera del runtime.
 
 ## Pendiente inmediato
 
-1. Construir una unica DEV 220 desde `main` integrado y confirmar en S22:
-   reproduccion, cobertura localizada, bloqueo bordo y doble toque `+10`.
-2. Mantener Diagnostic 85 solo como referencia hasta esa confirmacion.
+1. Confirmar en S22 con Diagnostic 86: reproduccion, cobertura localizada,
+   bloqueo bordo, doble toque `+10` y un GIF seguro.
+2. Si pasa, incrementar y construir una unica DEV 221 desde `main` integrado.
 3. Shorts, anuncios, TikTok e Instagram siguen NO PROBADOS/NO-GO si no exponen
    un elemento de video estable. No crear excepciones por proveedor.
 4. Con matriz suficiente, promover el mismo runtime DEV y retirar Diagnostic del
@@ -91,16 +91,31 @@ Estado y coordinador viven en modulos separados. Cubren los dos ordenes posibles
 entre `seeked` y el acuse nativo, exigen estabilidad y una autoridad nueva antes
 de rearmar. Validado automaticamente y en YouTube real A23.
 
+## Ticket cerrado — DAG-ANIMATED-IMAGES-01 (GIF)
+
+Los GIF seguros ya se entregan animados sin bloquear la pagina. El contenedor se
+valida completo (2 MiB, 120 cuadros y 60 s maximos); todos los cuadros se
+decodifican y recorren por mosaicos, el modelo pesado corre a 2 fps y ante un
+cambio material, con maximo de 10 inferencias. Cualquier error, cuadro riesgoso o
+complejidad mayor reemplaza solo el GIF por el placeholder existente.
+
+En A23, Diagnostic 86 mostro animado dentro de Wikimedia un GIF de 357x334, 10
+cuadros/30 s y 20 KiB: 10 inferencias, `model_allow` en 2,06 s, pagina visible y
+usable durante todo el flujo. El control sintetico de 60 cuadros hizo 6
+inferencias en 944 ms. Instrumentacion 2/2, unitarios DEV/Diagnostic, ktlint,
+lint ambos, JS 70/70 y build Diagnostic verdes. APK SHA-256:
+`eb2f3cb271d7934a2a0252e91424bc18d8667904b230bb6dc878b67fa3a55a28`.
+WebP/AVIF animados siguen bloqueados de forma localizada hasta otro ticket.
+
 ## Backlog posterior
 
-- `DAG-ANIMATED-IMAGES-01`: GIF y formatos animados.
 - `DAG-PARTIAL-REDACTION-01`: blur/pixelado parcial con segmentacion espacial.
 - Adaptador universal para URLs directas MP4/visor multimedia interno de Gecko.
 
 ## Riesgos y deuda
 
-- El muestreo puede omitir apariciones muy breves; falta un detector barato de
-  cambio por cuadro calibrado.
+- El muestreo de video puede omitir apariciones muy breves; GIF ya recorre cada
+  cuadro con detector barato, pero video aun no comparte ese detector.
 - `DagBrowserActivity.kt` supera 4.700 lineas: no agregar responsabilidades.
   Cualquier estado nuevo debe vivir en componentes separados.
 - `video-lab.js` tiene 790 lineas: usar sus modulos existentes o uno nuevo; no

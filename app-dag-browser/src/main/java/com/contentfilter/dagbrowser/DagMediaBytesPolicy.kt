@@ -55,6 +55,7 @@ internal object DagMediaBytesPolicy {
         analyzer: DagImageAnalyzer = UnavailableDagImageAnalyzer,
         trace: DagMediaPipelineTrace? = null,
         workGuard: DagMediaWorkGuard = AlwaysCurrentDagMediaWork,
+        gifFrameDecoder: DagGifFrameDecoder = AndroidDagGifFrameDecoder,
     ): DagMediaDecision {
         if (!validEnvelope(payload)) return blocked(payload, InvalidPayloadReason)
         if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
@@ -65,6 +66,7 @@ internal object DagMediaBytesPolicy {
             analyzer,
             trace,
             workGuard,
+            gifFrameDecoder,
         )
     }
 
@@ -82,6 +84,7 @@ internal object DagMediaBytesPolicy {
         analyzer: DagImageAnalyzer,
         trace: DagMediaPipelineTrace?,
         workGuard: DagMediaWorkGuard,
+        gifFrameDecoder: DagGifFrameDecoder,
     ): DagMediaDecision {
         if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
         val bytes =
@@ -117,6 +120,22 @@ internal object DagMediaBytesPolicy {
                 if (!DagImageDecodeContract.hasSafeDimensions(bounds.width, bounds.height)) {
                     return blocked(payload, UnsafeDimensionsReason)
                 }
+            }
+            when (val gif = DagGifTimelineParser.parse(analysisBytes)) {
+                is DagGifTimelineResult.Animated ->
+                    return inspectAnimatedGif(
+                        payload = payload,
+                        bytes = analysisBytes,
+                        timeline = gif.timeline,
+                        analyzer = analyzer,
+                        trace = trace,
+                        workGuard = workGuard,
+                        decoder = gifFrameDecoder,
+                    )
+                is DagGifTimelineResult.Rejected -> return blocked(payload, gif.reason)
+                DagGifTimelineResult.NotGif,
+                DagGifTimelineResult.StaticGif,
+                -> Unit
             }
             if (!workGuard.canContinue()) return blocked(payload, AnalysisExpiredReason)
             return when (
@@ -183,6 +202,80 @@ internal object DagMediaBytesPolicy {
         }
     }
 
+    private fun inspectAnimatedGif(
+        payload: DagMediaBytesPayload,
+        bytes: ByteArray,
+        timeline: DagGifTimeline,
+        analyzer: DagImageAnalyzer,
+        trace: DagMediaPipelineTrace?,
+        workGuard: DagMediaWorkGuard,
+        decoder: DagGifFrameDecoder,
+    ): DagMediaDecision {
+        var inspectedFrames = 0
+        var analyzedFrames = 0
+        var maximumProbability = 0f
+        var terminalDecision: DagMediaDecision? = null
+        val selector = DagTemporalFrameSelector()
+        val decodeResult =
+            decoder.decode(bytes, timeline) { timelineFrame, frame ->
+                if (!workGuard.canContinue()) {
+                    terminalDecision = blocked(payload, AnalysisExpiredReason)
+                    return@decode false
+                }
+                inspectedFrames += 1
+                when (
+                    selector.select(
+                        frameIndex = inspectedFrames - 1,
+                        timeMillis = timelineFrame.sampleTimeMillis,
+                        image = frame,
+                    )
+                ) {
+                    DagTemporalFrameDecision.Skip -> return@decode true
+                    DagTemporalFrameDecision.Reject -> {
+                        terminalDecision =
+                            blocked(payload, AndroidDagGifFrameDecoder.DecodeMismatchReason)
+                        return@decode false
+                    }
+                    DagTemporalFrameDecision.Analyze -> Unit
+                }
+                if (analyzedFrames >= MaximumGifHeavyAnalyses) {
+                    terminalDecision = blocked(payload, AnimatedGifAnalysisLimitReason)
+                    return@decode false
+                }
+                analyzedFrames += 1
+                val decision =
+                    DagPreparedRasterPolicy.decide(
+                        candidateId = payload.candidateId,
+                        preparedImages = listOf(frame),
+                        analyzer = analyzer,
+                        trace = trace,
+                        workGuard = workGuard,
+                    )
+                maximumProbability = maxOf(maximumProbability, decision.filterProbability ?: 0f)
+                if (decision.action != DagMediaAction.Allow) terminalDecision = decision
+                decision.action == DagMediaAction.Allow
+            }
+        trace?.preparedImageCount = maxOf(trace.preparedImageCount, analyzedFrames)
+        terminalDecision?.let { return it.copy(imageWidth = timeline.width, imageHeight = timeline.height) }
+        if (
+            decodeResult != DagGifFrameDecodeResult.Completed ||
+            inspectedFrames != timeline.frames.size
+        ) {
+            val reason =
+                (decodeResult as? DagGifFrameDecodeResult.Rejected)?.reason
+                    ?: AndroidDagGifFrameDecoder.DecodeFailedReason
+            return blocked(payload, reason)
+        }
+        return DagMediaDecision(
+            candidateId = payload.candidateId,
+            action = DagMediaAction.Allow,
+            reason = DagOnDeviceImageAnalyzer.ModelAllowReason,
+            filterProbability = maximumProbability,
+            imageWidth = timeline.width,
+            imageHeight = timeline.height,
+        )
+    }
+
     private fun decodeTransportBytes(bytes: ByteArray): ByteArray? {
         val isGzip =
             bytes.size >= 2 &&
@@ -232,6 +325,8 @@ internal object DagMediaBytesPolicy {
     private const val MaxCandidateIdLength = 80
     private const val MaxUrlLength = 4_096
     const val MaxCaptureBytes = 2 * 1024 * 1024
+    const val MaximumGifHeavyAnalyses = 10
+    const val AnimatedGifAnalysisLimitReason = "gif_analysis_limit"
     private const val GzipMagicFirst: Byte = 0x1f
     private const val GzipMagicSecond: Byte = -117
     private const val MaxBase64Length = ((MaxCaptureBytes + 2) / 3) * 4
