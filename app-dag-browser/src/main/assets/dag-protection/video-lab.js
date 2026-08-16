@@ -19,11 +19,6 @@
   const TOKEN_ATTRIBUTE = "data-glosh-dag-video-lab-token";
   const PRESENTATION_GUARD_ATTRIBUTE = "data-glosh-dag-presentation-guard";
   const PRESENTATION_GUARD_VERSION = "1";
-  const PRESENTATION_CAPABILITY_ATTRIBUTES = new Set([
-    "disablepictureinpicture",
-    "disableremoteplayback",
-    "playsinline",
-  ]);
   // The diagnostic transport is intentionally finite even though it replays a
   // sequence. There is one raw compositor grant, capture and decision at once.
   const INITIAL_COVERED_CAPTURE_COUNT = 2;
@@ -40,7 +35,22 @@
   const MAX_COVERED_VIEWPORT_TRANSITIONS = 8;
   const INTERNAL_FIXTURE_ATTRIBUTE = "data-glosh-dag-video-lab-fixture";
   const diagnosticLabels = globalThis.__gloshDagVideoLabDiagnostics;
-  if (diagnosticLabels === undefined) return;
+  const geometry = globalThis.__gloshDagVideoLabGeometry;
+  const presentation = globalThis.__gloshDagVideoLabPresentation;
+  if (diagnosticLabels === undefined || geometry === undefined || presentation === undefined) return;
+  const {
+    hasBackingMedia,
+    sameVideoRect,
+    sameViewportBounds,
+    sameViewportSignature,
+    sourceIdentity,
+    sourceSignature,
+  } = geometry;
+  const PRESENTATION_CAPABILITY_ATTRIBUTES = presentation.CAPABILITY_ATTRIBUTES;
+  const rectPayload = (video) => geometry.rectPayload(video, innerWidth, innerHeight);
+  const viewportSignature = (video) =>
+    geometry.viewportSignature(video, innerWidth, innerHeight, globalThis.visualViewport);
+  const visibleArea = (video) => geometry.visibleArea(video, innerWidth, innerHeight);
 
   let installed = false;
   let enabled = false;
@@ -201,24 +211,8 @@
   // These are preventive HTML-media capabilities only. The native cover and
   // exact grant/revocation protocol remain the authority for fail-closed
   // presentation; a hostile MAIN world is not trusted by this helper.
-  const enforcePresentationCapabilities = (record) => {
-    const { video } = record;
-    if ("disablePictureInPicture" in video) {
-      rememberExpectedPresentationMutation(record, "disablepictureinpicture", () => {
-        video.disablePictureInPicture = true;
-      });
-    }
-    if ("disableRemotePlayback" in video) {
-      rememberExpectedPresentationMutation(record, "disableremoteplayback", () => {
-        video.disableRemotePlayback = true;
-      });
-    }
-    if ("playsInline" in video) {
-      rememberExpectedPresentationMutation(record, "playsinline", () => {
-        video.playsInline = true;
-      });
-    }
-  };
+  const enforcePresentationCapabilities = (record) =>
+    presentation.enforceCapabilities(record, rememberExpectedPresentationMutation);
 
   // A raw compositor grant is scoped to the selected video only.  Audio and
   // every other video stay both silent and paused for the entire diagnostic
@@ -429,47 +423,10 @@
     return record;
   };
 
-  const sourceIdentity = (video) => ({
-    currentSrc: video.currentSrc || "",
-    srcAttribute: video.getAttribute("src") || "",
-    hasSrcObject: video.srcObject !== null,
-    sourceChildren: [...video.querySelectorAll("source")]
-      .map((source) => `${source.getAttribute("src") || ""}:${source.getAttribute("type") || ""}`)
-      .join("|"),
-  });
-
-  const sourceSignature = (video) => Object.values(sourceIdentity(video)).join("::");
-
-  const presentationCapabilityFailure = (video) => {
-    if ("disablePictureInPicture" in video && video.disablePictureInPicture !== true) {
-      return "picture_in_picture";
-    }
-    if ("disableRemotePlayback" in video && video.disableRemotePlayback !== true) {
-      return "remote_playback";
-    }
-    if ("playsInline" in video && video.playsInline !== true) return "plays_inline";
-    return null;
-  };
+  const presentationCapabilityFailure = presentation.capabilityFailure;
 
   const presentationGuardReady = () =>
-    document.documentElement?.getAttribute(PRESENTATION_GUARD_ATTRIBUTE) ===
-      PRESENTATION_GUARD_VERSION;
-
-  const visibleArea = (video) => {
-    if (!video.isConnected) return 0;
-    const rect = video.getBoundingClientRect();
-    const width = Math.max(0, Math.min(rect.right, innerWidth) - Math.max(rect.left, 0));
-    const height = Math.max(0, Math.min(rect.bottom, innerHeight) - Math.max(rect.top, 0));
-    return width * height;
-  };
-
-  const hasBackingMedia = (video) => {
-    if (video.currentSrc) return true;
-    if ((video.getAttribute("src") || "") !== "") return true;
-    if (video.srcObject != null) return true;
-    return [...video.querySelectorAll("source")].some((source) =>
-      (source.getAttribute("src") || "") !== "");
-  };
+    presentation.guardReady(document, PRESENTATION_GUARD_ATTRIBUTE, PRESENTATION_GUARD_VERSION);
 
   const reportBackingTransition = (video) => {
     const next = {
@@ -492,52 +449,6 @@
     if (!previous.sourceObject && next.sourceObject) postTimeline("timeline_src_object_assigned");
     if (!previous.sourceChildren && next.sourceChildren) postTimeline("timeline_source_child_assigned");
   };
-
-  const rectPayload = (video) => {
-    const rect = video.getBoundingClientRect();
-    return {
-      left: rect.left,
-      top: rect.top,
-      width: rect.width,
-      height: rect.height,
-      viewportWidth: innerWidth,
-      viewportHeight: innerHeight,
-    };
-  };
-
-  const viewportSignature = (video) => {
-    const rect = video.getBoundingClientRect();
-    const visual = globalThis.visualViewport;
-    return [
-      innerWidth,
-      innerHeight,
-      visual?.width ?? null,
-      visual?.height ?? null,
-      visual?.offsetLeft ?? null,
-      visual?.offsetTop ?? null,
-      visual?.scale ?? null,
-      rect.left,
-      rect.top,
-      rect.width,
-      rect.height,
-    ];
-  };
-
-  const sameViewportSignature = (left, right) =>
-    left !== null &&
-    right !== null &&
-    left.length === right.length &&
-    left.every((value, index) => value === right[index]);
-
-  const sameVideoRect = (left, right) =>
-    left !== null &&
-    right !== null &&
-    left.slice(7, 11).every((value, index) => value === right[index + 7]);
-
-  const sameViewportBounds = (left, right) =>
-    left !== null &&
-    right !== null &&
-    left.slice(0, 7).every((value, index) => value === right[index]);
 
   const armBootstrapGeneration = (record) => {
     if (
@@ -644,17 +555,8 @@
     }
   };
 
-  const unsafePresentationReason = (record) => {
-    const remoteState = record.video.remote?.state;
-    if (!presentationGuardReady()) return "guard_unverified";
-    if (document.fullscreenElement !== null) return "fullscreen";
-    if (document.pictureInPictureElement != null) return "picture_in_picture";
-    if (record.video.webkitPresentationMode === "fullscreen") return "webkit_fullscreen";
-    if (record.video.webkitPresentationMode === "picture-in-picture") return "webkit_picture_in_picture";
-    if (record.video.webkitCurrentPlaybackTargetIsWireless === true) return "wireless_target";
-    if (remoteState !== undefined && remoteState !== "disconnected") return `remote_${remoteState}`;
-    return null;
-  };
+  const unsafePresentationReason = (record) =>
+    presentation.unsafeReason(record, document, presentationGuardReady());
 
   const unsafePresentationActive = (record) => unsafePresentationReason(record) !== null;
 

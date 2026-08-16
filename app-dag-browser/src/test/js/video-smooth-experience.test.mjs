@@ -196,6 +196,12 @@ test("product smooth mode restores visible audible playback and revokes the orig
   context.globalThis = context;
   context.window.top = context.window;
 
+  vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, {
+    filename: "video-lab-geometry.js",
+  });
+  vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, {
+    filename: "video-lab-presentation.js",
+  });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, {
     filename: "video-lab-diagnostics.js",
   });

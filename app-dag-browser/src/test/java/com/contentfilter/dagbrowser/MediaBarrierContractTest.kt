@@ -12,6 +12,7 @@ class MediaBarrierContractTest {
     private val background by lazy { extensionRoot.resolve("background.js").readText() }
     private val barrier by lazy { extensionRoot.resolve("barrier.js").readText() }
     private val videoLab by lazy { extensionRoot.resolve("video-lab.js").readText() }
+    private val videoPresentation by lazy { extensionRoot.resolve("video-lab-presentation.js").readText() }
     private val ads by lazy { extensionRoot.resolve("ads.js").readText() }
     private val schedulerGuard by lazy { extensionRoot.resolve("runaway-scheduler-guard.js").readText() }
     private val presentationGuard by lazy { extensionRoot.resolve("presentation-guard.js").readText() }
@@ -50,7 +51,7 @@ class MediaBarrierContractTest {
         assertContains(presentationGuard, "documentPictureInPicture")
         assertContains(presentationGuard, "webkitSetPresentationMode")
         assertContains(presentationGuard, "RemotePlayback")
-        assertContains(videoLab, "return \"guard_unverified\"")
+        assertContains(videoPresentation, "return \"guard_unverified\"")
         assertFalse(videoLab.contains("controlslist", ignoreCase = true))
     }
 

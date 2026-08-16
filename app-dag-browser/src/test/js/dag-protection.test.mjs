@@ -1714,6 +1714,8 @@ test("a stale native close removes a newer grant but never acknowledges the stal
 
 test("video laboratory transport is bounded and contains no provider exceptions", async () => {
   const background = await readAsset("background.js");
+  const videoGeometry = await readAsset("video-lab-geometry.js");
+  const videoPresentation = await readAsset("video-lab-presentation.js");
   const videoDiagnostics = await readAsset("video-lab-diagnostics.js");
   const videoLab = await readAsset("video-lab.js");
   const presentationGuard = await readAsset("presentation-guard.js");
@@ -1721,6 +1723,8 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   const fixture = await readAsset("video-lab-fixture.html");
   const fixtureScript = await readAsset("video-lab-fixture.js");
   const manifest = await readAsset("manifest.json");
+  new vm.Script(videoGeometry);
+  new vm.Script(videoPresentation);
   new vm.Script(videoDiagnostics);
   new vm.Script(videoLab);
   assert.match(videoLab, /INITIAL_COVERED_CAPTURE_COUNT = 2/u);
@@ -1761,9 +1765,9 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /remote\.addEventListener\("disconnect", closeUnsafePresentation\)/u);
   assert.match(videoLab, /webkitcurrentplaybacktargetiswirelesschanged/u);
   assert.match(videoLab, /const enforcePresentationCapabilities/u);
-  assert.match(videoLab, /video\.disablePictureInPicture = true/u);
-  assert.match(videoLab, /video\.disableRemotePlayback = true/u);
-  assert.match(videoLab, /video\.playsInline = true/u);
+  assert.match(videoPresentation, /video\.disablePictureInPicture = true/u);
+  assert.match(videoPresentation, /video\.disableRemotePlayback = true/u);
+  assert.match(videoPresentation, /video\.playsInline = true/u);
   assert.doesNotMatch(videoLab, /controlslist/iu);
   assert.match(videoLab, /attributeOldValue: true/u);
   assert.match(videoLab, /const mutationRequiresTerminalClose/u);
@@ -1780,7 +1784,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /FRAME_RESULT_TIMEOUT_MS = 2_500/u);
   assert.match(videoLab, /MAX_COVERED_VIEWPORT_TRANSITION_MS = 1_000/u);
   assert.match(videoLab, /MAX_COVERED_VIEWPORT_TRANSITIONS = 8/u);
-  assert.match(videoLab, /return "guard_unverified"/u);
+  assert.match(videoPresentation, /return "guard_unverified"/u);
   assert.match(presentationGuard, /requestPictureInPicture/u);
   assert.match(presentationGuard, /documentPictureInPicture/u);
   assert.match(presentationGuard, /webkitSetPresentationMode/u);
@@ -1842,7 +1846,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoDiagnostics, /backing_object_tracks_present/u);
   assert.match(videoDiagnostics, /backing_source_children_none/u);
   assert.match(videoDiagnostics, /backing_scheme_blob_media_source_like/u);
-  assert.match(videoLab, /const hasBackingMedia/u);
+  assert.match(videoGeometry, /const hasBackingMedia/u);
   assert.match(videoLab, /area > 0 && hasBackingMedia\(video\)/u);
   assert.match(videoLab, /document\.addEventListener\(type, scheduleScan, true\)/u);
   for (const event of ["loadstart", "durationchange", "loadedmetadata", "canplay"]) {
@@ -1864,7 +1868,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /fixtureEnabled && event\?\.type === "resize" && sameVideoRect/u);
   assert.match(background, /awaitVideoLabCloseProof/u);
   assert.match(background, /revoke_waiting_for_proof/u);
-  assert.match(manifest, /"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
+  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
 });
 
@@ -1935,6 +1939,8 @@ test("video laboratory silences dynamic unselected media in capture phase", asyn
   const initialAudio = new HTMLMediaElement();
   const initialVideo = new HTMLMediaElement();
   media.push(initialAudio, initialVideo);
+  vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
+  vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
@@ -2103,6 +2109,8 @@ test("video laboratory ignores controls UI and closes on preventive capability m
   const video = new HTMLVideoElement();
   media.push(video);
 
+  vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
+  vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
@@ -2344,6 +2352,8 @@ test("failed video conceal leaves terminal media isolation locked until native r
   const video = new HTMLVideoElement();
   const audio = new HTMLMediaElement();
   media.push(video, audio);
+  vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
+  vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
@@ -2807,6 +2817,10 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.equal(protectionScript.js.includes("video-fluid-transport-benchmark.js"), false);
   assert.equal(protectionScript.js.includes("video-fluid-transport-runner.js"), false);
   assert.equal(protectionScript.js.includes("video-fluid-capability.js"), false);
+  assert.ok(protectionScript.js.indexOf("video-lab-geometry.js") <
+    protectionScript.js.indexOf("video-lab-presentation.js"));
+  assert.ok(protectionScript.js.indexOf("video-lab-presentation.js") <
+    protectionScript.js.indexOf("video-lab-diagnostics.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-diagnostics.js") <
     protectionScript.js.indexOf("video-bootstrap-state.js"));
   assert.ok(protectionScript.js.indexOf("video-bootstrap-state.js") <
@@ -2828,6 +2842,92 @@ test("video diagnostics expose only a bounded relative ordering timeline", async
   assert.match(videoLab, /timeline_source_mutation/u);
   assert.match(videoLab, /timeline_reflow_observed/u);
   assert.doesNotMatch(videoLab, /elapsedMillis:[^\n]*(currentSrc|srcAttribute|srcObject)/u);
+});
+
+test("video geometry keeps source and viewport identity exact", async () => {
+  const context = { globalThis: null };
+  context.globalThis = context;
+  vm.runInNewContext(await readAsset("video-lab-geometry.js"), context);
+  const geometry = context.__gloshDagVideoLabGeometry;
+  const sources = [
+    { getAttribute: (name) => name === "src" ? "part-a.webm" : "video/webm" },
+    { getAttribute: (name) => name === "src" ? "part-b.webm" : "video/webm" },
+  ];
+  const video = {
+    currentSrc: "blob:opaque",
+    getAttribute: (name) => name === "src" ? "fallback.mp4" : null,
+    getBoundingClientRect: () => ({ bottom: 90, height: 80, left: -10, right: 110, top: 10, width: 120 }),
+    isConnected: true,
+    querySelectorAll: () => sources,
+    srcObject: null,
+  };
+
+  assert.equal(geometry.hasBackingMedia(video), true);
+  assert.equal(geometry.visibleArea(video, 100, 100), 8_000);
+  assert.deepEqual(JSON.parse(JSON.stringify(geometry.rectPayload(video, 100, 100))), {
+    left: -10,
+    top: 10,
+    width: 120,
+    height: 80,
+    viewportWidth: 100,
+    viewportHeight: 100,
+  });
+  const first = geometry.viewportSignature(video, 100, 100, {
+    width: 100,
+    height: 90,
+    offsetLeft: 0,
+    offsetTop: 10,
+    scale: 1,
+  });
+  const rectChanged = [...first];
+  rectChanged[7] = 1;
+  const viewportChanged = [...first];
+  viewportChanged[1] = 101;
+  assert.equal(geometry.sameViewportSignature(first, [...first]), true);
+  assert.equal(geometry.sameViewportSignature(first, rectChanged), false);
+  assert.equal(geometry.sameVideoRect(first, rectChanged), false);
+  assert.equal(geometry.sameViewportBounds(first, rectChanged), true);
+  assert.equal(geometry.sameVideoRect(first, viewportChanged), true);
+  assert.equal(geometry.sameViewportBounds(first, viewportChanged), false);
+  assert.match(geometry.sourceSignature(video), /^blob:opaque::fallback\.mp4::false::/u);
+  assert.equal(Object.isFrozen(geometry), true);
+});
+
+test("video presentation policy stays provider-neutral and fail-closed", async () => {
+  const context = { console };
+  context.globalThis = context;
+  vm.runInNewContext(await readAsset("video-lab-presentation.js"), context);
+  const policy = context.__gloshDagVideoLabPresentation;
+  const attributes = new Map([["data-guard", "1"]]);
+  const document = {
+    documentElement: { getAttribute: (name) => attributes.get(name) ?? null },
+    fullscreenElement: null,
+    pictureInPictureElement: null,
+  };
+  const video = {
+    disablePictureInPicture: false,
+    disableRemotePlayback: false,
+    playsInline: false,
+    remote: { state: "disconnected" },
+    webkitPresentationMode: "inline",
+    webkitCurrentPlaybackTargetIsWireless: false,
+  };
+  const mutations = [];
+  policy.enforceCapabilities({ video }, (_record, attribute, apply) => {
+    mutations.push(attribute);
+    apply();
+  });
+  assert.deepEqual(mutations, [
+    "disablepictureinpicture",
+    "disableremoteplayback",
+    "playsinline",
+  ]);
+  assert.equal(policy.capabilityFailure(video), null);
+  assert.equal(policy.guardReady(document, "data-guard", "1"), true);
+  assert.equal(policy.unsafeReason({ video }, document, true), null);
+  document.pictureInPictureElement = {};
+  assert.equal(policy.unsafeReason({ video }, document, true), "picture_in_picture");
+  assert.equal(policy.unsafeReason({ video }, document, false), "guard_unverified");
 });
 
 test("video diagnostic labels stay pure, finite and content-free", async () => {
