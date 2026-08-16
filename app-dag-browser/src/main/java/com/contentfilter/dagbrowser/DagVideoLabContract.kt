@@ -12,6 +12,41 @@ internal data class DagVideoLabKey(
     val revision: Int,
 )
 
+internal object DagVideoLabAutoplayPolicy {
+    fun allow(
+        autoplayPermission: Boolean,
+        diagnostics: Boolean,
+        armed: Boolean,
+        activeTab: Boolean,
+        exactHarnessDocument: Boolean,
+    ): Boolean =
+        autoplayPermission &&
+            diagnostics &&
+            armed &&
+            activeTab &&
+            exactHarnessDocument
+}
+
+internal object DagVideoProtectionActivationPolicy {
+    fun runtimeEnabled(
+        diagnostics: Boolean,
+        diagnosticHarnessArmed: Boolean,
+    ): Boolean = true
+
+    fun senderEnabled(
+        diagnostics: Boolean,
+        diagnosticHarnessArmed: Boolean,
+        diagnosticTarget: Boolean,
+        eligibleTopLevelDocument: Boolean,
+    ): Boolean =
+        eligibleTopLevelDocument &&
+            (
+                !diagnostics ||
+                    !diagnosticHarnessArmed ||
+                    diagnosticTarget
+            )
+}
+
 /**
  * Identifies one immutable captured video frame.
  *
@@ -33,18 +68,54 @@ internal data class DagVideoLabFrameKey(
     }
 }
 
+internal data class DagVideoLabGrantAuthority(
+    val frameKey: DagVideoLabFrameKey,
+    val token: String,
+) {
+    fun isValid(): Boolean = frameKey.isValid() && TokenPattern.matches(token)
+
+    fun proves(close: DagVideoLabCloseRequest): Boolean = close.frameKey == frameKey && close.grantToken == token
+
+    private companion object {
+        val TokenPattern = Regex("^[a-f0-9]{32}$")
+    }
+}
+
+internal object DagVideoLabGrantTabAuthority {
+    /**
+     * WebExtension tab ids and app tab ids are different namespaces in GeckoView. The exact
+     * document token, which Android issued for the protected load, is the cross-port authority.
+     */
+    fun resolveAndroidTabId(
+        backgroundTabId: Long,
+        documentToken: String,
+        tabDocuments: List<Pair<Long, String?>>,
+    ): Long? {
+        if (backgroundTabId < 0L || !DocumentTokenPattern.matches(documentToken)) return null
+        return tabDocuments.singleOrNull { it.second == documentToken }?.first
+    }
+
+    private val DocumentTokenPattern = Regex("^document_[a-f0-9]{1,16}$")
+}
+
 /**
  * A close request is acknowledged only after the extension has removed its temporary raw-video
  * permission. A nonce makes a late acknowledgement from an older close attempt harmless.
  */
 internal data class DagVideoLabCloseRequest(
     val key: DagVideoLabKey,
+    val frameKey: DagVideoLabFrameKey?,
+    val grantToken: String?,
     val nonce: String,
 ) {
     fun isValid(): Boolean = CloseNoncePattern.matches(nonce)
 
+    fun hasDurableIdentity(): Boolean =
+        frameKey?.videoKey == key && frameKey.isValid() && GrantTokenPattern.matches(grantToken.orEmpty())
+
     private companion object {
         val CloseNoncePattern = Regex("^[a-f0-9]{32}$")
+        val GrantTokenPattern = CloseNoncePattern
     }
 }
 
@@ -233,7 +304,7 @@ internal class DagVideoLabStateMachine {
             current.key != key ||
             current.state == DagVideoLabState.Closing ||
             current.state == DagVideoLabState.Blocked ||
-            !DagVideoLabCloseRequest(key, nonce).isValid()
+            !DagVideoLabCloseRequest(key, current.frameKey, null, nonce).isValid()
         ) {
             return false
         }
@@ -373,4 +444,14 @@ internal object DagVideoLabFixtureProbe {
         val channels = listOf(red(pixel), green(pixel), blue(pixel))
         return channels.min() >= 180 && channels.max() - channels.min() <= 50
     }
+}
+
+internal object DagVideoLabFixtureCapturePolicy {
+    const val RetryDelayMillis = 50L
+    private const val MaximumRetryAttempt = 3
+
+    fun shouldRetry(
+        fixture: Boolean,
+        attempt: Int,
+    ): Boolean = fixture && attempt in 0 until MaximumRetryAttempt
 }

@@ -78,7 +78,6 @@
       scheduleStyleCarrierDiagnostics();
     }
   });
-
   const postToAndroid = (message) => {
     if (window.top !== window || nativePort === null) return;
     try {

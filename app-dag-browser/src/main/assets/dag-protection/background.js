@@ -10,7 +10,13 @@ const VIDEO_LAB_REVEAL_MESSAGE = "video-lab-reveal-style";
 const VIDEO_LAB_CONCEAL_MESSAGE = "video-lab-conceal-style";
 const VIDEO_LAB_CLOSE_MESSAGE = "video-lab-close";
 const VIDEO_LAB_REVOKED_MESSAGE = "video-lab-revoked";
+const VIDEO_LAB_DIAGNOSTIC_MESSAGE = "video-lab-diagnostic";
+const VIDEO_LAB_GRANT_ACTIVE_MESSAGE = "video-lab-grant-active";
+const VIDEO_LAB_GRANT_ACTIVE_ACK_MESSAGE = "video-lab-grant-active-ack";
+const VIDEO_LAB_REVOCATION_PROOF_MESSAGE = "video-lab-revocation-proof";
 const VIDEO_LAB_TOKEN_ATTRIBUTE = "data-glosh-dag-video-lab-token";
+const VIDEO_LAB_JOURNAL_KEY = "videoLabRevocationJournalV1";
+const MAX_VIDEO_LAB_JOURNAL_RECORDS = 16;
 const IMAGE_MIME_PATTERN = /^image\//iu;
 const PAGE_AD_HOSTS = new Set([
   "doubleclick.net", "googlesyndication.com", "googleadservices.com",
@@ -53,6 +59,8 @@ let nativeInFlight = 0;
 let cachedReplacementBytes = 0;
 let diagnosticsEnabled = false;
 let videoLabEnabled = false;
+let videoLabDiagnosticsEnabled = false;
+let videoLabRecoveryStage = "recovery_pending";
 let diagnosticFlushTimer = null;
 const pendingNative = new Map();
 const pendingDecisions = new Map();
@@ -67,10 +75,9 @@ const diagnosticDecisions = new Map();
 const responseMetadataByRequest = new Map();
 const videoLabGrantsByTab = new Map();
 const videoLabCloseRequestsByTab = new Map();
-// This is deliberately process-local. A background restart loses the proof and
-// therefore keeps Android's cover rather than assuming a former user stylesheet
-// was revoked.
-const videoLabRevocationProofsByTab = new Map();
+const videoLabCloseProofTimersByTab = new Map();
+const videoLabGrantActiveAcksByTab = new Map();
+const videoLabRevocationJournalByTab = new Map();
 
 const validTabId = (value) => Number.isInteger(value) && value >= 0;
 const validDocumentToken = (value) =>
@@ -78,6 +85,9 @@ const validDocumentToken = (value) =>
 const validVideoLabToken = (value) =>
   typeof value === "string" && /^[a-f0-9]{32}$/u.test(value);
 const validVideoLabCloseNonce = validVideoLabToken;
+const validVideoLabId = (value) =>
+  typeof value === "string" && /^video_[a-f0-9]{16}$/u.test(value);
+const validVideoLabCounter = (value) => Number.isInteger(value) && value >= 1 && value <= 1_000_000;
 const boundedDiagnosticUrl = (value) => typeof value === "string" ? value.slice(0, 4_096) : "";
 const newDocumentKey = () =>
   `document_${crypto.getRandomValues(new Uint32Array(1))[0].toString(16)}`;
@@ -98,34 +108,163 @@ const postDocumentLifecycle = (type, state) => {
   } catch {}
 };
 
-const isVideoLabFixtureSender = (sender) =>
-  sender?.url === browser.runtime.getURL("video-lab-fixture.html");
-
 const isVideoLabEligibleSender = (sender) =>
   sender?.frameId === 0 &&
-  (isVideoLabFixtureSender(sender) || /^https:\/\//iu.test(sender?.url || ""));
+  /^https:\/\//iu.test(sender?.url || "");
 
 const videoLabCss = (token) =>
-  `[${VIDEO_LAB_TOKEN_ATTRIBUTE}="${token}"] { visibility: visible !important; }`;
+  `:root [${VIDEO_LAB_TOKEN_ATTRIBUTE}="${token}"] { ` +
+  "visibility: visible !important; opacity: 1 !important; }";
 
-const hasVideoLabRevocationProof = (tabId, documentToken) =>
-  videoLabRevocationProofsByTab.get(tabId)?.has(documentToken) === true;
+const videoLabGrantIdentity = (value) => ({
+  tabId: value?.tabId,
+  documentToken: value?.documentToken,
+  videoId: value?.videoId,
+  revision: value?.revision,
+  viewportEpoch: value?.viewportEpoch,
+  frameSequence: value?.frameSequence,
+  token: value?.token,
+});
 
-const clearVideoLabRevocationProof = (tabId, documentToken) => {
-  const proofs = videoLabRevocationProofsByTab.get(tabId);
-  if (proofs === undefined) return;
-  proofs.delete(documentToken);
-  if (proofs.size === 0) videoLabRevocationProofsByTab.delete(tabId);
-};
+const validVideoLabGrantIdentity = (value) =>
+  validTabId(value?.tabId) &&
+  validDocumentToken(value?.documentToken) &&
+  validVideoLabId(value?.videoId) &&
+  validVideoLabCounter(value?.revision) &&
+  validVideoLabCounter(value?.viewportEpoch) &&
+  validVideoLabCounter(value?.frameSequence) &&
+  validVideoLabToken(value?.token);
 
-const markVideoLabRevocationProof = (tabId, documentToken) => {
-  let proofs = videoLabRevocationProofsByTab.get(tabId);
-  if (proofs === undefined) {
-    proofs = new Set();
-    videoLabRevocationProofsByTab.set(tabId, proofs);
+const sameVideoLabGrantIdentity = (left, right) =>
+  validVideoLabGrantIdentity(left) &&
+  validVideoLabGrantIdentity(right) &&
+  left.tabId === right.tabId &&
+  left.documentToken === right.documentToken &&
+  left.videoId === right.videoId &&
+  left.revision === right.revision &&
+  left.viewportEpoch === right.viewportEpoch &&
+  left.frameSequence === right.frameSequence &&
+  left.token === right.token;
+
+const VIDEO_LAB_JOURNAL_STATES = new Set(["active", "revoked", "retired"]);
+
+const persistVideoLabJournal = async () => {
+  const records = [...videoLabRevocationJournalByTab.values()];
+  if (records.length > MAX_VIDEO_LAB_JOURNAL_RECORDS) return false;
+  try {
+    await browser.storage.local.set({ [VIDEO_LAB_JOURNAL_KEY]: records });
+    return true;
+  } catch {
+    return false;
   }
-  proofs.add(documentToken);
 };
+
+const writeVideoLabJournal = async (identity, state) => {
+  if (!validVideoLabGrantIdentity(identity) || !VIDEO_LAB_JOURNAL_STATES.has(state)) return false;
+  const previous = videoLabRevocationJournalByTab.get(identity.tabId);
+  if (
+    previous?.state === "active" &&
+    !sameVideoLabGrantIdentity(previous, identity)
+  ) return false;
+  if (
+    !videoLabRevocationJournalByTab.has(identity.tabId) &&
+    videoLabRevocationJournalByTab.size >= MAX_VIDEO_LAB_JOURNAL_RECORDS
+  ) return false;
+  videoLabRevocationJournalByTab.set(identity.tabId, {
+    ...videoLabGrantIdentity(identity),
+    state,
+  });
+  if (await persistVideoLabJournal()) return true;
+  if (previous === undefined) videoLabRevocationJournalByTab.delete(identity.tabId);
+  else videoLabRevocationJournalByTab.set(identity.tabId, previous);
+  return false;
+};
+
+const hasVideoLabClosureProof = (identity) => {
+  const record = videoLabRevocationJournalByTab.get(identity?.tabId);
+  return ["revoked", "retired"].includes(record?.state) &&
+    sameVideoLabGrantIdentity(record, identity);
+};
+
+const videoLabTabIsConfirmedAbsent = async (tabId) => {
+  try {
+    const tabs = await browser.tabs.query({});
+    if (!Array.isArray(tabs) || tabs.some((tab) => !validTabId(tab?.id))) return false;
+    return !tabs.some((tab) => tab.id === tabId);
+  } catch {
+    return false;
+  }
+};
+
+const retireVideoLabJournalForReplacedDocument = async (tabId, currentDocumentToken) => {
+  const record = videoLabRevocationJournalByTab.get(tabId);
+  if (
+    record?.state !== "active" ||
+    !validDocumentToken(currentDocumentToken) ||
+    record.documentToken === currentDocumentToken
+  ) return false;
+  if (!await writeVideoLabJournal(record, "retired")) return false;
+  postVideoLabDiagnostic("recovery_document_retired");
+  return true;
+};
+
+const recoverVideoLabRevocationJournal = async () => {
+  let stored;
+  try {
+    stored = (await browser.storage.local.get(VIDEO_LAB_JOURNAL_KEY))?.[VIDEO_LAB_JOURNAL_KEY];
+  } catch {
+    videoLabRecoveryStage = "recovery_storage_read_failed";
+    return;
+  }
+  if (stored === undefined) {
+    videoLabRecoveryStage = "recovery_storage_empty";
+    return;
+  }
+  if (!Array.isArray(stored) || stored.length > MAX_VIDEO_LAB_JOURNAL_RECORDS) {
+    videoLabRecoveryStage = "recovery_storage_invalid";
+    return;
+  }
+  for (const record of stored) {
+    if (!validVideoLabGrantIdentity(record) || !VIDEO_LAB_JOURNAL_STATES.has(record.state)) continue;
+    videoLabRevocationJournalByTab.set(record.tabId, {
+      ...videoLabGrantIdentity(record),
+      state: record.state,
+    });
+  }
+  for (const record of [...videoLabRevocationJournalByTab.values()]) {
+    if (record.state !== "active") continue;
+    try {
+      await browser.tabs.removeCSS(record.tabId, {
+        code: videoLabCss(record.token),
+        cssOrigin: "user",
+        frameId: 0,
+      });
+    } catch {
+      if (await videoLabTabIsConfirmedAbsent(record.tabId)) {
+        if (!await writeVideoLabJournal(record, "retired")) {
+          videoLabRecoveryStage = "recovery_storage_write_failed";
+          continue;
+        }
+        videoLabRecoveryStage = "recovery_tab_retired";
+        continue;
+      }
+      videoLabRecoveryStage = "recovery_remove_failed";
+      continue;
+    }
+    if (!await writeVideoLabJournal(record, "revoked")) {
+      videoLabRecoveryStage = "recovery_storage_write_failed";
+      continue;
+    }
+    videoLabRecoveryStage = "recovery_active_removed";
+  }
+  if (videoLabRecoveryStage === "recovery_pending") {
+    videoLabRecoveryStage = videoLabRevocationJournalByTab.size > 0
+      ? "recovery_proof_loaded"
+      : "recovery_storage_empty";
+  }
+};
+
+const videoLabJournalReady = recoverVideoLabRevocationJournal();
 
 const postVideoLabRevoked = (request) => {
   if (nativePort === null || request === undefined) return;
@@ -135,15 +274,92 @@ const postVideoLabRevoked = (request) => {
       version: PROTOCOL_VERSION,
       tabId: request.tabId,
       documentToken: request.documentToken,
+      videoId: request.videoId,
+      revision: request.revision,
+      viewportEpoch: request.viewportEpoch,
+      frameSequence: request.frameSequence,
+      token: request.token,
       closeNonce: request.closeNonce,
+    });
+  } catch {}
+};
+
+const postVideoLabGrantState = (type, identity) => {
+  if (nativePort === null || !validVideoLabGrantIdentity(identity)) return false;
+  try {
+    nativePort.postMessage({
+      type,
+      version: PROTOCOL_VERSION,
+      ...videoLabGrantIdentity(identity),
+    });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const awaitVideoLabGrantActiveAck = async (grant) => {
+  if (!postVideoLabGrantState(VIDEO_LAB_GRANT_ACTIVE_MESSAGE, grant)) return false;
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => {
+      if (videoLabGrantActiveAcksByTab.get(grant.tabId)?.grant !== grant) return;
+      videoLabGrantActiveAcksByTab.delete(grant.tabId);
+      resolve(false);
+    }, 500);
+    videoLabGrantActiveAcksByTab.set(grant.tabId, { grant, resolve, timer });
+  });
+};
+
+const acceptVideoLabGrantActiveAck = (message) => {
+  const pending = videoLabGrantActiveAcksByTab.get(message?.tabId);
+  if (pending === undefined || !sameVideoLabGrantIdentity(pending.grant, message)) return;
+  clearTimeout(pending.timer);
+  videoLabGrantActiveAcksByTab.delete(message.tabId);
+  pending.resolve(true);
+};
+
+const postVideoLabDiagnostic = (stage) => {
+  if (!videoLabDiagnosticsEnabled || nativePort === null) return;
+  try {
+    nativePort.postMessage({
+      type: VIDEO_LAB_DIAGNOSTIC_MESSAGE,
+      version: PROTOCOL_VERSION,
+      stage,
     });
   } catch {}
 };
 
 const acknowledgeVideoLabClose = (request) => {
   if (videoLabCloseRequestsByTab.get(request.tabId) !== request) return;
+  clearTimeout(videoLabCloseProofTimersByTab.get(request.tabId));
+  videoLabCloseProofTimersByTab.delete(request.tabId);
   videoLabCloseRequestsByTab.delete(request.tabId);
+  postVideoLabDiagnostic("revoke_ack_posted");
   postVideoLabRevoked(request);
+};
+
+const awaitVideoLabCloseProof = (request) => {
+  clearTimeout(videoLabCloseProofTimersByTab.get(request.tabId));
+  videoLabCloseRequestsByTab.set(request.tabId, request);
+  const timer = setTimeout(() => {
+    videoLabCloseProofTimersByTab.delete(request.tabId);
+    if (videoLabCloseRequestsByTab.get(request.tabId) !== request) return;
+    const grant = videoLabGrantsByTab.get(request.tabId);
+    if (grant?.documentToken === request.documentToken) {
+      void removeVideoLabGrant(request.tabId, grant.token);
+      return;
+    }
+    if (hasVideoLabClosureProof(request)) {
+      acknowledgeVideoLabClose(request);
+      return;
+    }
+    postVideoLabDiagnostic(
+      videoLabRevocationJournalByTab.has(request.tabId)
+        ? "revoke_proof_document_mismatch"
+        : "revoke_no_grant_no_proof",
+    );
+  }, 100);
+  videoLabCloseProofTimersByTab.set(request.tabId, timer);
 };
 
 const removeVideoLabGrant = async (tabId, expectedToken = null) => {
@@ -156,7 +372,9 @@ const removeVideoLabGrant = async (tabId, expectedToken = null) => {
   grant.closePromise = (async () => {
     const inserted = await grant.insertionPromise;
     if (!inserted) {
-      markVideoLabRevocationProof(tabId, grant.documentToken);
+      if (!await writeVideoLabJournal(grant, "revoked")) return false;
+      postVideoLabDiagnostic("revoke_proof_marked");
+      postVideoLabGrantState(VIDEO_LAB_REVOCATION_PROOF_MESSAGE, grant);
       if (videoLabGrantsByTab.get(tabId) === grant) videoLabGrantsByTab.delete(tabId);
       const closeRequest = videoLabCloseRequestsByTab.get(tabId);
       if (closeRequest?.documentToken === grant.documentToken) {
@@ -174,7 +392,12 @@ const removeVideoLabGrant = async (tabId, expectedToken = null) => {
       grant.closePromise = null;
       return false;
     }
-    markVideoLabRevocationProof(tabId, grant.documentToken);
+    if (!await writeVideoLabJournal(grant, "revoked")) {
+      grant.closePromise = null;
+      return false;
+    }
+    postVideoLabDiagnostic("revoke_proof_marked");
+    postVideoLabGrantState(VIDEO_LAB_REVOCATION_PROOF_MESSAGE, grant);
     if (videoLabGrantsByTab.get(tabId) === grant) videoLabGrantsByTab.delete(tabId);
     const closeRequest = videoLabCloseRequestsByTab.get(tabId);
     if (closeRequest?.documentToken === grant.documentToken) {
@@ -204,15 +427,26 @@ const hasCurrentVideoLabGrant = (details) => {
     grant.documentToken === state.documentToken;
 };
 
-const closeVideoLabFromNative = (message) => {
+const closeVideoLabFromNative = async (message) => {
+  await videoLabJournalReady;
   if (
     !validTabId(message?.tabId) ||
     !validDocumentToken(message?.documentToken) ||
+    !validVideoLabId(message?.videoId) ||
+    !validVideoLabCounter(message?.revision) ||
+    !validVideoLabCounter(message?.viewportEpoch) ||
+    !validVideoLabCounter(message?.frameSequence) ||
+    !validVideoLabToken(message?.token) ||
     !validVideoLabCloseNonce(message?.closeNonce)
   ) return;
   const request = {
     tabId: message.tabId,
     documentToken: message.documentToken,
+    videoId: message.videoId,
+    revision: message.revision,
+    viewportEpoch: message.viewportEpoch,
+    frameSequence: message.frameSequence,
+    token: message.token,
     closeNonce: message.closeNonce,
   };
   // Native keeps its opaque cover until it sees this exact acknowledgement.
@@ -221,10 +455,21 @@ const closeVideoLabFromNative = (message) => {
   videoLabEnabled = false;
   const grant = videoLabGrantsByTab.get(message.tabId);
   if (grant === undefined) {
+    // GeckoView can briefly keep two background contexts during native-port
+    // reconnection. Refresh the durable journal at close time so a context
+    // whose startup snapshot predates another context's removal cannot treat
+    // its stale memory as authoritative.
+    if (!hasVideoLabClosureProof(request)) {
+      await recoverVideoLabRevocationJournal();
+    }
     // A missing in-memory grant is not enough after a background restart: a
     // user stylesheet may still exist. Only this process's successful removal
     // (or a failed insertion) proves that this exact tab/document is closed.
-    if (!hasVideoLabRevocationProof(message.tabId, message.documentToken)) return;
+    if (!hasVideoLabClosureProof(request)) {
+      postVideoLabDiagnostic("revoke_waiting_for_proof");
+      awaitVideoLabCloseProof(request);
+      return;
+    }
     videoLabCloseRequestsByTab.set(message.tabId, request);
     acknowledgeVideoLabClose(request);
     return;
@@ -232,11 +477,13 @@ const closeVideoLabFromNative = (message) => {
   // Never let an old close request revoke or acknowledge a newer document's
   // grant. It remains denied by videoLabEnabled=false and its CSS is still
   // removed immediately; only the stale acknowledgement is withheld.
-  if (grant.documentToken !== message.documentToken) {
+  if (!sameVideoLabGrantIdentity(grant, request)) {
+    postVideoLabDiagnostic("revoke_document_mismatch");
     void removeVideoLabGrant(message.tabId, grant.token);
     return;
   }
   videoLabCloseRequestsByTab.set(message.tabId, request);
+  postVideoLabDiagnostic("revoke_remove_requested");
   void removeVideoLabGrant(message.tabId, grant.token);
 };
 
@@ -632,7 +879,11 @@ const connectNative = () => {
     }
     port.onMessage.addListener((message) => {
       if (message?.type === VIDEO_LAB_CLOSE_MESSAGE && message?.version === PROTOCOL_VERSION) {
-        closeVideoLabFromNative(message);
+        void closeVideoLabFromNative(message);
+        return;
+      }
+      if (message?.type === VIDEO_LAB_GRANT_ACTIVE_ACK_MESSAGE && message?.version === PROTOCOL_VERSION) {
+        acceptVideoLabGrantActiveAck(message);
         return;
       }
       if (message?.type === "media-diagnostics-config" && message?.version === PROTOCOL_VERSION) {
@@ -648,6 +899,8 @@ const connectNative = () => {
         return;
       }
       if (message?.type === "video-lab-config" && message?.version === PROTOCOL_VERSION) {
+        videoLabDiagnosticsEnabled = message.diagnostics === true;
+        postVideoLabDiagnostic(videoLabRecoveryStage);
         videoLabEnabled = message.enabled === true;
         if (!videoLabEnabled) revokeAllVideoLabGrants();
         return;
@@ -1076,28 +1329,57 @@ browser.runtime.onMessage.addListener((message, sender) => {
       !isCurrentDocument(state) ||
       state.pageUrl !== sender.url ||
       state.documentToken !== message.documentToken ||
+      !validVideoLabId(message.videoId) ||
+      !validVideoLabCounter(message.revision) ||
+      !validVideoLabCounter(message.viewportEpoch) ||
+      !validVideoLabCounter(message.frameSequence) ||
       !validVideoLabToken(message.token)
     ) {
-      return Promise.resolve({ inserted: false });
+      const reason = !videoLabEnabled
+        ? "background_disabled"
+        : !isVideoLabEligibleSender(sender)
+          ? "sender_ineligible"
+          : !isCurrentDocument(state)
+            ? "document_not_current"
+            : state.pageUrl !== sender.url
+              ? "url_mismatch"
+              : state.documentToken !== message.documentToken
+                ? "document_mismatch"
+                : "token_invalid";
+      return Promise.resolve({ inserted: false, reason });
     }
     return (async () => {
+      await videoLabJournalReady;
+      await retireVideoLabJournalForReplacedDocument(tabId, state.documentToken);
       // One CSS grant is one raw compositor frame. Replacing an outstanding
       // grant would create a window where a failed revocation looks like a
       // successful new authorization, so an opening is registered before its
       // asynchronous CSS insertion begins.
-      if (videoLabGrantsByTab.has(tabId)) return { inserted: false };
+      if (videoLabGrantsByTab.has(tabId)) return { inserted: false, reason: "grant_exists" };
       const css = videoLabCss(message.token);
       const grant = {
         css,
+        tabId,
         documentState: state,
         documentToken: state.documentToken,
+        videoId: message.videoId,
+        revision: message.revision,
+        viewportEpoch: message.viewportEpoch,
+        frameSequence: message.frameSequence,
         token: message.token,
         inserted: false,
         closing: false,
         closePromise: null,
         insertionPromise: null,
       };
-      clearVideoLabRevocationProof(tabId, state.documentToken);
+      if (!await writeVideoLabJournal(grant, "active")) {
+        return { inserted: false, reason: "journal_unavailable" };
+      }
+      if (!await awaitVideoLabGrantActiveAck(grant)) {
+        await writeVideoLabJournal(grant, "revoked");
+        return { inserted: false, reason: "native_journal_unavailable" };
+      }
+      postVideoLabDiagnostic("revoke_proof_cleared");
       videoLabGrantsByTab.set(tabId, grant);
       grant.insertionPromise = Promise.resolve().then(() => browser.tabs.insertCSS(tabId, {
           code: css,
@@ -1109,9 +1391,14 @@ browser.runtime.onMessage.addListener((message, sender) => {
         }).catch(() => false);
       const inserted = await grant.insertionPromise;
       if (!inserted) {
-        markVideoLabRevocationProof(tabId, grant.documentToken);
+        if (!await writeVideoLabJournal(grant, "revoked")) {
+          grant.closing = true;
+          return { inserted: false, reason: "journal_unavailable" };
+        }
+        postVideoLabDiagnostic("revoke_proof_marked");
+        postVideoLabGrantState(VIDEO_LAB_REVOCATION_PROOF_MESSAGE, grant);
         if (videoLabGrantsByTab.get(tabId) === grant) videoLabGrantsByTab.delete(tabId);
-        return { inserted: false };
+        return { inserted: false, reason: "insert_failed" };
       }
       if (
         videoLabGrantsByTab.get(tabId) !== grant ||
@@ -1121,7 +1408,7 @@ browser.runtime.onMessage.addListener((message, sender) => {
         state.documentToken !== grant.documentToken
       ) {
         await removeVideoLabGrant(tabId, grant.token);
-        return { inserted: false };
+        return { inserted: false, reason: "insert_invalidated" };
       }
       return { inserted: true };
     })();
@@ -1134,6 +1421,10 @@ browser.runtime.onMessage.addListener((message, sender) => {
       !isVideoLabEligibleSender(sender) ||
       !validTabId(sender?.tab?.id) ||
       !validDocumentToken(message.documentToken) ||
+      !validVideoLabId(message.videoId) ||
+      !validVideoLabCounter(message.revision) ||
+      !validVideoLabCounter(message.viewportEpoch) ||
+      !validVideoLabCounter(message.frameSequence) ||
       !validVideoLabToken(message.token)
     ) {
       return Promise.resolve({ removed: false });
@@ -1147,19 +1438,30 @@ browser.runtime.onMessage.addListener((message, sender) => {
     const grant = videoLabGrantsByTab.get(sender.tab.id);
     if (
       grant?.documentState?.pageUrl !== sender.url ||
-      grant.documentToken !== message.documentToken
+      !sameVideoLabGrantIdentity(grant, {
+        tabId: sender.tab.id,
+        documentToken: message.documentToken,
+        videoId: message.videoId,
+        revision: message.revision,
+        viewportEpoch: message.viewportEpoch,
+        frameSequence: message.frameSequence,
+        token: message.token,
+      })
     ) return Promise.resolve({ removed: false });
     return removeVideoLabGrant(sender.tab.id, message.token).then((removed) => ({ removed }));
   }
   if (message?.type === "video-lab-status" && message?.version === PROTOCOL_VERSION) {
     const state = validTabId(sender?.tab?.id) ? documentStatesByTab.get(sender.tab.id) : null;
+    postVideoLabDiagnostic("background_status_received");
+    const enabled =
+      videoLabEnabled &&
+      isVideoLabEligibleSender(sender) &&
+      isCurrentDocument(state) &&
+      state.documentToken === message.documentToken &&
+      videoLabGrantsByTab.get(sender.tab.id)?.closing !== true;
+    postVideoLabDiagnostic(enabled ? "background_status_enabled" : "background_status_rejected");
     return Promise.resolve({
-      enabled:
-        videoLabEnabled &&
-        isVideoLabEligibleSender(sender) &&
-        isCurrentDocument(state) &&
-        state.documentToken === message.documentToken &&
-        videoLabGrantsByTab.get(sender.tab.id)?.closing !== true,
+      enabled,
     });
   }
   if (

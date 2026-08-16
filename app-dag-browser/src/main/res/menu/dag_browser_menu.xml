@@ -44,6 +44,9 @@
                 android:id="@+id/menu_video_lab"
                 android:title="@string/video_lab_open" />
             <item
+                android:id="@+id/menu_video_harness"
+                android:title="@string/video_lab_current_page" />
+            <item
                 android:id="@+id/menu_about"
                 android:title="@string/about_dag" />
         </menu>

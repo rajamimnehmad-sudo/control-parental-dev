@@ -43,8 +43,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 215
-        versionName = "0.70.19"
+        versionCode = 217
+        versionName = "0.70.21"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -78,7 +78,7 @@ android {
         create("diagnostic") {
             dimension = "distribution"
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 15
+            versionCode = 80
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
@@ -156,7 +156,12 @@ val testDagProtectionJs =
         group = "verification"
         description = "Runs the network-free DAG WebExtension security harness."
         workingDir = projectDir
-        commandLine("node", "--test", "src/test/js/dag-protection.test.mjs")
+        commandLine(
+            "node",
+            "--test",
+            "src/test/js/dag-protection.test.mjs",
+            "src/test/js/video-smooth-experience.test.mjs",
+        )
         inputs.files(
             "src/main/assets/dag-protection/ads.js",
             "src/main/assets/dag-protection/background.js",
@@ -168,6 +173,7 @@ val testDagProtectionJs =
             "src/main/assets/dag-protection/video-lab-fixture.js",
             "src/main/assets/dag-protection/video-lab.js",
             "src/test/js/dag-protection.test.mjs",
+            "src/test/js/video-smooth-experience.test.mjs",
         )
     }
 

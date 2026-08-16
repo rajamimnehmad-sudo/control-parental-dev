@@ -1,7 +1,7 @@
 {
   "manifest_version": 2,
   "name": "Glosh DAG Protection",
-  "version": "2.0.17",
+  "version": "2.0.37",
   "description": "Single on-device GloshIA response gate with isolated page and video protection.",
   "browser_specific_settings": {
     "gecko": {
@@ -18,10 +18,12 @@
       "matches": [
         "<all_urls>"
       ],
-      "all_frames": false,
       "run_at": "document_start",
       "world": "MAIN",
+      "all_frames": true,
+      "match_about_blank": true,
       "js": [
+        "presentation-guard.js",
         "runaway-scheduler-guard.js"
       ]
     },
@@ -37,7 +39,9 @@
         "barrier.css"
       ],
       "js": [
+        "video-bootstrap-state.js",
         "video-lab.js",
+        "video-lab-fixture.js",
         "barrier.js",
         "ads.js"
       ]
@@ -49,6 +53,7 @@
     "webRequestBlocking",
     "nativeMessaging",
     "nativeMessagingFromContent",
+    "storage",
     "geckoViewAddons"
   ]
 }

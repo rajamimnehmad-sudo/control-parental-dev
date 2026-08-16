@@ -69,6 +69,34 @@ import kotlin.math.ceil
 import kotlin.math.floor
 
 class DagBrowserActivity : Activity() {
+    private enum class VideoLabMode {
+        Fixture,
+        CurrentPage,
+    }
+
+    private enum class VideoLabGrantAuthorityFailure(val stage: String) {
+        TabIdMissing("tab_id_missing"),
+        TabIdFormat("tab_id_format"),
+        DocumentTokenMissing("document_token_missing"),
+        DocumentTokenFormat("document_token_format"),
+        DocumentTokenUnbound("document_token_unbound"),
+        VideoIdMissing("video_id_missing"),
+        VideoIdFormat("video_id_format"),
+        RevisionMissing("revision_missing"),
+        RevisionFormat("revision_format"),
+        ViewportEpochMissing("viewport_epoch_missing"),
+        ViewportEpochFormat("viewport_epoch_format"),
+        FrameSequenceMissing("frame_sequence_missing"),
+        FrameSequenceFormat("frame_sequence_format"),
+        TokenMissing("token_missing"),
+        TokenFormat("token_format"),
+    }
+
+    private data class VideoLabGrantAuthorityResult(
+        val failure: VideoLabGrantAuthorityFailure? = null,
+        val authority: DagVideoLabGrantAuthority? = null,
+    )
+
     private lateinit var geckoView: DagGeckoView
     private lateinit var navigationSnapshot: ImageView
     private lateinit var videoLabOverlay: View
@@ -116,6 +144,7 @@ class DagBrowserActivity : Activity() {
     private val videoLabState = DagVideoLabStateMachine()
     private val activeVideoLabKey = AtomicReference<DagVideoLabKey?>(null)
     private val videoLabAnalysisGeneration = AtomicLong(0L)
+    private val videoLabDiagnosticStartedAt = SystemClock.elapsedRealtime()
     private val mediaAnalysisThreadFactory =
         ThreadFactory { work ->
             Thread(
@@ -140,11 +169,18 @@ class DagBrowserActivity : Activity() {
         )
     private var protectionExtension: WebExtension? = null
     private var activeVideoLabPort: WebExtension.Port? = null
+    private var videoLabSmoothKey: DagVideoLabKey? = null
+    private var videoLabSmoothGrant: DagVideoLabGrantAuthority? = null
     private var pendingVideoLabReplay: PendingVideoLabReplayFrame? = null
     private var displayedVideoLabReplayBitmap: Bitmap? = null
+    private var activeVideoLabGrantToken: String? = null
+    private var durableVideoLabGrant: DagVideoLabGrantAuthority? = null
+    private var durableVideoLabGrantRevoked = false
     private var videoLabCloseRequest: DagVideoLabCloseRequest? = null
     private var videoLabPostCloseAction: (() -> Unit)? = null
     private var videoLabArmedForSession = false
+    private var videoLabMode: VideoLabMode? = null
+    private var videoLabTargetTabId: Long? = null
     private var extensionReady = false
     private var activeTab: BrowserTab? = null
     private var nextTabId = 1L
@@ -209,12 +245,17 @@ class DagBrowserActivity : Activity() {
                     message: Any,
                     sourcePort: WebExtension.Port,
                 ) {
-                    val payload = message as? JSONObject ?: return
+                    val payload = message as? JSONObject
+                    if (payload == null) {
+                        retireVideoLabForPort(sourcePort, "port_message_malformed")
+                        sourcePort.disconnect()
+                        return
+                    }
                     handleContentPortMessage(payload, sender, senderTab, sourcePort)
                 }
 
-                override fun onDisconnect(port: WebExtension.Port) {
-                    retireVideoLabForPort(port, "port_disconnected")
+                override fun onDisconnect(sourcePort: WebExtension.Port) {
+                    retireVideoLabForPort(sourcePort, "port_disconnected")
                 }
             },
         )
@@ -228,7 +269,11 @@ class DagBrowserActivity : Activity() {
                 )
             }
         }
-        postVideoLabConfig(port, enabled = isVideoLabActiveSender(sender))
+        postVideoLabConfig(
+            port,
+            enabled = isVideoProtectionActiveSender(sender),
+            fixture = isVideoLabFixtureSender(sender),
+        )
     }
 
     private fun handleContentPortMessage(
@@ -250,26 +295,51 @@ class DagBrowserActivity : Activity() {
             PreviewEligibilityMessage -> applyPreviewEligibility(senderTab, payload)
             CompactImageSourceMetadataMessage -> logCompactImageSourceMetadata(payload)
             StyleRasterCarrierSummaryMessage -> logStyleRasterCarrierSummary(payload)
+            VideoLabDiagnosticMessage -> handleVideoLabDiagnostic(payload, sender, senderTab)
             VideoLabCoverRequestMessage ->
                 handleVideoLabCoverRequest(payload, sender, senderTab, sourcePort)
             VideoLabFrameRequestMessage ->
                 handleVideoLabFrameRequest(payload, sender, senderTab, sourcePort)
             VideoLabFrameConcealedMessage ->
                 handleVideoLabFrameConcealed(payload, senderTab, sourcePort)
+            VideoLabSmoothStartMessage ->
+                handleVideoLabSmoothStart(payload, sender, senderTab, sourcePort)
             VideoLabRetireMessage -> handleVideoLabRetire(payload, senderTab, sourcePort)
         }
+    }
+
+    private fun handleVideoLabDiagnostic(
+        payload: JSONObject,
+        sender: WebExtension.MessageSender,
+        senderTab: BrowserTab,
+    ) {
+        if (!BuildConfig.DAG_DIAGNOSTICS) return
+        val stage = payload.optString("stage")
+        if (!VideoLabDiagnosticStagePattern.matches(stage)) return
+        val elapsedMillis = payload.optLong("elapsedMillis", -1L)
+        if (elapsedMillis !in 0L..120_000L) return
+        val documentMatches = payload.optString("documentToken") == senderTab.previewDocumentToken
+        Log.i(
+            VideoLabLogTag,
+            "signal=$stage relative_ms=$elapsedMillis tab=${senderTab.id} active=${senderTab === activeTab} " +
+                "armed=$videoLabArmedForSession sender=${isVideoProtectionActiveSender(sender)} " +
+                "document=$documentMatches",
+        )
     }
 
     private fun postVideoLabConfig(
         port: WebExtension.Port,
         enabled: Boolean,
+        fixture: Boolean = false,
     ) {
         runCatching {
             port.postMessage(
                 JSONObject()
                     .put("type", VideoLabConfigMessage)
                     .put("version", ProtectionProtocolVersion)
-                    .put("enabled", BuildConfig.DAG_DIAGNOSTICS && enabled),
+                    .put("diagnostics", BuildConfig.DAG_DIAGNOSTICS)
+                    .put("enabled", enabled)
+                    .put("fixture", BuildConfig.DAG_DIAGNOSTICS && enabled && fixture),
             )
         }
     }
@@ -290,6 +360,11 @@ class DagBrowserActivity : Activity() {
         }
         if (currentKey == key && videoLabState.currentState != DagVideoLabState.Covering) return
         if (!videoLabState.requestCover(key, rect)) return
+        activeVideoLabGrantToken = null
+        durableVideoLabGrant = null
+        durableVideoLabGrantRevoked = false
+        videoLabSmoothKey = null
+        videoLabSmoothGrant = null
         val previousKey = activeVideoLabKey.getAndSet(key)
         if (previousKey != key) {
             videoLabAnalysisGeneration.incrementAndGet()
@@ -313,7 +388,9 @@ class DagBrowserActivity : Activity() {
                     videoLabState.markCovered(key)
                 ) {
                     recordVideoLabEvent(senderTab, key, "cover_armed", "two_frame_commit")
-                    postVideoLabResult(sourcePort, VideoLabCoverArmedMessage, key)
+                    Log.i(VideoLabLogTag, "transport=cover_post_before")
+                    val posted = postVideoLabResult(sourcePort, VideoLabCoverArmedMessage, key)
+                    Log.i(VideoLabLogTag, if (posted) "transport=cover_post_after" else "transport=cover_post_failed")
                 }
             }
         }
@@ -328,6 +405,7 @@ class DagBrowserActivity : Activity() {
         if (!validVideoLabContext(payload, sender, senderTab)) return
         val key = videoLabKey(payload, senderTab) ?: return
         val frameKey = videoLabFrameKey(payload, key) ?: return
+        val grantToken = payload.optString("token").takeIf(VideoLabGrantTokenPattern::matches) ?: return
         val rect = videoLabRect(payload) ?: return
         if (
             sourcePort !== activeVideoLabPort ||
@@ -335,6 +413,7 @@ class DagBrowserActivity : Activity() {
         ) {
             return
         }
+        activeVideoLabGrantToken = grantToken
         val coverMillis = videoLabMetric(payload, "coverMillis")
         val decodeMillis = videoLabMetric(payload, "decodeMillis")
         recordVideoLabEvent(
@@ -357,7 +436,32 @@ class DagBrowserActivity : Activity() {
             decodeMillis = decodeMillis,
             startedAt = startedAt,
             attempt = 0,
+            fixtureCaptureAttempt = 0,
         )
+    }
+
+    private fun handleVideoLabSmoothStart(
+        payload: JSONObject,
+        sender: WebExtension.MessageSender,
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+    ) {
+        if (!validVideoLabContext(payload, sender, senderTab)) return
+        val key = videoLabKey(payload, senderTab) ?: return
+        if (
+            sourcePort !== activeVideoLabPort ||
+            !videoLabState.isCurrent(key, DagVideoLabState.Covered) ||
+            payload.optInt("cadenceMillis", -1) != VideoLabSmoothCadenceMillis
+        ) {
+            return
+        }
+        val smoothGrant = durableVideoLabGrant?.takeIf { it.frameKey.videoKey == key } ?: return
+        videoLabSmoothGrant = smoothGrant
+        videoLabSmoothKey = key
+        clearPendingVideoLabReplay()
+        clearDisplayedVideoLabReplay()
+        videoLabOverlay.visibility = View.GONE
+        recordVideoLabEvent(senderTab, key, "smooth_started", "adaptive_two_fps")
     }
 
     private fun captureVideoLabFrame(
@@ -371,6 +475,7 @@ class DagBrowserActivity : Activity() {
         decodeMillis: Double?,
         startedAt: Long,
         attempt: Int,
+        fixtureCaptureAttempt: Int,
     ) {
         if (
             sourcePort !== activeVideoLabPort ||
@@ -379,7 +484,7 @@ class DagBrowserActivity : Activity() {
             return
         }
         geckoView.postOnAnimation {
-            val surfaceRect = videoLabSurfaceRect(senderTab, rect)
+            val surfaceRect = videoLabSurfaceRect(senderTab, key, rect)
             if (surfaceRect == null) {
                 if (attempt < VideoLabSurfaceReadyRetries) {
                     handler.postDelayed(
@@ -395,6 +500,7 @@ class DagBrowserActivity : Activity() {
                                 decodeMillis,
                                 startedAt,
                                 attempt + 1,
+                                fixtureCaptureAttempt,
                             )
                         },
                         VideoLabSurfaceRetryDelayMillis,
@@ -455,8 +561,42 @@ class DagBrowserActivity : Activity() {
                             startedAt,
                         )
                     }
-                    !fixtureMatches ->
-                        {
+                    !fixtureMatches -> {
+                        if (
+                            DagVideoLabFixtureCapturePolicy.shouldRetry(
+                                fixture = fixture,
+                                attempt = fixtureCaptureAttempt,
+                            )
+                        ) {
+                            bitmap.recycle()
+                            recordVideoLabEvent(
+                                senderTab,
+                                key,
+                                action = "capture_retry",
+                                reason = "fixture_pattern_retry",
+                                nativeMillis =
+                                    (SystemClock.elapsedRealtime() - startedAt).coerceAtLeast(0L),
+                                captureMillis = captureMillis,
+                            )
+                            handler.postDelayed(
+                                {
+                                    captureVideoLabFrame(
+                                        senderTab,
+                                        sourcePort,
+                                        key,
+                                        frameKey,
+                                        rect,
+                                        fixture,
+                                        coverMillis,
+                                        decodeMillis,
+                                        startedAt,
+                                        attempt,
+                                        fixtureCaptureAttempt + 1,
+                                    )
+                                },
+                                DagVideoLabFixtureCapturePolicy.RetryDelayMillis,
+                            )
+                        } else {
                             bitmap.recycle()
                             failVideoLabCapture(
                                 senderTab,
@@ -466,6 +606,7 @@ class DagBrowserActivity : Activity() {
                                 startedAt,
                             )
                         }
+                    }
                     preparedImage == null ->
                         {
                             bitmap.recycle()
@@ -485,12 +626,16 @@ class DagBrowserActivity : Activity() {
                             return@captureRegion
                         }
                         clearPendingVideoLabReplay()
-                        pendingVideoLabReplay =
-                            PendingVideoLabReplayFrame(
-                                frameKey = frameKey,
-                                surfaceRect = Rect(surfaceRect),
-                                bitmap = capturedBitmap,
-                            )
+                        if (videoLabSmoothKey == key) {
+                            capturedBitmap.recycle()
+                        } else {
+                            pendingVideoLabReplay =
+                                PendingVideoLabReplayFrame(
+                                    frameKey = frameKey,
+                                    surfaceRect = Rect(surfaceRect),
+                                    bitmap = capturedBitmap,
+                                )
+                        }
                         recordVideoLabEvent(
                             senderTab,
                             key,
@@ -623,13 +768,15 @@ class DagBrowserActivity : Activity() {
         bitmap: Bitmap,
         rect: DagVideoLabClientRect,
     ): Boolean {
-        val quarter = bitmap.width / 4
-        val threeQuarters = bitmap.width * 3 / 4
+        val quarterX = bitmap.width / 4
+        val threeQuartersX = bitmap.width * 3 / 4
+        val quarterY = bitmap.height / 4
+        val threeQuartersY = bitmap.height * 3 / 4
         return DagVideoLabFixtureProbe.matches(
-            topLeft = bitmap.getPixel(quarter, quarter),
-            topRight = bitmap.getPixel(threeQuarters, quarter),
-            bottomLeft = bitmap.getPixel(quarter, threeQuarters),
-            bottomRight = bitmap.getPixel(threeQuarters, threeQuarters),
+            topLeft = bitmap.getPixel(quarterX, quarterY),
+            topRight = bitmap.getPixel(threeQuartersX, quarterY),
+            bottomLeft = bitmap.getPixel(quarterX, threeQuartersY),
+            bottomRight = bitmap.getPixel(threeQuartersX, threeQuartersY),
             expectedTopLeft = fixtureExpectedColor(rect, 0.25f, 0.25f),
             expectedTopRight = fixtureExpectedColor(rect, 0.75f, 0.25f),
             expectedBottomLeft = fixtureExpectedColor(rect, 0.25f, 0.75f),
@@ -665,7 +812,7 @@ class DagBrowserActivity : Activity() {
         senderTab: BrowserTab,
         sourcePort: WebExtension.Port,
     ) {
-        if (!BuildConfig.DAG_DIAGNOSTICS || sourcePort !== activeVideoLabPort) return
+        if (sourcePort !== activeVideoLabPort) return
         val key = videoLabKey(payload, senderTab) ?: return
         val frameKey = videoLabFrameKey(payload, key) ?: return
         if (!videoLabState.isCurrent(frameKey)) return
@@ -756,7 +903,7 @@ class DagBrowserActivity : Activity() {
         senderTab: BrowserTab,
         sourcePort: WebExtension.Port,
     ) {
-        if (!BuildConfig.DAG_DIAGNOSTICS || sourcePort !== activeVideoLabPort) return
+        if (sourcePort !== activeVideoLabPort) return
         val key = videoLabKey(payload, senderTab) ?: return
         if (!videoLabState.isCurrent(key)) return
         beginVideoLabClose(
@@ -824,13 +971,18 @@ class DagBrowserActivity : Activity() {
                 .put("inferenceCount", trace?.inferenceCount ?: 0)
         decision.filterProbability?.takeIf(Float::isFinite)?.let { result.put("score", it.toDouble()) }
         inferenceMillis?.takeIf(Double::isFinite)?.let { result.put("inferenceMillis", it) }
+        val allowed = classified && decision.action == DagMediaAction.Allow
+        if (!allowed && videoLabSmoothKey == key) {
+            videoLabSmoothKey = null
+            showVideoLabCover()
+        }
         postVideoLabResult(
             sourcePort,
             VideoLabFrameResultMessage,
             frameKey,
             result,
         )
-        if (!classified || decision.action != DagMediaAction.Allow) {
+        if (!allowed) {
             clearPendingVideoLabReplay(frameKey)
             clearDisplayedVideoLabReplay()
             return
@@ -851,6 +1003,10 @@ class DagBrowserActivity : Activity() {
         val key = frameKey.videoKey
         clearPendingVideoLabReplay(frameKey)
         clearDisplayedVideoLabReplay()
+        if (videoLabSmoothKey == key) {
+            videoLabSmoothKey = null
+            showVideoLabCover()
+        }
         if (!videoLabState.completeCapture(frameKey, captured = false)) return
         recordVideoLabEvent(
             senderTab,
@@ -882,8 +1038,8 @@ class DagBrowserActivity : Activity() {
         type: String,
         key: DagVideoLabKey,
         extra: JSONObject = JSONObject(),
-    ) {
-        if (port !== activeVideoLabPort || !videoLabState.isCurrent(key)) return
+    ): Boolean {
+        if (port !== activeVideoLabPort || !videoLabState.isCurrent(key)) return false
         val message =
             JSONObject()
                 .put("type", type)
@@ -892,7 +1048,7 @@ class DagBrowserActivity : Activity() {
                 .put("videoId", key.videoId)
                 .put("revision", key.revision)
         extra.keys().forEach { name -> message.put(name, extra.get(name)) }
-        runCatching { port.postMessage(message) }
+        return runCatching { port.postMessage(message) }.isSuccess
     }
 
     private fun postVideoLabResult(
@@ -941,8 +1097,7 @@ class DagBrowserActivity : Activity() {
         sender: WebExtension.MessageSender,
         senderTab: BrowserTab,
     ): Boolean =
-        BuildConfig.DAG_DIAGNOSTICS &&
-            isVideoLabActiveSender(sender) &&
+        isVideoProtectionActiveSender(sender) &&
             sender.isTopLevel &&
             senderTab === activeTab &&
             senderTab.session === geckoView.session &&
@@ -992,6 +1147,7 @@ class DagBrowserActivity : Activity() {
 
     private fun videoLabSurfaceRect(
         senderTab: BrowserTab,
+        key: DagVideoLabKey,
         clientRect: DagVideoLabClientRect,
     ): Rect? {
         if (
@@ -1000,7 +1156,10 @@ class DagBrowserActivity : Activity() {
             geckoView.width <= 0 ||
             geckoView.height <= 0 ||
             geckoView.visibility != View.VISIBLE ||
-            videoLabOverlay.visibility != View.VISIBLE
+            (
+                videoLabOverlay.visibility != View.VISIBLE &&
+                    videoLabSmoothKey != key
+            )
         ) {
             return null
         }
@@ -1043,13 +1202,23 @@ class DagBrowserActivity : Activity() {
         ) {
             return false
         }
+        val durableFrameKey =
+            videoLabSmoothGrant?.frameKey?.takeIf { it.videoKey == key }
+                ?: videoLabState.currentFrameKey
+                ?: durableVideoLabGrant?.frameKey?.takeIf { it.videoKey == key }
         val close =
             DagVideoLabCloseRequest(
                 key = key,
+                frameKey = durableFrameKey,
+                grantToken =
+                    videoLabSmoothGrant?.token
+                        ?: activeVideoLabGrantToken
+                        ?: durableVideoLabGrant?.token,
                 nonce = UUID.randomUUID().toString().replace("-", ""),
             )
         if (!videoLabState.beginClosing(key, close.nonce)) return false
         videoLabArmedForSession = false
+        videoLabSmoothKey = null
         videoLabCloseRequest = close
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
@@ -1062,10 +1231,34 @@ class DagBrowserActivity : Activity() {
         handler.removeCallbacks(videoLabCloseTimeout)
         handler.postDelayed(videoLabCloseTimeout, VideoLabCloseTimeoutMillis)
         val decisionPort = activeMediaDecisionPort
-        if (decisionPort == null || !postVideoLabClose(decisionPort, close)) {
+        val durableAuthority =
+            close.frameKey?.let { frameKey ->
+                close.grantToken?.let { token -> DagVideoLabGrantAuthority(frameKey, token) }
+            }
+        if (durableVideoLabGrantRevoked && durableVideoLabGrant == durableAuthority) {
+            if (BuildConfig.DAG_DIAGNOSTICS) {
+                Log.i(VideoLabLogTag, "background_signal=revoke_local_durable")
+            }
+            handleVideoLabRevoked(videoLabRevokedPayload(close))
+        } else if (decisionPort == null || !postVideoLabClose(decisionPort, close)) {
             blockVideoLabClose(close, "revoke_request_not_delivered")
         }
         return true
+    }
+
+    private fun videoLabRevokedPayload(close: DagVideoLabCloseRequest): JSONObject {
+        val frameKey = close.frameKey
+        return JSONObject()
+            .put("type", VideoLabRevokedMessage)
+            .put("version", ProtectionProtocolVersion)
+            .put("tabId", close.key.tabId)
+            .put("documentToken", close.key.documentToken)
+            .put("videoId", close.key.videoId)
+            .put("revision", close.key.revision)
+            .put("viewportEpoch", frameKey?.viewportEpoch ?: -1)
+            .put("frameSequence", frameKey?.frameSequence ?: -1)
+            .put("token", close.grantToken.orEmpty())
+            .put("closeNonce", close.nonce)
     }
 
     /**
@@ -1089,24 +1282,40 @@ class DagBrowserActivity : Activity() {
     private fun postVideoLabClose(
         port: WebExtension.Port,
         close: DagVideoLabCloseRequest,
-    ): Boolean =
-        runCatching {
+    ): Boolean {
+        if (!close.hasDurableIdentity()) return false
+        val frameKey = close.frameKey ?: return false
+        val grantToken = close.grantToken ?: return false
+        return runCatching {
             port.postMessage(
                 JSONObject()
                     .put("type", VideoLabCloseMessage)
                     .put("version", ProtectionProtocolVersion)
                     .put("tabId", close.key.tabId)
                     .put("documentToken", close.key.documentToken)
+                    .put("videoId", close.key.videoId)
+                    .put("revision", close.key.revision)
+                    .put("viewportEpoch", frameKey.viewportEpoch)
+                    .put("frameSequence", frameKey.frameSequence)
+                    .put("token", grantToken)
                     .put("closeNonce", close.nonce),
             )
             true
         }.getOrDefault(false)
+    }
 
     private fun handleVideoLabRevoked(payload: JSONObject) {
         val close = videoLabCloseRequest ?: return
+        val frameKey = close.frameKey ?: return
+        val grantToken = close.grantToken ?: return
         if (
             payload.optLong("tabId", -1L) != close.key.tabId ||
             payload.optString("documentToken") != close.key.documentToken ||
+            payload.optString("videoId") != close.key.videoId ||
+            payload.optInt("revision", -1) != close.key.revision ||
+            payload.optInt("viewportEpoch", -1) != frameKey.viewportEpoch ||
+            payload.optInt("frameSequence", -1) != frameKey.frameSequence ||
+            payload.optString("token") != grantToken ||
             payload.optString("closeNonce") != close.nonce
         ) {
             return
@@ -1114,7 +1323,14 @@ class DagBrowserActivity : Activity() {
         if (!videoLabState.acknowledgeClose(close.key, close.nonce)) return
         handler.removeCallbacks(videoLabCloseTimeout)
         videoLabCloseRequest = null
+        activeVideoLabGrantToken = null
+        durableVideoLabGrant = null
+        durableVideoLabGrantRevoked = false
         activeVideoLabPort = null
+        videoLabSmoothKey = null
+        videoLabSmoothGrant = null
+        videoLabMode = null
+        videoLabTargetTabId = null
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
         videoLabOverlay.visibility = View.GONE
@@ -1133,7 +1349,14 @@ class DagBrowserActivity : Activity() {
         if (!videoLabState.blockClosing(close.key, close.nonce)) return
         handler.removeCallbacks(videoLabCloseTimeout)
         videoLabCloseRequest = null
+        activeVideoLabGrantToken = null
+        durableVideoLabGrant = null
+        durableVideoLabGrantRevoked = false
         activeVideoLabPort = null
+        videoLabSmoothKey = null
+        videoLabSmoothGrant = null
+        videoLabMode = null
+        videoLabTargetTabId = null
         videoLabPostCloseAction = null
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
@@ -1300,7 +1523,7 @@ class DagBrowserActivity : Activity() {
                     .put("enabled", true),
             )
         }
-        postVideoLabConfig(port, enabled = videoLabArmedForSession)
+        postVideoLabConfig(port, enabled = isVideoProtectionRuntimeEnabled())
     }
 
     private fun handleDecisionPortMessage(
@@ -1317,8 +1540,145 @@ class DagBrowserActivity : Activity() {
             MediaDocumentRetiredMessage -> handleMediaDocumentRetired(payload)
             ViewportImagesReadyMessage -> handleViewportImagesReady(payload)
             MediaDiagnosticSummaryMessage -> logMediaDiagnosticSummary(payload)
+            VideoLabDiagnosticMessage -> logBackgroundVideoLabDiagnostic(payload)
+            VideoLabGrantActiveMessage -> handleVideoLabGrantActive(payload, sourcePort)
+            VideoLabRevocationProofMessage -> handleVideoLabRevocationProof(payload)
             VideoLabRevokedMessage -> handleVideoLabRevoked(payload)
         }
+    }
+
+    private fun logBackgroundVideoLabDiagnostic(payload: JSONObject) {
+        if (!BuildConfig.DAG_DIAGNOSTICS) return
+        val stage = payload.optString("stage")
+        if (!VideoLabDiagnosticStagePattern.matches(stage)) return
+        Log.i(VideoLabLogTag, "background_signal=$stage")
+    }
+
+    private fun videoLabGrantAuthority(payload: JSONObject): DagVideoLabGrantAuthority? =
+        videoLabGrantAuthorityResult(payload).authority
+
+    private fun videoLabGrantAuthorityResult(payload: JSONObject): VideoLabGrantAuthorityResult {
+        fun missing(name: String) = !payload.has(name) || payload.isNull(name)
+
+        fun exactLong(name: String): Long? {
+            val value = payload.opt(name) as? Number ?: return null
+            val longValue = value.toLong()
+            return longValue.takeIf { value.toDouble() == longValue.toDouble() }
+        }
+
+        fun exactCounter(name: String): Int? =
+            exactLong(name)?.takeIf { it in 1L..VideoLabMaximumRevision.toLong() }?.toInt()
+
+        if (missing("tabId")) return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.TabIdMissing)
+        val tabId =
+            exactLong("tabId")
+                ?.takeIf { it >= 0L }
+                ?: return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.TabIdFormat)
+        if (missing("documentToken")) {
+            return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.DocumentTokenMissing)
+        }
+        val documentToken =
+            payload.opt("documentToken") as? String
+                ?: return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.DocumentTokenFormat)
+        if (!PreviewDocumentTokenPattern.matches(documentToken)) {
+            return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.DocumentTokenFormat)
+        }
+        val androidTabId =
+            DagVideoLabGrantTabAuthority.resolveAndroidTabId(
+                backgroundTabId = tabId,
+                documentToken = documentToken,
+                tabDocuments = tabs.map { it.id to it.previewDocumentToken },
+            ) ?: return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.DocumentTokenUnbound)
+        val tab = tabs.single { it.id == androidTabId }
+
+        if (missing("videoId")) return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.VideoIdMissing)
+        val videoId =
+            payload.opt("videoId") as? String
+                ?: return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.VideoIdFormat)
+        if (!VideoLabIdPattern.matches(videoId)) {
+            return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.VideoIdFormat)
+        }
+
+        if (missing("revision")) return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.RevisionMissing)
+        val revision =
+            exactCounter("revision")
+                ?: return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.RevisionFormat)
+        if (missing("viewportEpoch")) {
+            return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.ViewportEpochMissing)
+        }
+        val viewportEpoch =
+            exactCounter("viewportEpoch")
+                ?: return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.ViewportEpochFormat)
+        if (missing("frameSequence")) {
+            return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.FrameSequenceMissing)
+        }
+        val frameSequence =
+            exactCounter("frameSequence")
+                ?: return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.FrameSequenceFormat)
+
+        if (missing("token")) return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.TokenMissing)
+        val token =
+            payload.opt("token") as? String
+                ?: return VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.TokenFormat)
+        val authority =
+            DagVideoLabGrantAuthority(
+                frameKey =
+                    DagVideoLabFrameKey(
+                        videoKey = DagVideoLabKey(tab.id, documentToken, videoId, revision),
+                        viewportEpoch = viewportEpoch,
+                        frameSequence = frameSequence,
+                    ),
+                token = token,
+            )
+        return if (authority.isValid()) {
+            VideoLabGrantAuthorityResult(authority = authority)
+        } else {
+            VideoLabGrantAuthorityResult(VideoLabGrantAuthorityFailure.TokenFormat)
+        }
+    }
+
+    private fun handleVideoLabGrantActive(
+        payload: JSONObject,
+        sourcePort: WebExtension.Port,
+    ) {
+        val result = videoLabGrantAuthorityResult(payload)
+        val authority = result.authority
+        if (authority == null) {
+            if (BuildConfig.DAG_DIAGNOSTICS) {
+                Log.i(VideoLabLogTag, "background_signal=grant_active_invalid_${result.failure!!.stage}")
+            }
+            return
+        }
+        if (videoLabState.currentKey != authority.frameKey.videoKey) {
+            if (BuildConfig.DAG_DIAGNOSTICS) Log.i(VideoLabLogTag, "background_signal=grant_active_stale")
+            return
+        }
+        durableVideoLabGrant = authority
+        durableVideoLabGrantRevoked = false
+        activeVideoLabGrantToken = authority.token
+        val acknowledged =
+            runCatching {
+                sourcePort.postMessage(
+                    JSONObject(payload.toString())
+                        .put("type", VideoLabGrantActiveAckMessage),
+                )
+                true
+            }.getOrDefault(false)
+        if (BuildConfig.DAG_DIAGNOSTICS) {
+            Log.i(VideoLabLogTag, "background_signal=grant_active_ack_$acknowledged")
+        }
+    }
+
+    private fun handleVideoLabRevocationProof(payload: JSONObject) {
+        val authority = videoLabGrantAuthority(payload) ?: return
+        if (durableVideoLabGrant != authority) return
+        durableVideoLabGrantRevoked = true
+        if (BuildConfig.DAG_DIAGNOSTICS) {
+            Log.i(VideoLabLogTag, "background_signal=revoke_proof_received")
+        }
+        videoLabCloseRequest
+            ?.takeIf(authority::proves)
+            ?.let { close -> handleVideoLabRevoked(videoLabRevokedPayload(close)) }
     }
 
     private fun logMediaDiagnosticSummary(payload: JSONObject) {
@@ -1571,6 +1931,51 @@ class DagBrowserActivity : Activity() {
     }
 
     private fun configureSession(tab: BrowserTab) {
+        tab.session.permissionDelegate =
+            object : GeckoSession.PermissionDelegate {
+                override fun onContentPermissionRequest(
+                    session: GeckoSession,
+                    permission: GeckoSession.PermissionDelegate.ContentPermission,
+                ): GeckoResult<Int> {
+                    val autoplayPermission =
+                        permission.permission == GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_INAUDIBLE ||
+                            permission.permission == GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE
+                    val exactHarnessDocument =
+                        videoLabMode != null &&
+                            videoLabTargetTabId == tab.id &&
+                            activeTab === tab &&
+                            session === tab.session
+                    val allow =
+                        DagVideoLabAutoplayPolicy.allow(
+                            autoplayPermission = autoplayPermission,
+                            diagnostics = BuildConfig.DAG_DIAGNOSTICS,
+                            armed = videoLabArmedForSession,
+                            activeTab = activeTab === tab && session === tab.session,
+                            exactHarnessDocument = exactHarnessDocument,
+                        )
+                    if (BuildConfig.DAG_DIAGNOSTICS && autoplayPermission) {
+                        Log.i(
+                            VideoLabLogTag,
+                            "autoplay_request audible=" +
+                                (
+                                    permission.permission ==
+                                        GeckoSession.PermissionDelegate.PERMISSION_AUTOPLAY_AUDIBLE
+                                ) +
+                                " armed=$videoLabArmedForSession active=${activeTab === tab} " +
+                                "harness=$exactHarnessDocument allow=$allow " +
+                                "native_relative_ms=" +
+                                (SystemClock.elapsedRealtime() - videoLabDiagnosticStartedAt),
+                        )
+                    }
+                    val decision =
+                        if (allow) {
+                            GeckoSession.PermissionDelegate.ContentPermission.VALUE_ALLOW
+                        } else {
+                            GeckoSession.PermissionDelegate.ContentPermission.VALUE_DENY
+                        }
+                    return GeckoResult.fromValue(decision)
+                }
+            }
         tab.session.promptDelegate =
             object : GeckoSession.PromptDelegate {
                 override fun onChoicePrompt(
@@ -3368,17 +3773,8 @@ class DagBrowserActivity : Activity() {
     private fun showBrowserMenu() {
         val popup = browserMenu ?: createBrowserMenu().also { browserMenu = it }
         popup.menu.findItem(R.id.menu_default_browser)?.isVisible = !isDefaultBrowser()
-        popup.menu.findItem(R.id.menu_video_lab)?.apply {
-            isVisible = BuildConfig.DAG_DIAGNOSTICS
-            title =
-                getString(
-                    if (videoLabArmedForSession) {
-                        R.string.video_lab_disable
-                    } else {
-                        R.string.video_lab_open
-                    },
-                )
-        }
+        popup.menu.findItem(R.id.menu_video_lab)?.isVisible = false
+        popup.menu.findItem(R.id.menu_video_harness)?.isVisible = false
         popup.show()
     }
 
@@ -3431,6 +3827,14 @@ class DagBrowserActivity : Activity() {
                         toggleVideoLab()
                         true
                     }
+                    R.id.menu_video_harness -> {
+                        if (videoLabArmedForSession) {
+                            disableVideoLab()
+                        } else {
+                            armVideoHarnessForCurrentPage()
+                        }
+                        true
+                    }
                     R.id.menu_about -> {
                         showAboutDag()
                         true
@@ -3445,12 +3849,43 @@ class DagBrowserActivity : Activity() {
             Toast.makeText(this, R.string.video_lab_unavailable, Toast.LENGTH_SHORT).show()
             return
         }
-        videoLabArmedForSession = !videoLabArmedForSession
-        activeMediaDecisionPort?.let { postVideoLabConfig(it, videoLabArmedForSession) }
         if (videoLabArmedForSession) {
-            openVideoLabFixture()
+            disableVideoLab()
             return
         }
+        val tab = activeTab ?: return
+        videoLabMode = VideoLabMode.Fixture
+        videoLabTargetTabId = tab.id
+        videoLabArmedForSession = true
+        activeMediaDecisionPort?.let { postVideoLabConfig(it, videoLabArmedForSession) }
+        openVideoLabFixture()
+    }
+
+    private fun armVideoHarnessForCurrentPage() {
+        val tab = activeTab
+        if (
+            !BuildConfig.DAG_DIAGNOSTICS ||
+            videoLabArmedForSession ||
+            tab == null ||
+            !tab.session.isOpen ||
+            !tab.url.startsWith("https://", ignoreCase = true)
+        ) {
+            Toast.makeText(this, R.string.video_lab_current_page_unavailable, Toast.LENGTH_SHORT).show()
+            return
+        }
+        videoLabMode = VideoLabMode.CurrentPage
+        videoLabTargetTabId = tab.id
+        videoLabArmedForSession = true
+        activeMediaDecisionPort?.let { postVideoLabConfig(it, enabled = true) }
+        reloadActivePage()
+        Toast.makeText(this, R.string.video_lab_current_page_armed, Toast.LENGTH_SHORT).show()
+    }
+
+    private fun disableVideoLab() {
+        videoLabArmedForSession = false
+        videoLabMode = null
+        videoLabTargetTabId = null
+        activeMediaDecisionPort?.let { postVideoLabConfig(it, enabled = false) }
         activeVideoLabPort?.let { postVideoLabConfig(it, enabled = false) }
         beginVideoLabClose("lab_disabled")
         Toast.makeText(this, R.string.video_lab_disabled, Toast.LENGTH_SHORT).show()
@@ -3458,13 +3893,12 @@ class DagBrowserActivity : Activity() {
 
     private fun openVideoLabFixture() {
         val tab = activeTab
-        val fixtureUrl = videoLabFixtureUrl()
+        val fixtureUrl = VideoLabFixtureUrl
         if (
             !BuildConfig.DAG_DIAGNOSTICS ||
             !videoLabArmedForSession ||
             tab == null ||
-            !tab.session.isOpen ||
-            fixtureUrl == null
+            !tab.session.isOpen
         ) {
             Toast.makeText(this, R.string.video_lab_unavailable, Toast.LENGTH_SHORT).show()
             return
@@ -3474,31 +3908,40 @@ class DagBrowserActivity : Activity() {
         tab.session.loadUri(fixtureUrl)
     }
 
-    private fun videoLabFixtureUrl(): String? =
-        protectionExtension
-            ?.metaData
-            ?.baseUrl
-            ?.let { baseUrl -> "$baseUrl$VideoLabFixturePath" }
+    private fun isVideoLabFixtureUrl(url: String): Boolean = BuildConfig.DAG_DIAGNOSTICS && url == VideoLabFixtureUrl
 
-    private fun isVideoLabFixtureUrl(url: String): Boolean = BuildConfig.DAG_DIAGNOSTICS && url == videoLabFixtureUrl()
+    private fun isVideoLabTargetSender(sender: WebExtension.MessageSender): Boolean {
+        val targetTab = tabs.firstOrNull { it.id == videoLabTargetTabId } ?: return false
+        return sender.session === targetTab.session
+    }
 
     private fun isVideoLabFixtureSender(sender: WebExtension.MessageSender): Boolean =
         BuildConfig.DAG_DIAGNOSTICS &&
+            videoLabMode == VideoLabMode.Fixture &&
+            isVideoLabTargetSender(sender) &&
             sender.session != null &&
-            sender.isTopLevel &&
-            sender.url == videoLabFixtureUrl()
+            sender.isTopLevel
 
     private fun isVideoLabEligibleSender(sender: WebExtension.MessageSender): Boolean =
-        BuildConfig.DAG_DIAGNOSTICS &&
-            sender.session != null &&
+        sender.session != null &&
             sender.isTopLevel &&
             (
-                sender.url == videoLabFixtureUrl() ||
-                    sender.url.orEmpty().startsWith("https://", ignoreCase = true)
+                sender.url.orEmpty().startsWith("https://", ignoreCase = true)
             )
 
-    private fun isVideoLabActiveSender(sender: WebExtension.MessageSender): Boolean =
-        videoLabArmedForSession && isVideoLabEligibleSender(sender)
+    private fun isVideoProtectionRuntimeEnabled(): Boolean =
+        DagVideoProtectionActivationPolicy.runtimeEnabled(
+            diagnostics = BuildConfig.DAG_DIAGNOSTICS,
+            diagnosticHarnessArmed = videoLabArmedForSession,
+        )
+
+    private fun isVideoProtectionActiveSender(sender: WebExtension.MessageSender): Boolean =
+        DagVideoProtectionActivationPolicy.senderEnabled(
+            diagnostics = BuildConfig.DAG_DIAGNOSTICS,
+            diagnosticHarnessArmed = videoLabArmedForSession,
+            diagnosticTarget = isVideoLabTargetSender(sender),
+            eligibleTopLevelDocument = isVideoLabEligibleSender(sender),
+        )
 
     private fun showDagDiagnostics() {
         Toast.makeText(this, R.string.dag_diagnostics_loading, Toast.LENGTH_SHORT).show()
@@ -4210,16 +4653,22 @@ class DagBrowserActivity : Activity() {
         const val ViewportImagesReadyMessage = "viewport-images-ready"
         const val DocumentSanitizedReadyMessage = "document-sanitized-ready"
         const val VideoLabConfigMessage = "video-lab-config"
+        const val VideoLabDiagnosticMessage = "video-lab-diagnostic"
+        const val VideoLabGrantActiveMessage = "video-lab-grant-active"
+        const val VideoLabGrantActiveAckMessage = "video-lab-grant-active-ack"
+        const val VideoLabRevocationProofMessage = "video-lab-revocation-proof"
         const val VideoLabCoverRequestMessage = "video-lab-cover-request"
         const val VideoLabCoverArmedMessage = "video-lab-cover-armed"
         const val VideoLabFrameRequestMessage = "video-lab-frame-request"
         const val VideoLabFrameCapturedMessage = "video-lab-frame-captured"
         const val VideoLabFrameConcealedMessage = "video-lab-frame-concealed"
         const val VideoLabFrameResultMessage = "video-lab-frame-result"
+        const val VideoLabSmoothStartMessage = "video-lab-smooth-start"
         const val VideoLabCloseMessage = "video-lab-close"
         const val VideoLabRevokedMessage = "video-lab-revoked"
         const val VideoLabRetireMessage = "video-lab-retire"
-        const val VideoLabFixturePath = "video-lab-fixture.html"
+        const val VideoLabSmoothCadenceMillis = 500
+        const val VideoLabFixtureUrl = "https://example.com/"
         const val ProtectionProtocolVersion = 2
         const val CacheMaintenancePreferences = "dag-cache-maintenance"
         const val CacheMaintenanceRevisionKey = "intercepted-media-cache-revision"
@@ -4259,7 +4708,9 @@ class DagBrowserActivity : Activity() {
         val MediaDiagnosticValuePattern = Regex("^[a-z_]{1,40}$")
         val MediaDiagnosticTokenPattern = Regex("^[a-z0-9_]{1,40}$")
         val VideoLabIdPattern = Regex("^video_[a-f0-9]{16}$")
+        val VideoLabGrantTokenPattern = Regex("^[a-f0-9]{32}$")
         val VideoLabReasonPattern = Regex("^[a-z_]{1,40}$")
+        val VideoLabDiagnosticStagePattern = Regex("^[a-z_]{1,40}$")
         const val EnabledControlAlpha = 1f
         const val DisabledControlAlpha = 0.45f
         const val EnabledChoiceAlpha = 1f

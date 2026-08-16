@@ -8,6 +8,169 @@ import kotlin.test.assertTrue
 
 class DagVideoLabContractTest {
     @Test
+    fun `DEV protects every eligible top level video document automatically`() {
+        assertTrue(
+            DagVideoProtectionActivationPolicy.runtimeEnabled(
+                diagnostics = false,
+                diagnosticHarnessArmed = false,
+            ),
+        )
+        assertTrue(
+            DagVideoProtectionActivationPolicy.senderEnabled(
+                diagnostics = false,
+                diagnosticHarnessArmed = false,
+                diagnosticTarget = false,
+                eligibleTopLevelDocument = true,
+            ),
+        )
+        assertFalse(
+            DagVideoProtectionActivationPolicy.senderEnabled(
+                diagnostics = false,
+                diagnosticHarnessArmed = false,
+                diagnosticTarget = false,
+                eligibleTopLevelDocument = false,
+            ),
+        )
+    }
+
+    @Test
+    fun `Diagnostic is automatic until an explicit harness narrows its exact target`() {
+        assertTrue(
+            DagVideoProtectionActivationPolicy.runtimeEnabled(
+                diagnostics = true,
+                diagnosticHarnessArmed = false,
+            ),
+        )
+        assertTrue(
+            DagVideoProtectionActivationPolicy.senderEnabled(
+                diagnostics = true,
+                diagnosticHarnessArmed = false,
+                diagnosticTarget = false,
+                eligibleTopLevelDocument = true,
+            ),
+        )
+        assertFalse(
+            DagVideoProtectionActivationPolicy.senderEnabled(
+                diagnostics = true,
+                diagnosticHarnessArmed = true,
+                diagnosticTarget = false,
+                eligibleTopLevelDocument = true,
+            ),
+        )
+        assertTrue(
+            DagVideoProtectionActivationPolicy.senderEnabled(
+                diagnostics = true,
+                diagnosticHarnessArmed = true,
+                diagnosticTarget = true,
+                eligibleTopLevelDocument = true,
+            ),
+        )
+    }
+
+    @Test
+    fun `autoplay requires the exact armed Diagnostic document`() {
+        assertTrue(
+            DagVideoLabAutoplayPolicy.allow(
+                autoplayPermission = true,
+                diagnostics = true,
+                armed = true,
+                activeTab = true,
+                exactHarnessDocument = true,
+            ),
+        )
+        listOf(
+            listOf(false, true, true, true, true),
+            listOf(true, false, true, true, true),
+            listOf(true, true, false, true, true),
+            listOf(true, true, true, false, true),
+            listOf(true, true, true, true, false),
+        ).forEach { conditions ->
+            assertFalse(
+                DagVideoLabAutoplayPolicy.allow(
+                    autoplayPermission = conditions[0],
+                    diagnostics = conditions[1],
+                    armed = conditions[2],
+                    activeTab = conditions[3],
+                    exactHarnessDocument = conditions[4],
+                ),
+            )
+        }
+    }
+
+    @Test
+    fun `durable close identity requires the exact captured frame and grant token`() {
+        val key = key(revision = 4)
+        val frame = frame(key, viewportEpoch = 3, frameSequence = 9)
+        assertTrue(
+            DagVideoLabCloseRequest(
+                key = key,
+                frameKey = frame,
+                grantToken = closeNonce(),
+                nonce = closeNonce(),
+            ).hasDurableIdentity(),
+        )
+        assertFalse(
+            DagVideoLabCloseRequest(
+                key = key,
+                frameKey = frame(key(revision = 5), viewportEpoch = 3, frameSequence = 9),
+                grantToken = closeNonce(),
+                nonce = closeNonce(),
+            ).hasDurableIdentity(),
+        )
+        assertFalse(
+            DagVideoLabCloseRequest(
+                key = key,
+                frameKey = frame,
+                grantToken = null,
+                nonce = closeNonce(),
+            ).hasDurableIdentity(),
+        )
+    }
+
+    @Test
+    fun `native grant authority binds the complete immutable frame`() {
+        val key = key(revision = 7)
+        val authority = DagVideoLabGrantAuthority(frame(key, viewportEpoch = 4, frameSequence = 11), closeNonce())
+        assertTrue(authority.isValid())
+        assertFalse(authority.copy(token = "bad").isValid())
+        assertFalse(authority.copy(frameKey = frame(key, viewportEpoch = 0, frameSequence = 11)).isValid())
+    }
+
+    @Test
+    fun `late durable proof completes only its exact pending close`() {
+        val key = key(revision = 7)
+        val frame = frame(key, viewportEpoch = 4, frameSequence = 11)
+        val token = closeNonce()
+        val authority = DagVideoLabGrantAuthority(frame, token)
+        val close = DagVideoLabCloseRequest(key, frame, token, closeNonce())
+
+        assertTrue(authority.proves(close))
+        assertFalse(authority.proves(close.copy(grantToken = closeNonce("b"))))
+        assertFalse(authority.proves(close.copy(frameKey = frame.copy(frameSequence = 12))))
+    }
+
+    @Test
+    fun `native grant resolves the Android tab by its exact document across Gecko tab namespaces`() {
+        val tabs = listOf(2L to "document_a1b2", 8L to "document_c3d4")
+
+        assertEquals(
+            2L,
+            DagVideoLabGrantTabAuthority.resolveAndroidTabId(
+                backgroundTabId = 41L,
+                documentToken = "document_a1b2",
+                tabDocuments = tabs,
+            ),
+        )
+        assertNull(
+            DagVideoLabGrantTabAuthority.resolveAndroidTabId(
+                backgroundTabId = 41L,
+                documentToken = "document_a1b2",
+                tabDocuments = tabs + (9L to "document_a1b2"),
+            ),
+        )
+    }
+
+    @Test
     fun `exact revision advances through one bounded capture`() {
         val machine = DagVideoLabStateMachine()
         val key = key(revision = 4)
@@ -169,6 +332,16 @@ class DagVideoLabContractTest {
                 expectedBottomRight = DagVideoLabFixtureColor.LightNeutral,
             ),
         )
+    }
+
+    @Test
+    fun `fixture compositor retry is bounded and never applies to real pages`() {
+        assertTrue(DagVideoLabFixtureCapturePolicy.shouldRetry(fixture = true, attempt = 0))
+        assertTrue(DagVideoLabFixtureCapturePolicy.shouldRetry(fixture = true, attempt = 1))
+        assertTrue(DagVideoLabFixtureCapturePolicy.shouldRetry(fixture = true, attempt = 2))
+        assertFalse(DagVideoLabFixtureCapturePolicy.shouldRetry(fixture = true, attempt = 3))
+        assertFalse(DagVideoLabFixtureCapturePolicy.shouldRetry(fixture = false, attempt = 0))
+        assertTrue(DagVideoLabFixtureCapturePolicy.RetryDelayMillis in 1L..100L)
     }
 
     private fun key(
