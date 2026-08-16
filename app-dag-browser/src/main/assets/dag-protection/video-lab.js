@@ -40,13 +40,15 @@
   const recordState = globalThis.__gloshDagVideoLabRecord;
   const mutationPolicy = globalThis.__gloshDagVideoLabMutations;
   const bootstrapRuntime = globalThis.__gloshDagVideoLabBootstrap;
+  const isolationRuntime = globalThis.__gloshDagVideoLabIsolation;
   if (
     diagnosticLabels === undefined ||
     geometry === undefined ||
     presentation === undefined ||
     recordState === undefined ||
     mutationPolicy === undefined ||
-    bootstrapRuntime === undefined
+    bootstrapRuntime === undefined ||
+    isolationRuntime === undefined
   ) return;
   const {
     hasBackingMedia,
@@ -84,7 +86,6 @@
   const timelineStages = new Set();
   const records = new WeakMap();
   const backingSnapshots = new WeakMap();
-  const originalAudioStates = new WeakMap();
 
   const randomToken = (wordCount) => {
     const words = crypto.getRandomValues(new Uint32Array(wordCount));
@@ -173,34 +174,19 @@
       ...extra,
     });
 
-  const enforceMuted = (record) => {
-    if (record !== activeRecord || record.retiring || record.smoothActive) return;
-    if (!record.video.muted) record.video.muted = true;
-    if (!record.video.defaultMuted) record.video.defaultMuted = true;
-    if (record.video.volume !== 0) record.video.volume = 0;
-  };
-
-  const originalAudioState = (media) => {
-    const existing = originalAudioStates.get(media);
-    if (existing !== undefined) return existing;
-    const state = Object.freeze({
-      muted: media.muted === true,
-      defaultMuted: media.defaultMuted === true,
-      volume: Number.isFinite(media.volume) ? Math.min(1, Math.max(0, media.volume)) : 1,
-    });
-    originalAudioStates.set(media, state);
-    return state;
-  };
-
-  const safePause = (video) => {
-    const backedVideo = typeof HTMLVideoElement !== "undefined" &&
-      video instanceof HTMLVideoElement &&
-      hasBackingMedia(video);
-    postTimeline(backedVideo ? "timeline_safe_pause_backing" : "timeline_safe_pause_no_backing");
-    try {
-      video.pause();
-    } catch {}
-  };
+  const isolation = isolationRuntime.create({
+    MediaElement: HTMLMediaElement,
+    VideoElement: globalThis.HTMLVideoElement ?? null,
+    activeRecord: () => activeRecord,
+    closingRecord: () => closingRecord,
+    enabled: () => enabled,
+    hasBackingMedia,
+    isolationLocked: () => isolationLocked,
+    postTimeline,
+  });
+  const enforceMuted = isolation.enforceMuted;
+  const originalAudioState = isolation.originalAudioState;
+  const safePause = isolation.safePause;
 
   const rememberExpectedPresentationMutation = (record, attribute, apply) => {
     const before = record.video.getAttribute(attribute);
@@ -227,45 +213,11 @@
   // A raw compositor grant is scoped to the selected video only.  Audio and
   // every other video stay both silent and paused for the entire diagnostic
   // session; a document cannot race a newly inserted element past this guard.
-  const isAuthorizedRawPlayback = (media) => {
-    const record = activeRecord;
-    return record !== null &&
-      media === record.video &&
-      record.rawFrameOpen && (
-        (record.framePending && !record.smoothActive) ||
-        (record.smoothActive && record.covered)
-      ) &&
-      !isolationLocked &&
-      !record.retiring &&
-      !record.terminal;
-  };
-
-  const silenceAndPauseMedia = (media) => {
-    if (!(media instanceof HTMLMediaElement)) return;
-    if (isAuthorizedRawPlayback(media)) return;
-    originalAudioState(media);
-    if (!media.muted) media.muted = true;
-    if (!media.defaultMuted) media.defaultMuted = true;
-    if (media.volume !== 0) media.volume = 0;
-    if (!isAuthorizedRawPlayback(media)) safePause(media);
-  };
-
-  const mediaIsolationActive = () =>
-    isolationLocked || enabled || activeRecord !== null || closingRecord !== null;
-
-  const enforceMediaIsolation = () => {
-    if (!mediaIsolationActive()) return;
-    postTimeline("timeline_isolation_enforced");
-    for (const media of document.querySelectorAll("audio, video")) {
-      silenceAndPauseMedia(media);
-    }
-  };
-
-  const stopUnauthorizedPlayback = (event) => {
-    if (!mediaIsolationActive()) return;
-    postTimeline("timeline_play_event");
-    silenceAndPauseMedia(event.target);
-  };
+  const isAuthorizedRawPlayback = isolation.isAuthorizedRawPlayback;
+  const silenceAndPauseMedia = isolation.silenceAndPauseMedia;
+  const mediaIsolationActive = isolation.active;
+  const enforceMediaIsolation = () => isolation.enforce(document);
+  const stopUnauthorizedPlayback = isolation.stopUnauthorizedPlayback;
 
   const clearRecordTimers = recordState.clearTimers;
   const resetFrameState = recordState.resetFrame;
