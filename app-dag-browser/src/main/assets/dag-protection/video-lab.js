@@ -37,7 +37,17 @@
   const diagnosticLabels = globalThis.__gloshDagVideoLabDiagnostics;
   const geometry = globalThis.__gloshDagVideoLabGeometry;
   const presentation = globalThis.__gloshDagVideoLabPresentation;
-  if (diagnosticLabels === undefined || geometry === undefined || presentation === undefined) return;
+  const recordState = globalThis.__gloshDagVideoLabRecord;
+  const mutationPolicy = globalThis.__gloshDagVideoLabMutations;
+  const bootstrapRuntime = globalThis.__gloshDagVideoLabBootstrap;
+  if (
+    diagnosticLabels === undefined ||
+    geometry === undefined ||
+    presentation === undefined ||
+    recordState === undefined ||
+    mutationPolicy === undefined ||
+    bootstrapRuntime === undefined
+  ) return;
   const {
     hasBackingMedia,
     sameVideoRect,
@@ -257,92 +267,19 @@
     silenceAndPauseMedia(event.target);
   };
 
-  const clearRecordTimers = (record) => {
-    clearTimeout(record.nextCaptureTimer);
-    clearTimeout(record.readinessTimer);
-    clearTimeout(record.resultTimer);
-    clearTimeout(record.coverTimer);
-    clearTimeout(record.presentationMutationClearTimer);
-    record.nextCaptureTimer = null;
-    record.readinessTimer = null;
-    record.resultTimer = null;
-    record.coverTimer = null;
-    record.presentationMutationClearTimer = null;
-    if (
-      record.frameCallbackId !== null &&
-      typeof record.video.cancelVideoFrameCallback === "function"
-    ) {
-      try {
-        record.video.cancelVideoFrameCallback(record.frameCallbackId);
-      } catch {}
-    }
-    record.frameCallbackId = null;
-  };
-
-  const resetFrameState = (record) => {
-    record.framePending = false;
-    record.frameCaptured = false;
-    record.frameConcealed = false;
-    record.frameAllowed = null;
-    record.frameViewportEpoch = record.viewportEpoch;
-  };
+  const clearRecordTimers = recordState.clearTimers;
+  const resetFrameState = recordState.resetFrame;
 
   const recordFor = (video) => {
     const existing = records.get(video);
     if (existing !== undefined) return existing;
     const audioState = originalAudioState(video);
-    const record = {
+    const record = recordState.create(
       video,
-      videoId: `video_${randomToken(2)}`,
-      revision: 0,
-      activations: 0,
-      captures: 0,
-      covered: false,
-      coverPending: false,
-      coverAcknowledged: false,
-      framePending: false,
-      frameCaptured: false,
-      frameConcealed: false,
-      frameAllowed: null,
-      frameSequence: 0,
-      viewportEpoch: 0,
-      frameViewportEpoch: 0,
-      rawFrameOpen: false,
-      smoothActive: false,
-      smoothGrantIdentity: null,
-      originalMuted: audioState.muted,
-      originalDefaultMuted: audioState.defaultMuted,
-      originalVolume: audioState.volume,
-      terminal: false,
-      retiring: false,
-      retirePromise: null,
-      concealFailed: false,
-      concealPromise: null,
-      sourceSignature: "",
-      sourceIdentity: null,
-      revealToken: randomToken(4),
-      nextCaptureTimer: null,
-      readinessTimer: null,
-      resultTimer: null,
-      coverTimer: null,
-      frameCallbackId: null,
-      coverRequestedAt: null,
-      coverMillis: null,
-      decodeStartedAt: null,
-      expectedPresentationMutations: [],
-      presentationMutationClearTimer: null,
-      viewportSignature: null,
-      viewportTransitionStartedAt: null,
-      viewportTransitionCount: 0,
-      pendingViewportSignature: null,
-      bootstrapBackingGeneration: 0,
-      bootstrapLoadStarted: false,
-      bootstrapLoadSourceSignature: null,
-      bootstrapTransitionUsed: false,
-      bootstrapSourceSignature: null,
-      bootstrapState: globalThis.__gloshDagVideoBootstrapState.create(),
-      playGeneration: 0,
-    };
+      audioState,
+      randomToken,
+      globalThis.__gloshDagVideoBootstrapState.create(),
+    );
     const keepMuted = () => enforceMuted(record);
     const closeUnsafePresentation = () => retireUnsafePresentation(record);
     const reportPlaybackEvent = (event) => {
@@ -428,6 +365,17 @@
   const presentationGuardReady = () =>
     presentation.guardReady(document, PRESENTATION_GUARD_ATTRIBUTE, PRESENTATION_GUARD_VERSION);
 
+  const bootstrapTransitions = bootstrapRuntime.create({
+    activeRecord: () => activeRecord,
+    capabilityFailure: presentationCapabilityFailure,
+    hasDocumentToken: () => documentToken !== "",
+    now: () => performance.now(),
+    sameViewportBounds,
+    sameViewportSignature,
+    sourceSignature,
+    unsafeActive: (record) => unsafePresentationActive(record),
+  });
+
   const reportBackingTransition = (video) => {
     const next = {
       currentSrc: Boolean(video.currentSrc),
@@ -451,76 +399,22 @@
   };
 
   const armBootstrapGeneration = (record) => {
-    if (
-      record !== activeRecord ||
-      !record.coverAcknowledged ||
-      !record.bootstrapLoadStarted ||
-      record.bootstrapBackingGeneration !== 0 ||
-      record.bootstrapLoadSourceSignature !== record.sourceSignature ||
-      record.sourceSignature !== sourceSignature(record.video) ||
-      !record.video.isConnected ||
-      record.rawFrameOpen ||
-      record.frameCaptured ||
-      record.captures !== 0
-    ) {
+    if (!bootstrapTransitions.armGeneration(record)) {
       void retireRecord(record, "bootstrap_revalidation_failed");
       return;
     }
-    record.bootstrapBackingGeneration = 1;
-    record.bootstrapSourceSignature = record.sourceSignature;
     postDiagnostic("bootstrap_generation_started");
   };
 
   const beginBootstrapViewportTransition = (record, nextSignature) => {
-    const commonInvalid =
-      record !== activeRecord ||
-      record.rawFrameOpen ||
-      record.frameCaptured ||
-      record.resultTimer !== null ||
-      record.sourceSignature !== sourceSignature(record.video) ||
-      (record.bootstrapBackingGeneration !== 0 &&
-        record.bootstrapSourceSignature !== record.sourceSignature) ||
-      !sameViewportBounds(record.viewportSignature, nextSignature) ||
-      presentationCapabilityFailure(record.video) !== null ||
-      unsafePresentationActive(record) ||
-      !record.video.isConnected ||
-      documentToken === "";
-    const bootstrapPhase = record.bootstrapState.phase();
-    const phase = record.bootstrapBackingGeneration === 1 &&
-        record.captures <= 1 &&
-        !record.framePending &&
-        bootstrapPhase === "generation"
-      ? record.bootstrapState.beginTransition(!commonInvalid)
-      : record.captures === 1 && !record.framePending && bootstrapPhase === "stable"
-        ? record.bootstrapState.beginPostFrameTransition(!commonInvalid)
-        : "terminal";
-    if (!["transition", "post_frame_transition"].includes(phase)) return false;
-    record.bootstrapTransitionUsed = true;
-    record.viewportTransitionStartedAt = performance.now();
-    record.viewportTransitionCount = 1;
-    record.pendingViewportSignature = nextSignature;
+    const phase = bootstrapTransitions.beginViewportTransition(record, nextSignature);
+    if (phase === null) return false;
     postDiagnostic(phase === "transition" ? "bootstrap_transition_covered" : "post_frame_transition_covered");
     return true;
   };
 
   const completeBootstrapViewportTransition = (record, settledSignature) => {
-    const invalid =
-      !record.bootstrapTransitionUsed ||
-      record.pendingViewportSignature === null ||
-      !sameViewportSignature(record.pendingViewportSignature, settledSignature) ||
-      record.sourceSignature !== sourceSignature(record.video) ||
-      (record.bootstrapBackingGeneration !== 0 &&
-        record.bootstrapSourceSignature !== record.sourceSignature) ||
-      !sameViewportBounds(record.viewportSignature, settledSignature) ||
-      presentationCapabilityFailure(record.video) !== null ||
-      unsafePresentationActive(record) ||
-      !record.video.isConnected;
-    if (record.bootstrapState.settle(!invalid) !== "stable") return false;
-    record.viewportEpoch += 1;
-    record.viewportSignature = settledSignature;
-    record.pendingViewportSignature = null;
-    record.viewportTransitionStartedAt = null;
-    record.viewportTransitionCount = 0;
+    if (!bootstrapTransitions.completeViewportTransition(record, settledSignature)) return false;
     postDiagnostic("viewport_transition_stable");
     return true;
   };
@@ -1366,83 +1260,23 @@
     scheduleScan();
   };
 
-  const mutationTouchesActiveVideo = (mutation, record) => {
-    if (mutation.target === record.video) return true;
-    if (mutation.target instanceof HTMLSourceElement && mutation.target.parentElement === record.video) {
-      return true;
-    }
-    for (const node of [...mutation.addedNodes, ...mutation.removedNodes]) {
-      if (node === record.video) return true;
-      if (node instanceof HTMLSourceElement && node.parentElement === record.video) return true;
-    }
-    return false;
-  };
-
-  const consumeExpectedPresentationMutation = (mutation, record) => {
-    if (mutation.type !== "attributes" || mutation.target !== record.video) return false;
-    const attribute = mutation.attributeName?.toLowerCase();
-    if (!PRESENTATION_CAPABILITY_ATTRIBUTES.has(attribute)) return false;
-    const expectedIndex = record.expectedPresentationMutations.findIndex((expected) =>
-      expected.attribute === attribute && expected.oldValue === mutation.oldValue);
-    if (expectedIndex < 0) return false;
-    record.expectedPresentationMutations.splice(expectedIndex, 1);
-    return true;
-  };
-
   const mutationRequiresTerminalClose = (mutation, record) =>
-    mutationTouchesActiveVideo(mutation, record) &&
-    !consumeExpectedPresentationMutation(mutation, record);
+    mutationPolicy.requiresTerminalClose(
+      mutation,
+      record,
+      HTMLSourceElement,
+      PRESENTATION_CAPABILITY_ATTRIBUTES,
+    );
 
   const postMutationDiagnostics = (mutation, record) => {
     if (!diagnosticsEnabled) return;
-    const attribute = mutation.attributeName?.toLowerCase();
-    if (mutation.type === "attributes" && mutation.target === record.video) {
-      if (attribute === "src") {
-        postDiagnostic("mutation_video_attribute_src");
-      } else if (PRESENTATION_CAPABILITY_ATTRIBUTES.has(attribute)) {
-        postDiagnostic("mutation_video_attribute_capability");
-        postDiagnostic(`mutation_capability_${attribute}`);
-      } else {
-        postDiagnostic("mutation_video_attribute_other");
-      }
-    } else if (mutation.type === "attributes" && mutation.target instanceof HTMLSourceElement) {
-      postDiagnostic(attribute === "src" ? "mutation_source_attribute_src" : "mutation_source_attribute_type");
-    } else if (mutation.type === "childList" && mutation.target === record.video) {
-      const addedSource = [...mutation.addedNodes].some((node) => node instanceof HTMLSourceElement);
-      const removedSource = [...mutation.removedNodes].some((node) => node instanceof HTMLSourceElement);
-      postDiagnostic(
-        addedSource && removedSource
-          ? "mutation_source_replaced"
-          : addedSource
-            ? "mutation_source_added"
-            : removedSource
-              ? "mutation_source_removed"
-              : "mutation_video_children_other",
-      );
-    } else {
-      const videoAdded = [...mutation.addedNodes].includes(record.video);
-      const videoRemoved = [...mutation.removedNodes].includes(record.video);
-      postDiagnostic(videoRemoved ? "mutation_video_removed" : videoAdded ? "mutation_video_added" : "mutation_other");
-    }
-
-    const before = record.sourceIdentity;
-    const after = sourceIdentity(record.video);
-    if (before === null) {
-      postDiagnostic("mutation_source_identity_unknown");
-      return;
-    }
-    if (before.currentSrc !== after.currentSrc) postDiagnostic("mutation_current_src_changed");
-    if (before.srcAttribute !== after.srcAttribute) postDiagnostic("mutation_src_attribute_changed");
-    if (before.hasSrcObject !== after.hasSrcObject) postDiagnostic("mutation_src_object_changed");
-    if (before.sourceChildren !== after.sourceChildren) postDiagnostic("mutation_source_children_changed");
-    if (
-      before.currentSrc === after.currentSrc &&
-      before.srcAttribute === after.srcAttribute &&
-      before.hasSrcObject === after.hasSrcObject &&
-      before.sourceChildren === after.sourceChildren
-    ) {
-      postDiagnostic("mutation_source_identity_stable");
-    }
+    mutationPolicy.diagnosticStages(
+      mutation,
+      record,
+      HTMLSourceElement,
+      PRESENTATION_CAPABILITY_ATTRIBUTES,
+      sourceIdentity,
+    ).forEach(postDiagnostic);
   };
 
   const mutationObserver = new MutationObserver((recordsList) => {

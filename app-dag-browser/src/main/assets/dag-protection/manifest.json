@@ -41,8 +41,11 @@
       "js": [
         "video-lab-geometry.js",
         "video-lab-presentation.js",
+        "video-lab-record.js",
+        "video-lab-mutations.js",
         "video-lab-diagnostics.js",
         "video-bootstrap-state.js",
+        "video-lab-bootstrap.js",
         "video-lab.js",
         "video-lab-fixture.js",
         "barrier.js",

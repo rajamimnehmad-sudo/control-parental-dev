@@ -202,11 +202,20 @@ test("product smooth mode restores visible audible playback and revokes the orig
   vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, {
     filename: "video-lab-presentation.js",
   });
+  vm.runInNewContext(await readAsset("video-lab-record.js"), context, {
+    filename: "video-lab-record.js",
+  });
+  vm.runInNewContext(await readAsset("video-lab-mutations.js"), context, {
+    filename: "video-lab-mutations.js",
+  });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, {
     filename: "video-lab-diagnostics.js",
   });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, {
     filename: "video-bootstrap-state.js",
+  });
+  vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, {
+    filename: "video-lab-bootstrap.js",
   });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({

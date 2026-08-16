@@ -1716,6 +1716,9 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   const background = await readAsset("background.js");
   const videoGeometry = await readAsset("video-lab-geometry.js");
   const videoPresentation = await readAsset("video-lab-presentation.js");
+  const videoRecord = await readAsset("video-lab-record.js");
+  const videoMutations = await readAsset("video-lab-mutations.js");
+  const videoBootstrap = await readAsset("video-lab-bootstrap.js");
   const videoDiagnostics = await readAsset("video-lab-diagnostics.js");
   const videoLab = await readAsset("video-lab.js");
   const presentationGuard = await readAsset("presentation-guard.js");
@@ -1725,6 +1728,9 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   const manifest = await readAsset("manifest.json");
   new vm.Script(videoGeometry);
   new vm.Script(videoPresentation);
+  new vm.Script(videoRecord);
+  new vm.Script(videoMutations);
+  new vm.Script(videoBootstrap);
   new vm.Script(videoDiagnostics);
   new vm.Script(videoLab);
   assert.match(videoLab, /INITIAL_COVERED_CAPTURE_COUNT = 2/u);
@@ -1737,7 +1743,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /video-lab-frame-captured/u);
   assert.match(videoLab, /video-lab-frame-concealed/u);
   assert.match(videoLab, /video-lab-smooth-start/u);
-  assert.match(videoLab, /smoothGrantIdentity: null/u);
+  assert.match(videoRecord, /smoothGrantIdentity: null/u);
   assert.match(videoLab, /smoothGrantIdentity = Object\.freeze\(grantIdentity\(record\)\)/u);
   assert.match(videoLab, /smoothGrantIdentity \?\? grantIdentity\(record\)/u);
   assert.match(videoLab, /video-lab-retire/u);
@@ -1750,7 +1756,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /const isAuthorizedRawPlayback/u);
   assert.match(videoLab, /const originalAudioStates = new WeakMap\(\)/u);
   assert.match(videoLab, /originalAudioState\(media\);[\s\S]*media\.muted = true/u);
-  assert.match(videoLab, /originalMuted: audioState\.muted/u);
+  assert.match(videoRecord, /originalMuted: audioState\.muted/u);
   assert.match(videoLab, /smooth_visibility_ready/u);
   assert.match(videoLab, /smooth_audio_restored/u);
   assert.match(background, /:root \[\$\{VIDEO_LAB_TOKEN_ATTRIBUTE\}/u);
@@ -1771,9 +1777,9 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.doesNotMatch(videoLab, /controlslist/iu);
   assert.match(videoLab, /attributeOldValue: true/u);
   assert.match(videoLab, /const mutationRequiresTerminalClose/u);
-  assert.match(videoLab, /"disablepictureinpicture"/u);
-  assert.match(videoLab, /"disableremoteplayback"/u);
-  assert.match(videoLab, /"playsinline"/u);
+  assert.match(videoPresentation, /"disablepictureinpicture"/u);
+  assert.match(videoPresentation, /"disableremoteplayback"/u);
+  assert.match(videoPresentation, /"playsinline"/u);
   assert.match(videoLab, /document\.documentElement\.hasAttribute\(INTERNAL_FIXTURE_ATTRIBUTE\)/u);
   assert.match(videoLab, /requestVideoFrameCallback/u);
   assert.match(videoLab, /frameSequence/u);
@@ -1798,14 +1804,14 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /postDiagnostic\("viewport_transition_unstable"\)/u);
   assert.match(videoLab, /postDiagnostic\("viewport_settle_mismatch"\)/u);
   assert.match(videoLab, /postDiagnostic\("play_aborted_for_viewport"\)/u);
-  assert.match(videoLab, /bootstrapBackingGeneration === 1/u);
+  assert.match(videoBootstrap, /bootstrapBackingGeneration === 1/u);
   assert.match(videoLab, /record\.bootstrapLoadStarted = true/u);
   assert.match(videoLab, /record\.coverAcknowledged\) armBootstrapGeneration\(record\)/u);
   assert.match(videoLab, /if \(record\.bootstrapLoadStarted\) armBootstrapGeneration\(record\)/u);
   assert.match(videoLab, /record\.bootstrapLoadStarted \|\| record\.bootstrapBackingGeneration !== 0/u);
-  assert.match(videoLab, /record\.bootstrapLoadSourceSignature !== record\.sourceSignature/u);
+  assert.match(videoBootstrap, /record\.bootstrapLoadSourceSignature !== record\.sourceSignature/u);
   assert.match(videoLab, /record\.sourceSignature !== sourceSignature\(record\.video\)/u);
-  assert.match(videoLab, /record\.rawFrameOpen \|\|\s*record\.frameCaptured/u);
+  assert.match(videoBootstrap, /record\.rawFrameOpen \|\|\s*record\.frameCaptured/u);
   assert.match(videoLab, /\(activeRecord\.covered \|\| activeRecord\.coverAcknowledged\) &&/u);
   assert.match(videoLab, /if \(!recordMatchesMessage\(record, message\) \|\| !record\.coverPending\) return;/u);
   assert.match(videoLab, /record\.coverAcknowledged = true;/u);
@@ -1821,15 +1827,15 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(background, /background_status_enabled/u);
   assert.match(background, /background_status_rejected/u);
   assert.match(videoLab, /record\.bootstrapTransitionUsed/u);
-  assert.match(videoLab, /record\.bootstrapTransitionUsed = true/u);
+  assert.match(videoBootstrap, /record\.bootstrapTransitionUsed = true/u);
   assert.match(videoLab, /const beginBootstrapViewportTransition/u);
   assert.match(videoLab, /const completeBootstrapViewportTransition/u);
   assert.match(videoLab, /beginBootstrapViewportTransition\(record, settledSignature\)/u);
   assert.match(videoLab, /record\.pendingViewportSignature !== null/u);
   assert.match(videoLab, /beginBootstrapViewportTransition\(activeRecord, nextSignature\)/u);
-  assert.match(videoLab, /record\.bootstrapTransitionUsed \|\|/u);
-  assert.match(videoLab, /record\.rawFrameOpen \|\|\s*record\.frameCaptured/u);
-  assert.match(videoLab, /!sameViewportBounds\(record\.viewportSignature, nextSignature\)/u);
+  assert.match(videoBootstrap, /record\.bootstrapTransitionUsed \|\|/u);
+  assert.match(videoBootstrap, /record\.rawFrameOpen \|\|\s*record\.frameCaptured/u);
+  assert.match(videoBootstrap, /!dependencies\.sameViewportBounds\(record\.viewportSignature, nextSignature\)/u);
   assert.match(videoLab, /retireRecord\(record, "bootstrap_generation_repeated"\)/u);
   assert.match(videoLab, /record\.sourceSignature !== sourceSignature\(record\.video\)/u);
   assert.match(videoDiagnostics, /play_ready_nothing/u);
@@ -1868,7 +1874,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /fixtureEnabled && event\?\.type === "resize" && sameVideoRect/u);
   assert.match(background, /awaitVideoLabCloseProof/u);
   assert.match(background, /revoke_waiting_for_proof/u);
-  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
+  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
 });
 
@@ -1941,8 +1947,11 @@ test("video laboratory silences dynamic unselected media in capture phase", asyn
   media.push(initialAudio, initialVideo);
   vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
   vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
+  vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
+  vm.runInNewContext(await readAsset("video-lab-mutations.js"), context, { filename: "video-lab-mutations.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
+  vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2111,8 +2120,11 @@ test("video laboratory ignores controls UI and closes on preventive capability m
 
   vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
   vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
+  vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
+  vm.runInNewContext(await readAsset("video-lab-mutations.js"), context, { filename: "video-lab-mutations.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
+  vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2354,8 +2366,11 @@ test("failed video conceal leaves terminal media isolation locked until native r
   media.push(video, audio);
   vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
   vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
+  vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
+  vm.runInNewContext(await readAsset("video-lab-mutations.js"), context, { filename: "video-lab-mutations.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
+  vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2820,10 +2835,16 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.ok(protectionScript.js.indexOf("video-lab-geometry.js") <
     protectionScript.js.indexOf("video-lab-presentation.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-presentation.js") <
+    protectionScript.js.indexOf("video-lab-record.js"));
+  assert.ok(protectionScript.js.indexOf("video-lab-record.js") <
+    protectionScript.js.indexOf("video-lab-mutations.js"));
+  assert.ok(protectionScript.js.indexOf("video-lab-mutations.js") <
     protectionScript.js.indexOf("video-lab-diagnostics.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-diagnostics.js") <
     protectionScript.js.indexOf("video-bootstrap-state.js"));
   assert.ok(protectionScript.js.indexOf("video-bootstrap-state.js") <
+    protectionScript.js.indexOf("video-lab-bootstrap.js"));
+  assert.ok(protectionScript.js.indexOf("video-lab-bootstrap.js") <
     protectionScript.js.indexOf("video-lab.js"));
   assert.ok(protectionScript.js.indexOf("video-lab.js") < protectionScript.js.indexOf("barrier.js"));
   assert.ok(protectionScript.js.indexOf("barrier.js") < protectionScript.js.indexOf("ads.js"));
@@ -2928,6 +2949,51 @@ test("video presentation policy stays provider-neutral and fail-closed", async (
   document.pictureInPictureElement = {};
   assert.equal(policy.unsafeReason({ video }, document, true), "picture_in_picture");
   assert.equal(policy.unsafeReason({ video }, document, false), "guard_unverified");
+});
+
+test("video record state starts closed and clears every pending frame resource", async () => {
+  const cleared = [];
+  const cancelled = [];
+  const context = {
+    clearTimeout: (value) => cleared.push(value),
+    console,
+  };
+  context.globalThis = context;
+  vm.runInNewContext(await readAsset("video-lab-record.js"), context);
+  const state = context.__gloshDagVideoLabRecord;
+  const video = { cancelVideoFrameCallback: (value) => cancelled.push(value) };
+  const record = state.create(
+    video,
+    { muted: false, defaultMuted: false, volume: 0.75 },
+    (count) => `token-${count}`,
+    { phase: () => "idle" },
+  );
+  assert.equal(record.covered, false);
+  assert.equal(record.rawFrameOpen, false);
+  assert.equal(record.framePending, false);
+  assert.equal(record.videoId, "video_token-2");
+  assert.equal(record.revealToken, "token-4");
+  record.framePending = true;
+  record.frameCaptured = true;
+  record.frameConcealed = true;
+  record.frameAllowed = true;
+  record.viewportEpoch = 4;
+  state.resetFrame(record);
+  assert.equal(record.framePending, false);
+  assert.equal(record.frameCaptured, false);
+  assert.equal(record.frameConcealed, false);
+  assert.equal(record.frameAllowed, null);
+  assert.equal(record.frameViewportEpoch, 4);
+  record.nextCaptureTimer = 1;
+  record.readinessTimer = 2;
+  record.resultTimer = 3;
+  record.coverTimer = 4;
+  record.presentationMutationClearTimer = 5;
+  record.frameCallbackId = 6;
+  state.clearTimers(record);
+  assert.deepEqual(cleared, [1, 2, 3, 4, 5]);
+  assert.deepEqual(cancelled, [6]);
+  assert.equal(record.frameCallbackId, null);
 });
 
 test("video diagnostic labels stay pure, finite and content-free", async () => {
