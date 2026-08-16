@@ -7,9 +7,9 @@ internal data class DagOpenTabSession(
     val lastActivatedSequence: Long,
 )
 
-/** Keeps Gecko content processes bounded independently from the visible tab capacity. */
+/** Keeps Gecko decoders and content processes bounded independently from the tab list. */
 internal object DagTabSessionPolicy {
-    const val MaxOpenSessions = 3
+    const val MaxOpenSessions = 1
 
     fun sessionsToHibernate(tabs: List<DagOpenTabSession>): Set<Long> {
         val openTabs = tabs.filter(DagOpenTabSession::open)

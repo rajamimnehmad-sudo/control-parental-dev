@@ -2,11 +2,10 @@ package com.contentfilter.dagbrowser
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
-import kotlin.test.assertTrue
 
 class DagTabSessionPolicyTest {
     @Test
-    fun `keeps active tab and two most recent warm sessions`() {
+    fun `keeps only the active session open`() {
         val tabs =
             listOf(
                 session(1, sequence = 1),
@@ -16,11 +15,11 @@ class DagTabSessionPolicyTest {
                 session(5, sequence = 2),
             )
 
-        assertEquals(setOf(1L, 5L), DagTabSessionPolicy.sessionsToHibernate(tabs))
+        assertEquals(setOf(1L, 2L, 4L, 5L), DagTabSessionPolicy.sessionsToHibernate(tabs))
     }
 
     @Test
-    fun `closed sessions never consume warm capacity`() {
+    fun `closed sessions never consume the active session capacity`() {
         val tabs =
             listOf(
                 session(1, active = true, sequence = 1),
@@ -28,7 +27,7 @@ class DagTabSessionPolicyTest {
                 session(3, sequence = 3, open = false),
             )
 
-        assertTrue(DagTabSessionPolicy.sessionsToHibernate(tabs).isEmpty())
+        assertEquals(setOf(2L), DagTabSessionPolicy.sessionsToHibernate(tabs))
     }
 
     private fun session(

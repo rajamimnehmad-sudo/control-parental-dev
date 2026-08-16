@@ -108,6 +108,13 @@ prueba, un segundo YouTube distinto arranco automaticamente, llego a
 con 39 pestañas acumuladas agoto el decoder VP9 del A23 (`NO_MEMORY`); no fue una
 regresion del filtro y desaparecio al volver a una pestaña limpia.
 
+La saturacion tambien cerro una deuda general de pestañas: el A23 no sostiene de
+forma fiable decodificadores VP9 en tres sesiones Gecko abiertas. La politica
+local ahora conserva abierta solo la pestaña activa; las otras mantienen sus
+metadatos y miniatura y vuelven a cargar bajo las barreras al seleccionarlas.
+Este cambio esta validado localmente y queda pendiente de medicion fisica, sin
+nueva APK en este punto.
+
 Limpieza del lote: se retiraron los prototipos aislados de WebM, transporte y
 benchmark que nunca estuvieron en el manifiesto ni conectados a la Activity,
 junto con sus pruebas duplicadas. La decision arquitectonica queda conservada
