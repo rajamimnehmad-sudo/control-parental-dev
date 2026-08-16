@@ -121,11 +121,11 @@ junto con sus pruebas duplicadas. La decision arquitectonica queda conservada
 en `DAG_VIDEO_FLUID_ARCHITECTURE.md`; la suite activa de producto queda 60/60,
 y los unitarios DEV/Diagnostic y ktlint siguen verdes. No se genero otra APK.
 
-`DAG-STRUCTURE-01` completo nueve cortes neutrales: diagnostico, identidad de
+`DAG-STRUCTURE-01` completo diez cortes neutrales: diagnostico, identidad de
 fuente/geometria/viewport, presentacion preventiva, estado por video,
 clasificacion de mutaciones, aislamiento multimedia y transiciones bootstrap
-mas reinicio de autoridad y revocacion durable salieron a modulos acotados.
-`video-lab.js` bajo de 1.758 a 1.254 lineas sin mover la autoridad ni
+mas reinicio de autoridad, revocacion durable y reproduccion fluida salieron a
+modulos acotados. `video-lab.js` bajo de 1.758 a 1.118 lineas sin mover la autoridad ni
 el cierre seguro. La carga explicita, los contratos directos y el flujo de
 producto quedan en 64/64;
 unitarios DEV/Diagnostic y ktlint tambien pasan. Sin APK ni prueba fisica porque
@@ -152,8 +152,8 @@ Progreso ejecutivo DAG Video: 99%.
   captura e inferencia. Ese es el riesgo temporal que debe comunicar producto.
 - `DagBrowserActivity.kt` supera 4.000 lineas y no debe recibir otra
   responsabilidad. El runtime fluido debe vivir en componentes separados.
-- `video-lab.js` aun tiene 1.254 lineas. `DAG-STRUCTURE-01` esta en progreso;
-  el siguiente corte debe separar captura fluida antes
+- `video-lab.js` aun tiene 1.118 lineas. `DAG-STRUCTURE-01` esta en progreso;
+  el siguiente corte debe separar preparacion/acuse de captura antes
   de sumar responsabilidades nuevas.
 - Los prototipos WebM/transporte/binario siguen como investigacion aislada y
   fuera del manifiesto/Activity; no conectarlos sin otra decision de arquitectura.

@@ -16,6 +16,7 @@ class MediaBarrierContractTest {
     private val videoRecord by lazy { extensionRoot.resolve("video-lab-record.js").readText() }
     private val videoIsolation by lazy { extensionRoot.resolve("video-lab-isolation.js").readText() }
     private val videoLifecycle by lazy { extensionRoot.resolve("video-lab-lifecycle.js").readText() }
+    private val videoPlayback by lazy { extensionRoot.resolve("video-lab-playback.js").readText() }
     private val ads by lazy { extensionRoot.resolve("ads.js").readText() }
     private val schedulerGuard by lazy { extensionRoot.resolve("runaway-scheduler-guard.js").readText() }
     private val presentationGuard by lazy { extensionRoot.resolve("presentation-guard.js").readText() }
@@ -213,12 +214,12 @@ class MediaBarrierContractTest {
         assertContains(background, "cssOrigin: \"user\"")
         assertContains(background, "hasCurrentVideoLabGrant(details)")
         assertContains(background, "AUDIO_MEDIA_MIME_PATTERN.test(contentType)")
-        assertContains(videoLab, "coverMillis: record.coverMillis")
-        assertContains(videoLab, "decodeMillis,")
+        assertContains(videoPlayback, "coverMillis: record.coverMillis")
+        assertContains(videoPlayback, "decodeMillis,")
         assertContains(rasterPolicy, "DagOnDeviceImageAnalyzer.FilterThreshold")
         assertContains(rasterPolicy, "DagUncertainRegionalCropper.quadrantViews")
         assertFalse(videoLab.contains(".style.visibility ="))
-        assertContains(videoLab, "const style = getComputedStyle(record.video)")
+        assertContains(videoPlayback, "const style = dependencies.getComputedStyle(record.video)")
         assertContains(videoLab, "message.action === \"allow\"")
         assertContains(videoLab, "record.frameConcealed")
     }
@@ -344,12 +345,12 @@ class MediaBarrierContractTest {
         assertContains(videoLab, "video-lab-frame-request")
         assertContains(videoLab, "video-lab-smooth-start")
         assertContains(videoRecord, "smoothGrantIdentity: null")
-        assertContains(videoLab, "record.smoothGrantIdentity = Object.freeze(grantIdentity(record))")
+        assertContains(videoPlayback, "record.smoothGrantIdentity = Object.freeze(dependencies.grantIdentity(record))")
         assertContains(videoLifecycle, "record.smoothGrantIdentity ?? dependencies.grantIdentity(record)")
         assertContains(videoIsolation, "const originalAudioStates = new WeakMap()")
         assertContains(videoRecord, "originalMuted: audioState.muted")
-        assertContains(videoLab, "smooth_visibility_ready")
-        assertContains(videoLab, "smooth_audio_restored")
+        assertContains(videoPlayback, "smooth_visibility_ready")
+        assertContains(videoPlayback, "smooth_audio_restored")
         assertContains(background, "opacity: 1 !important")
         assertContains(activity, "handleVideoLabSmoothStart")
         assertContains(videoLab, "record.video.muted = true")
@@ -359,7 +360,7 @@ class MediaBarrierContractTest {
         assertContains(videoLab, "data-glosh-dag-video-lab-token")
         assertContains(videoLab, "FRAME_RESULT_TIMEOUT_MS = 2_500")
         assertContains(videoLab, "record.framePending ||")
-        assertContains(videoLab, "requestVideoFrameCallback")
+        assertContains(videoPlayback, "requestVideoFrameCallback")
         assertContains(videoLab, "frameSequence")
         assertContains(videoLab, "viewportEpoch")
         assertContains(background, "isVideoLabEligibleSender")

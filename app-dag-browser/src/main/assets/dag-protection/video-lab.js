@@ -42,6 +42,7 @@
   const bootstrapRuntime = globalThis.__gloshDagVideoLabBootstrap;
   const isolationRuntime = globalThis.__gloshDagVideoLabIsolation;
   const lifecycleRuntime = globalThis.__gloshDagVideoLabLifecycle;
+  const playbackRuntime = globalThis.__gloshDagVideoLabPlayback;
   if (
     diagnosticLabels === undefined ||
     geometry === undefined ||
@@ -50,7 +51,8 @@
     mutationPolicy === undefined ||
     bootstrapRuntime === undefined ||
     isolationRuntime === undefined ||
-    lifecycleRuntime === undefined
+    lifecycleRuntime === undefined ||
+    playbackRuntime === undefined
   ) return;
   const {
     hasBackingMedia,
@@ -553,178 +555,40 @@
     return false;
   };
 
-  const finishFrameIfReady = (record) => {
-    if (
-      record !== activeRecord ||
-      !record.framePending ||
-      !record.frameConcealed ||
-      record.frameAllowed === null
-    ) return;
-    clearTimeout(record.resultTimer);
-    record.resultTimer = null;
-    const allowed = record.frameAllowed === true;
-    resetFrameState(record);
-    if (!allowed || !enabled || record.terminal) {
-      record.terminal = true;
-      safePause(record.video);
-      return;
-    }
-    record.captures += 1;
-    if (record.captures >= MAX_CAPTURE_COUNT) {
-      // The native side closes the bounded laboratory at this point. Stop
-      // local reselection synchronously so its disable message cannot race a
-      // new candidate into coverPending after the exact durable close.
-      enabled = false;
-      void retireRecord(record, "capture_limit");
-      return;
-    }
-    if (!record.smoothActive && record.captures >= INITIAL_COVERED_CAPTURE_COUNT) {
-      void startSmoothPlayback(record);
-      return;
-    }
-    scheduleNextCapture(record);
-  };
-
-  const scheduleNextCapture = (record) => {
-    record.nextCaptureTimer = setTimeout(() => {
-      record.nextCaptureTimer = null;
-      requestFrameWhenReady(record);
-    }, record.smoothActive ? SMOOTH_CAPTURE_DELAY_MS : CAPTURE_DELAY_MS);
-  };
-
-  const startSmoothPlayback = async (record) => {
-    if (
-      record !== activeRecord || !record.covered || record.rawFrameOpen ||
-      record.retiring || record.terminal || !record.video.isConnected
-    ) return;
-    const reveal = await browser.runtime.sendMessage({
-      type: REVEAL_MESSAGE,
-      version: protocolVersion,
-      documentToken,
-      token: record.revealToken,
-      ...grantIdentity(record),
-    }).catch(() => null);
-    if (reveal?.inserted !== true || record !== activeRecord || !record.covered) {
-      void retireRecord(record, "smooth_reveal_denied");
-      return;
-    }
-    record.rawFrameOpen = true;
-    record.smoothActive = true;
-    record.smoothGrantIdentity = Object.freeze(grantIdentity(record));
-    record.video.muted = true;
-    record.video.defaultMuted = true;
-    record.video.volume = 0;
-    record.video.setAttribute(TOKEN_ATTRIBUTE, record.revealToken);
-    enforcePresentationCapabilities(record);
-    const style = getComputedStyle(record.video);
-    const opacity = Number.parseFloat(style.opacity);
-    if (
-      style.visibility !== "visible" ||
-      style.display === "none" ||
-      !Number.isFinite(opacity) ||
-      opacity <= 0 ||
-      visibleArea(record.video) <= 0
-    ) {
-      postDiagnostic("smooth_visibility_rejected");
-      void retireRecord(record, "smooth_visibility_rejected");
-      return;
-    }
-    postDiagnostic("smooth_visibility_ready");
-    try {
-      await record.video.play();
-    } catch {
-      void retireRecord(record, "smooth_play_rejected");
-      return;
-    }
-    if (record !== activeRecord || !record.smoothActive || unsafePresentationActive(record)) {
-      void retireRecord(record, "smooth_start_invalidated");
-      return;
-    }
-    record.video.muted = record.originalMuted;
-    record.video.defaultMuted = record.originalDefaultMuted;
-    record.video.volume = record.originalVolume;
-    if (
-      record.video.muted !== record.originalMuted ||
-      record.video.defaultMuted !== record.originalDefaultMuted ||
-      record.video.volume !== record.originalVolume
-    ) {
-      postDiagnostic("smooth_audio_restore_failed");
-      void retireRecord(record, "smooth_audio_restore_failed");
-      return;
-    }
-    postDiagnostic("smooth_audio_restored");
-    if (!postRecord(SMOOTH_START_MESSAGE, record, { cadenceMillis: SMOOTH_CAPTURE_DELAY_MS })) {
-      void retireRecord(record, "smooth_start_rejected");
-      return;
-    }
-    postDiagnostic("smooth_playback_started");
-    scheduleNextCapture(record);
-  };
-
-  const beginSmoothFrame = (record) => {
-    record.frameSequence += 1;
-    record.frameViewportEpoch = record.viewportEpoch;
-    record.framePending = true;
-    record.frameCaptured = false;
-    record.frameConcealed = false;
-    record.frameAllowed = null;
-    record.decodeStartedAt = performance.now();
-    requestVideoFrame(record);
-  };
-
-  const requestVideoFrame = (record) => {
-    if (
-      record !== activeRecord ||
-      !record.framePending ||
-      record.retiring ||
-      record.terminal ||
-      unsafePresentationActive(record)
-    ) {
-      if (record === activeRecord && unsafePresentationActive(record)) {
-        retireUnsafePresentation(record);
-      }
-      return;
-    }
-    if (record.viewportTransitionStartedAt !== null) return;
-    if (typeof record.video.requestVideoFrameCallback !== "function") {
-      void retireRecord(record, "frame_callback_unavailable");
-      return;
-    }
-    record.frameCallbackId = record.video.requestVideoFrameCallback((_now, metadata) => {
-      record.frameCallbackId = null;
-      if (
-        record !== activeRecord ||
-        !record.framePending ||
-        record.retiring ||
-        record.terminal ||
-        unsafePresentationActive(record)
-      ) {
-        if (record === activeRecord && unsafePresentationActive(record)) {
-          retireUnsafePresentation(record);
-        }
-        return;
-      }
-      clearTimeout(record.readinessTimer);
-      record.readinessTimer = null;
-      if (!record.smoothActive) safePause(record.video);
-      const decodeMillis = record.decodeStartedAt === null
-        ? null
-        : Math.max(0, performance.now() - record.decodeStartedAt);
-      if (!postFrameRecord(FRAME_REQUEST_MESSAGE, record, {
-        captureIndex: record.captures,
-        coverMillis: record.coverMillis,
-        decodeMillis,
-        presentedFrames: Number.isFinite(metadata?.presentedFrames) ? metadata.presentedFrames : null,
-      })) {
-        void retireRecord(record, "frame_request_rejected");
-        return;
-      }
-      record.resultTimer = setTimeout(() => {
-        record.resultTimer = null;
-        void retireRecord(record, "frame_result_timeout");
-      }, FRAME_RESULT_TIMEOUT_MS);
-    });
-  };
+  const playback = playbackRuntime.create({
+    browser,
+    captureDelayMillis: CAPTURE_DELAY_MS,
+    documentToken: () => documentToken,
+    enforcePresentationCapabilities,
+    frameRequestMessage: FRAME_REQUEST_MESSAGE,
+    frameResultTimeoutMillis: FRAME_RESULT_TIMEOUT_MS,
+    getComputedStyle: (element) => getComputedStyle(element),
+    grantIdentity,
+    initialCoveredCaptureCount: INITIAL_COVERED_CAPTURE_COUNT,
+    maximumCaptureCount: MAX_CAPTURE_COUNT,
+    now: () => performance.now(),
+    postDiagnostic,
+    postFrameRecord,
+    postRecord,
+    protocolVersion: () => protocolVersion,
+    requestFrameWhenReady: (record) => requestFrameWhenReady(record),
+    resetFrameState,
+    retireRecord,
+    retireUnsafePresentation,
+    revealMessage: REVEAL_MESSAGE,
+    safePause,
+    smoothCaptureDelayMillis: SMOOTH_CAPTURE_DELAY_MS,
+    smoothStartMessage: SMOOTH_START_MESSAGE,
+    state: lifecycleState,
+    tokenAttribute: TOKEN_ATTRIBUTE,
+    unsafePresentationActive,
+    visibleArea,
+  });
+  const beginSmoothFrame = playback.beginSmoothFrame;
+  const finishFrameIfReady = playback.finishFrameIfReady;
+  const requestVideoFrame = playback.requestVideoFrame;
+  const scheduleNextCapture = playback.scheduleNextCapture;
+  const startSmoothPlayback = playback.startSmoothPlayback;
 
   const revealAndRequestFrame = async (record) => {
     if (
