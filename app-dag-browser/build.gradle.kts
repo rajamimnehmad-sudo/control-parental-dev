@@ -177,6 +177,7 @@ val testDagProtectionJs =
             "src/main/assets/dag-protection/video-lab-record.js",
             "src/main/assets/dag-protection/video-lab-mutations.js",
             "src/main/assets/dag-protection/video-lab-isolation.js",
+            "src/main/assets/dag-protection/video-lab-lifecycle.js",
             "src/main/assets/dag-protection/video-lab-bootstrap.js",
             "src/main/assets/dag-protection/video-lab.js",
             "src/test/js/dag-protection.test.mjs",

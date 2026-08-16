@@ -15,6 +15,7 @@ class MediaBarrierContractTest {
     private val videoPresentation by lazy { extensionRoot.resolve("video-lab-presentation.js").readText() }
     private val videoRecord by lazy { extensionRoot.resolve("video-lab-record.js").readText() }
     private val videoIsolation by lazy { extensionRoot.resolve("video-lab-isolation.js").readText() }
+    private val videoLifecycle by lazy { extensionRoot.resolve("video-lab-lifecycle.js").readText() }
     private val ads by lazy { extensionRoot.resolve("ads.js").readText() }
     private val schedulerGuard by lazy { extensionRoot.resolve("runaway-scheduler-guard.js").readText() }
     private val presentationGuard by lazy { extensionRoot.resolve("presentation-guard.js").readText() }
@@ -344,7 +345,7 @@ class MediaBarrierContractTest {
         assertContains(videoLab, "video-lab-smooth-start")
         assertContains(videoRecord, "smoothGrantIdentity: null")
         assertContains(videoLab, "record.smoothGrantIdentity = Object.freeze(grantIdentity(record))")
-        assertContains(videoLab, "record.smoothGrantIdentity ?? grantIdentity(record)")
+        assertContains(videoLifecycle, "record.smoothGrantIdentity ?? dependencies.grantIdentity(record)")
         assertContains(videoIsolation, "const originalAudioStates = new WeakMap()")
         assertContains(videoRecord, "originalMuted: audioState.muted")
         assertContains(videoLab, "smooth_visibility_ready")

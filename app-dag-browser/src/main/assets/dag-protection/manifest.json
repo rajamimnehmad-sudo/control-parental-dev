@@ -44,6 +44,7 @@
         "video-lab-record.js",
         "video-lab-mutations.js",
         "video-lab-isolation.js",
+        "video-lab-lifecycle.js",
         "video-lab-diagnostics.js",
         "video-bootstrap-state.js",
         "video-lab-bootstrap.js",

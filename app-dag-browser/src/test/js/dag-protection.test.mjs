@@ -1719,6 +1719,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   const videoRecord = await readAsset("video-lab-record.js");
   const videoMutations = await readAsset("video-lab-mutations.js");
   const videoIsolation = await readAsset("video-lab-isolation.js");
+  const videoLifecycle = await readAsset("video-lab-lifecycle.js");
   const videoBootstrap = await readAsset("video-lab-bootstrap.js");
   const videoDiagnostics = await readAsset("video-lab-diagnostics.js");
   const videoLab = await readAsset("video-lab.js");
@@ -1732,6 +1733,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   new vm.Script(videoRecord);
   new vm.Script(videoMutations);
   new vm.Script(videoIsolation);
+  new vm.Script(videoLifecycle);
   new vm.Script(videoBootstrap);
   new vm.Script(videoDiagnostics);
   new vm.Script(videoLab);
@@ -1747,7 +1749,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /video-lab-smooth-start/u);
   assert.match(videoRecord, /smoothGrantIdentity: null/u);
   assert.match(videoLab, /smoothGrantIdentity = Object\.freeze\(grantIdentity\(record\)\)/u);
-  assert.match(videoLab, /smoothGrantIdentity \?\? grantIdentity\(record\)/u);
+  assert.match(videoLifecycle, /smoothGrantIdentity \?\? dependencies\.grantIdentity\(record\)/u);
   assert.match(videoLab, /video-lab-retire/u);
   assert.match(videoLab, /retireRecord\(record, "seek_requested"\)/u);
   assert.match(videoLab, /video\.addEventListener\("seeking", closeTimelineDiscontinuity\)/u);
@@ -1802,7 +1804,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /const coveredBrowserTransition =\s*event\?\.type === "resize"/u);
   assert.doesNotMatch(videoLab, /const coveredBrowserTransition =\s*diagnosticsEnabled &&/u);
   assert.match(videoLab, /activeRecord\.resultTimer === null &&\s*!activeRecord\.frameCaptured/u);
-  assert.match(videoLab, /concealRecord\(record\)\.then\(\(concealed\)/u);
+  assert.match(videoLifecycle, /concealRecord\(record\)\.then\(\(concealed\)/u);
   assert.match(videoLab, /postDiagnostic\("viewport_transition_unstable"\)/u);
   assert.match(videoLab, /postDiagnostic\("viewport_settle_mismatch"\)/u);
   assert.match(videoLab, /postDiagnostic\("play_aborted_for_viewport"\)/u);
@@ -1876,7 +1878,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /fixtureEnabled && event\?\.type === "resize" && sameVideoRect/u);
   assert.match(background, /awaitVideoLabCloseProof/u);
   assert.match(background, /revoke_waiting_for_proof/u);
-  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-isolation.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
+  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-isolation.js",\s*"video-lab-lifecycle.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
 });
 
@@ -1952,6 +1954,7 @@ test("video laboratory silences dynamic unselected media in capture phase", asyn
   vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
   vm.runInNewContext(await readAsset("video-lab-mutations.js"), context, { filename: "video-lab-mutations.js" });
   vm.runInNewContext(await readAsset("video-lab-isolation.js"), context, { filename: "video-lab-isolation.js" });
+  vm.runInNewContext(await readAsset("video-lab-lifecycle.js"), context, { filename: "video-lab-lifecycle.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
@@ -2126,6 +2129,7 @@ test("video laboratory ignores controls UI and closes on preventive capability m
   vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
   vm.runInNewContext(await readAsset("video-lab-mutations.js"), context, { filename: "video-lab-mutations.js" });
   vm.runInNewContext(await readAsset("video-lab-isolation.js"), context, { filename: "video-lab-isolation.js" });
+  vm.runInNewContext(await readAsset("video-lab-lifecycle.js"), context, { filename: "video-lab-lifecycle.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
@@ -2373,6 +2377,7 @@ test("failed video conceal leaves terminal media isolation locked until native r
   vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
   vm.runInNewContext(await readAsset("video-lab-mutations.js"), context, { filename: "video-lab-mutations.js" });
   vm.runInNewContext(await readAsset("video-lab-isolation.js"), context, { filename: "video-lab-isolation.js" });
+  vm.runInNewContext(await readAsset("video-lab-lifecycle.js"), context, { filename: "video-lab-lifecycle.js" });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
@@ -2846,6 +2851,8 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.ok(protectionScript.js.indexOf("video-lab-mutations.js") <
     protectionScript.js.indexOf("video-lab-isolation.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-isolation.js") <
+    protectionScript.js.indexOf("video-lab-lifecycle.js"));
+  assert.ok(protectionScript.js.indexOf("video-lab-lifecycle.js") <
     protectionScript.js.indexOf("video-lab-diagnostics.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-diagnostics.js") <
     protectionScript.js.indexOf("video-bootstrap-state.js"));

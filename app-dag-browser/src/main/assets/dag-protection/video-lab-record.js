@@ -86,5 +86,51 @@
     record.frameViewportEpoch = record.viewportEpoch;
   };
 
-  globalThis.__gloshDagVideoLabRecord = Object.freeze({ clearTimers, create, resetFrame });
+  const resetAuthority = (record, identity) => {
+    clearTimers(record);
+    record.activations += 1;
+    record.revision += 1;
+    record.captures = 0;
+    record.covered = false;
+    record.coverPending = false;
+    record.coverAcknowledged = false;
+    record.rawFrameOpen = false;
+    record.smoothActive = false;
+    record.smoothGrantIdentity = null;
+    record.terminal = false;
+    record.retiring = false;
+    record.retirePromise = null;
+    record.concealFailed = false;
+    record.concealPromise = null;
+    record.expectedPresentationMutations.length = 0;
+    clearTimeout(record.presentationMutationClearTimer);
+    record.presentationMutationClearTimer = null;
+    record.frameSequence = 0;
+    record.viewportEpoch += 1;
+    resetFrame(record);
+    record.sourceSignature = identity.sourceSignature;
+    record.sourceIdentity = identity.sourceIdentity;
+    record.revealToken = identity.revealToken;
+    record.coverRequestedAt = null;
+    record.coverMillis = null;
+    record.decodeStartedAt = null;
+    record.viewportSignature = identity.viewportSignature;
+    record.viewportTransitionStartedAt = null;
+    record.viewportTransitionCount = 0;
+    record.pendingViewportSignature = null;
+    record.bootstrapBackingGeneration = 0;
+    record.bootstrapLoadStarted = false;
+    record.bootstrapLoadSourceSignature = null;
+    record.bootstrapTransitionUsed = false;
+    record.bootstrapSourceSignature = null;
+    record.bootstrapState.reset();
+    record.playGeneration = 0;
+  };
+
+  globalThis.__gloshDagVideoLabRecord = Object.freeze({
+    clearTimers,
+    create,
+    resetAuthority,
+    resetFrame,
+  });
 })();

@@ -41,6 +41,7 @@
   const mutationPolicy = globalThis.__gloshDagVideoLabMutations;
   const bootstrapRuntime = globalThis.__gloshDagVideoLabBootstrap;
   const isolationRuntime = globalThis.__gloshDagVideoLabIsolation;
+  const lifecycleRuntime = globalThis.__gloshDagVideoLabLifecycle;
   if (
     diagnosticLabels === undefined ||
     geometry === undefined ||
@@ -48,7 +49,8 @@
     recordState === undefined ||
     mutationPolicy === undefined ||
     bootstrapRuntime === undefined ||
-    isolationRuntime === undefined
+    isolationRuntime === undefined ||
+    lifecycleRuntime === undefined
   ) return;
   const {
     hasBackingMedia,
@@ -415,153 +417,48 @@
     void retireRecord(record, "unsafe_presentation");
   };
 
-  const concealRecord = (record) => {
-    record.video.removeAttribute(TOKEN_ATTRIBUTE);
-    if (!record.rawFrameOpen) return Promise.resolve(true);
-    if (record.concealPromise !== null) return record.concealPromise;
-    const promise = browser.runtime.sendMessage({
-      type: CONCEAL_MESSAGE,
-      version: protocolVersion,
-      documentToken,
-      token: record.revealToken,
-      ...(record.smoothGrantIdentity ?? grantIdentity(record)),
-    }).then((result) => result?.removed === true).catch(() => false).then((removed) => {
-      postDiagnostic(removed ? "conceal_removed" : "conceal_failed");
-      record.concealFailed = !removed;
-      if (removed) {
-        record.rawFrameOpen = false;
-        record.smoothGrantIdentity = null;
-      }
-      return removed;
-    });
-    record.concealPromise = promise;
-    void promise.finally(() => {
-      if (record.concealPromise === promise) record.concealPromise = null;
-    });
-    return promise;
+  const lifecycleState = {
+    get activeRecord() { return activeRecord; },
+    set activeRecord(value) { activeRecord = value; },
+    get closingRecord() { return closingRecord; },
+    set closingRecord(value) { closingRecord = value; },
+    get enabled() { return enabled; },
+    set enabled(value) { enabled = value; },
+    get isolationLocked() { return isolationLocked; },
+    set isolationLocked(value) { isolationLocked = value; },
+    get isolationLockedRecord() { return isolationLockedRecord; },
+    set isolationLockedRecord(value) { isolationLockedRecord = value; },
+    get isolationRetryPromise() { return isolationRetryPromise; },
+    set isolationRetryPromise(value) { isolationRetryPromise = value; },
   };
-
-  const postRetire = (record, reason) => {
-    if (postToAndroid === null) return;
-    try {
-      postToAndroid({
-        type: RETIRE_MESSAGE,
-        videoId: record.videoId,
-        revision: record.revision,
-        reason,
-      });
-    } catch {}
-  };
-
-  // A failed CSS removal means the old user-origin reveal may still exist.
-  // Keep a separate latch and record reference instead of relying on active or
-  // closing state: those can legitimately be cleared while the page continues
-  // firing media events. Only a later explicit native reconfiguration may
-  // retry revocation and release this latch after a confirmed success.
-  const retryTerminalIsolation = () => {
-    if (!isolationLocked) return Promise.resolve(true);
-    if (isolationRetryPromise !== null) return isolationRetryPromise;
-    const record = isolationLockedRecord;
-    if (record === null) return Promise.resolve(false);
-    record.concealFailed = false;
-    const promise = concealRecord(record).then((concealed) => {
-      if (!concealed || isolationLockedRecord !== record) {
-        enforceMediaIsolation();
-        return false;
-      }
-      isolationLocked = false;
-      isolationLockedRecord = null;
-      return true;
-    });
-    isolationRetryPromise = promise;
-    void promise.finally(() => {
-      if (isolationRetryPromise === promise) isolationRetryPromise = null;
-    });
-    return promise;
-  };
-
-  const retireRecord = (record, reason) => {
-    if (record === null) return Promise.resolve(true);
-    if (record.retirePromise !== null) return record.retirePromise;
-    clearRecordTimers(record);
-    safePause(record.video);
-    record.smoothActive = false;
-    record.covered = false;
-    record.coverPending = false;
-    record.coverAcknowledged = false;
-    record.bootstrapState.terminate();
-    record.bootstrapLoadStarted = false;
-    record.bootstrapLoadSourceSignature = null;
-    record.terminal = true;
-    record.retiring = true;
-    resetFrameState(record);
-    const wasActive = record === activeRecord;
-    if (wasActive) activeRecord = null;
-    closingRecord = record;
-    enforceMediaIsolation();
-    const conceal = record.concealFailed ? Promise.resolve(false) : concealRecord(record);
-    const promise = conceal.then((concealed) => {
-      record.retiring = false;
-      record.retirePromise = null;
-      if (!concealed) {
-        // The background retains the failed grant in closing state and Android
-        // keeps its native cover. Keep media isolation alive independently: a
-        // later page event must not make audio or another video resume locally.
-        enabled = false;
-        isolationLocked = true;
-        isolationLockedRecord = record;
-        if (closingRecord === record) closingRecord = null;
-        enforceMediaIsolation();
-        return false;
-      }
-      if (closingRecord === record) closingRecord = null;
-      if (wasActive) postRetire(record, reason);
-      if (enabled) scheduleScan();
-      return true;
-    });
-    record.retirePromise = promise;
-    return promise;
-  };
+  const lifecycle = lifecycleRuntime.create({
+    browser,
+    clearRecordTimers,
+    concealMessage: CONCEAL_MESSAGE,
+    documentToken: () => documentToken,
+    enforceMediaIsolation,
+    grantIdentity,
+    postDiagnostic,
+    postToAndroid: () => postToAndroid,
+    protocolVersion: () => protocolVersion,
+    resetFrameState,
+    retireMessage: RETIRE_MESSAGE,
+    safePause,
+    scheduleScan: () => scheduleScan(),
+    state: lifecycleState,
+    tokenAttribute: TOKEN_ATTRIBUTE,
+  });
+  const concealRecord = lifecycle.concealRecord;
+  const retireRecord = lifecycle.retireRecord;
+  const retryTerminalIsolation = lifecycle.retryTerminalIsolation;
 
   const resetForAuthority = (record) => {
-    clearRecordTimers(record);
-    record.activations += 1;
-    record.revision += 1;
-    record.captures = 0;
-    record.covered = false;
-    record.coverPending = false;
-    record.coverAcknowledged = false;
-    record.rawFrameOpen = false;
-    record.smoothActive = false;
-    record.smoothGrantIdentity = null;
-    record.terminal = false;
-    record.retiring = false;
-    record.retirePromise = null;
-    record.concealFailed = false;
-    record.concealPromise = null;
-    record.expectedPresentationMutations.length = 0;
-    clearTimeout(record.presentationMutationClearTimer);
-    record.presentationMutationClearTimer = null;
-    record.frameSequence = 0;
-    record.viewportEpoch += 1;
-    resetFrameState(record);
-    record.sourceSignature = sourceSignature(record.video);
-    record.sourceIdentity = sourceIdentity(record.video);
-    record.revealToken = randomToken(4);
-    record.coverRequestedAt = null;
-    record.coverMillis = null;
-    record.decodeStartedAt = null;
-    record.viewportSignature = viewportSignature(record.video);
-    record.viewportTransitionStartedAt = null;
-    record.viewportTransitionCount = 0;
-    record.pendingViewportSignature = null;
-    record.bootstrapBackingGeneration = 0;
-    record.bootstrapLoadStarted = false;
-    record.bootstrapLoadSourceSignature = null;
-    record.bootstrapTransitionUsed = false;
-    record.bootstrapSourceSignature = null;
-    record.bootstrapState.reset();
-    record.playGeneration = 0;
+    recordState.resetAuthority(record, {
+      revealToken: randomToken(4),
+      sourceIdentity: sourceIdentity(record.video),
+      sourceSignature: sourceSignature(record.video),
+      viewportSignature: viewportSignature(record.video),
+    });
   };
 
   const requestCover = (record) => {
