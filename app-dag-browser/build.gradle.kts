@@ -161,6 +161,7 @@ val testDagProtectionJs =
             "--test",
             "src/test/js/dag-protection.test.mjs",
             "src/test/js/video-smooth-experience.test.mjs",
+            "src/test/js/video-seek-state.test.mjs",
         )
         inputs.files(
             "src/main/assets/dag-protection/ads.js",
@@ -183,8 +184,10 @@ val testDagProtectionJs =
             "src/main/assets/dag-protection/video-lab-viewport.js",
             "src/main/assets/dag-protection/video-lab-bootstrap.js",
             "src/main/assets/dag-protection/video-lab.js",
+            "src/main/assets/dag-protection/video-seek-state.js",
             "src/test/js/dag-protection.test.mjs",
             "src/test/js/video-smooth-experience.test.mjs",
+            "src/test/js/video-seek-state.test.mjs",
         )
     }
 

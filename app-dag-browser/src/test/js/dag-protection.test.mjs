@@ -2857,6 +2857,7 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.equal(protectionScript.js.includes("video-fluid-transport-benchmark.js"), false);
   assert.equal(protectionScript.js.includes("video-fluid-transport-runner.js"), false);
   assert.equal(protectionScript.js.includes("video-fluid-capability.js"), false);
+  assert.equal(protectionScript.js.includes("video-seek-state.js"), false);
   assert.ok(protectionScript.js.indexOf("video-lab-geometry.js") <
     protectionScript.js.indexOf("video-lab-presentation.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-presentation.js") <
