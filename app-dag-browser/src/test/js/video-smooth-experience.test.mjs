@@ -217,6 +217,12 @@ test("product smooth mode restores visible audible playback and revokes the orig
   vm.runInNewContext(await readAsset("video-lab-playback.js"), context, {
     filename: "video-lab-playback.js",
   });
+  vm.runInNewContext(await readAsset("video-lab-capture.js"), context, {
+    filename: "video-lab-capture.js",
+  });
+  vm.runInNewContext(await readAsset("video-lab-viewport.js"), context, {
+    filename: "video-lab-viewport.js",
+  });
   vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, {
     filename: "video-lab-diagnostics.js",
   });

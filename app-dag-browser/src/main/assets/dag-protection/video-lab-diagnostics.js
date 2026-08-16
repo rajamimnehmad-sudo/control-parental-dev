@@ -104,6 +104,38 @@
     return labels;
   };
 
+  const viewportChange = (before, after) => {
+    if (before === null || after === null) return [];
+    const labels = [];
+    const groups = [
+      ["viewport_change_window", 0, 2],
+      ["viewport_change_visual", 2, 7],
+      ["viewport_change_video_rect", 7, 11],
+    ];
+    for (const [stage, start, end] of groups) {
+      if (before.slice(start, end).some((value, index) => value !== after[start + index])) {
+        labels.push(stage);
+      }
+    }
+    const details = [
+      ["viewport_window_width", 0],
+      ["viewport_window_height", 1],
+      ["viewport_visual_width", 2],
+      ["viewport_visual_height", 3],
+      ["viewport_visual_offset_left", 4],
+      ["viewport_visual_offset_top", 5],
+      ["viewport_visual_scale", 6],
+      ["viewport_video_left", 7],
+      ["viewport_video_top", 8],
+      ["viewport_video_width", 9],
+      ["viewport_video_height", 10],
+    ];
+    for (const [stage, index] of details) {
+      if (before[index] !== after[index]) labels.push(stage);
+    }
+    return labels;
+  };
+
   globalThis.__gloshDagVideoLabDiagnostics = Object.freeze({
     backing,
     backingScheme,
@@ -111,5 +143,6 @@
     playAttempt,
     playError,
     readyState,
+    viewportChange,
   });
 })();

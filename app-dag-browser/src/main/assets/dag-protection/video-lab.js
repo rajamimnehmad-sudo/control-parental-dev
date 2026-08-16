@@ -43,6 +43,8 @@
   const isolationRuntime = globalThis.__gloshDagVideoLabIsolation;
   const lifecycleRuntime = globalThis.__gloshDagVideoLabLifecycle;
   const playbackRuntime = globalThis.__gloshDagVideoLabPlayback;
+  const captureRuntime = globalThis.__gloshDagVideoLabCapture;
+  const viewportRuntime = globalThis.__gloshDagVideoLabViewport;
   if (
     diagnosticLabels === undefined ||
     geometry === undefined ||
@@ -52,7 +54,9 @@
     bootstrapRuntime === undefined ||
     isolationRuntime === undefined ||
     lifecycleRuntime === undefined ||
-    playbackRuntime === undefined
+    playbackRuntime === undefined ||
+    captureRuntime === undefined ||
+    viewportRuntime === undefined
   ) return;
   const {
     hasBackingMedia,
@@ -376,33 +380,8 @@
   };
 
   const postViewportChangeDiagnostics = (before, after) => {
-    if (!diagnosticsEnabled || before === null || after === null) return;
-    const groups = [
-      ["viewport_change_window", 0, 2],
-      ["viewport_change_visual", 2, 7],
-      ["viewport_change_video_rect", 7, 11],
-    ];
-    for (const [stage, start, end] of groups) {
-      if (before.slice(start, end).some((value, index) => value !== after[start + index])) {
-        postDiagnostic(stage);
-      }
-    }
-    const details = [
-      ["viewport_window_width", 0],
-      ["viewport_window_height", 1],
-      ["viewport_visual_width", 2],
-      ["viewport_visual_height", 3],
-      ["viewport_visual_offset_left", 4],
-      ["viewport_visual_offset_top", 5],
-      ["viewport_visual_scale", 6],
-      ["viewport_video_left", 7],
-      ["viewport_video_top", 8],
-      ["viewport_video_width", 9],
-      ["viewport_video_height", 10],
-    ];
-    for (const [stage, index] of details) {
-      if (before[index] !== after[index]) postDiagnostic(stage);
-    }
+    if (!diagnosticsEnabled) return;
+    diagnosticLabels.viewportChange(before, after).forEach(postDiagnostic);
   };
 
   const unsafePresentationReason = (record) =>
@@ -590,388 +569,81 @@
   const scheduleNextCapture = playback.scheduleNextCapture;
   const startSmoothPlayback = playback.startSmoothPlayback;
 
-  const revealAndRequestFrame = async (record) => {
-    if (
-      record !== activeRecord ||
-      !record.covered ||
-      record.framePending ||
-      record.retiring ||
-      record.terminal ||
-      !record.video.isConnected
-    ) return;
-    if (unsafePresentationActive(record)) {
-      retireUnsafePresentation(record);
-      return;
-    }
-    enforcePresentationCapabilities(record);
-    if (unsafePresentationActive(record)) {
-      retireUnsafePresentation(record);
-      return;
-    }
-    record.frameSequence += 1;
-    record.frameViewportEpoch = record.viewportEpoch;
-    record.framePending = true;
-    record.frameCaptured = false;
-    record.frameConcealed = false;
-    record.frameAllowed = null;
-    const reveal = await browser.runtime.sendMessage({
-      type: REVEAL_MESSAGE,
-      version: protocolVersion,
-      documentToken,
-      token: record.revealToken,
-      ...grantIdentity(record),
-    }).catch(() => null);
-    if (reveal?.inserted !== true) {
-      const reason = typeof reveal?.reason === "string" && /^[a-z_]{1,40}$/u.test(reveal.reason)
-        ? reveal.reason
-        : "unknown";
-      postDiagnostic(`reveal_denied_${reason}`);
-      void retireRecord(record, "reveal_denied");
-      return;
-    }
-    record.rawFrameOpen = true;
-    if (
-      record !== activeRecord ||
-      !enabled ||
-      record.retiring ||
-      record.terminal ||
-      unsafePresentationActive(record)
-    ) {
-      void retireRecord(record, "reveal_invalidated");
-      return;
-    }
-    enforceMediaIsolation();
-    enforcePresentationCapabilities(record);
-    if (unsafePresentationActive(record)) {
-      retireUnsafePresentation(record);
-      return;
-    }
-    record.video.muted = true;
-    record.video.defaultMuted = true;
-    record.video.volume = 0;
-    record.video.preload = "auto";
-    record.video.setAttribute(TOKEN_ATTRIBUTE, record.revealToken);
-    record.decodeStartedAt = performance.now();
-    if (
-      record.captures === 0 &&
-      document.documentElement.hasAttribute(INTERNAL_FIXTURE_ATTRIBUTE)
-    ) {
-      record.video.load();
-    }
-    record.readinessTimer = setTimeout(() => {
-      record.readinessTimer = null;
-      void retireRecord(record, "frame_ready_timeout");
-    }, FRAME_READY_TIMEOUT_MS);
-    enforcePresentationCapabilities(record);
-    if (unsafePresentationActive(record)) {
-      retireUnsafePresentation(record);
-      return;
-    }
-    record.playGeneration += 1;
-    postPlayAttemptDiagnostics(record);
-    try {
-      await record.video.play();
-      postDiagnostic("play_promise_resolved");
-    } catch (error) {
-      postDiagnostic(
-        record.sourceSignature === sourceSignature(record.video)
-          ? "play_reject_source_stable"
-          : "play_reject_source_changed",
-      );
-      postDiagnostic(record.video.paused ? "play_reject_paused" : "play_reject_playing");
-      postDiagnostic(record.video.ended ? "play_reject_ended" : "play_reject_not_ended");
-      postDiagnostic(diagnosticLabels.readyState(record.video).replace("play_ready_", "play_reject_ready_"));
-      postDiagnostic(diagnosticLabels.networkState(record.video).replace("play_network_", "play_reject_network_"));
-      if (record === activeRecord && record.viewportTransitionStartedAt !== null) {
-        postDiagnostic("play_aborted_for_viewport");
-        return;
-      }
-      postDiagnostic(diagnosticLabels.playError(error));
-      void retireRecord(record, "play_rejected");
-      return;
-    }
-    requestVideoFrame(record);
-  };
+  const capture = captureRuntime.create({
+    armBootstrapGeneration,
+    backgroundReady,
+    beginBootstrapViewportTransition,
+    beginSmoothFrame,
+    browser,
+    completeBootstrapViewportTransition,
+    concealRecord,
+    diagnosticLabels,
+    document,
+    documentToken: () => documentToken,
+    enforceMediaIsolation,
+    enforcePresentationCapabilities,
+    finishFrameIfReady,
+    fixtureAttribute: INTERNAL_FIXTURE_ATTRIBUTE,
+    frameConcealedMessage: FRAME_CONCEALED_MESSAGE,
+    frameMatchesMessage,
+    frameReadyTimeoutMillis: FRAME_READY_TIMEOUT_MS,
+    grantIdentity,
+    lastViewportChangeAt: () => lastViewportChangeAt,
+    now: () => performance.now(),
+    postDiagnostic,
+    postFrameRecord,
+    postPlayAttemptDiagnostics,
+    postViewportChangeDiagnostics,
+    protocolVersion: () => protocolVersion,
+    recordMatchesMessage,
+    requestVideoFrame,
+    retireRecord,
+    retireUnsafePresentation,
+    revealMessage: REVEAL_MESSAGE,
+    safePause,
+    sameViewportSignature,
+    sourceSignature,
+    state: lifecycleState,
+    tokenAttribute: TOKEN_ATTRIBUTE,
+    unsafePresentationActive,
+    viewportSettleMillis: VIEWPORT_SETTLE_MS,
+    viewportSignature,
+  });
+  const armCoveredVideo = capture.armCoveredVideo;
+  const handleFrameCaptured = capture.handleFrameCaptured;
+  const handleFrameResult = capture.handleFrameResult;
+  const requestFrameWhenReady = capture.requestFrameWhenReady;
 
-  const requestFrameWhenReady = (record) => {
-    if (
-      record !== activeRecord ||
-      !record.covered ||
-      record.framePending ||
-      record.retiring ||
-      record.terminal ||
-      !record.video.isConnected
-    ) return;
-    const request = () => {
-      if (
-        record !== activeRecord ||
-        !record.covered ||
-        record.framePending ||
-        record.retiring ||
-        record.terminal ||
-        !record.video.isConnected
-      ) return;
-      if (unsafePresentationActive(record)) {
-        retireUnsafePresentation(record);
-        return;
-      }
-      const viewportWait = VIEWPORT_SETTLE_MS - (performance.now() - lastViewportChangeAt);
-      if (viewportWait > 0) {
-        record.readinessTimer = setTimeout(request, viewportWait);
-        return;
-      }
-      const settledSignature = viewportSignature(record.video);
-      if (!sameViewportSignature(record.viewportSignature, settledSignature)) {
-        if (record.pendingViewportSignature !== null) {
-          if (!completeBootstrapViewportTransition(record, settledSignature)) {
-            postDiagnostic("viewport_settle_mismatch");
-            record.viewportEpoch += 1;
-            void retireRecord(record, "viewport_changed");
-            return;
-          }
-        } else if (beginBootstrapViewportTransition(record, settledSignature)) {
-          record.readinessTimer = setTimeout(request, VIEWPORT_SETTLE_MS);
-          return;
-        } else {
-          postViewportChangeDiagnostics(record.viewportSignature, settledSignature);
-          postDiagnostic("viewport_settle_mismatch");
-          record.viewportEpoch += 1;
-          void retireRecord(record, "viewport_changed");
-          return;
-        }
-      }
-      if (record.viewportTransitionStartedAt !== null) {
-        record.viewportTransitionStartedAt = null;
-        record.viewportTransitionCount = 0;
-        postDiagnostic("viewport_transition_stable");
-      }
-      record.readinessTimer = null;
-      if (record.smoothActive) beginSmoothFrame(record);
-      else void revealAndRequestFrame(record);
-    };
-    request();
-  };
-
-  const armCoveredVideo = async (message) => {
-    postDiagnostic("cover_arm_entered");
-    const record = activeRecord;
-    if (!recordMatchesMessage(record, message) || !record.coverPending) return;
-    postDiagnostic("cover_ack_received");
-    const ackPhase = record.bootstrapState.acknowledge(true);
-    if (ackPhase === "terminal") {
-      void retireRecord(record, "bootstrap_revalidation_failed");
-      return;
-    }
-    record.coverAcknowledged = true;
-    if (record.bootstrapLoadStarted) armBootstrapGeneration(record);
-    if (record !== activeRecord || record.retiring) return;
-    postDiagnostic("background_wait_started");
-    if (!await backgroundReady()) {
-      postDiagnostic("background_wait_failed");
-      if (record === activeRecord) record.coverAcknowledged = false;
-      return;
-    }
-    postDiagnostic("background_wait_completed");
-    if (
-      !recordMatchesMessage(record, message) ||
-      !record.coverPending ||
-      !record.coverAcknowledged
-    ) {
-      record.coverAcknowledged = false;
-      return;
-    }
-    clearTimeout(record.coverTimer);
-    record.coverTimer = null;
-    record.coverMillis = record.coverRequestedAt === null
-      ? null
-      : Math.max(0, performance.now() - record.coverRequestedAt);
-    record.coverPending = false;
-    record.covered = true;
-    if (
-      record.bootstrapState.phase() === "acknowledged" &&
-      record.bootstrapState.coverReady(
-        !record.bootstrapLoadStarted && record.sourceSignature === sourceSignature(record.video),
-      ) !== "stable"
-    ) {
-      void retireRecord(record, "bootstrap_revalidation_failed");
-      return;
-    }
-    record.video.muted = true;
-    record.video.defaultMuted = true;
-    record.video.volume = 0;
-    enforcePresentationCapabilities(record);
-    enforceMediaIsolation();
-    // The cover acknowledgement does not open a raw frame. The next method
-    // performs the only ephemeral reveal, after the Android cover is confirmed.
-    requestFrameWhenReady(record);
-  };
-
-  const handleFrameCaptured = (message) => {
-    const record = activeRecord;
-    if (!frameMatchesMessage(record, message) || !record.rawFrameOpen) return;
-    record.frameCaptured = true;
-    if (record.smoothActive) {
-      record.frameConcealed = true;
-      finishFrameIfReady(record);
-      return;
-    }
-    void concealRecord(record).then((concealed) => {
-      if (!frameMatchesMessage(record, message)) return;
-      if (!concealed) {
-        void retireRecord(record, "frame_conceal_failed");
-        return;
-      }
-      record.frameConcealed = true;
-      if (!postFrameRecord(FRAME_CONCEALED_MESSAGE, record)) {
-        void retireRecord(record, "frame_concealed_rejected");
-        return;
-      }
-      finishFrameIfReady(record);
-    });
-  };
-
-  const handleFrameResult = (message) => {
-    const record = activeRecord;
-    if (!frameMatchesMessage(record, message)) return;
-    record.frameAllowed = message.captured === true && message.action === "allow";
-    if (!record.frameAllowed) {
-      // A block never schedules another raw compositor frame. If Android's
-      // capture acknowledgement is still racing (or capture failed before it
-      // could be sent), concealment remains required immediately.
-      record.terminal = true;
-      safePause(record.video);
-      if (record.smoothActive) record.frameConcealed = false;
-      if (!record.frameConcealed) {
-        void concealRecord(record).then((concealed) => {
-          if (!frameMatchesMessage(record, message)) return;
-          if (!concealed) {
-            void retireRecord(record, "terminal_frame_conceal_failed");
-            return;
-          }
-          record.smoothActive = false;
-          record.frameConcealed = true;
-          finishFrameIfReady(record);
-        });
-      }
-    }
-    finishFrameIfReady(record);
-  };
-
-  const invalidateForViewport = (event) => {
-    lastViewportChangeAt = performance.now();
-    postTimeline("timeline_reflow_observed");
-    if (activeRecord !== null) {
-      const nextSignature = viewportSignature(activeRecord.video);
-      if (fixtureEnabled && event?.type === "resize" && sameVideoRect(activeRecord.viewportSignature, nextSignature)) {
-        activeRecord.viewportSignature = nextSignature;
-        postDiagnostic("fixture_viewport_transition");
-        return;
-      }
-      if (event?.type === "resize" && sameViewportSignature(activeRecord.viewportSignature, nextSignature)) {
-        postDiagnostic("viewport_resize_unchanged");
-        return;
-      }
-      postViewportChangeDiagnostics(activeRecord.viewportSignature, nextSignature);
-      postDiagnostic(event?.type === "scroll" ? "viewport_scroll" : "viewport_resize");
-      const coveredBrowserTransition =
-        event?.type === "resize" &&
-        activeRecord.covered &&
-        activeRecord.resultTimer === null &&
-        !activeRecord.frameCaptured &&
-        sameVideoRect(activeRecord.viewportSignature, nextSignature);
-      const coveredBootstrapTransition =
-        event?.type === "resize" &&
-        (activeRecord.covered || activeRecord.coverAcknowledged) &&
-        beginBootstrapViewportTransition(activeRecord, nextSignature);
-      if (coveredBrowserTransition || coveredBootstrapTransition) {
-        const now = performance.now();
-        activeRecord.viewportTransitionStartedAt ??= now;
-        if (!coveredBootstrapTransition) activeRecord.viewportTransitionCount += 1;
-        const withinBound =
-          now - activeRecord.viewportTransitionStartedAt <= MAX_COVERED_VIEWPORT_TRANSITION_MS &&
-          activeRecord.viewportTransitionCount <= MAX_COVERED_VIEWPORT_TRANSITIONS;
-        if (withinBound) {
-          activeRecord.pendingViewportSignature = nextSignature;
-          postDiagnostic("viewport_transition_covered");
-          clearTimeout(activeRecord.readinessTimer);
-          activeRecord.readinessTimer = setTimeout(() => {
-            const record = activeRecord;
-            if (record === null || record.viewportTransitionStartedAt === null) return;
-            record.readinessTimer = null;
-            const settledSignature = viewportSignature(record.video);
-            const transitionStable =
-              sameViewportSignature(record.pendingViewportSignature, settledSignature) &&
-              (sameVideoRect(record.viewportSignature, settledSignature) ||
-                (record.bootstrapTransitionUsed && sameViewportBounds(record.viewportSignature, settledSignature))) &&
-              performance.now() - lastViewportChangeAt >= VIEWPORT_SETTLE_MS;
-            if (!transitionStable) {
-              postDiagnostic("viewport_settle_mismatch");
-              record.viewportEpoch += 1;
-              void retireRecord(record, "viewport_changed");
-              return;
-            }
-            if (
-              record.bootstrapTransitionUsed &&
-              !completeBootstrapViewportTransition(record, settledSignature)
-            ) {
-              void retireRecord(record, "bootstrap_revalidation_failed");
-              return;
-            }
-            const reopen = () => {
-              if (record !== activeRecord || record.retiring || record.terminal) return;
-              if (
-                record.sourceSignature !== sourceSignature(record.video) ||
-                (record.bootstrapBackingGeneration !== 0 &&
-                  record.bootstrapSourceSignature !== record.sourceSignature) ||
-                presentationCapabilityFailure(record.video) !== null ||
-                unsafePresentationActive(record) ||
-                !record.video.isConnected ||
-                documentToken === ""
-              ) {
-                void retireRecord(record, "bootstrap_revalidation_failed");
-                return;
-              }
-              resetFrameState(record);
-              record.viewportEpoch += 1;
-              record.viewportSignature = settledSignature;
-              record.pendingViewportSignature = null;
-              record.viewportTransitionStartedAt = null;
-              record.viewportTransitionCount = 0;
-              postDiagnostic("viewport_transition_stable");
-              requestFrameWhenReady(record);
-            };
-            if (!record.rawFrameOpen) {
-              reopen();
-              return;
-            }
-            safePause(record.video);
-            if (
-              record.frameCallbackId !== null &&
-              typeof record.video.cancelVideoFrameCallback === "function"
-            ) {
-              try {
-                record.video.cancelVideoFrameCallback(record.frameCallbackId);
-              } catch {}
-              record.frameCallbackId = null;
-            }
-            void concealRecord(record).then((concealed) => {
-              if (!concealed) {
-                void retireRecord(record, "viewport_conceal_failed");
-                return;
-              }
-              reopen();
-            });
-          }, VIEWPORT_SETTLE_MS);
-          return;
-        }
-        postDiagnostic("viewport_transition_unstable");
-      }
-      activeRecord.viewportEpoch += 1;
-      void retireRecord(activeRecord, "viewport_changed");
-      return;
-    }
-    scheduleScan();
-  };
+  const viewportController = viewportRuntime.create({
+    beginBootstrapViewportTransition,
+    completeBootstrapViewportTransition,
+    concealRecord,
+    fixtureEnabled: () => fixtureEnabled,
+    hasDocumentToken: () => documentToken !== "",
+    lastViewportChangeAt: () => lastViewportChangeAt,
+    maximumTransitionMillis: MAX_COVERED_VIEWPORT_TRANSITION_MS,
+    maximumTransitions: MAX_COVERED_VIEWPORT_TRANSITIONS,
+    now: () => performance.now(),
+    postDiagnostic,
+    postTimeline,
+    postViewportChangeDiagnostics,
+    presentationCapabilityFailure,
+    requestFrameWhenReady,
+    resetFrameState,
+    retireRecord,
+    safePause,
+    sameVideoRect,
+    sameViewportBounds,
+    sameViewportSignature,
+    scheduleScan,
+    setLastViewportChangeAt: (value) => { lastViewportChangeAt = value; },
+    sourceSignature,
+    state: lifecycleState,
+    unsafePresentationActive,
+    viewportSettleMillis: VIEWPORT_SETTLE_MS,
+    viewportSignature,
+  });
+  const invalidateForViewport = viewportController.invalidate;
 
   const mutationRequiresTerminalClose = (mutation, record) =>
     mutationPolicy.requiresTerminalClose(

@@ -17,6 +17,7 @@ class MediaBarrierContractTest {
     private val videoIsolation by lazy { extensionRoot.resolve("video-lab-isolation.js").readText() }
     private val videoLifecycle by lazy { extensionRoot.resolve("video-lab-lifecycle.js").readText() }
     private val videoPlayback by lazy { extensionRoot.resolve("video-lab-playback.js").readText() }
+    private val videoCapture by lazy { extensionRoot.resolve("video-lab-capture.js").readText() }
     private val ads by lazy { extensionRoot.resolve("ads.js").readText() }
     private val schedulerGuard by lazy { extensionRoot.resolve("runaway-scheduler-guard.js").readText() }
     private val presentationGuard by lazy { extensionRoot.resolve("presentation-guard.js").readText() }
@@ -220,8 +221,8 @@ class MediaBarrierContractTest {
         assertContains(rasterPolicy, "DagUncertainRegionalCropper.quadrantViews")
         assertFalse(videoLab.contains(".style.visibility ="))
         assertContains(videoPlayback, "const style = dependencies.getComputedStyle(record.video)")
-        assertContains(videoLab, "message.action === \"allow\"")
-        assertContains(videoLab, "record.frameConcealed")
+        assertContains(videoCapture, "message.action === \"allow\"")
+        assertContains(videoCapture, "record.frameConcealed")
     }
 
     @Test
@@ -353,13 +354,16 @@ class MediaBarrierContractTest {
         assertContains(videoPlayback, "smooth_audio_restored")
         assertContains(background, "opacity: 1 !important")
         assertContains(activity, "handleVideoLabSmoothStart")
-        assertContains(videoLab, "record.video.muted = true")
-        assertContains(videoLab, "record.video.volume = 0")
+        assertContains(videoCapture, "record.video.muted = true")
+        assertContains(videoCapture, "record.video.volume = 0")
         assertContains(videoLab, "video.addEventListener(\"volumechange\", keepMuted)")
-        assertContains(videoLab, "document.documentElement.hasAttribute(INTERNAL_FIXTURE_ATTRIBUTE)")
+        assertContains(
+            videoCapture,
+            "dependencies.document.documentElement.hasAttribute(dependencies.fixtureAttribute)",
+        )
         assertContains(videoLab, "data-glosh-dag-video-lab-token")
         assertContains(videoLab, "FRAME_RESULT_TIMEOUT_MS = 2_500")
-        assertContains(videoLab, "record.framePending ||")
+        assertContains(videoCapture, "record.framePending ||")
         assertContains(videoPlayback, "requestVideoFrameCallback")
         assertContains(videoLab, "frameSequence")
         assertContains(videoLab, "viewportEpoch")
