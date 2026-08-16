@@ -1,6 +1,6 @@
 # DAG BROWSER — HANDOFF
 
-Actualizado: 2026-08-15. Responsable: Jefe.
+Actualizado: 2026-08-16. Responsable: Jefe.
 
 ## Mision
 
@@ -11,7 +11,7 @@ video y herramientas Diagnostic. Gradle es aislado; usar siempre
 ## Estado operativo
 
 - Rama `main` local; lote DAG modificado y no publicado.
-- DEV 217 pausado; Diagnostic 80 automatico; extension integrada 2.0.37.
+- DEV 217 candidata local; Diagnostic 80 automatico; extension integrada 2.0.37.
 - Diagnostic es una herramienta temporal. LAB ya no se construye. Video de
   producto continua NO-GO.
 - R3.1, su umbral y la politica de imagen siguen siendo la referencia vigente.
@@ -112,8 +112,15 @@ La saturacion tambien cerro una deuda general de pestañas: el A23 no sostiene d
 forma fiable decodificadores VP9 en tres sesiones Gecko abiertas. La politica
 local ahora conserva abierta solo la pestaña activa; las otras mantienen sus
 metadatos y miniatura y vuelven a cargar bajo las barreras al seleccionarlas.
-Este cambio esta validado localmente y queda pendiente de medicion fisica, sin
-nueva APK en este punto.
+Este cambio esta validado localmente y en una DEV 217 integrada sobre A23, sin
+abrir ningun menu de laboratorio. YouTube normal pidio cobertura automaticamente
+y, tras el gesto estandar de Play, dos capturas separadas confirmaron movimiento
+visible; el audio quedo activo a 48 kHz, sin crash ni ANR. PSS puntual: 235 MiB;
+RSS: 339 MiB. El OMX VP9 del A23 rechazo varias aperturas con `NO_MEMORY`, pero
+Gecko recupero cada una con `c2.android.vp9.decoder` por software y la
+reproduccion continuo. Es una advertencia de eficiencia del dispositivo, no una
+falla funcional de esta corrida. La app se detuvo al terminar y no se publico
+ni entrego la APK.
 
 Limpieza del lote: se retiraron los prototipos aislados de WebM, transporte y
 benchmark que nunca estuvieron en el manifiesto ni conectados a la Activity,
