@@ -14,16 +14,18 @@ const PACKAGE_PATTERN = /^com\.contentfilter\.dagbrowser(?:\.dev|\.diagnostic\.d
 const EVENT_KEYS = new Set([
   "sequence", "wall_ms", "elapsed_ms", "type", "tab", "candidate", "carrier", "priority",
   "action", "reason", "basis", "bytes", "width", "height", "score", "full_score",
-  "bridge_ms", "queue_ms", "native_ms", "inference_ms", "inferences", "count",
+  "bridge_ms", "cover_ms", "decode_ms", "capture_ms", "preprocess_ms", "queue_ms",
+  "native_ms", "inference_ms", "inferences", "count",
   "event_schema", "app_version_code", "page_url", "page", "resource_url", "resource",
-  "request", "resource_type", "source_kind", "mime", "frame", "status", "from_cache",
+  "request", "resource_type", "source_kind", "source_instance", "mime", "frame", "status",
+  "from_cache", "decision_cache",
   "active_streams", "queued_analyses", "captured_bytes", "natural_width", "natural_height",
   "rendered_width", "rendered_height", "visual_state",
 ]);
 const SAFE_EVENT_TYPES = new Set([
   "app_started", "navigation_started", "barrier_ready", "document_sanitized", "viewport_ready",
   "page_visible", "barrier_timeout", "media_decision", "media_drop",
-  "media_resource", "media_element",
+  "media_resource", "media_element", "video_lab",
 ]);
 
 function safeDiagnosticUrl(value: unknown): boolean {
@@ -106,14 +108,16 @@ function validateEvent(value: unknown): boolean {
   for (const key of ["candidate", "page", "resource", "request"] as const) {
     if (event[key] !== undefined && (typeof event[key] !== "string" || !/^[a-f0-9]{16}$/u.test(event[key]))) return false;
   }
-  for (const key of ["resource_type", "source_kind", "visual_state"] as const) {
+  for (const key of ["resource_type", "source_kind", "source_instance", "visual_state"] as const) {
     if (event[key] !== undefined && (typeof event[key] !== "string" || !SAFE_EVENT_VALUE.test(event[key]))) return false;
   }
   if (event.mime !== undefined && (typeof event.mime !== "string" || !/^[a-z0-9.+-]{1,64}\/[a-z0-9.+-]{1,64}$/u.test(event.mime))) return false;
   if (event.page_url !== undefined && !safeDiagnosticUrl(event.page_url)) return false;
   if (event.resource_url !== undefined && !safeDiagnosticUrl(event.resource_url)) return false;
-  if (event.from_cache !== undefined && typeof event.from_cache !== "boolean") return false;
-  if (event.event_schema !== undefined && event.event_schema !== 2) return false;
+  for (const key of ["from_cache", "decision_cache"] as const) {
+    if (event[key] !== undefined && typeof event[key] !== "boolean") return false;
+  }
+  if (event.event_schema !== undefined && ![2, 3].includes(Number(event.event_schema))) return false;
   if (event.app_version_code !== undefined && !finiteNumber(event.app_version_code, 1, Number.MAX_SAFE_INTEGER)) return false;
   for (const key of ["tab", "bytes", "width", "height", "inferences", "count", "frame", "status", "active_streams", "queued_analyses", "captured_bytes", "natural_width", "natural_height", "rendered_width", "rendered_height"] as const) {
     if (event[key] !== undefined && !finiteNumber(event[key], 0, 10_000_000)) return false;
@@ -121,7 +125,7 @@ function validateEvent(value: unknown): boolean {
   for (const key of ["score", "full_score"] as const) {
     if (event[key] !== undefined && !finiteNumber(event[key], 0, 1)) return false;
   }
-  for (const key of ["bridge_ms", "queue_ms", "native_ms", "inference_ms"] as const) {
+  for (const key of ["bridge_ms", "cover_ms", "decode_ms", "capture_ms", "preprocess_ms", "queue_ms", "native_ms", "inference_ms"] as const) {
     if (event[key] !== undefined && !finiteNumber(event[key], -1, 60_000)) return false;
   }
   return true;
