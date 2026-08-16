@@ -25,6 +25,9 @@ class MediaBarrierContractTest {
     private val activity by lazy {
         File("src/main/java/com/contentfilter/dagbrowser/DagBrowserActivity.kt").readText()
     }
+    private val blockedPlaceholder by lazy {
+        File("src/main/java/com/contentfilter/dagbrowser/DagVideoBlockedPlaceholderPresenter.kt").readText()
+    }
     private val browserLayout by lazy { File("src/main/res/layout/activity_dag_browser.xml").readText() }
 
     @Test
@@ -33,7 +36,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"css_origin\": \"user\"")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.39\"")
+        assertContains(manifest, "\"version\": \"2.0.40\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(manifest, "\"presentation-guard.js\"")
@@ -210,7 +213,15 @@ class MediaBarrierContractTest {
         assertContains(activity, "VideoLabFrameCapturedMessage")
         assertContains(activity, "VideoLabFrameConcealedMessage")
         assertContains(activity, "AndroidDagImagePreprocessor.prepareVideoCapturedRaster")
-        assertContains(activity, "videoLabOverlay.setOnTouchListener { _, _ -> true }")
+        assertContains(activity, "videoBlockedPlaceholder.show(close.key)")
+        assertContains(activity, "videoBlockedPlaceholder.clearForTab(tab.id)")
+        assertContains(blockedPlaceholder, "overlay.setBackgroundColor(Color.TRANSPARENT)")
+        assertContains(blockedPlaceholder, "frame.setBackgroundColor(blockedColor)")
+        assertContains(blockedPlaceholder, "frame.setOnTouchListener { _, _ -> true }")
+        assertContains(blockedPlaceholder, "event.actionMasked == MotionEvent.ACTION_DOWN")
+        assertContains(blockedPlaceholder, "!displayRect.contains(event.x.toInt(), event.y.toInt())")
+        assertContains(videoLifecycle, "reason !== \"frame_blocked\"")
+        assertContains(videoLifecycle, "state.isolationLocked = true")
         assertContains(browserLayout, "android:id=\"@+id/video_lab_overlay\"")
         assertContains(browserLayout, "android:clickable=\"true\"")
         assertContains(browserLayout, "android:focusableInTouchMode=\"true\"")

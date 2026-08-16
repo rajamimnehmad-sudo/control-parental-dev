@@ -24,6 +24,7 @@ test("product smooth mode restores visible audible playback and revokes the orig
   const posted = [];
   const timers = new Map();
   const windowListeners = new Map();
+  const documentListeners = new Map();
   const revealMessages = [];
   const concealMessages = [];
   let nextTimer = 1;
@@ -120,7 +121,9 @@ test("product smooth mode restores visible audible playback and revokes the orig
     },
     fullscreenElement: null,
     pictureInPictureElement: null,
-    addEventListener() {},
+    addEventListener(type, listener) {
+      documentListeners.set(type, listener);
+    },
     querySelectorAll(selector) {
       if (selector === "audio, video" || selector === "video") return [video];
       return [];
@@ -338,4 +341,13 @@ test("product smooth mode restores visible audible playback and revokes the orig
   assert.equal(retire.reason, "frame_blocked");
   assert.ok(video.pauseCalls > 0);
   assert.equal(concealMessages.length > 0, true);
+  const pausesBeforeReplayAttempt = video.pauseCalls;
+  video.muted = false;
+  video.defaultMuted = false;
+  video.volume = 0.7;
+  documentListeners.get("play")({ target: video });
+  assert.equal(video.muted, true);
+  assert.equal(video.defaultMuted, true);
+  assert.equal(video.volume, 0);
+  assert.equal(video.pauseCalls, pausesBeforeReplayAttempt + 1);
 });

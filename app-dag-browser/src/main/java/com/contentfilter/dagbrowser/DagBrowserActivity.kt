@@ -99,9 +99,10 @@ class DagBrowserActivity : Activity() {
 
     private lateinit var geckoView: DagGeckoView
     private lateinit var navigationSnapshot: ImageView
-    private lateinit var videoLabOverlay: View
+    private lateinit var videoLabOverlay: FrameLayout
     private lateinit var videoLabFrame: ImageView
     private lateinit var videoLabCoverLabel: TextView
+    private lateinit var videoBlockedPlaceholder: DagVideoBlockedPlaceholderPresenter
     private lateinit var browserRoot: View
     private lateinit var browserToolbar: View
     private lateinit var addressBar: View
@@ -177,6 +178,7 @@ class DagBrowserActivity : Activity() {
     private var durableVideoLabGrant: DagVideoLabGrantAuthority? = null
     private var durableVideoLabGrantRevoked = false
     private var videoLabCloseRequest: DagVideoLabCloseRequest? = null
+    private var videoLabCloseReason: String? = null
     private var videoLabPostCloseAction: (() -> Unit)? = null
     private var videoLabArmedForSession = false
     private var videoLabMode: VideoLabMode? = null
@@ -516,6 +518,7 @@ class DagBrowserActivity : Activity() {
                 }
                 return@postOnAnimation
             }
+            videoBlockedPlaceholder.rememberTarget(key, surfaceRect)
             val capturePlan = DagVideoLabCapturePlan.fromSurfaceRect(surfaceRect)
             if (capturePlan == null) {
                 failVideoLabCapture(
@@ -839,6 +842,7 @@ class DagBrowserActivity : Activity() {
 
     private fun showVideoLabCover() {
         if (!this::videoLabOverlay.isInitialized) return
+        videoBlockedPlaceholder.prepareFullCover()
         videoLabOverlay.visibility = View.VISIBLE
         videoLabOverlay.bringToFront()
     }
@@ -850,8 +854,7 @@ class DagBrowserActivity : Activity() {
         if (
             bitmap.isRecycled ||
             surfaceRect.isEmpty ||
-            !this::videoLabFrame.isInitialized ||
-            videoLabOverlay !is FrameLayout
+            !this::videoLabFrame.isInitialized
         ) {
             bitmap.recycleIfNeeded()
             return
@@ -1220,6 +1223,7 @@ class DagBrowserActivity : Activity() {
         videoLabArmedForSession = false
         videoLabSmoothKey = null
         videoLabCloseRequest = close
+        videoLabCloseReason = reason
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
         showVideoLabCover()
@@ -1322,7 +1326,9 @@ class DagBrowserActivity : Activity() {
         }
         if (!videoLabState.acknowledgeClose(close.key, close.nonce)) return
         handler.removeCallbacks(videoLabCloseTimeout)
+        val closeReason = videoLabCloseReason
         videoLabCloseRequest = null
+        videoLabCloseReason = null
         activeVideoLabGrantToken = null
         durableVideoLabGrant = null
         durableVideoLabGrantRevoked = false
@@ -1333,11 +1339,16 @@ class DagBrowserActivity : Activity() {
         videoLabTargetTabId = null
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
-        videoLabOverlay.visibility = View.GONE
+        val localizedBlock =
+            closeReason == "frame_blocked" && videoBlockedPlaceholder.show(close.key)
+        if (!localizedBlock) videoLabOverlay.visibility = View.GONE
         val postCloseAction = videoLabPostCloseAction
         videoLabPostCloseAction = null
         tabs.firstOrNull { it.id == close.key.tabId }?.let { tab ->
             recordVideoLabEvent(tab, close.key, "retired", "revoke_ack")
+            if (localizedBlock) {
+                recordVideoLabEvent(tab, close.key, "placeholder_shown", "model_filter")
+            }
         }
         if (!isFinishing && !isDestroyed) postCloseAction?.invoke()
     }
@@ -1349,6 +1360,7 @@ class DagBrowserActivity : Activity() {
         if (!videoLabState.blockClosing(close.key, close.nonce)) return
         handler.removeCallbacks(videoLabCloseTimeout)
         videoLabCloseRequest = null
+        videoLabCloseReason = null
         activeVideoLabGrantToken = null
         durableVideoLabGrant = null
         durableVideoLabGrantRevoked = false
@@ -1903,7 +1915,16 @@ class DagBrowserActivity : Activity() {
         videoLabOverlay = findViewById(R.id.video_lab_overlay)
         videoLabFrame = findViewById(R.id.video_lab_frame)
         videoLabCoverLabel = findViewById(R.id.video_lab_cover_label)
-        videoLabOverlay.setOnTouchListener { _, _ -> true }
+        videoBlockedPlaceholder =
+            DagVideoBlockedPlaceholderPresenter(
+                overlay = videoLabOverlay,
+                frame = videoLabFrame,
+                label = videoLabCoverLabel,
+                fullCoverColor = getColor(R.color.dag_navy),
+                blockedColor = getColor(R.color.dag_video_blocked),
+                overlayOrigin = { geckoView.left to geckoView.top },
+            )
+        videoBlockedPlaceholder.prepareFullCover()
         addressInput = findViewById(R.id.address_input)
         newPageButton = findViewById(R.id.new_page_button)
         securityButton = findViewById(R.id.security_button)
@@ -2662,6 +2683,7 @@ class DagBrowserActivity : Activity() {
         startNewPerformanceNavigation: Boolean = false,
         keepCurrentPageVisible: Boolean = false,
     ) {
+        videoBlockedPlaceholder.clearForTab(tab.id)
         val retiresVideoLab = videoLabState.currentKey?.tabId == tab.id
         if (tab.displayState != TabDisplayState.Loading) {
             markTabThumbnailStale(tab)
@@ -3230,6 +3252,7 @@ class DagBrowserActivity : Activity() {
 
     private fun switchToWithoutCapture(tab: BrowserTab) {
         if (!tabs.contains(tab) || tab === activeTab) return
+        activeTab?.let { videoBlockedPlaceholder.clearForTab(it.id) }
         activeTab?.takeIf(::isVideoLabCovered)?.let {
             if (
                 deferVideoLabActionUntilRevoked("tab_switched") {

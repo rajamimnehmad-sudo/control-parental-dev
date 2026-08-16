@@ -99,8 +99,12 @@
           return false;
         }
         if (state.closingRecord === record) state.closingRecord = null;
+        if (reason === "frame_blocked") {
+          state.isolationLocked = true;
+          state.isolationLockedRecord = record;
+        }
         if (wasActive) postRetire(record, reason);
-        if (state.enabled) dependencies.scheduleScan();
+        if (state.enabled && reason !== "frame_blocked") dependencies.scheduleScan();
         return true;
       });
       record.retirePromise = promise;

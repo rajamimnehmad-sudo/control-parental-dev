@@ -11,6 +11,7 @@
     <color name="dag_border">#D9E4EA</color>
     <color name="dag_status_error">#FFE1DE</color>
     <color name="dag_status_error_text">#8B2820</color>
+    <color name="dag_video_blocked">#6D1F2A</color>
     <color name="dag_private_navy">#241B3A</color>
     <color name="dag_private_surface">#F4EEFF</color>
     <color name="dag_private_accent">#A477E8</color>

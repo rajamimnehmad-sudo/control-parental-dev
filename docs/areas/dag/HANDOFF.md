@@ -11,7 +11,7 @@ video y herramientas Diagnostic. Gradle es aislado; usar siempre
 ## Estado operativo
 
 - Rama `main` local; lote DAG modificado y no publicado.
-- DEV 218 candidata local; Diagnostic 82 automatico; extension integrada 2.0.39.
+- DEV 219 candidata local; Diagnostic 83 automatico; extension integrada 2.0.40.
 - Diagnostic es una herramienta temporal. LAB ya no se construye. Video de
   producto continua NO-GO.
 - R3.1, su umbral y la politica de imagen siguen siendo la referencia vigente.
@@ -123,6 +123,19 @@ verdes. Gates finales DEV/Diagnostic: unitarios, ktlint, lint y ambos assemble
 completos. DEV 218 SHA-256
 `5a07356f9a3c5ff6471a66820c5f7da79ea3801c5a1da46b09a35f3a463b76ef`.
 
+Diagnostic 83 cambia la salida visible de un bloqueo normal sin debilitar el
+cierre: tras el acuse durable, solo el rectangulo exacto del video queda bordo;
+la pagina permanece navegable y el video sigue oculto, pausado y mudo. El estado
+terminal conserva el aislamiento y no vuelve a seleccionar el mismo video. La
+cobertura bordo vive en un presenter separado de la Activity; una interaccion
+fuera del rectangulo la retira para que no quede fija sobre contenido desplazado,
+y navegacion/recarga tambien la limpian. Una corrida A23 produjo `model_filter`
+0,830, `revoke_ack` y `placeholder_shown`; la captura visual confirmo bordo solo
+en el reproductor y el gesto externo devolvio el resto de la pagina sin cierre,
+crash ni ANR. Un fallo real de revocacion conserva la recuperacion segura que
+descarta la pestaña exacta. DEV 219 SHA-256
+`9fd1b6ced4613602ba3a1fa144ee450e6365cc4b756c6bcccf277dcd1dd8ff96`.
+
 La saturacion tambien cerro una deuda general de pestañas: el A23 no sostiene de
 forma fiable decodificadores VP9 en tres sesiones Gecko abiertas. La politica
 local ahora conserva abierta solo la pestaña activa; las otras mantienen sus
@@ -158,7 +171,7 @@ Progreso ejecutivo DAG Video: 99%.
 
 ## Siguiente hito — matriz y promocion
 
-1. Mantener Diagnostic 82 como referencia automatica mientras se completa la
+1. Mantener Diagnostic 83 como referencia automatica mientras se completa la
    investigacion; no enviar APK por ahora.
 2. Cuando se cierre el lote, compilar una sola DEV con el mismo runtime universal
    y hacer una unica comprobacion humana S22.
@@ -166,6 +179,10 @@ Progreso ejecutivo DAG Video: 99%.
    un elemento de video estable; no crear excepciones por proveedor.
 4. Si la matriz suficiente queda verde, integrar el mismo modo a DEV y generar
    una unica APK candidata. Diagnostic sigue siendo herramienta temporal.
+
+Despues del cierre actual: `DAG-VIDEO-CONTROLS-01`, adelantar, retroceder y mover
+la barra con nueva autoridad cubierta. Hoy `seeking` sigue siendo terminal y no
+se relajara dentro del arreglo visual.
 
 ## Riesgos y deuda
 
