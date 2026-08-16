@@ -154,7 +154,12 @@ internal fun shouldRequireInstallApproval(
         !packageName.startsWith("com.contentfilter.admin") &&
         !isProtectedBrowserPackage(packageName)
 
+internal val ProtectedBrowserPackageNames =
+    setOf(
+        "com.contentfilter.dagbrowser",
+        "com.contentfilter.dagbrowser.dev",
+        "com.contentfilter.dagbrowser.diagnostic.dev",
+    )
+
 internal fun isProtectedBrowserPackage(packageName: String): Boolean =
-    packageName == "com.contentfilter.dagbrowser" ||
-        packageName == "com.contentfilter.dagbrowser.dev" ||
-        packageName == "com.contentfilter.dagbrowser.lab"
+    packageName in ProtectedBrowserPackageNames

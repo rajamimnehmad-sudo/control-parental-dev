@@ -2,7 +2,6 @@
 set -euo pipefail
 
 readonly PACKAGE="com.contentfilter.dagbrowser.dev"
-readonly LAB_PACKAGE="com.contentfilter.dagbrowser.lab"
 readonly ACTIVITY="com.contentfilter.dagbrowser.DagBrowserActivity"
 readonly MINIMUM_SDK="29"
 readonly EXPECTED_ABI="arm64-v8a"
@@ -21,7 +20,6 @@ Options:
   --warm                Do not force-stop DAG before launch.
   --output DIR          Explicit artifact directory.
   --expected-model NAME Require one exact model for a reproducible comparison.
-  --lab                 Use isolated lab APK and HTTP loopback fixture.
   --help                Show this help.
 
 Safety contract:
@@ -39,9 +37,7 @@ swipes="3"
 cold="1"
 expected_model=""
 output_dir=""
-lab="0"
 package_name="$PACKAGE"
-scheme="https"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -52,7 +48,6 @@ while [[ $# -gt 0 ]]; do
     --warm) cold="0"; shift ;;
     --output) output_dir="${2:-}"; shift 2 ;;
     --expected-model) expected_model="${2:-}"; shift 2 ;;
-    --lab) lab="1"; package_name="$LAB_PACKAGE"; scheme="http"; shift ;;
     --help|-h) usage; exit 0 ;;
     *) echo "Unknown argument: $1" >&2; usage >&2; exit 2 ;;
   esac
@@ -158,14 +153,11 @@ server_args=(
   --cert-dir "$tls_dir"
   --event-log "$output_dir/fixture-events.jsonl"
 )
-if [[ "$lab" == "1" ]]; then
-  server_args+=(--http)
-fi
 python3 "$script_dir/fixture_server.py" "${server_args[@]}" \
   >"$output_dir/fixture-server.log" 2>&1 &
 server_pid=$!
 for _ in {1..50}; do
-  if curl -kfsS --connect-timeout 1 "$scheme://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
+  if curl -kfsS --connect-timeout 1 "https://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
     break
   fi
   if ! kill -0 "$server_pid" 2>/dev/null; then
@@ -174,7 +166,7 @@ for _ in {1..50}; do
   fi
   sleep 0.1
 done
-if ! curl -kfsS --connect-timeout 1 "$scheme://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
+if ! curl -kfsS --connect-timeout 1 "https://127.0.0.1:$port/healthz" >/dev/null 2>&1; then
   echo "Fixture server did not become ready." >&2
   exit 1
 fi
@@ -194,8 +186,7 @@ reverse_added="1"
   echo "cold=$cold"
   echo "settle_seconds=$settle"
   echo "swipes=$swipes"
-  echo "lab=$lab"
-  echo "fixture_url=$scheme://$([[ \"$lab\" == \"1\" ]] && echo 127.0.0.1 || echo localhost):$port/fixture/?run=$run_id"
+  echo "fixture_url=https://localhost:$port/fixture/?run=$run_id"
   "$adb_bin" -s "$serial" shell getprop ro.build.version.release | tr -d '\r' | sed 's/^/android=/'
   "$adb_bin" -s "$serial" shell dumpsys package "$package_name" | sed -n 's/^[[:space:]]*versionCode=/versionCode=/p; s/^[[:space:]]*versionName=/versionName=/p' | head -2
 } >"$output_dir/run-metadata.txt"
@@ -231,10 +222,7 @@ if [[ "$cold" == "1" ]]; then
 fi
 "$adb_bin" -s "$serial" shell dumpsys gfxinfo "$package_name" reset >"$output_dir/gfxinfo-reset.txt" 2>&1 || true
 
-fixture_url="$scheme://localhost:$port/fixture/?run=$run_id"
-if [[ "$lab" == "1" ]]; then
-  fixture_url="$scheme://127.0.0.1:$port/fixture/?run=$run_id"
-fi
+fixture_url="https://localhost:$port/fixture/?run=$run_id"
 "$adb_bin" -s "$serial" shell am start -W \
   -a android.intent.action.VIEW \
   -d "$fixture_url" \
@@ -269,11 +257,7 @@ if (( remaining > 0 )); then sleep "$remaining"; fi
 if [[ -s "$output_dir/fixture-events.jsonl" ]]; then
   "$adb_bin" -s "$serial" exec-out screencap -p >"$output_dir/fixture-screen.png" 2>/dev/null || true
 else
-  if [[ "$lab" == "1" ]]; then
-    echo "Fixture emitted no event. The isolated lab activity did not report readiness; inspect logcat and activity state." >&2
-  else
-    echo "Fixture emitted no event. A fresh DAG profile may require a one-time Gecko certificate exception." >&2
-  fi
+  echo "Fixture emitted no event. A fresh DAG profile may require a one-time Gecko certificate exception." >&2
   echo "No screenshot was captured, preventing accidental capture of a non-fixture page." >&2
 fi
 

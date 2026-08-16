@@ -10,7 +10,7 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 22 commits por delante de `origin/main`; sin push ni publicacion.
+- Rama `main`, 24 commits por delante de `origin/main`; sin push ni publicacion.
 - DEV 221 / 0.70.23 es la candidata integrada local. Diagnostic 102 y extension
   2.0.55 quedan como herramientas locales; contienen el rearme de sesion,
   viewport estable y espera acotada de superficie Gecko vigentes.
@@ -67,10 +67,11 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Guardar el lote integrado local y continuar con la limpieza de integracion DAG
-(retirar referencias LAB antiguas). URLs MP4 directas, iframes, Shorts, anuncios,
-Instagram y TikTok siguen NO PROBADOS o NO-GO y requieren tickets separados,
-sin excepciones por sitio.
+El lote integrado y la retirada de la APK LAB ya estan guardados localmente.
+Antes del proximo cambio funcional de video, abrir `DAG-VIDEO-STRUCTURE-01` para
+dividir `video-lab.js` sin cambiar conducta. URLs MP4 directas, iframes, Shorts,
+anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO y requieren tickets
+separados, sin excepciones por sitio.
 
 ## Video normal vigente
 

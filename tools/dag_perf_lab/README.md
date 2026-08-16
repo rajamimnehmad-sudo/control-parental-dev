@@ -113,7 +113,7 @@ usuario, se construye e instala la variante separada `diagnostic` y se agrega
 `--diagnostic`:
 
 ```bash
-./gradlew :app-dag-browser:assembleDiagnosticDebug
+scripts/dag_gradle.sh assembleDiagnosticDebug
 adb install -r app-dag-browser/build/outputs/apk/diagnostic/debug/DagBrowser-diagnostic-debug.apk
 tools/dag_perf_lab/run_live_site.sh \
   --serial SERIAL \
@@ -129,19 +129,3 @@ perfil independientes. El runner fija el PID exacto después de abrirlo y genera
 tiempos, tamaños, puntajes y motivos de decisión. No contiene URL, consulta,
 bytes, miniaturas ni píxeles. Cada ejecución queda delimitada por su `run_id` y
 no mezcla movimientos anteriores del teléfono.
-
-### Fixture HTTP del harness aislado
-
-GeckoView no expone en el runtime productivo una excepción para certificados
-HTTPS autofirmados. Para conservar TLS estricto en DAG DEV, el laboratorio tiene
-un flavor separado `lab` que solo permite `http://localhost/fixture/` y sirve el
-fixture por HTTP mediante `adb reverse`. No se instala una CA, no se desactiva
-TLS en DAG DEV y el APK `lab` nunca es un artefacto de publicación.
-
-Construcción y ejecución:
-
-```bash
-./gradlew assembleLabDebug
-tools/dag_perf_lab/run_a23_fixture.sh \
-  --serial SERIAL --lab --expected-model SM-S908E
-```

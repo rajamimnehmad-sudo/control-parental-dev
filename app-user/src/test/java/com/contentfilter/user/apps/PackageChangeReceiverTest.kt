@@ -33,7 +33,7 @@ class PackageChangeReceiverTest {
         listOf(
             "com.contentfilter.dagbrowser",
             "com.contentfilter.dagbrowser.dev",
-            "com.contentfilter.dagbrowser.lab",
+            "com.contentfilter.dagbrowser.diagnostic.dev",
         ).forEach { packageName ->
             assertFalse(
                 shouldRequireInstallApproval(
@@ -44,5 +44,13 @@ class PackageChangeReceiverTest {
                 ),
             )
         }
+        assertTrue(
+            shouldRequireInstallApproval(
+                "com.contentfilter.dagbrowser.lab",
+                false,
+                false,
+                "com.contentfilter.user.dev",
+            ),
+        )
     }
 }

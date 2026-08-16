@@ -73,20 +73,20 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 - **Diagnostic** (`com.contentfilter.dagbrowser.diagnostic.dev`): herramienta
   temporal para investigar fallos que DEV no explica. No es una tercera app para
   usuarios y debe retirarse del telefono al cerrar la investigacion.
-- **LAB** (`com.contentfilter.dagbrowser.lab`): ya no se construye. Persisten
-  referencias antiguas en App Usuario; se propone retirarlas en un ticket corto.
+- **LAB** (`com.contentfilter.dagbrowser.lab`): retirado. No existe flavor, APK,
+  runner ni confianza activa en App Usuario. Una regresion verifica que el
+  paquete antiguo vuelva a tratarse como tercero.
 - Produccion no tiene hoy un flavor operativo de DAG. No fingir que existe; se
   definira recien cuando haya un candidato aprobado.
 
 ## Prioridad recomendada
 
 1. Guardar el hito DAG Video/DEV 221 en un commit local coherente, sin push.
-2. Limpiar la integracion DAG: retirar LAB y documentar instalacion DEV/Diagnostic.
-3. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
+2. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
    dispositivo.
-4. Dividir archivos criticos gigantes en tickets funcionalmente neutros.
-5. Agregar validacion automatica minima a Super Admin y Edge Functions.
-6. Clasificar los 5,4 GB de `.codex-tmp` y retirar solo cache reproducible con OK.
+3. Dividir archivos criticos gigantes en tickets funcionalmente neutros.
+4. Agregar validacion automatica minima a Super Admin y Edge Functions.
+5. Clasificar los 5,4 GB de `.codex-tmp` y retirar solo cache reproducible con OK.
 
 GIF esta cerrado para el formato GIF; WebP/AVIF animados quedan pendientes.
 
