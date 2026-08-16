@@ -11,8 +11,8 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 ## Estado operativo
 
 - Rama `main`, 24 commits por delante de `origin/main`; sin push ni publicacion.
-- DEV 221 / 0.70.23 es la candidata integrada local. Diagnostic 102 y extension
-  2.0.55 quedan como herramientas locales; contienen el rearme de sesion,
+- DEV 222 / 0.70.24 es la candidata integrada local. Diagnostic 102 y extension
+  2.0.56 quedan como herramientas locales; contienen el rearme de sesion,
   viewport estable y espera acotada de superficie Gecko vigentes.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
@@ -65,11 +65,21 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
   Instalado sin borrar datos en A23, YouTube mostro imagen fluida y Android
   confirmo salida AAudio de medios, estereo 48 kHz. Sin crash ni ANR.
 
+## Ultimo hito — DAG-VIDEO-STRUCTURE-01
+
+- El protocolo, nombres de mensajes e identidad exacta de autoridad salieron a
+  `video-protection-protocol.js`; `video-lab.js` bajo de 812 a 799 lineas.
+- No cambio reproduccion, politica, tiempos ni excepciones por sitio.
+- Prevalidacion: JS 89/89; unitarios DEV 211/211 y Diagnostic 211/211; ktlint,
+  lint DEV/Diagnostic y assemble DEV verdes.
+- A23 con datos conservados: YouTube normal mostro cuadros sucesivos visibles,
+  audio multimedia estereo 48 kHz y ningun crash/ANR. DEV 222 quedo instalada y
+  detenida al finalizar.
+
 ### Proximo paso
 
-El lote integrado y la retirada de la APK LAB ya estan guardados localmente.
-Antes del proximo cambio funcional de video, abrir `DAG-VIDEO-STRUCTURE-01` para
-dividir `video-lab.js` sin cambiar conducta. URLs MP4 directas, iframes, Shorts,
+Prueba humana de DEV 222 en A23/S22: dos videos consecutivos, pausa/reanudacion,
+adelantar/retroceder y navegacion normal. URLs MP4 directas, iframes, Shorts,
 anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO y requieren tickets
 separados, sin excepciones por sitio.
 
@@ -105,8 +115,8 @@ reemplaza solo el GIF. WebP/AVIF animados quedan para otro ticket.
   por cuadro, video todavia no.
 - `DagBrowserActivity.kt` supera 4.800 lineas: no agregar responsabilidades;
   usar politicas/componentes nuevos.
-- `video-lab.js` tiene 812 lineas. No agregar otra responsabilidad; el proximo
-  cambio funcional debe abrir primero el ticket de division neutral.
+- `video-lab.js` tiene 799 lineas tras extraer el protocolo. Sigue siendo un
+  coordinador grande: no agregarle otra responsabilidad.
 - Tras tres intentos sin cambiar hito o decision, auditoria enfocada antes de
   otra edicion, build o APK.
 - Automatizar ADB, agrupar pruebas y pedir intervencion solo si es inevitable.

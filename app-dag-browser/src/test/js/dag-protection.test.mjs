@@ -1712,8 +1712,32 @@ test("a stale native close removes a newer grant but never acknowledges the stal
   }).cancel, true);
 });
 
+test("video protection protocol matches only the exact active frame authority", async () => {
+  const context = { Uint32Array };
+  vm.runInNewContext(await readAsset("video-protection-protocol.js"), context, {
+    filename: "video-protection-protocol.js",
+  });
+  const protocol = context.__gloshDagVideoProtectionProtocol;
+  const record = {
+    framePending: true,
+    frameSequence: 7,
+    frameViewportEpoch: 3,
+    revealToken: "token_a",
+    revision: 5,
+    videoId: 11,
+  };
+  const exact = { frameSequence: 7, revision: 5, videoId: 11, viewportEpoch: 3 };
+  assert.equal(protocol.recordMatchesMessage(record, exact, record), true);
+  assert.equal(protocol.frameMatchesMessage(record, exact, record), true);
+  assert.equal(protocol.frameMatchesMessage(record, { ...exact, frameSequence: 8 }, record), false);
+  assert.equal(protocol.frameMatchesMessage(record, exact, { ...record }), false);
+  record.framePending = false;
+  assert.equal(protocol.frameMatchesMessage(record, exact, record), false);
+});
+
 test("video laboratory transport is bounded and contains no provider exceptions", async () => {
   const background = await readAsset("background.js");
+  const videoProtocol = await readAsset("video-protection-protocol.js");
   const videoGeometry = await readAsset("video-lab-geometry.js");
   const videoPresentation = await readAsset("video-lab-presentation.js");
   const videoRecord = await readAsset("video-lab-record.js");
@@ -1735,6 +1759,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   const fixture = await readAsset("video-lab-fixture.html");
   const fixtureScript = await readAsset("video-lab-fixture.js");
   const manifest = await readAsset("manifest.json");
+  new vm.Script(videoProtocol);
   new vm.Script(videoGeometry);
   new vm.Script(videoPresentation);
   new vm.Script(videoRecord);
@@ -1756,15 +1781,15 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /SMOOTH_CAPTURE_DELAY_MS = 500/u);
   assert.match(videoPlayback, /state\.enabled = false;\s*void dependencies\.retireRecord\(record, "capture_limit"\)/u);
   assert.match(videoLab, /MAX_STATUS_RETRIES = 20/u);
-  assert.match(videoLab, /video-lab-cover-request/u);
-  assert.match(videoLab, /video-lab-frame-request/u);
-  assert.match(videoLab, /video-lab-frame-captured/u);
-  assert.match(videoLab, /video-lab-frame-concealed/u);
-  assert.match(videoLab, /video-lab-smooth-start/u);
+  assert.match(videoProtocol, /video-lab-cover-request/u);
+  assert.match(videoProtocol, /video-lab-frame-request/u);
+  assert.match(videoProtocol, /video-lab-frame-captured/u);
+  assert.match(videoProtocol, /video-lab-frame-concealed/u);
+  assert.match(videoProtocol, /video-lab-smooth-start/u);
   assert.match(videoRecord, /smoothGrantIdentity: null/u);
   assert.match(videoPlayback, /smoothGrantIdentity = Object\.freeze\(dependencies\.grantIdentity\(record\)\)/u);
   assert.match(videoLifecycle, /smoothGrantIdentity \?\? dependencies\.grantIdentity\(record\)/u);
-  assert.match(videoLab, /video-lab-retire/u);
+  assert.match(videoProtocol, /video-lab-retire/u);
   assert.match(videoSeek, /retireRecord\(record, "seek_requested"\)/u);
   assert.match(videoLab, /video\.addEventListener\("seeking", \(\) => seekController\?\.onSeeking\(record\)\)/u);
   assert.match(videoLab, /video\.addEventListener\("seeked", \(\) => seekController\?\.onSeeked\(record\)\)/u);
@@ -1801,11 +1826,11 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoPresentation, /"playsinline"/u);
   assert.match(videoCapture, /dependencies\.document\.documentElement\.hasAttribute\(dependencies\.fixtureAttribute\)/u);
   assert.match(videoPlayback, /requestVideoFrameCallback/u);
-  assert.match(videoLab, /frameSequence/u);
-  assert.match(videoLab, /viewportEpoch/u);
+  assert.match(videoProtocol, /frameSequence/u);
+  assert.match(videoProtocol, /viewportEpoch/u);
   assert.match(videoCapture, /record\.frameConcealed/u);
   assert.match(videoCapture, /message\.action === "allow"/u);
-  assert.match(videoLab, /data-glosh-dag-video-lab-token/u);
+  assert.match(videoProtocol, /data-glosh-dag-video-lab-token/u);
   assert.match(videoLab, /FRAME_RESULT_TIMEOUT_MS = 2_500/u);
   assert.match(videoLab, /MAX_COVERED_VIEWPORT_TRANSITION_MS = 1_000/u);
   assert.match(videoLab, /MAX_COVERED_VIEWPORT_TRANSITIONS = 8/u);
@@ -1893,7 +1918,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoViewport, /dependencies\.fixtureEnabled\(\)[\s\S]*event\?\.type === "resize"[\s\S]*dependencies\.sameVideoRect/u);
   assert.match(background, /awaitVideoLabCloseProof/u);
   assert.match(background, /revoke_waiting_for_proof/u);
-  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-isolation.js",\s*"video-lab-lifecycle.js",\s*"video-lab-playback.js",\s*"video-lab-capture.js",\s*"video-lab-viewport.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-seek-state.js",\s*"video-lab-seek.js",\s*"video-source-bootstrap.js",\s*"video-authority-selection.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
+  assert.match(manifest, /"video-protection-protocol.js",\s*"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-isolation.js",\s*"video-lab-lifecycle.js",\s*"video-lab-playback.js",\s*"video-lab-capture.js",\s*"video-lab-viewport.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-seek-state.js",\s*"video-lab-seek.js",\s*"video-source-bootstrap.js",\s*"video-authority-selection.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
   assert.doesNotMatch(videoAuthoritySelection, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
   assert.doesNotMatch(videoSourceBootstrap, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
@@ -1970,6 +1995,7 @@ test("video laboratory silences dynamic unselected media in capture phase", asyn
   const initialAudio = new HTMLMediaElement();
   const initialVideo = new HTMLMediaElement();
   media.push(initialAudio, initialVideo);
+  vm.runInNewContext(await readAsset("video-protection-protocol.js"), context, { filename: "video-protection-protocol.js" });
   vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
   vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
   vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
@@ -2303,6 +2329,7 @@ test("video laboratory ignores controls UI and closes on preventive capability m
   const video = new HTMLVideoElement();
   media.push(video);
 
+  vm.runInNewContext(await readAsset("video-protection-protocol.js"), context, { filename: "video-protection-protocol.js" });
   vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
   vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
   vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
@@ -2558,6 +2585,7 @@ test("failed video conceal leaves terminal media isolation locked until native r
   const video = new HTMLVideoElement();
   const audio = new HTMLMediaElement();
   media.push(video, audio);
+  vm.runInNewContext(await readAsset("video-protection-protocol.js"), context, { filename: "video-protection-protocol.js" });
   vm.runInNewContext(await readAsset("video-lab-geometry.js"), context, { filename: "video-lab-geometry.js" });
   vm.runInNewContext(await readAsset("video-lab-presentation.js"), context, { filename: "video-lab-presentation.js" });
   vm.runInNewContext(await readAsset("video-lab-record.js"), context, { filename: "video-lab-record.js" });
@@ -3037,6 +3065,8 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.equal(protectionScript.js.includes("video-fluid-capability.js"), false);
   assert.equal(protectionScript.js.includes("video-seek-state.js"), true);
   assert.equal(protectionScript.js.includes("video-lab-seek.js"), true);
+  assert.ok(protectionScript.js.indexOf("video-protection-protocol.js") <
+    protectionScript.js.indexOf("video-lab-geometry.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-geometry.js") <
     protectionScript.js.indexOf("video-lab-presentation.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-presentation.js") <

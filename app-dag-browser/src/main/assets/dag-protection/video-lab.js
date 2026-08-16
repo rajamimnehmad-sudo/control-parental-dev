@@ -2,22 +2,6 @@
 
 (() => {
   if (globalThis.__gloshDagVideoLab !== undefined) return;
-  const CONFIG_MESSAGE = "video-lab-config";
-  const STATUS_MESSAGE = "video-lab-status";
-  const DIAGNOSTIC_MESSAGE = "video-lab-diagnostic";
-  const COVER_REQUEST_MESSAGE = "video-lab-cover-request";
-  const COVER_ARMED_MESSAGE = "video-lab-cover-armed";
-  const FRAME_REQUEST_MESSAGE = "video-lab-frame-request";
-  const FRAME_CAPTURED_MESSAGE = "video-lab-frame-captured";
-  const FRAME_CONCEALED_MESSAGE = "video-lab-frame-concealed";
-  const FRAME_RESULT_MESSAGE = "video-lab-frame-result";
-  const SMOOTH_START_MESSAGE = "video-lab-smooth-start";
-  const RETIRE_MESSAGE = "video-lab-retire";
-  const REVEAL_MESSAGE = "video-lab-reveal-style";
-  const CONCEAL_MESSAGE = "video-lab-conceal-style";
-  const TOKEN_ATTRIBUTE = "data-glosh-dag-video-lab-token";
-  const PRESENTATION_GUARD_ATTRIBUTE = "data-glosh-dag-presentation-guard";
-  const PRESENTATION_GUARD_VERSION = "1";
   const INITIAL_COVERED_CAPTURE_COUNT = 2;
   const MAX_CAPTURE_COUNT = 7_200;
   const CAPTURE_DELAY_MS = 0;
@@ -30,7 +14,7 @@
   const VIEWPORT_SETTLE_MS = 150;
   const MAX_COVERED_VIEWPORT_TRANSITION_MS = 1_000;
   const MAX_COVERED_VIEWPORT_TRANSITIONS = 8;
-  const INTERNAL_FIXTURE_ATTRIBUTE = "data-glosh-dag-video-lab-fixture";
+  const protocol = globalThis.__gloshDagVideoProtectionProtocol;
   const diagnosticLabels = globalThis.__gloshDagVideoLabDiagnostics;
   const geometry = globalThis.__gloshDagVideoLabGeometry;
   const presentation = globalThis.__gloshDagVideoLabPresentation;
@@ -47,6 +31,7 @@
   const sourceBootstrapRuntime = globalThis.__gloshDagVideoSourceBootstrap;
   const authoritySelectionRuntime = globalThis.__gloshDagVideoAuthoritySelection;
   if (
+    protocol === undefined ||
     diagnosticLabels === undefined ||
     geometry === undefined ||
     presentation === undefined ||
@@ -63,6 +48,26 @@
     sourceBootstrapRuntime === undefined ||
     authoritySelectionRuntime === undefined
   ) return;
+  const {
+    fixtureAttribute: INTERNAL_FIXTURE_ATTRIBUTE,
+    messages,
+    presentationGuardAttribute: PRESENTATION_GUARD_ATTRIBUTE,
+    presentationGuardVersion: PRESENTATION_GUARD_VERSION,
+    tokenAttribute: TOKEN_ATTRIBUTE,
+  } = protocol;
+  const {
+    config: CONFIG_MESSAGE,
+    status: STATUS_MESSAGE,
+    coverRequest: COVER_REQUEST_MESSAGE,
+    coverArmed: COVER_ARMED_MESSAGE,
+    frameRequest: FRAME_REQUEST_MESSAGE,
+    frameCaptured: FRAME_CAPTURED_MESSAGE,
+    frameConcealed: FRAME_CONCEALED_MESSAGE,
+    frameResult: FRAME_RESULT_MESSAGE,
+    smoothStart: SMOOTH_START_MESSAGE,
+    retire: RETIRE_MESSAGE,
+    reveal: REVEAL_MESSAGE,
+  } = messages;
   const {
     hasBackingMedia,
     sameVideoRect,
@@ -99,30 +104,12 @@
   const diagnosticStartedAt = performance.now();
   const timelineStages = new Set();
   const records = new WeakMap();
-  const randomToken = (wordCount) => {
-    const words = crypto.getRandomValues(new Uint32Array(wordCount));
-    return Array.from(words, (word) => word.toString(16).padStart(8, "0")).join("");
-  };
-  const frameIdentity = (record) => ({
-    frameSequence: record.frameSequence,
-    viewportEpoch: record.frameViewportEpoch,
-  });
-  const grantIdentity = (record) => ({
-    videoId: record.videoId,
-    revision: record.revision,
-    ...frameIdentity(record),
-    token: record.revealToken,
-  });
+  const randomToken = (wordCount) => protocol.randomToken(crypto, wordCount);
+  const grantIdentity = protocol.grantIdentity;
   const recordMatchesMessage = (record, message) =>
-    record !== null &&
-    record === activeRecord &&
-    message?.videoId === record.videoId &&
-    message?.revision === record.revision;
+    protocol.recordMatchesMessage(record, message, activeRecord);
   const frameMatchesMessage = (record, message) =>
-    recordMatchesMessage(record, message) &&
-    record.framePending &&
-    message?.frameSequence === record.frameSequence &&
-    message?.viewportEpoch === record.frameViewportEpoch;
+    protocol.frameMatchesMessage(record, message, activeRecord);
   const postRecord = (type, record, extra = {}) => {
     if (
       postToAndroid === null ||
@@ -144,7 +131,7 @@
     lastDiagnosticStage = stage;
     try {
       postToAndroid({
-        type: DIAGNOSTIC_MESSAGE,
+        type: messages.diagnostic,
         stage,
         elapsedMillis: Math.min(120_000, Math.max(0, Math.round(performance.now() - diagnosticStartedAt))),
       });
@@ -382,7 +369,7 @@
     browser,
     cancelSourceBootstrap: (record) => sourceBootstrap?.cancel(record),
     clearRecordTimers,
-    concealMessage: CONCEAL_MESSAGE,
+    concealMessage: messages.conceal,
     documentToken: () => documentToken,
     enforceMediaIsolation,
     grantIdentity,

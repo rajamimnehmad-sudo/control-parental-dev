@@ -4,12 +4,12 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- Rama: `main`, 22 commits locales por delante de `origin/main`.
+- Rama: `main`, 25 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
-- DAG local modificado: DEV 221 / 0.70.23 es candidata integrada; Diagnostic 102 / extension
-  2.0.55 son herramientas locales. El reporte S22 demostro que el segundo video
+- DAG local modificado: DEV 222 / 0.70.24 es candidata integrada; Diagnostic 102 / extension
+  2.0.56 son herramientas locales. El reporte S22 demostro que el segundo video
   fallaba por falta de rearme tras `viewport_changed`, no por cache. En A23,
   Diagnostic 101 reprodujo primer video, scroll y segundo video sin limpiar
   datos: ambos llegaron a `smooth_started`, con cierre durable entre autoridades
@@ -19,7 +19,10 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
   externa elegida no entrego cuadros, por lo que esa fila sigue pendiente. JS
   88/88. La auditoria de cierre acepta la evidencia HTML5 fisica anterior de
   120/120 cuadros mas el replay actual; DEV 221 paso todos los gates y en A23
-  mostro YouTube fluido con salida AAudio estereo 48 kHz. GIF seguro conserva
+  mostro YouTube fluido con salida AAudio estereo 48 kHz. El protocolo de video
+  quedo separado del coordinador (799 lineas), con JS 89/89, unitarios 211/211
+  por variante, lint completo y nueva comprobacion A23 de imagen en movimiento,
+  audio estereo 48 kHz y cero crash/ANR. GIF seguro conserva
   animacion. DAG Video premium queda en 84%; video general sigue NO-GO para
   URLs directas, iframes, Shorts, anuncios y redes sociales.
 - Super Admin compila y pasa typecheck/lint; queda un warning de imagen y no hay
@@ -81,7 +84,7 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Prioridad recomendada
 
-1. Guardar el hito DAG Video/DEV 221 en un commit local coherente, sin push.
+1. Prueba humana breve de DAG DEV 222 en dos videos consecutivos y controles.
 2. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
    dispositivo.
 3. Dividir archivos criticos gigantes en tickets funcionalmente neutros.
@@ -103,7 +106,7 @@ del video. Requiere limites anti-bucle y no admite excepciones por proveedor.
 - `DagBrowserActivity.kt` supera 4.000 lineas.
 - `RulesViewModel.kt` supera 2.000 lineas.
 - `background.js`, Accessibility y VPN superan o rondan 900. `video-lab.js`
-  llego a 812; antes de otra responsabilidad debe abrirse su division neutral.
+  quedo en 799 tras extraer su protocolo; no debe recibir otra responsabilidad.
   DAG-STRUCTURE-01 ya separo diagnostico, geometria, presentacion, estado,
   mutaciones, aislamiento, ciclo de vida, reproduccion, captura, viewport y
   bootstrap del ultimo; bajo de 1.758 a 790 lineas con todos los contratos

@@ -11,6 +11,7 @@ class MediaBarrierContractTest {
     private val manifest by lazy { extensionRoot.resolve("manifest.json").readText() }
     private val background by lazy { extensionRoot.resolve("background.js").readText() }
     private val barrier by lazy { extensionRoot.resolve("barrier.js").readText() }
+    private val videoProtocol by lazy { extensionRoot.resolve("video-protection-protocol.js").readText() }
     private val videoLab by lazy { extensionRoot.resolve("video-lab.js").readText() }
     private val videoPresentation by lazy { extensionRoot.resolve("video-lab-presentation.js").readText() }
     private val videoRecord by lazy { extensionRoot.resolve("video-lab-record.js").readText() }
@@ -36,12 +37,13 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"css_origin\": \"user\"")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.55\"")
+        assertContains(manifest, "\"version\": \"2.0.56\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(manifest, "\"presentation-guard.js\"")
         assertContains(manifest, "\"video-bootstrap-state.js\"")
         assertContains(manifest, "\"video-authority-selection.js\"")
+        assertContains(manifest, "\"video-protection-protocol.js\"")
         assertFalse(manifest.contains("\"video-fluid-capability.js\""))
         assertContains(activity, ".ensureBuiltIn(ExtensionLocation, ExtensionId)")
         assertFalse(activity.contains(".installBuiltIn(ExtensionLocation)"))
@@ -373,9 +375,9 @@ class MediaBarrierContractTest {
         assertContains(videoLab, "INITIAL_COVERED_CAPTURE_COUNT = 2")
         assertContains(videoLab, "MAX_CAPTURE_COUNT = 7_200")
         assertContains(videoLab, "SMOOTH_CAPTURE_DELAY_MS = 500")
-        assertContains(videoLab, "video-lab-cover-request")
-        assertContains(videoLab, "video-lab-frame-request")
-        assertContains(videoLab, "video-lab-smooth-start")
+        assertContains(videoProtocol, "video-lab-cover-request")
+        assertContains(videoProtocol, "video-lab-frame-request")
+        assertContains(videoProtocol, "video-lab-smooth-start")
         assertContains(videoRecord, "smoothGrantIdentity: null")
         assertContains(videoPlayback, "record.smoothGrantIdentity = Object.freeze(dependencies.grantIdentity(record))")
         assertContains(videoLifecycle, "record.smoothGrantIdentity ?? dependencies.grantIdentity(record)")
@@ -392,12 +394,12 @@ class MediaBarrierContractTest {
             videoCapture,
             "dependencies.document.documentElement.hasAttribute(dependencies.fixtureAttribute)",
         )
-        assertContains(videoLab, "data-glosh-dag-video-lab-token")
+        assertContains(videoProtocol, "data-glosh-dag-video-lab-token")
         assertContains(videoLab, "FRAME_RESULT_TIMEOUT_MS = 2_500")
         assertContains(videoCapture, "record.framePending ||")
         assertContains(videoPlayback, "requestVideoFrameCallback")
-        assertContains(videoLab, "frameSequence")
-        assertContains(videoLab, "viewportEpoch")
+        assertContains(videoProtocol, "frameSequence")
+        assertContains(videoProtocol, "viewportEpoch")
         assertContains(background, "isVideoLabEligibleSender")
         assertContains(manifest, "\"video-lab-fixture.js\"")
         assertFalse(extensionRoot.resolve("video-lab-fixture.js").readText().contains("video.play()"))
