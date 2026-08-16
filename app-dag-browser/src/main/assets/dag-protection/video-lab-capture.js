@@ -222,6 +222,10 @@
       record.video.volume = 0;
       dependencies.enforcePresentationCapabilities(record);
       dependencies.enforceMediaIsolation();
+      if (!dependencies.hasBackingMedia(record.video)) {
+        void dependencies.retireRecord(record, "source_changed");
+        return;
+      }
       requestFrameWhenReady(record);
     };
 

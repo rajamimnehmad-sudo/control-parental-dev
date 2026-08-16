@@ -18,8 +18,6 @@
   const TOKEN_ATTRIBUTE = "data-glosh-dag-video-lab-token";
   const PRESENTATION_GUARD_ATTRIBUTE = "data-glosh-dag-presentation-guard";
   const PRESENTATION_GUARD_VERSION = "1";
-  // The diagnostic transport is intentionally finite even though it replays a
-  // sequence. There is one raw compositor grant, capture and decision at once.
   const INITIAL_COVERED_CAPTURE_COUNT = 2;
   const MAX_CAPTURE_COUNT = 7_200;
   const CAPTURE_DELAY_MS = 0;
@@ -46,6 +44,8 @@
   const viewportRuntime = globalThis.__gloshDagVideoLabViewport;
   const seekRuntime = globalThis.__gloshDagVideoLabSeek;
   const seekStateRuntime = globalThis.__gloshDagVideoSeekState;
+  const sourceBootstrapRuntime = globalThis.__gloshDagVideoSourceBootstrap;
+  const authoritySelectionRuntime = globalThis.__gloshDagVideoAuthoritySelection;
   if (
     diagnosticLabels === undefined ||
     geometry === undefined ||
@@ -59,7 +59,9 @@
     captureRuntime === undefined ||
     viewportRuntime === undefined ||
     seekRuntime === undefined ||
-    seekStateRuntime === undefined
+    seekStateRuntime === undefined ||
+    sourceBootstrapRuntime === undefined ||
+    authoritySelectionRuntime === undefined
   ) return;
   const {
     hasBackingMedia,
@@ -93,10 +95,10 @@
   let unsafePresentationBlocked = false;
   let seekController = null;
   let lastViewportChangeAt = performance.now();
+  let viewportStabilityRequired = false;
   const diagnosticStartedAt = performance.now();
   const timelineStages = new Set();
   const records = new WeakMap();
-  const backingSnapshots = new WeakMap();
   const randomToken = (wordCount) => {
     const words = crypto.getRandomValues(new Uint32Array(wordCount));
     return Array.from(words, (word) => word.toString(16).padStart(8, "0")).join("");
@@ -137,8 +139,6 @@
     });
     return true;
   };
-  // Diagnostic builds report only a finite state label. No URL, DOM, media
-  // identifier or frame data leaves the content script through this path.
   const postDiagnostic = (stage) => {
     if (!diagnosticsEnabled || postToAndroid === null || stage === lastDiagnosticStage) return;
     lastDiagnosticStage = stage;
@@ -155,12 +155,10 @@
     timelineStages.add(stage);
     postDiagnostic(stage);
   };
-
   const postDiagnosticLabels = (labels) => {
     if (!diagnosticsEnabled) return;
     labels.forEach(postDiagnostic);
   };
-
   const postPlayAttemptDiagnostics = (record) => {
     postDiagnosticLabels(
       diagnosticLabels.playAttempt(
@@ -170,13 +168,11 @@
       ),
     );
   };
-
   const postFrameRecord = (type, record, extra = {}) =>
     postRecord(type, record, {
       ...grantIdentity(record),
       ...extra,
     });
-
   const isolation = isolationRuntime.create({
     MediaElement: HTMLMediaElement,
     VideoElement: globalThis.HTMLVideoElement ?? null,
@@ -207,15 +203,9 @@
     }, 0);
   };
 
-  // These are preventive HTML-media capabilities only. The native cover and
-  // exact grant/revocation protocol remain the authority for fail-closed
-  // presentation; a hostile MAIN world is not trusted by this helper.
   const enforcePresentationCapabilities = (record) =>
     presentation.enforceCapabilities(record, rememberExpectedPresentationMutation);
 
-  // A raw compositor grant is scoped to the selected video only.  Audio and
-  // every other video stay both silent and paused for the entire diagnostic
-  // session; a document cannot race a newly inserted element past this guard.
   const isAuthorizedRawPlayback = isolation.isAuthorizedRawPlayback;
   const silenceAndPauseMedia = isolation.silenceAndPauseMedia;
   const mediaIsolationActive = isolation.active;
@@ -252,6 +242,7 @@
         postDiagnosticLabels(diagnosticLabels.backing(record.video));
         postDiagnostic(diagnosticLabels.readyState(record.video).replace("play_ready_", "backing_ready_"));
         postDiagnostic(diagnosticLabels.networkState(record.video).replace("play_network_", "backing_network_"));
+        if (sourceBootstrap?.backingReady(record) === true) return;
         if (type === "loadstart") {
           if (record.bootstrapLoadStarted || record.bootstrapBackingGeneration !== 0) {
             postDiagnostic("bootstrap_generation_repeated");
@@ -328,27 +319,10 @@
     unsafeActive: (record) => unsafePresentationActive(record),
   });
 
-  const reportBackingTransition = (video) => {
-    const next = {
-      currentSrc: Boolean(video.currentSrc),
-      sourceAttribute: (video.getAttribute("src") || "") !== "",
-      sourceObject: video.srcObject != null,
-      sourceChildren: [...video.querySelectorAll("source")].some((source) =>
-        (source.getAttribute("src") || "") !== ""),
-    };
-    const previous = backingSnapshots.get(video);
-    backingSnapshots.set(video, next);
-    if (previous === undefined) {
-      postTimeline(hasBackingMedia(video)
-        ? "timeline_video_seen_backing"
-        : "timeline_video_seen_no_backing");
-      return;
-    }
-    if (!previous.currentSrc && next.currentSrc) postTimeline("timeline_current_src_assigned");
-    if (!previous.sourceAttribute && next.sourceAttribute) postTimeline("timeline_src_attribute_assigned");
-    if (!previous.sourceObject && next.sourceObject) postTimeline("timeline_src_object_assigned");
-    if (!previous.sourceChildren && next.sourceChildren) postTimeline("timeline_source_child_assigned");
-  };
+  const reportBackingTransition = sourceBootstrapRuntime.createBackingReporter({
+    hasBackingMedia,
+    postTimeline,
+  });
 
   const armBootstrapGeneration = (record) => {
     if (!bootstrapTransitions.armGeneration(record)) {
@@ -406,6 +380,7 @@
   };
   const lifecycle = lifecycleRuntime.create({
     browser,
+    cancelSourceBootstrap: (record) => sourceBootstrap?.cancel(record),
     clearRecordTimers,
     concealMessage: CONCEAL_MESSAGE,
     documentToken: () => documentToken,
@@ -424,6 +399,18 @@
   const concealRecord = lifecycle.concealRecord;
   const retireRecord = lifecycle.retireRecord;
   const retryTerminalIsolation = lifecycle.retryTerminalIsolation;
+  let sourceBootstrap = sourceBootstrapRuntime.create({
+    activeRecord: () => activeRecord,
+    enforceMediaIsolation,
+    enforcePresentationCapabilities,
+    hasBackingMedia,
+    onPlayRejected: (record) => retireRecord(record, "bootstrap_play_rejected"),
+    onPlayStarted: () => postDiagnostic("bootstrap_play_started"),
+    onReady: () => scheduleScan(),
+    onTimeout: (record) => retireRecord(record, "bootstrap_no_backing_timeout"),
+    safePause,
+    timeoutMillis: FRAME_READY_TIMEOUT_MS,
+  });
 
   const resetForAuthority = (record) => {
     recordState.resetAuthority(record, {
@@ -447,7 +434,12 @@
     }
     if (record.sourceSignature !== sourceSignature(record.video)) {
       postDiagnostic("source_changed");
-      void retireRecord(record, "source_changed");
+      void retireRecord(
+        record,
+        record.sourceBootstrapCompleted && record.captures === 0 && !record.rawFrameOpen
+          ? "authority_changed"
+          : "source_changed",
+      );
       return;
     }
     if (record.covered || record.coverPending) return;
@@ -476,40 +468,55 @@
     scanScheduled = false;
     if (!enabled || unsafePresentationBlocked || window.top !== window || closingRecord !== null) return;
     enforceMediaIsolation();
-    const candidate = [...document.querySelectorAll("video")]
-      .map((video) => {
-        reportBackingTransition(video);
-        return { video, area: visibleArea(video) };
-      })
-      .filter(({ video, area }) => area > 0 && hasBackingMedia(video))
-      .sort((left, right) => right.area - left.area)[0]?.video || null;
-    if (candidate === activeRecord?.video) {
-      if (activeRecord !== null) requestCover(activeRecord);
-      return;
-    }
-    if (activeRecord !== null) {
-      void retireRecord(activeRecord, "authority_changed");
-      return;
-    }
-    if (candidate === null) {
-      postDiagnostic("scan_no_candidate");
-      return;
-    }
-    const record = recordFor(candidate);
-    resetForAuthority(record);
-    activeRecord = record;
-    postTimeline("timeline_candidate_selected");
-    postDiagnostic("candidate_selected");
-    enforcePresentationCapabilities(record);
-    enforceMediaIsolation();
-    requestCover(record);
+    authoritySelection.scan([...document.querySelectorAll("video")]);
   };
 
-  const scheduleScan = () => {
+  const scheduleScanNow = () => {
     if (scanScheduled || unsafePresentationBlocked || seekController?.holdsScan() === true) return;
     scanScheduled = true;
     requestAnimationFrame(selectVisibleVideo);
   };
+  const scanGate = viewportRuntime.createScanGate({
+    lastChangeAt: () => lastViewportChangeAt,
+    markStable: () => { viewportStabilityRequired = false; },
+    now: () => performance.now(),
+    required: () => viewportStabilityRequired,
+    scheduleNow: scheduleScanNow,
+    setTimeout: (callback, millis) => setTimeout(callback, millis),
+    settleMillis: VIEWPORT_SETTLE_MS,
+  });
+  const scheduleScan = scanGate.schedule;
+
+  const authoritySelection = authoritySelectionRuntime.create({
+    activeVideo: () => activeRecord?.video ?? null,
+    canBootstrapCandidate: (video) => sourceBootstrap.canAttempt(video),
+    clearTimeout: (timer) => clearTimeout(timer),
+    hasBackingMedia,
+    maximumTransitions: 8,
+    now: () => performance.now(),
+    onActiveCandidate: () => requestCover(activeRecord),
+    onAuthorityChanged: () => retireRecord(activeRecord, "authority_changed"),
+    onHandoffWaiting: () => postDiagnostic("authority_handoff_waiting"),
+    onNoCandidate: () => postDiagnostic("scan_no_candidate"),
+    onSelected: (video) => {
+      const record = recordFor(video);
+      resetForAuthority(record);
+      activeRecord = record;
+      postTimeline("timeline_candidate_selected");
+      postDiagnostic("candidate_selected");
+      enforcePresentationCapabilities(record);
+      enforceMediaIsolation();
+      if (hasBackingMedia(video)) requestCover(record);
+      else if (!sourceBootstrap.start(record)) void retireRecord(record, "bootstrap_unavailable");
+    },
+    reportBackingTransition,
+    scheduleScan,
+    setTimeout: (callback, millis) => setTimeout(callback, millis),
+    settleMillis: VIEWPORT_SETTLE_MS,
+    sourceSignature,
+    viewportSignature,
+    visibleArea,
+  });
 
   seekController = seekRuntime.create({
     Phase: seekStateRuntime.Phase,
@@ -595,6 +602,7 @@
     frameConcealedMessage: FRAME_CONCEALED_MESSAGE,
     frameMatchesMessage,
     frameReadyTimeoutMillis: FRAME_READY_TIMEOUT_MS,
+    hasBackingMedia,
     grantIdentity,
     lastViewportChangeAt: () => lastViewportChangeAt,
     now: () => performance.now(),
@@ -644,7 +652,10 @@
     sameViewportBounds,
     sameViewportSignature,
     scheduleScan,
-    setLastViewportChangeAt: (value) => { lastViewportChangeAt = value; },
+    setLastViewportChangeAt: (value) => {
+      lastViewportChangeAt = value;
+      viewportStabilityRequired = true;
+    },
     sourceSignature,
     state: lifecycleState,
     unsafePresentationActive,
@@ -722,7 +733,10 @@
       }
       addEventListener("scroll", invalidateForViewport, { passive: true });
       addEventListener("resize", invalidateForViewport, { passive: true });
-      addEventListener("pagehide", () => void retireRecord(activeRecord, "document_retired"));
+      addEventListener("pagehide", () => {
+        authoritySelection.cancel();
+        void retireRecord(activeRecord, "document_retired");
+      });
       addEventListener("fullscreenchange", () => {
         if (document.fullscreenElement !== null) {
           void document.exitFullscreen?.().catch(() => {});

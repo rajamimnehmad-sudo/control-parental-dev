@@ -1726,6 +1726,8 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   const videoBootstrap = await readAsset("video-lab-bootstrap.js");
   const videoSeek = await readAsset("video-lab-seek.js");
   const videoSeekState = await readAsset("video-seek-state.js");
+  const videoSourceBootstrap = await readAsset("video-source-bootstrap.js");
+  const videoAuthoritySelection = await readAsset("video-authority-selection.js");
   const videoDiagnostics = await readAsset("video-lab-diagnostics.js");
   const videoLab = await readAsset("video-lab.js");
   const presentationGuard = await readAsset("presentation-guard.js");
@@ -1745,6 +1747,8 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   new vm.Script(videoBootstrap);
   new vm.Script(videoSeek);
   new vm.Script(videoSeekState);
+  new vm.Script(videoSourceBootstrap);
+  new vm.Script(videoAuthoritySelection);
   new vm.Script(videoDiagnostics);
   new vm.Script(videoLab);
   assert.match(videoLab, /INITIAL_COVERED_CAPTURE_COUNT = 2/u);
@@ -1868,7 +1872,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoDiagnostics, /backing_source_children_none/u);
   assert.match(videoDiagnostics, /backing_scheme_blob_media_source_like/u);
   assert.match(videoGeometry, /const hasBackingMedia/u);
-  assert.match(videoLab, /area > 0 && hasBackingMedia\(video\)/u);
+  assert.match(videoAuthoritySelection, /backed \|\| dependencies\.canBootstrapCandidate\(video\)/u);
   assert.match(videoLab, /document\.addEventListener\(type, scheduleScan, true\)/u);
   for (const event of ["loadstart", "durationchange", "loadedmetadata", "canplay"]) {
     assert.match(videoLab, new RegExp(`\"${event}\"`, "u"));
@@ -1889,16 +1893,22 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoViewport, /dependencies\.fixtureEnabled\(\)[\s\S]*event\?\.type === "resize"[\s\S]*dependencies\.sameVideoRect/u);
   assert.match(background, /awaitVideoLabCloseProof/u);
   assert.match(background, /revoke_waiting_for_proof/u);
-  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-isolation.js",\s*"video-lab-lifecycle.js",\s*"video-lab-playback.js",\s*"video-lab-capture.js",\s*"video-lab-viewport.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-seek-state.js",\s*"video-lab-seek.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
+  assert.match(manifest, /"video-lab-geometry.js",\s*"video-lab-presentation.js",\s*"video-lab-record.js",\s*"video-lab-mutations.js",\s*"video-lab-isolation.js",\s*"video-lab-lifecycle.js",\s*"video-lab-playback.js",\s*"video-lab-capture.js",\s*"video-lab-viewport.js",\s*"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab-bootstrap.js",\s*"video-seek-state.js",\s*"video-lab-seek.js",\s*"video-source-bootstrap.js",\s*"video-authority-selection.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
+  assert.doesNotMatch(videoAuthoritySelection, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
+  assert.doesNotMatch(videoSourceBootstrap, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
 });
 
-test("video laboratory waits for real backing media before selecting a visible video", async () => {
+test("video laboratory bootstraps a visible source only behind the user-origin barrier", async () => {
   const videoLab = await readAsset("video-lab.js");
-  assert.match(videoLab, /video\.currentSrc/u);
-  assert.match(videoLab, /video\.getAttribute\("src"\)/u);
-  assert.match(videoLab, /video\.srcObject != null/u);
-  assert.match(videoLab, /video\.querySelectorAll\("source"\)/u);
+  const videoCapture = await readAsset("video-lab-capture.js");
+  const videoSourceBootstrap = await readAsset("video-source-bootstrap.js");
+  assert.match(videoCapture, /!dependencies\.hasBackingMedia\(record\.video\)/u);
+  assert.match(videoSourceBootstrap, /record\.sourceBootstrapActive = true/u);
+  assert.match(videoSourceBootstrap, /record\.covered \|\|\s*record\.coverPending/u);
+  assert.match(videoSourceBootstrap, /record\.video\.muted = true/u);
+  assert.match(videoSourceBootstrap, /dependencies\.safePause\(record\.video\)/u);
+  assert.match(videoLab, /if \(hasBackingMedia\(video\)\) requestCover\(record\)/u);
   assert.match(videoLab, /"loadstart", "durationchange", "loadedmetadata", "canplay"/u);
   assert.doesNotMatch(videoLab, /\.load\(\).*hasBackingMedia/su);
 });
@@ -1974,6 +1984,8 @@ test("video laboratory silences dynamic unselected media in capture phase", asyn
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
   vm.runInNewContext(await readAsset("video-seek-state.js"), context, { filename: "video-seek-state.js" });
   vm.runInNewContext(await readAsset("video-lab-seek.js"), context, { filename: "video-lab-seek.js" });
+  vm.runInNewContext(await readAsset("video-source-bootstrap.js"), context, { filename: "video-source-bootstrap.js" });
+  vm.runInNewContext(await readAsset("video-authority-selection.js"), context, { filename: "video-authority-selection.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2012,6 +2024,157 @@ test("video laboratory silences dynamic unselected media in capture phase", asyn
   assert.equal(dynamicAudio.defaultMuted, true);
   assert.equal(dynamicAudio.volume, 0);
   assert.equal(dynamicAudio.pauseCalls, pausesBeforePlay + 1);
+});
+
+test("video scan waits for one stable viewport after a burst of changes", async () => {
+  const context = {};
+  vm.runInNewContext(await readAsset("video-lab-viewport.js"), context, {
+    filename: "video-lab-viewport.js",
+  });
+  let now = 10;
+  let lastChangeAt = 0;
+  let scans = 0;
+  let stabilityRequired = true;
+  const timers = [];
+  const gate = context.__gloshDagVideoLabViewport.createScanGate({
+    lastChangeAt: () => lastChangeAt,
+    markStable: () => { stabilityRequired = false; },
+    now: () => now,
+    required: () => stabilityRequired,
+    scheduleNow: () => { scans += 1; },
+    setTimeout: (callback, delay) => {
+      timers.push({ callback, delay });
+      return timers.length;
+    },
+    settleMillis: 150,
+  });
+
+  gate.schedule();
+  gate.schedule();
+  assert.equal(timers.length, 1, "a scroll burst owns one stability timer");
+  assert.equal(scans, 0);
+  lastChangeAt = 100;
+  now = 150;
+  timers.shift().callback();
+  assert.equal(timers.length, 1, "an extended burst waits only for its remaining quiet time");
+  assert.equal(scans, 0);
+  now = 250;
+  timers.shift().callback();
+  assert.equal(scans, 1, "the candidate is scanned once after the viewport settles");
+  assert.equal(stabilityRequired, false);
+});
+
+test("covered video retirement waits for fresh native configuration before rescanning", async () => {
+  const context = {};
+  vm.runInNewContext(await readAsset("video-lab-lifecycle.js"), context, {
+    filename: "video-lab-lifecycle.js",
+  });
+  let scans = 0;
+  const retired = [];
+  const video = { removeAttribute() {} };
+  const record = {
+    bootstrapLoadSourceSignature: "source",
+    bootstrapLoadStarted: true,
+    bootstrapState: { terminate() {} },
+    concealFailed: false,
+    concealPromise: null,
+    coverAcknowledged: true,
+    coverPending: true,
+    covered: true,
+    rawFrameOpen: false,
+    retirePromise: null,
+    retiring: false,
+    revision: 1,
+    smoothActive: true,
+    terminal: false,
+    video,
+    videoId: "video_1",
+  };
+  const state = {
+    activeRecord: record,
+    closingRecord: null,
+    enabled: true,
+    isolationLocked: false,
+    isolationLockedRecord: null,
+    isolationRetryPromise: null,
+  };
+  const lifecycle = context.__gloshDagVideoLabLifecycle.create({
+    browser: { runtime: { sendMessage: () => Promise.resolve({ removed: true }) } },
+    cancelSourceBootstrap() {},
+    clearRecordTimers() {},
+    concealMessage: "video-lab-conceal-style",
+    documentToken: () => "document_1",
+    enforceMediaIsolation() {},
+    grantIdentity: () => ({}),
+    postDiagnostic() {},
+    postToAndroid: () => (message) => retired.push(message),
+    protocolVersion: () => 2,
+    resetFrameState() {},
+    retireMessage: "video-lab-retire",
+    safePause() {},
+    scheduleScan: () => { scans += 1; },
+    state,
+    tokenAttribute: "data-glosh-token",
+  });
+
+  assert.equal(await lifecycle.retireRecord(record, "viewport_changed"), true);
+  assert.equal(scans, 0, "the old enabled epoch cannot select a replacement candidate");
+  assert.equal(retired.length, 1);
+  assert.equal(retired[0].reason, "viewport_changed");
+  assert.equal(state.enabled, false, "retirement closes the old configuration epoch immediately");
+  assert.equal(state.activeRecord, null);
+  assert.equal(state.closingRecord, null);
+});
+
+test("pre-cover video retirement may rescan inside the same native configuration", async () => {
+  const context = {};
+  vm.runInNewContext(await readAsset("video-lab-lifecycle.js"), context, {
+    filename: "video-lab-lifecycle.js",
+  });
+  let scans = 0;
+  const video = { removeAttribute() {} };
+  const record = {
+    bootstrapLoadSourceSignature: "source",
+    bootstrapLoadStarted: false,
+    bootstrapState: { terminate() {} },
+    captures: 0,
+    concealFailed: false,
+    concealPromise: null,
+    coverAcknowledged: false,
+    coverPending: false,
+    covered: false,
+    rawFrameOpen: false,
+    retirePromise: null,
+    retiring: false,
+    revision: 1,
+    smoothActive: false,
+    terminal: false,
+    video,
+    videoId: "video_1",
+  };
+  const state = {
+    activeRecord: record,
+    closingRecord: null,
+    enabled: true,
+    isolationLocked: false,
+    isolationLockedRecord: null,
+    isolationRetryPromise: null,
+  };
+  const lifecycle = context.__gloshDagVideoLabLifecycle.create({
+    browser: { runtime: { sendMessage: () => Promise.resolve({ removed: true }) } },
+    cancelSourceBootstrap() {}, clearRecordTimers() {},
+    concealMessage: "video-lab-conceal-style",
+    documentToken: () => "document_1",
+    enforceMediaIsolation() {}, grantIdentity: () => ({}), postDiagnostic() {},
+    postToAndroid: () => () => {}, protocolVersion: () => 2, resetFrameState() {},
+    retireMessage: "video-lab-retire", safePause() {},
+    scheduleScan: () => { scans += 1; }, state,
+    tokenAttribute: "data-glosh-token",
+  });
+
+  assert.equal(await lifecycle.retireRecord(record, "authority_changed"), true);
+  assert.equal(state.enabled, true);
+  assert.equal(scans, 1, "a candidate rejected before native cover cannot deadlock the page");
 });
 
 test("video laboratory ignores controls UI and closes on preventive capability mutation", async () => {
@@ -2154,6 +2317,8 @@ test("video laboratory ignores controls UI and closes on preventive capability m
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
   vm.runInNewContext(await readAsset("video-seek-state.js"), context, { filename: "video-seek-state.js" });
   vm.runInNewContext(await readAsset("video-lab-seek.js"), context, { filename: "video-lab-seek.js" });
+  vm.runInNewContext(await readAsset("video-source-bootstrap.js"), context, { filename: "video-source-bootstrap.js" });
+  vm.runInNewContext(await readAsset("video-authority-selection.js"), context, { filename: "video-authority-selection.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2407,6 +2572,8 @@ test("failed video conceal leaves terminal media isolation locked until native r
   vm.runInNewContext(await readAsset("video-lab-bootstrap.js"), context, { filename: "video-lab-bootstrap.js" });
   vm.runInNewContext(await readAsset("video-seek-state.js"), context, { filename: "video-seek-state.js" });
   vm.runInNewContext(await readAsset("video-lab-seek.js"), context, { filename: "video-lab-seek.js" });
+  vm.runInNewContext(await readAsset("video-source-bootstrap.js"), context, { filename: "video-source-bootstrap.js" });
+  vm.runInNewContext(await readAsset("video-authority-selection.js"), context, { filename: "video-authority-selection.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,
@@ -2897,6 +3064,10 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.ok(protectionScript.js.indexOf("video-seek-state.js") <
     protectionScript.js.indexOf("video-lab-seek.js"));
   assert.ok(protectionScript.js.indexOf("video-lab-seek.js") <
+    protectionScript.js.indexOf("video-source-bootstrap.js"));
+  assert.ok(protectionScript.js.indexOf("video-source-bootstrap.js") <
+    protectionScript.js.indexOf("video-authority-selection.js"));
+  assert.ok(protectionScript.js.indexOf("video-authority-selection.js") <
     protectionScript.js.indexOf("video-lab.js"));
   assert.ok(protectionScript.js.indexOf("video-lab.js") < protectionScript.js.indexOf("barrier.js"));
   assert.ok(protectionScript.js.indexOf("barrier.js") < protectionScript.js.indexOf("ads.js"));
@@ -2904,14 +3075,15 @@ test("extension manifest installs presentation and scheduler guards in the main 
 
 test("video diagnostics expose only a bounded relative ordering timeline", async () => {
   const videoIsolation = await readAsset("video-lab-isolation.js");
+  const videoSourceBootstrap = await readAsset("video-source-bootstrap.js");
   const videoViewport = await readAsset("video-lab-viewport.js");
   const videoLab = await readAsset("video-lab.js");
   assert.match(videoLab, /elapsedMillis: Math\.min\(120_000/u);
-  assert.match(videoLab, /timeline_video_seen_no_backing/u);
-  assert.match(videoLab, /timeline_current_src_assigned/u);
-  assert.match(videoLab, /timeline_src_attribute_assigned/u);
-  assert.match(videoLab, /timeline_src_object_assigned/u);
-  assert.match(videoLab, /timeline_source_child_assigned/u);
+  assert.match(videoSourceBootstrap, /timeline_video_seen_no_backing/u);
+  assert.match(videoSourceBootstrap, /timeline_current_src_assigned/u);
+  assert.match(videoSourceBootstrap, /timeline_src_attribute_assigned/u);
+  assert.match(videoSourceBootstrap, /timeline_src_object_assigned/u);
+  assert.match(videoSourceBootstrap, /timeline_source_child_assigned/u);
   assert.match(videoIsolation, /timeline_safe_pause_no_backing/u);
   assert.match(videoIsolation, /timeline_isolation_enforced/u);
   assert.match(videoLab, /timeline_source_mutation/u);

@@ -4,130 +4,109 @@ Actualizado: 2026-08-16. Responsable: Jefe.
 
 ## Mision
 
-Navegador protegido independiente: cobertura visual, GloshIA R3.1, imagenes,
-video y herramientas Diagnostic. Gradle es aislado; usar siempre
+Navegador protegido independiente: cobertura visual localizada, GloshIA R3.1,
+imagenes, GIF y video. Gradle es aislado; usar siempre
 `scripts/dag_gradle.sh`.
 
 ## Estado operativo
 
-- Rama `main`; al cerrar este lote quedara 22 commits por delante de
-  `origin/main`, sin push.
-- DEV 220 candidata; Diagnostic 86; extension integrada 2.0.42.
-- Diagnostic es temporal. LAB ya no se construye. No hay APK Production.
-- Fotos estan mas maduras y validadas que video. R3.1 y su politica vigente no
-  cambiaron.
-- YouTube normal y sus controles basicos estan GO local. Video general continua
-  NO-GO hasta cerrar S22 y la matriz minima.
+- Rama `main`, 22 commits por delante de `origin/main`; sin push ni publicacion.
+- DEV 221 / 0.70.23 es la candidata integrada local. Diagnostic 102 y extension
+  2.0.55 quedan como herramientas locales; contienen el rearme de sesion,
+  viewport estable y espera acotada de superficie Gecko vigentes.
+- Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
+  video general y reproductores con DOM dinamico siguen NO-GO.
+- Progreso real: DAG Video premium 84%. La matriz minima superior queda cerrada;
+  video general sigue NO-GO para categorias aun no cubiertas.
 
-## Ticket activo — cierre DAG-VIDEO-03
+## Ultimo hito — DAG-VIDEO-SESSION-REARM-01
 
-Modo adaptativo universal, sin excepciones por sitio, formato o proveedor:
+Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
-1. Los dos primeros cuadros se analizan bajo cobertura nativa.
-2. Si ambos se permiten, el video original reproduce con audio.
-3. DAG muestrea cada 500 ms; en A23 la cadencia real medida fue ~713 ms.
-4. Un bloqueo/error cubre y pausa antes de retirar el permiso visual exacto.
+1. Todo video permanece oculto por CSS de origen usuario desde `document_start`.
+2. Un video visible sin fuente puede iniciar una sola vez, mudo y por hasta
+   2,5 s, solo para que el reproductor cree su backing media.
+3. Al aparecer la fuente se pausa inmediatamente. No se abre permiso de pixels.
+4. Si fuente y geometria siguen exactas, se crea una autoridad nueva y recien
+   entonces Android coloca la cobertura localizada y analiza.
+5. Reemplazos DOM previos al primer grant pueden promoverse de inmediato solo
+   cuando pasan de sin-fuente a con-fuente y conservan geometria exacta.
+6. Segunda fuente, geometria distinta, limite o ambiguedad siguen fail-closed.
 
-No se transporta ni recodifica el video entero. El riesgo aceptado del modo
-fluido es una deteccion de ~500 ms mas inferencia; no garantiza cero aparicion
-entre muestras. El pipeline estricto con buffer A/V queda fuera del runtime.
+### Evidencia actual
 
-## Evidencia vigente
+- El diagnostico real del S22 mostro que limpiar cache no era la causa: despues
+  de `viewport_changed -> revoke_ack`, la politica no habilitaba otra autoridad.
+- La politica ahora rearma cambios seguros de viewport, fuente o elemento solo
+  despues del cierre exacto; errores de seguridad y bloqueos siguen terminales.
+- Las pestañas conservan el ultimo puerto de documento superior y eliminan la
+  referencia al desconectar, hibernar o cerrar la sesion.
+- Una auditoria fisica encontro un bucle de rearmado durante scroll. Diagnostic
+  101 agrupa el burst y espera 150 ms estables antes de una unica seleccion.
+- Gate final: JS 88/88, unitarios dirigidos DEV/Diagnostic, ktlint, lint vital y
+  assemble Diagnostic verdes.
+- A23 sin borrar datos: primer YouTube llego a `smooth_started`; un scroll dio
+  un solo `viewport_changed -> revoke_ack -> config_enabled -> smooth_started`;
+  al abrir un segundo video distinto, `active_video_mutated` cerro limpio y la
+  revision nueva alcanzo `cover_requested -> smooth_started` con imagen visible.
+- La matriz encontro que un video HTML5 muy temprano podia pedir cobertura antes
+  de que Gecko expusiera su matriz de superficie. Diagnostic 102 reutiliza el
+  limite Android ya vigente: hasta 10 reintentos cada 50 ms, siempre con el video
+  oculto. W3Schools paso de `invalid_surface_rect` a `cover_armed`; su archivo
+  remoto no entrego datos reproducibles y cerro seguro por `frame_ready_timeout`.
+- Regresion A23 de Diagnostic 102: YouTube Big Buck Bunny alcanzo cobertura en
+  109 ms, dos cuadros permitidos, `smooth_started`, imagen visible y muestreo
+  continuo sin crash ni ANR.
+- Auditoria de cierre: HTML5 superior ya habia completado 120/120 cuadros en A23;
+  el replay automatico actual cubre la experiencia fluida y los gates quedaron
+  88/88. Los intentos nuevos no contradijeron esa evidencia: fallaron por recurso
+  remoto sin datos, salida en iframe o documento multimedia especial.
+- DEV 221 paso 88/88 JS, unitarios DEV/Diagnostic, ktlint, lint DEV y assemble.
+  Instalado sin borrar datos en A23, YouTube mostro imagen fluida y Android
+  confirmo salida AAudio de medios, estereo 48 kHz. Sin crash ni ANR.
 
-- YouTube normal fue validado en emulador, A23 y S22 con imagen, audio y muestreo
-  continuo. Captura A23 p50 6 ms/p95 7 ms; inferencia p50 145 ms/p95 168 ms.
-- DEV 219 corrige el bloqueo permanente y la reseleccion en bucle. Un
-  `model_filter` retira la autoridad exacta con `revoke_ack`; si el acuse falla,
-  Android descarta solo la pestaña/sesion afectada antes de quitar la cobertura.
-- Diagnostic 83 produjo en A23 un bloqueo real score 0,830. El video quedo
-  pausado, mudo y oculto; solo su rectangulo se mostro bordo y la pagina siguio
-  utilizable. Una interaccion externa, navegacion o recarga retira el rectangulo
-  para que no quede fijo sobre otro contenido.
-- Diagnostic 85 hace localizada tambien la cobertura de analisis: solo cubre el
-  rectangulo del video y deja visible/usable el resto de la pagina. En A23 la
-  cobertura inicial aparecio en 64 ms. Un doble toque `+10` retiro el grant
-  anterior con `revoke_ack`, creo revision 2, analizo dos cuadros y restauro
-  reproduccion fluida en ~2,1 s sin cerrar la pestaña. Los eventos repetidos de
-  un mismo gesto se agrupan bajo la misma cobertura; cambio de fuente/documento
-  sigue fail-closed. Sin crash ni ANR. PSS 232 MiB, RSS 249 MiB y CPU puntual
-  10% durante reproduccion. APK Diagnostic 85 SHA-256:
-  `71863c5b22ae342f5a152dd53c6170adf2a81100d8367f0df15969de148d6d4c`.
-- La politica de pestañas conserva abierta solo la sesion activa para evitar
-  agotar decodificadores VP9 en dispositivos modestos.
-- Gates verdes: JS 70/70, unitarios DEV/Diagnostic, ktlint, lint DEV/Diagnostic
-  y assemble Diagnostic.
-- DEV 219 SHA-256:
-  `9fd1b6ced4613602ba3a1fa144ee450e6365cc4b756c6bcccf277dcd1dd8ff96`.
-- Commits de cierre: `c5d8f332` y `a933c0f7`. Sin push ni publicacion.
+### Proximo paso
 
-## Pendiente inmediato
+Guardar el lote integrado local y continuar con la limpieza de integracion DAG
+(retirar referencias LAB antiguas). URLs MP4 directas, iframes, Shorts, anuncios,
+Instagram y TikTok siguen NO PROBADOS o NO-GO y requieren tickets separados,
+sin excepciones por sitio.
 
-1. Confirmar en S22 con Diagnostic 86: reproduccion, cobertura localizada,
-   bloqueo bordo, doble toque `+10` y un GIF seguro.
-2. Si pasa, incrementar y construir una unica DEV 221 desde `main` integrado.
-3. Shorts, anuncios, TikTok e Instagram siguen NO PROBADOS/NO-GO si no exponen
-   un elemento de video estable. No crear excepciones por proveedor.
-4. Con matriz suficiente, promover el mismo runtime DEV y retirar Diagnostic del
-   telefono de prueba.
+## Video normal vigente
 
-Progreso: base DAG Video/YouTube normal 99%; matriz premium general 85%.
+- Dos cuadros iniciales se analizan bajo cobertura nativa.
+- Si ambos se permiten, el video original reproduce con audio.
+- DAG muestrea cada 500 ms; en A23 la cadencia real medida fue ~713 ms.
+- Un bloqueo/error cubre y pausa antes de retirar el permiso visual exacto.
+- YouTube normal completo 120 muestras estables con cierre `revoke_ack`.
+- El modo fluido acepta el riesgo de deteccion aproximada de 500 ms mas
+  inferencia; no garantiza detectar una aparicion de pocos milisegundos.
 
-## Ticket cerrado — DAG-VIDEO-CONTROLS-01
+## GIF vigente
 
-Adelantar y retroceder ya no son terminales: el destino nunca se revela antes de
-reanalizarlo.
+GIF seguro ya se entrega animado. Limites: 2 MiB, 120 cuadros y 60 s. Todos los
+cuadros se recorren con detector barato; el modelo pesado corre a 2 fps y ante
+cambio material, con maximo 10 inferencias. Error, riesgo o complejidad mayor
+reemplaza solo el GIF. WebP/AVIF animados quedan para otro ticket.
 
-Contrato a diseñar antes del runtime:
+## Backlog aprobado
 
-- ocultar, pausar y silenciar sincronicamente al comenzar el salto;
-- revocar el grant anterior con identidad exacta;
-- esperar `seeked` y estabilidad de fuente/geometria;
-- abrir una autoridad nueva bajo cobertura y repetir los dos cuadros iniciales;
-- eventos repetidos del mismo gesto se agrupan; cambio de fuente, timeout o falta
-  de acuse queda fail-closed;
-- primero replay determinista; una sola APK fisica recien si el contrato pasa.
+- `DAG-VIDEO-SAFE-SKIP-01`: cuando un tramo se bloquee, mantener cobertura
+  localizada, avanzar en pasos acotados, analizar y reanudar en el primer tramo
+  seguro. Mostrar dentro del video una nota breve: “Se salto una parte no
+  permitida”. Evitar bucles, saltos infinitos y excepciones por proveedor.
+- `DAG-PARTIAL-REDACTION-01`: blur o pixelado parcial mediante segmentacion.
+- Adaptador universal para URLs directas MP4 y visor multimedia de Gecko.
 
-Estado y coordinador viven en modulos separados. Cubren los dos ordenes posibles
-entre `seeked` y el acuse nativo, exigen estabilidad y una autoridad nueva antes
-de rearmar. Validado automaticamente y en YouTube real A23.
+## Riesgos y reglas
 
-## Ticket cerrado — DAG-ANIMATED-IMAGES-01 (GIF)
-
-Los GIF seguros ya se entregan animados sin bloquear la pagina. El contenedor se
-valida completo (2 MiB, 120 cuadros y 60 s maximos); todos los cuadros se
-decodifican y recorren por mosaicos, el modelo pesado corre a 2 fps y ante un
-cambio material, con maximo de 10 inferencias. Cualquier error, cuadro riesgoso o
-complejidad mayor reemplaza solo el GIF por el placeholder existente.
-
-En A23, Diagnostic 86 mostro animado dentro de Wikimedia un GIF de 357x334, 10
-cuadros/30 s y 20 KiB: 10 inferencias, `model_allow` en 2,06 s, pagina visible y
-usable durante todo el flujo. El control sintetico de 60 cuadros hizo 6
-inferencias en 944 ms. Instrumentacion 2/2, unitarios DEV/Diagnostic, ktlint,
-lint ambos, JS 70/70 y build Diagnostic verdes. APK SHA-256:
-`eb2f3cb271d7934a2a0252e91424bc18d8667904b230bb6dc878b67fa3a55a28`.
-WebP/AVIF animados siguen bloqueados de forma localizada hasta otro ticket.
-
-## Backlog posterior
-
-- `DAG-PARTIAL-REDACTION-01`: blur/pixelado parcial con segmentacion espacial.
-- Adaptador universal para URLs directas MP4/visor multimedia interno de Gecko.
-
-## Riesgos y deuda
-
-- El muestreo de video puede omitir apariciones muy breves; GIF ya recorre cada
-  cuadro con detector barato, pero video aun no comparte ese detector.
-- `DagBrowserActivity.kt` supera 4.700 lineas: no agregar responsabilidades.
-  Cualquier estado nuevo debe vivir en componentes separados.
-- `video-lab.js` tiene 790 lineas: usar sus modulos existentes o uno nuevo; no
-  volver a inflar el orquestador.
-- Los prototipos WebM/transporte/binario fueron retirados del runtime. No
-  reactivarlos sin otra decision arquitectonica.
-
-## Operacion
-
-Automatizar por ADB instalacion, apertura, gestos, logs, capturas y cierre. Pedir
-al usuario solo una accion fisica inevitable y agruparla. Sin push, PR,
-publicacion, Production ni borrado de datos sin OK explicito actual de Jefe.
-
-La historia detallada queda en la evidencia fechada del area y en Git; no volver
-a copiarla a este handoff.
+- El muestreo puede omitir apariciones muy breves; GIF ya tiene detector barato
+  por cuadro, video todavia no.
+- `DagBrowserActivity.kt` supera 4.800 lineas: no agregar responsabilidades;
+  usar politicas/componentes nuevos.
+- `video-lab.js` tiene 812 lineas. No agregar otra responsabilidad; el proximo
+  cambio funcional debe abrir primero el ticket de division neutral.
+- Tras tres intentos sin cambiar hito o decision, auditoria enfocada antes de
+  otra edicion, build o APK.
+- Automatizar ADB, agrupar pruebas y pedir intervencion solo si es inevitable.
+- Sin push, PR, publicacion, Production ni borrado de datos sin OK actual.

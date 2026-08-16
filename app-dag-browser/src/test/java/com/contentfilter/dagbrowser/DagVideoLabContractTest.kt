@@ -72,10 +72,12 @@ class DagVideoLabContractTest {
         assertTrue(
             DagVideoLabAutoplayPolicy.allow(
                 autoplayPermission = true,
+                audiblePermission = true,
                 diagnostics = true,
                 armed = true,
                 activeTab = true,
                 exactHarnessDocument = true,
+                protectedInaudibleBootstrap = false,
             ),
         )
         listOf(
@@ -88,13 +90,41 @@ class DagVideoLabContractTest {
             assertFalse(
                 DagVideoLabAutoplayPolicy.allow(
                     autoplayPermission = conditions[0],
+                    audiblePermission = true,
                     diagnostics = conditions[1],
                     armed = conditions[2],
                     activeTab = conditions[3],
                     exactHarnessDocument = conditions[4],
+                    protectedInaudibleBootstrap = false,
                 ),
             )
         }
+    }
+
+    @Test
+    fun `protected active document grants only inaudible bootstrap autoplay`() {
+        assertTrue(
+            DagVideoLabAutoplayPolicy.allow(
+                autoplayPermission = true,
+                audiblePermission = false,
+                diagnostics = false,
+                armed = false,
+                activeTab = true,
+                exactHarnessDocument = false,
+                protectedInaudibleBootstrap = true,
+            ),
+        )
+        assertFalse(
+            DagVideoLabAutoplayPolicy.allow(
+                autoplayPermission = true,
+                audiblePermission = true,
+                diagnostics = false,
+                armed = false,
+                activeTab = true,
+                exactHarnessDocument = false,
+                protectedInaudibleBootstrap = true,
+            ),
+        )
     }
 
     @Test

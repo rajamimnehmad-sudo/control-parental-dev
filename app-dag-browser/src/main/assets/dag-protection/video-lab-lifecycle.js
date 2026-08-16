@@ -70,6 +70,10 @@
     const retireRecord = (record, reason) => {
       if (record === null) return Promise.resolve(true);
       if (record.retirePromise !== null) return record.retirePromise;
+      const nativeAuthorityStarted =
+        record.coverPending || record.covered || record.rawFrameOpen ||
+        record.captures > 0 || record.smoothActive;
+      dependencies.cancelSourceBootstrap(record);
       dependencies.clearRecordTimers(record);
       dependencies.safePause(record.video);
       record.smoothActive = false;
@@ -81,6 +85,9 @@
       record.bootstrapLoadSourceSignature = null;
       record.terminal = true;
       record.retiring = true;
+      // Once native has accepted an authority, only its exact revoke+enable
+      // may start another. Pre-cover candidates remain a local JS concern.
+      if (nativeAuthorityStarted) state.enabled = false;
       dependencies.resetFrameState(record);
       const wasActive = record === state.activeRecord;
       if (wasActive) state.activeRecord = null;
@@ -104,7 +111,11 @@
           state.isolationLockedRecord = record;
         }
         if (wasActive) postRetire(record, reason);
-        if (state.enabled && reason !== "frame_blocked") dependencies.scheduleScan();
+        if (!nativeAuthorityStarted && state.enabled && reason !== "frame_blocked") {
+          dependencies.scheduleScan();
+        }
+        // Native owns the close/revoke boundary. Only its fresh enable may
+        // start the next authority after the exact close is acknowledged.
         return true;
       });
       record.retirePromise = promise;

@@ -54,6 +54,8 @@
     bootstrapSourceSignature: null,
     bootstrapState,
     playGeneration: 0,
+    sourceBootstrapActive: false,
+    sourceBootstrapCompleted: false,
   });
 
   const clearTimers = (record) => {
@@ -125,6 +127,8 @@
     record.bootstrapSourceSignature = null;
     record.bootstrapState.reset();
     record.playGeneration = 0;
+    record.sourceBootstrapActive = false;
+    record.sourceBootstrapCompleted = false;
   };
 
   globalThis.__gloshDagVideoLabRecord = Object.freeze({

@@ -43,8 +43,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 220
-        versionName = "0.70.22"
+        versionCode = 221
+        versionName = "0.70.23"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -78,7 +78,7 @@ android {
         create("diagnostic") {
             dimension = "distribution"
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 86
+            versionCode = 102
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
@@ -160,6 +160,8 @@ val testDagProtectionJs =
             "node",
             "--test",
             "src/test/js/dag-protection.test.mjs",
+            "src/test/js/video-authority-selection.test.mjs",
+            "src/test/js/video-source-bootstrap.test.mjs",
             "src/test/js/video-smooth-experience.test.mjs",
             "src/test/js/video-seek-state.test.mjs",
         )
@@ -186,7 +188,11 @@ val testDagProtectionJs =
             "src/main/assets/dag-protection/video-lab.js",
             "src/main/assets/dag-protection/video-lab-seek.js",
             "src/main/assets/dag-protection/video-seek-state.js",
+            "src/main/assets/dag-protection/video-authority-selection.js",
+            "src/main/assets/dag-protection/video-source-bootstrap.js",
             "src/test/js/dag-protection.test.mjs",
+            "src/test/js/video-authority-selection.test.mjs",
+            "src/test/js/video-source-bootstrap.test.mjs",
             "src/test/js/video-smooth-experience.test.mjs",
             "src/test/js/video-seek-state.test.mjs",
         )

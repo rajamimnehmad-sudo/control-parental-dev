@@ -45,9 +45,12 @@
       const record = dependencies.activeRecord();
       return record !== null &&
         media === record.video &&
-        record.rawFrameOpen && (
-          (record.framePending && !record.smoothActive) ||
-          (record.smoothActive && record.covered)
+        (
+          (record.sourceBootstrapActive && !record.rawFrameOpen) ||
+          (record.rawFrameOpen && (
+            (record.framePending && !record.smoothActive) ||
+            (record.smoothActive && record.covered)
+          ))
         ) &&
         !dependencies.isolationLocked() &&
         !record.retiring &&

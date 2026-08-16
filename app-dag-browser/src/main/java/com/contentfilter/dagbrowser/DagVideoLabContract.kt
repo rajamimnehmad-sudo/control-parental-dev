@@ -15,16 +15,19 @@ internal data class DagVideoLabKey(
 internal object DagVideoLabAutoplayPolicy {
     fun allow(
         autoplayPermission: Boolean,
+        audiblePermission: Boolean,
         diagnostics: Boolean,
         armed: Boolean,
         activeTab: Boolean,
         exactHarnessDocument: Boolean,
+        protectedInaudibleBootstrap: Boolean,
     ): Boolean =
         autoplayPermission &&
-            diagnostics &&
-            armed &&
             activeTab &&
-            exactHarnessDocument
+            (
+                (diagnostics && armed && exactHarnessDocument) ||
+                    (!audiblePermission && protectedInaudibleBootstrap)
+            )
 }
 
 internal object DagVideoProtectionActivationPolicy {

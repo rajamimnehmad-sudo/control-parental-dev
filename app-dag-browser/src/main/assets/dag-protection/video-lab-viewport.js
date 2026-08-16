@@ -3,6 +3,29 @@
 (() => {
   if (globalThis.__gloshDagVideoLabViewport !== undefined) return;
 
+  const createScanGate = (dependencies) => {
+    let timer = null;
+    const schedule = () => {
+      if (!dependencies.required()) {
+        dependencies.scheduleNow();
+        return;
+      }
+      const remaining = dependencies.settleMillis -
+        (dependencies.now() - dependencies.lastChangeAt());
+      if (remaining <= 0) {
+        dependencies.markStable();
+        dependencies.scheduleNow();
+        return;
+      }
+      if (timer !== null) return;
+      timer = dependencies.setTimeout(() => {
+        timer = null;
+        schedule();
+      }, Math.max(1, Math.ceil(remaining)));
+    };
+    return Object.freeze({ schedule });
+  };
+
   const create = (dependencies) => {
     const invalidate = (event) => {
       const changedAt = dependencies.now();
@@ -138,5 +161,5 @@
     return Object.freeze({ invalidate });
   };
 
-  globalThis.__gloshDagVideoLabViewport = Object.freeze({ create });
+  globalThis.__gloshDagVideoLabViewport = Object.freeze({ create, createScanGate });
 })();
