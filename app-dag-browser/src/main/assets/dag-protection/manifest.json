@@ -39,6 +39,7 @@
         "barrier.css"
       ],
       "js": [
+        "video-lab-diagnostics.js",
         "video-bootstrap-state.js",
         "video-lab.js",
         "video-lab-fixture.js",

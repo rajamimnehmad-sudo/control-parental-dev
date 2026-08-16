@@ -121,6 +121,13 @@ junto con sus pruebas duplicadas. La decision arquitectonica queda conservada
 en `DAG_VIDEO_FLUID_ARCHITECTURE.md`; la suite activa de producto queda 60/60,
 y los unitarios DEV/Diagnostic y ktlint siguen verdes. No se genero otra APK.
 
+`DAG-STRUCTURE-01` inicio con un corte neutral: las etiquetas y snapshots de
+diagnostico salieron de `video-lab.js` a `video-lab-diagnostics.js` (115 lineas),
+sin mover estados ni decisiones. El archivo principal bajo de 1.758 a 1.669
+lineas. La carga explicita, privacidad de etiquetas y flujo de producto quedan
+en 61/61; unitarios DEV/Diagnostic y ktlint tambien pasan. Sin APK ni prueba
+fisica porque no cambio el comportamiento.
+
 Progreso ejecutivo DAG Video: 99%.
 
 ## Siguiente hito — matriz y promocion
@@ -142,8 +149,9 @@ Progreso ejecutivo DAG Video: 99%.
   captura e inferencia. Ese es el riesgo temporal que debe comunicar producto.
 - `DagBrowserActivity.kt` supera 4.000 lineas y no debe recibir otra
   responsabilidad. El runtime fluido debe vivir en componentes separados.
-- `video-lab.js` supera 1.600 lineas. Queda abierto `DAG-STRUCTURE-01` para
-  extraer coordinadores antes de sumar responsabilidades nuevas a esos archivos.
+- `video-lab.js` aun supera 1.600 lineas. `DAG-STRUCTURE-01` esta en progreso;
+  el siguiente corte debe separar presentacion/aislamiento o geometria como
+  modulo probado antes de sumar responsabilidades nuevas.
 - Los prototipos WebM/transporte/binario siguen como investigacion aislada y
   fuera del manifiesto/Activity; no conectarlos sin otra decision de arquitectura.
 - Shorts reemplaza el elemento DOM y sigue NO-GO. Anuncios, Instagram Reels y

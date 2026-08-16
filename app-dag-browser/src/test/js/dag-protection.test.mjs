@@ -1714,12 +1714,14 @@ test("a stale native close removes a newer grant but never acknowledges the stal
 
 test("video laboratory transport is bounded and contains no provider exceptions", async () => {
   const background = await readAsset("background.js");
+  const videoDiagnostics = await readAsset("video-lab-diagnostics.js");
   const videoLab = await readAsset("video-lab.js");
   const presentationGuard = await readAsset("presentation-guard.js");
   const css = await readAsset("barrier.css");
   const fixture = await readAsset("video-lab-fixture.html");
   const fixtureScript = await readAsset("video-lab-fixture.js");
   const manifest = await readAsset("manifest.json");
+  new vm.Script(videoDiagnostics);
   new vm.Script(videoLab);
   assert.match(videoLab, /INITIAL_COVERED_CAPTURE_COUNT = 2/u);
   assert.match(videoLab, /MAX_CAPTURE_COUNT = 7_200/u);
@@ -1826,20 +1828,20 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /!sameViewportBounds\(record\.viewportSignature, nextSignature\)/u);
   assert.match(videoLab, /retireRecord\(record, "bootstrap_generation_repeated"\)/u);
   assert.match(videoLab, /record\.sourceSignature !== sourceSignature\(record\.video\)/u);
-  assert.match(videoLab, /play_ready_nothing/u);
-  assert.match(videoLab, /play_generation_second/u);
-  assert.match(videoLab, /play_state_paused/u);
-  assert.match(videoLab, /play_state_ended/u);
-  assert.match(videoLab, /play_network_loading/u);
-  assert.match(videoLab, /play_source_stable/u);
+  assert.match(videoDiagnostics, /play_ready_nothing/u);
+  assert.match(videoDiagnostics, /play_generation_second/u);
+  assert.match(videoDiagnostics, /play_state_paused/u);
+  assert.match(videoDiagnostics, /play_state_ended/u);
+  assert.match(videoDiagnostics, /play_network_loading/u);
+  assert.match(videoDiagnostics, /play_source_stable/u);
   assert.match(videoLab, /play_reject_source_stable/u);
   assert.match(videoLab, /play_reject_network_/u);
-  assert.match(videoLab, /backing_src_attribute_absent/u);
-  assert.match(videoLab, /backing_current_src_absent/u);
-  assert.match(videoLab, /backing_src_object_present/u);
-  assert.match(videoLab, /backing_object_tracks_present/u);
-  assert.match(videoLab, /backing_source_children_none/u);
-  assert.match(videoLab, /backing_scheme_blob_media_source_like/u);
+  assert.match(videoDiagnostics, /backing_src_attribute_absent/u);
+  assert.match(videoDiagnostics, /backing_current_src_absent/u);
+  assert.match(videoDiagnostics, /backing_src_object_present/u);
+  assert.match(videoDiagnostics, /backing_object_tracks_present/u);
+  assert.match(videoDiagnostics, /backing_source_children_none/u);
+  assert.match(videoDiagnostics, /backing_scheme_blob_media_source_like/u);
   assert.match(videoLab, /const hasBackingMedia/u);
   assert.match(videoLab, /area > 0 && hasBackingMedia\(video\)/u);
   assert.match(videoLab, /document\.addEventListener\(type, scheduleScan, true\)/u);
@@ -1849,10 +1851,10 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   for (const event of ["play", "playing", "pause", "abort", "emptied", "waiting", "stalled"]) {
     assert.match(videoLab, new RegExp(`play_event_\\$\\{type\\}|\"${event}\"`, "u"));
   }
-  assert.match(videoLab, /play_video_tracks_none/u);
-  assert.match(videoLab, /play_track_live/u);
-  assert.match(videoLab, /play_error_not_allowed/u);
-  assert.match(videoLab, /play_error_not_supported/u);
+  assert.match(videoDiagnostics, /play_video_tracks_none/u);
+  assert.match(videoDiagnostics, /play_track_live/u);
+  assert.match(videoDiagnostics, /play_error_not_allowed/u);
+  assert.match(videoDiagnostics, /play_error_not_supported/u);
   assert.match(videoLab, /!record\.covered \|\|\s*record\.framePending \|\|/u);
   assert.match(css, /video,\s*audio,/u);
   assert.doesNotMatch(css, /data-glosh-dag-video-lab/u);
@@ -1862,7 +1864,7 @@ test("video laboratory transport is bounded and contains no provider exceptions"
   assert.match(videoLab, /fixtureEnabled && event\?\.type === "resize" && sameVideoRect/u);
   assert.match(background, /awaitVideoLabCloseProof/u);
   assert.match(background, /revoke_waiting_for_proof/u);
-  assert.match(manifest, /"video-bootstrap-state.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
+  assert.match(manifest, /"video-lab-diagnostics.js",\s*"video-bootstrap-state.js",\s*"video-lab.js",\s*"video-lab-fixture.js",\s*"barrier.js"/u);
   assert.doesNotMatch(videoLab, /youtube|instagram|tiktok|mimo|fravega|cheeky/iu);
 });
 
@@ -1933,6 +1935,7 @@ test("video laboratory silences dynamic unselected media in capture phase", asyn
   const initialAudio = new HTMLMediaElement();
   const initialVideo = new HTMLMediaElement();
   media.push(initialAudio, initialVideo);
+  vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
@@ -2100,6 +2103,7 @@ test("video laboratory ignores controls UI and closes on preventive capability m
   const video = new HTMLVideoElement();
   media.push(video);
 
+  vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
@@ -2340,6 +2344,7 @@ test("failed video conceal leaves terminal media isolation locked until native r
   const video = new HTMLVideoElement();
   const audio = new HTMLMediaElement();
   media.push(video, audio);
+  vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context, { filename: "video-lab-diagnostics.js" });
   vm.runInNewContext(await readAsset("video-bootstrap-state.js"), context, { filename: "video-bootstrap-state.js" });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
@@ -2802,6 +2807,8 @@ test("extension manifest installs presentation and scheduler guards in the main 
   assert.equal(protectionScript.js.includes("video-fluid-transport-benchmark.js"), false);
   assert.equal(protectionScript.js.includes("video-fluid-transport-runner.js"), false);
   assert.equal(protectionScript.js.includes("video-fluid-capability.js"), false);
+  assert.ok(protectionScript.js.indexOf("video-lab-diagnostics.js") <
+    protectionScript.js.indexOf("video-bootstrap-state.js"));
   assert.ok(protectionScript.js.indexOf("video-bootstrap-state.js") <
     protectionScript.js.indexOf("video-lab.js"));
   assert.ok(protectionScript.js.indexOf("video-lab.js") < protectionScript.js.indexOf("barrier.js"));
@@ -2821,6 +2828,56 @@ test("video diagnostics expose only a bounded relative ordering timeline", async
   assert.match(videoLab, /timeline_source_mutation/u);
   assert.match(videoLab, /timeline_reflow_observed/u);
   assert.doesNotMatch(videoLab, /elapsedMillis:[^\n]*(currentSrc|srcAttribute|srcObject)/u);
+});
+
+test("video diagnostic labels stay pure, finite and content-free", async () => {
+  const context = {
+    globalThis: null,
+    HTMLMediaElement: {
+      HAVE_NOTHING: 0,
+      HAVE_METADATA: 1,
+      HAVE_CURRENT_DATA: 2,
+      HAVE_FUTURE_DATA: 3,
+      HAVE_ENOUGH_DATA: 4,
+    },
+  };
+  context.globalThis = context;
+  vm.runInNewContext(await readAsset("video-lab-diagnostics.js"), context);
+  const labels = context.__gloshDagVideoLabDiagnostics;
+
+  assert.equal(labels.readyState({ readyState: 4 }), "play_ready_enough");
+  assert.equal(labels.readyState({ readyState: 99 }), "play_ready_unknown");
+  assert.equal(labels.networkState({ networkState: 2 }), "play_network_loading");
+  assert.equal(labels.backingScheme("blob:opaque"), "backing_scheme_blob_media_source_like");
+  assert.equal(labels.backingScheme("https://media.example.test/video"), "backing_scheme_network");
+  assert.equal(labels.playError({ name: "NotAllowedError" }), "play_error_not_allowed");
+  assert.equal(labels.playError({ name: "private payload" }), "play_error_unknown");
+  const attempt = labels.playAttempt({
+    currentSrc: "https://secret.example.test/private.mp4",
+    ended: false,
+    getAttribute: () => "https://secret.example.test/private.mp4",
+    networkState: 2,
+    paused: true,
+    querySelectorAll: () => [],
+    readyState: 4,
+    srcObject: null,
+  }, 2, true);
+  assert.deepEqual(Array.from(attempt), [
+    "play_generation_second",
+    "play_state_paused",
+    "play_state_not_ended",
+    "play_ready_enough",
+    "play_network_loading",
+    "backing_src_attribute_present",
+    "backing_current_src_present",
+    "backing_src_object_absent",
+    "backing_source_children_none",
+    "backing_scheme_network",
+    "play_source_stable",
+    "play_video_tracks_none",
+  ]);
+  assert.equal(attempt.some((label) => label.includes("secret")), false);
+  assert.equal(Object.isFrozen(labels), true);
 });
 
 test("video bootstrap replay is deterministic and fail-closed for observed event orders", async () => {
