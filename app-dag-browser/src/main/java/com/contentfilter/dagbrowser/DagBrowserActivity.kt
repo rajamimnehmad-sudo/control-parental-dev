@@ -104,7 +104,6 @@ class DagBrowserActivity : Activity() {
     private lateinit var videoLabOverlay: FrameLayout
     private lateinit var videoLabFrame: ImageView
     private lateinit var videoLabCoverLabel: TextView
-    private lateinit var videoLabFullscreenButton: ImageButton
     private lateinit var videoBlockedPlaceholder: DagVideoBlockedPlaceholderPresenter
     private lateinit var browserRoot: View
     private lateinit var browserToolbar: View
@@ -181,7 +180,6 @@ class DagBrowserActivity : Activity() {
     private var pendingVideoLabSafeSkipNotice: DagVideoLabKey? = null
     private var pendingVideoLabReplay: PendingVideoLabReplayFrame? = null
     private var displayedVideoLabReplayBitmap: Bitmap? = null
-    private var protectedFallbackFullscreen = false
     private var activeVideoLabGrantToken: String? = null
     private var durableVideoLabGrant: DagVideoLabGrantAuthority? = null
     private var durableVideoLabGrantRevoked = false
@@ -327,8 +325,6 @@ class DagBrowserActivity : Activity() {
                 handleVideoLabSmoothStart(payload, sender, senderTab, sourcePort)
             VideoLabSafeSkipNoticeMessage ->
                 handleVideoLabSafeSkipNotice(payload, sender, senderTab, sourcePort)
-            VideoLabFullscreenReadyMessage ->
-                handleVideoLabFullscreenReady(payload, senderTab, sourcePort)
             VideoLabRetireMessage -> handleVideoLabRetire(payload, senderTab, sourcePort)
         }
     }
@@ -533,11 +529,7 @@ class DagBrowserActivity : Activity() {
                 getString(R.string.video_safe_skip_notice),
             )
         } else {
-            videoBlockedPlaceholder.showSmoothFullscreenControl(
-                key = key,
-                fullscreen = fullscreenChrome.active,
-                onToggleFullscreen = { toggleProtectedVideoFullscreen(key) },
-            )
+            videoBlockedPlaceholder.showNativePlayback(key)
         }
         recordVideoLabEvent(senderTab, key, "smooth_started", "adaptive_two_fps")
     }
@@ -975,8 +967,6 @@ class DagBrowserActivity : Activity() {
         videoLabOverlay.setBackgroundColor(Color.TRANSPARENT)
         videoBlockedPlaceholder.enableReplayInteraction(
             key = key,
-            fullscreen = fullscreenChrome.active,
-            onToggleFullscreen = { toggleProtectedVideoFullscreen(key) },
         ) { event ->
             val tab = activeTab
             if (tab?.id != key.tabId || !videoLabState.isCurrent(key, DagVideoLabState.Covered)) {
@@ -987,81 +977,6 @@ class DagBrowserActivity : Activity() {
             runCatching { tab.session.panZoomController.onTouchEvent(forwarded) }
             forwarded.recycle()
         }
-    }
-
-    private fun toggleProtectedVideoFullscreen(key: DagVideoLabKey) {
-        val tab = activeTab ?: return
-        if (tab.id != key.tabId || !videoLabState.isCurrent(key, DagVideoLabState.Covered)) return
-        if (fullscreenChrome.active) {
-            if (protectedFallbackFullscreen) {
-                exitProtectedFallbackFullscreen(key)
-                return
-            }
-            videoBlockedPlaceholder.showFullscreenTransition(key)
-            runCatching { tab.session.exitFullScreen() }
-            return
-        }
-        enterProtectedFallbackFullscreen(key)
-    }
-
-    private fun enterProtectedFallbackFullscreen(key: DagVideoLabKey) {
-        if (!videoLabState.isCurrent(key, DagVideoLabState.Covered)) return
-        val port = activeVideoLabPort ?: return
-        if (
-            !postVideoLabResult(
-                port,
-                VideoLabFullscreenStateMessage,
-                key,
-                JSONObject().put("active", true),
-            )
-        ) {
-            return
-        }
-    }
-
-    private fun exitProtectedFallbackFullscreen(key: DagVideoLabKey? = videoLabState.currentKey) {
-        val port = activeVideoLabPort
-        if (key != null && port != null) {
-            postVideoLabResult(
-                port,
-                VideoLabFullscreenStateMessage,
-                key,
-                JSONObject().put("active", false),
-            )
-        }
-    }
-
-    private fun handleVideoLabFullscreenReady(
-        payload: JSONObject,
-        senderTab: BrowserTab,
-        sourcePort: WebExtension.Port,
-    ) {
-        val key = videoLabKey(payload, senderTab) ?: return
-        if (
-            sourcePort !== activeVideoLabPort ||
-            senderTab !== activeTab ||
-            !videoLabState.isCurrent(key, DagVideoLabState.Covered)
-        ) {
-            return
-        }
-        applyProtectedFallbackFullscreen(payload.optBoolean("active", false))
-    }
-
-    private fun applyProtectedFallbackFullscreen(active: Boolean) {
-        protectedFallbackFullscreen = active
-        fullscreenChrome.setFullscreen(active)
-        videoLabState.currentKey?.let { key ->
-            videoBlockedPlaceholder.showSmoothFullscreenControl(
-                key = key,
-                fullscreen = active,
-                onToggleFullscreen = { toggleProtectedVideoFullscreen(key) },
-            )
-        }
-    }
-
-    private fun forceExitProtectedFallbackFullscreen() {
-        protectedFallbackFullscreen = false
-        fullscreenChrome.setFullscreen(false)
     }
 
     private fun clearPendingVideoLabReplay(frameKey: DagVideoLabFrameKey? = null) {
@@ -1428,7 +1343,6 @@ class DagBrowserActivity : Activity() {
         pendingVideoLabSafeSkipNotice = null
         videoLabCloseRequest = close
         videoLabCloseReason = reason
-        if (protectedFallbackFullscreen) forceExitProtectedFallbackFullscreen()
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
         if (reason == "fullscreen_transition" || reason == "fullscreen_exit_transition") {
@@ -2157,13 +2071,11 @@ class DagBrowserActivity : Activity() {
         videoLabOverlay = findViewById(R.id.video_lab_overlay)
         videoLabFrame = findViewById(R.id.video_lab_frame)
         videoLabCoverLabel = findViewById(R.id.video_lab_cover_label)
-        videoLabFullscreenButton = findViewById(R.id.video_lab_fullscreen_button)
         videoBlockedPlaceholder =
             DagVideoBlockedPlaceholderPresenter(
                 overlay = videoLabOverlay,
                 frame = videoLabFrame,
                 label = videoLabCoverLabel,
-                fullscreenButton = videoLabFullscreenButton,
                 fullCoverColor = getColor(R.color.dag_navy),
                 blockedColor = getColor(R.color.dag_video_blocked),
                 overlayOrigin = { geckoView.left to geckoView.top },
@@ -2249,12 +2161,7 @@ class DagBrowserActivity : Activity() {
         fullscreen: Boolean,
     ) {
         if (tab !== activeTab || !this::fullscreenChrome.isInitialized) return
-        if (fullscreen && protectedFallbackFullscreen) {
-            protectedFallbackFullscreen = false
-            return
-        }
         if (!fullscreen) {
-            protectedFallbackFullscreen = false
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
         val protectedVideoActive = isVideoLabCovered(tab)
@@ -4884,11 +4791,6 @@ class DagBrowserActivity : Activity() {
 
     private fun handleBackNavigation() {
         val tab = activeTab
-        if (protectedFallbackFullscreen) {
-            exitProtectedFallbackFullscreen()
-            forceExitProtectedFallbackFullscreen()
-            return
-        }
         if (this::fullscreenChrome.isInitialized && fullscreenChrome.active) {
             tab?.session?.let { session -> runCatching { session.exitFullScreen() } }
             return
@@ -4939,9 +4841,7 @@ class DagBrowserActivity : Activity() {
     }
 
     override fun onStop() {
-        if (protectedFallbackFullscreen) {
-            exitProtectedFallbackFullscreen()
-        } else if (this::fullscreenChrome.isInitialized && fullscreenChrome.active) {
+        if (this::fullscreenChrome.isInitialized && fullscreenChrome.active) {
             activeTab?.session?.let { session -> runCatching { session.exitFullScreen() } }
             fullscreenChrome.setFullscreen(false)
         }
@@ -5098,8 +4998,6 @@ class DagBrowserActivity : Activity() {
         const val VideoLabFrameConcealedMessage = "video-lab-frame-concealed"
         const val VideoLabFrameResultMessage = "video-lab-frame-result"
         const val VideoLabSmoothStartMessage = "video-lab-smooth-start"
-        const val VideoLabFullscreenStateMessage = "video-lab-fullscreen-state"
-        const val VideoLabFullscreenReadyMessage = "video-lab-fullscreen-ready"
         const val VideoLabSafeSkipNoticeMessage = "video-lab-safe-skip-notice"
         const val VideoLabCloseMessage = "video-lab-close"
         const val VideoLabRevokedMessage = "video-lab-revoked"

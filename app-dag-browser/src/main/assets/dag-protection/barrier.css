@@ -38,21 +38,6 @@ video[data-glosh-dag-video-blurred="true"] {
   transition: filter 160ms ease-out !important;
 }
 
-:root[data-glosh-dag-video-fullscreen-root="true"] {
-  overflow: hidden !important;
-}
-
-video[data-glosh-dag-video-fullscreen="true"] {
-  position: fixed !important;
-  inset: 0 !important;
-  width: 100vw !important;
-  height: 100vh !important;
-  margin: 0 !important;
-  object-fit: contain !important;
-  z-index: 2147483646 !important;
-  background: #000 !important;
-}
-
 [data-glosh-dag-sponsored-result="true"],
 .glosh-dag-page-ad-hidden,
 [data-ad],

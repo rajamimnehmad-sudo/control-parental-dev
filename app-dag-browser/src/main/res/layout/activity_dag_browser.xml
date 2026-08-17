@@ -177,16 +177,6 @@
                 android:textColor="@color/dag_on_navy"
                 android:textSize="16sp" />
 
-            <ImageButton
-                android:id="@+id/video_lab_fullscreen_button"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/dag_overlay_icon_background"
-                android:contentDescription="@string/video_fullscreen"
-                android:elevation="8dp"
-                android:padding="10dp"
-                android:src="@drawable/ic_dag_fullscreen"
-                android:visibility="gone" />
         </FrameLayout>
 
         <FrameLayout

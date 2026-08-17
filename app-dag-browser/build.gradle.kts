@@ -43,8 +43,8 @@ android {
         applicationId = "com.contentfilter.dagbrowser"
         minSdk = 29
         targetSdk = 36
-        versionCode = 228
-        versionName = "0.70.30"
+        versionCode = 229
+        versionName = "0.70.31"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             // The direct-install APK targets modern 64-bit Android phones. Additional ABIs must
@@ -78,7 +78,7 @@ android {
         create("diagnostic") {
             dimension = "distribution"
             applicationIdSuffix = ".diagnostic.dev"
-            versionCode = 112
+            versionCode = 114
             versionNameSuffix = "-diagnostic"
             resValue("string", "app_name", "DAG Browser Diagnostic")
             buildConfigField("boolean", "DAG_DIAGNOSTICS", "true")
@@ -167,7 +167,6 @@ val testDagProtectionJs =
             "src/test/js/video-safe-skip.test.mjs",
             "src/test/js/video-premium-continuity.test.mjs",
             "src/test/js/video-viewport-continuity.test.mjs",
-            "src/test/js/video-premium-fullscreen.test.mjs",
         )
         inputs.files(
             "src/main/assets/dag-protection/ads.js",
@@ -198,7 +197,6 @@ val testDagProtectionJs =
             "src/main/assets/dag-protection/video-safe-skip.js",
             "src/main/assets/dag-protection/video-premium-overlay.js",
             "src/main/assets/dag-protection/video-premium-continuity.js",
-            "src/main/assets/dag-protection/video-premium-fullscreen.js",
             "src/main/assets/dag-protection/video-premium-runtime.js",
             "src/main/assets/dag-protection/video-lab-events.js",
             "src/main/assets/dag-protection/video-lab-record-binding.js",
@@ -212,7 +210,6 @@ val testDagProtectionJs =
             "src/test/js/video-safe-skip.test.mjs",
             "src/test/js/video-premium-continuity.test.mjs",
             "src/test/js/video-viewport-continuity.test.mjs",
-            "src/test/js/video-premium-fullscreen.test.mjs",
         )
     }
 

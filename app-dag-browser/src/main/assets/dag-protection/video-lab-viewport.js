@@ -38,7 +38,7 @@
       }
       const nextSignature = dependencies.viewportSignature(activeRecord.video);
       if (
-        (event?.type === "scroll" || activeRecord.premiumFullscreenTransitionUntil >= changedAt) &&
+        event?.type === "scroll" &&
         activeRecord.smoothActive &&
         activeRecord.rawFrameOpen &&
         activeRecord.video.isConnected &&

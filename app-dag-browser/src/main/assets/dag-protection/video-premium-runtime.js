@@ -29,16 +29,7 @@
       skipStepSeconds: 2,
       sourceSignature: dependencies.sourceSignature,
     });
-    const fullscreen = globalThis.__gloshDagVideoPremiumFullscreen.create({
-      activeRecord: dependencies.activeRecord,
-      documentElement: dependencies.documentObject.documentElement,
-      now: dependencies.now,
-      postDiagnostic: dependencies.postDiagnostic,
-      rootAttribute: dependencies.fullscreenRootAttribute,
-      transitionMillis: dependencies.fullscreenTransitionMillis,
-      videoAttribute: dependencies.fullscreenVideoAttribute,
-    });
-    return Object.freeze({ continuity, fullscreen });
+    return Object.freeze({ continuity });
   };
 
   globalThis.__gloshDagVideoPremiumRuntime = Object.freeze({ create });

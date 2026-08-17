@@ -48,8 +48,6 @@
     viewportTransitionCount: 0,
     pendingViewportSignature: null,
     viewportSuspended: false,
-    premiumFullscreenActive: false,
-    premiumFullscreenTransitionUntil: 0,
     bootstrapBackingGeneration: 0,
     bootstrapLoadStarted: false,
     bootstrapLoadSourceSignature: null,
@@ -124,8 +122,6 @@
     record.viewportTransitionCount = 0;
     record.pendingViewportSignature = null;
     record.viewportSuspended = false;
-    record.premiumFullscreenActive = false;
-    record.premiumFullscreenTransitionUntil = 0;
     record.bootstrapBackingGeneration = 0;
     record.bootstrapLoadStarted = false;
     record.bootstrapLoadSourceSignature = null;

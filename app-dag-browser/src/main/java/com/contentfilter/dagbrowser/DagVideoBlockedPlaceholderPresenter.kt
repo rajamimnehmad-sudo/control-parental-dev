@@ -7,7 +7,6 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.widget.FrameLayout
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.TextView
 
@@ -16,7 +15,6 @@ internal class DagVideoBlockedPlaceholderPresenter(
     private val overlay: FrameLayout,
     private val frame: ImageView,
     private val label: TextView,
-    private val fullscreenButton: ImageButton,
     private val fullCoverColor: Int,
     private val blockedColor: Int,
     private val overlayOrigin: () -> Pair<Int, Int>,
@@ -26,9 +24,6 @@ internal class DagVideoBlockedPlaceholderPresenter(
     private var placeholderKey: DagVideoLabKey? = null
     private var noticeKey: DagVideoLabKey? = null
     private var noticeDismissal: Runnable? = null
-    private var fullscreenControlKey: DagVideoLabKey? = null
-    private var fullscreenControlActive = false
-    private var fullscreenControlAction: (() -> Unit)? = null
 
     fun rememberTarget(
         key: DagVideoLabKey,
@@ -37,13 +32,6 @@ internal class DagVideoBlockedPlaceholderPresenter(
         if (surfaceRect.isEmpty) return
         targetKey = key
         targetRect = Rect(surfaceRect)
-        if (fullscreenButton.visibility == View.VISIBLE && fullscreenControlKey == key) {
-            val (originX, originY) = overlayOrigin()
-            val displayRect = Rect(surfaceRect).apply { offset(originX, originY) }
-            fullscreenControlAction?.let { action ->
-                showFullscreenButton(displayRect, fullscreenControlActive, action)
-            }
-        }
     }
 
     fun show(key: DagVideoLabKey): Boolean {
@@ -72,8 +60,6 @@ internal class DagVideoBlockedPlaceholderPresenter(
 
     fun enableReplayInteraction(
         key: DagVideoLabKey,
-        fullscreen: Boolean,
-        onToggleFullscreen: () -> Unit,
         onTouch: (MotionEvent) -> Unit,
     ): Boolean {
         if (targetKey != key || frame.visibility != View.VISIBLE) return false
@@ -88,60 +74,24 @@ internal class DagVideoBlockedPlaceholderPresenter(
             onTouch(event)
             true
         }
-        showFullscreenButton(displayRect, fullscreen, onToggleFullscreen)
         return true
     }
 
-    fun showSmoothFullscreenControl(
-        key: DagVideoLabKey,
-        fullscreen: Boolean,
-        onToggleFullscreen: () -> Unit,
-    ): Boolean {
+    fun showNativePlayback(key: DagVideoLabKey): Boolean {
         cancelNotice()
         if (targetKey != key) return false
-        val surfaceRect = targetRect?.takeUnless(Rect::isEmpty) ?: return false
-        val (originX, originY) = overlayOrigin()
-        val displayRect = Rect(surfaceRect).apply { offset(originX, originY) }
         clearFrame()
         overlay.setBackgroundColor(Color.TRANSPARENT)
         overlay.isClickable = false
         overlay.isFocusable = false
         overlay.setOnTouchListener(null)
         label.visibility = View.GONE
-        overlay.visibility = View.VISIBLE
-        overlay.bringToFront()
-        showFullscreenButton(displayRect, fullscreen, onToggleFullscreen)
+        overlay.visibility = View.GONE
         return true
     }
 
     fun targetSurfaceRect(key: DagVideoLabKey): Rect? =
         targetRect?.takeIf { targetKey == key && !it.isEmpty }?.let(::Rect)
-
-    private fun showFullscreenButton(
-        displayRect: Rect,
-        fullscreen: Boolean,
-        onToggleFullscreen: () -> Unit,
-    ) {
-        fullscreenControlKey = targetKey
-        fullscreenControlActive = fullscreen
-        fullscreenControlAction = onToggleFullscreen
-        val buttonSize = fullscreenButton.dp(44)
-        val inset = fullscreenButton.dp(12)
-        val right = if (fullscreen) overlay.width else displayRect.right
-        val bottom = if (fullscreen) overlay.height else displayRect.bottom
-        fullscreenButton.layoutParams =
-            FrameLayout.LayoutParams(buttonSize, buttonSize).apply {
-                gravity = Gravity.TOP or Gravity.START
-                leftMargin = (right - buttonSize - inset).coerceAtLeast(inset)
-                topMargin = (bottom - buttonSize - inset).coerceAtLeast(inset)
-            }
-        fullscreenButton.setImageResource(
-            if (fullscreen) R.drawable.ic_dag_fullscreen_exit else R.drawable.ic_dag_fullscreen,
-        )
-        fullscreenButton.setOnClickListener { onToggleFullscreen() }
-        fullscreenButton.visibility = View.VISIBLE
-        fullscreenButton.bringToFront()
-    }
 
     private fun showLocalized(
         key: DagVideoLabKey,
@@ -183,7 +133,6 @@ internal class DagVideoBlockedPlaceholderPresenter(
         frame.isClickable = true
         frame.setOnTouchListener { _, _ -> true }
         frame.visibility = View.VISIBLE
-        fullscreenButton.visibility = View.GONE
         label.visibility = View.GONE
         placeholderKey = key.takeIf { clearOutside }
         overlay.visibility = View.VISIBLE
@@ -276,10 +225,6 @@ internal class DagVideoBlockedPlaceholderPresenter(
         frame.setImageDrawable(null)
         frame.setBackgroundColor(Color.TRANSPARENT)
         frame.visibility = View.GONE
-        fullscreenButton.setOnClickListener(null)
-        fullscreenButton.visibility = View.GONE
-        fullscreenControlKey = null
-        fullscreenControlAction = null
     }
 
     private fun View.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

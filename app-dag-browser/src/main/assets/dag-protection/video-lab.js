@@ -62,8 +62,6 @@
   const {
     blurAttribute: BLUR_ATTRIBUTE,
     fixtureAttribute: INTERNAL_FIXTURE_ATTRIBUTE,
-    fullscreenRootAttribute: FULLSCREEN_ROOT_ATTRIBUTE,
-    fullscreenVideoAttribute: FULLSCREEN_VIDEO_ATTRIBUTE,
     messages,
     presentationGuardAttribute: PRESENTATION_GUARD_ATTRIBUTE,
     presentationGuardVersion: PRESENTATION_GUARD_VERSION,
@@ -78,8 +76,6 @@
     frameCaptured: FRAME_CAPTURED_MESSAGE,
     frameConcealed: FRAME_CONCEALED_MESSAGE,
     frameResult: FRAME_RESULT_MESSAGE,
-    fullscreen: FULLSCREEN_MESSAGE,
-    fullscreenReady: FULLSCREEN_READY_MESSAGE,
     smoothStart: SMOOTH_START_MESSAGE,
     safeSkipNotice: SAFE_SKIP_NOTICE_MESSAGE,
     retire: RETIRE_MESSAGE,
@@ -117,7 +113,6 @@
   let seekController = null;
   let safeSkipController = null;
   let premiumContinuity = null;
-  let premiumFullscreen = null;
   let lastViewportChangeAt = performance.now();
   let viewportStabilityRequired = false;
   const records = new WeakMap();
@@ -308,7 +303,7 @@
     browser,
     cancelSafeSkip: () => safeSkipController?.cancel(),
     clearPremiumContinuity: (record) => premiumContinuity?.clear(record),
-    clearPremiumFullscreen: (record) => premiumFullscreen?.clear(record),
+    clearPremiumFullscreen: () => {},
     cancelSourceBootstrap: (record) => sourceBootstrap?.cancel(record),
     clearRecordTimers,
     concealMessage: messages.conceal,
@@ -418,6 +413,10 @@
     settleMillis: VIEWPORT_SETTLE_MS,
   });
   const scheduleScan = scanGate.schedule;
+  // Media players can emit a second seeking/seeked pair hundreds of milliseconds
+  // after the first one for the same user gesture. Keep the exact authority closed
+  // until that burst has been quiet long enough instead of reopening between pairs.
+  const SEEK_SETTLE_MS = 750;
 
   const authoritySelection = authoritySelectionRuntime.create({
     activeVideo: () => activeRecord?.video ?? null,
@@ -444,7 +443,7 @@
     reportBackingTransition,
     scheduleScan,
     setTimeout: (callback, millis) => setTimeout(callback, millis),
-    settleMillis: VIEWPORT_SETTLE_MS,
+    settleMillis: SEEK_SETTLE_MS,
     sourceSignature,
     viewportSignature,
     visibleArea,
@@ -601,9 +600,6 @@
     blurAttribute: BLUR_ATTRIBUTE,
     clearTimeout: (timer) => clearTimeout(timer),
     documentObject: document,
-    fullscreenRootAttribute: FULLSCREEN_ROOT_ATTRIBUTE,
-    fullscreenTransitionMillis: MAX_COVERED_VIEWPORT_TRANSITION_MS,
-    fullscreenVideoAttribute: FULLSCREEN_VIDEO_ATTRIBUTE,
     now: () => performance.now(),
     postDiagnostic,
     requestFrameWhenReady,
@@ -615,7 +611,6 @@
     windowObject: globalThis,
   });
   premiumContinuity = premium.continuity;
-  premiumFullscreen = premium.fullscreen;
 
   const viewportController = viewportRuntime.create({
     beginBootstrapViewportTransition,
@@ -779,17 +774,6 @@
         handleFrameCaptured(message);
       } else if (message.type === FRAME_RESULT_MESSAGE) {
         handleFrameResult(message);
-      } else if (enabled && message.type === FULLSCREEN_MESSAGE) {
-        const record = activeRecord;
-        if (!recordMatchesMessage(record, message)) return;
-        if (!premiumFullscreen.set(record, message.active === true)) {
-          void retireRecord(record, "fullscreen_error");
-          return;
-        }
-        invalidateForViewport({ type: "fullscreen" });
-        if (!postRecord(FULLSCREEN_READY_MESSAGE, record, { active: message.active === true })) {
-          void retireRecord(record, "fullscreen_error");
-        }
       } else if (enabled && message.type === COVER_ARMED_MESSAGE) {
         postDiagnostic("cover_message_received");
         void armCoveredVideo(message);

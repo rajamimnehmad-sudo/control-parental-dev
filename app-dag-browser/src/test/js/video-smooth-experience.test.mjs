@@ -264,9 +264,6 @@ test("product smooth mode keeps playback blurred and exits after two safe sample
   vm.runInNewContext(await readAsset("video-premium-continuity.js"), context, {
     filename: "video-premium-continuity.js",
   });
-  vm.runInNewContext(await readAsset("video-premium-fullscreen.js"), context, {
-    filename: "video-premium-fullscreen.js",
-  });
   vm.runInNewContext(await readAsset("video-premium-runtime.js"), context, {
     filename: "video-premium-runtime.js",
   });

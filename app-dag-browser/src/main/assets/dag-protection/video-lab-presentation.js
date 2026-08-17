@@ -45,7 +45,8 @@
   const unsafeReason = (record, document, guardVerified) => {
     const remoteState = record.video.remote?.state;
     if (!guardVerified) return "guard_unverified";
-    if (document.fullscreenElement !== null) return "fullscreen";
+    // Standard document fullscreen stays owned by the original player. GeckoView's
+    // native fullscreen callback covers and rearms the exact document transition.
     if (document.pictureInPictureElement != null) return "picture_in_picture";
     if (record.video.webkitPresentationMode === "fullscreen") return "webkit_fullscreen";
     if (record.video.webkitPresentationMode === "picture-in-picture") {

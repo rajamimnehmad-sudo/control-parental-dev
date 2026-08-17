@@ -27,6 +27,7 @@ const controllerHarness = async () => {
   const retireReasons = [];
   let nextTimer = 1;
   let scans = 0;
+  const timerDelays = [];
   const video = {
     currentTime: 10,
     seeking: true,
@@ -40,10 +41,11 @@ const controllerHarness = async () => {
     postDiagnostic: () => {},
     retireRecord: async (_record, reason) => { retireReasons.push(reason); },
     scheduleScan: () => { scans += 1; },
-    setTimeout: (callback) => {
+    setTimeout: (callback, delay) => {
       const id = nextTimer;
       nextTimer += 1;
       timers.set(id, callback);
+      timerDelays.push(delay);
       return id;
     },
     settleMillis: 150,
@@ -64,6 +66,7 @@ const controllerHarness = async () => {
     retireReasons,
     runLatestTimer,
     scans: () => scans,
+    timerDelays,
     video,
   };
 };
@@ -174,5 +177,27 @@ test("seek controller coalesces one repeated gesture under the same closed autho
   harness.controller.onSeeked(harness.record);
   harness.runLatestTimer();
   assert.equal(harness.controller.holdsScan(), false);
+  assert.equal(harness.scans(), 1);
+});
+
+test("seek controller restarts the quiet window when the same gesture seeks again", async () => {
+  const harness = await controllerHarness();
+  harness.controller.onSeeking(harness.record);
+  assert.equal(harness.controller.onNativeRearm(), true);
+
+  harness.video.currentTime = 20;
+  harness.video.seeking = false;
+  harness.controller.onSeeked(harness.record);
+  harness.video.currentTime = 21;
+  harness.video.seeking = true;
+  assert.equal(harness.controller.onSeeking(harness.record), true);
+  assert.equal(harness.controller.holdsScan(), true);
+
+  harness.video.currentTime = 22;
+  harness.video.seeking = false;
+  harness.controller.onSeeked(harness.record);
+  harness.runLatestTimer();
+
+  assert.deepEqual(harness.retireReasons, ["seek_requested"]);
   assert.equal(harness.scans(), 1);
 });

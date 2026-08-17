@@ -8,8 +8,18 @@ Actualizado: 2026-08-17. Responsable: Direccion General Tecnica.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
-- DAG local modificado: DEV 228 / 0.70.30 es candidata integrada; Diagnostic 112
-  / extension 2.0.61 son herramientas locales. `DAG-VIDEO-PREMIUM-CONTINUITY-03`
+- DAG local modificado: DEV 229 / 0.70.31 es el siguiente candidato; Diagnostic
+  114 / extension 2.0.63 validan el lote local. Los reportes S22 de DEV 228
+  demostraron que una reapertura a 150 ms dividia un mismo seek en dos cierres y
+  el segundo podia terminar en `revoke_timeout`. El seek ahora espera 750 ms
+  estables y coalesce el gesto completo. Se eliminaron boton, CSS, mensajes y
+  modulo de fullscreen artificial: YouTube conserva controles y fullscreen web
+  originales; Gecko/Android cubren, revocan y rearman la transicion exacta. A23
+  confirmo `fullscreen_transition -> revoke_ack -> revision 2 -> smooth_started`
+  con imagen/blur vivo y sin negro. JS 102/102, unitarios DEV/Diagnostic, ktlint
+  y assemble Diagnostic verdes. Falta una corrida final multi-video/seek antes
+  de promover DEV 229.
+- `DAG-VIDEO-PREMIUM-CONTINUITY-03`
   reemplaza el corte automatico por blur vivo opaco con audio continuo, exige
   dos muestras seguras para retirarlo y ofrece salto manual despues de dos
   segundos. Scroll del mismo video suspende solo la captura, reubica geometria
