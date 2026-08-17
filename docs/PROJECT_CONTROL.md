@@ -4,11 +4,11 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- Rama: `main`, 28 commits locales por delante de `origin/main`.
+- Rama: `main`, 29 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
-- DAG local modificado: DEV 223 / 0.70.25 es candidata integrada; Diagnostic 103 / extension
+- DAG local modificado: DEV 224 / 0.70.26 es candidata integrada; Diagnostic 103 / extension
   2.0.58 son herramientas locales. El reporte S22 demostro que el segundo video
   fallaba por falta de rearme tras `viewport_changed`, no por cache. En A23,
   Diagnostic 101 reprodujo primer video, scroll y segundo video sin limpiar
@@ -35,6 +35,9 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 - `DAG-STRUCTURE-02` separo eventos y configuracion del coordinador de video,
   que bajo de 832 a 799 lineas sin cambio funcional. JS 95/95, unitarios
   DEV/Diagnostic 213/213 y lint de ambas variantes verdes.
+- `DAG-UI-PREMIUM-01` modernizo chrome, inicio, incognito, pestañas y listas sin
+  tocar filtrado. DEV 224 paso gates y validacion visual A23 sin crash ni ANR;
+  la cobertura de video mantiene color y alcance de seguridad propios.
 - Super Admin compila y pasa typecheck/lint; queda un warning de imagen y no hay
   cobertura automatica suficiente.
 - Supabase DEV esta operativo y las migraciones locales/remotas estan alineadas.
@@ -94,7 +97,7 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Prioridad recomendada
 
-1. Prueba humana de DAG DEV 223: tramo filtrado, salto seguro y segundo video sin limpiar datos.
+1. Prueba humana de DAG DEV 224: tramo filtrado, salto seguro y segundo video sin limpiar datos.
 2. Ejecutar auditoria de seguridad Supabase DEV por grupos, sin romper tokens de
    dispositivo.
 3. Dividir archivos criticos gigantes en tickets funcionalmente neutros.

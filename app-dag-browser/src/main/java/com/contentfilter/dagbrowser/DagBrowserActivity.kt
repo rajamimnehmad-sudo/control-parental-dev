@@ -9,6 +9,7 @@ import android.app.role.RoleManager
 import android.content.ComponentCallbacks2
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.Matrix
@@ -3569,13 +3570,17 @@ class DagBrowserActivity : Activity() {
 
     private fun updatePrivateAppearance(tab: BrowserTab) {
         val privateTab = tab.isPrivate
-        val toolbarColor = getColor(if (privateTab) R.color.dag_private_navy else R.color.dag_navy)
+        val toolbarColor = getColor(if (privateTab) R.color.dag_private_navy else R.color.dag_chrome)
+        val toolbarContentColor = getColor(if (privateTab) R.color.dag_private_text else R.color.dag_text)
         browserRoot.setBackgroundColor(toolbarColor)
         browserToolbar.setBackgroundColor(toolbarColor)
         addressBar.setBackgroundResource(
             if (privateTab) R.drawable.dag_private_address_background else R.drawable.dag_address_background,
         )
         addressInput.setTextColor(getColor(if (privateTab) R.color.dag_private_text else R.color.dag_text))
+        newPageButton.imageTintList = ColorStateList.valueOf(toolbarContentColor)
+        menuButton.imageTintList = ColorStateList.valueOf(toolbarContentColor)
+        tabButton.setTextColor(toolbarContentColor)
         tabButton.setBackgroundResource(
             if (privateTab) R.drawable.dag_private_tab_button_background else R.drawable.dag_tab_button_background,
         )

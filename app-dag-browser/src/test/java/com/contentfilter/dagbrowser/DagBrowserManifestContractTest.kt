@@ -113,4 +113,24 @@ class DagBrowserManifestContractTest {
         )
         assertFalse(activity.contains("shimmer = true"))
     }
+
+    @Test
+    fun `premium browser chrome keeps protection states visually distinct`() {
+        val layout = File("src/main/res/layout/activity_dag_browser.xml").readText()
+        val styles = File("src/main/res/values/styles.xml").readText()
+        val tabLayout = File("src/main/res/layout/item_dag_tab.xml").readText()
+        val pageEntryLayout = File("src/main/res/layout/item_dag_page_entry.xml").readText()
+
+        assertContains(layout, "android:background=\"@color/dag_chrome\"")
+        assertContains(layout, "android:background=\"@drawable/dag_toolbar_button_background\"")
+        assertContains(layout, "android:src=\"@drawable/ic_dag_add\"")
+        assertContains(layout, "android:id=\"@+id/video_lab_overlay\"")
+        assertContains(layout, "android:background=\"@color/dag_navy\"")
+        assertContains(layout, "android:id=\"@+id/safety_overlay\"")
+        assertContains(layout, "android:background=\"@color/dag_background\"")
+        assertContains(tabLayout, "@drawable/dag_tab_card_background")
+        assertContains(pageEntryLayout, "@drawable/dag_tab_card_background")
+        assertContains(styles, "<item name=\"android:windowLightStatusBar\">true</item>")
+        assertContains(styles, "<item name=\"android:windowLightNavigationBar\">true</item>")
+    }
 }

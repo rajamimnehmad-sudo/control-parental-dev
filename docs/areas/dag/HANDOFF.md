@@ -10,8 +10,8 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 28 commits por delante de `origin/main`; sin push ni publicacion.
-- DEV 223 / 0.70.25 es la candidata integrada local. Diagnostic 103 y extension
+- Rama `main`, 29 commits por delante de `origin/main`; sin push ni publicacion.
+- DEV 224 / 0.70.26 es la candidata integrada local. Diagnostic 103 y extension
   2.0.58 quedan como herramientas locales; contienen el rearme de sesion,
   viewport estable y espera acotada de superficie Gecko vigentes.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
@@ -37,6 +37,16 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
   audio, filtrado ni comportamiento por sitio.
 - Gates: JS 95/95, unitarios DEV/Diagnostic 213/213, ktlint y lint de ambas
   variantes verdes. Sin version nueva ni APK.
+
+## Hito — DAG-UI-PREMIUM-01
+
+- Navegacion normal e incognito usan chrome claro, barra compacta, controles
+  consistentes y una paleta accesible. Pestañas, historial y favoritos usan
+  tarjetas reales con jerarquia y espaciado comunes.
+- La pantalla de inicio quedo clara y liviana. La cobertura de seguridad de
+  video conserva su color oscuro/bordo y su alcance localizado.
+- DEV 224 paso unitarios DEV/Diagnostic, ktlint, lint y assemble. Validacion A23:
+  inicio, pagina real, selector de pestañas, menu e incognito sin crash ni ANR.
 
 ## Ultimo hito — DAG-VIDEO-SESSION-REARM-01
 
@@ -113,7 +123,7 @@ Objetivo universal, sin excepciones por pagina, formato o proveedor:
 
 ### Proximo paso
 
-Probar DEV 223 en S22 con el video que produjo el bloqueo seguido de
+Probar DEV 224 en S22 con el video que produjo el bloqueo seguido de
 otro video sin borrar datos. Confirmar salto seguro, audio, pagina utilizable y
 rearme. La nota visual breve del salto sigue pendiente de UX. URLs MP4 directas, iframes, Shorts,
 anuncios, Instagram y TikTok siguen NO PROBADOS o NO-GO y requieren tickets

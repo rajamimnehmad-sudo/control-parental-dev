@@ -8,16 +8,17 @@
     <LinearLayout
         android:id="@+id/tab_switcher_header"
         android:layout_width="match_parent"
-        android:layout_height="64dp"
+        android:layout_height="72dp"
+        android:background="@color/dag_chrome"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp">
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp">
 
         <ImageButton
             android:id="@+id/tab_switcher_new"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
             android:background="@drawable/dag_switcher_button_background"
             android:contentDescription="@string/new_tab"
             android:padding="11dp"
@@ -31,12 +32,12 @@
             android:fontFamily="sans-serif-medium"
             android:gravity="center"
             android:textColor="@color/dag_text"
-            android:textSize="18sp" />
+            android:textSize="19sp" />
 
         <ImageButton
             android:id="@+id/tab_switcher_done"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
+            android:layout_width="42dp"
+            android:layout_height="42dp"
             android:background="@drawable/dag_switcher_button_background"
             android:contentDescription="@string/close_tab_switcher"
             android:padding="12dp"
@@ -46,9 +47,10 @@
     <TextView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingStart="18dp"
-        android:paddingEnd="18dp"
-        android:paddingBottom="5dp"
+        android:paddingStart="20dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="8dp"
         android:text="@string/tab_switcher_hint"
         android:textColor="@color/dag_muted"
         android:textSize="13sp" />
@@ -59,9 +61,9 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:clipToPadding="false"
-        android:paddingStart="8dp"
-        android:paddingTop="4dp"
-        android:paddingEnd="8dp"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="12dp"
         android:paddingBottom="18dp"
         android:scrollbars="vertical" />
 
