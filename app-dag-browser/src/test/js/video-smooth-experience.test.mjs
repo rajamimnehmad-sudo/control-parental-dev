@@ -19,7 +19,7 @@ const waitFor = async (probe, label) => {
   throw new Error(`timed out waiting for ${label}`);
 };
 
-test("product smooth mode skips a blocked segment under cover and resumes safely", async () => {
+test("product smooth mode keeps playback blurred and exits after two safe samples", async () => {
   const animationFrames = [];
   const posted = [];
   const timers = new Map();
@@ -258,8 +258,23 @@ test("product smooth mode skips a blocked segment under cover and resumes safely
   vm.runInNewContext(await readAsset("video-safe-skip.js"), context, {
     filename: "video-safe-skip.js",
   });
+  vm.runInNewContext(await readAsset("video-premium-overlay.js"), context, {
+    filename: "video-premium-overlay.js",
+  });
+  vm.runInNewContext(await readAsset("video-premium-continuity.js"), context, {
+    filename: "video-premium-continuity.js",
+  });
+  vm.runInNewContext(await readAsset("video-premium-fullscreen.js"), context, {
+    filename: "video-premium-fullscreen.js",
+  });
+  vm.runInNewContext(await readAsset("video-premium-runtime.js"), context, {
+    filename: "video-premium-runtime.js",
+  });
   vm.runInNewContext(await readAsset("video-lab-events.js"), context, {
     filename: "video-lab-events.js",
+  });
+  vm.runInNewContext(await readAsset("video-lab-record-binding.js"), context, {
+    filename: "video-lab-record-binding.js",
   });
   vm.runInNewContext(await readAsset("video-lab-configuration.js"), context, {
     filename: "video-lab-configuration.js",
@@ -333,7 +348,8 @@ test("product smooth mode skips a blocked segment under cover and resumes safely
   assert.equal(context.getComputedStyle(video).visibility, "visible");
   assert.equal(typeof video.listeners.get("seeking"), "function");
 
-  const persistentGrant = revealMessages.at(-1);
+  const pauseCallsBeforeBlock = video.pauseCalls;
+  const concealCountBeforeBlock = concealMessages.length;
   await runTimersUntil(
     () => video.frameCallback,
     (delay) => delay <= 500,
@@ -360,46 +376,49 @@ test("product smooth mode skips a blocked segment under cover and resumes safely
     action: "block",
     captured: true,
   });
-  await waitFor(() => video.currentTime === 2, "safe skip start after concealment");
-
-  const finalConceal = concealMessages.at(-1);
-  assert.equal(finalConceal.frameSequence, persistentGrant.frameSequence);
-  assert.notEqual(finalConceal.frameSequence, blockedFrame.frameSequence);
-  assert.equal(video.currentTime, 2);
-  assert.equal(posted.some((message) => message.type === "video-lab-retire"), false);
-  video.seeking = true;
-  video.listeners.get("seeking")();
-  video.seeking = false;
-  video.listeners.get("seeked")();
-  assert.equal(runNextTimer((delay) => delay === 150), true);
-  await waitFor(() => video.frameCallback, "safe skip frame callback");
-  const safeCallback = video.frameCallback;
-  video.frameCallback = null;
-  const framesBeforeSafePoint = posted.filter((message) =>
-    message.type === "video-lab-frame-request").length;
-  safeCallback(now, { presentedFrames: 3 });
-  const safeFrame = await waitFor(() => {
-    const frames = posted.filter((message) => message.type === "video-lab-frame-request");
-    return frames.length > framesBeforeSafePoint ? frames.at(-1) : null;
-  }, "safe point frame request");
-  context.__gloshDagVideoLab.onNativeMessage({
-    ...safeFrame,
-    type: "video-lab-frame-captured",
-    version: 2,
-  });
   await new Promise((resolve) => setImmediate(resolve));
-  context.__gloshDagVideoLab.onNativeMessage({
-    ...safeFrame,
-    type: "video-lab-frame-result",
-    version: 2,
-    action: "allow",
-    captured: true,
-  });
-  await waitFor(() => posted.filter((message) =>
-    message.type === "video-lab-smooth-start").length >= 2, "smooth resume after safe skip");
+  assert.equal(video.currentTime, 0);
+  assert.equal(video.getAttribute("data-glosh-dag-video-blurred"), "true");
+  assert.equal(video.pauseCalls, pauseCallsBeforeBlock);
+  assert.equal(concealMessages.length, concealCountBeforeBlock);
+  assert.equal(posted.some((message) => message.type === "video-lab-retire"), false);
+
+  const allowSmoothSample = async (presentedFrames) => {
+    await runTimersUntil(
+      () => video.frameCallback,
+      (delay) => delay <= 500,
+      "next blurred sample",
+    );
+    const callback = video.frameCallback;
+    video.frameCallback = null;
+    const previousCount = posted.filter((message) =>
+      message.type === "video-lab-frame-request").length;
+    callback(now, { presentedFrames });
+    const frame = await waitFor(() => {
+      const frames = posted.filter((message) => message.type === "video-lab-frame-request");
+      return frames.length > previousCount ? frames.at(-1) : null;
+    }, "blurred frame request");
+    context.__gloshDagVideoLab.onNativeMessage({
+      ...frame,
+      type: "video-lab-frame-captured",
+      version: 2,
+    });
+    context.__gloshDagVideoLab.onNativeMessage({
+      ...frame,
+      type: "video-lab-frame-result",
+      version: 2,
+      action: "allow",
+      captured: true,
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+
+  await allowSmoothSample(3);
+  assert.equal(video.getAttribute("data-glosh-dag-video-blurred"), "true");
+  await allowSmoothSample(4);
+  assert.equal(video.getAttribute("data-glosh-dag-video-blurred"), null);
   assert.equal(posted.some((message) => message.type === "video-lab-retire"), false);
   assert.equal(video.muted, false);
   assert.equal(video.volume, 0.7);
-  assert.ok(video.pauseCalls > 0);
-  assert.equal(concealMessages.length > 0, true);
+  assert.equal(video.pauseCalls, pauseCallsBeforeBlock);
 });

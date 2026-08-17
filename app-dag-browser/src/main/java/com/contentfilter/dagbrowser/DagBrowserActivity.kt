@@ -327,6 +327,8 @@ class DagBrowserActivity : Activity() {
                 handleVideoLabSmoothStart(payload, sender, senderTab, sourcePort)
             VideoLabSafeSkipNoticeMessage ->
                 handleVideoLabSafeSkipNotice(payload, sender, senderTab, sourcePort)
+            VideoLabFullscreenReadyMessage ->
+                handleVideoLabFullscreenReady(payload, senderTab, sourcePort)
             VideoLabRetireMessage -> handleVideoLabRetire(payload, senderTab, sourcePort)
         }
     }
@@ -992,7 +994,7 @@ class DagBrowserActivity : Activity() {
         if (tab.id != key.tabId || !videoLabState.isCurrent(key, DagVideoLabState.Covered)) return
         if (fullscreenChrome.active) {
             if (protectedFallbackFullscreen) {
-                exitProtectedFallbackFullscreen()
+                exitProtectedFallbackFullscreen(key)
                 return
             }
             videoBlockedPlaceholder.showFullscreenTransition(key)
@@ -1004,12 +1006,66 @@ class DagBrowserActivity : Activity() {
 
     private fun enterProtectedFallbackFullscreen(key: DagVideoLabKey) {
         if (!videoLabState.isCurrent(key, DagVideoLabState.Covered)) return
-        protectedFallbackFullscreen = true
-        fullscreenChrome.setFullscreen(true)
-        requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        val port = activeVideoLabPort ?: return
+        if (
+            !postVideoLabResult(
+                port,
+                VideoLabFullscreenStateMessage,
+                key,
+                JSONObject().put("active", true),
+            )
+        ) {
+            return
+        }
     }
 
-    private fun exitProtectedFallbackFullscreen() {
+    private fun exitProtectedFallbackFullscreen(key: DagVideoLabKey? = videoLabState.currentKey) {
+        val port = activeVideoLabPort
+        if (key != null && port != null) {
+            postVideoLabResult(
+                port,
+                VideoLabFullscreenStateMessage,
+                key,
+                JSONObject().put("active", false),
+            )
+        }
+    }
+
+    private fun handleVideoLabFullscreenReady(
+        payload: JSONObject,
+        senderTab: BrowserTab,
+        sourcePort: WebExtension.Port,
+    ) {
+        val key = videoLabKey(payload, senderTab) ?: return
+        if (
+            sourcePort !== activeVideoLabPort ||
+            senderTab !== activeTab ||
+            !videoLabState.isCurrent(key, DagVideoLabState.Covered)
+        ) {
+            return
+        }
+        applyProtectedFallbackFullscreen(payload.optBoolean("active", false))
+    }
+
+    private fun applyProtectedFallbackFullscreen(active: Boolean) {
+        protectedFallbackFullscreen = active
+        requestedOrientation =
+            if (active) {
+                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+            } else {
+                ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
+        fullscreenChrome.setFullscreen(active)
+        videoLabState.currentKey?.let { key ->
+            videoBlockedPlaceholder.showSmoothFullscreenControl(
+                key = key,
+                fullscreen = active,
+                onToggleFullscreen = { toggleProtectedVideoFullscreen(key) },
+            )
+        }
+    }
+
+    private fun forceExitProtectedFallbackFullscreen() {
         protectedFallbackFullscreen = false
         requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         fullscreenChrome.setFullscreen(false)
@@ -1379,6 +1435,7 @@ class DagBrowserActivity : Activity() {
         pendingVideoLabSafeSkipNotice = null
         videoLabCloseRequest = close
         videoLabCloseReason = reason
+        if (protectedFallbackFullscreen) forceExitProtectedFallbackFullscreen()
         clearPendingVideoLabReplay()
         clearDisplayedVideoLabReplay()
         if (reason == "fullscreen_transition" || reason == "fullscreen_exit_transition") {
@@ -4836,6 +4893,7 @@ class DagBrowserActivity : Activity() {
         val tab = activeTab
         if (protectedFallbackFullscreen) {
             exitProtectedFallbackFullscreen()
+            forceExitProtectedFallbackFullscreen()
             return
         }
         if (this::fullscreenChrome.isInitialized && fullscreenChrome.active) {
@@ -5047,6 +5105,8 @@ class DagBrowserActivity : Activity() {
         const val VideoLabFrameConcealedMessage = "video-lab-frame-concealed"
         const val VideoLabFrameResultMessage = "video-lab-frame-result"
         const val VideoLabSmoothStartMessage = "video-lab-smooth-start"
+        const val VideoLabFullscreenStateMessage = "video-lab-fullscreen-state"
+        const val VideoLabFullscreenReadyMessage = "video-lab-fullscreen-ready"
         const val VideoLabSafeSkipNoticeMessage = "video-lab-safe-skip-notice"
         const val VideoLabCloseMessage = "video-lab-close"
         const val VideoLabRevokedMessage = "video-lab-revoked"

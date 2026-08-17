@@ -184,6 +184,7 @@
     };
 
     const beginSmoothFrame = (record) => {
+      if (record.viewportSuspended) return;
       record.frameSequence += 1;
       record.frameViewportEpoch = record.viewportEpoch;
       record.framePending = true;

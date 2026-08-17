@@ -38,6 +38,56 @@
       }
       const nextSignature = dependencies.viewportSignature(activeRecord.video);
       if (
+        (event?.type === "scroll" || activeRecord.premiumFullscreenTransitionUntil >= changedAt) &&
+        activeRecord.smoothActive &&
+        activeRecord.rawFrameOpen &&
+        activeRecord.video.isConnected &&
+        dependencies.hasDocumentToken() &&
+        dependencies.sourceSignature(activeRecord.video) === activeRecord.sourceSignature &&
+        !dependencies.unsafePresentationActive(activeRecord)
+      ) {
+        const firstEvent = !activeRecord.viewportSuspended;
+        activeRecord.viewportSuspended = true;
+        activeRecord.pendingViewportSignature = nextSignature;
+        clearTimeout(activeRecord.nextCaptureTimer);
+        activeRecord.nextCaptureTimer = null;
+        clearTimeout(activeRecord.readinessTimer);
+        if (firstEvent) dependencies.postDiagnostic("scroll_rebind_start");
+        dependencies.rebindPremiumContinuity(activeRecord);
+        activeRecord.readinessTimer = setTimeout(() => {
+          const record = dependencies.state.activeRecord;
+          if (record !== activeRecord || !record.viewportSuspended) return;
+          record.readinessTimer = null;
+          const settledSignature = dependencies.viewportSignature(record.video);
+          const valid =
+            record.video.isConnected &&
+            dependencies.hasDocumentToken() &&
+            dependencies.sourceSignature(record.video) === record.sourceSignature &&
+            dependencies.presentationCapabilityFailure(record.video) === null &&
+            !dependencies.unsafePresentationActive(record) &&
+            dependencies.now() - dependencies.lastViewportChangeAt() >=
+              dependencies.viewportSettleMillis;
+          if (!valid) {
+            record.viewportSuspended = false;
+            record.viewportEpoch += 1;
+            void dependencies.retireRecord(record, "viewport_changed");
+            return;
+          }
+          record.viewportSignature = settledSignature;
+          record.pendingViewportSignature = null;
+          record.viewportEpoch += 1;
+          record.viewportSuspended = false;
+          dependencies.rebindPremiumContinuity(record);
+          dependencies.postDiagnostic("scroll_rebind_stable");
+          if (dependencies.visibleArea(record.video) > 0) {
+            dependencies.scheduleNextCapture(record);
+          } else {
+            dependencies.postDiagnostic("scroll_video_offscreen");
+          }
+        }, dependencies.viewportSettleMillis);
+        return;
+      }
+      if (
         dependencies.fixtureEnabled() &&
         event?.type === "resize" &&
         dependencies.sameVideoRect(activeRecord.viewportSignature, nextSignature)

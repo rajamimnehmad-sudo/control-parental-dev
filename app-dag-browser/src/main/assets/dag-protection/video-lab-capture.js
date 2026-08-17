@@ -11,6 +11,7 @@
         record.framePending ||
         record.retiring ||
         record.terminal ||
+        record.viewportSuspended ||
         !record.video.isConnected
       ) return;
       if (dependencies.unsafePresentationActive(record)) {
@@ -128,6 +129,7 @@
           record.framePending ||
           record.retiring ||
           record.terminal ||
+          record.viewportSuspended ||
           !record.video.isConnected
         ) return;
         if (dependencies.unsafePresentationActive(record)) {
@@ -256,8 +258,17 @@
     const handleFrameResult = (message) => {
       const record = dependencies.state.activeRecord;
       if (!dependencies.frameMatchesMessage(record, message)) return;
+      if (record.viewportSuspended) {
+        clearTimeout(record.resultTimer);
+        record.resultTimer = null;
+        dependencies.resetFrameState(record);
+        record.terminal = false;
+        dependencies.postDiagnostic("scroll_sample_discarded");
+        return;
+      }
       record.frameAllowed = message.captured === true && message.action === "allow";
       if (!record.frameAllowed) {
+        if (dependencies.onFrameBlocked(record)) return;
         record.terminal = true;
         dependencies.safePause(record.video);
         if (record.smoothActive) record.frameConcealed = false;
@@ -270,12 +281,12 @@
             }
             record.smoothActive = false;
             record.frameConcealed = true;
-            if (!dependencies.onFrameBlocked(record)) {
+            if (!dependencies.onCoveredFrameBlocked(record)) {
               void dependencies.retireRecord(record, "frame_blocked");
             }
           });
         } else {
-          if (!dependencies.onFrameBlocked(record)) {
+          if (!dependencies.onCoveredFrameBlocked(record)) {
             void dependencies.retireRecord(record, "frame_blocked");
           }
         }

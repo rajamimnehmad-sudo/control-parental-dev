@@ -1,5 +1,4 @@
 "use strict";
-
 (() => {
   if (globalThis.__gloshDagVideoLab !== undefined) return;
   const INITIAL_COVERED_CAPTURE_COUNT = 2;
@@ -32,7 +31,9 @@
   const authoritySelectionRuntime = globalThis.__gloshDagVideoAuthoritySelection;
   const blockQuarantineRuntime = globalThis.__gloshDagVideoBlockQuarantine;
   const safeSkipRuntime = globalThis.__gloshDagVideoSafeSkip;
+  const premiumRuntime = globalThis.__gloshDagVideoPremiumRuntime;
   const eventRuntime = globalThis.__gloshDagVideoLabEvents;
+  const recordBindingRuntime = globalThis.__gloshDagVideoLabRecordBinding;
   const configurationRuntime = globalThis.__gloshDagVideoLabConfiguration;
   if (
     protocol === undefined ||
@@ -53,10 +54,16 @@
     authoritySelectionRuntime === undefined ||
     blockQuarantineRuntime === undefined ||
     safeSkipRuntime === undefined ||
-    (eventRuntime === undefined || configurationRuntime === undefined)
+    premiumRuntime === undefined ||
+    eventRuntime === undefined ||
+    recordBindingRuntime === undefined ||
+    configurationRuntime === undefined
   ) return;
   const {
+    blurAttribute: BLUR_ATTRIBUTE,
     fixtureAttribute: INTERNAL_FIXTURE_ATTRIBUTE,
+    fullscreenRootAttribute: FULLSCREEN_ROOT_ATTRIBUTE,
+    fullscreenVideoAttribute: FULLSCREEN_VIDEO_ATTRIBUTE,
     messages,
     presentationGuardAttribute: PRESENTATION_GUARD_ATTRIBUTE,
     presentationGuardVersion: PRESENTATION_GUARD_VERSION,
@@ -71,6 +78,8 @@
     frameCaptured: FRAME_CAPTURED_MESSAGE,
     frameConcealed: FRAME_CONCEALED_MESSAGE,
     frameResult: FRAME_RESULT_MESSAGE,
+    fullscreen: FULLSCREEN_MESSAGE,
+    fullscreenReady: FULLSCREEN_READY_MESSAGE,
     smoothStart: SMOOTH_START_MESSAGE,
     safeSkipNotice: SAFE_SKIP_NOTICE_MESSAGE,
     retire: RETIRE_MESSAGE,
@@ -107,6 +116,8 @@
   let unsafePresentationBlocked = false;
   let seekController = null;
   let safeSkipController = null;
+  let premiumContinuity = null;
+  let premiumFullscreen = null;
   let lastViewportChangeAt = performance.now();
   let viewportStabilityRequired = false;
   const records = new WeakMap();
@@ -194,90 +205,36 @@
   const mediaIsolationActive = isolation.active;
   const enforceMediaIsolation = () => isolation.enforce(document);
   const stopUnauthorizedPlayback = isolation.stopUnauthorizedPlayback;
-
   const clearRecordTimers = recordState.clearTimers;
   const resetFrameState = recordState.resetFrame;
 
-  const recordFor = (video) => {
-    const existing = records.get(video);
-    if (existing !== undefined) return existing;
-    const audioState = originalAudioState(video);
-    const record = recordState.create(
-      video,
-      audioState,
-      randomToken,
-      globalThis.__gloshDagVideoBootstrapState.create(),
-    );
-    const keepMuted = () => enforceMuted(record);
-    const closeUnsafePresentation = () => retireUnsafePresentation(record);
-    const reportPlaybackEvent = (event) => {
-      if (!diagnosticsEnabled || record !== activeRecord) return;
-      const type = event?.type;
-      if (["play", "playing", "pause", "abort", "emptied", "waiting", "stalled"].includes(type)) {
-        postDiagnostic(`play_event_${type}`);
-      }
-    };
-    const reportBackingEvent = (event) => {
-      if (record !== activeRecord) return;
-      const type = event?.type;
-      if (["loadstart", "durationchange", "loadedmetadata", "canplay"].includes(type)) {
-        postDiagnostic(`backing_event_${type}`);
-        postDiagnosticLabels(diagnosticLabels.backing(record.video));
-        postDiagnostic(diagnosticLabels.readyState(record.video).replace("play_ready_", "backing_ready_"));
-        postDiagnostic(diagnosticLabels.networkState(record.video).replace("play_network_", "backing_network_"));
-        if (sourceBootstrap?.backingReady(record) === true) return;
-        if (type === "loadstart") {
-          if (record.bootstrapLoadStarted || record.bootstrapBackingGeneration !== 0) {
-            postDiagnostic("bootstrap_generation_repeated");
-            void retireRecord(record, "bootstrap_generation_repeated");
-            return;
-          }
-          const signature = sourceSignature(record.video);
-          const validLoad =
-            record.captures !== 0 ||
-            record.frameCaptured ||
-            record.rawFrameOpen ||
-            (!record.coverPending && !record.coverAcknowledged) ||
-            signature !== record.sourceSignature;
-          const loadPhase = record.bootstrapState.loadStart(!validLoad);
-          if (loadPhase === "terminal") {
-            void retireRecord(record, "bootstrap_source_changed");
-            return;
-          }
-          record.bootstrapLoadStarted = true;
-          record.bootstrapLoadSourceSignature = signature;
-          postDiagnostic("bootstrap_load_started");
-          if (record.coverAcknowledged) armBootstrapGeneration(record);
-        } else if (type === "canplay" && record.bootstrapState.phase() === "stable") {
-          if (record.bootstrapState.mediaReady(record.sourceSignature === sourceSignature(record.video)) !== "stable") {
-            void retireRecord(record, "bootstrap_revalidation_failed");
-          }
-        }
-      }
-    };
-    eventRuntime.bindRecord({
-      video,
-      keepMuted,
-      reportPlaybackEvent,
-      reportBackingEvent,
-      onSeeking: () => {
-        if (safeSkipController?.onSeeking(record) !== true) seekController?.onSeeking(record);
-      },
-      onSeeked: () => {
-        if (safeSkipController?.onSeeked(record) !== true) seekController?.onSeeked(record);
-      },
-      onUnsafePresentation: closeUnsafePresentation,
-      onGenerationChanged: () => blockQuarantine.noteGeneration(video),
-    });
-    records.set(video, record);
-    return record;
-  };
+  const recordFor = recordBindingRuntime.create({
+    activeRecord: () => activeRecord,
+    armBootstrapGeneration: (record) => armBootstrapGeneration(record),
+    bindRecord: eventRuntime.bindRecord,
+    createBootstrapState: () => globalThis.__gloshDagVideoBootstrapState.create(),
+    createRecord: recordState.create,
+    diagnosticLabels,
+    diagnosticsEnabled: () => diagnosticsEnabled,
+    enforceMuted,
+    noteGeneration: (video) => blockQuarantine.noteGeneration(video),
+    originalAudioState,
+    postDiagnostic,
+    postDiagnosticLabels,
+    premiumContinuity: () => premiumContinuity,
+    randomToken,
+    records,
+    retireRecord: (record, reason) => retireRecord(record, reason),
+    retireUnsafePresentation: (record) => retireUnsafePresentation(record),
+    safeSkipController: () => safeSkipController,
+    seekController: () => seekController,
+    sourceBootstrap: () => sourceBootstrap,
+    sourceSignature,
+  });
 
   const presentationCapabilityFailure = presentation.capabilityFailure;
-
   const presentationGuardReady = () =>
     presentation.guardReady(document, PRESENTATION_GUARD_ATTRIBUTE, PRESENTATION_GUARD_VERSION);
-
   const bootstrapTransitions = bootstrapRuntime.create({
     activeRecord: () => activeRecord,
     capabilityFailure: presentationCapabilityFailure,
@@ -293,7 +250,6 @@
     hasBackingMedia,
     postTimeline,
   });
-
   const armBootstrapGeneration = (record) => {
     if (!bootstrapTransitions.armGeneration(record)) {
       void retireRecord(record, "bootstrap_revalidation_failed");
@@ -351,6 +307,8 @@
   const lifecycle = lifecycleRuntime.create({
     browser,
     cancelSafeSkip: () => safeSkipController?.cancel(),
+    clearPremiumContinuity: (record) => premiumContinuity?.clear(record),
+    clearPremiumFullscreen: (record) => premiumFullscreen?.clear(record),
     cancelSourceBootstrap: (record) => sourceBootstrap?.cancel(record),
     clearRecordTimers,
     concealMessage: messages.conceal,
@@ -557,7 +515,6 @@
   const requestVideoFrame = playback.requestVideoFrame;
   const scheduleNextCapture = playback.scheduleNextCapture;
   const startSmoothPlayback = playback.startSmoothPlayback;
-
   const capture = captureRuntime.create({
     armBootstrapGeneration,
     backgroundReady,
@@ -580,8 +537,12 @@
     grantIdentity,
     lastViewportChangeAt: () => lastViewportChangeAt,
     now: () => performance.now(),
-    onFrameAllowed: (record) => safeSkipController?.onFrameAllowed(record),
-    onFrameBlocked: (record) => safeSkipController?.onFrameBlocked(record) === true,
+    onFrameAllowed: (record) => {
+      safeSkipController?.onFrameAllowed(record);
+      premiumContinuity?.onFrameAllowed(record);
+    },
+    onFrameBlocked: (record) => premiumContinuity?.onFrameBlocked(record) === true,
+    onCoveredFrameBlocked: (record) => safeSkipController?.onFrameBlocked(record) === true,
     postDiagnostic,
     postFrameRecord,
     postPlayAttemptDiagnostics,
@@ -605,7 +566,6 @@
   const handleFrameCaptured = capture.handleFrameCaptured;
   const handleFrameResult = capture.handleFrameResult;
   const requestFrameWhenReady = capture.requestFrameWhenReady;
-
   safeSkipController = safeSkipRuntime.create({
     activeRecord: () => activeRecord,
     clearTimeout: (timer) => clearTimeout(timer),
@@ -636,6 +596,27 @@
     viewportSignature,
   });
 
+  const premium = premiumRuntime.create({
+    activeRecord: () => activeRecord,
+    blurAttribute: BLUR_ATTRIBUTE,
+    clearTimeout: (timer) => clearTimeout(timer),
+    documentObject: document,
+    fullscreenRootAttribute: FULLSCREEN_ROOT_ATTRIBUTE,
+    fullscreenTransitionMillis: MAX_COVERED_VIEWPORT_TRANSITION_MS,
+    fullscreenVideoAttribute: FULLSCREEN_VIDEO_ATTRIBUTE,
+    now: () => performance.now(),
+    postDiagnostic,
+    requestFrameWhenReady,
+    resetFrameState,
+    scheduleNextCapture,
+    setTimeout: (callback, millis) => setTimeout(callback, millis),
+    sourceSignature,
+    viewportSettleMillis: VIEWPORT_SETTLE_MS,
+    windowObject: globalThis,
+  });
+  premiumContinuity = premium.continuity;
+  premiumFullscreen = premium.fullscreen;
+
   const viewportController = viewportRuntime.create({
     beginBootstrapViewportTransition,
     completeBootstrapViewportTransition,
@@ -650,6 +631,7 @@
     postTimeline,
     postViewportChangeDiagnostics,
     presentationCapabilityFailure,
+    rebindPremiumContinuity: (record) => premiumContinuity?.rebind(record),
     requestFrameWhenReady,
     resetFrameState,
     retireRecord,
@@ -657,6 +639,7 @@
     sameVideoRect,
     sameViewportBounds,
     sameViewportSignature,
+    scheduleNextCapture,
     scheduleScan,
     setLastViewportChangeAt: (value) => {
       lastViewportChangeAt = value;
@@ -665,6 +648,7 @@
     sourceSignature,
     state: lifecycleState,
     unsafePresentationActive,
+    visibleArea,
     viewportSettleMillis: VIEWPORT_SETTLE_MS,
     viewportSignature,
   });
@@ -795,6 +779,17 @@
         handleFrameCaptured(message);
       } else if (message.type === FRAME_RESULT_MESSAGE) {
         handleFrameResult(message);
+      } else if (enabled && message.type === FULLSCREEN_MESSAGE) {
+        const record = activeRecord;
+        if (!recordMatchesMessage(record, message)) return;
+        if (!premiumFullscreen.set(record, message.active === true)) {
+          void retireRecord(record, "fullscreen_error");
+          return;
+        }
+        invalidateForViewport({ type: "fullscreen" });
+        if (!postRecord(FULLSCREEN_READY_MESSAGE, record, { active: message.active === true })) {
+          void retireRecord(record, "fullscreen_error");
+        }
       } else if (enabled && message.type === COVER_ARMED_MESSAGE) {
         postDiagnostic("cover_message_received");
         void armCoveredVideo(message);

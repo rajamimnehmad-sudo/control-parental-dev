@@ -26,6 +26,9 @@ internal class DagVideoBlockedPlaceholderPresenter(
     private var placeholderKey: DagVideoLabKey? = null
     private var noticeKey: DagVideoLabKey? = null
     private var noticeDismissal: Runnable? = null
+    private var fullscreenControlKey: DagVideoLabKey? = null
+    private var fullscreenControlActive = false
+    private var fullscreenControlAction: (() -> Unit)? = null
 
     fun rememberTarget(
         key: DagVideoLabKey,
@@ -34,6 +37,13 @@ internal class DagVideoBlockedPlaceholderPresenter(
         if (surfaceRect.isEmpty) return
         targetKey = key
         targetRect = Rect(surfaceRect)
+        if (fullscreenButton.visibility == View.VISIBLE && fullscreenControlKey == key) {
+            val (originX, originY) = overlayOrigin()
+            val displayRect = Rect(surfaceRect).apply { offset(originX, originY) }
+            fullscreenControlAction?.let { action ->
+                showFullscreenButton(displayRect, fullscreenControlActive, action)
+            }
+        }
     }
 
     fun show(key: DagVideoLabKey): Boolean {
@@ -112,6 +122,9 @@ internal class DagVideoBlockedPlaceholderPresenter(
         fullscreen: Boolean,
         onToggleFullscreen: () -> Unit,
     ) {
+        fullscreenControlKey = targetKey
+        fullscreenControlActive = fullscreen
+        fullscreenControlAction = onToggleFullscreen
         val buttonSize = fullscreenButton.dp(44)
         val inset = fullscreenButton.dp(12)
         val right = if (fullscreen) overlay.width else displayRect.right
@@ -265,6 +278,8 @@ internal class DagVideoBlockedPlaceholderPresenter(
         frame.visibility = View.GONE
         fullscreenButton.setOnClickListener(null)
         fullscreenButton.visibility = View.GONE
+        fullscreenControlKey = null
+        fullscreenControlAction = null
     }
 
     private fun View.dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()

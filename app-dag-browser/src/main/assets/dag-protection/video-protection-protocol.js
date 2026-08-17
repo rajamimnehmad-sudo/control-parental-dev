@@ -13,6 +13,8 @@
     frameCaptured: "video-lab-frame-captured",
     frameConcealed: "video-lab-frame-concealed",
     frameResult: "video-lab-frame-result",
+    fullscreen: "video-lab-fullscreen-state",
+    fullscreenReady: "video-lab-fullscreen-ready",
     smoothStart: "video-lab-smooth-start",
     safeSkipNotice: "video-lab-safe-skip-notice",
     retire: "video-lab-retire",
@@ -50,6 +52,7 @@
     message?.viewportEpoch === record.frameViewportEpoch;
 
   globalThis.__gloshDagVideoProtectionProtocol = Object.freeze({
+    blurAttribute: "data-glosh-dag-video-blurred",
     diagnosticMessage: messages.diagnostic,
     fixtureAttribute: "data-glosh-dag-video-lab-fixture",
     frameIdentity,
@@ -58,6 +61,8 @@
     messages,
     presentationGuardAttribute: "data-glosh-dag-presentation-guard",
     presentationGuardVersion: "1",
+    fullscreenRootAttribute: "data-glosh-dag-video-fullscreen-root",
+    fullscreenVideoAttribute: "data-glosh-dag-video-fullscreen",
     randomToken,
     recordMatchesMessage,
     tokenAttribute: "data-glosh-dag-video-lab-token",
