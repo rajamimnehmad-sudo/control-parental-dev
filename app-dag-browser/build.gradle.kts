@@ -193,6 +193,8 @@ val testDagProtectionJs =
             "src/main/assets/dag-protection/video-authority-selection.js",
             "src/main/assets/dag-protection/video-block-quarantine.js",
             "src/main/assets/dag-protection/video-safe-skip.js",
+            "src/main/assets/dag-protection/video-lab-events.js",
+            "src/main/assets/dag-protection/video-lab-configuration.js",
             "src/main/assets/dag-protection/video-source-bootstrap.js",
             "src/test/js/dag-protection.test.mjs",
             "src/test/js/video-authority-selection.test.mjs",

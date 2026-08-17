@@ -10,9 +10,9 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
 
 ## Estado operativo
 
-- Rama `main`, 26 commits por delante de `origin/main`; sin push ni publicacion.
+- Rama `main`, 28 commits por delante de `origin/main`; sin push ni publicacion.
 - DEV 223 / 0.70.25 es la candidata integrada local. Diagnostic 103 y extension
-  2.0.57 quedan como herramientas locales; contienen el rearme de sesion,
+  2.0.58 quedan como herramientas locales; contienen el rearme de sesion,
   viewport estable y espera acotada de superficie Gecko vigentes.
 - Fotos y GIF estan mas maduros que video. YouTube normal funciona localmente;
   video general y reproductores con DOM dinamico siguen NO-GO.
@@ -28,6 +28,15 @@ imagenes, GIF y video. Gradle es aislado; usar siempre
   usuario haya cambiado a una pestaña normal.
 - Prevalidacion: JS 95/95, unitarios DEV/Diagnostic y ktlint verdes. No requirio
   APK, cambio de version ni prueba fisica.
+
+## Hito — DAG-STRUCTURE-02
+
+- El registro de eventos DOM y globales salio a `video-lab-events.js`; el parseo
+  de configuracion quedo en `video-lab-configuration.js`.
+- `video-lab.js` bajo de 832 a 799 lineas. No cambiaron tiempos, politica,
+  audio, filtrado ni comportamiento por sitio.
+- Gates: JS 95/95, unitarios DEV/Diagnostic 213/213, ktlint y lint de ambas
+  variantes verdes. Sin version nueva ni APK.
 
 ## Ultimo hito — DAG-VIDEO-SESSION-REARM-01
 
@@ -142,10 +151,9 @@ reemplaza solo el GIF. WebP/AVIF animados quedan para otro ticket.
   por cuadro, video todavia no.
 - `DagBrowserActivity.kt` supera 4.800 lineas: no agregar responsabilidades;
   usar politicas/componentes nuevos.
-- `video-lab.js` tiene 832 lineas: salto y cuarentena viven en modulos separados,
-  pero su cableado llevo al coordinador sobre el limite. Queda abierto
-  `DAG-STRUCTURE-02` para extraer eventos/configuracion sin cambiar conducta; no
-  agregarle otra responsabilidad antes de esa division.
+- `video-lab.js` tiene 799 lineas tras separar eventos y configuracion. No sumar
+  responsabilidades nuevas al coordinador; las nuevas politicas deben vivir en
+  componentes propios.
 - Tras tres intentos sin cambiar hito o decision, auditoria enfocada antes de
   otra edicion, build o APK.
 - Automatizar ADB, agrupar pruebas y pedir intervencion solo si es inevitable.

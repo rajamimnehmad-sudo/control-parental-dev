@@ -258,6 +258,12 @@ test("product smooth mode skips a blocked segment under cover and resumes safely
   vm.runInNewContext(await readAsset("video-safe-skip.js"), context, {
     filename: "video-safe-skip.js",
   });
+  vm.runInNewContext(await readAsset("video-lab-events.js"), context, {
+    filename: "video-lab-events.js",
+  });
+  vm.runInNewContext(await readAsset("video-lab-configuration.js"), context, {
+    filename: "video-lab-configuration.js",
+  });
   vm.runInNewContext(await readAsset("video-lab.js"), context, { filename: "video-lab.js" });
   context.__gloshDagVideoLab.install({
     protocolVersion: 2,

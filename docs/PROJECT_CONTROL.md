@@ -4,12 +4,12 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
 
 ## Estado ejecutivo
 
-- Rama: `main`, 26 commits locales por delante de `origin/main`.
+- Rama: `main`, 28 commits locales por delante de `origin/main`.
 - El lote DAG de video conserva cambios locales no publicados; no mezclar ni
   descartar hasta integrarlo de forma coherente.
 - App Usuario local: versionCode 311. App Admin local: 293.
 - DAG local modificado: DEV 223 / 0.70.25 es candidata integrada; Diagnostic 103 / extension
-  2.0.57 son herramientas locales. El reporte S22 demostro que el segundo video
+  2.0.58 son herramientas locales. El reporte S22 demostro que el segundo video
   fallaba por falta de rearme tras `viewport_changed`, no por cache. En A23,
   Diagnostic 101 reprodujo primer video, scroll y segundo video sin limpiar
   datos: ambos llegaron a `smooth_started`, con cierre durable entre autoridades
@@ -32,6 +32,9 @@ Actualizado: 2026-08-16. Responsable: Direccion General Tecnica.
   de medios ahora se autorizan por documento exacto y nunca por la pestaña
   visible global. Identidad desconocida o privada falla cerrada; JS 95/95,
   unitarios DEV/Diagnostic y ktlint verdes.
+- `DAG-STRUCTURE-02` separo eventos y configuracion del coordinador de video,
+  que bajo de 832 a 799 lineas sin cambio funcional. JS 95/95, unitarios
+  DEV/Diagnostic 213/213 y lint de ambas variantes verdes.
 - Super Admin compila y pasa typecheck/lint; queda un warning de imagen y no hay
   cobertura automatica suficiente.
 - Supabase DEV esta operativo y las migraciones locales/remotas estan alineadas.
@@ -115,9 +118,8 @@ del video. Requiere limites anti-bucle y no admite excepciones por proveedor.
 - `background.js`, Accessibility y VPN superan o rondan 900. DAG-STRUCTURE-01
   separo diagnostico, geometria, presentacion, estado, mutaciones, aislamiento,
   ciclo de vida, reproduccion, captura, viewport y bootstrap. El cableado del
-  salto seguro dejo `video-lab.js` en 832 lineas; queda abierto
-  `DAG-STRUCTURE-02` para extraer eventos/configuracion antes de agregar otra
-  responsabilidad.
+  salto seguro dejo `video-lab.js` en 832 lineas; DAG-STRUCTURE-02 extrajo
+  eventos/configuracion y lo redujo a 799 sin cambio funcional.
 - `docs/BACKLOG_PRODUCTO.md` y `docs/HANDOFF_ACTUAL.md` mezclan presente e historia.
 - Existe un worktree DAG historico, limpio y sin commits unicos, muy atrasado.
 - Falta CI web y pruebas sistematicas de funciones Supabase.

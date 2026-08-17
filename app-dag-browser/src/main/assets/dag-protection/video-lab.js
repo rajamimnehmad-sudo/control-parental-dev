@@ -32,6 +32,8 @@
   const authoritySelectionRuntime = globalThis.__gloshDagVideoAuthoritySelection;
   const blockQuarantineRuntime = globalThis.__gloshDagVideoBlockQuarantine;
   const safeSkipRuntime = globalThis.__gloshDagVideoSafeSkip;
+  const eventRuntime = globalThis.__gloshDagVideoLabEvents;
+  const configurationRuntime = globalThis.__gloshDagVideoLabConfiguration;
   if (
     protocol === undefined ||
     diagnosticLabels === undefined ||
@@ -50,7 +52,8 @@
     sourceBootstrapRuntime === undefined ||
     authoritySelectionRuntime === undefined ||
     blockQuarantineRuntime === undefined ||
-    safeSkipRuntime === undefined
+    safeSkipRuntime === undefined ||
+    (eventRuntime === undefined || configurationRuntime === undefined)
   ) return;
   const {
     fixtureAttribute: INTERNAL_FIXTURE_ATTRIBUTE,
@@ -251,38 +254,20 @@
         }
       }
     };
-    const remote = video.remote;
-    video.addEventListener("play", keepMuted);
-    for (const type of ["play", "playing", "pause", "abort", "emptied", "waiting", "stalled"]) {
-      video.addEventListener(type, reportPlaybackEvent);
-    }
-    for (const type of ["loadstart", "durationchange", "loadedmetadata", "canplay"]) {
-      video.addEventListener(type, reportBackingEvent);
-    }
-    video.addEventListener("volumechange", keepMuted);
-    video.addEventListener("seeking", () => {
-      if (safeSkipController?.onSeeking(record) !== true) seekController?.onSeeking(record);
+    eventRuntime.bindRecord({
+      video,
+      keepMuted,
+      reportPlaybackEvent,
+      reportBackingEvent,
+      onSeeking: () => {
+        if (safeSkipController?.onSeeking(record) !== true) seekController?.onSeeking(record);
+      },
+      onSeeked: () => {
+        if (safeSkipController?.onSeeked(record) !== true) seekController?.onSeeked(record);
+      },
+      onUnsafePresentation: closeUnsafePresentation,
+      onGenerationChanged: () => blockQuarantine.noteGeneration(video),
     });
-    video.addEventListener("seeked", () => {
-      if (safeSkipController?.onSeeked(record) !== true) seekController?.onSeeked(record);
-    });
-    video.addEventListener("enterpictureinpicture", closeUnsafePresentation);
-    video.addEventListener("leavepictureinpicture", closeUnsafePresentation);
-    video.addEventListener("webkitbeginfullscreen", closeUnsafePresentation);
-    video.addEventListener("webkitendfullscreen", closeUnsafePresentation);
-    video.addEventListener("webkitpresentationmodechanged", closeUnsafePresentation);
-    video.addEventListener(
-      "webkitcurrentplaybacktargetiswirelesschanged",
-      closeUnsafePresentation,
-    );
-    video.addEventListener("emptied", () => blockQuarantine.noteGeneration(video));
-    video.addEventListener("emptied", closeUnsafePresentation);
-    video.addEventListener("error", closeUnsafePresentation);
-    if (typeof remote?.addEventListener === "function") {
-      remote.addEventListener("connecting", closeUnsafePresentation);
-      remote.addEventListener("connect", closeUnsafePresentation);
-      remote.addEventListener("disconnect", closeUnsafePresentation);
-    }
     records.set(video, record);
     return record;
   };
@@ -726,44 +711,31 @@
       protocolVersion = configuration.protocolVersion;
       documentToken = configuration.documentToken;
       postToAndroid = configuration.postToAndroid;
-      mutationObserver.observe(document, {
-        attributes: true,
-        attributeFilter: [
-          "src",
-          "type",
-          "disablepictureinpicture",
-          "disableremoteplayback",
-          "playsinline",
-        ],
-        attributeOldValue: true,
-        childList: true,
-        subtree: true,
-      });
-      document.addEventListener("play", stopUnauthorizedPlayback, true);
-      document.addEventListener("volumechange", stopUnauthorizedPlayback, true);
-      for (const type of ["loadstart", "durationchange", "loadedmetadata", "canplay"]) {
-        document.addEventListener(type, scheduleScan, true);
-        document.addEventListener(type, (event) => {
+      eventRuntime.installDocument({
+        documentObject: document,
+        windowObject: globalThis,
+        VideoElement: globalThis.HTMLVideoElement ?? null,
+        mutationObserver,
+        stopUnauthorizedPlayback,
+        scheduleScan,
+        onBackingEvent: (type, video) => {
           postTimeline(`timeline_event_${type}`);
-          if (event.target instanceof HTMLVideoElement) {
-            if (type === "loadstart") blockQuarantine.noteGeneration(event.target);
-            reportBackingTransition(event.target);
+          if (type === "loadstart") blockQuarantine.noteGeneration(video);
+          reportBackingTransition(video);
+        },
+        invalidateForViewport,
+        onPageHide: () => {
+          authoritySelection.cancel();
+          void retireRecord(activeRecord, "document_retired");
+        },
+        onFullscreen: () => {
+          if (document.fullscreenElement !== null) {
+            void document.exitFullscreen?.().catch(() => {});
+            void retireRecord(activeRecord, "fullscreen_requested");
           }
-        }, true);
-      }
-      addEventListener("scroll", invalidateForViewport, { passive: true });
-      addEventListener("resize", invalidateForViewport, { passive: true });
-      addEventListener("pagehide", () => {
-        authoritySelection.cancel();
-        void retireRecord(activeRecord, "document_retired");
+        },
+        onFullscreenError: () => void retireRecord(activeRecord, "fullscreen_error"),
       });
-      addEventListener("fullscreenchange", () => {
-        if (document.fullscreenElement !== null) {
-          void document.exitFullscreen?.().catch(() => {});
-          void retireRecord(activeRecord, "fullscreen_requested");
-        }
-      });
-      addEventListener("fullscreenerror", () => void retireRecord(activeRecord, "fullscreen_error"));
       if (pendingConfiguration?.version === protocolVersion) {
         diagnosticsEnabled = pendingConfiguration.diagnostics;
         fixtureEnabled = pendingConfiguration.fixture;
@@ -776,12 +748,7 @@
     },
     onNativeMessage(message) {
       if (message?.type === CONFIG_MESSAGE) {
-        const configuration = {
-          version: message.version,
-          diagnostics: message.diagnostics === true,
-          enabled: message.enabled === true,
-          fixture: message.fixture === true,
-        };
+        const configuration = configurationRuntime.parse(message);
         if (!installed) {
           pendingConfiguration = configuration;
           return;

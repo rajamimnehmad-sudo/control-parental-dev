@@ -13,6 +13,7 @@ class MediaBarrierContractTest {
     private val barrier by lazy { extensionRoot.resolve("barrier.js").readText() }
     private val videoProtocol by lazy { extensionRoot.resolve("video-protection-protocol.js").readText() }
     private val videoLab by lazy { extensionRoot.resolve("video-lab.js").readText() }
+    private val videoEvents by lazy { extensionRoot.resolve("video-lab-events.js").readText() }
     private val videoPresentation by lazy { extensionRoot.resolve("video-lab-presentation.js").readText() }
     private val videoRecord by lazy { extensionRoot.resolve("video-lab-record.js").readText() }
     private val videoIsolation by lazy { extensionRoot.resolve("video-lab-isolation.js").readText() }
@@ -37,7 +38,7 @@ class MediaBarrierContractTest {
         assertContains(manifest, "\"all_frames\": true")
         assertContains(manifest, "\"css_origin\": \"user\"")
         assertContains(manifest, "\"nativeMessaging\"")
-        assertContains(manifest, "\"version\": \"2.0.57\"")
+        assertContains(manifest, "\"version\": \"2.0.58\"")
         assertContains(manifest, "\"world\": \"MAIN\"")
         assertContains(manifest, "\"runaway-scheduler-guard.js\"")
         assertContains(manifest, "\"presentation-guard.js\"")
@@ -398,7 +399,7 @@ class MediaBarrierContractTest {
         assertContains(activity, "handleVideoLabSmoothStart")
         assertContains(videoCapture, "record.video.muted = true")
         assertContains(videoCapture, "record.video.volume = 0")
-        assertContains(videoLab, "video.addEventListener(\"volumechange\", keepMuted)")
+        assertContains(videoEvents, "video.addEventListener(\"volumechange\", keepMuted)")
         assertContains(
             videoCapture,
             "dependencies.document.documentElement.hasAttribute(dependencies.fixtureAttribute)",
